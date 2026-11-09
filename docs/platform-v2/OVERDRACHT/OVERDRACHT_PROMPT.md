@@ -78,6 +78,11 @@ Repo-indeling (vast besluit):
   latest-tags (base images op @sha256), boiler nooit schakelen, geen betaalde API-overage; deterministische policy, executor
   controleert handtekening/nonce/vervaltijd/allowlist/policy-hash zelf opnieuw.
 - Echte NAS-, hardware- en accounttests kunnen hier niet: NIET GEVALIDEERD / Geblokkeerd. Nooit doen alsof ze geslaagd zijn.
+- **HARDE EIS van de gebruiker (2026-11-09):** alle kijkgeschiedenis (gezien-status, hervatpunten, favorieten, beoordelingen,
+  onthouden spoorkeuzes, gebruikers, rechten) en de MediaGuard-voortgang blijven altijd beschikbaar; geen cutover zonder
+  vóór/na-rapport per gebruiker en akkoord op elk verschil; de bestaande installatie blijft als terugval. De huidige
+  mediaserver is **Emby**; de overname daarvandaan (B03-015, JLT-70…74) is P0; Emby verwijdert de gebruiker zelf na de
+  controlelijst (ADR-0020). Genomen en open B03-besluiten: `02_BOUWPLANNEN/B03_BESLUITEN.md`.
 - Git: branch `ccr-c133d7a0-kuz1cv` in elke repo, NL-commitberichten, geen force-push, geen geheimen, geen modelnaam in
   commits/code. Sluit commits af met de attributieregels die jouw sessie voorschrijft.
 
@@ -109,9 +114,26 @@ Repo-indeling (vast besluit):
 - **P2:** B02, B01-003/007/008/009, B11, B12-004…007, B08-003/004, executor + koppelen, manifest I10.
 - **P3:** hiaten B04/B05/B06 (incl. my_house als alles-in-één Custom App en herstelprocedures zonder terminal), Hub-adapters
   MediaGuard/MSO/my_house op hun bestaande routes, B14, B01-011, manifests I03/I04/I05/I15–I20.
-- **P4:** B03 in jelly-leon, jelly-leon-web, jelly-leon-clients (plugins vóór core-patches), manifests I06/I22/I24.
-- **P5:** B10, B07, B15, B08-005/006, B01-010/012, B02-009, manifests I11/I12/I14/I21/I25/I26 + lokale modellen.
-- **P6:** integrale E2E EX01–EX50, regressie, documentatie, Excel bijwerken, eindreview.
+- **P4-0 (nieuw, vóór P4):** upgrade jelly-leon + jelly-leon-web naar de nieuwste stabiele Jellyfin 12.x (ADR-0011 in
+  jelly-leon; B03-014), overname vanuit de bestaande mediaserver — **Emby**, en Jellyfin als D07 dat meet — met een
+  vóór/na-rapport per gebruiker en akkoord van de gebruiker op elk verschil (B03-015; HARDE EIS, ADR-0020), definitieve
+  stock-baselines op dezelfde 12.x-digest (B03-016), register `UPSTREAM_GEDRAG.md` (B03-019). Exitcriterium: Δ-MG-AUTH per
+  server en Δ-MG-DUAL in media-guard-ultimate; zonder Δ-MG-AUTH geen B03-batch op de NAS. Golf 0 (corpus, harnas,
+  voormetingen tegen stock 12.4 en — met voorrang, P0 van de gebruiker — de Emby-overname-proefrun JLT-70…73 met een echte
+  Emby-container) mag al parallel aan P0–P3. Plan: `02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md`, `B03_FASERING.md`,
+  `B03_BESLUITEN.md`.
+- **P4:** B03 in jelly-leon, jelly-leon-web, jelly-leon-clients (plugins vóór core-patches), in golven: golf 1
+  gemeenschappelijke basis (één plugin met modules, connector/Hub-pin JL4, foutcatalogus, MediaGuard-viewerclient,
+  analysewerker, globale planner, belastingtest; B03-009/010/017/018); golf 2–4 de zes functies F1–F6 (Watch Together,
+  aanbevelingen, ondertitels klassiek, kwaliteitscontrole, apparaatprofielen, intro/outro/recap; B03-004/005/007 en
+  B03-020…079 zonder de P5-rijen); patches en Hub-kaarten in golf 4; manifests I06/I22/I24. Ontwerpstap en -review
+  alleen voor de Hub-kaarten (Jelly Leon zelf valt buiten de ontwerptaal).
+- **P5:** B10, B07, B15, B08-005/006, B01-010/012, B02-009, manifests I11/I12/I14/I21/I25/I26 + lokale modellen, **plus de
+  P5-delen van B03** (B03-038, B03-044…046, B03-048, B03-049-rest, B03-059, B03-079) met één producent per modelsoort
+  (Δ-CONTRACT-MODEL, Δ-CONTRACT-MT); alles optioneel en standaard uit.
+- **P6:** integrale E2E EX01–EX50, regressie, documentatie, Excel bijwerken, eindreview; plus de NAS-testrijen van B03
+  (JLT-06/15/26/39/49/59/69/74), de echte overname vanuit Emby met laatste delta en akkoord (B03-015), de terugzetproef
+  B03-013 en de controlelijst "Emby verwijderen" (de gebruiker verwijdert Emby zelf, APP-02/I26-26-02).
 
 Na elke fase: alle repos schoon en gepusht, Excel bijwerken en committen in ai-server-manager, korte statusmelding aan de
 gebruiker met wat NIET GEVALIDEERD/Geblokkeerd is en welke menselijke input nodig is.
