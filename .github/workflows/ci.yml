@@ -59,7 +59,9 @@ jobs:
           python -m hub migrate
           python -m hub migrate --check
           python -m hub migrate --down base
-          ! python -m hub migrate --check
+          if python -m hub migrate --check; then
+            echo "FOUT: na downgrade naar base meldt migrate --check ten onrechte 'actueel'" >&2; exit 1
+          fi
           python -m hub migrate
           (cd apps/api && alembic -c alembic.ini check)
       - name: OpenAPI-drift

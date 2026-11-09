@@ -46,6 +46,18 @@ expect "enroll-schema 1.2: oud verzoek → 422" "$(curl -sS --noproxy '*' -H 'co
 expect "sleutelrotaties: lege lijst" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/key-rotations)" '"items":[]'
 test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' \
   -d '{"action_id":"app.restart"}' http://127.0.0.1:30410/api/v1/execute)" = 403
+# Contract 1.2 §5: > 1 MiB → 413 vóór routering en aanmelding, ook chunked (zonder Content-Length). Hub via de webpoort
+# (Node-doorgang → API), executor rechtstreeks; beide op een route zonder aanmelding.
+big413() {  # big413 <url> → HTTP-status van een chunked POST van 1 MiB + 1 byte
+  head -c 1048577 /dev/zero | curl -sS --noproxy '*' -o "$WORK/413.json" -w '%{http_code}' -X POST \
+    -H 'Transfer-Encoding: chunked' -H 'content-type: application/json' --data-binary @- "$1" || true
+}
+for url in http://127.0.0.1:30400/api/v1/services/00000000-0000-4000-8000-000000000000/rotate \
+           http://127.0.0.1:30410/connector/v1/hub-link/unlink; do
+  code="$(big413 "$url")"
+  test "$code" = 413 || { echo "FOUT: chunked > 1 MiB naar $url gaf $code i.p.v. 413" >&2; exit 1; }
+  expect "413 chunked ($url)" "$(cat "$WORK/413.json")" '"max_bytes":1048576'
+done
 # Geen root-processen meer en de AI-runner als aparte gebruiker:
 uids="$(docker exec -u 568 asm-smoke-hub sh -c 'for p in /proc/[0-9]*; do awk "/^Uid:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' ')"
 echo "uid's in de Hub-container: $uids"
