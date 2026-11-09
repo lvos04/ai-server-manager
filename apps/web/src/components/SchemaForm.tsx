@@ -1,6 +1,8 @@
 "use client";
 
+import { OctagonX } from "lucide-react";
 import { emptyDraft, setAt, type Draft, type Errors, type FieldNode } from "@/lib/schema-form";
+import { Button } from "@/components/ui/button";
 
 type Path = (string | number)[];
 
@@ -42,8 +44,9 @@ function Help({ id, text }: { id: string; text?: string }) {
 
 function ErrorText({ id, text }: { id: string; text?: string }) {
   return text ? (
-    <p className="error" id={`${id}-fout`}>
-      {text}
+    <p className="flex items-start gap-1.5 text-sm font-semibold text-down-ink" id={`${id}-fout`}>
+      <OctagonX aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-down" />
+      <span>{text}</span>
     </p>
   ) : null;
 }
@@ -133,25 +136,24 @@ function FieldView({
                   update={update}
                   itemLabel={`${label} ${i + 1}`}
                 />
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  disabled={disabled}
+                <Button
+                 
+                  variant="gevaar"
+                  uit={disabled}
                   onClick={() => update(path, items.filter((_, j) => j !== i))}
                 >
                   Verwijder<span className="sr-only">{` ${label} ${i + 1}`}</span>
-                </button>
+                </Button>
               </div>
             ))}
             <div className="row">
-              <button
-                type="button"
-                className="btn"
-                disabled={disabled || full}
+              <Button
+                variant="secundair"
+                uit={disabled || full}
                 onClick={() => update(path, [...items, emptyDraft(node.item)])}
               >
                 {`Toevoegen: ${label.toLowerCase()}`}
-              </button>
+              </Button>
             </div>
             <ErrorText id={id} text={error} />
           </div>

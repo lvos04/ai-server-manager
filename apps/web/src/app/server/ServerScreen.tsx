@@ -4,10 +4,11 @@ import Link from "next/link";
 import { KindSection } from "@/components/KindSection";
 import { PageHeader } from "@/components/PageHeader";
 import { RefreshInventory } from "@/components/RefreshInventory";
-import { StatusBadge } from "@/components/StatusBadge";
+import { ErnstLabel, StatusBadge } from "@/components/StatusBadge";
+import { SERVER_SUBNAV, Subnav } from "@/components/Subnav";
 import { TableWrap } from "@/components/TableWrap";
 import { formatBytes, formatDateTime, formatDuration, formatPercent, orUnknown } from "@/lib/format";
-import { alertTone, gpuLabel } from "@/lib/home";
+import { alertErnst, gpuLabel } from "@/lib/home";
 import { appState, kindStatus, poolHealth } from "@/lib/status";
 import type {
   AlertInfo,
@@ -25,6 +26,7 @@ import { useApi } from "@/lib/use-api";
 
 const KIND_LABEL: Record<string, string> = {
   apps: "Apps",
+  images: "Images",
   pools: "Pools",
   datasets: "Datasets",
   gpus: "GPU's",
@@ -78,7 +80,8 @@ export function ServerScreen() {
         title="Server"
         intro="Inventaris van je TrueNAS, alleen-lezen: de Hub wijzigt hier niets op de NAS. Onbekend of verouderd staat er ook zo."
       />
-      <nav className="toc" aria-label="Onderdelen van de inventaris">
+      <Subnav items={SERVER_SUBNAV} label="Server" />
+      <nav className="toc mb-4" aria-label="Onderdelen van de inventaris">
         <a href="#overzicht">Overzicht</a>
         <a href="#systeem">Systeem</a>
         <a href="#pools">Pools</a>
@@ -134,7 +137,7 @@ export function ServerScreen() {
                       <tr key={k.kind}>
                         <td>{KIND_LABEL[k.kind] ?? k.kind}</td>
                         <td>
-                          <StatusBadge view={kindStatus(k.status, k.verouderd)} />
+                          {kindStatus(k.status, k.verouderd) ? <StatusBadge view={kindStatus(k.status, k.verouderd)!} /> : <span className="text-sm">Vers</span>}
                           {k.status !== "ok" && k.reason_code ? <div className="meta">{k.reason_code}</div> : null}
                         </td>
                         <td>{k.aantal ?? "—"}</td>
@@ -256,7 +259,7 @@ export function ServerScreen() {
             <>
               <ul className="plain-list">
                 {apps.data.items.map((a) => (
-                  <li key={a.naam} className="row" style={{ justifyContent: "space-between" }}>
+                  <li key={a.naam} className="flex flex-wrap items-center justify-between gap-2">
                     <span>
                       <strong>{a.naam}</strong>{" "}
                       <span className="meta">{a.images[0] ? <code>{a.images[0].image}</code> : "image onbekend"}</span>
@@ -356,7 +359,7 @@ export function ServerScreen() {
           {alerts.data?.items?.length ? (
             <ul className="plain-list">
               {alerts.data.items.map((al) => (
-                <li key={al.uuid} className="row" style={{ justifyContent: "space-between" }}>
+                <li key={al.uuid} className="flex flex-wrap items-center justify-between gap-2">
                   <span>
                     {al.tekst}
                     <br />
@@ -365,7 +368,7 @@ export function ServerScreen() {
                       {al.genegeerd ? " · genegeerd in TrueNAS" : ""}
                     </span>
                   </span>
-                  <StatusBadge view={{ tone: alertTone(al.niveau), label: orUnknown(al.niveau) }} />
+                  <ErnstLabel ernst={alertErnst(al.niveau)} />
                 </li>
               ))}
             </ul>

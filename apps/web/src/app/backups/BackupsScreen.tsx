@@ -87,7 +87,7 @@ export function BackupsScreen() {
                       <br />
                       <span className="meta">{b.observed_at ? `gemeten ${formatDateTime(b.observed_at)}` : "nooit gemeten"}</span>
                     </span>
-                    <StatusBadge view={kindStatus(b.status, b.verouderd)} />
+                    {kindStatus(b.status, b.verouderd) ? <StatusBadge view={kindStatus(b.status, b.verouderd)!} /> : <span className="text-sm">Vers</span>}
                   </li>
                 ))}
               </ul>
@@ -132,7 +132,7 @@ export function BackupsScreen() {
                           <StatusBadge view={testResult(a.laatste_hersteltest?.resultaat)} />
                           {a.laatste_hersteltest ? <div className="meta">{formatDateTime(a.laatste_hersteltest.uitgevoerd_op)}</div> : null}
                         </td>
-                        <td>{a.volledige_appbackup ? <StatusBadge view={{ tone: "ok", label: "Ja" }} /> : <StatusBadge view={{ tone: "bad", label: "Nee" }} />}</td>
+                        <td>{a.volledige_appbackup ? <StatusBadge view={{ tone: "neutral", label: "Ja", icon: "geslaagd" }} /> : <StatusBadge view={{ tone: "neutral", label: "Nee", icon: "min" }} />}</td>
                         <td>
                           {a.rpo_rto.bron ? (
                             <>
@@ -209,13 +209,13 @@ export function BackupsScreen() {
           {self.data ? (
             self.data.laatste_geverifieerd ? (
               <p>
-                <StatusBadge view={{ tone: "ok", label: "Geverifieerd" }} /> Laatste geverifieerde export (pg_dump + SHA-256 + pg_restore --list):{" "}
+                <StatusBadge view={{ tone: "neutral", label: "Geverifieerd", icon: "geslaagd" }} /> Laatste geverifieerde export (pg_dump + SHA-256 + pg_restore --list):{" "}
                 {formatDateTime(self.data.laatste_geverifieerd.beeindigd_op)}
                 {self.data.laatste_geverifieerd.inhoudsopgave_items ? ` (${self.data.laatste_geverifieerd.inhoudsopgave_items} items)` : ""}.
               </p>
             ) : (
               <p>
-                <StatusBadge view={{ tone: "bad", label: "Ontbreekt" }} /> Er is nog geen geverifieerde export van de Hub-database. De worker maakt die
+                <StatusBadge view={{ tone: "unknown", label: "Ontbreekt" }} /> Er is nog geen geverifieerde export van de Hub-database. De worker maakt die
                 dagelijks; een export telt pas als geslaagd na controle van checksum en inhoudsopgave.
               </p>
             )

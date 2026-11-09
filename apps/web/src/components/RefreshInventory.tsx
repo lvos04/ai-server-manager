@@ -6,6 +6,7 @@ import { hasRole, useRole } from "@/lib/session";
 import type { Job } from "@/lib/types";
 import { waitForJob } from "@/lib/use-api";
 import { ErrorPanel } from "./ErrorPanel";
+import { Button } from "@/components/ui/button";
 
 /** Inventaris vernieuwen (alleen-lezen op de NAS). Operator of hoger. */
 export function RefreshInventory({ onDone }: { onDone: () => void }) {
@@ -40,9 +41,9 @@ export function RefreshInventory({ onDone }: { onDone: () => void }) {
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="row">
-        <button type="button" className="btn btn-primary" onClick={() => void run()} disabled={busy} data-testid="inventaris-vernieuwen">
+        <Button variant="primair" onClick={() => void run()} bezig={busy} data-testid="inventaris-vernieuwen">
           {busy ? "Bezig met vernieuwen…" : "Inventaris vernieuwen"}
-        </button>
+        </Button>
       </div>
       <p role="status" aria-live="polite" className="meta" data-testid="vernieuwen-status">
         {msg ?? ""}

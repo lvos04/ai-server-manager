@@ -21,6 +21,16 @@ export function formatDateTime(iso: string | null | undefined): string {
   return d ? dateTimeFmt.format(d) : "onbekend";
 }
 
+const timeFmt = new Intl.DateTimeFormat("nl-NL", { hour: "2-digit", minute: "2-digit" });
+
+/** "11:56" als het vandaag is, anders "8 nov 2026, 22:10" (ONTWERPTAAL §11 notatie). */
+export function formatTime(iso: string | null | undefined, now: Date = new Date()): string {
+  const d = parseIso(iso);
+  if (!d) return "onbekend";
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  return sameDay ? timeFmt.format(d) : dateTimeFmt.format(d);
+}
+
 export function formatDate(iso: string | null | undefined): string {
   const d = parseIso(iso);
   return d ? dateFmt.format(d) : "onbekend";

@@ -17,6 +17,8 @@ import { hasRole, useRole } from "@/lib/session";
 import { decisionStatus, measurementStatus, testResult } from "@/lib/status";
 import type { Decision, Measurement } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Melding } from "@/components/Melding";
 
 const BRON: Record<string, string> = { gebruiker: "ingevuld door de gebruiker", meting: "gemeten via TrueNAS", vast: "vast besluit" };
 
@@ -103,16 +105,16 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
         actions={<StatusBadge view={decisionStatus(d.status)} testId="besluit-status" />}
       />
       <nav className="row" aria-label="Besluiten" style={{ marginBottom: 16 }}>
-        <Link className="btn" href="/onboarding">
+        <Link className={buttonVariants({ variant: "secundair" })} href="/onboarding">
           ← Overzicht
         </Link>
         {prev ? (
-          <Link className="btn" href={`/onboarding/besluit/${prev}`}>
+          <Link className={buttonVariants({ variant: "secundair" })} href={`/onboarding/besluit/${prev}`}>
             Vorige ({prev})
           </Link>
         ) : null}
         {next ? (
-          <Link className="btn" href={`/onboarding/besluit/${next}`}>
+          <Link className={buttonVariants({ variant: "secundair" })} href={`/onboarding/besluit/${next}`}>
             Volgende ({next})
           </Link>
         ) : null}
@@ -157,7 +159,7 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
               <strong>Reden ({d.status}):</strong> {d.reden}
             </p>
           ) : null}
-          {d.vast ? <p className="notice tone-info">Dit is een vast besluit van de gebruiker en kan hier niet worden gewijzigd.</p> : null}
+          {d.vast ? <Melding soort="info"><p>Dit is een vast besluit van de gebruiker en kan hier niet worden gewijzigd.</p></Melding> : null}
         </section>
 
         {d.meetbaar ? (
@@ -166,9 +168,9 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
             <p>De Hub leest dit besluit uit de TrueNAS-API met de alleen-lezen-key. Een geslaagde meting zet het besluit op Getest, met bewijs.</p>
             {isOperator ? (
               <div className="row">
-                <button type="button" className="btn btn-primary" onClick={() => void runMeasure()} disabled={busy !== null} data-testid="meten">
+                <Button variant="primair" onClick={() => void runMeasure()} bezig={busy !== null} data-testid="meten">
                   {busy === "meten" ? "Bezig met meten…" : "Meten via TrueNAS"}
-                </button>
+                </Button>
                 <Link href="/onboarding/truenas">TrueNAS-koppeling</Link>
               </div>
             ) : (
@@ -176,7 +178,7 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
             )}
             {measureError ? <ErrorPanel error={measureError} title="Meten mislukt" /> : null}
             {lastMeasure ? (
-              <div className={`notice tone-${measurementStatus(lastMeasure.status).tone}`} role="status" data-testid="meting-resultaat">
+              <div className="flex flex-col gap-2 rounded-lg border-2 border-border-strong bg-card p-4" role="status" data-testid="meting-resultaat">
                 <p>
                   <StatusBadge view={measurementStatus(lastMeasure.status)} /> {lastMeasure.melding}
                 </p>
@@ -198,7 +200,7 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
             <h2 id="invullen">{d.waarde ? "Waarde wijzigen" : "Invullen"}</h2>
             {!editable ? <p className="meta">Invullen kan alleen een beheerder.</p> : null}
             {d.status === "Getest" && editable ? (
-              <p className="notice tone-warn">Let op: wijzigen zet het besluit terug op Ingevuld; de test hoorde bij de oude waarde.</p>
+              <Melding soort="info"><p>Let op: wijzigen zet het besluit terug op Ingevuld; de test hoorde bij de oude waarde.</p></Melding>
             ) : null}
             <form className="form" onSubmit={(ev) => void save(ev)} noValidate>
               <SchemaForm node={node} draft={draft} errors={errors} disabled={!editable || busy !== null} idPrefix={`w-${id}`} onChange={setDraft} />
@@ -208,9 +210,9 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
               </p>
               {editable ? (
                 <div className="row">
-                  <button type="submit" className="btn btn-primary" disabled={busy !== null} data-testid="opslaan">
+                  <Button type="submit" variant="primair" bezig={busy !== null} data-testid="opslaan">
                     {busy === "opslaan" ? "Opslaan…" : "Opslaan"}
-                  </button>
+                  </Button>
                 </div>
               ) : null}
             </form>
@@ -342,9 +344,9 @@ function EvidenceForm({ decision, onDone }: { decision: Decision; onDone: () => 
             {ok ?? ""}
           </p>
           <div className="row">
-            <button type="submit" className="btn" disabled={busy}>
+            <Button type="submit" variant="secundair" bezig={busy}>
               {busy ? "Bezig…" : "Bewijs vastleggen"}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -407,9 +409,9 @@ function StatusForm({ decision, etag, onDone }: { decision: Decision; etag: stri
         ) : null}
         {error ? <ErrorPanel error={error} title="Status wijzigen mislukt" /> : null}
         <div className="row">
-          <button type="submit" className="btn" disabled={busy}>
+          <Button type="submit" variant="secundair" bezig={busy}>
             {busy ? "Bezig…" : "Status wijzigen"}
-          </button>
+          </Button>
         </div>
       </form>
     </section>

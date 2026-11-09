@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { activeDesktopHref, activeMobileHref, DESKTOP_NAV, isActive, MOBILE_NAV, MORE_LINKS, PLANNED, safeReturnPath } from "@/lib/nav";
-import { appState, coverageStatus, decisionStatus, gateStatus, kindStatus, measurementStatus, poolHealth, testResult, worstTone } from "@/lib/status";
+import { activeDesktopHref, activeMobileHref, DESKTOP_NAV, isActive, isKindPath, KIND_NAV, MOBILE_NAV, MORE_LINKS, PLANNED, PRODUCT, PUBLIC_PATHS, safeReturnPath } from "@/lib/nav";
+import {
+  appState,
+  coverageStatus,
+  decisionStatus,
+  ernstVan,
+  gateStatus,
+  healthView,
+  kindStatus,
+  measurementStatus,
+  poolHealth,
+  testResult,
+  TOTAAL_LABEL,
+  worstTone,
+  zekerheidVan,
+  ZEKERHEID_LABEL,
+} from "@/lib/status";
 
 describe("navigatie exact volgens 08_UI", () => {
   it("mobiel: Home, Apps, Problemen, AI, Meer", () => {
@@ -31,8 +46,16 @@ describe("navigatie exact volgens 08_UI", () => {
     expect(activeDesktopHref("/problemen")).toBeNull();
   });
 
-  it("latere fasen volgens 06_FASERING", () => {
-    expect(PLANNED.problemen?.fase).toBe("P1");
+  it("kindschil: Home · Kijken · Zoeken · Ik (O-05); productnaam (O-07); noodlogin publiek", () => {
+    expect(KIND_NAV.map((i) => i.label)).toEqual(["Home", "Kijken", "Zoeken", "Ik"]);
+    expect(isKindPath("/kijken")).toBe(true);
+    expect(isKindPath("/server")).toBe(false);
+    expect(PRODUCT).toBe("TrueNAS Home Platform");
+    expect(PUBLIC_PATHS).toContain("/inloggen/nood");
+  });
+
+  it("latere fasen volgens 06_FASERING (Problemen is in P1 echt)", () => {
+    expect(PLANNED.problemen).toBeUndefined();
     expect(PLANNED.ai?.fase).toBe("P2");
     expect(PLANNED.automatisering?.fase).toBe("P2");
     expect(PLANNED.huis?.fase).toBe("P3");
@@ -50,45 +73,80 @@ describe("navigatie exact volgens 08_UI", () => {
   });
 });
 
-describe("statussen: onbekend is nooit groen", () => {
-  it("inventaris", () => {
-    expect(kindStatus("ok").tone).toBe("ok");
-    expect(kindStatus("ok", true).tone).toBe("unknown");
-    expect(kindStatus("unknown").tone).toBe("unknown");
-    expect(kindStatus(undefined).tone).toBe("unknown");
+describe("statussen in Peil: groen alleen voor gemeten en goed", () => {
+  it("inventaris: vers = geen badge, verouderd = Verouderd, anders Onbekend", () => {
+    expect(kindStatus("ok")).toBeNull();
+    expect(kindStatus("ok", true)?.tone).toBe("stale");
+    expect(kindStatus("unknown")?.tone).toBe("unknown");
+    expect(kindStatus(undefined)?.label).toBe("Onbekend");
   });
 
-  it("pool alleen gezond als vers gemeten", () => {
-    expect(poolHealth(true, true).tone).toBe("ok");
+  it("pool: alleen gezond als vers gemeten; DEGRADED = Beperkt; FAULTED = Storing", () => {
+    expect(poolHealth(true, true).tone).toBe("healthy");
     expect(poolHealth(true, false).tone).toBe("unknown");
-    expect(poolHealth(false, true).tone).toBe("bad");
+    expect(poolHealth(false, true)).toEqual({ tone: "down", label: "Storing" });
+    expect(poolHealth(true, true, "DEGRADED").label).toBe("Beperkt");
+    expect(poolHealth(false, true, "FAULTED").tone).toBe("down");
     expect(poolHealth(null, true).tone).toBe("unknown");
   });
 
-  it("‘draait’ volgens TrueNAS is geen gezond", () => {
-    expect(appState("draait").tone).toBe("info");
-    expect(appState("gecrasht").tone).toBe("bad");
+  it("‘Draait’ volgens TrueNAS is een neutrale pil, nooit gezond; gecrasht = Storing", () => {
+    expect(appState("draait")).toEqual({ tone: "neutral", label: "Draait", icon: "draait" });
+    expect(appState("RUNNING").tone).toBe("neutral");
+    expect(appState("gecrasht").tone).toBe("down");
     expect(appState("iets").tone).toBe("unknown");
   });
 
-  it("besluiten, gates, dekking, metingen en hersteltests", () => {
-    expect(decisionStatus("Getest").tone).toBe("ok");
-    expect(decisionStatus("Ingevuld").tone).toBe("info");
-    expect(decisionStatus("N.v.t.").tone).toBe("neutral");
-    expect(gateStatus("toegestaan").tone).toBe("ok");
+  it("besluiten en gates zijn nooit rood of groen; open is geen storing", () => {
+    for (const st of ["Open", "Ingevuld", "Getest", "N.v.t."]) expect(decisionStatus(st).tone).toBe("neutral");
+    expect(decisionStatus("Geblokkeerd").tone).toBe("gate");
+    expect(gateStatus("toegestaan").tone).toBe("neutral");
+    expect(gateStatus("geblokkeerd").tone).toBe("gate");
     expect(gateStatus("unknown").tone).toBe("unknown");
-    expect(coverageStatus("gedekt").tone).toBe("ok");
-    expect(coverageStatus("binnen").tone).toBe("ok");
-    expect(coverageStatus("overschreden").tone).toBe("bad");
+  });
+
+  it("dekking, metingen en hersteltests: geslaagd is neutraal, gemeten falen is Storing/Beperkt", () => {
+    expect(coverageStatus("gedekt").tone).toBe("neutral");
+    expect(coverageStatus("overschreden").tone).toBe("degraded");
+    expect(coverageStatus("verouderd").tone).toBe("stale");
     expect(coverageStatus("unknown").tone).toBe("unknown");
+    expect(measurementStatus("geslaagd").tone).toBe("neutral");
     expect(measurementStatus("voorstel").tone).toBe("info");
+    expect(measurementStatus("mislukt").tone).toBe("down");
+    expect(testResult("geslaagd").tone).toBe("neutral");
     expect(testResult(undefined).tone).toBe("unknown");
   });
 
-  it("slechtste toon wint; onbekend weegt zwaarder dan ok", () => {
-    expect(worstTone(["ok", "unknown"])).toBe("unknown");
-    expect(worstTone(["ok", "bad", "unknown"])).toBe("bad");
-    expect(worstTone(["ok", "ok"])).toBe("ok");
+  it("API-gezondheid: verouderd gaat altijd voor, onbekende waarden zijn Onbekend", () => {
+    expect(healthView("healthy").label).toBe("Gezond");
+    expect(healthView("healthy", true).tone).toBe("stale");
+    expect(healthView("degraded").label).toBe("Beperkt");
+    expect(healthView("down").label).toBe("Storing");
+    expect(healthView("iets").tone).toBe("unknown");
+  });
+
+  it("totaalstatus (OB-06): Storing > Beperkt > Deels onbekend > Alles gezond; neutraal telt niet mee", () => {
+    expect(worstTone(["healthy", "unknown"])).toBe("unknown");
+    expect(worstTone(["healthy", "unknown", "degraded"])).toBe("degraded");
+    expect(worstTone(["healthy", "down", "degraded"])).toBe("down");
+    expect(worstTone(["healthy", "stale"])).toBe("unknown");
+    expect(worstTone(["healthy", "neutral", "gate", "not_yet", "info"])).toBe("healthy");
+    expect(worstTone(["neutral"])).toBe("unknown");
     expect(worstTone([])).toBe("unknown");
+    expect(TOTAAL_LABEL.healthy).toBe("Alles gezond");
+    expect(TOTAAL_LABEL.unknown).toBe("Deels onbekend");
+  });
+
+  it("ernst (OB-05) en zekerheid als woord, nooit als percentage (OB-04)", () => {
+    expect(ernstVan("kritiek")).toBe("kritiek");
+    expect(ernstVan("waarschuwing")).toBe("middel");
+    expect(ernstVan("info")).toBe("info");
+    expect(zekerheidVan(0.9)).toBe("zeker");
+    expect(zekerheidVan(0.85)).toBe("zeker");
+    expect(zekerheidVan(0.6)).toBe("waarschijnlijk");
+    expect(zekerheidVan(0.5)).toBe("onzeker");
+    expect(zekerheidVan(null)).toBe("weet_niet");
+    expect(ZEKERHEID_LABEL.weet_niet).toBe("Ik weet het niet");
+    for (const w of Object.values(ZEKERHEID_LABEL)) expect(w).not.toMatch(/%/);
   });
 });

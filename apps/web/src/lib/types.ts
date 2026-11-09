@@ -8,6 +8,10 @@ export interface User {
   display_name: string;
   role: Role;
   disabled: boolean;
+  /** Noodaccount (contract 1.2 §4.1). */
+  break_glass?: boolean;
+  /** Herkomst van de gebruiker: lokaal of oidc. */
+  auth_bron?: string;
   created_at: string | null;
   updated_at: string | null;
   version: number;

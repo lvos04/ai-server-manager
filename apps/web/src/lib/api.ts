@@ -89,7 +89,10 @@ export async function apiRequest<T>(path: string, opts: ApiOptions = {}): Promis
     }
   }
   if (!res.ok) {
-    if (res.status === 401 && typeof window !== "undefined" && !AUTH_PATHS.some((p) => path.startsWith(p))) {
+    // Alleen een verlopen/ontbrekende sessie (code "unauthorized") meldt de gebruiker af; een 401 met een inhoudelijke
+    // code (bv. invalid_totp bij het bevestigen van het noodaccount) is een veldfout, geen afmelding.
+    const sessionGone = isErrorBody(parsed) ? parsed.code === "unauthorized" : true;
+    if (res.status === 401 && sessionGone && typeof window !== "undefined" && !AUTH_PATHS.some((p) => path.startsWith(p))) {
       window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
     }
     if (isErrorBody(parsed)) {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { apiRequest, HubApiError, readCookie } from "@/lib/api";
+import { apiRequest, HubApiError, readCookie, UNAUTHORIZED_EVENT } from "@/lib/api";
 import { uuidv4 } from "@/lib/uuid";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -83,5 +83,26 @@ describe("apiRequest", () => {
     const res = await apiRequest("/api/v1/auth/logout", { method: "POST", fetchImpl: f as unknown as typeof fetch });
     expect(res.status).toBe(204);
     expect(res.data).toBeNull();
+  });
+});
+
+describe("401: alleen een verlopen sessie meldt af", () => {
+  it("code unauthorized → afmeld-event; invalid_totp (veldfout) → geen afmelding", async () => {
+    const seen: string[] = [];
+    const target = new EventTarget();
+    const g = globalThis as unknown as { window?: EventTarget };
+    const prev = g.window;
+    g.window = target;
+    target.addEventListener(UNAUTHORIZED_EVENT, () => seen.push("uit"));
+    try {
+      const reply = (code: string) =>
+        (async () => new Response(JSON.stringify({ code, message: "x", details: {}, trace_id: "t" }), { status: 401 })) as unknown as typeof fetch;
+      await expect(apiRequest("/api/v1/auth/break-glass/confirm", { method: "POST", body: {}, fetchImpl: reply("invalid_totp") })).rejects.toMatchObject({ code: "invalid_totp" });
+      expect(seen).toEqual([]);
+      await expect(apiRequest("/api/v1/inventory", { fetchImpl: reply("unauthorized") })).rejects.toMatchObject({ code: "unauthorized" });
+      expect(seen).toEqual(["uit"]);
+    } finally {
+      g.window = prev;
+    }
   });
 });

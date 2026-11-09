@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { SettingsScreen } from "./SettingsScreen";
+import { InstellingenIndex } from "./InstellingenIndex";
 
 export const metadata: Metadata = { title: "Instellingen" };
 
 export default function Page() {
-  return <SettingsScreen />;
+  return <InstellingenIndex />;
 }

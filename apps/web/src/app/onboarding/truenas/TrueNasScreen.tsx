@@ -16,6 +16,7 @@ import { decisionStatus, measurementStatus } from "@/lib/status";
 import type { Decision, Measurement, TrueNasStatus, TrueNasTest } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 import { truenasView } from "../OnboardingScreen";
+import { Button } from "@/components/ui/button";
 
 function asError(e: unknown): HubApiError {
   return e instanceof HubApiError ? e : new HubApiError(0, "onbekend", String(e));
@@ -91,15 +92,15 @@ export function TrueNasScreen() {
             ) : null}
             {isOperator ? (
               <div className="row">
-                <button
-                  type="button"
-                  className="btn btn-primary"
+                <Button
+                 
+                  variant="primair"
                   onClick={() => void runTest()}
-                  disabled={busy !== null || !c?.nas_url}
+                  uit={busy !== null || !c?.nas_url}
                   data-testid="verbinding-testen"
                 >
                   {busy === "test" ? "Bezig met testen…" : "Verbinding testen"}
-                </button>
+                </Button>
                 {!c?.nas_url ? <span className="meta">Vul eerst het NAS-adres in.</span> : null}
               </div>
             ) : (
@@ -242,9 +243,9 @@ function AddressStep({
           </Field>
           {saveError ? <ErrorPanel error={saveError} title="Opslaan mislukt" /> : null}
           <div className="row">
-            <button type="submit" className="btn btn-primary" disabled={busy} data-testid="adres-opslaan">
+            <Button type="submit" variant="primair" bezig={busy} data-testid="adres-opslaan">
               {busy ? "Opslaan…" : "Adres opslaan"}
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
@@ -283,10 +284,10 @@ function KeyStep({ status, canEdit, onSaved }: { status: TrueNasStatus | undefin
         <h2 id="stap-key" className="step-title">
           Alleen-lezen-gebruiker en API-key
         </h2>
-        <StatusBadge view={k?.ingesteld ? { tone: "info", label: `Ingesteld (…${k.laatste4 ?? "????"})` } : { tone: "warn", label: "Niet ingesteld" }} />
+        <StatusBadge view={k?.ingesteld ? { tone: "neutral", label: `Ingesteld (…${k.laatste4 ?? "????"})`, icon: "ingesteld" } : { tone: "neutral", label: "Niet ingesteld", icon: "open" }} />
       </div>
       <details>
-        <summary style={{ minHeight: 44, display: "flex", alignItems: "center", cursor: "pointer", fontWeight: 600 }}>
+        <summary className="flex min-h-touch cursor-pointer items-center font-semibold">
           Zo maak je in de TrueNAS-web-UI een alleen-lezen-gebruiker en API-key
         </summary>
         <ol className="howto">
@@ -332,9 +333,9 @@ function KeyStep({ status, canEdit, onSaved }: { status: TrueNasStatus | undefin
           </Field>
           {error ? <ErrorPanel error={error} title="Key opslaan mislukt" /> : null}
           <div className="row">
-            <button type="submit" className="btn btn-primary" disabled={busy} data-testid="key-opslaan">
+            <Button type="submit" variant="primair" bezig={busy} data-testid="key-opslaan">
               {busy ? "Opslaan…" : "Key opslaan"}
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
@@ -345,11 +346,20 @@ function KeyStep({ status, canEdit, onSaved }: { status: TrueNasStatus | undefin
 }
 
 function TestResult({ test }: { test: TrueNasTest }) {
-  const tone = test.verbonden ? "ok" : "bad";
+  // TestResultaat (C-58): een geslaagde test is neutraal (geen gezondheid); mislukt = gemeten falen.
   return (
-    <div className={`notice tone-${tone}`} role="status" data-testid="test-resultaat" data-reason={test.reason_code ?? "ok"}>
-      <p>
-        <StatusBadge view={test.verbonden ? { tone: "ok", label: "Verbonden" } : { tone: "bad", label: "Niet verbonden" }} /> {test.melding}
+    <div
+      className={
+        test.verbonden
+          ? "flex flex-col gap-2 rounded-lg border-2 border-border-strong bg-card p-4"
+          : "flex flex-col gap-2 rounded-lg border-2 border-down bg-down-bg p-4 text-down-ink"
+      }
+      role="status"
+      data-testid="test-resultaat"
+      data-reason={test.reason_code ?? "ok"}
+    >
+      <p className="flex flex-wrap items-center gap-2">
+        <StatusBadge view={test.verbonden ? { tone: "neutral", label: "Verbonden", icon: "geslaagd" } : { tone: "down", label: "Niet verbonden" }} /> {test.melding}
       </p>
       {test.advies ? <p>{test.advies}</p> : null}
       <dl className="kv">
@@ -374,7 +384,7 @@ function TestResult({ test }: { test: TrueNasTest }) {
       </dl>
       {test.capabilities ? (
         <details>
-          <summary style={{ minHeight: 44, display: "flex", alignItems: "center", cursor: "pointer" }}>Gevonden leesmethoden ({test.capabilities.bron})</summary>
+          <summary className="flex min-h-touch cursor-pointer items-center">Gevonden leesmethoden ({test.capabilities.bron})</summary>
           <ul>
             {Object.entries(test.capabilities.lezen).map(([k, v]) => (
               <li key={k}>
@@ -468,9 +478,9 @@ function TrustStep({
                 <span>Ik heb de vingerafdruk vergeleken en hij is exact gelijk.</span>
               </label>
               <div className="row">
-                <button type="button" className="btn btn-primary" disabled={!checked || busy} onClick={() => void trust()} data-testid="vingerafdruk-vertrouwen">
+                <Button variant="primair" uit={!checked || busy} onClick={() => void trust()} data-testid="vingerafdruk-vertrouwen">
                   {busy ? "Bezig…" : "Dit certificaat vertrouwen"}
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -486,9 +496,9 @@ function TrustStep({
           <p className="fingerprint">{pinned}</p>
           {canEdit ? (
             <div className="row">
-              <button type="button" className="btn btn-danger" disabled={busy} onClick={() => void untrust()}>
+              <Button variant="gevaar" bezig={busy} onClick={() => void untrust()}>
                 Vertrouwen intrekken
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -526,9 +536,9 @@ function QuickMeasure() {
               </span>
               <span className="row">
                 {r && !(r instanceof HubApiError) ? <StatusBadge view={measurementStatus(r.status)} /> : null}
-                <button type="button" className="btn" onClick={() => void run(q.id)} disabled={busy !== null} data-testid={`meet-${q.id}`}>
+                <Button variant="secundair" onClick={() => void run(q.id)} bezig={busy !== null} data-testid={`meet-${q.id}`}>
                   {busy === q.id ? "Meten…" : `Meet ${q.id}`}
-                </button>
+                </Button>
               </span>
             </li>
           );

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { HomeScreen } from "./HomeScreen";
+import { HomeOfKind } from "./HomeOfKind";
 
-export const metadata: Metadata = { title: "Home" };
+// De titelsjabloon uit layout.tsx geldt niet voor hetzelfde segment: daarom hier de volledige titel.
+export const metadata: Metadata = { title: { absolute: "Home — TrueNAS Home Platform" } };
 
 export default function Page() {
-  return <HomeScreen />;
+  return <HomeOfKind />;
 }

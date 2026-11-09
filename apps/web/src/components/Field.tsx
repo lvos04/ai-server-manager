@@ -1,3 +1,4 @@
+import { OctagonX } from "lucide-react";
 import type { ReactNode } from "react";
 
 /** Label + invoer + hulptekst + fout, met de juiste aria-koppelingen. */
@@ -25,8 +26,9 @@ export function Field({
         </p>
       ) : null}
       {error ? (
-        <p className="error" id={`${id}-fout`}>
-          {error}
+        <p className="flex items-start gap-1.5 text-sm font-semibold text-down-ink" id={`${id}-fout`}>
+          <OctagonX aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-down" />
+          <span>{error}</span>
         </p>
       ) : null}
     </div>

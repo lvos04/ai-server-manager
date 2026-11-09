@@ -1,44 +1,71 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatDateTime, formatRelative } from "@/lib/format";
+import { formatDateTime, formatRelative, formatTime } from "@/lib/format";
 
-/** "Laatst bijgewerkt" + bron: verplicht op elke kaart (contract §1). */
+/**
+ * Versheid (C-06): `dl` met Bron / Bijgewerkt (/ Geprobeerd). Geen badge en nooit groen. Relatieve tijd ververst elke
+ * minuut zonder live-aankondiging. "Nog nooit gemeten" als er geen waarneming is.
+ */
 export function Freshness({
   observedAt,
   bron,
   verouderd,
-  label = "Laatst bijgewerkt",
+  geprobeerd,
+  label = "Bijgewerkt",
+  extra,
 }: {
   observedAt: string | null | undefined;
   bron?: string | null;
   verouderd?: boolean;
+  geprobeerd?: { op: string | null | undefined; uitkomst: string } | null;
   label?: string;
+  extra?: [string, string][];
 }) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+  const now = useNow(60_000);
   return (
     <dl className="meta" data-testid="freshness">
       <div>
-        <dt>{label}: </dt>
+        <dt>Bron</dt>
+        <dd>{bron || "onbekend"}</dd>
+      </div>
+      <div>
+        <dt>{label}</dt>
         <dd>
           {observedAt ? (
             <time dateTime={observedAt} title={formatDateTime(observedAt)}>
-              {formatDateTime(observedAt)} ({formatRelative(observedAt, now)})
+              {formatTime(observedAt, now)} ({formatRelative(observedAt, now)})
             </time>
           ) : (
-            "nog nooit gemeten"
+            "Nog nooit gemeten"
           )}
-          {verouderd ? " — verouderd" : ""}
+          {verouderd ? " · verouderd" : ""}
         </dd>
       </div>
-      <div>
-        <dt>Bron: </dt>
-        <dd>{bron || "onbekend"}</dd>
-      </div>
+      {geprobeerd ? (
+        <div>
+          <dt>Geprobeerd</dt>
+          <dd>
+            {geprobeerd.op ? <time dateTime={geprobeerd.op}>{formatTime(geprobeerd.op, now)}</time> : "onbekend"} · {geprobeerd.uitkomst}
+          </dd>
+        </div>
+      ) : null}
+      {extra?.map(([k, v]) => (
+        <div key={k}>
+          <dt>{k}</dt>
+          <dd>{v}</dd>
+        </div>
+      ))}
     </dl>
   );
+}
+
+/** Huidige tijd die elke `ms` ververst (voor relatieve tijden en aftellen). */
+export function useNow(ms: number): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
 }

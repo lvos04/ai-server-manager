@@ -10,6 +10,7 @@ import { apiRequest, HubApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { uuidv4 } from "@/lib/uuid";
 import type { LoginResult } from "@/lib/types";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
 const MIN_PASSWORD = 12;
@@ -40,7 +41,7 @@ export function FirstStart() {
           <h1 id="klaar">Eerste start is al afgerond</h1>
           <p>Er is al een beheerder. Log in met je account.</p>
           <p>
-            <Link className="btn btn-primary" href="/inloggen">
+            <Link className={buttonVariants({ variant: "primair" })} href="/inloggen">
               Naar inloggen
             </Link>
           </p>
@@ -88,7 +89,7 @@ export function FirstStart() {
           <h1 id="titel">Eerste start</h1>
           <p>Welkom. Maak het eerste beheerdersaccount aan met de eenmalige setupcode.</p>
         </div>
-        <div className="notice tone-info" data-testid="setupcode-uitleg">
+        <div className="flex flex-col gap-2 rounded-lg border-2 border-info bg-info-bg p-4 text-info-ink" data-testid="setupcode-uitleg">
           <p>
             <strong>Waar vind ik de setupcode?</strong>
           </p>
@@ -162,9 +163,9 @@ export function FirstStart() {
             </div>
           ) : null}
           <div className="row">
-            <button type="submit" className="btn btn-primary" disabled={busy}>
+            <Button type="submit" variant="primair" bezig={busy}>
               {busy ? "Bezig…" : "Beheerder aanmaken"}
-            </button>
+            </Button>
           </div>
         </form>
       </section>

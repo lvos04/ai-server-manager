@@ -1,11 +1,12 @@
 "use client";
 
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { Loading } from "@/components/Loading";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { TableWrap } from "@/components/TableWrap";
+import { Melding } from "@/components/Melding";
 import { formatDateTime } from "@/lib/format";
 import { decisionStatus, gateStatus, type StatusView } from "@/lib/status";
 import type { DecisionList, Gate, TrueNasStatus } from "@/lib/types";
@@ -13,11 +14,12 @@ import { useApi } from "@/lib/use-api";
 
 export function truenasView(t: TrueNasStatus | undefined): StatusView {
   if (!t) return { tone: "unknown", label: "Onbekend" };
-  if (!t.nas_url) return { tone: "warn", label: "NAS-adres ontbreekt" };
-  if (!t.api_key.ingesteld) return { tone: "warn", label: "Key ontbreekt" };
-  if (t.laatste_test?.status === "ok") return { tone: "ok", label: "Verbonden (alleen-lezen)" };
-  if (t.laatste_test) return { tone: "bad", label: "Verbinding mislukt" };
-  return { tone: "warn", label: "Nog niet getest" };
+  if (!t.nas_url) return { tone: "neutral", label: "NAS-adres ontbreekt", icon: "open" };
+  if (!t.api_key.ingesteld) return { tone: "neutral", label: "Key ontbreekt", icon: "open" };
+  // Een geslaagde verbindingstest is geen gezondheid: neutraal (OB-03).
+  if (t.laatste_test?.status === "ok") return { tone: "neutral", label: "Verbonden (alleen-lezen)", icon: "gekoppeld" };
+  if (t.laatste_test) return { tone: "down", label: "Verbinding mislukt" };
+  return { tone: "neutral", label: "Nog niet getest", icon: "open" };
 }
 
 export function OnboardingScreen() {
@@ -70,7 +72,7 @@ export function OnboardingScreen() {
                 <h2 id="stap-account" className="step-title">
                   Beheerder aanmaken
                 </h2>
-                <StatusBadge view={{ tone: "ok", label: "Klaar" }} />
+                <StatusBadge view={{ tone: "neutral", label: "Klaar", icon: "geslaagd" }} />
               </div>
               <p className="meta">Gedaan met de setupcode uit de app-log. Extra gebruikers beheer je onder Instellingen.</p>
             </section>
@@ -85,7 +87,7 @@ export function OnboardingScreen() {
               </div>
               <p>NAS-adres (D03), een alleen-lezen-API-key, de verbindingstest en zo nodig de certificaat-vingerafdruk.</p>
               <p>
-                <Link className="btn btn-primary" href="/onboarding/truenas">
+                <Link className={buttonVariants({ variant: "primair" })} href="/onboarding/truenas">
                   TrueNAS-koppeling
                 </Link>
               </p>
@@ -123,11 +125,14 @@ export function OnboardingScreen() {
                 <h2 id="stap-executor" className="step-title">
                   Executor installeren en koppelen
                 </h2>
-                <StatusBadge view={{ tone: "neutral", label: "Koppelen volgt in P2" }} />
+                <StatusBadge view={{ tone: "not_yet", label: "Schrijfsleutel: op de executorpagina" }} />
               </div>
-              <p>Uitleg over de tweede Custom App. Het koppelen zelf is in deze versie nog niet mogelijk.</p>
               <p>
-                <Link className="btn" href="/onboarding/executor">
+                Uitleg over de tweede Custom App en de koppelcode. De schrijfsleutel voor TrueNAS vul je alleen op de
+                statuspagina van de executor in; de Hub ziet hem nooit.
+              </p>
+              <p>
+                <Link className={buttonVariants({ variant: "secundair" })} href="/onboarding/executor">
                   Uitleg executor
                 </Link>
               </p>
@@ -140,29 +145,30 @@ export function OnboardingScreen() {
           <p className="meta">{gates.data?.toelichting ?? "Onbekend telt nooit als groen; gates kunnen niet worden weggeklikt."}</p>
           {gates.error ? <ErrorPanel error={gates.error} /> : null}
           {gates.data ? (
-            <TableWrap label="Gates en hun status">
-              <table>
-                <caption className="sr-only">Gates en hun status</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Gate</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Waarom</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {gates.data.items.map((g) => (
-                    <tr key={g.id}>
-                      <td>{g.naam}</td>
-                      <td>
+            <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Gates en hun status">
+              {gates.data.items.map((g) => (
+                <li key={g.id} data-testid={`gate-${g.id}`}>
+                  {g.status === "toegestaan" ? (
+                    <div className="flex flex-col gap-1 rounded-lg border border-border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <strong>{g.naam}</strong>
                         <StatusBadge view={gateStatus(g.status)} />
-                      </td>
-                      <td>{g.redenen.length ? g.redenen.map((r) => r.tekst).join(" ") : "Alle voorwaarden aangetoond."}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableWrap>
+                      </div>
+                      <p className="text-sm">Alle voorwaarden aangetoond.</p>
+                    </div>
+                  ) : g.status === "geblokkeerd" ? (
+                    <Melding soort="gate" titel={`Geblokkeerd door de ${g.naam.toLowerCase()}`}>
+                      <p>Nodig: {g.redenen.map((r) => r.tekst).join(" ") || "voorwaarden aantonen."}</p>
+                      <p className="text-sm">Dit is geen storing; er wacht een voorwaarde. Doorgaan zonder kan niet.</p>
+                    </Melding>
+                  ) : (
+                    <Melding soort="onbekend" titel={`${g.naam}: onbekend — blijft dicht`}>
+                      <p>{g.redenen.map((r) => r.tekst).join(" ") || "Status niet vast te stellen; onbekend opent nooit."}</p>
+                    </Melding>
+                  )}
+                </li>
+              ))}
+            </ul>
           ) : null}
           {gates.data?.items[0] ? <p className="meta">Afgeleid op {formatDateTime(gates.data.items[0].afgeleid_op)}.</p> : null}
         </section>

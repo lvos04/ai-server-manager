@@ -1,8 +1,12 @@
 /** Navigatie exact volgens 01_ARCHITECTUUR/08_UI_EN_INTERACTIES.md. */
 
+/** Sleutels van de navigatie-iconen (lucide, vaste koppeling ONTWERPTAAL §7); de schil koppelt ze aan componenten. */
 export type IconName =
   | "home" | "apps" | "alert" | "ai" | "more" | "server" | "media" | "house" | "network" | "flow" | "backup"
-  | "costs" | "settings" | "wizard" | "logout";
+  | "costs" | "settings" | "wizard" | "logout" | "kijken" | "zoeken" | "ik";
+
+/** Productnaam (besluit gebruiker O-07). "Hub" blijft de naam van de centrale app ín het product. */
+export const PRODUCT = "TrueNAS Home Platform";
 
 export interface NavItem {
   href: string;
@@ -38,8 +42,22 @@ export const MORE_LINKS: NavItem[] = [
   ...DESKTOP_NAV.filter((i) => i.href !== "/"),
 ];
 
+/** Kindschil (besluit gebruiker O-05): Home · Kijken · Zoeken · Ik, op elke breedte; verder niets. */
+export const KIND_NAV: NavItem[] = [
+  { href: "/", label: "Home", icon: "home" },
+  { href: "/kijken", label: "Kijken", icon: "kijken" },
+  { href: "/zoeken", label: "Zoeken", icon: "zoeken" },
+  { href: "/ik", label: "Ik", icon: "ik" },
+];
+export const KIND_PATHS = KIND_NAV.map((i) => i.href);
+
+/** Routes alleen voor de kindschil (andere rollen krijgen er een gewone 'niet gevonden'). */
+export function isKindPath(pathname: string): boolean {
+  return KIND_PATHS.includes(normalizePath(pathname));
+}
+
 /** Schermen zonder login. */
-export const PUBLIC_PATHS = ["/eerste-start", "/inloggen"];
+export const PUBLIC_PATHS = ["/eerste-start", "/inloggen", "/inloggen/nood"];
 
 export function normalizePath(pathname: string): string {
   if (!pathname) return "/";
@@ -79,12 +97,6 @@ export interface PlannedScreen {
 
 /** Schermen die pas in latere fasen komen: eerlijk tonen, nooit nepdata (06_FASERING_EN_GATES). */
 export const PLANNED: Record<string, PlannedScreen> = {
-  problemen: {
-    titel: "Problemen",
-    fase: "P1",
-    wat: "Eén inbox met incidenten: ernst, bron, eerste en laatste gebeurtenis, onderliggende events en ‘toon bewijs’.",
-    bron: "Monitoring en incidenten (B09) met Uptime Kuma, Beszel en Gotify.",
-  },
   ai: {
     titel: "AI",
     fase: "P2",
