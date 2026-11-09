@@ -1,11 +1,11 @@
-"""Healthcheck van de alles-in-één Hub-image: de API meldt ready (database bereikbaar, migraties op head, geheimen)."""
+"""Healthcheck van de alles-in-één Hub-image: API ready (database, migraties, geheimen) én de web-UI op de app-poort."""
 
 import os
 import sys
 import urllib.request
 from pathlib import Path
 
-web = Path("/opt/hub-web/server.js").exists()
+web = Path(os.environ.get("HUB_WEB_SERVER", "/opt/hub-web/server/hub-server.mjs")).exists()
 port = os.environ.get("HUB_INTERNAL_API_PORT", "8400") if web else os.environ.get("HUB_PORT", "30400")
 
 
@@ -19,5 +19,7 @@ def ok(url: str) -> bool:
 
 checks = [f"http://127.0.0.1:{port}/readyz"]
 if web:
-    checks.append(f"http://127.0.0.1:{os.environ.get('HUB_PORT', '30400')}/")
+    # De web-UI (statische schil) en de doorgang naar de API via dezelfde poort als de gebruiker.
+    app_port = os.environ.get("HUB_PORT", "30400")
+    checks += [f"http://127.0.0.1:{app_port}/inloggen", f"http://127.0.0.1:{app_port}/healthz"]
 sys.exit(0 if all(ok(u) for u in checks) else 1)

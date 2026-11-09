@@ -1,7 +1,8 @@
 """AI Server Manager (Hub) — procesbewaker van de alles-in-één image (PID 1 van de container).
 
 Eén container met alles: PostgreSQL 16 (alleen unix-socket, geen netwerkpoort, geen wachtwoord), first-start-init,
-migraties, API, worker, AI-runner (stub) en — zodra de volgende versie hem meelevert — de web-UI. Daardoor installeert
+migraties, API, worker, AI-runner (stub) en de web-UI (Next.js op poort 30400, met doorgang naar de API die dan alleen
+op 127.0.0.1:8400 luistert). Daardoor installeert
 de Hub als gewone TrueNAS **Custom App** met één image, één poort (30400) en één map (/appdata). Geen YAML.
 
 Regels:
@@ -40,7 +41,7 @@ PGDATA = DATA / "postgres"
 SOCKET_DIR = Path("/tmp/asm-pg")  # noqa: S108 — 0700 van uid 568: de AI-runner (569) kan er niet bij
 PORT = os.environ.get("HUB_PORT", "30400")
 API_PORT = os.environ.get("HUB_INTERNAL_API_PORT", "8400")
-WEB_SERVER = Path("/opt/hub-web/server.js")  # PLEK VOOR DE WEB-UI: aanwezig → web op PORT, API intern
+WEB_SERVER = Path(os.environ.get("HUB_WEB_SERVER", "/opt/hub-web/server/hub-server.mjs"))  # aanwezig → web op PORT, API intern
 DB_URL = f"postgresql+psycopg://hub@/hub?host={SOCKET_DIR}"
 MANAGED = ("postgres", "secrets", "backups", "logs")
 STOP = threading.Event()

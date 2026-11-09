@@ -10,7 +10,8 @@ category: platform
 description_nl: >-
   Centrale Hub van het platform: onboarding-wizard (D01–D18) en gates, alleen-lezen TrueNAS-inventaris,
   dienstenregister, aanmelden en rollen, enrollment van eigen diensten, events-inbox, back-updekking en een
-  geverifieerde back-up van de eigen database. De web-UI volgt; AI staat standaard uit.
+  geverifieerde back-up van de eigen database, met de Nederlandstalige web-UI (PWA) op dezelfde poort. AI staat
+  standaard uit.
 version: "0.1.0"
 install:
   method: custom_app
@@ -24,7 +25,7 @@ custom_app:
       container_port: 30400
       host_port: {param: host_port}
       protocol: tcp
-      purpose_nl: Hub (API, statuspagina en later de web-UI)
+      purpose_nl: Hub-web-UI; /api, /connector, /healthz en /readyz gaan intern door naar de API (127.0.0.1)
   storage:
     - name: appdata
       type: host_path
@@ -86,7 +87,7 @@ network:
       container_port: 30400
       host_port: {param: host_port}
       protocol: tcp
-      purpose_nl: Hub (API, statuspagina en later de web-UI)
+      purpose_nl: Hub-web-UI; /api, /connector, /healthz en /readyz gaan intern door naar de API (127.0.0.1)
   host_network: false
   host_network_reason: null
   joins_platform_network: false

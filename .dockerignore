@@ -14,3 +14,13 @@ tests
 apps/api/tests
 apps/executor/tests
 appdata
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
+apps/web/e2e
+apps/web/tests
+apps/web/playwright.config.ts
+apps/web/vitest.config.mts
+apps/web/next-env.d.ts
+apps/web/tsconfig.tsbuildinfo
+docs/screenshots
