@@ -14,7 +14,7 @@ NPM := cd $(WEB) && NEXT_TELEMETRY_DISABLED=1
 
 .PHONY: venv lint format type test test-unit test-integration test-e2e migrate-check openapi openapi-check audit \
         image-hub image-executor images smoke lock clean runbooks \
-        web-install web-lint web-test web-build web-e2e web-audit web-schema-fixture
+        web-install web-lint web-test web-build web-e2e web-review web-audit web-schema-fixture
 
 venv:
 	$(PY) -m venv $(VENV)
@@ -90,6 +90,11 @@ web-build:
 # Playwright (360/390/768/1440) tegen de echte API + fake TrueNAS; start zelf de teststack en de productie-build.
 web-e2e: web-build
 	$(NPM) HUB_E2E_PYTHON=$(BIN)/python $(NICE) npx playwright test
+
+# Peil-ontwerpreview (apps/web/review/README.md): alle schermen op 320/360/390/768/1024/1440 × licht/donker met axe,
+# gemeten contrast, focusdoorloop, doelen en Peil-semantiek; faalt bij een harde bevinding. Vraagt een verse web-build.
+web-review:
+	$(NPM) HUB_E2E_PYTHON=$(BIN)/python $(NICE) npx playwright test -c playwright.review.config.ts && node review/samenvat.mjs --streng
 
 web-audit:
 	$(NPM) npm audit --omit=dev --audit-level=high
