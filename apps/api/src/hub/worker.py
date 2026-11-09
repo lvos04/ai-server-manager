@@ -43,8 +43,16 @@ def _enqueue_if_due(db: Session, settings: Settings) -> list[str]:
     active = {j.kind for j in db.scalars(select(Job).where(Job.status.in_(("queued", "running"))))}
     target = current_target(db)
     if target is not None and "inventory_refresh" not in active:
+        # Interval op basis van de laatste job (ook als die 'not_configured' gaf en dus geen run opsloeg),
+        # zodat een half ingevulde koppeling niet elke ronde een nieuwe job maakt.
         run = latest_run(db, target.url)
-        if run is None or now - run.started_at > timedelta(seconds=settings.inventory_interval_seconds):
+        last_job = db.scalars(
+            select(Job).where(Job.kind == "inventory_refresh").order_by(Job.created_at.desc()).limit(1)
+        ).first()
+        interval = timedelta(seconds=settings.inventory_interval_seconds)
+        run_due = run is None or now - run.started_at > interval
+        job_due = last_job is None or now - last_job.created_at > interval
+        if run_due and job_due:
             db.add(
                 Job(
                     kind="inventory_refresh",
@@ -118,6 +126,7 @@ def cleanup(db: Session) -> None:
     db.execute(delete(IdempotencyRecord).where(IdempotencyRecord.created_at < now - timedelta(days=1)))
     db.execute(delete(WebSession).where(WebSession.expires_at < now - timedelta(days=7)))
     db.execute(delete(EnrollmentGrant).where(EnrollmentGrant.expires_at < now - timedelta(days=30)))
+    db.execute(delete(Job).where(Job.status.in_(("done", "failed")), Job.created_at < now - timedelta(days=14)))
     prune_runs(db, keep=50)
     db.commit()
 

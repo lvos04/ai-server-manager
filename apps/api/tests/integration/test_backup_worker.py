@@ -135,3 +135,18 @@ def test_openapi_actueel() -> None:
 
     out = Path(__file__).resolve().parents[4] / "docs" / "openapi" / "hub-api.openapi.json"
     assert export(out, check=True) == 0, "draai `make openapi`"
+
+
+def test_worker_plant_inventaris_niet_elke_ronde(admin: Any, worker_once: Any) -> None:
+    admin.put(
+        "/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "127.0.0.1", "https_poort": 1}}, headers=idem()
+    ).raise_for_status()
+    first = [d for d in worker_once(schedule=True) if d["kind"] == "inventory_refresh"]
+    assert first and first[0]["reason_code"] == "not_configured"  # nog geen API-key
+    assert [d for d in worker_once(schedule=True) if d["kind"] == "inventory_refresh"] == []
+    admin.put("/api/v1/truenas/api-key", json={"api_key": "readonly-test-key-0123456789"}, headers=idem())
+    assert [d for d in worker_once(schedule=True) if d["kind"] == "inventory_refresh"] == []  # binnen interval
+    r = admin.post("/api/v1/inventory/refresh", headers=idem())  # handmatig kan altijd
+    assert r.status_code == 202
+    done = [d for d in worker_once() if d["kind"] == "inventory_refresh"]
+    assert done and done[0]["reason_code"] == "unreachable"
