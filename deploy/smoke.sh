@@ -130,7 +130,7 @@ expect "observability zonder NAS: unknown (geen bron)" \
 expect "standaard-alertregels gezaaid" \
   "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/alerts/rules)" '"standaard_sleutel":"app-down"'
 
-# P1 deel 2 (ADR-0022/0023): migraties 0006–0008, incidenten, runbooks, auditketting, out-of-band, SSO standaard uit.
+# P1 deel 2 (ADR-0022/0023): migraties 0006–0009, incidenten, runbooks, auditketting, out-of-band, SSO standaard uit.
 expect "incidenten-inbox bereikbaar" \
   "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/incidents/samenvatting)" '"per_status"'
 expect "runbooks: acht scenario's met hash" \
