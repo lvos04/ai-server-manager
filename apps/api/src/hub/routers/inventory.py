@@ -168,14 +168,16 @@ def registry(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
     if d03 is not None and d03.status in ("Ingevuld", "Getest") and isinstance(d03.waarde, dict):
         adres = str(d03.waarde.get("nas_adres") or "") or None
     st = _state(db, settings, "apps")
-    enrolled = {s.app_id: s for s in db.scalars(select(Service))}
+    services = list(db.scalars(select(Service)))
+    enrolled = {s.app_id: s for s in services}
+    by_app_name = {s.truenas_app_name: s for s in services if s.truenas_app_name}
     items = []
     for a in st.get("data") or []:
         ports = [p for p in a.get("poorten") or [] if p.get("host_poort") and p.get("protocol") == "tcp"]
         host = f"[{adres}]" if adres and ":" in adres else adres
         urls = [f"http://{host}:{p['host_poort']}" for p in ports] if adres else []
         key = a.get("herkend_als") or a["naam"]
-        svc = enrolled.get(str(key)) or enrolled.get(str(a["naam"]))
+        svc = by_app_name.get(str(a["naam"])) or enrolled.get(str(key)) or enrolled.get(str(a["naam"]))
         items.append(
             {
                 "app": a["naam"],

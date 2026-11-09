@@ -7,7 +7,7 @@ from datetime import date
 from typing import Any
 
 import pytest
-from conftest import idem, login_as, make_user
+from conftest import enroll_body, idem, login_as, make_user
 
 pytestmark = pytest.mark.integration
 
@@ -17,7 +17,7 @@ def _service(admin: Any, app: Any, app_id: str = "home-control-hub") -> tuple[An
 
     tok = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": app_id}).json()["enrollment_token"]
     anon = TestClient(app, base_url="https://testserver")
-    svc = anon.post("/api/v1/services/enroll", json={"app_id": app_id, "enrollment_token": tok}).json()
+    svc = anon.post("/api/v1/services/enroll", json=enroll_body(app_id, token=tok)).json()
     return anon, {"Authorization": f"Bearer {svc['service_token']}"}
 
 

@@ -17,6 +17,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 ISSUER = "hub"
+MAX_JWT_TTL_SECONDS = 120
+TOKEN_USE_USER = "user"  # noqa: S105 — soort JWT, geen geheim
+TOKEN_USE_HUB_SERVICE = "hub_service"  # noqa: S105 — soort JWT, geen geheim
 
 
 def _b64url(data: bytes) -> str:
@@ -120,27 +123,55 @@ class KeyRing:
         """Vingerafdruk over de JWKS + policy-sleutel die een dienst bij enrollment pint (contract 1.2 §4.5)."""
         return keyset_fingerprint(self.jwks()["keys"], self.policy_public_jwk())
 
-    def issue_user_jwt(
-        self, *, subject: str, audience: str, roles: list[str], ttl_seconds: int, now: datetime | None = None
-    ) -> tuple[str, datetime]:
-        if ttl_seconds > 120:
-            raise ValueError("dienst-JWT mag maximaal 120 s geldig zijn (contract §4)")
+    def _sign(self, claims: dict[str, Any]) -> str:
+        return jwt.encode(
+            claims, self.jwt_signing, algorithm="EdDSA", headers={"kid": key_id(self.jwt_signing.public_key())}
+        )
+
+    @staticmethod
+    def _base_claims(audience: str, ttl_seconds: int, now: datetime | None) -> tuple[dict[str, Any], datetime]:
+        if ttl_seconds > MAX_JWT_TTL_SECONDS:
+            raise ValueError("Hub-JWT mag maximaal 120 s geldig zijn (contract §3.4/§4)")
         issued = (now or datetime.now(UTC)).replace(microsecond=0)
         expires = issued + timedelta(seconds=ttl_seconds)
         claims: dict[str, Any] = {
             "iss": ISSUER,
             "aud": audience,
-            "sub": subject,
-            "roles": roles,
             "iat": int(issued.timestamp()),
             "nbf": int(issued.timestamp()),
             "exp": int(expires.timestamp()),
             "jti": str(uuid.uuid4()),
         }
-        token = jwt.encode(
-            claims, self.jwt_signing, algorithm="EdDSA", headers={"kid": key_id(self.jwt_signing.public_key())}
+        return claims, expires
+
+    def issue_user_jwt(
+        self, *, subject: str, audience: str, roles: list[str], ttl_seconds: int, now: datetime | None = None
+    ) -> tuple[str, datetime]:
+        """JWT met gebruikerscontext voor één dienst (contract 1.2 §4.2): ``token_use: "user"``."""
+        if "service" in roles:
+            raise ValueError("rol 'service' hoort alleen bij een dienst-JWT (token_use hub_service)")
+        claims, expires = self._base_claims(audience, ttl_seconds, now)
+        claims.update({"sub": subject, "token_use": TOKEN_USE_USER, "roles": roles})
+        return self._sign(claims), expires
+
+    def issue_hub_service_jwt(
+        self, *, audience: str, service_id: str, ttl_seconds: int = 60, now: datetime | None = None
+    ) -> tuple[str, datetime]:
+        """Dienst-JWT waarmee de Hub zich bij een eigen dienst meldt (contract 1.2 §4.3); per aanroep een nieuwe.
+
+        ``sub: "hub"``, ``roles: ["service"]``, ``token_use: "hub_service"``, ``service_id`` van de registratie, eigen
+        ``jti`` (replaycache bij de dienst, §4.6). Nooit het service-token van de dienst zelf.
+        """
+        claims, expires = self._base_claims(audience, ttl_seconds, now)
+        claims.update(
+            {
+                "sub": "hub",
+                "token_use": TOKEN_USE_HUB_SERVICE,
+                "roles": ["service"],
+                "service_id": str(uuid.UUID(service_id)),
+            }
         )
-        return token, expires
+        return self._sign(claims), expires
 
     def verify_user_jwt(self, token: str, *, audience: str) -> dict[str, Any]:
         """Hulpfunctie voor tests en voor diensten-SDK's: verifieer met de eigen publieke sleutel."""
@@ -150,5 +181,5 @@ class KeyRing:
             algorithms=["EdDSA"],
             audience=audience,
             issuer=ISSUER,
-            options={"require": ["exp", "iat", "sub", "aud", "iss"]},
+            options={"require": ["exp", "iat", "nbf", "sub", "aud", "iss", "jti"]},
         )

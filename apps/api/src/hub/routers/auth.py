@@ -6,7 +6,7 @@ import uuid
 from datetime import timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text, update
@@ -21,6 +21,7 @@ from hub.deps import (
     Idem,
     Principal,
     SettingsDep,
+    Viewer,
     get_keyring,
 )
 from hub.errors import HubError
@@ -93,7 +94,7 @@ class ServiceJwtIn(Strict):
     audience: str = Field(pattern=r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 
 
-def _client_ip(request: Request) -> str:
+def client_ip(request: Request) -> str:
     return request.client.host if request.client else "onbekend"
 
 
@@ -122,45 +123,52 @@ def user_dict(u: User) -> dict[str, Any]:
         "display_name": u.display_name,
         "role": u.role,
         "disabled": u.disabled,
+        "break_glass": u.break_glass,
         "created_at": iso(u.created_at),
         "updated_at": iso(u.updated_at),
         "version": u.version,
     }
 
 
-def _start_session(request: Request, db: Any, settings: Any, user: User) -> JSONResponse:
+def start_session(
+    request: Request, db: Any, settings: Any, user: User, *, ttl_seconds: int | None = None, break_glass: bool = False
+) -> JSONResponse:
     from hub.security import new_token
 
     token, csrf = new_token("ses"), new_token("csrf", 24)
     now = utcnow()
+    ttl = ttl_seconds or settings.session_ttl_seconds
     sess = WebSession(
         token_hash=sha256_hex(token),
         csrf_hash=sha256_hex(csrf),
         user_id=user.id,
         created_at=now,
-        expires_at=now + timedelta(seconds=settings.session_ttl_seconds),
+        expires_at=now + timedelta(seconds=ttl),
         last_seen_at=now,
         user_agent=request.headers.get("user-agent", "")[:256],
-        client_ip=_client_ip(request),
+        client_ip=client_ip(request),
+        break_glass=break_glass,
     )
     db.add(sess)
     audit.record(
         db,
         actor_type="user",
         actor_id=user.username,
-        action="auth.login",
+        action="auth.break_glass_login" if break_glass else "auth.login",
         target_type="session",
         target_id=str(sess.id),
         trace_id=str(getattr(request.state, "trace_id", "")),
     )
     db.commit()
     secure = settings.cookie_secure == "true" or (settings.cookie_secure == "auto" and request.url.scheme == "https")
-    body = {"user": user_dict(user), "csrf_token": csrf, "sessie_verloopt_op": iso(sess.expires_at)}
+    body: dict[str, Any] = {"user": user_dict(user), "csrf_token": csrf, "sessie_verloopt_op": iso(sess.expires_at)}
+    if break_glass:
+        body["noodlogin"] = True
     resp = JSONResponse(body, headers={"Cache-Control": "no-store"})
     resp.set_cookie(
         SESSION_COOKIE,
         token,
-        max_age=settings.session_ttl_seconds,
+        max_age=ttl,
         httponly=True,
         secure=secure,
         samesite="strict",
@@ -169,7 +177,7 @@ def _start_session(request: Request, db: Any, settings: Any, user: User) -> JSON
     resp.set_cookie(
         CSRF_COOKIE,
         csrf,
-        max_age=settings.session_ttl_seconds,
+        max_age=ttl,
         httponly=False,
         secure=secure,
         samesite="strict",
@@ -206,7 +214,7 @@ def setup_status(db: DB, settings: SettingsDep) -> dict[str, Any]:
 
 @router.post("/setup/admin", summary="Eerste beheerder aanmaken met de setupcode uit de app-log")
 def setup_admin(body: SetupAdminIn, request: Request, db: DB, settings: SettingsDep) -> JSONResponse:
-    key = f"setup:{_client_ip(request)}"
+    key = f"setup:{client_ip(request)}"
     _rate_check(db, key, settings)
     # Eenmalig, ook bij gelijktijdige verzoeken met dezelfde code: één transactie tegelijk (advisory lock tot commit of
     # rollback), en pas ná het verkrijgen van de lock opnieuw kijken of er al een beheerder is.
@@ -239,31 +247,32 @@ def setup_admin(body: SetupAdminIn, request: Request, db: DB, settings: Settings
     clear_failures(db, key)
     db.commit()
     mark_setup_completed(settings.secrets_dir)
-    return _start_session(request, db, settings, user)
+    return start_session(request, db, settings, user)
 
 
 @router.post("/auth/login", summary="Aanmelden (argon2id, rate-limit)")
 def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep) -> JSONResponse:
     username = body.username.strip().lower()
-    key = f"login:{username}:{_client_ip(request)}"
+    key = f"login:{username}:{client_ip(request)}"
     _rate_check(db, key, settings)
     user = db.scalars(select(User).where(User.username == username)).first()
     ok = verify_password(user.password_hash if user else None, body.password)
-    if not ok or user is None or user.disabled:
+    # Het noodaccount logt alleen in via /auth/break-glass/login (met TOTP, alleen privé-adressen).
+    if not ok or user is None or user.disabled or user.break_glass:
         record_failure(db, key)
         audit.record(
             db,
             actor_type="user",
             actor_id=username[:64],
             action="auth.login_failed",
-            details={"ip": _client_ip(request)},
+            details={"ip": client_ip(request)},
         )
         db.commit()
         raise HubError(401, "invalid_credentials", "Gebruikersnaam of wachtwoord onjuist.")
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(body.password)
     clear_failures(db, key)
-    return _start_session(request, db, settings, user)
+    return start_session(request, db, settings, user)
 
 
 @router.post("/auth/logout", summary="Afmelden (sessie intrekken)")
@@ -344,6 +353,8 @@ def revoke_session(session_id: uuid.UUID, db: DB, principal: AnyUser, idem: Idem
 def change_password(body: PasswordIn, db: DB, settings: SettingsDep, principal: AnyUser) -> dict[str, Any]:
     user = db.get(User, uuid.UUID(principal.id))
     assert user is not None
+    if user.break_glass:
+        raise HubError(409, "use_break_glass_rotate", "Het noodaccount wijzig je via 'noodaccount roteren'.")
     # Zelfde rate-limit als bij inloggen: met een overgenomen sessie mag het huidige wachtwoord niet te raden zijn.
     key = f"password:{user.id}"
     _rate_check(db, key, settings)
@@ -375,6 +386,26 @@ def change_password(body: PasswordIn, db: DB, settings: SettingsDep, principal: 
 @router.get("/auth/jwks", summary="Publieke sleutels (JWKS) voor dienst-JWT's")
 def jwks(keyring: Annotated[KeyRing, Depends(get_keyring)]) -> JSONResponse:
     return JSONResponse(keyring.jwks(), headers={"Cache-Control": "public, max-age=300"})
+
+
+@router.get(
+    "/auth/key-rotations",
+    summary="Ondertekende sleutelrotaties (zonder authenticatie; contract 1.2 §4.5). Nog niet gebouwd: lege lijst",
+)
+def key_rotations(after: Annotated[int, Query(ge=0, le=2**31)] = 0) -> dict[str, Any]:
+    # De Hub roteert zijn sleutels nog niet; rotatie = opnieuw koppelen. Dus nooit een statement.
+    return {"items": []}
+
+
+@router.get("/auth/keyset", summary="Publieke sleutelset (jwks + policy-sleutel) met vingerafdruk, om te kopiëren")
+def keyset(_: Viewer, keyring: Annotated[KeyRing, Depends(get_keyring)]) -> dict[str, Any]:
+    return {
+        "jwks": keyring.jwks(),
+        "policy_public_key": keyring.policy_public_jwk(),
+        "keyset_fingerprint": keyring.keyset_fingerprint(),
+        "toelichting": "Publieke sleutels (geen geheim). Bestaande apps die een ondertekend ExecutionRequest "
+        "verifiëren, plakken deze set in hun eigen beheer-UI en vergelijken de vingerafdruk (contract §2.3).",
+    }
 
 
 @router.post("/auth/service-jwt", summary="Kortlevende JWT met gebruikerscontext voor een dienst (exp ≤ 120 s)")
@@ -437,6 +468,8 @@ def patch_user(user_id: uuid.UUID, body: UserPatch, db: DB, principal: Admin, id
     user = db.get(User, user_id)
     if user is None:
         raise HubError(404, "not_found", "Gebruiker niet gevonden.")
+    if user.break_glass and body.role is not None and body.role != Role.admin:
+        raise HubError(409, "break_glass_stays_admin", "Het noodaccount houdt de rol 'admin'.")
     demote = (body.role is not None and body.role != Role.admin) or body.disabled is True
     if user.role == Role.admin.value and demote:
         admins = db.scalar(select(func.count()).select_from(User).where(User.role == "admin", User.disabled.is_(False)))

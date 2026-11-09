@@ -12,7 +12,7 @@ import uuid
 from typing import Any
 
 import pytest
-from conftest import idem, login_as, make_user
+from conftest import enroll_body, idem, login_as, make_user
 
 pytestmark = pytest.mark.integration
 
@@ -29,6 +29,14 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/setup/admin"): PUBLIC,
     ("POST", "/api/v1/auth/login"): PUBLIC,
     ("GET", "/api/v1/auth/jwks"): PUBLIC,
+    ("GET", "/api/v1/auth/key-rotations"): PUBLIC,
+    ("POST", "/api/v1/auth/break-glass/login"): PUBLIC,
+    ("GET", "/api/v1/auth/keyset"): "viewer",
+    ("GET", "/api/v1/auth/break-glass"): "admin",
+    ("POST", "/api/v1/auth/break-glass/setup"): "admin",
+    ("POST", "/api/v1/auth/break-glass/rotate"): "admin",
+    ("POST", "/api/v1/auth/break-glass/confirm"): "admin",
+    ("POST", "/api/v1/auth/break-glass/selftest"): "admin",
     ("POST", "/api/v1/services/enroll"): PUBLIC,
     ("POST", "/api/v1/auth/logout"): "kind",
     ("GET", "/api/v1/auth/me"): "kind",
@@ -67,6 +75,9 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/services/enrollment-tokens"): "admin",
     ("POST", "/api/v1/services/pairing-codes"): "admin",
     ("POST", "/api/v1/services/self/rotate"): SERVICE,
+    ("GET", "/api/v1/services/self"): SERVICE,
+    ("POST", "/api/v1/services/{service_id}/unlink"): "admin",
+    ("PUT", "/api/v1/services/{service_id}/truenas-app"): "admin",
     ("POST", "/api/v1/services/{service_id}/revoke"): "admin",
     ("POST", "/api/v1/services/{service_id}/rotate"): "admin",
     ("GET", "/api/v1/truenas"): "viewer",
@@ -155,7 +166,7 @@ def _service_token(admin: Any) -> str:
     assert r.status_code == 201, r.text
     r = admin.post(
         "/api/v1/services/enroll",
-        json={"app_id": "home-control-hub", "enrollment_token": r.json()["enrollment_token"], "version": "0.1.0"},
+        json=enroll_body("home-control-hub", token=r.json()["enrollment_token"]),
     )
     assert r.status_code == 200, r.text
     return str(r.json()["service_token"])

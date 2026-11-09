@@ -44,11 +44,30 @@
         "title": "ApiKeyIn",
         "type": "object"
       },
-      "EnrollIn": {
+      "ConfirmIn": {
         "additionalProperties": false,
         "properties": {
+          "totp": {
+            "maxLength": 12,
+            "minLength": 6,
+            "title": "Totp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "totp"
+        ],
+        "title": "ConfirmIn",
+        "type": "object"
+      },
+      "EnrollIn": {
+        "additionalProperties": false,
+        "description": "Exact schema van contract 1.2 §3.3; onbekende velden → 422.",
+        "properties": {
           "app_id": {
-            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
             "title": "App Id",
             "type": "string"
           },
@@ -56,7 +75,7 @@
             "anyOf": [
               {
                 "maxLength": 512,
-                "pattern": "^https?://[^\\s/]+(:\\d+)?(/.*)?$",
+                "pattern": "^https?://[A-Za-z0-9.\\-\\[\\]:]+(/[^\\s?#]*)?$",
                 "type": "string"
               },
               {
@@ -68,7 +87,7 @@
           "enrollment_token": {
             "anyOf": [
               {
-                "maxLength": 128,
+                "pattern": "^enr_[A-Za-z0-9_-]{43}$",
                 "type": "string"
               },
               {
@@ -90,28 +109,23 @@
             "title": "Pairing Code"
           },
           "public_key_jwk": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Public Key Jwk"
+            "additionalProperties": true,
+            "title": "Public Key Jwk",
+            "type": "object"
           },
           "version": {
-            "default": "",
             "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[0-9A-Za-z][0-9A-Za-z.+_-]*$",
             "title": "Version",
             "type": "string"
           }
         },
         "required": [
-          "app_id"
+          "app_id",
+          "version",
+          "base_url",
+          "public_key_jwk"
         ],
         "title": "EnrollIn",
         "type": "object"
@@ -293,7 +307,9 @@
         "additionalProperties": false,
         "properties": {
           "app_id": {
-            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
             "title": "App Id",
             "type": "string"
           }
@@ -315,29 +331,6 @@
           }
         },
         "title": "HTTPValidationError",
-        "type": "object"
-      },
-      "LoginIn": {
-        "additionalProperties": false,
-        "properties": {
-          "password": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Password",
-            "type": "string"
-          },
-          "username": {
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Username",
-            "type": "string"
-          }
-        },
-        "required": [
-          "username",
-          "password"
-        ],
-        "title": "LoginIn",
         "type": "object"
       },
       "PasswordIn": {
@@ -466,6 +459,43 @@
         "title": "Role",
         "type": "string"
       },
+      "RotateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "huidig_wachtwoord": {
+            "description": "Wachtwoord van de beheerder zelf",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Huidig Wachtwoord",
+            "type": "string"
+          },
+          "nieuw_wachtwoord": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Nieuw Wachtwoord",
+            "type": "string"
+          },
+          "sessieduur_minuten": {
+            "anyOf": [
+              {
+                "maximum": 240.0,
+                "minimum": 5.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessieduur Minuten"
+          }
+        },
+        "required": [
+          "huidig_wachtwoord",
+          "nieuw_wachtwoord"
+        ],
+        "title": "RotateIn",
+        "type": "object"
+      },
       "ServiceJwtIn": {
         "additionalProperties": false,
         "properties": {
@@ -516,6 +546,49 @@
         "title": "SetupAdminIn",
         "type": "object"
       },
+      "SetupIn": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "default": "Noodaccount",
+            "maxLength": 128,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "huidig_wachtwoord": {
+            "description": "Wachtwoord van de beheerder zelf",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Huidig Wachtwoord",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "sessieduur_minuten": {
+            "default": 60,
+            "maximum": 240.0,
+            "minimum": 5.0,
+            "title": "Sessieduur Minuten",
+            "type": "integer"
+          },
+          "username": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "huidig_wachtwoord",
+          "username",
+          "password"
+        ],
+        "title": "SetupIn",
+        "type": "object"
+      },
       "StatusIn": {
         "additionalProperties": false,
         "properties": {
@@ -539,6 +612,23 @@
           "status"
         ],
         "title": "StatusIn",
+        "type": "object"
+      },
+      "TrueNasAppIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+            "title": "App Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_name"
+        ],
+        "title": "TrueNasAppIn",
         "type": "object"
       },
       "TrustIn": {
@@ -683,6 +773,59 @@
         ],
         "title": "ValueIn",
         "type": "object"
+      },
+      "hub__routers__auth__LoginIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginIn",
+        "type": "object"
+      },
+      "hub__routers__breakglass__LoginIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "totp": {
+            "maxLength": 12,
+            "minLength": 6,
+            "title": "Totp",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "totp"
+        ],
+        "title": "LoginIn",
+        "type": "object"
       }
     }
   },
@@ -760,6 +903,218 @@
         ]
       }
     },
+    "/api/v1/auth/break-glass": {
+      "get": {
+        "operationId": "get_status_api_v1_auth_break_glass_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Status Api V1 Auth Break Glass Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status van het noodaccount (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/break-glass/confirm": {
+      "post": {
+        "operationId": "confirm_api_v1_auth_break_glass_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Confirm Api V1 Auth Break Glass Confirm Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "TOTP van het noodaccount bevestigen of herbevestigen (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/break-glass/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_break_glass_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hub__routers__breakglass__LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "invalid_credentials"
+          },
+          "403": {
+            "description": "source_not_private"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Noodlogin met wachtwoord + TOTP, alleen vanaf privé-adressen (sessie ≤ 60 min, niet verlengbaar)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/break-glass/rotate": {
+      "post": {
+        "operationId": "rotate_api_v1_auth_break_glass_rotate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Noodaccount roteren: nieuw wachtwoord en nieuwe TOTP (admin; rotatieplicht)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/break-glass/selftest": {
+      "post": {
+        "operationId": "selftest_api_v1_auth_break_glass_selftest_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Selftest Api V1 Auth Break Glass Selftest Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Zelftest van de noodlogin zonder in te loggen en zonder mutatie (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/break-glass/setup": {
+      "post": {
+        "operationId": "setup_api_v1_auth_break_glass_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Noodaccount aanmaken met TOTP (admin; geheim wordt één keer getoond)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
     "/api/v1/auth/jwks": {
       "get": {
         "operationId": "jwks_api_v1_auth_jwks_get",
@@ -779,6 +1134,76 @@
         ]
       }
     },
+    "/api/v1/auth/key-rotations": {
+      "get": {
+        "operationId": "key_rotations_api_v1_auth_key_rotations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 2147483648,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Key Rotations Api V1 Auth Key Rotations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ondertekende sleutelrotaties (zonder authenticatie; contract 1.2 §4.5). Nog niet gebouwd: lege lijst",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/keyset": {
+      "get": {
+        "operationId": "keyset_api_v1_auth_keyset_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Keyset Api V1 Auth Keyset Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Publieke sleutelset (jwks + policy-sleutel) met vingerafdruk, om te kopiëren",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login_api_v1_auth_login_post",
@@ -786,7 +1211,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LoginIn"
+                "$ref": "#/components/schemas/hub__routers__auth__LoginIn"
               }
             }
           },
@@ -2140,18 +2565,17 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "invalid_enrollment (onbekend, verlopen, al gebruikt of andere app_id)"
+          },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "validation_error"
+          },
+          "429": {
+            "description": "rate_limited (met Retry-After)"
           }
         },
-        "summary": "Dienst meldt zich aan met enrollment-token of koppelcode (eenmalig)",
+        "summary": "Dienst meldt zich aan met enrollment-token of koppelcode (contract 1.2 §3.3)",
         "tags": [
           "diensten en enrollment"
         ]
@@ -2235,6 +2659,29 @@
         ]
       }
     },
+    "/api/v1/services/self": {
+      "get": {
+        "operationId": "service_self_api_v1_services_self_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Service Self Api V1 Services Self Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dienst bevestigt zijn koppeling (Bearer service-token, contract 1.2 §3.6)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
     "/api/v1/services/self/rotate": {
       "post": {
         "operationId": "rotate_self_api_v1_services_self_rotate_post",
@@ -2248,7 +2695,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Dienst roteert zijn eigen token (Bearer)",
+        "summary": "Dienst roteert zijn eigen service-token (Bearer, contract 1.2 §3.8)",
         "tags": [
           "diensten en enrollment"
         ]
@@ -2313,7 +2760,7 @@
     },
     "/api/v1/services/{service_id}/rotate": {
       "post": {
-        "operationId": "rotate_api_v1_services__service_id__rotate_post",
+        "operationId": "request_rotation_api_v1_services__service_id__rotate_post",
         "parameters": [
           {
             "in": "path",
@@ -2324,8 +2771,91 @@
               "title": "Service Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
           }
         ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotatie van het service-token aanvragen (admin); de dienst roteert zelf, er komt geen token terug",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/{service_id}/truenas-app": {
+      "put": {
+        "operationId": "confirm_truenas_app_api_v1_services__service_id__truenas_app_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrueNasAppIn"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -2346,7 +2876,70 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Service-token roteren (admin); nieuw token wordt één keer getoond",
+        "summary": "Gemeten TrueNAS-appnaam van deze dienst bevestigen (admin, H14)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/{service_id}/unlink": {
+      "post": {
+        "operationId": "unlink_api_v1_services__service_id__unlink_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "adres onbekend"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "502": {
+            "description": "dienst onbereikbaar of weigerde"
+          }
+        },
+        "summary": "Ontkoppelen (admin): de Hub roept bij de dienst hub-link/unlink aan en trekt daarna de registratie in",
         "tags": [
           "diensten en enrollment"
         ]

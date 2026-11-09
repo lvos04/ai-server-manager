@@ -77,7 +77,7 @@ def _bearer(request: Request) -> str | None:
     return None
 
 
-def _service_principal(db: Session, token: str) -> Principal:
+def _service_principal(request: Request, db: Session, settings: Settings, token: str) -> Principal:
     row = db.scalars(select(ServiceToken).where(ServiceToken.token_hash == sha256_hex(token))).first()
     now = utcnow()
     if row is None or row.revoked_at is not None or (row.expires_at is not None and row.expires_at <= now):
@@ -85,9 +85,39 @@ def _service_principal(db: Session, token: str) -> Principal:
     svc = db.get(Service, row.service_id)
     if svc is None or svc.status != "active":
         raise HubError(401, "unauthorized", "Deze dienst is ingetrokken.")
+    changed = False
+    if row.first_used_at is None:
+        # Eerste gebruik van een (nieuw) token: vervangen oudere tokens vervallen 10 min later (contract 1.2 §3.8).
+        row.first_used_at = now
+        grace_until = now + timedelta(seconds=settings.service_token_rotation_grace_seconds)
+        older = db.scalars(
+            select(ServiceToken).where(
+                ServiceToken.service_id == row.service_id,
+                ServiceToken.id != row.id,
+                ServiceToken.superseded_at.is_not(None),
+                ServiceToken.created_at < row.created_at,
+                ServiceToken.revoked_at.is_(None),
+            )
+        )
+        for t in older:
+            if t.expires_at is None or t.expires_at > grace_until:
+                t.expires_at = grace_until
+        changed = True
     if row.last_used_at is None or now - row.last_used_at > timedelta(minutes=1):
         row.last_used_at = now
+        changed = True
+    if changed:
         db.commit()
+    newest = db.scalars(
+        select(ServiceToken)
+        .where(ServiceToken.service_id == row.service_id, ServiceToken.revoked_at.is_(None))
+        .order_by(ServiceToken.created_at.desc())
+        .limit(1)
+    ).first()
+    stale_token = newest is not None and newest.id != row.id and newest.first_used_at is None
+    if svc.rotation_requested_at is not None or stale_token:
+        # Aangevraagde rotatie of herstel na een onderbroken rotatie: de middleware zet Hub-Token-Rotation: required.
+        request.state.hub_token_rotation = True
     return Principal("service", str(svc.id), svc.app_id, service_app_id=svc.app_id, service_token_id=row.id)
 
 
@@ -119,7 +149,7 @@ def _session_principal(request: Request, db: Session, settings: Settings) -> Pri
 def optional_principal(request: Request, db: DB, settings: SettingsDep) -> Principal | None:
     token = _bearer(request)
     if token:
-        return _service_principal(db, token)
+        return _service_principal(request, db, settings, token)
     return _session_principal(request, db, settings)
 
 

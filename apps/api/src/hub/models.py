@@ -47,6 +47,15 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    # Noodaccount (contract 1.2 §4.1): alleen via /api/v1/auth/break-glass/*; TOTP-geheim versleuteld in de vault.
+    break_glass: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    totp_secret_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    totp_confirmed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # tegen hergebruik van een code
+    break_glass_session_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    break_glass_rotation_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    break_glass_reconfirmed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    break_glass_last_used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
 
 
 class WebSession(Base):
@@ -61,6 +70,7 @@ class WebSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     user_agent: Mapped[str] = mapped_column(String(256), default="")
     client_ip: Mapped[str] = mapped_column(String(64), default="")
+    break_glass: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class LoginAttempt(Base):
@@ -82,6 +92,14 @@ class Service(Base):
     enrolled_via: Mapped[str] = mapped_column(String(16))  # token|koppelcode
     enrolled_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    # Rotatie aangevraagd door een beheerder (contract 1.2 §3.8): Hub-Token-Rotation tot de dienst geroteerd heeft.
+    rotation_requested_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    rotation_requested_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Werkelijke TrueNAS-appnaam (H14): app_id is vast (§2); de appnaam is gemeten (app.query) en door een beheerder
+    # bevestigd. Leeg = nog niet bevestigd; dan geldt de app_id als appnaam.
+    truenas_app_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    truenas_app_name_confirmed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    truenas_app_name_confirmed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
 
 
 class EnrollmentGrant(Base):
@@ -96,6 +114,8 @@ class EnrollmentGrant(Base):
     expires_at: Mapped[datetime] = mapped_column(TS)
     used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     used_by_service: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    # RFC 7638-thumbprint van public_key_jwk bij het eerste gebruik: toegestane herhaling alleen met dezelfde sleutel.
+    used_with_key_thumbprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class ServiceToken(Base):
@@ -109,6 +129,12 @@ class ServiceToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     rotated_from: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    grant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("enrollment_grant.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    first_used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    # Gezet bij een rotatie: vervangen token; vervalt 10 min na het eerste gebruik van het nieuwe (max. 24 uur).
+    superseded_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
 
 
 class VaultSecret(Base):

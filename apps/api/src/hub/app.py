@@ -19,7 +19,7 @@ from hub.errors import error_body, install_error_handlers
 from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
 from hub.onboarding.service import seed
-from hub.routers import auth, backups, events, health, inventory, onboarding, services
+from hub.routers import auth, backups, breakglass, events, health, inventory, onboarding, services
 from hub.vault import Vault
 
 log = logging.getLogger("hub")
@@ -143,6 +143,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return JSONResponse(error_body(request, "payload_too_large", "Het verzoek is te groot."), status_code=413)
         response = await call_next(request)
         response.headers["X-Trace-Id"] = trace
+        if getattr(request.state, "hub_token_rotation", False):
+            response.headers["Hub-Token-Rotation"] = "required"
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault("X-Frame-Options", "DENY")
@@ -153,6 +155,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for r in (
         health.router,
         auth.router,
+        breakglass.router,
         services.router,
         onboarding.router,
         inventory.router,

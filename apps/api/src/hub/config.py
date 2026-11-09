@@ -43,10 +43,26 @@ class Settings(BaseSettings):
     # JWT voor gebruikerscontext naar diensten (contract §4: exp ≤ 120 s)
     jwt_ttl_seconds: int = Field(default=120, ge=10, le=120)
 
-    # Enrollment (contract §3)
+    # Enrollment (contract 1.2 §3.3–§3.8)
     enrollment_token_ttl_seconds: int = Field(default=60 * 60, ge=60, le=60 * 60)
     pairing_code_ttl_seconds: int = Field(default=60 * 60, ge=60, le=60 * 60)
+    executor_pairing_code_ttl_seconds: int = Field(default=30 * 60, ge=60, le=30 * 60)
+    enroll_max_failures: int = Field(default=10, ge=1, le=100)  # mislukte pogingen (401) per bron-IP …
+    enroll_window_seconds: int = Field(default=15 * 60, ge=60, le=24 * 3600)  # … binnen dit venster → 429
+    # Oud service-token blijft na een rotatie geldig tot zoveel seconden na het eerste gebruik van het nieuwe …
     service_token_rotation_grace_seconds: int = Field(default=10 * 60, ge=0, le=24 * 3600)
+    # … maar hooguit zoveel seconden na de rotatie.
+    service_token_rotation_max_seconds: int = Field(default=24 * 3600, ge=60, le=24 * 3600)
+    service_token_rotation_advice_days: int = Field(default=180, ge=1, le=3650)  # alleen een melding, nooit automatisch
+
+    # Uitgaande aanroepen van de Hub naar eigen diensten (contract §5: 5 s connect / 15 s read, nooit redirects)
+    service_call_connect_timeout: float = Field(default=5.0, gt=0, le=60)
+    service_call_read_timeout: float = Field(default=15.0, gt=0, le=120)
+
+    # Noodlogin (contract 1.2 §4.1)
+    break_glass_password_min_length: int = Field(default=20, ge=20, le=256)
+    break_glass_session_minutes_default: int = Field(default=60, ge=5, le=240)
+    break_glass_reconfirm_days: int = Field(default=90, ge=1, le=365)
 
     # TrueNAS JSON-RPC (contract §5: 5 s connect / 15 s read)
     truenas_connect_timeout: float = Field(default=5.0, gt=0, le=60)

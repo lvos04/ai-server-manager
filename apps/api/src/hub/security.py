@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import secrets
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -59,16 +60,25 @@ def constant_eq(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode(), b.encode())
 
 
+CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+PAIRING_CODE_LENGTH = 12
+
+
 def new_pairing_code() -> str:
     """Koppelcode voor handmatig geïnstalleerde apps: 12 tekens Crockford-base32 in groepen van 4 (~60 bit)."""
-    alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-    raw = "".join(secrets.choice(alphabet) for _ in range(12))
+    raw = "".join(secrets.choice(CROCKFORD_ALPHABET) for _ in range(PAIRING_CODE_LENGTH))
     return f"{raw[:4]}-{raw[4:8]}-{raw[8:]}"
 
 
 def normalize_pairing_code(code: str) -> str:
-    cleaned = "".join(ch for ch in code.upper() if ch.isalnum())
+    """Contract 1.2 §3.3: alleen letters/cijfers, hoofdletters, ``O→0``, ``I/L→1``."""
+    cleaned = "".join(ch for ch in code.upper() if ch.isascii() and ch.isalnum())
     return cleaned.replace("O", "0").replace("I", "1").replace("L", "1")
+
+
+def is_valid_pairing_code(normalized: str) -> bool:
+    """Precies 12 tekens uit het Crockford-alfabet (na normalisatie); anders 422."""
+    return len(normalized) == PAIRING_CODE_LENGTH and all(ch in CROCKFORD_ALPHABET for ch in normalized)
 
 
 # ------------------------------------------------------------------ rate-limit (in de database: werkt over herstarts)
@@ -94,3 +104,22 @@ def clear_failures(db: Session, key: str) -> None:
 
 def prune_attempts(db: Session, older_than_seconds: int) -> None:
     db.execute(delete(LoginAttempt).where(LoginAttempt.attempted_at < utcnow() - timedelta(seconds=older_than_seconds)))
+
+
+def retry_after_seconds(
+    db: Session, key: str, window_seconds: int, max_failures: int, now: datetime | None = None
+) -> int:
+    """Seconden tot er binnen het venster weer minder dan ``max_failures`` mislukte pogingen zijn (0 = nu al)."""
+    now = now or utcnow()
+    since = now - timedelta(seconds=window_seconds)
+    times = list(
+        db.scalars(
+            select(LoginAttempt.attempted_at)
+            .where(LoginAttempt.key == key, LoginAttempt.attempted_at >= since)
+            .order_by(LoginAttempt.attempted_at)
+        )
+    )
+    if len(times) < max_failures:
+        return 0
+    expiry = times[len(times) - max_failures] + timedelta(seconds=window_seconds)
+    return max(1, math.ceil((expiry - now).total_seconds()))

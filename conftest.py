@@ -160,3 +160,45 @@ def worker_once(app: Any, settings: Any) -> Any:
         return worker.run_once(app.state.sessionmaker, settings, app.state.vault(), schedule=schedule)
 
     return run
+
+
+def service_jwk(seed: bytes | None = None) -> dict[str, str]:
+    """Publieke Ed25519-identiteit van een dienst zoals contract 1.2 §3.3 vraagt: ``{kty, crv, x, kid=thumbprint}``."""
+    import base64
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from hub.keys import jwk_thumbprint
+
+    key = Ed25519PrivateKey.from_private_bytes(seed) if seed else Ed25519PrivateKey.generate()
+    raw = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    jwk = {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": base64.urlsafe_b64encode(raw).rstrip(b"=").decode(),
+    }
+    jwk["kid"] = jwk_thumbprint(jwk)
+    return jwk
+
+
+def enroll_body(
+    app_id: str,
+    *,
+    token: str | None = None,
+    code: str | None = None,
+    jwk: dict[str, str] | None = None,
+    version: str = "0.1.0",
+    base_url: str | None = None,
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "app_id": app_id,
+        "version": version,
+        "base_url": base_url,
+        "public_key_jwk": jwk or service_jwk(),
+    }
+    if token is not None:
+        body["enrollment_token"] = token
+    if code is not None:
+        body["pairing_code"] = code
+    return body
