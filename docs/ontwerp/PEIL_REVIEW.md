@@ -1,0 +1,248 @@
+# Peil-ontwerpreview van de gebouwde Hub-UI en de executor-statuspagina
+
+**Datum:** 9 november 2026 · **Rol:** onafhankelijke ontwerp-agent (contract 1.2 §13) · **Onderwerp:** de gebouwde
+`apps/web` (stand `333de88`, P1-webstap) en de statuspagina van de executor (`apps/executor`), met alle schermen van
+beheerder, kijker en kind, de publieke pagina's en de toestanden NAS offline en browser offline.
+**Toetsing aan:** ontwerptaal Peil 1.1.0 (`docs/platform-v2/ONTWERPTAAL.md`, `design/ontwerptaal/COMPONENTEN.md`,
+ADR-0015 met de besluiten van de gebruiker), de prototypes en afdrukken in `design/ontwerptaal/` en ADR-0024.
+**Besluiten:** ADR-0025. **Gereedschap:** `apps/web/review/` (`make web-review`).
+
+> **Eerlijkheid.** Alles hieronder is gemeten in Chromium (Playwright) tegen de echte Hub-API, met de worker en een
+> eigen PostgreSQL-database. TrueNAS, Uptime Kuma, Beszel, Gotify, de OIDC-issuer en de simulator-dienst zijn
+> simulators: **Sim-getest**. **NIET GEVALIDEERD:** echte schermlezer (NVDA/TalkBack), echte Android-telefoon in fel
+> licht, tv, echte NAS en echte accounts.
+
+## Oordeel
+
+**Goedgekeurd na herstel.** De Hub-UI volgt Peil goed:
+
+- statuswoorden, vormen en kleuren kloppen;
+- groen komt alleen voor bij "gemeten en goed";
+- onbekend en verouderd zijn nooit groen;
+- de laatst bekende waarde staat gedempt in een gearceerd vak;
+- de kindschil bestaat en de microcopy is rustig.
+
+De review vond wel fouten die de bestaande Playwright-suite niet ziet:
+
+- de grafieken toonden nooit gegevens en zeiden ten onrechte "Geen meting";
+- focus zonder ring of achter een balk;
+- een axe-fout bij het open gebruikersmenu;
+- overloop op 1024;
+- losse links kleiner dan 44 px;
+- iconen en woorden die van Peil afweken.
+
+Alles binnen het mandaat (uiterlijk, tekst en toegankelijkheid) is gerepareerd en opnieuw gemeten.
+
+**Eén blokkerende fout viel buiten het mandaat:** koppelen via de statuspagina van de executor werkt in geen enkele
+echte browser (N-01). Die is gereproduceerd en overgedragen, niet gerepareerd.
+
+| | Nulmeting (vóór) | Na herstel |
+|---|---|---|
+| Schermen en toestanden | 59 | 59 |
+| Metingen (scherm × breedte × thema) | 548¹ | 700 |
+| Harde bevindingen (per scherm en soort) | 35¹ | **0** |
+| axe-overtredingen (WCAG 2.2 A/AA) | 8 (`aria-hidden-focus`, serious) | **0** |
+| Laagste gerenderde tekstcontrast buiten de toestand NAS offline (alle tekst AAA) | 7,61:1 | 7,61:1 |
+| Laagste tekstcontrast, bewust gedempte laatst-bekende waarde (`--stale-ink` op arcering) | 4,56:1 (eis ≥ 4,5:1) | 4,56:1 licht, 5,01:1 donker |
+| Laagste focusring (met halo) | 5,13:1 | 5,13:1 |
+| Grafieken met gegevens | 0 (lus: ± 1300 aanvragen in 6 s) | alle reeksen met metingen (3 aanvragen in 6 s) |
+
+¹ Bij de nulmeting draaide door een fout in de projectfilter de breedtetest van 320 en 768 nog een keer mee, terwijl
+de NAS offline stond. Een deel van de JSON van 360, 390, 1024 en 1440 is daarbij overschreven. De twee bevindingen die
+alleen op 1024 voorkwamen (R-05 en R-07) staan in de eerste volledige uitvoer en in de afdrukken
+(`instellingen-monitoring` op 1024 was 1066 px breed). Daarom staat er 33 + 2 = 35. De filter is gerepareerd (de
+review en de toestanden zijn nu aparte projecten).
+
+## Werkwijze
+
+- **Skills:**
+  - `design:design-critique` (indruk, bruikbaarheid, hiërarchie, consistentie);
+  - `design:accessibility-review` (WCAG 2.2 AA-structuur);
+  - `design:ux-copy` (NL-microcopy tegen de woordenlijst van Peil §11);
+  - `design:design-system` (audit op hardgecodeerde waarden);
+  - `dataviz` (vóór elk oordeel over de grafieken, met de anti-patronenlijst);
+  - `design:design-handoff` (COMPONENTEN.md §28).
+- **Echte dienst met testgegevens.**
+  - `tests/e2e/web_stack.py` (API, worker, database en simulators) en `server/hub-server.mjs` (dezelfde server als
+    in de image), met een productie-build van `apps/web`.
+  - De opzet uit `e2e/00–01` maakt de testgegevens: beheerder, TrueNAS-koppeling, inventaris, apps, 100 identieke
+    events → één incident, diensten, noodaccount, SSO-gate en monitoringbronnen.
+  - De review maakt daarna een kijker en een kind aan, via de echte API.
+  - De executor draaide als echte dienst (`python -m executor api`), nog nooit gekoppeld.
+- **Meten.** `apps/web/review/peil-review.spec.ts` + `in-pagina.js` (afgeleid van `design/ontwerptaal/bouw/controle.cjs`).
+  - Per scherm × 320/360/390/768/1024/1440 × licht/donker: axe-core (WCAG 2.0/2.1/2.2 A+AA) en gerenderd
+    tekstcontrast, met opacity, `color-mix` en de donkerste arceerpixel.
+  - Daarnaast: veld- en stippelranden, doelen van ≥ 44 px (losse links tellen mee; inline links in een zin niet),
+    lettergrootte, overloop, afkappen met een ellips en tekstoverlap.
+  - Verder: Peil-semantiek (groen alleen met "Gezond", onbekend en verouderd nooit groen, statusvorm nooit zonder
+    woord) en de woordenlijst.
+  - Uitklapblokken worden ook open gemeten.
+  - Op 390 en 1440 een volledige Tab-doorloop: ring aanwezig, ring ≥ 3:1 tegen de achtergrond, niet bedekt door
+    kop- of ondernavigatie, en niet afgesneden door een scrollkader.
+- **Bekijken.** 700 volledige-pagina-afdrukken per meting. Ik heb ze met Read bekeken, als kolommen naast
+  elkaar, en vergeleken met de prototypes (`design/ontwerptaal/shots/*`). Een selectie voor/na staat in
+  `docs/ontwerp/review/`.
+- **Gedrag los gecontroleerd:**
+  - de grafiek met pijltjes, End en Esc, met voorlezen;
+  - het aantal aanvragen van de grafieken;
+  - de focus in een datumveld (deelvelden en kalenderknop);
+  - koppelen op de executor-statuspagina, met de headers van het verzoek.
+
+## Bevindingen en reparaties
+
+Ernst: **Blokkerend** · **Hoog** (WCAG-fout of onware uitspraak) · **Middel** (Peil-regel, bruikbaarheid) ·
+**Laag** (afwerking). Alle reparaties zitten in `apps/web`, behalve waar anders staat.
+
+| # | Ernst | Scherm (breedte) | Bevinding | Regel | Reparatie |
+|---|---|---|---|---|---|
+| R-01 | Hoog | Server → Metrieken, appdetail → Metrieken | Elke grafiek zei "Geen meting in deze periode", terwijl de API metingen had. `queryPath` zette `van` en `tot` op de milliseconde: het pad veranderde bij elke weergave en `useApi` haalde eindeloos opnieuw op (gemeten: 1357 aanvragen in 6 s). | Peil §1 (eerlijk), §10 | `van` op de hele minuut en geen `tot` (de Hub neemt "nu"); tijdens het laden "Meetreeks ophalen…" en bij een fout "Onbekend — …", nooit "Geen meting". Na herstel: 3 aanvragen in 6 s en een lijn met 6 punten. |
+| R-02 | Hoog | Besluit D02/D03, veld "Uitgevoerd op" (alle breedtes) | Tab naar de kalenderknop in het datumveld gaf geen ring (`:focus-visible` geldt dan niet op het veld). | WCAG 2.4.7, Peil §12 | Peil-ring op `:focus-within` voor datum- en tijdvelden. |
+| R-03 | Hoog | Kindschil, Ik (1024–1440) | "Intrekken" verdween bij Tab volledig achter de ondernavigatie: Peil zet de scroll-padding onder vanaf 1024 op 0,75 rem, maar de kindschil heeft daar ook een ondernavigatie. | WCAG 2.4.11 | `html:has([data-schil=kind])` krijgt de scroll-padding van de ondernavigatie. |
+| R-04 | Hoog | Gebruikersmenu open (alle breedtes) | axe `aria-hidden-focus` (serious): het modale Radix-menu zet `aria-hidden` op de pagina met focusbare inhoud. | WCAG 4.1.2 | Menu niet-modaal; Esc, Tab en klikken buiten sluiten het. |
+| R-05 | Hoog | Instellingen → Monitoring (1024) | Tabel Alertregels 42 px breder dan het scherm (naast de subnavigatie). | WCAG 1.4.10 | Tabel pas vanaf 1280, daaronder kaarten. |
+| R-06 | Middel | 6 fase-schermen, 404, besluiten, Server, Metrieken, Backups, TrueNAS, appslijst | Losse links van 22–24 px hoog ("Terug naar Home", "Naar Home", "TrueNAS-koppeling", "Alle details per app", "Meetdekking per metriek en bron", "Leg RPO/RTO vast in D16", "← Terug naar de onboarding" en de app-namen in de lijst). | Peil §6 (44 px overal), WCAG 2.5.8 | Recept `.losse-link` (44 px); "← Terug" werd een kruimelpad; rijlink in de appslijst 44 px. |
+| R-07 | Middel | Toegang → SSO "Groep → rol" (1024) | Groepsveld 26 px breed (drie kolommen in een smalle kolom). | Peil §6, WCAG 1.4.10 | Containerquery: naast elkaar pas vanaf 36 rem kolombreedte. |
+| R-08 | Middel | Incidentdetail (< 1280) | Kopsprong h1 → h3 (en h4 in het stappenplan). | WCAG 1.3.1, Peil A-02 | Kopniveau volgt de context: eigen pagina h1/h2/h3, master-detail h2/h3/h4. |
+| R-09 | Middel | Server → Metrieken | Op elke verse StatKaart een neutrale pil "✓ Gemeten", naast "· gemeten" bij het getal: een versheidsbadge. | Peil §4.4, K3 | Geen badge bij een verse waarde; alleen afwijkingen krijgen een pil. |
+| R-10 | Middel | Zijbalk, ondernavigatie, Meer, kopbalk, Home | Iconen weken af van §7. Huis was hetzelfde huisje als Home, Backups `archive`, Kosten `euro`, Media `film`, Problemen `circle-alert`, AI `sparkles`, Meer `ellipsis`; op Home GPU `cpu`. | Peil §7, WCAG 3.2.4 | Vaste koppeling §7: `sofa`, `database-backup`, `wallet`, `clapperboard`, `inbox`, `bot`, `menu`, GPU `microchip`. |
+| R-11 | Middel | Ik (kind), Account | Op Ik zag een kind IP-adressen, "gestart/verloopt" en een rode knop "Intrekken"; ook voor volwassenen was intrekken rood. | Peil A-19 (kind), §4.1 regel 2 | Kindvariant "Waar je bent ingelogd" ("Dit apparaat", "Uitloggen op dat apparaat"; IP achter "Details voor een volwassene"); intrekken is een gewone knop. |
+| R-12 | Middel | Zijbalk (≥ 1024) | Focusring van de navigatielinks links en rechts afgesneden door het scrollkader. | WCAG 2.4.7/2.4.13 | Scrollkader 6 px ruimer dan de items. |
+| R-13 | Middel | Server (alle) | De ankerlijst (Overzicht · Systeem · Pools …) zag er precies zo uit als de subnavigatie (Overzicht · Apps · Metrieken …): twee knoppenrijen met twee keer "Overzicht" en "Apps". | Peil §9 ("één tabrij"), hiërarchie | Lichte ankerlijst "Op deze pagina:" met onderstreepte links (C-64). |
+| R-14 | Laag | Home, Logs, SSO, appdetail, Diensten, Server, Metrieken, Onboarding | Taal: "pool(s)", "kanaal/kanalen", "sleutel(s)", "regel(s)", "Data-dataset(s)", "0 dagen oud", "Klaar", "— unknown", "realtime: ok", "Geprobeerd … · stale", redencode als losse tekst, "—" voor "n.v.t.". | Peil §11 | Echte meervouden (`aantal()`); "van vandaag"; "Aangemaakt"; "geslaagd / deels gelukt / mislukt (stand onbekend)"; "live-meting … werkt"; "Reden `code`"; "Geprobeerd … · geen antwoord (`unreachable`)"; "n.v.t." of "onbekend". |
+| R-15 | Laag | KopieerVeld (320–390) | Digest en URL stonden in een kolom van 12 tekens naast de knop (6 regels). | Peil §5 (codes breken, leesbaar) | Veld minstens 12 rem; anders springt de knop eronder. |
+| R-16 | Laag | Appdetail, Monitoring | Iconen in een lange regel krompen tot een stip; de aan/uit-knop stond bij "Uptime over 30 dagen" en "Uitgelezen om". | Peil §7 | `svg.lucide` krimpt nooit; `info` en `check` in plaats van `power`. |
+| R-17 | Laag | Metrieken, GPU's | Tekst "Geen meting — er is nog geen reeks." tegen de stippelrand. | afwerking | Opvulling en gecentreerd. |
+| R-18 | Laag | Onboarding, besluitenlijst (390) | De pil "Ingevuld (nog niet getest)" werd een ovaal van drie regels. | afwerking | Rij loopt om: de pil komt onder de titel als hij niet past. |
+| R-19 | Laag | Kind-403 | Tabtitel "Server — TrueNAS Home Platform" (een beheerterm voor een kind). | Peil A-19 | "Niet voor jou — TrueNAS Home Platform". |
+| R-20 | Laag | Grafieken | Geen toetsenbord-draadkruis (afwijking in ADR-0024), geen eindpunt of direct label, geen arcering in een gat, geen bron en tijd bij de grafiek, dubbele patroon-id's per pagina, tabelregio niet met het toetsenbord bereikbaar. | Peil §10, C-32, A-08 | Volgens C-32 gebouwd (COMPONENTEN.md §28): pijltjes, Home, End en Esc, draadkruis, uitlezing en `aria-live`, eindpunt met label, gat "Geen meting", bronregel, `useId` en een benoemde regio. |
+| R-21 | Laag | Backups (768) | Een lege tabel in een scrollkader was als focusdoel 40 px hoog. | Peil §6 | Scrollkader minstens 44 px. |
+| R-22 | Laag | Problemen (≥ 1280) | Zonder gekozen incident alleen een lijst over de volle breedte; na een klik sprong de indeling naar master-detail. | Peil §9 | Ook zonder keuze master-detail met de regel "Kies links een incident…". |
+| R-23 | Middel | Metrieken, Netwerk | Een gemeten kleine waarde las als 0: de tegel zei "0 Mbit/s" en de y-as "0, 0, 0, 0, 0" (één decimaal). | Peil §1 (nooit 0 voor iets dat niet 0 is), dataviz | Kleine waarden met 2 significante cijfers ("0,03 Mbit/s"), op de as en in de labels. |
+| R-24 | Laag | Metrieken, Opslag | Poolmeter boven de drempel had alleen een kleur en een tekst zonder icoon; "Onbekend" stond als losse tekst. | Peil §4.2/§10 (nooit alleen kleur) | `triangle-alert` + "… gebruikt — boven de drempel van 90%" in `degraded-ink`; Onbekend als StatusBadge. |
+| R-25 | Laag | Besluiten (schemaformulier) | "Verwijder" bij een rij in een nog niet opgeslagen formulier was een rode gevaarknop; de knop "Meet D01" stond in de gebiedende wijs. | Peil §4.1 regel 2, §11 | Gewone knop "Verwijderen" met prullenbak; "D01 meten". |
+
+Tijdens het herstel kwam R-13 terug in een nieuwe vorm: de nieuwe ankerlinks waren 39–43 px breed. Dat is direct
+gerepareerd (`min-w-touch`) en opnieuw gemeten.
+
+### Niet gerepareerd (buiten het mandaat of een functionele toevoeging)
+
+| # | Ernst | Bevinding | Waarom niet | Voorstel |
+|---|---|---|---|---|
+| N-01 | **Blokkerend** | **Executor: koppelen via de statuspagina mislukt in elke echte browser.** De pagina stuurt `Referrer-Policy: no-referrer`; bij een formulier-POST zet de browser dan `Origin: null`. `POST /koppelen` accepteert alleen `http(s)://<host>` en zegt "Geweigerd: het formulier komt niet van deze pagina." Gereproduceerd in Chromium: het verzoek had `Origin: null`. De pytest-client stuurt wel een Origin, dus de tests zagen dit niet. | Functionele en beveiligingscode van de executor; de ontwerp-agent repareert alleen uiterlijk, tekst en toegankelijkheid. | Zoals home-control-hub, appstore-en-fork, jelly-leon-platform en zoeken-en-persoonlijke-ai: `Origin: null` of een ontbrekende Origin accepteren en blijven vertrouwen op het CSRF-cookie (`SameSite=Strict`, HttpOnly) met de formuliertoken. Of de statuspagina `Referrer-Policy: same-origin` geven. Daarbij een browser-E2E-test (Playwright) op het koppelformulier. |
+| N-02 | Middel | De kopbalk mist Zoeken (C-51) en de Live-indicator. | Functionele toevoeging (ADR-0024 punt 8); er is in P1 geen zoekindex of live-stroom. | In P2/P5 bouwen; tot dan geen schijnknop (zo is het nu ook). |
+| N-03 | Laag | De tabs in het appdetail hebben geen iconen (het prototype wel). | Cosmetisch; de tabs zijn duidelijk. | Bij de volgende webstap `activity`, `chart-line`, `logs`, `tag` en `list-checks`. |
+| N-04 | Laag | Nog een paar inline styles in P0-schermen (`DecisionScreen`, `ValueView`, `RefreshInventory`). Geen kleuren: alleen afstanden. | Fase 3 "opruimen" (ADR-0024 punt 3). | Vervangen door utilities. |
+| N-05 | Laag | Gezondheid per onderdeel in het appdetail is op mobiel een stapel kaarten met de labels "Onderdeel/Status/Toelichting"; het prototype heeft compacte rijen (naam, bron, pil rechts). | Werkt en is toegankelijk; het is een dichtheidskeuze. | Compacte rijen zoals in `appdetail-p1.html` (minder scrollen op 360). |
+
+## Ontwerpkritiek (design-critique)
+
+**Eerste indruk.** Op elk scherm valt eerst de status op: SysteemStatusPaneel, "Wat actie nodig heeft",
+StatusBadge rechts in de kop. Dat klopt met Peil §1.2. Het rustige koele neutraal met inkt en één diep blauw leest
+goed in licht en donker. De rode rand van het systeemstatuspaneel bij Storing is het sterkste signaal, en terecht.
+
+**Bruikbaarheid.**
+
+- Rollen: kijker en kind zien uitgeschakelde bediening met de reden ernaast. Het kind ziet een eigen, kleine wereld:
+  Home · Kijken · Zoeken · Ik. Het kind ziet geen beheertermen meer, ook niet in de tabtitel of op Ik.
+- Grafieken: tot R-01 nutteloos, nu bruikbaar met muis én toetsenbord.
+- Server: de dubbele knoppenrij (R-13) was het grootste hiërarchieprobleem; nu is het duidelijk wat naar een andere
+  pagina gaat en wat binnen de pagina springt.
+
+**Visuele hiërarchie.** Paginakop h1 → intro → meta "Bijgewerkt … · vernieuwt elke … s" → acties. Kaarten hebben
+titel, (alleen bij een afwijking) een pil, de waarde en de bron. Na R-09 hebben verse waarden geen pil meer, en dat
+maakt Metrieken rustiger: alleen afwijkingen vallen op (Peil §1.4).
+
+**Consistentie.**
+
+- Hetzelfde begrip heeft overal hetzelfde woord en icoon (na R-10 en R-16).
+- Status, ernst, zekerheid, validatie en gate hebben elk hun eigen vorm: pil, linkerbalk, drie stippen, gestippelde
+  mono en slot.
+- De executor-statuspagina is het exacte Peil-sjabloon, met "Gekoppeld" neutraal en "Niet gereed — deels onbekend"
+  als eerlijke kop.
+
+**Wat goed werkt.**
+
+- O-03: de laatst bekende waarde staat gearceerd en gedempt (gemeten 4,56:1 licht, 5,01:1 donker; eis ≥ 4,5:1) met
+  status Onbekend/Verouderd, en geen enkel groen element bij NAS offline.
+- "Geen open problemen" verschijnt alleen bij verse monitoring.
+- P2-acties zijn zichtbaar maar uit, met "Volgt in fase P2" en zonder schijn-risicoklasse.
+- "Data verwijderen (R3) staat hier bewust niet."
+- De foutpanelen hebben een kopieerbare trace-ID; de terugval voor kopiëren noemt geen Ctrl+C.
+- Thema Systeem/Licht/Donker zet altijd het opgeloste thema; de focusring heeft een halo en haalt overal ≥ 5:1.
+
+**Vergelijking met de prototypes.**
+
+- Indeling en componenten volgen de prototypes voor Home, Apps, appdetail, Problemen (master-detail ≥ 1280),
+  Metrieken, Diensten, Noodaccount, Instellingen (index + subnavigatie), kindschil en statuspagina.
+- Bewuste afwijkingen uit ADR-0024:
+  - geen Zoeken en geen Live in de kopbalk;
+  - "Meer" als pagina in plaats van een sheet;
+  - tabs zonder iconen.
+- Onbewuste afwijkingen, nu gerepareerd: R-09 (badge "Gemeten" staat niet in het prototype), R-10 (iconen),
+  R-20 (grafiek).
+
+## Toegankelijkheid (accessibility-review, WCAG 2.2 AA)
+
+| Criterium | Uitkomst na herstel | Hoe gemeten |
+|---|---|---|
+| 1.1.1, 1.3.1 | 0 axe-overtredingen; één h1 per scherm, geen kopsprongen, geen dubbele id's of kapotte `aria-*`-verwijzingen | axe-core 4.14 + structuurcontrole, alle schermen × 6 breedtes × 2 thema's |
+| 1.4.3 / Peil 7:1 | Buiten NAS offline is elke tekst ≥ 7,61:1 (AAA). In NAS offline is alleen de bewust gedempte laatst-bekende waarde lager (4,56:1 licht, 5,01:1 donker; AA en de Peil-uitzondering) | gerenderd in de DOM, met de donkerste arceerpixel |
+| 1.4.10 | Geen overloop van 320 tot 1440, ook niet met uitklapblokken open | `scrollWidth` − `clientWidth` |
+| 1.4.11 | Veldranden en stippelranden ≥ 3:1 | gerenderd |
+| 2.4.7 / 2.4.11 / 2.4.13 | Tab-doorloop op 390 en 1440: elke stop heeft een ring van 3 px + 2 px halo (≥ 5,13:1), nooit volledig bedekt en nooit afgesneden | volledige Tab-doorloop, `elementFromPoint` op 5 punten |
+| 2.5.8 / Peil 44 px | Elk bedienbaar element ≥ 44 × 44 px, ook losse links; inline links in een zin zijn uitgezonderd | gemeten per element |
+| 4.1.2 | Menu, tabs en grafiek hebben een naam, rol en waarde; het grafiekplotvak is `role=img` met samenvatting, en de waarde per punt komt via `aria-live` | axe + gedragstest |
+
+**Toetsenbord.**
+
+| Element | Tab | Enter/Spatie | Esc | Pijltjes |
+|---|---|---|---|---|
+| Skiplink "Naar de inhoud" | eerste stop | naar `main` | — | — |
+| Gebruikersmenu | stop | opent | sluit | door de items |
+| Tabs in het appdetail | één stop (roving) | — | — | ← → Home End |
+| Grafiekplotvak | stop (ring om het plotvak) | — | wist het draadkruis | ← → per punt, Home/End; voorlezen "22:45: 23,5%" of "Geen meting" |
+| "Toon als tabel" | stop | klapt open | — | scrollregio met naam is een stop |
+| Datumveld | dag, maand, jaar, kalender | — | — | ring op het hele veld (R-02) |
+
+**Schermlezer (niet echt getest).** Alleen de toegankelijkheidsboom is gecontroleerd. Een echte NVDA/TalkBack-sessie
+staat nog open: NIET GEVALIDEERD.
+
+## Microcopy (ux-copy)
+
+- De vaste woorden (Gezond · Beperkt · Storing · Onbekend + reden · Verouderd · Nog niet beschikbaar · Alles gezond ·
+  Deels onbekend) worden overal gelijk gebruikt.
+- Knoppen beginnen met een werkwoord en een object ("Inventaris vernieuwen", "Testmelding versturen", "Incident
+  bekijken"). Er staat geen "OK", "Doorgaan" of "Weet je het zeker?".
+- Gerepareerd: R-14 (meervouden, ruwe Engelse statuswoorden, "Klaar", "0 dagen oud") en R-11 (kindertaal op Ik).
+- De woordenlijstcontrole gaf na herstel 0 treffers. Een aanvullende scan van alle 1346 unieke zichtbare teksten op Engelse of ruwe woorden vond alleen brongegevens (simulator-logregels, de SMART-tekst van TrueNAS), en de hierboven gerepareerde "stale" in "Geprobeerd … · stale" (nu "geen nieuwe meting (`stale`)").
+- Teksten uit de simulator (bijv. "home-control-hub: app.process crashed (Node-RED)") zijn gegevens van de bron en
+  geen UI-tekst.
+
+## Grafieken (dataviz)
+
+- **Vorm:** een trend is een lijn met één y-as; een huidige waarde is een StatKaart; geheugen is een meter. Geen
+  dubbele as en geen taart.
+- **Kleur:** reeks 1 is `--chart-1` en netwerk Ontvangen/Verzonden zijn `--chart-1`/`--chart-2` met een legenda. Het
+  palet is ongewijzigd en was al gevalideerd (dataviz-validator: PASS in licht en donker, `contrast.json`). Er is geen
+  nieuwe kleur.
+- **Merktekens:** lijn 2 px, raster en as als solide haarlijn, eindpunt met een ring in de vlakkleur, en een direct
+  label alleen bij één reeks.
+- **Eerlijkheid:** een gat is arcering met "Geen meting" (nooit 0); verouderd is arcering met "Verouderd sinds …";
+  laden en een fout zijn eigen toestanden.
+- **Interactie:** tooltip en draadkruis met de aanwijzer én het toetsenbord; de tabel is de WCAG-tweeling.
+- **Anti-patronen:** geen dubbele as, geen hercoloreren bij een filter, de periodefilter staat boven alle grafieken
+  en er is geen skeletflits bij verversen.
+- **Rest:** het pad wisselt eens per minuut, en dan staat er kort "Meetreeks ophalen…" (geen skelet).
+
+## Bewijs
+
+- Voor/na-afdrukken (WebP): `docs/ontwerp/review/*.webp`.
+- Opnieuw meten: `make web-build && make web-review`. CI draait dezelfde review als stap na de web-E2E en faalt bij
+  een harde bevinding.
+- Unit-tests voor de reparaties: `apps/web/tests/unit/peil-review.test.tsx` (stabiel querypad, gaten, meervouden,
+  bronlabel, StatKaart zonder badge).
+- De web-E2E-suite (Playwright, 360/390/768/1440 × licht/donker met axe) blijft groen: 179 geslaagd. Eén eerdere run
+  faalde op een wedloop in de opzettest: het incident stond er al met ×32, terwijl de worker de 100 events nog
+  verwerkte. De test wacht nu tot alle 100 meetellen. Het was geen fout in de Hub.
+- `docs/screenshots/p1` toont nog de stand vóór deze review (`333de88`). De actuele afdrukken maakt `make web-review`
+  (`apps/web/review/uit/shots`, niet in Git); de voor/na-selectie staat in `docs/ontwerp/review/`.

@@ -36,8 +36,8 @@ laatst-bekende waarde (`--stale-ink`, ≈ 6:1 en ≥ 4,5:1 op de arcering) haalt
 | `components.json` | Advies-configuratie voor de shadcn-CLI (zie COMPONENTEN.md §1). | Hub, MediaGuard, MSO |
 | `aliaslagen/*.css` | Migratiefase 1: oude variabelenamen → Peil (MediaGuard/MSO, my_house, Hub P0). | per app |
 | `contrast.json` | Alle contrastparen, ΔE-scheiding, paletvalidatie en de my_house-paren — herberekend. | controle |
-| `prototypes/*.html` | Elf referentieschermen (statische HTML met gecompileerde Tailwind, fictieve data), waaronder de statuspagina in twee toestanden. | referentie |
-| `shots/*.png` | 88 schermafdrukken: 11 schermen × 360/390/768/1440 × licht/donker. | review |
+| `prototypes/*.html` | Achttien referentieschermen (statische HTML met gecompileerde Tailwind, fictieve data), waaronder de statuspagina in twee toestanden en de zeven schermen van de Hub-ontwerpstap P1. | referentie |
+| `shots/*.png` | 144 schermafdrukken: 18 schermen × 360/390/768/1440 × licht/donker. | review |
 | `controle/` | Uitkomst van de automatische controle (axe, contrast in de DOM, focus, overloop) en het gedragstest. | bewijs |
 | `bouw/` | Bron (`tokens.mjs`) en alle scripts. `node bouw/alles.mjs --shots --controle` bouwt alles opnieuw. | onderhoud |
 
@@ -340,7 +340,7 @@ Regels voor namen (bindend):
 <!-- END:contrast -->
 
 Daarnaast meet `bouw/controle.cjs` het contrast **in de gerenderde DOM** (met opacity, color-mix en de donkerste
-arceerpixel) op alle elf prototypes, 6 breedtes × 2 thema's: 0 tekstfouten; laagste tekst 4,56:1 licht en 5,01:1
+arceerpixel) op alle prototypes (eerst elf, sinds de Hub-ontwerpstap achttien), 6 breedtes × 2 thema's: 0 tekstfouten; laagste tekst 4,56:1 licht en 5,01:1
 donker — dat is de bewust gedempte laatst-bekende waarde op de arcering (`--stale-ink`, eis ≥ 4,5:1).
 
 ---
@@ -803,6 +803,12 @@ op selecteren, forced colors houdt de stippelrand, 200 %-zoom (640 px) zonder ov
 **Niet gedaan:** echte schermlezer (NVDA/TalkBack), echte Android-telefoon in fel licht, tv/speler. Die horen bij de
 acceptatie (08_UI) en blijven open.
 
+**Uitkomst op de gebouwde Hub-UI** (ontwerpreview, `docs/ontwerp/PEIL_REVIEW.md`, ADR-0025): dezelfde controles,
+plus de Peil-semantiek en de woordenlijst, op de echte `apps/web` met de web-E2E-teststack (Sim-getest). Gemeten op
+320/360/390/768/1024/1440 × licht/donker, voor alle schermen van beheerder, kijker en kind, de publieke pagina's, de
+executor-statuspagina en de toestanden NAS offline en browser offline. Opnieuw meten: `make web-review`
+(`apps/web/review/`).
+
 ---
 
 ## 13. Per oppervlak
@@ -937,13 +943,18 @@ bij bestaande grafieken) vragen akkoord van de gebruiker en zijn géén onderdee
 
 ---
 
-## 15. Open punten (besluit van de gebruiker nodig)
+## 15. Open punten
 
-1. **O-07 productnaam** in de schil: prototypes gebruiken "Hub · Thuisplatform" als plaatshouder.
-2. **O-09 themaknop in my_house** en **O-11 "Terug naar de Hub"** in de bestaande apps: functionele toevoegingen.
-3. **Tabelweergave en toetsenbord bij bestaande grafieken** in MediaGuard/MSO: verbetert toegankelijkheid maar is een
-   UI-toevoeging.
-4. **Native Android-apps** van MediaGuard en my_house vallen buiten de reikwijdte en gaan visueel afwijken.
-5. **O-05 rechten van de rol kind** (prototype: Home · Kijken · Zoeken · Ik) — bevestigen met de API-bouwer.
-6. **O-03** vraagt een codewijziging in de Hub (laatst bekend bewaren) — pas na de overdracht.
-7. Echte schermlezer-, telefoon- en tv-test vóór afmelding (08_UI).
+Besloten door de gebruiker op 9 november 2026 (`design/ontwerptaal/BESLUITEN_GEBRUIKER.md`, ADR-0015):
+
+1. ~~O-07 productnaam~~: **TrueNAS Home Platform**. Dit staat in de prototypes en is in de Hub gebouwd (ADR-0024).
+2. ~~O-09 themaknop in my_house en O-11 "Terug naar de Hub"~~: allebei toegestaan.
+3. ~~Tabelweergave en toetsenbord bij bestaande grafieken in MediaGuard/MSO~~: toegestaan.
+4. ~~Native Android-apps van MediaGuard en my_house~~: vallen nu binnen de reikwijdte, in Peil-stijl.
+5. ~~O-05 rechten van de rol kind~~: Home · Kijken · Zoeken · Ik. De API weigert kind op de beheerroutes (ADR-0024).
+6. ~~O-03 laatst bekend bewaren~~: gebouwd in de Hub (ADR-0024 punt 4).
+
+Nog open:
+
+7. Echte schermlezer-, telefoon- en tv-test vóór afmelding (08_UI). Alle metingen tot nu toe zijn Sim-getest in
+   Chromium (NIET GEVALIDEERD).

@@ -558,3 +558,23 @@ Toegevoegd door de ontwerpstap voor de Hub-UI (`docs/ontwerp/HUB_PEIL_ONTWERP.md
 (intrekken/ingetrokken), `smartphone` (authenticator-app), `user-plus`, `send` (testmelding), `plug-zap` (bron
 uitlezen/verbinding testen), `key-square`, `life-buoy` (noodaccount), `log-in` (testlogin). `power` = aan/uit- en
 draaitoestand. Deze koppeling geldt overal (ONTWERPTAAL §7).
+
+---
+
+## 28. Aanvulling uit de ontwerpreview van de gebouwde Hub-UI (9 november 2026)
+
+Vastgelegd door de onafhankelijke review van de **gebouwde** UI (`docs/ontwerp/PEIL_REVIEW.md`, ADR-0025). Er zijn
+geen nieuwe tokens en Peil blijft 1.1.0. Het gaat om hoe een paar specificaties in de React-code worden gebouwd, en om
+één nieuw recept.
+
+| ID | Component | Specificatie (zoals gebouwd in `apps/web`) |
+|---|---|---|
+| C-32 | **Lijngrafiek in recharts** | Plotvak `div[role=img][tabindex=0]` met `aria-label`: titel, aantal meetpunten, van–tot, aantal perioden zonder meting en "Gebruik de pijltjestoetsen…". **Toetsen:** ← → per punt (de eerste druk springt naar het laatste punt), Home/End, Esc wist. **Draadkruis:** `ReferenceLine` 1 px `--foreground` + `ReferenceDot` r 6 met een ring van 2 px in `--card`. **Uitlezing:** zichtbaar vak rechtsboven (`popover`, waarde vet, tijd in `muted-foreground`, `aria-hidden`), plus een `p.sr-only[aria-live=polite]` ("22:45: 23,5%"; voor een gat "22:45: Geen meting"). Bij blur verdwijnt de uitlezing. **Eindpunt:** r 5 + ring van 2 px; bij één reeks een direct label rechts uitgelijnd (`text-anchor: end`) boven het punt, zodat het nooit buiten het plotvak valt. **Gat:** `ReferenceArea` met patroon `--chart-gap` (135°, per grafiek een eigen id via `useId`), met het label "Geen meting" als het gat ≥ 15 % van de breedte is. **Laden:** "Meetreeks ophalen…" (nooit "Geen meting" zolang de gegevens onderweg zijn). **Fout zonder eerdere gegevens:** stippelvak `unknown`: "Onbekend — de meetreeks kon niet worden opgehaald." **Onderschrift:** "Bron: TrueNAS (reporting.realtime) · bijgewerkt 22:56 · een gat betekent dat er geen meting was (nooit 0)." **Toon als tabel:** de scrollregio is `role=region` met naam en `tabindex=0`. |
+| C-32 | **Querypad van een reeks** | `van` op de hele minuut, zonder `tot` (de Hub neemt "nu"). Een pad dat bij elke weergave verandert, laat `useApi` eindeloos opnieuw ophalen. |
+| C-63 | **Losse link** (`.losse-link`) | Een link die niet in een zin staat (alleen in een alinea, rij of kaart): `inline-flex min-h-touch items-center gap-1.5`, onderstreept in `--link`. Zo heeft elke bediening 44 px. Alleen links in lopende tekst vallen onder de uitzondering van WCAG 2.5.8. "Terug naar …" wordt een kruimelpad (C-02). |
+| C-64 | **Ankerlijst "Op deze pagina"** (`nav.toc`) | Voor sprongen binnen één pagina (Server-inventaris). Vooraf het label "Op deze pagina:" (`text-sm font-semibold text-muted-foreground`); links onderstreept in `--link`, 44 × 44 px, `gap-x-4`, zonder rand en zonder vlak. Hij lijkt dus bewust **niet** op de subnavigatie (C-62), want twee gelijke knoppenrijen met tweemaal "Overzicht" en "Apps" waren verwarrend. |
+| C-65 | **Sessielijst** (eigen sessies) | Volwassenen: "Deze sessie"/"Andere sessie" · IP (`code`) · gestart · laatst gezien · verloopt; knop **Intrekken** met `log-out` als gewone (secundaire) knop. Intrekken is geen gevaar: opnieuw inloggen kan altijd (§4.1 regel 2). **Kind (Ik):** h2 "Waar je bent ingelogd"; per regel "Dit apparaat"/"Een ander apparaat" + "Laatst gebruikt …"; IP en tijden achter `details` "Details voor een volwassene"; knop "Uitloggen op dat apparaat". |
+| C-66 | **Datum- en tijdveld** | De Peil-ring staat op `:focus-within` (en niet alleen op `:focus-visible`). In Chromium kan de focus ín het veld op de kalenderknop staan; dan geldt `:focus-visible` niet op het veld, en zonder deze regel is er geen ring. |
+| C-01 | **Gebruikersmenu** | Radix DropdownMenu **niet-modaal** (`modal={false}`). Een modaal menu zet `aria-hidden` op de pagina terwijl daar focusbare elementen blijven (axe `aria-hidden-focus`). Esc, Tab en klikken buiten het menu sluiten het. |
+| C-01 | **Kindschil** | Op elke breedte een ondernavigatie, dus ook vanaf 1024 `scroll-padding-bottom` = ondernavigatie + safe area + 12 px. Tabtitel van de kind-403: "Niet voor jou — TrueNAS Home Platform". |
+| C-05 | **StatKaart, vers** | Geen badge: alleen de waarde met "· gemeten" en de tijd (K3). Een badge verschijnt alleen bij een afwijking (Onbekend, Verouderd, Beperkt, Storing). |
