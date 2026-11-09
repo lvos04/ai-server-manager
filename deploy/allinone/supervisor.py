@@ -57,11 +57,25 @@ def fail(msg: str, code: int = 78) -> None:
     sys.exit(code)
 
 
+PR_SET_NO_NEW_PRIVS = 38
+
+
+def set_no_new_privs() -> bool:
+    """Contract §10 'no-new-privileges': het standaard Custom App-formulier kan die vlag niet zetten, dus doet de image
+    het zelf na de gebruikerswissel. Erft over op alle kinderen; daarna wint geen proces nog rechten (ook niet via
+    setuid-bestanden). Stil (ook bruikbaar als preexec_fn); de bewaker controleert en meldt het zelf."""
+    try:
+        return int(ctypes.CDLL(None, use_errno=True).prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) == 0
+    except (OSError, AttributeError):
+        return False
+
+
 def demote_to(uid: int, gid: int) -> None:
     if os.getuid() == 0:
         os.setgroups([])
         os.setgid(gid)
         os.setuid(uid)
+    set_no_new_privs()
 
 
 def demote() -> None:
@@ -251,6 +265,8 @@ def main() -> None:
         log("AI-runner niet gestart: de container draait niet als root, dus een aparte gebruiker is niet mogelijk")
 
     demote()  # vanaf hier draait niets meer als root
+    if not set_no_new_privs():
+        log("WAARSCHUWING: no-new-privileges kon niet worden gezet (prctl); de processen draaien wel als 568")
     init_database()
     pg = postgres_child()
     pg.start()

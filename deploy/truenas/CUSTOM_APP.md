@@ -13,6 +13,9 @@ geen compose-bestand, geen terminal en geen `install.sh`.
 > kunnen per versie iets afwijken. Waarden tussen `<…>` vul je zelf in; er staan hier bewust geen voorbeeld-IP's of
 > poolnamen.
 
+> **Nog niet uitgebracht:** de tag `0.1.0` bestaat op GHCR pas nadat release `v0.1.0` is gemaakt (`release.yml`; zie
+> `CHANGELOG.md`). Tot dan kan TrueNAS de image niet ophalen; vul dus geen andere tag (en zeker niet `latest`) in.
+
 ## 0. Eenmalig: images openbaar maken op GitHub
 
 Een nieuw GHCR-pakket is standaard privé. Ga naar `https://github.com/lvos04?tab=packages` → pakket
@@ -61,7 +64,9 @@ submappen en verder van niets.
 | Resources Configuration | CPUs / Memory | bv. 2 CPU / 1024 MiB (in de bouwomgeving gebruikte de Hub met web-UI in rust ±250 MiB; meet zelf) |
 
 Wat er **niet** in staat (bewust): geen Docker-socket-mount, geen extra hostpaden, geen host network, geen
-privileged-modus.
+privileged-modus. Of het standaardformulier *no new privileges* kan zetten verschilt per versie (niet gecontroleerd op een
+echte NAS); de image zet die vlag daarom zelf voor al zijn processen, direct nadat hij als root de eigenaar van
+`/appdata` heeft geregeld (geldt ook voor de executor; de rooktest controleert `NoNewPrivs: 1` per proces).
 
 **Install.** Open daarna **Apps → ai-server-manager → Logs**. Bij de eerste start staat daar een blok:
 

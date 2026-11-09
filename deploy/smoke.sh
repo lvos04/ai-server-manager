@@ -50,6 +50,43 @@ case " $uids" in *" 569 "*) ;; *) echo "FOUT: AI-runner draait niet als aparte g
 socks="$(docker exec -u 568 asm-smoke-hub sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk "NR>1 && \$4==\"0A\" {print \$2}"' | sort -u | tr '\n' ' ')"
 echo "luisterende sockets (hex ip:poort): $socks"
 test "$socks" = "00000000:76C0 0100007F:20D0 "
+# no-new-privileges (contract §10; het standaardformulier kan dat niet zetten, de images doen het zelf). Processen van
+# 'docker exec' zelf (deze shell en zijn kinderen) tellen niet mee.
+nnp() {
+  docker exec -u 568 "$1" sh -c 'me=$$; for p in /proc/[0-9]*; do pid=${p#/proc/}; [ "$pid" = "$me" ] && continue;
+    pp=$(awk "/^PPid:/{print \$2}" $p/status 2>/dev/null); [ "$pp" = "$me" ] && continue; [ "$pp" = 0 ] && [ "$pid" != 1 ] && continue;
+    awk "/^NoNewPrivs:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' '
+}
+for c in asm-smoke-hub asm-smoke-exec; do
+  v="$(nnp "$c")"; echo "NoNewPrivs in $c: $v"
+  test "$v" = "1 " || { echo "FOUT: niet alle processen in $c hebben no-new-privileges" >&2; exit 1; }
+done
+
+# Herstart zonder dataverlies: eerste beheerder via de setupcode uit de log, dan herstart en harde kill.
+CODE="$(docker logs asm-smoke-hub 2>&1 | awk '/SETUPCODE \(eenmalig/ {c=$NF} END {print c}')"
+test -n "$CODE"
+PW='Rooktest-Wachtwoord-123!'
+api() { curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' -H 'content-type: application/json' "$@"; }
+test "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"beheerder\",\"password\":\"$PW\"}" \
+  http://127.0.0.1:30400/api/v1/setup/admin)" = 200 && echo "ok: eerste beheerder aangemaakt via de webpoort"
+test "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"tweede\",\"password\":\"$PW\"}" \
+  http://127.0.0.1:30400/api/v1/setup/admin)" = 409 && echo "ok: setupcode is eenmalig"
+EXEC_ID="$(curl -fsS --noproxy '*' http://127.0.0.1:30410/api/v1/status | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')"
+for how in restart kill; do
+  if [ "$how" = restart ]; then docker restart -t 30 asm-smoke-hub asm-smoke-exec >/dev/null
+  else docker kill -s KILL asm-smoke-hub asm-smoke-exec >/dev/null; docker start asm-smoke-hub asm-smoke-exec >/dev/null; fi
+  wait_healthy asm-smoke-hub
+  wait_healthy asm-smoke-exec
+  expect "na $how: setup blijft afgerond" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/setup/status)" '"setup_vereist":false'
+  test "$(api -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" http://127.0.0.1:30400/api/v1/auth/login)" = 200 \
+    && echo "ok: na $how: inloggen met het bestaande account"
+  n="$(docker logs asm-smoke-hub 2>&1 | grep -c 'SETUPCODE (eenmalig' || true)"
+  test "$n" = 1 || { echo "FOUT: na $how verscheen een nieuwe setupcode ($n)" >&2; exit 1; }
+  test "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/api/v1/status | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')" = "$EXEC_ID" \
+    && echo "ok: na $how: executor-identiteit ongewijzigd (geheimen niet overschreven)"
+done
+expect "harde kill: oude postmaster.pid opgeruimd" "$(docker logs asm-smoke-hub 2>&1)" 'oude postmaster.pid'
+
 docker stop -t 30 asm-smoke-hub >/dev/null
-expect "netjes gestopt" "$(docker logs asm-smoke-hub 2>&1)" '[hub] gestopt'
+expect "netjes gestopt" "$(docker logs asm-smoke-hub 2>&1 | tail -n 5)" '[hub] gestopt'
 echo "rooktest geslaagd"
