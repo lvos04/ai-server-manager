@@ -1,0 +1,1576 @@
+{
+ "richting": "peil",
+ "pagina": "diensten.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 166,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 166,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 166,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 35,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 7.31,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 166,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 176,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 178,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 42,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 7.31,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 166,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 166,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 166,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 35,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 6.55,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 166,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 176,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "select#dienst-kies.invoer.max-w-80",
+     "type": "select-one",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-6.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-7.code-veld.flex-1.basis-56",
+     "t": "{\"jwks\":{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed2",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-8.code-veld.flex-1.basis-56",
+     "t": "K7MW-2QXD-9RTH",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-9.code-veld.flex-1.basis-56",
+     "t": "7QK2-M4XD-9HCR-T1VB",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-10.code-veld.flex-1.basis-56",
+     "t": "3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Apps",
+     "w": 33,
+     "h": 19,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 178,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 42,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 6.55,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Instellingen\":\n          - /url: instellingen-toegang.html\n      - listitem: Diensten\n  - heading \"Diensten\" [level=1]\n  - paragraph: Eigen diensten van het platform en hun koppeling met de Hub. Koppelen, rotatie en intrekken doe je hier; de diensten zelf tonen alleen hun status.\n  - paragraph:\n    - text: Bijgewerkt\n    - time: 11:56\n    - text: (zojuist)\n  - link \"Dienst koppelen\":\n    - /url: \"#koppelen\"\n  - region \"Vingerafdruk van deze Hub\":\n    - heading \"Vingerafdruk van deze Hub\" [level=2]\n    - paragraph: Een dienst toont na het koppelen de vingerafdruk van de Hub waarmee hij gekoppeld is. Komt die niet overeen met deze, koppel dan niet en trek de dienst in.\n    - text: Vingerafdruk van de Hub-sleutelset\n    - code: 7QK2-M4XD-9HCR-T1VB\n    - button \"Kopiëren Vingerafdruk van de Hub-sleutelset\"\n    - paragraph\n    - group: Publieke sleutelset voor bestaande apps\n  - region \"Dienst koppelen\":\n    - heading \"Dienst koppelen\" [level=2]\n    - form \"Dienst koppelen\":\n      - text: Welke dienst?\n      - paragraph: Alleen eigen diensten van het platform. De executor koppel je via Onboarding → Executor (koppelcode 30 minuten).\n      - combobox \"Welke dienst?\":\n        - option \"appstore-en-fork\" [selected]\n        - option \"home-control-hub\"\n        - option \"jelly-leon-platform\"\n        - option \"zoeken-en-persoonlijke-ai\"\n      - group \"Hoe koppel je? (verplicht)\":\n        - text: Hoe koppel je? (verplicht)\n        - radio \"Enrollment-token in het Custom App-formulier (aanbevolen) Je vult drie omgevingsvariabelen in bij de app in TrueNAS. Niemand anders kan ertussen komen.\"\n        - text: Enrollment-token in het Custom App-formulier (aanbevolen) Je vult drie omgevingsvariabelen in bij de app in TrueNAS. Niemand anders kan ertussen komen.\n        - radio \"Koppelcode op de statuspagina van de dienst Voor een dienst die al draait. Je vult de code en de vingerafdruk in op de statuspagina.\" [checked]\n        - text: Koppelcode op de statuspagina van de dienst Voor een dienst die al draait. Je vult de code en de vingerafdruk in op de statuspagina.\n      - button \"Koppelcode maken\"\n    - heading \"Koppelcode voor appstore-en-fork\" [level=3]\n    - paragraph:\n      - text: Gemaakt om\n      - time: 11:56\n      - text: door Beheerder · geldig tot\n      - time: 12:56\n      - text: · nog 59:12\n    - text: Koppelcode\n    - code: K7MW-2QXD-9RTH\n    - button \"Kopiëren Koppelcode\"\n    - paragraph\n    - text: Vingerafdruk van de Hub\n    - code: 7QK2-M4XD-9HCR-T1VB\n    - button \"Kopiëren Vingerafdruk van de Hub\"\n    - paragraph\n    - paragraph:\n      - strong: Deze code zie je maar één keer.\n      - text: Hij werkt één keer en verloopt na 60 minuten. Een nieuwe code maakt deze niet ongeldig.\n    - list:\n      - listitem: \"Open de statuspagina van appstore-en-fork: http://nas.voorbeeld:30430 Voorbeeld Adres gemeten: NAS-adres uit D03 + hostpoort uit de inventaris.\"\n      - listitem:\n        - text: Vul daar het Hub-adres, de koppelcode en de vingerafdruk in en kies\n        - strong: Koppelen\n        - text: .\n      - listitem: Vergelijk daarna op de statuspagina de vingerafdruk met die hierboven.\n    - paragraph: Wacht op de dienst — deze pagina toont de koppeling zodra appstore-en-fork zich meldt.\n  - region \"Gekoppelde diensten\":\n    - heading \"Gekoppelde diensten\" [level=2]\n    - paragraph: 5 gekoppeld · 1 ingetrokken (verborgen)\n    - paragraph:\n      - text: \"\\\"Gekoppeld\\\" zegt alleen dat de dienst een geldige sleutel heeft. Of hij gezond is, zie je bij\"\n      - link \"Apps\":\n        - /url: apps.html\n      - text: .\n    - article \"home-control-hub\":\n      - heading \"home-control-hub\" [level=3]\n      - text: Gekoppeld\n      - term: App-id\n      - definition: home-control-hub\n      - term: Versie\n      - definition: 0.4.0\n      - term: Gekoppeld\n      - definition: 8 nov, via koppelcode\n      - term: Laatste contact\n      - definition:\n        - time: 11:55\n        - text: (1 min geleden)\n      - term: Token\n      - definition: ••••Q7xD · 12 dagen oud\n      - 'button \"Rotatie aanvragen: home-control-hub\"': Rotatie aanvragen\n      - 'button \"Ontkoppelen…: home-control-hub\"': Ontkoppelen…\n      - 'button \"Intrekken…: home-control-hub\"': Intrekken…\n    - article \"appstore-en-fork\":\n      - heading \"appstore-en-fork\" [level=3]\n      - text: Gekoppeld Rotatie aangevraagd\n      - term: App-id\n      - definition: appstore-en-fork\n      - term: Versie\n      - definition: 0.3.2\n      - term: Gekoppeld\n      - definition: 7 nov, via enrollment-token\n      - term: Laatste contact\n      - definition:\n        - time: 11:38\n        - text: (18 min geleden)\n      - term: Token\n      - definition: ••••m2Ra · 2 dagen oud\n      - paragraph:\n        - text: Rotatie aangevraagd om\n        - time: 11:40\n        - text: door Beheerder. De dienst roteert zelf bij zijn volgende aanroep; daarna blijft het oude token nog hooguit 10 minuten geldig.\n      - 'button \"Ontkoppelen…: appstore-en-fork\"': Ontkoppelen…\n      - 'button \"Intrekken…: appstore-en-fork\"': Intrekken…\n    - article \"jelly-leon-platform\":\n      - heading \"jelly-leon-platform\" [level=3]\n      - text: Gekoppeld\n      - term: App-id\n      - definition: jelly-leon-platform\n      - term: Versie\n      - definition: 0.2.0\n      - term: Gekoppeld\n      - definition: 9 mei, via enrollment-token\n      - term: Laatste contact\n      - definition:\n        - time: 11:54\n        - text: (2 min geleden)\n      - term: Token\n      - definition: ••••a91K · 194 dagen oud\n      - paragraph:\n        - strong: Token ouder dan 180 dagen.\n        - text: We raden aan rotatie aan te vragen. De Hub roteert nooit zelf en de AI kan het niet aanvragen.\n      - 'button \"Rotatie aanvragen: jelly-leon-platform\"': Rotatie aanvragen\n      - 'button \"Ontkoppelen…: jelly-leon-platform\"': Ontkoppelen…\n      - 'button \"Intrekken…: jelly-leon-platform\"': Intrekken…\n    - article \"zoeken-en-persoonlijke-ai\":\n      - heading \"zoeken-en-persoonlijke-ai\" [level=3]\n      - text: Gekoppeld\n      - term: App-id\n      - definition: zoeken-en-persoonlijke-ai\n      - term: Versie\n      - definition: 0.1.4\n      - term: Gekoppeld\n      - definition: 6 nov, via koppelcode\n      - term: Laatste contact\n      - definition:\n        - time: 7 nov, 09:12\n        - text: (2 dagen geleden)\n      - term: Token\n      - definition: ••••c0Vt · 3 dagen oud\n      - heading \"Ontkoppelen is mislukt\" [level=4]\n      - paragraph: \"De dienst is niet bereikbaar; er is niets ontkoppeld en niets ingetrokken. Start de dienst in TrueNAS en probeer het opnieuw. Of trek alleen de registratie in: de dienst merkt dat bij zijn volgende aanroep.\"\n      - term: Code\n      - definition:\n        - code: service_unreachable\n      - text: Trace-ID\n      - code: 3e8a1c57-0b6d-4f29-a1e4-9c7d2b5f8e03\n      - button \"Kopiëren Trace-ID\"\n      - paragraph\n      - button \"Opnieuw proberen\"\n      - group: Technische details\n      - 'button \"Rotatie aanvragen: zoeken-en-persoonlijke-ai\"': Rotatie aanvragen\n      - 'button \"Intrekken…: zoeken-en-persoonlijke-ai\"': Intrekken…\n    - article \"Executor\":\n      - heading \"Executor\" [level=3]\n      - text: Gekoppeld\n      - term: App-id\n      - definition: ai-server-manager-executor\n      - term: Versie\n      - definition: 0.1.0\n      - term: Gekoppeld\n      - definition: 8 nov, via koppelcode (30 min)\n      - term: Laatste contact\n      - definition:\n        - time: 11:56\n        - text: (zojuist)\n      - term: Schrijfsleutel\n      - definition: Alleen op de executorpagina; de Hub ziet hem nooit.\n      - link \"Executorpagina openen (opent in een nieuw tabblad)\":\n        - /url: \"#\"\n      - 'button \"Intrekken…: Executor\"': Intrekken…\n    - checkbox \"Ingetrokken diensten tonen (1)\"\n    - text: Ingetrokken diensten tonen (1)\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

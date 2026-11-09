@@ -1,0 +1,1216 @@
+{
+ "richting": "peil",
+ "pagina": "appdetail-p1.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 89,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 89,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 89,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 20,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.81,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 89,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 100,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 102,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 28,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.81,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 89,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 89,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 89,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 20,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.97,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 89,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 100,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-5.code-veld.flex-1.basis-56",
+     "t": "sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Herstarten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Stoppen: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Bijwerken: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Terugzetten: appstore-en-fork",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.md:w-auto",
+     "t": "Verwijderen (container): appstore-en-for",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Incident bekijken",
+     "w": 129,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 102,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 28,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.97,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Server\":\n          - /url: server-metrieken.html\n      - listitem:\n        - link \"Apps\":\n          - /url: apps.html\n      - listitem: appstore-en-fork\n  - heading \"appstore-en-fork\" [level=1]\n  - paragraph: Eigen dienst · Custom App (standaardformulier) · versie 0.3.2\n  - link \"Openen in appstore-en-fork (opent in een nieuw tabblad)\":\n    - /url: \"#\"\n  - region \"Gezondheid\":\n    - heading \"Gezondheid\" [level=2]\n    - text: Beperkt\n    - paragraph:\n      - text: Antwoordt (HTTP 200), maar de worker rondde sinds 10:40 geen taken af.\n      - link \"Incident bekijken\":\n        - /url: problemen.html\n    - heading \"Gezondheid per onderdeel\" [level=3]\n    - list:\n      - listitem:\n        - text: TrueNAS-staat TrueNAS app.query Draait Draaien alleen is geen bewijs van gezond. ·\n        - time: 11:54\n      - listitem:\n        - text: Buitenkant Uptime Kuma Gezond HTTP 200 in 84 ms. ·\n        - time: 11:55\n      - listitem:\n        - text: \"Binnenkant Gezondheidscontrole van de dienst Beperkt Controle \\\"worker\\\": geen afgeronde taken sinds 10:40. ·\"\n        - time: 11:55\n    - text: Image-digest\n    - code: sha256:5be8a7c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6ea913\n    - button \"Kopiëren Image-digest\"\n    - paragraph\n    - term: Bron\n    - definition: TrueNAS-API (app.query, app.image.query), Uptime Kuma\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n    - term: Image\n    - definition: ghcr.io/voorbeeld/appstore-en-fork:0.3.2\n    - term: Data-dataset\n    - definition: voorbeeldpool/apps/appstore\n    - term: Resourcegrenzen\n    - definition: Onbekend — de Hub leest de app-configuratie niet (kan geheimen bevatten).\n  - tablist \"Onderdelen van de app\":\n    - tab \"Status\"\n    - tab \"Metrieken\"\n    - tab \"Logs\"\n    - tab \"Versies\"\n    - tab \"Acties\" [selected]\n  - tabpanel \"Acties\":\n    - region \"Acties\":\n      - heading \"Acties\" [level=2]\n      - paragraph:\n        - strong: Nog niet beschikbaar — volgt in fase P2 (veilig automatiseren).\n        - text: Dan opent elke actie eerst een voorstel met preview, het risico volgens het beleid, een back-up vooraf en een controle na uitvoering. Tot dan wijzigt de Hub niets aan apps.\n      - list:\n        - listitem:\n          - text: Herstarten\n          - paragraph:\n            - code: app.restart\n            - text: · risico bepaalt het beleid (R1 of R2)\n          - 'button \"Herstarten : appstore-en-fork\" [disabled]'\n          - text: Volgt in fase P2\n        - listitem:\n          - text: Stoppen\n          - paragraph:\n            - code: app.stop\n            - text: · risico bepaalt het beleid\n          - 'button \"Stoppen : appstore-en-fork\" [disabled]'\n          - text: Volgt in fase P2\n        - listitem:\n          - text: Bijwerken\n          - paragraph:\n            - code: app.update\n            - text: · back-up vooraf; risico bepaalt het beleid\n          - 'button \"Bijwerken : appstore-en-fork\" [disabled]'\n          - text: Volgt in fase P2\n        - listitem:\n          - text: Terugzetten\n          - paragraph:\n            - code: app.rollback\n            - text: · alleen met een herstelplan\n          - 'button \"Terugzetten : appstore-en-fork\" [disabled]'\n          - text: Volgt in fase P2\n        - listitem:\n          - text: Verwijderen (container)\n          - paragraph:\n            - code: app.uninstall\n            - text: · data blijft bewaard op de dataset\n          - 'button \"Verwijderen (container) : appstore-en-fork\" [disabled]'\n          - text: Volgt in fase P2\n      - paragraph:\n        - strong: Data verwijderen (R3)\n        - text: staat hier bewust niet. Dat is een aparte flow met een eigen bevestiging en wordt nooit door de AI aangeboden.\n      - paragraph:\n        - text: \"Wat nu al kan:\"\n        - strong: Openen in appstore-en-fork\n        - text: (bovenaan) — alleen lezen, de Hub wijzigt niets. Voorbeeld\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

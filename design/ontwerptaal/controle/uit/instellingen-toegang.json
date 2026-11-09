@@ -1,0 +1,1120 @@
+{
+ "richting": "peil",
+ "pagina": "instellingen-toegang.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 136,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 136,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 136,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 30,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.81,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 136,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 154,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 145,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 45,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.81,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 136,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 136,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 136,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 30,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.97,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 136,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 154,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "checkbox",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#issuer.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#client.invoer.max-w-96.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-14.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/api/v1/auth/o",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button.knop.knop-secundair.w-full.sm:w-auto",
+     "t": "OIDC verplicht maken",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Advies van home-control-hub: minste rech",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 145,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 45,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.97,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Instellingen\":\n          - /url: \"#\"\n      - listitem: Gebruikers en toegang\n  - heading \"Gebruikers en toegang\" [level=1]\n  - paragraph: Wie de Hub mag gebruiken en hoe je inlogt.\n  - paragraph:\n    - text: Bijgewerkt\n    - time: 11:56\n    - text: (zojuist)\n  - region \"Gebruikers en rollen\":\n    - heading \"Gebruikers en rollen\" [level=2]\n    - button \"Gebruiker toevoegen\"\n    - heading \"Gebruikers\" [level=3]\n    - list:\n      - listitem:\n        - paragraph: Beheerder beheerder\n        - term: Rol\n        - definition: Beheerder\n        - term: Aanmelden\n        - definition: Lokaal wachtwoord\n        - term: Sessies\n        - definition: 2 actief\n        - 'button \"Rol wijzigen: Beheerder\"': Rol wijzigen\n        - 'button \"Sessies intrekken: Beheerder\"': Sessies intrekken\n      - listitem:\n        - paragraph: Noodaccount noodbeheer\n        - term: Rol\n        - definition: Beheerder\n        - term: Aanmelden\n        - definition: Noodlogin (wachtwoord + TOTP)\n        - term: Sessies\n        - definition: geen\n        - link \"Noodaccount beheren\":\n          - /url: noodaccount.html\n      - listitem:\n        - paragraph: Alex alex\n        - term: Rol\n        - definition: Operator\n        - term: Aanmelden\n        - definition: Lokaal wachtwoord\n        - term: Sessies\n        - definition: geen\n        - 'button \"Rol wijzigen: Alex\"': Rol wijzigen\n        - 'button \"Sessies intrekken: Alex\"': Sessies intrekken\n      - listitem:\n        - paragraph: Huisgenoot huisgenoot\n        - term: Rol\n        - definition: Kijker\n        - term: Aanmelden\n        - definition: SSO · groep gezin\n        - term: Sessies\n        - definition: 1 actief\n        - 'button \"Rol wijzigen: Huisgenoot\"': Rol wijzigen\n        - 'button \"Sessies intrekken: Huisgenoot\"': Sessies intrekken\n      - listitem:\n        - paragraph: Sam sam\n        - term: Rol\n        - definition: Kind\n        - term: Aanmelden\n        - definition: SSO · groep kinderen\n        - term: Sessies\n        - definition: 1 actief\n        - 'button \"Rol wijzigen: Sam\"': Rol wijzigen\n        - 'button \"Sessies intrekken: Sam\"': Sessies intrekken\n    - checkbox \"Gedeactiveerde gebruikers tonen (1)\"\n    - text: Gedeactiveerde gebruikers tonen (1)\n    - group: Wat mag elke rol?\n  - region \"Inloggen via SSO\":\n    - heading \"Inloggen via SSO\" [level=2]\n    - text: Uit\n    - paragraph: Inloggen met je Authentik-account (OpenID Connect). Lokaal inloggen en het noodaccount blijven altijd werken.\n    - paragraph: \"Inschakelen kan nog niet: geblokkeerd door de HTTPS-voorwaarde\"\n    - paragraph: \"Nodig: besluit D17 (HTTPS) op Getest. De testlogin hieronder is wel geslaagd.\"\n    - paragraph: Dit is geen storing; er wacht een voorwaarde. Doorgaan zonder kan niet.\n    - link \"D17 openen\":\n      - /url: \"#\"\n    - form \"Inloggen via SSO\":\n      - text: Issuer-adres\n      - paragraph: Exact zoals Authentik het noemt, alleen https. Wijzigen zet SSO uit tot een nieuwe testlogin slaagt.\n      - textbox \"Issuer-adres\": https://auth.voorbeeld/application/o/hub/\n      - text: Client-ID\n      - textbox \"Client-ID\": hub-voorbeeld\n      - text: Clientgeheim\n      - paragraph: ••••7f3a opgeslagen 9 nov 2026 · de waarde wordt nooit getoond\n      - button \"Geheim vervangen\"\n      - text: Terugkeer-adres (zet dit in Authentik)\n      - code: http://hub.voorbeeld:30400/api/v1/auth/oidc/callback\n      - button \"Kopiëren Terugkeer-adres (zet dit in Authentik)\"\n      - paragraph\n      - paragraph:\n        - text: Dit terugkeer-adres is\n        - strong: http\n        - text: . De aanmeldcode is beschermd met PKCE en een browsercookie, maar zet HTTPS aan zodra D17 klaar is.\n    - heading \"Controle van de issuer\" [level=3]\n    - status:\n      - text: Geslaagd · opgehaald om\n      - time: 11:48\n      - text: .\n    - list:\n      - listitem: Issuer klopt exact Gelijk aan het adres hierboven.\n      - listitem: Zelfde oorsprong Alle endpoints op hetzelfde adres als de issuer.\n      - listitem: Sleutels 1 sleutel (RS256); symmetrische ondertekening wordt geweigerd.\n    - heading \"Groep → rol\" [level=3]\n    - table \"Koppeling van Authentik-groepen aan rollen\":\n      - caption: Koppeling van Authentik-groepen aan rollen\n      - rowgroup:\n        - row \"Groep in Authentik Rol in de Hub\":\n          - columnheader \"Groep in Authentik\"\n          - columnheader \"Rol in de Hub\"\n      - rowgroup:\n        - row \"hub-beheerders Beheerder\":\n          - rowheader \"hub-beheerders\"\n          - cell \"Beheerder\"\n        - row \"hub-operators Operator\":\n          - rowheader \"hub-operators\"\n          - cell \"Operator\"\n        - row \"gezin Kijker\":\n          - rowheader \"gezin\"\n          - cell \"Kijker\"\n        - row \"kinderen Kind\":\n          - rowheader \"kinderen\"\n          - cell \"Kind\"\n    - heading \"Testlogin\" [level=3]\n    - paragraph:\n      - text: Geslaagd om\n      - time: 11:50\n      - text: als beheerder · groep hub-beheerders → Beheerder. Er is geen sessie gemaakt.\n    - button \"Testlogin starten\"\n    - text: OIDC verplicht\n    - button \"OIDC verplicht maken\" [disabled]\n    - text: \"Kan pas als SSO aanstaat én het noodaccount werkt (nu niet: TOTP wacht op bevestiging).\"\n    - paragraph: \"Advies van home-control-hub: minste rechten deels gecontroleerd.\"\n    - paragraph:\n      - text: Niet alle rechten van de Hub-client in Authentik konden worden nagegaan. Bijgewerkt\n      - time: 11:30\n      - text: .\n  - region \"Noodaccount\":\n    - heading \"Noodaccount\" [level=2]\n    - text: Rotatie loopt\n    - paragraph: \"Noodlogin werkt nu niet: de nieuwe TOTP is nog niet bevestigd.\"\n    - link \"Noodaccount openen\":\n      - /url: noodaccount.html\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

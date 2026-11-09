@@ -1,0 +1,904 @@
+{
+ "richting": "peil",
+ "pagina": "apps.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 126,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 126,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 126,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 32,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 126,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 114,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 116,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 40,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.24,
+   "aantalTekst": 126,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.24,
+   "aantalTekst": 126,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.24,
+   "aantalTekst": 126,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 32,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.24,
+   "aantalTekst": 126,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.24,
+   "aantalTekst": 114,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek-app.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.24,
+   "aantalTekst": 116,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 40,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Server\":\n          - /url: server-metrieken.html\n      - listitem: Apps\n  - heading \"Apps\" [level=1]\n  - paragraph: \"Alle apps op de NAS met hun gezondheid. Alleen lezen: herstarten, bijwerken en andere acties volgen in fase P2.\"\n  - paragraph:\n    - text: Catalogus bijgewerkt\n    - time: 11:56\n    - text: · inventaris van\n    - time: 11:54\n    - text: (TrueNAS app.query)\n  - button \"Catalogus bijwerken\"\n  - search \"Apps filteren\":\n    - text: Zoeken\n    - searchbox \"Zoeken\"\n    - button \"Meer filters\"\n    - group \"Gezondheid\":\n      - button \"Alle (7)\" [pressed]\n      - button \"Storing (1)\"\n      - button \"Beperkt (1)\"\n      - button \"Onbekend (3)\"\n      - button \"Gezond (2)\"\n  - paragraph: \"Gezond betekent: bereikbaar én (voor apps met eigen taken) een verse controle van binnenuit. \\\"Draait\\\" volgens TrueNAS alleen is nooit gezond.\"\n  - region \"Apps op de NAS\":\n    - heading \"Apps op de NAS\" [level=2]\n    - paragraph: \"7 apps · slechtste status eerst · filter: alle\"\n    - list:\n      - listitem:\n        - link \"Voorbeeld-app\":\n          - /url: problemen.html\n        - text: Storing\n        - paragraph: TrueNAS meldt de app als gecrasht; Uptime Kuma krijgt geen antwoord sinds 11:54.\n        - term: App-id\n        - definition: voorbeeld-app\n        - term: Versie\n        - definition: 2.4.1 · sha256:91c4…7d02\n        - term: Installatie\n        - definition: Catalogusapp\n        - term: Eigenaar\n        - definition: App van derden\n        - link \"Openen in Voorbeeld-app (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n      - listitem:\n        - link \"appstore-en-fork\":\n          - /url: appdetail-p1.html\n        - text: Beperkt\n        - paragraph: Antwoordt (HTTP 200), maar de worker rondde sinds 10:40 geen taken af.\n        - term: App-id\n        - definition: appstore-en-fork\n        - term: Versie\n        - definition: 0.3.2 · sha256:5be8…a913\n        - term: Installatie\n        - definition: Custom App (standaardformulier)\n        - term: Eigenaar\n        - definition: Eigen dienst\n        - link \"Openen in appstore-en-fork (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n      - listitem:\n        - link \"MediaGuard\":\n          - /url: \"#\"\n        - text: Onbekend\n        - paragraph: \"Binnenkant volgt in fase P3 (koppeling met MediaGuard). TrueNAS: draait; Uptime Kuma: bereikbaar.\"\n        - term: App-id\n        - definition: mediaguard\n        - term: Versie\n        - definition: 3.8.0 · sha256:0c7d…3c21\n        - term: Installatie\n        - definition: Custom App (standaardformulier)\n        - term: Eigenaar\n        - definition: Bestaande app\n        - link \"Openen in MediaGuard (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n      - listitem:\n        - link \"my_house\":\n          - /url: \"#\"\n        - text: Verouderd\n        - paragraph: Laatste meting 10:12; sindsdien geen antwoord. Status onbekend.\n        - term: App-id\n        - definition: my-house\n        - term: Versie\n        - definition: 1.9.3 · sha256:d1e2…d4e5\n        - term: Installatie\n        - definition: Custom App (standaardformulier)\n        - term: Eigenaar\n        - definition: Bestaande app\n        - link \"Openen in my_house (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n      - listitem:\n        - link \"home-control-hub\":\n          - /url: \"#\"\n        - text: Gezond\n        - paragraph: Bereikbaar en de eigen gezondheidscontrole is vers (11:55).\n        - term: App-id\n        - definition: home-control-hub\n        - term: Versie\n        - definition: 0.4.0 · sha256:7a8b…7b81\n        - term: Installatie\n        - definition: Custom App (standaardformulier)\n        - term: Eigenaar\n        - definition: Eigen dienst\n        - link \"Openen in home-control-hub (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Gotify\":\n          - /url: \"#\"\n        - text: Onbekend\n        - paragraph: Geen Uptime Kuma-monitor gekoppeld; alleen de TrueNAS-staat is bekend.\n        - term: App-id\n        - definition: gotify\n        - term: Versie\n        - definition: 2.6.1 · digest onbekend\n        - term: Installatie\n        - definition: Catalogusapp\n        - term: Eigenaar\n        - definition: App van derden\n        - link \"Openen in Gotify (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Uptime Kuma\":\n          - /url: \"#\"\n        - text: Gezond\n        - paragraph: \"Monitor bereikbaar in 41 ms; TrueNAS: draait.\"\n        - term: App-id\n        - definition: uptime-kuma\n        - term: Versie\n        - definition: 2.0.2 · sha256:2f3a…2f3a\n        - term: Installatie\n        - definition: Catalogusapp\n        - term: Eigenaar\n        - definition: App van derden\n        - link \"Openen in Uptime Kuma (opent in een nieuw tabblad)\":\n          - /url: \"#\"\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

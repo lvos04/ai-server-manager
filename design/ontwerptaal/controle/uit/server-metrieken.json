@@ -1,0 +1,1460 @@
+{
+ "richting": "peil",
+ "pagina": "server-metrieken.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.56,
+   "aantalTekst": 347,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.56,
+   "aantalTekst": 347,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.56,
+   "aantalTekst": 347,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 28,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2",
+     "3px/4"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.56,
+   "aantalTekst": 362,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.56,
+   "aantalTekst": 372,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.56,
+   "aantalTekst": 374,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 35,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2",
+     "3px/4"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.01,
+   "aantalTekst": 347,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.01,
+   "aantalTekst": 347,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.01,
+   "aantalTekst": 347,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 28,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2",
+     "3px/4"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.01,
+   "aantalTekst": 362,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.01,
+   "aantalTekst": 372,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-x",
+     "t": "Geen meting",
+     "bw": 0,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "article.kaart.kaart-verouderd.xl:order-2",
+     "t": "Intel UHD 770PCI 0000:00:02.0 VoorbeeldO",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.status.status-verouderd.",
+     "t": "Verouderd",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.waardevak-verouderd",
+     "t": "Laatst bekend · 09:459 % (laatst bekende",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Vermogen: Niet beschikbaarBeszel levert ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.rounded-md.border-2.border-dashed.border-unknown",
+     "t": "Temperatuur: OnbekendGeen bron levert de",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.arcering-gat.absolute.inset-y-0.border-l-2",
+     "t": "Verouderd sinds 09:45",
+     "bw": 0,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.01,
+   "aantalTekst": 374,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 35,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2",
+     "3px/4"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Server\":\n          - /url: \"#\"\n      - listitem: Metrieken\n  - heading \"Metrieken\" [level=1]\n  - paragraph: Live metingen van de NAS met bron en tijd. Wat geen verse bron heeft, staat als onbekend — nooit als 0.\n  - paragraph:\n    - text: Bijgewerkt\n    - time: 11:56\n    - text: (zojuist) · vernieuwt elke 60 s\n  - button \"Vernieuwen\"\n  - navigation \"Server\":\n    - list:\n      - listitem:\n        - link \"Overzicht\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Apps\":\n          - /url: apps.html\n      - listitem:\n        - link \"Metrieken\":\n          - /url: server-metrieken.html\n      - listitem:\n        - link \"Meetdekking\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Logs\":\n          - /url: \"#\"\n  - group \"Periode\":\n    - text: Periode\n    - button \"1 u\"\n    - button \"6 u\" [pressed]\n    - button \"24 u\"\n    - button \"7 d\"\n    - button \"30 d\"\n    - text: Ruwe metingen tot 6 u; 7 d per 5 min; langer per uur.\n  - heading \"Nu\" [level=2]\n  - article \"CPU-gebruik\":\n    - heading \"CPU-gebruik\" [level=3]\n    - paragraph: 23 % · gemeten\n    - paragraph: alle threads samen, nu\n    - term: Bron\n    - definition: TrueNAS (reporting.realtime)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n  - article \"CPU-temperatuur\":\n    - heading \"CPU-temperatuur\" [level=3]\n    - paragraph: 48 °C · gemeten\n    - paragraph: heetste kern\n    - term: Bron\n    - definition: TrueNAS (reporting.realtime)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n  - article \"Geheugen\":\n    - heading \"Geheugen\" [level=3]\n    - text: Gebruikt 41,2 GiB van 62,6 GiB\n    - meter \"Gebruikt\"\n    - paragraph: 66% gebruikt\n    - term: Bron\n    - definition: TrueNAS (reporting.realtime)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n  - article \"ZFS-cache (ARC)\":\n    - heading \"ZFS-cache (ARC)\" [level=3]\n    - paragraph: 22,1 GiB · gemeten\n    - paragraph:\n      - text: Trefkans\n      - strong: 97%\n      - text: · gemeten\n    - term: Bron\n    - definition: TrueNAS (reporting.realtime)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n  - figure \"CPU-gebruik\":\n    - heading \"CPU-gebruik\" [level=3]\n    - paragraph: Afgelopen 6 u, per kwartier. Schommelt tussen 12 en 41%. Tussen 08:15 en 08:45 was er geen meting.\n    - img \"CPU-gebruik. Afgelopen 6 u, per kwartier. Schommelt tussen 12 en 41%. Tussen 08:15 en 08:45 was er geen meting. Gebruik de pijltjestoetsen om per meetpunt te lezen.\": Geen meting 0 25 50 75 100 06:00 11:45 23 %\n    - paragraph\n    - text: \"Bron: TrueNAS (reporting.realtime) · bijgewerkt\"\n    - time: 11:56\n    - text: · een gat betekent dat er geen meting was (nooit 0).\n    - group: Toon als tabel\n  - region \"GPU's\":\n    - heading \"GPU's\" [level=2]\n    - paragraph: Elke GPU heeft een eigen grafiek met dezelfde schaal (0–100%). De koppeling loopt via het PCI-slot, nooit via de naam van het apparaat in /dev/dri.\n    - article \"Intel Arc A310\":\n      - heading \"Intel Arc A310\" [level=3]\n      - paragraph: PCI 0000:03:00.0 Voorbeeld\n      - paragraph: 31 % · gemeten gebruik nu\n      - paragraph: 18 W · gemeten vermogen nu\n      - paragraph: \"Temperatuur: Onbekend\"\n      - paragraph: Geen bron levert de temperatuur van de A310. We tonen geen schatting en nooit 0 °C.\n      - term: Bron\n      - definition: Beszel (gebruik, vermogen)\n      - term: Bijgewerkt\n      - definition:\n        - time: 11:55\n        - text: (1 min geleden)\n    - figure \"Intel Arc A310 — gebruik\":\n      - heading \"Intel Arc A310 — gebruik\" [level=3]\n      - paragraph: Afgelopen 6 u, per kwartier. AV1-taken pieken tot 78%.\n      - img \"Intel Arc A310 — gebruik. Afgelopen 6 u, per kwartier. AV1-taken pieken tot 78%. Gebruik de pijltjestoetsen om per meetpunt te lezen.\": 0 25 50 75 100 06:00 11:45 31 %\n      - paragraph\n      - text: \"Bron: Beszel · bijgewerkt\"\n      - time: 11:55\n      - text: · een gat betekent dat er geen meting was (nooit 0).\n      - group: Toon als tabel\n    - article \"Intel UHD 770\":\n      - heading \"Intel UHD 770\" [level=3]\n      - paragraph: PCI 0000:00:02.0 Voorbeeld\n      - text: Onbekend Verouderd\n      - paragraph: Laatst bekend · 09:45\n      - paragraph: 9 % (laatst bekende waarde, verouderd) gebruik\n      - paragraph: Beszel levert sinds 09:45 geen nieuwe meting voor deze GPU.\n      - paragraph: \"Vermogen: Niet beschikbaar\"\n      - paragraph:\n        - text: Beszel levert geen vermogen voor deze GPU.\n        - code: capability_unavailable\n      - paragraph: \"Temperatuur: Onbekend\"\n      - paragraph: Geen bron levert de temperatuur van de UHD 770. We tonen geen schatting en nooit 0 °C.\n      - term: Bron\n      - definition: Beszel\n      - term: Bijgewerkt\n      - definition:\n        - time: 09:45\n        - text: (2 u 11 min geleden)\n      - term: Geprobeerd\n      - definition:\n        - time: 11:55 (geen meting voor deze GPU)\n    - figure \"Intel UHD 770 — gebruik\":\n      - heading \"Intel UHD 770 — gebruik\" [level=3]\n      - paragraph: Afgelopen 6 u, per kwartier. Geen meting meer na 09:45; daarna verouderd.\n      - img \"Intel UHD 770 — gebruik. Afgelopen 6 u, per kwartier. Geen meting meer na 09:45; daarna verouderd. Gebruik de pijltjestoetsen om per meetpunt te lezen.\": Verouderd sinds 09:45 0 25 50 75 100 06:00 11:45 9 %\n      - paragraph\n      - text: \"Bron: Beszel · bijgewerkt\"\n      - time: 09:45\n      - text: · een gat betekent dat er geen meting was (nooit 0).\n      - group: Toon als tabel\n  - region \"Opslag\":\n    - heading \"Opslag\" [level=2]\n    - text: voorbeeldpool 5,1 TiB van 7,2 TiB\n    - meter \"voorbeeldpool\"\n    - paragraph: 71% gebruikt\n    - text: back-uppool 6,7 TiB van 7,2 TiB\n    - meter \"back-uppool\"\n    - paragraph: 93% van de grens — boven de drempel van 90%\n    - term: Bron\n    - definition: TrueNAS (pool.query)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:54\n      - text: (2 min geleden)\n  - article \"Netwerk ontvangen\":\n    - heading \"Netwerk ontvangen\" [level=3]\n    - paragraph: 12,4 Mbit/s · gemeten\n    - paragraph: alle interfaces samen, nu\n    - term: Bron\n    - definition: TrueNAS (reporting.realtime)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n  - article \"Netwerk verzonden\":\n    - heading \"Netwerk verzonden\" [level=3]\n    - paragraph: 3,1 Mbit/s · gemeten\n    - paragraph: alle interfaces samen, nu\n    - term: Bron\n    - definition: TrueNAS (reporting.realtime)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:56\n      - text: (zojuist)\n  - region \"Meetdekking\":\n    - heading \"Meetdekking\" [level=2]\n    - paragraph:\n      - strong: 14 van 19\n      - text: \"metrieken hebben nu een verse bron. Hiaten: GPU-temperatuur (beide GPU's), schijftemperatuur, CPU en geheugen per app.\"\n    - paragraph:\n      - text: Het Beszel-systeem\n      - strong: mini-pc\n      - text: \"telt niet mee: die hoort niet bij het platform (D10).\"\n    - link \"Meetdekking bekijken\":\n      - /url: \"#\"\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

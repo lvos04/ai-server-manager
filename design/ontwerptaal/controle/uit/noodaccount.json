@@ -1,0 +1,1180 @@
+{
+ "richting": "peil",
+ "pagina": "noodaccount.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 90,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 90,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 90,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 19,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 90,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 100,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 102,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 26,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 90,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 90,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 90,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 19,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 90,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 100,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#totp-code.invoer.max-w-48.font-mono.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#duur.invoer.max-w-32.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Noodlogin werkt nu niet: de nieuwe TOTP ",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "code#kopieer-11.code-veld.flex-1.basis-56",
+     "t": "JBSW Y3DP EHPK 3PXP K7QV 2MDA",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-12.code-veld.flex-1.basis-56",
+     "t": "otpauth://totp/TrueNAS%20Home%20Platform",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-13.code-veld.flex-1.basis-56",
+     "t": "http://hub.voorbeeld:30400/inloggen/nood",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 102,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 26,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Instellingen\":\n          - /url: instellingen-toegang.html\n      - listitem:\n        - link \"Toegang\":\n          - /url: instellingen-toegang.html\n      - listitem: Noodaccount\n  - heading \"Noodaccount\" [level=1]\n  - paragraph: Een lokaal account waarmee je de Hub in kunt als inloggen via SSO niet werkt. Met wachtwoord én een code uit een authenticator-app, alleen vanaf je eigen netwerk.\n  - paragraph:\n    - text: Bijgewerkt\n    - time: 11:56\n    - text: (zojuist)\n  - region \"Status\":\n    - heading \"Status\" [level=2]\n    - text: Ingesteld Rotatie loopt\n    - paragraph: \"Noodlogin werkt nu niet: de nieuwe TOTP is nog niet bevestigd.\"\n    - paragraph: Na de noodlogin van 8 nov om 21:04 moesten wachtwoord en TOTP opnieuw. Het wachtwoord is vernieuwd; bevestig hieronder de code uit je authenticator-app. Tot dan kan \"OIDC verplicht\" ook niet aan.\n    - term: Account\n    - definition: noodbeheer\n    - term: Rol\n    - definition: Beheerder (vast)\n    - term: Sessieduur\n    - definition: 60 min, niet te verlengen\n    - term: Laatst gebruikt\n    - definition:\n      - time: 8 nov 2026, 21:04\n      - text: · incident gemeld\n    - term: Herbevestiging\n    - definition:\n      - text: Volgende uiterlijk\n      - time: 6 feb 2027\n      - text: . Elke 90 dagen een melding, nooit een blokkade.\n    - term: Inloggen kan\n    - definition: Alleen vanaf privé-adressen (LAN of VPN), nooit vanaf internet.\n  - region \"Wachtwoord en TOTP vernieuwen\":\n    - heading \"Wachtwoord en TOTP vernieuwen\" [level=2]\n    - navigation \"Stappen van het vernieuwen\":\n      - list:\n        - listitem: Nieuw wachtwoord (klaar)\n        - listitem: Authenticator-app en code\n    - 'heading \"Stap 2 van 2: Authenticator-app instellen en code bevestigen\" [level=3]'\n    - paragraph:\n      - strong: Dit geheim zie je maar één keer.\n      - text: Zet het nu in je authenticator-app en bewaar een kopie offline, bijvoorbeeld op papier bij je herstelkit. De Hub toont het hierna nooit meer.\n    - text: Geheim (handmatig invoeren)\n    - code: JBSW Y3DP EHPK 3PXP K7QV 2MDA\n    - button \"Kopiëren Geheim (handmatig invoeren)\"\n    - paragraph\n    - text: Koppeling voor de app (otpauth)\n    - code: otpauth://totp/TrueNAS%20Home%20Platform:noodbeheer?secret=JBSWY3DPEHPK3PXPK7QV2MDA&issuer=TrueNAS%20Home%20Platform&digits=6&period=30\n    - button \"Kopiëren Koppeling voor de app (otpauth)\"\n    - paragraph\n    - paragraph: Kies in de app \"Code toevoegen\" en dan \"Sleutel invoeren\" (tijdgebaseerd, 6 cijfers, elke 30 seconden). De namen verschillen per app. Voorbeeld\n    - form \"Code bevestigen\":\n      - heading \"Code bevestigen\" [level=4]\n      - text: Code uit de authenticator-app\n      - paragraph: 6 cijfers. De code wisselt elke 30 seconden; een oude code werkt niet.\n      - textbox \"Code uit de authenticator-app\"\n      - button \"Code bevestigen\"\n      - button \"Opnieuw beginnen\"\n  - region \"Zelftest\":\n    - heading \"Zelftest\" [level=2]\n    - paragraph: Controleert of noodlogin zou werken, zonder in te loggen en zonder Authentik of het netwerk te gebruiken. Er verandert niets.\n    - button \"Zelftest uitvoeren\"\n    - status:\n      - text: Uitkomst om\n      - time: 11:56\n      - text: \": noodlogin werkt nu niet (1 controle mislukt).\"\n    - list:\n      - listitem: Noodaccount Aanwezig en actief.\n      - listitem: \"TOTP Nog niet bevestigd: rotatie loopt. Bevestig de code hierboven.\"\n      - listitem: Privé-adres wordt toegelaten Testadres 10.0.0.1 telt als privé.\n      - listitem: Internetadres wordt geweigerd Documentatie-adres 192.0.2.10 telt niet als privé.\n      - listitem:\n        - text: Jouw adres zoals de Hub het ziet 172.17.0.1 —\n        - strong: \"Onbekend:\"\n        - text: dit lijkt het gateway-adres van het Docker-netwerk. Dan ziet de Hub niet het echte adres van je apparaat en is de controle op privé-adressen zwakker. Niet gevalideerd op de NAS.\n  - region \"Noodlogin gebruiken\":\n    - heading \"Noodlogin gebruiken\" [level=2]\n    - text: Adres van de noodlogin (zet dit in je herstelkit)\n    - code: http://hub.voorbeeld:30400/inloggen/nood\n    - button \"Kopiëren Adres van de noodlogin (zet dit in je herstelkit)\"\n    - paragraph\n    - text: Sessieduur van een noodlogin\n    - paragraph: 5 tot 240 minuten; standaard 60. De sessie is niet te verlengen.\n    - textbox \"Sessieduur van een noodlogin\": \"60\"\n    - text: minuten\n    - paragraph: \"Wijzigen vraagt je eigen wachtwoord. Dit zijn geen acties voor de AI: die kan het noodaccount niet zien, voorstellen of wijzigen.\"\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

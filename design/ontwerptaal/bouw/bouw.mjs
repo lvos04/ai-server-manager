@@ -15,6 +15,14 @@ const paginas = {
   'kind': async () => (await import('./pagina-kind.mjs')).kind(),
   'statuspagina': async () => (await import('./pagina-statuspagina.mjs')).statuspagina(),
   'statuspagina-gekoppeld': async () => (await import('./pagina-statuspagina.mjs')).statuspaginaGekoppeld(),
+  // Hub-ontwerpstap P1 + contract 1.2 (docs/ontwerp/HUB_PEIL_ONTWERP.md)
+  'apps': async () => (await import('./pagina-apps.mjs')).apps(),
+  'appdetail-p1': async () => (await import('./pagina-apps.mjs')).appdetailP1(),
+  'server-metrieken': async () => (await import('./pagina-server.mjs')).serverMetrieken(),
+  'diensten': async () => (await import('./pagina-diensten.mjs')).diensten(),
+  'noodaccount': async () => (await import('./pagina-noodaccount.mjs')).noodaccount(),
+  'instellingen-toegang': async () => (await import('./pagina-instellingen.mjs')).instellingenToegang(),
+  'instellingen-bronnen': async () => (await import('./pagina-instellingen.mjs')).instellingenBronnen(),
 };
 const kies = (process.argv[2] || '').split(',').filter(Boolean);
 for (const [naam, f] of Object.entries(paginas)) {
