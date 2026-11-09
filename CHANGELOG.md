@@ -4,6 +4,23 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — onafhankelijke review van contract 1.2 in Hub en executor (ADR-0014)
+- **1 MiB vóór routering en aanmelding (§5):** Hub en executor lezen de body nu vóór alles, met hooguit 1 MiB in het
+  geheugen. Een chunked verzoek van meer dan 1 MiB geeft altijd `413` met `details.max_bytes`; vroeger gaf de Hub dan
+  401/405 op routes zonder body, en de executor kende helemaal geen grens voor chunked verzoeken.
+- **Executor, `unlink` (§4.6, §3.8, §4.2):**
+  - Een persistente `jti`-replaycache (`/appdata/executor.sqlite3`): een hergebruikte `jti` geeft `401 token_replayed`,
+    ook na een herstart. Een exacte herhaling krijgt het opgeslagen antwoord. Is de cache onbruikbaar, dan `503`.
+  - `Idempotency-Key` is verplicht en een gebruikers-JWT moet de rol `admin` hebben.
+  - De rol `kind` wint nu altijd.
+  - Een JWT met een `iat` in de toekomst wordt geweigerd.
+- **CI:** de controle "na een downgrade is de database niet actueel" faalde nooit (`!` zet `errexit` uit). Dat is
+  gerepareerd.
+- **Webpoort (Node-doorgang):** een chunked upload van meer dan 1 MiB werd vaak `502` ("Hub-API niet bereikbaar")
+  in plaats van `413`. De doorgang telt nu zelf en antwoordt met dezelfde 413-body als de API.
+- **Rooktest:** controleert nu ook chunked verzoeken van meer dan 1 MiB (tot 3 MB, herhaald), zowel naar de Hub via
+  de webpoort als naar de executor.
+
 ### Gewijzigd — contract 1.2 toegepast in de Hub en de executor (ADR-0013)
 - **Enrollment (H1/H2):** `POST /api/v1/services/enroll` volgt §3.3 exact (strikte JWK, token- en koppelcodeformaat,
   `version`/`base_url`/`public_key_jwk` verplicht); antwoord met `schema_version`, `keyset_fingerprint`,

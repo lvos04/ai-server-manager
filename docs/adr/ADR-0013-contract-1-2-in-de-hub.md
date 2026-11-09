@@ -61,8 +61,9 @@ testen. Een aantal punten laat het contract open of hangt af van latere fasen; d
    `/appdata/secrets/hub-link.json`; inkomende Hub-JWT's op `GET /connector/v1/hub-link` met de controlevolgorde en
    redenen van §4.7 (zonder PyJWT, met `cryptography`). `POST /connector/v1/hub-link/unlink` → `501
    capability_unavailable` en geen koppelformulier na de eerste koppeling: §3.9 staat ontkoppelen op de executor alleen
-   toe na een live geverifieerde TrueNAS-schrijfkey, en die bestaat pas in P2. Een `jti`-replaycache is nog niet nodig
-   (de executor heeft geen muterende route die Hub-JWT's accepteert); die komt mee met de uitvoerroute in P2.
+   toe na een live geverifieerde TrueNAS-schrijfkey, en die bestaat pas in P2. *(Bijgewerkt door ADR-0014: `unlink` is
+   wél een mutatie met Hub-JWT; de executor heeft nu een persistente `jti`-replaycache, `Idempotency-Key` en rolcontrole
+   op die route.)*
 9. **UI wacht op de ontwerpstap.** De schermen "Diensten" (H5) en "Noodaccount" (H6) zijn niet gebouwd: contract §13
    vraagt vooraf een ontwerpstap van de design-agent, en `docs/platform-v2/ONTWERPTAAL.md` + `design/ontwerptaal/`
    staan nog niet in deze repo. Tot dan zijn alle functies via de API (en `/api/docs`) bereikbaar, en zegt

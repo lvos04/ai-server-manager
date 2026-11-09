@@ -96,6 +96,16 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   (Custom App-tag met digest). Niet gedaan: UI-schermen "Diensten" en "Noodaccount" (wachten op de ontwerpstap, §13),
   H10/H11 (P2/P3), H12 (ontwerptaal nog niet in de repo), H13 (open punt). De diensten kunnen nu tegen de echte Hub
   testen; Sim-getest, niets op een echte NAS.
+- **Onafhankelijke review van contract 1.2 in ai-server-manager (2026-11-09, ADR-0014).** Gerepareerd:
+  - 1 MiB vóór routering en aanmelding, ook chunked: de Hub gaf eerst 401/405 en de executor had geen grens voor
+    chunked verzoeken;
+  - in de executor een persistente `jti`-replaycache, een verplichte `Idempotency-Key` en de rol `admin` op `unlink`;
+  - de rol `kind` wint nu altijd, en een `iat` in de toekomst wordt geweigerd;
+  - een CI-stap (controle na downgrade) die nooit kon falen;
+  - via de webpoort werd een chunked upload > 1 MiB vaak `502` in plaats van `413`; de Node-doorgang telt nu zelf.
+
+  Daarnaast negatieve tests toegevoegd, onder meer: koppelen na de eerste koppeling met een oude formuliercode, en een
+  verlopen executor-koppelcode. Sim-getest; niets op een echte NAS.
 - CI-stand na de P0-afronding (gezien in de review): groen in jelly-leon, jelly-leon-platform,
   zoeken-en-persoonlijke-ai, home-control-hub, appstore-en-fork, jelly-leon-clients en jelly-leon-web.
 
