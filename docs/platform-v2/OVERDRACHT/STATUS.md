@@ -2,6 +2,15 @@
 
 Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment nog commits hebben gepusht).
 
+## Afstemming tussen de twee machines
+
+- **Overdrachtsstatus: OUDE MACHINE NOG BEZIG.** Zolang deze regel er staat werkt de oude sessie nog in: ai-server-manager,
+  appstore-en-fork, zoeken-en-persoonlijke-ai, jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients.
+  Daar niets committen of pushen (alleen lezen).
+- Vrij voor de nieuwe machine: home-control-hub, media-guard-ultimate, media-source-optimizer, my_house.
+- Als de oude sessie klaar is, vervangt ze de regel hierboven door **OVERDRACHT VOLTOOID** (met tijdstip) en werkt ze
+  deze STATUS.md bij met de definitieve P0-stand. Controleer met `git -C ai-server-manager pull` (bijv. elk kwartier).
+
 ## Klaar en gepusht (branch `ccr-c133d7a0-kuz1cv`)
 
 - **Alle repos:** `docs/platform-v2/` (pakketdocs per repo), `PLATFORM_CONTRACTEN.md` 1.1, `EXCEL_TAKEN.json`.
