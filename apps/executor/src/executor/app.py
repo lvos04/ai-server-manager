@@ -37,6 +37,7 @@ from executor.hublink import (
     AuthFailed,
     EnrollFailed,
     HubLinkStore,
+    KeyRotationPoller,
     confirm,
     enroll_with_pairing_code,
     public_status,
@@ -99,6 +100,13 @@ class PairingThrottle:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     store = HubLinkStore(settings.secrets_dir)
+    rotations = KeyRotationPoller(store)
+    stop = threading.Event()
+
+    def poll_loop() -> None:
+        while not stop.wait(15 * 60):  # contract 1.2 §4.5: hooguit elke 15 minuten
+            rotations.poll(force=True)
+
     throttle = PairingThrottle(
         settings.pairing_attempts_per_ip, settings.pairing_attempts_total, settings.pairing_window_seconds
     )
@@ -110,7 +118,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             link = store.read()
             if link.get("state") == "gekoppeld" and not link.get("confirmed_at"):
                 threading.Thread(target=confirm, args=(store,), daemon=True).start()
+        threading.Thread(target=poll_loop, daemon=True).start()
         yield
+        stop.set()
 
     app = FastAPI(
         title="AI Server Manager — executor",
@@ -208,6 +218,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             return verify_hub_jwt(token, store.read(), audience=APP_ID)
         except AuthFailed as exc:
+            if exc.reason == "unknown_key":
+                rotations.trigger_background()
             return _err("unauthorized", AUTH_MESSAGES[exc.reason], 401, {"reason": exc.reason})
 
     @app.get(

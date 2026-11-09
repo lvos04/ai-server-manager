@@ -129,6 +129,12 @@ def test_executor_koppelt_met_koppelcode_en_vingerafdruk(
     kind, _ = keyring.issue_user_jwt(subject=str(uuid.uuid4()), audience="ai-server-manager-executor",
                                      roles=["kind"], ttl_seconds=60)  # fmt: skip
     assert c.get("/connector/v1/hub-link", headers={"Authorization": f"Bearer {kind}"}).status_code == 403
+    import jwt as pyjwt
+
+    claims = pyjwt.decode(jwt_hub, options={"verify_signature": False})
+    unknown = pyjwt.encode(claims, keyring.jwt_signing, algorithm="EdDSA", headers={"kid": "onbekende-kid"})
+    r = c.get("/connector/v1/hub-link", headers={"Authorization": f"Bearer {unknown}"})
+    assert r.status_code == 401 and r.json()["details"]["reason"] == "unknown_key"  # + poll op de achtergrond
     wrong_aud, _ = keyring.issue_hub_service_jwt(audience="home-control-hub", service_id=sid)
     r = c.get("/connector/v1/hub-link", headers={"Authorization": f"Bearer {wrong_aud}"})
     assert r.status_code == 401 and r.json()["details"]["reason"] == "invalid_token"

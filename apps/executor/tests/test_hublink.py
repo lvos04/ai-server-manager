@@ -245,3 +245,31 @@ def test_inkomende_hub_jwt_redenen_en_volgorde() -> None:
         with pytest.raises(AuthFailed) as exc:
             verify_hub_jwt(token, {**link, **change}, audience=aud)
         assert exc.value.reason == reason, (change, reason)
+
+
+def test_sleutelrotaties_pollen_lege_lijst_en_niet_lege_lijst(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from executor import hublink
+
+    store = HubLinkStore(tmp_path / "secrets")
+    poller = hublink.KeyRotationPoller(store, min_interval=30)
+    assert poller.poll(force=True) is None  # niet gekoppeld: niets ophalen
+    with store.update() as link:
+        link.update(state="gekoppeld", hub_url="http://192.0.2.5:30400",
+                    pins={"jwt": [], "policy": [], "keyset_fingerprint": "X", "rotation_sequence": 0})  # fmt: skip
+    seen: list[str] = []
+
+    def fake(hub_url: str, method: str, path: str, **_: Any) -> hublink.HubResponse:
+        seen.append(path)
+        return hublink.HubResponse(200, {"items": []})
+
+    monkeypatch.setattr(hublink, "hub_request", fake)
+    assert poller.poll(force=True) == "geen_rotaties" and seen == ["/api/v1/auth/key-rotations?after=0"]
+    assert poller.poll() == "geen_rotaties" and len(seen) == 1  # max. 1× per 30 s
+    monkeypatch.setattr(
+        hublink, "hub_request", lambda *a, **k: hublink.HubResponse(200, {"items": [{"sequence": 1, "statement": "x"}]})
+    )
+    assert poller.poll(force=True) == "sleutelrotatie_niet_toegepast"
+    link = store.read()
+    assert (
+        link["last_error"]["code"] == "sleutelrotatie_niet_toegepast" and link["pins"]["jwt"] == []
+    )  # pins ongewijzigd

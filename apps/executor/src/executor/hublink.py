@@ -19,6 +19,8 @@ import ipaddress
 import json
 import os
 import re
+import threading
+import time
 import uuid
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -49,6 +51,8 @@ ERRORS_NL = {
     "rate_limited": "Te veel pogingen; wacht even en probeer het dan opnieuw.",
     "koppelen_onderbroken": "Het koppelen is onderbroken door een herstart. Voer de koppelcode opnieuw in.",
     "ingetrokken_door_hub": "De Hub heeft deze koppeling ingetrokken; opnieuw koppelen gaat via de Hub.",
+    "sleutelrotatie_niet_toegepast": "De Hub meldt een sleutelrotatie die deze versie nog niet kan toepassen; "
+    "opnieuw koppelen via de Hub.",
 }
 PUBLIC_FIELDS = (
     "state",
@@ -418,6 +422,52 @@ def enroll_with_pairing_code(
         )
     confirm(store)
     return public_status(store.read())
+
+
+class KeyRotationPoller:
+    """§4.5: sleutelrotaties ophalen (≤ elke 15 min; bij een onbekende ``kid`` extra, max. 1× per 30 s).
+
+    De Hub roteert nog niet en geeft ``{"items": []}``. Statements toepassen (handtekening met een gepinde sleutel van
+    hetzelfde doel, ``sequence`` zonder gaten) is nog niet gebouwd: een niet-lege lijst stopt daarom het toepassen en
+    wordt zichtbaar als ``last_error`` — de pins blijven ongewijzigd (nooit stil vertrouwen toevoegen).
+    """
+
+    def __init__(self, store: HubLinkStore, *, min_interval: float = 30.0) -> None:
+        self.store, self.min_interval = store, min_interval
+        self.last_poll = 0.0
+        self.last_result: str | None = None
+        self._lock = threading.Lock()
+
+    def poll(self, *, force: bool = False) -> str | None:
+        with self._lock:
+            now = time.monotonic()
+            if not force and now - self.last_poll < self.min_interval:
+                return self.last_result
+            self.last_poll = now
+        link = self.store.read()
+        if link.get("state") != "gekoppeld" or not link.get("hub_url"):
+            return None
+        seq = int((link.get("pins") or {}).get("rotation_sequence") or 0)
+        try:
+            res = hub_request(str(link["hub_url"]), "GET", f"/api/v1/auth/key-rotations?after={seq}")
+        except HubUnreachable:
+            self.last_result = "hub_onbereikbaar"
+            return self.last_result
+        items = res.body.get("items") if res.status == 200 and isinstance(res.body, dict) else None
+        if not isinstance(items, list):
+            self.last_result = "antwoord_ongeldig"
+        elif not items:
+            self.last_result = "geen_rotaties"
+        else:
+            self.last_result = "sleutelrotatie_niet_toegepast"
+            with self.store.update() as cur:
+                cur["last_error"] = {"code": "sleutelrotatie_niet_toegepast", "at": now_iso()}
+        return self.last_result
+
+    def trigger_background(self) -> None:
+        """Na een onbekende ``kid``: poll op de achtergrond; het verzoek wacht daar niet op."""
+        if time.monotonic() - self.last_poll >= self.min_interval:
+            threading.Thread(target=self.poll, daemon=True).start()
 
 
 def confirm(store: HubLinkStore) -> bool:
