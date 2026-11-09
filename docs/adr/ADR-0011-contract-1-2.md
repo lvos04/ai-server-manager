@@ -22,7 +22,7 @@ Alle vier diensten namen aan dat de Hub hen aanroept met **hun eigen service-tok
 alleen de SHA-256 en kan dat dus niet. Alle vier vertrouwden de JWKS die later via HTTP op het LAN wordt opgehaald
 (jelly-leon-platform repareerde in de P0-review al een kritieke auth-bypass via een vreemde "Hub", ADR-0009 daar).
 Daarnaast meldde P0 de Custom App-realiteit (ix-app 1.4.8 laat no-new-privileges/cap_drop weg, `app.rollback` werkt
-niet voor image-tags, catalogusversies verdwijnen) en namen de gebruikers zeven besluiten.
+niet voor image-tags, catalogusversies verdwijnen) en nam de gebruiker zeven besluiten.
 
 ## Besluiten
 
