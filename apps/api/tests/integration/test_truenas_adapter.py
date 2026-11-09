@@ -75,6 +75,37 @@ def test_extra_ca_en_pinning(nas: FakeTrueNAS) -> None:
     assert e.reason_code == "tls_untrusted" and "gewijzigd" in e.detail
 
 
+def test_key_nooit_verstuurd_bij_onvertrouwd_of_gewijzigd_certificaat(nas: FakeTrueNAS) -> None:
+    """TLS wordt nooit stil uitgeschakeld: zonder vertrouwde CA en zonder bevestigde vingerafdruk, of met een andere
+    vingerafdruk dan bevestigd, gaat er geen enkele JSON-RPC-aanroep (dus ook geen API-key) naar de NAS."""
+
+    def logins() -> int:
+        return sum(1 for m, _ in nas.calls if m == "auth.login_with_api_key")
+
+    before_logins, before_calls = logins(), len(nas.calls)
+    assert _err(_open(nas.url, KEY, TLSSettings())).reason_code == "tls_untrusted"
+    wrong = TLSSettings(pinned_fingerprint=normalize_fingerprint("ab" * 32))
+    assert _err(_open(nas.url, KEY, wrong)).reason_code == "tls_untrusted"
+    assert logins() == before_logins and len(nas.calls) == before_calls
+    # Ter controle: met de bevestigde (juiste) vingerafdruk wordt wél aangemeld.
+    fp = _run(_fingerprint(nas))
+
+    async def ok() -> None:
+        c = await _open(nas.url, KEY, TLSSettings(pinned_fingerprint=fp))
+        await c.close()
+
+    _run(ok())
+    assert logins() == before_logins + 1
+
+
+async def _fingerprint(nas: FakeTrueNAS) -> str:
+    from hub.truenas.client import fetch_server_fingerprint
+
+    fp = await fetch_server_fingerprint(nas.url, 3)
+    assert fp is not None
+    return fp
+
+
 def test_foutcodes(nas: FakeTrueNAS) -> None:
     tls = TLSSettings(extra_ca_file=nas.ca_file)
     assert _err(_open(nas.url, "foute-key-123456789", tls)).reason_code == "auth_failed"
