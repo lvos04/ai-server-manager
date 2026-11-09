@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -461,3 +461,62 @@ def status(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
 @router.get("/coverage", summary="Meetdekking: welke bron welke metriek levert (kan/levert) en de hiaten (B09-001)")
 def coverage(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
     return coverage_compute(db, settings)
+
+
+# ------------------------------------------------------------------ out-of-band (B09-005, EX22/EX23)
+class OutOfBandIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    getest_op: datetime
+    kuma_meldt_hub_uitval: bool = Field(description="In Kuma gezien: een monitor op de Hub gaf een melding")
+    kuma_gotify_test_ontvangen: bool = Field(description="De testmelding van Kuma via Gotify kwam aan op de telefoon")
+    externe_host: bool = Field(description="Kuma én Gotify draaien op een host buiten deze NAS")
+    notitie: str = Field(default="", max_length=500)
+
+    @field_validator("getest_op")
+    @classmethod
+    def _tz(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("getest_op moet een tijdzone hebben (UTC, eindigend op Z)")
+        return v
+
+
+@router.get(
+    "/out-of-band",
+    summary="Out-of-band melden: zit de Hub in het meldpad, bewaakt Kuma de Hub, en wat bij volledige NAS-uitval",
+)
+def out_of_band(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
+    from hub.monitoring.outofband import status
+
+    return status(db, settings, utcnow())
+
+
+@router.post(
+    "/out-of-band/bevestiging",
+    status_code=201,
+    summary="Handmatige test van Kuma → Gotify vastleggen (admin; audit, nooit 'gevalideerd door de Hub')",
+)
+def confirm_out_of_band(body: OutOfBandIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
+    from hub.monitoring.outofband import BEVESTIGING_ACTIE, status
+
+    if (replay := idem.replay()) is not None:
+        return replay
+    if body.getest_op > utcnow() + timedelta(minutes=5):
+        raise HubError(422, "validation_error", "getest_op ligt in de toekomst.")
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=principal.name,
+        action=BEVESTIGING_ACTIE,
+        target_type="out_of_band",
+        target_id="kuma_gotify",
+        details={
+            "getest_op": iso(body.getest_op),
+            "kuma_meldt_hub_uitval": body.kuma_meldt_hub_uitval,
+            "kuma_gotify_test_ontvangen": body.kuma_gotify_test_ontvangen,
+            "externe_host": body.externe_host,
+            "notitie": body.notitie,
+            "soort_bewijs": "handmatig bevestigd",
+        },
+    )
+    db.flush()
+    return idem.save(201, status(db, settings, utcnow()))

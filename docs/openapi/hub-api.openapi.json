@@ -685,6 +685,45 @@
         "title": "OplosIn",
         "type": "object"
       },
+      "OutOfBandIn": {
+        "additionalProperties": false,
+        "properties": {
+          "externe_host": {
+            "description": "Kuma én Gotify draaien op een host buiten deze NAS",
+            "title": "Externe Host",
+            "type": "boolean"
+          },
+          "getest_op": {
+            "format": "date-time",
+            "title": "Getest Op",
+            "type": "string"
+          },
+          "kuma_gotify_test_ontvangen": {
+            "description": "De testmelding van Kuma via Gotify kwam aan op de telefoon",
+            "title": "Kuma Gotify Test Ontvangen",
+            "type": "boolean"
+          },
+          "kuma_meldt_hub_uitval": {
+            "description": "In Kuma gezien: een monitor op de Hub gaf een melding",
+            "title": "Kuma Meldt Hub Uitval",
+            "type": "boolean"
+          },
+          "notitie": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Notitie",
+            "type": "string"
+          }
+        },
+        "required": [
+          "getest_op",
+          "kuma_meldt_hub_uitval",
+          "kuma_gotify_test_ontvangen",
+          "externe_host"
+        ],
+        "title": "OutOfBandIn",
+        "type": "object"
+      },
       "PasswordIn": {
         "additionalProperties": false,
         "properties": {
@@ -5853,6 +5892,86 @@
           }
         },
         "summary": "Heartbeat van een eigen dienst (Bearer service-token; dedupe op observed_at)",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/out-of-band": {
+      "get": {
+        "operationId": "out_of_band_api_v1_monitoring_out_of_band_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Out Of Band Api V1 Monitoring Out Of Band Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Out-of-band melden: zit de Hub in het meldpad, bewaakt Kuma de Hub, en wat bij volledige NAS-uitval",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/out-of-band/bevestiging": {
+      "post": {
+        "operationId": "confirm_out_of_band_api_v1_monitoring_out_of_band_bevestiging_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutOfBandIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Handmatige test van Kuma → Gotify vastleggen (admin; audit, nooit 'gevalideerd door de Hub')",
         "tags": [
           "monitoring"
         ]

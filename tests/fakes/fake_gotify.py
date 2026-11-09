@@ -1,5 +1,6 @@
-"""Fake Gotify (alleen tests), naar de routes van ``gotify/server`` v3.1.1: ``POST /message`` met
-``X-Gotify-Key`` (applicatietoken), ``GET /version`` en ``GET /health``. Ongeldig token → 401 zoals Gotify."""
+"""Fake Gotify (alleen tests), naar de routes van ``gotify/server`` v3.1.1: ``POST /message`` met het
+applicatietoken in ``X-Gotify-Key`` of ``?token=``, ``GET /version`` en ``GET /health``. Ongeldig token → 401 zoals
+Gotify."""
 
 from __future__ import annotations
 
@@ -22,7 +23,9 @@ class FakeGotify(FakeHTTP):
         if seen.path == "/health" and seen.method in ("GET", "HEAD"):
             return Reply(200, {"health": "green", "database": "green"})
         if seen.path == "/message" and seen.method == "POST":
-            if seen.headers.get("x-gotify-key") not in self.tokens:
+            # Gotify accepteert het applicatietoken als header of als query (?token=…, zoals Uptime Kuma het stuurt).
+            token = seen.headers.get("x-gotify-key") or (seen.query.get("token") or [None])[0]
+            if token not in self.tokens:
                 return Reply(
                     401,
                     {
