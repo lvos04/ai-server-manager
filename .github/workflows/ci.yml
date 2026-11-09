@@ -1,6 +1,7 @@
 # CI: ruff, mypy, pytest met PostgreSQL-service, alembic up/down, OpenAPI-drift, pip-audit; web-UI: eslint, tsc,
 # vitest, next build, npm audit (runtime) en Playwright (360/390/768/1440, axe) tegen de echte API + fake TrueNAS;
-# daarna beide images bouwen, starten en de healthcheck/rooktest draaien. Geen echte NAS: alles Sim-getest.
+# daarna beide images bouwen, starten en de healthcheck/rooktest draaien; los daarvan de tests van de Excel-bijwerker
+# (tools/excel). Geen echte NAS: alles Sim-getest.
 name: ci
 on:
   push:
@@ -130,6 +131,19 @@ jobs:
             docs/screenshots/p0
           retention-days: 14
           if-no-files-found: ignore
+
+  excel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Afhankelijkheden Excel-bijwerker (exact vastgezet)
+        run: python -m pip install -r tools/excel/requirements-test.txt
+      - name: pytest Excel-bijwerker (klein test-werkboek + echte Excel in een tijdelijke kopie)
+        run: python -m pytest -q tools/excel/tests
 
   images:
     runs-on: ubuntu-24.04
