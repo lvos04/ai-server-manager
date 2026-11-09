@@ -1,0 +1,104 @@
+# Release: tag v<versie> → beide images naar GHCR (exacte versie, nooit latest), SBOM en digests in
+# release/digests.json als release-bijlage. De digests vullen daarna de manifesten (deploy/manifest).
+name: release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: write
+  packages: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Tag moet gelijk zijn aan VERSION
+        run: |
+          v="$(cat VERSION)"
+          test "${GITHUB_REF_NAME}" = "v${v}" || { echo "Tag ${GITHUB_REF_NAME} ≠ VERSION ${v}"; exit 1; }
+          echo "VERSION=${v}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Hub-image publiceren
+        id: hub
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/allinone/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/ai-server-manager:${{ env.VERSION }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            REVISION=${{ github.sha }}
+          sbom: true
+          provenance: mode=max
+      - name: Executor-image publiceren
+        id: executor
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/executor/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/ai-server-manager-executor:${{ env.VERSION }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            REVISION=${{ github.sha }}
+          sbom: true
+          provenance: mode=max
+      - name: SBOM (SPDX) van de Hub-image
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/ai-server-manager:${{ env.VERSION }}@${{ steps.hub.outputs.digest }}
+          format: spdx-json
+          output-file: release/sbom-ai-server-manager.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: SBOM (SPDX) van de executor-image
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/ai-server-manager-executor:${{ env.VERSION }}@${{ steps.executor.outputs.digest }}
+          format: spdx-json
+          output-file: release/sbom-ai-server-manager-executor.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: release/digests.json
+        env:
+          HUB_DIGEST: ${{ steps.hub.outputs.digest }}
+          EXEC_DIGEST: ${{ steps.executor.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          mkdir -p release
+          python3 - <<'PY'
+          import json, os
+          v, owner = os.environ["VERSION"], os.environ["OWNER"]
+          out = {"version": v, "commit": os.environ["GITHUB_SHA"], "images": {
+              "ai-server-manager": {"repository": f"ghcr.io/{owner}/ai-server-manager", "tag": v,
+                                    "digest": os.environ["HUB_DIGEST"]},
+              "ai-server-manager-executor": {"repository": f"ghcr.io/{owner}/ai-server-manager-executor", "tag": v,
+                                             "digest": os.environ["EXEC_DIGEST"]}}}
+          for d in out["images"].values():
+              assert d["digest"].startswith("sha256:") and len(d["digest"]) == 71, d
+          json.dump(out, open("release/digests.json", "w"), indent=2)
+          print(json.dumps(out, indent=2))
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ env.VERSION }}
+          path: release/
+      - name: GitHub-release met digests en SBOM's
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          files: |
+            release/digests.json
+            release/sbom-ai-server-manager.spdx.json
+            release/sbom-ai-server-manager-executor.spdx.json
+          body: >-
+            Images: ghcr.io/${{ github.repository_owner }}/ai-server-manager:${{ env.VERSION }} en
+            ghcr.io/${{ github.repository_owner }}/ai-server-manager-executor:${{ env.VERSION }}.
+            Installatie als standaard TrueNAS Custom App: deploy/truenas/CUSTOM_APP.md. Zie CHANGELOG.md.
+            Validatie: Sim-getest; NIET GEVALIDEERD op een echte NAS.

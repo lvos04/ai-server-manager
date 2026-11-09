@@ -1,0 +1,94 @@
+# CI: ruff, mypy, pytest met PostgreSQL-service, alembic up/down, OpenAPI-drift, pip-audit, beide images bouwen,
+# starten en de healthcheck/rooktest draaien. Geen echte NAS: alles met simulators (Sim-getest).
+name: ci
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: docker.io/library/postgres:16.15-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      HUB_TEST_ADMIN_URL: postgresql://postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL 16-client (pg_dump/pg_restore voor de back-uptests)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq postgresql-client-16
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+      - name: Afhankelijkheden (exact vastgezet)
+        run: |
+          python -m pip install -r apps/api/requirements.lock -r apps/api/requirements-dev.lock
+          python -m pip install --no-deps -e apps/api -e apps/executor
+          python -m pip check
+          pg_dump --version
+      - name: ruff (lint + format)
+        run: make lint BIN="$(dirname "$(command -v python)")"
+      - name: mypy (strict)
+        run: make type BIN="$(dirname "$(command -v python)")"
+      - name: pytest (unit, integratie, dienst-E2E met fake TrueNAS)
+        run: python -m pytest -q
+      - name: alembic upgrade → downgrade → upgrade op een lege database
+        env:
+          HUB_DATABASE_URL: postgresql+psycopg://postgres@127.0.0.1:5432/asm_ci_migrate
+        run: |
+          psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE asm_ci_migrate"
+          python -m hub migrate
+          python -m hub migrate --check
+          python -m hub migrate --down base
+          ! python -m hub migrate --check
+          python -m hub migrate
+          (cd apps/api && alembic -c alembic.ini check)
+      - name: OpenAPI-drift
+        run: make openapi-check BIN="$(dirname "$(command -v python)")"
+      - name: pip-audit (runtime-afhankelijkheden)
+        run: pip-audit --strict -r apps/api/requirements.lock -r apps/executor/requirements.lock
+
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Hub-image bouwen (alles-in-één)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/allinone/Dockerfile
+          tags: ai-server-manager:ci
+          load: true
+          build-args: |
+            REVISION=${{ github.sha }}
+      - name: Executor-image bouwen
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/executor/Dockerfile
+          tags: ai-server-manager-executor:ci
+          load: true
+          build-args: |
+            REVISION=${{ github.sha }}
+      - name: Starten, healthcheck en rooktest
+        run: bash deploy/smoke.sh ai-server-manager:ci ai-server-manager-executor:ci
