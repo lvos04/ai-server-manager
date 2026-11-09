@@ -45,17 +45,36 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   16 Geblokkeerd / 241 Niet gestart; Testmatrix 6 Bezig; Besluiten 17 Open + D10 Ingevuld; Fasen P0 Bezig (NAS-gate open);
   Releases bijgewerkt (MSO v1.6.0 is getagd; my_house 0.2.0 niet gepubliceerd). Nergens Gereed/Geslaagd.
 
-## Openstaande besluiten voor de gebruiker (via keuzemenu vragen)
+## Besluiten van de gebruiker (gevraagd via keuzemenu op de nieuwe machine, 2026-11-09)
 
-1. **Android applicationId** van de clients: zelfde ID (vervangt de officiële app) of eigen ID (naast elkaar installeerbaar).
-   Advies bouwer: eigen ID.
-2. **Swiftfin 1.6.1** gebruikt een SDK voor Jellyfin-API 12.0, de server is 10.11.11 (app toont "Update to Jellyfin"):
-   1.6.1 houden, terug naar 1.5.x, of jelly-leon later naar upstream 12.x (.NET 10) — zie jelly-leon-clients ADR-0009.
-3. **Repos en GHCR-pakketten publiek of privé** (GPL: bron beschikbaar stellen; TrueNAS moet de image kunnen pullen —
-   privé vraagt registry-login in TrueNAS).
-4. Optioneel geheim `JL_SYNC_PUSH_TOKEN` (upstream-sync-branches pushen).
-5. **my_house 0.2.0** is niet gepubliceerd (release-run faalde op een Gradle-download, HTTP 504): opnieuw starten?
-6. Eerste GitHub Actions-runs van de nieuwe CI-workflows en release-tags `v0.1.0` (pas na akkoord: publiceren is extern).
+1. **Android applicationId:** eigen ID, naast de officiële app installeerbaar (geregistreerde patch: android
+   `applicationId`, androidtv daarnaast `app_id` en `app_search_suggest_authority`). iOS: eigen bundle-id (NIET GEVALIDEERD
+   (Mac/Xcode)).
+2. **Swiftfin:** 1.6.1 blijft; de **server gaat naar de nieuwste stabiele Jellyfin 12.x (.NET 10) vóór P4**, zodat B03 direct
+   op 12.x gebouwd wordt (jelly-leon + jelly-leon-web; Android-clients op 12.x-compatibiliteit controleren).
+3. **Zichtbaarheid:** alle repos en GHCR-images **publiek**, pas na een scan van de volledige historie op geheimen en
+   privégegevens (bevindingen eerst aan de gebruiker voorleggen).
+4. **`JL_SYNC_PUSH_TOKEN`:** de gebruiker wil dat de bouwer dit regelt. Een fine-grained token kan alleen via de GitHub-web-UI;
+   het alternatief (SSH-deploysleutel met schrijfrecht per fork als repo-geheim) vraagt nog uitdrukkelijke toestemming in de
+   sessie — staat open.
+5. **my_house 0.2.0:** release opnieuw starten (mag).
+6. **Releases:** release-tags `v0.1.0` voor de nieuwe repos (images naar GHCR met digests) zodra hun CI groen is (mag).
+7. **Ontwerptaal (nieuw):** één eigen ontwerptaal op Tailwind 4 + shadcn/ui + lucide, ontworpen door een aparte
+   design-agent in de workflows (ontwerpstap vóór en ontwerpreview ná elke UI-bouwstap), voor de Hub-UI (P0-UI wordt omgezet),
+   de statuspagina's van de nieuwe diensten en het **uiterlijk** van MediaGuard, MSO en my_house (functies/routes blijven).
+   Jelly Leon web/clients vallen erbuiten. De design-agent beslist zelfstandig; resultaat wordt achteraf getoond.
+
+## Nieuwe machine (vanaf 2026-11-09 12:56)
+
+- Ubuntu 26.04.1, 22 CPU's, 14,5 GiB RAM + 4 GiB swap (geheugen is de grens), Docker 29 (systeemdaemon), PostgreSQL 16.15 +
+  pgvector 0.8.7 (PGDG, alleen 127.0.0.1), python3.12 (deadsnakes), Node 22, pnpm 10, Java 21, .NET 9 via image,
+  Android SDK (platform 36, build-tools 36.0.0), Playwright-Chromium, actionlint. Geen proxy of eigen CA meer.
+- Workflow-scripts `workflows/p0.js` en `p1.js`: `OMGEVING:` aangepast aan deze machine, werkmap `/home/transcode/truenas-v2`,
+  filter per repo (`args.keys`), `git pull --rebase` vóór elke push, `flock` voor Gradle-, image- en stackbuilds, commits
+  eindigen met alleen de Co-Authored-By-regel van de sessie.
+- CI-stand bij overname (GitHub Actions, branch `ccr-c133d7a0-kuz1cv`): rood in jelly-leon (setup-dotnet vindt SDK 9.0.0 uit
+  global.json niet), jelly-leon-platform (4 Ruff-fouten) en zoeken-en-persoonlijke-ai (rooktest alles-in-één image);
+  home-control-hub werd in P1 gerepareerd. Deze P0-hiaten worden eerst afgemaakt.
 
 ## Contract 1.2 — nog te verwerken (uit P0-meldingen; daarna naar alle repos kopiëren)
 

@@ -6,6 +6,6 @@
   appstore B08-002 + APP-01…20), `plat` (manifests I07/I08/I09/I13/I23, simulators, installatie-rooktest).
 
 Gebruik (Workflow-tool): `Workflow({scriptPath: ".../p1.js", args: {"groups": ["hub"]}})`, één workflow per groep zodat
-ze parallel lopen. **Pas eerst het blok `OMGEVING:` in de `COMMON`-tekst aan** (geen proxy/CA meer, echte CPU-telling) en
-vervang `/home/user` door de werkmap met de 11 repos. P0 is grotendeels uitgevoerd; draai alleen wat nog ontbreekt
+ze parallel lopen. Het blok `OMGEVING:` in de `COMMON`-tekst is aangepast aan de Ubuntu-machine (geen proxy/CA, 22 CPU's / 14,5 GiB,
+werkmap `/home/transcode/truenas-v2`). Filter op één repo met `args.keys` (bv. `{"keys":["hch"]}`). P0 is grotendeels uitgevoerd; draai alleen wat nog ontbreekt
 (zie `../STATUS.md` en de git-historie per repo), bijvoorbeeld de ontbrekende reviews.
