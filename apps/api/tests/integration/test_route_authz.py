@@ -45,6 +45,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/auth/sessions"): "kind",
     ("POST", "/api/v1/auth/sessions/{session_id}/revoke"): "kind",
     ("GET", "/api/v1/audit"): "admin",
+    ("GET", "/api/v1/audit/verify"): "admin",
     ("GET", "/api/v1/apps"): "viewer",
     ("POST", "/api/v1/apps/discover"): "operator",
     ("GET", "/api/v1/apps/{app_uuid}"): "viewer",

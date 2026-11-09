@@ -170,6 +170,25 @@ def _task_notify(db: Session, ctx: Context) -> dict[str, Any]:
     return dispatch(db, ctx.settings, ctx.vault, now=ctx.now)
 
 
+def _task_audit_anchor(db: Session, ctx: Context) -> dict[str, Any]:
+    from hub import audit
+
+    return audit.write_anchor(db, ctx.settings.data_dir, ctx.now)
+
+
+def _task_audit_verify(db: Session, ctx: Context) -> dict[str, Any]:
+    """Volledige controle van de hash-ketting; een (nieuwe) breuk → event ``audit.chain.broken`` (→ incident)."""
+    from hub import audit
+    from hub.events.envelope import emit
+
+    res = audit.verify(db, ctx.settings.data_dir)
+    row = db.get(PeriodicTask, "audit_controleren")
+    before = (row.details or {}).get("status") if row is not None else None
+    if res["status"] == "verbroken" and before != "verbroken":
+        emit(db, "audit.chain.broken", "audit_chain", "hub", {"fouten": res["fouten"], "anker": res["anker"]})
+    return {"status": res["status"], "gecontroleerd": res["gecontroleerd"], "fouten": res["fouten"][:3]}
+
+
 TASKS: list[Task] = [
     Task("nas_meten", lambda s: s.nas_metrics_interval_seconds, _task_nas),
     Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
@@ -177,6 +196,8 @@ TASKS: list[Task] = [
     Task("alerts_evalueren", lambda s: s.alert_interval_seconds, _task_alerts),
     Task("meldingen_versturen", lambda s: 0, _task_notify),
     Task("tijdreeksen_onderhoud", lambda s: s.metrics_maintenance_interval_seconds, _task_maintenance),
+    Task("audit_verankeren", lambda s: s.audit_anchor_interval_seconds, _task_audit_anchor),
+    Task("audit_controleren", lambda s: s.audit_verify_interval_seconds, _task_audit_verify),
 ]
 
 

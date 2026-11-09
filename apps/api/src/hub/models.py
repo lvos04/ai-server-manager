@@ -175,6 +175,10 @@ class AuditEvent(Base):
     target_id: Mapped[str] = mapped_column(String(128), default="")
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     trace_id: Mapped[str] = mapped_column(String(36), default="")
+    # Hash-ketting (ADR-0022): bij commit verzegeld; een trigger maakt de tabel append-only.
+    ketting_nr: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 # ------------------------------------------------------------------ onboarding-besluiten D01–D18

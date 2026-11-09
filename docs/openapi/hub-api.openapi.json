@@ -2457,6 +2457,44 @@
               "description": "Cursor uit `next_cursor` van de vorige pagina.",
               "title": "Cursor"
             }
+          },
+          {
+            "description": "Exacte actie, bv. auth.login",
+            "in": "query",
+            "name": "actie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 96,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exacte actie, bv. auth.login",
+              "title": "Actie"
+            }
+          },
+          {
+            "description": "Exacte actor-id",
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exacte actor-id",
+              "title": "Actor"
+            }
           }
         ],
         "responses": {
@@ -2483,7 +2521,30 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Globaal auditspoor (admin)",
+        "summary": "Globaal auditspoor (admin), nieuwste eerst, met hash-ketting",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/api/v1/audit/verify": {
+      "get": {
+        "operationId": "verify_audit_api_v1_audit_verify_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Verify Audit Api V1 Audit Verify Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Hash-ketting van het auditspoor controleren (admin): nummering, koppeling, inhoud en anker",
         "tags": [
           "events en connector"
         ]

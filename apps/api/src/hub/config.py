@@ -107,6 +107,10 @@ class Settings(BaseSettings):
     notify_max_attempts: int = Field(default=8, ge=1, le=50)
     notify_expire_seconds: int = Field(default=24 * 3600, ge=600, le=7 * 24 * 3600)
 
+    # Auditspoor (ADR-0022): kop van de hash-ketting naar het ankerbestand; volledige controle van de ketting.
+    audit_anchor_interval_seconds: int = Field(default=15 * 60, ge=60, le=24 * 3600)
+    audit_verify_interval_seconds: int = Field(default=24 * 3600, ge=300, le=7 * 24 * 3600)
+
     # AI is standaard uit (lokale modellen optioneel en standaard uit; geen betaalde overage)
     ai_enabled: bool = False
 

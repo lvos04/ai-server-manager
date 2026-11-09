@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
 
-from hub import APP_ID, __version__
+from hub import APP_ID, __version__, audit
 from hub.backup.selfbackup import latest_verified
 from hub.backup.selfbackup import to_dict as backup_dict
 from hub.deps import (
@@ -70,32 +70,38 @@ def list_events(
     }
 
 
-@router.get("/api/v1/audit", summary="Globaal auditspoor (admin)")
-def list_audit(db: DB, _: Admin, limit: Limit = 50, cursor: Cursor = None) -> dict[str, Any]:
+@router.get("/api/v1/audit", summary="Globaal auditspoor (admin), nieuwste eerst, met hash-ketting")
+def list_audit(
+    db: DB,
+    _: Admin,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+    actie: str | None = Query(default=None, max_length=96, description="Exacte actie, bv. auth.login"),
+    actor: str | None = Query(default=None, max_length=64, description="Exacte actor-id"),
+) -> dict[str, Any]:
     before = decode_cursor(cursor)
     q = select(AuditEvent)
     if before is not None:
         q = q.where(AuditEvent.id < before)
+    if actie:
+        q = q.where(AuditEvent.action == actie)
+    if actor:
+        q = q.where(AuditEvent.actor_id == actor)
     rows = list(db.scalars(q.order_by(AuditEvent.id.desc()).limit(limit + 1)))
     more = len(rows) > limit
     rows = rows[:limit]
     return {
-        "items": [
-            {
-                "id": r.id,
-                "op": iso(r.at),
-                "actor_type": r.actor_type,
-                "actor_id": r.actor_id,
-                "actie": r.action,
-                "doel_type": r.target_type,
-                "doel_id": r.target_id,
-                "details": r.details,
-                "trace_id": r.trace_id,
-            }
-            for r in rows
-        ],
+        "items": [audit.to_dict(r) for r in rows],
         "next_cursor": encode_cursor(rows[-1].id) if more and rows else None,
     }
+
+
+@router.get(
+    "/api/v1/audit/verify",
+    summary="Hash-ketting van het auditspoor controleren (admin): nummering, koppeling, inhoud en anker",
+)
+def verify_audit(db: DB, settings: SettingsDep, _: Admin) -> dict[str, Any]:
+    return audit.verify(db, settings.data_dir)
 
 
 # ------------------------------------------------------------------ connectorcontract §6 (de Hub als bron)
