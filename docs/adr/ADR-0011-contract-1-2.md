@@ -1,6 +1,9 @@
 # ADR-0011 — Contract 1.2: enrollment, Hub-authenticatie, sleutelpinning en Custom App-realiteit
 
 Status: aangenomen · 2026-11-09 · ronde "contract 1.2" · eigenaar contract: `ai-server-manager`
+Aangevuld door ADR-0012 (onafhankelijke review, zelfde dag): o.a. `app_id` vast per image, `pending` naast `state`,
+rotatie zonder buitensluiten, geen automatische rotatie (R2), ook PID 1 niet als root. De tabel hieronder is de stand
+bij het vaststellen; jelly-leon-platform stuurt sinds `8c83aa6` al exact de Hub-velden.
 Bron: `docs/platform-v2/OVERDRACHT/STATUS.md` (secties "Contract 1.2" en "Besluiten van de gebruiker"), de
 enrollment-code, tests en ADR's van alle nieuwe diensten. Resultaat: `docs/platform-v2/PLATFORM_CONTRACTEN.md` 1.2 en
 `docs/platform-v2/CONTRACT_1.2_CONFORMITEIT.md`.
