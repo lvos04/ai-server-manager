@@ -14,7 +14,7 @@ schrijfrechten krijgt en moet daarom een eigen app zijn.
 - De bewaker is **zelf PID 1** (signalen + opruimen van verweesde processen) en wisselt na het rechtzetten van
   `/appdata` naar 568. Daardoor draait na de init **geen enkel proces als root** — strenger dan het MSO-voorbeeld, waar
   `dumb-init` als root blijft draaien. Gemeten: `uid's in de Hub-container: 568 569` (rooktest).
-- Web-UI-plek: zodra `/opt/hub-web/server.js` in de image staat, start de bewaker de web-UI op 30400 en luistert de
+- Web-UI (sinds ADR-0009 `/opt/hub-web/server/hub-server.mjs`): zodra die in de image staat, start de bewaker de web-UI op 30400 en luistert de
   API alleen op `127.0.0.1:8400`; de healthcheck controleert dan beide.
 - Executor-image (`deploy/executor`): één proces (`entrypoint.py` geeft `/appdata` aan 568 en vervangt zichzelf door
   de API), eigen dataset, eigen Ed25519-identiteit en `vault.key`. Fase P0: allowlist leeg, alles geweigerd.

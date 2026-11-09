@@ -4,14 +4,14 @@ De Hub van het platform: **B01** (centrale web-UI en beheer-API), **B02** (AI-be
 **B09** (monitoring/incidenten) en **B12** (back-up en herstel). Taal: Nederlands. Bron van waarheid voor de
 platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.1).
 
-## Stand (versie 0.1.0, fase P0 — backend)
+## Stand (versie 0.1.0, fase P0 — backend en web-UI)
 
 | Onderdeel | Stand | Validatie |
 |---|---|---|
 | Hub-API (`apps/api`, pakket `hub`) | first-start-init, setupcode → eerste admin, login/rollen/CSRF, JWKS + dienst-JWT, enrollment + service-tokens, onboarding-wizard D01–D18, gates, alleen-lezen TrueNAS-inventaris, dienstenregister, back-updekking, eigen pg_dump, events-inbox, connectorcontract | Sim-getest (fake TrueNAS), echte PostgreSQL 16 |
 | Executor (`apps/executor`) | healthz/readyz, statuspagina "nog niet gekoppeld", allowlist die **alles weigert** | Unit-getest + image-rooktest |
-| Images | `deploy/allinone` (Hub, alles-in-één) en `deploy/executor` | gebouwd en gestart in Docker; **NIET GEVALIDEERD (echte NAS)** |
-| Web-UI (`apps/web`, PWA) | volgt (volgende stap); plek in de Dockerfile is gemarkeerd | — |
+| Web-UI (`apps/web`, Next.js-PWA) | eerste start met setupcode, inloggen/uitloggen, onboarding-wizard D01–D18, TrueNAS-koppeling met vingerafdruk, Server-inventaris, Apps, Backups-dekking, Home, Instellingen; latere fasen eerlijk "nog niet beschikbaar" | Unit-getest (vitest) + Sim-getest (Playwright 360/390/768/1440 + axe, ook tegen de image) |
+| Images | `deploy/allinone` (Hub + web-UI, alles-in-één, één poort 30400) en `deploy/executor` | gebouwd en gestart in Docker; **NIET GEVALIDEERD (echte NAS)** |
 | Policy/AI | volgt in P2; AI staat standaard uit, geen modellen, geen betaalde aanroepen | — |
 
 Echte NAS-, hardware- en accounttests zijn in deze bouwomgeving niet mogelijk. Zie
@@ -20,8 +20,9 @@ Echte NAS-, hardware- en accounttests zijn in deze bouwomgeving niet mogelijk. Z
 ## Installeren (gebruiker)
 
 Uitsluitend als **standaard TrueNAS Custom App** (formulier: image + tag, poort, opslag) — nooit via YAML of compose.
-Twee formulieren: [`deploy/truenas/CUSTOM_APP.md`](deploy/truenas/CUSTOM_APP.md). De setupcode voor het eerste
-beheerdersaccount staat in de app-log (TrueNAS → Apps → ai-server-manager → Logs).
+Twee formulieren: [`deploy/truenas/CUSTOM_APP.md`](deploy/truenas/CUSTOM_APP.md). Daarna open je de Hub in de browser;
+de pagina **Eerste start** vraagt de setupcode uit de app-log (TrueNAS → Apps → ai-server-manager → Logs) en maakt het
+eerste beheerdersaccount, waarna de onboarding-wizard volgt.
 
 ## Ontwikkelen
 
@@ -31,7 +32,11 @@ make lint type     # ruff + mypy (strict)
 make test          # unit + integratie (PostgreSQL op 127.0.0.1:5432) + dienst-E2E met fake TrueNAS
 make openapi       # docs/openapi/*.openapi.json bijwerken (CI faalt bij drift)
 make images smoke  # beide images bouwen en de rooktest draaien
+make web-install web-lint web-test   # web-UI: npm ci, eslint + tsc, vitest
+make web-e2e       # Playwright (360/390/768/1440, axe) tegen de echte API + fake TrueNAS
 ```
+
+Details over de web-UI: [`apps/web/README.md`](apps/web/README.md).
 
 `deploy/dev/compose.yaml` is alleen voor ontwikkeling/CI. Variabelen: [`.env.example`](.env.example) (geen echte
 waarden; de Custom App heeft geen verplichte variabelen).
@@ -42,12 +47,14 @@ waarden; de Custom App heeft geen verplichte variabelen).
 |---|---|
 | `apps/api` | Hub-API: `src/hub`, Alembic-migraties, unit- en integratietests |
 | `apps/executor` | executor (eigen image/app) |
-| `tests/e2e`, `tests/fakes` | dienst-E2E en de fake TrueNAS-WebSocketserver |
+| `apps/web` | web-UI (Next.js-PWA), eigen webserver met API-doorgang, vitest en Playwright |
+| `tests/e2e`, `tests/fakes` | dienst-E2E, teststack voor de web-E2E (`web_stack.py`) en de fake TrueNAS-WebSocketserver |
 | `deploy/allinone`, `deploy/executor` | Dockerfiles, procesbewaker, healthchecks |
 | `deploy/truenas` | formuliervelden van de twee Custom Apps |
 | `deploy/manifest` | manifesten (manifeststandaard v1, `install.method: custom_app`) |
 | `policy/` | risicobeleid (volgt in P2) |
 | `docs/openapi`, `docs/adr` | OpenAPI-export en besluiten (ADR's) |
+| `docs/screenshots/p0` | schermafbeeldingen (mobiel en desktop) uit de Playwright-suite |
 | `docs/platform-v2` | pakketdocumentatie, contracten, Excel-taken en `EVIDENCE.json` |
 
 Geen licentie toegevoegd (contract §10: alleen na vraag aan de gebruiker).
