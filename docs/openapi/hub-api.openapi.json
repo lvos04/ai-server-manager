@@ -234,6 +234,40 @@
         "title": "ChannelPatch",
         "type": "object"
       },
+      "Check": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_.-]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "down",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "Check",
+        "type": "object"
+      },
       "ConfirmIn": {
         "additionalProperties": false,
         "properties": {
@@ -521,6 +555,56 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HeartbeatIn": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            },
+            "maxItems": 20,
+            "title": "Checks",
+            "type": "array"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "down"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verwacht_interval_s": {
+            "default": 60,
+            "maximum": 3600.0,
+            "minimum": 10.0,
+            "title": "Verwacht Interval S",
+            "type": "integer"
+          },
+          "worker": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Worker"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "observed_at"
+        ],
+        "title": "HeartbeatIn",
         "type": "object"
       },
       "PasswordIn": {
@@ -1144,6 +1228,260 @@
         "title": "SnoozeIn",
         "type": "object"
       },
+      "SourceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uptime Kuma-API-key.",
+            "title": "Api Key"
+          },
+          "basis_url": {
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Basis Url",
+            "type": "string"
+          },
+          "identiteit": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Beszel-gebruiker.",
+            "title": "Identiteit"
+          },
+          "ingeschakeld": {
+            "default": true,
+            "title": "Ingeschakeld",
+            "type": "boolean"
+          },
+          "metrics": {
+            "default": true,
+            "title": "Metrics",
+            "type": "boolean"
+          },
+          "naam": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Naam",
+            "type": "string"
+          },
+          "nas_systeem": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9]{1,32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nas Systeem"
+          },
+          "soort": {
+            "enum": [
+              "uptime_kuma",
+              "beszel"
+            ],
+            "title": "Soort",
+            "type": "string"
+          },
+          "status_paginas": {
+            "items": {
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Status Paginas",
+            "type": "array"
+          },
+          "wachtwoord": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Beszel-wachtwoord.",
+            "title": "Wachtwoord"
+          }
+        },
+        "required": [
+          "soort",
+          "naam",
+          "basis_url"
+        ],
+        "title": "SourceIn",
+        "type": "object"
+      },
+      "SourcePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "basis_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Url"
+          },
+          "identiteit": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identiteit"
+          },
+          "ingeschakeld": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingeschakeld"
+          },
+          "koppelingen": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Monitor-sleutel → app-id (uuid) of 'geen'; null verwijdert de handmatige keuze.",
+            "title": "Koppelingen"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          },
+          "naam": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naam"
+          },
+          "nas_systeem": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9]{1,32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nas Systeem"
+          },
+          "nas_systeem_wissen": {
+            "default": false,
+            "title": "Nas Systeem Wissen",
+            "type": "boolean"
+          },
+          "status_paginas": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^[a-z0-9-]{1,64}$",
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Paginas"
+          },
+          "wachtwoord": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wachtwoord"
+          }
+        },
+        "title": "SourcePatch",
+        "type": "object"
+      },
       "StatusIn": {
         "additionalProperties": false,
         "properties": {
@@ -1327,6 +1665,70 @@
           "waarde"
         ],
         "title": "ValueIn",
+        "type": "object"
+      },
+      "Worker": {
+        "additionalProperties": false,
+        "properties": {
+          "bezig": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bezig"
+          },
+          "jobs_stil_na_s": {
+            "default": 900,
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Jobs Stil Na S",
+            "type": "integer"
+          },
+          "laatste_hartslag": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laatste Hartslag"
+          },
+          "laatste_job_klaar": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laatste Job Klaar"
+          },
+          "wachtrij": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wachtrij"
+          }
+        },
+        "title": "Worker",
         "type": "object"
       },
       "hub__routers__auth__LoginIn": {
@@ -3925,6 +4327,431 @@
         ]
       }
     },
+    "/api/v1/monitoring/health": {
+      "get": {
+        "operationId": "list_observations_api_v1_monitoring_health_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "bron_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "uptime_kuma",
+                    "heartbeat",
+                    "connector"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bron Type"
+            }
+          },
+          {
+            "description": "Alleen monitors zonder app.",
+            "in": "query",
+            "name": "alleen_ongekoppeld",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Alleen monitors zonder app.",
+              "title": "Alleen Ongekoppeld",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Observations Api V1 Monitoring Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alle gezondheidswaarnemingen (Uptime Kuma, heartbeat, connector) met veroudering",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/heartbeat": {
+      "post": {
+        "operationId": "heartbeat_api_v1_monitoring_heartbeat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "te vaak (minimaal 5 s tussen heartbeats)"
+          }
+        },
+        "summary": "Heartbeat van een eigen dienst (Bearer service-token; dedupe op observed_at)",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/poll": {
+      "post": {
+        "operationId": "poll_now_api_v1_monitoring_poll_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alle bronnen en eigen diensten nu uitlezen (operator); alleen-lezen",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/sources": {
+      "get": {
+        "operationId": "list_sources_api_v1_monitoring_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Sources Api V1 Monitoring Sources Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Monitoringbronnen (Uptime Kuma, Beszel) met status, versie en reden",
+        "tags": [
+          "monitoring"
+        ]
+      },
+      "post": {
+        "operationId": "create_source_api_v1_monitoring_sources_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bron toevoegen (admin); geheim in de vault, nooit terug",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/sources/{source_id}": {
+      "get": {
+        "operationId": "get_source_api_v1_monitoring_sources__source_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Source Api V1 Monitoring Sources  Source Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bron met monitors/systemen en hun koppeling aan apps",
+        "tags": [
+          "monitoring"
+        ]
+      },
+      "patch": {
+        "operationId": "update_source_api_v1_monitoring_sources__source_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourcePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bron wijzigen (admin), inclusief handmatige koppeling monitor → app",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/sources/{source_id}/test": {
+      "post": {
+        "operationId": "test_source_api_v1_monitoring_sources__source_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bron nu echt uitlezen (admin) en het echte resultaat tonen",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/status": {
+      "get": {
+        "operationId": "status_api_v1_monitoring_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Status Api V1 Monitoring Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Periodieke taken (meten, alerts, meldingen, tijdreeksonderhoud) en bronnen",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "operationId": "list_notifications_api_v1_notifications_get",
@@ -5552,6 +6379,10 @@
     {
       "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
       "name": "appcatalogus"
+    },
+    {
+      "description": "Bronnen (Uptime Kuma, Beszel), healthchecks en heartbeat van eigen diensten (B09-002).",
+      "name": "monitoring"
     },
     {
       "description": "Genormaliseerde reeksen met bron en veroudering; ruw → 5 min → 1 uur met retentie (B09-003).",

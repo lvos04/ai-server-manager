@@ -123,6 +123,12 @@ def _task_maintenance(db: Session, ctx: Context) -> dict[str, Any]:
     return {"aggregatie": timeseries.rollup(db, since=since), "retentie": timeseries.prune(db, now=ctx.now)}
 
 
+def _task_sources(db: Session, ctx: Context) -> dict[str, Any]:
+    from hub.monitoring.sources import poll_all
+
+    return poll_all(db, ctx.settings, ctx.vault, ctx.keyring, now=ctx.now)
+
+
 def _task_alerts(db: Session, ctx: Context) -> dict[str, Any]:
     added = alerts.seed_default_rules(db)
     return {"standaardregels_toegevoegd": added, **alerts.evaluate(db, ctx.settings, now=ctx.now)}
@@ -133,6 +139,7 @@ def _task_notify(db: Session, ctx: Context) -> dict[str, Any]:
 
 
 TASKS: list[Task] = [
+    Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
     Task("gezondheid_vastleggen", lambda s: s.health_record_interval_seconds, _task_health),
     Task("alerts_evalueren", lambda s: s.alert_interval_seconds, _task_alerts),
     Task("meldingen_versturen", lambda s: 0, _task_notify),

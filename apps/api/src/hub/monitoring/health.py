@@ -58,6 +58,14 @@ MELDINGEN: dict[str, str] = {
     "dienst_weigerde": "De dienst weigerde de Hub (aanmelding of koppeling); gezond is niet vast te stellen.",
     "antwoord_ongeldig": "De dienst gaf een ongeldig gezondheidsantwoord.",
     "eerste_fout_grace": "Eén mislukte controle: nog binnen de marge; bij de volgende fout telt de app als down.",
+    "dienst_meldt_down": "De dienst meldt zelf dat hij niet werkt.",
+    "dienst_meldt_degraded": "De dienst meldt zelf dat hij verminderd werkt.",
+    "controle_faalt": "Een controle van de dienst zelf faalt.",
+    "capability_unavailable": "De dienst biedt (nog) geen gezondheidsroute aan; gezond is niet vast te stellen.",
+    "dienst_adres_onbekend": "Het adres van de dienst is niet gemeten (NAS-adres uit D03 + hostpoort uit de "
+    "inventaris).",
+    "bron_credential_geweigerd": "De monitoringbron weigerde de API-key of het wachtwoord; de monitors gelden als "
+    "onbekend tot er geldige gegevens zijn (nooit open of 'nog gezond').",
 }
 
 
@@ -85,20 +93,31 @@ class Component:
 
 
 def freshen(c: Component, ttl_seconds: float, now: datetime | None = None) -> Component:
-    """Een component ouder dan zijn TTL wordt ``unknown`` (``verouderd``); de laatste status blijft zichtbaar."""
+    """Een component ouder dan zijn TTL wordt ``unknown`` (``verouderd``); de laatste status blijft zichtbaar. Was hij
+    al ``unknown`` met een eigen reden (bv. een geweigerde key), dan blijft die reden staan."""
     now = now or utcnow()
     stale = c.observed_at is None or (now - c.observed_at).total_seconds() > ttl_seconds
-    if stale and (c.status != "unknown" or c.reason_code != "verouderd"):
+    if not stale:
+        return c
+    if c.status == "unknown":
         return Component(
             c.soort,
             c.bron,
             "unknown",
-            "verouderd",
+            c.reason_code or "verouderd",
             c.observed_at,
             c.detail,
-            {**c.extra, "laatste_status": c.status, "verouderd": True},
+            {**c.extra, "verouderd": True},
         )
-    return c
+    return Component(
+        c.soort,
+        c.bron,
+        "unknown",
+        "verouderd",
+        c.observed_at,
+        c.detail,
+        {**c.extra, "laatste_status": c.status, "verouderd": True},
+    )
 
 
 def _aggregate(components: list[Component]) -> Component | None:

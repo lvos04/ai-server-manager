@@ -571,3 +571,30 @@ class Notification(Base):
     aangemaakt_door: Mapped[str] = mapped_column(String(64), default="system")
     verzonden_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     extern_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+# ------------------------------------------------------------------ monitoringbronnen (B09-002)
+class MonitorSource(Base):
+    """Uptime Kuma of Beszel als alleen-lezen bron. Geheimen alleen als vault-referentie (``geheim_ref``)."""
+
+    __tablename__ = "monitor_source"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    soort: Mapped[str] = mapped_column(String(16))  # uptime_kuma|beszel
+    naam: Mapped[str] = mapped_column(String(64))
+    basis_url: Mapped[str] = mapped_column(String(512))
+    geheim_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    identiteit: Mapped[str | None] = mapped_column(String(128), nullable=True)  # Beszel-gebruiker (geen geheim)
+    opties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    koppelingen: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # monitor-sleutel → app-uuid|"geen"
+    ingeschakeld: Mapped[bool] = mapped_column(Boolean, default=True)
+    laatste_poging: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_ok: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # ok|fout
+    laatste_reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    laatste_versie: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    laatste_detail: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    aangemaakt_door: Mapped[str] = mapped_column(String(64))
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    bijgewerkt_door: Mapped[str] = mapped_column(String(64))
+    bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    version: Mapped[int] = mapped_column(Integer, default=1)

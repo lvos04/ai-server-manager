@@ -29,6 +29,7 @@ from hub.routers import (
     health,
     inventory,
     metrics,
+    monitoring,
     notifications,
     onboarding,
     services,
@@ -139,6 +140,10 @@ OPENAPI_TAGS = [
         "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
     },
     {
+        "name": "monitoring",
+        "description": "Bronnen (Uptime Kuma, Beszel), healthchecks en heartbeat van eigen diensten (B09-002).",
+    },
+    {
         "name": "tijdreeksen",
         "description": "Genormaliseerde reeksen met bron en veroudering; ruw → 5 min → 1 uur met retentie (B09-003).",
     },
@@ -237,6 +242,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         onboarding.router,
         inventory.router,
         catalog.router,
+        monitoring.router,
         metrics.router,
         alerts.router,
         notifications.router,
