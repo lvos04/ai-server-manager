@@ -10,6 +10,8 @@ Onbekende NAS-gegevens (D01–D18) worden nooit met voorbeeldwaarden ingevuld; z
 
 ## Bestanden
 
+- `PLATFORM_CONTRACTEN.md` — bindend bouwcontract (`contracts 1.2`), bron van waarheid voor alle repos
+- `CONTRACT_1.2_CONFORMITEIT.md` — per repo wat er moet veranderen om aan contract 1.2 te voldoen
 - `00_START/BESLUITEN_EN_ONBEKENDEN.md`
 - `00_START/INHOUDSOPGAVE.md`
 - `00_START/INHOUD_CONTROLE.json`
