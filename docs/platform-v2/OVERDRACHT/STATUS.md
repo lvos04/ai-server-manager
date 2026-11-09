@@ -76,7 +76,12 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   global.json niet), jelly-leon-platform (4 Ruff-fouten) en zoeken-en-persoonlijke-ai (rooktest alles-in-één image);
   home-control-hub werd in P1 gerepareerd. Deze P0-hiaten worden eerst afgemaakt.
 
-## Contract 1.2 — nog te verwerken (uit P0-meldingen; daarna naar alle repos kopiëren)
+## Contract 1.2 — verwerkt in `PLATFORM_CONTRACTEN.md` (`contracts 1.2`, 2026-11-09)
+
+- Vastgesteld in `ai-server-manager` met `CONTRACT_1.2_CONFORMITEIT.md` (wat elke repo moet veranderen) en
+  `docs/adr/ADR-0011-contract-1-2.md` (keuzes). **Nog niet** naar de andere repos gekopieerd (volgende stap) en
+  nog nergens in code doorgevoerd. De punten hieronder waren de invoer.
+
 
 - **Bestaande apps** (MediaGuard, MSO, my_house, Jellyfin): eigen poorten (MG 30080 + fork-poorten, MSO 38081), eigen DB
   (MG SQLite-WAL, mounts /config,/work,/data), eigen UI, eigen foutformaat op bestaande routes; contractformaat alleen op nieuwe

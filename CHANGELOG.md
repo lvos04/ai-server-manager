@@ -4,6 +4,21 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — platformcontract 1.2 (alleen documentatie)
+- `docs/platform-v2/PLATFORM_CONTRACTEN.md` naar `contracts 1.2` met wijzigingslog: exact enroll-schema, dienst-JWT
+  voor Hub → dienst, sleutelpinning met sleutelset-vingerafdruk, `jti`-replaycache, opslag in
+  `/appdata/secrets/hub-link.json`, koppelen via de statuspagina alleen vóór de eerste koppeling, Custom App-realiteit,
+  manifestwijzigingen, noodlogin in de Hub, besluiten van de gebruiker en nieuw §13 Ontwerptaal.
+- Nieuw: `docs/platform-v2/CONTRACT_1.2_CONFORMITEIT.md` (wat elke repo moet veranderen) en
+  `docs/adr/ADR-0011-contract-1-2.md` (keuzes). De code van de Hub volgt in een volgende stap (H1–H13).
+- `apps/api/src/hub/keys.py`: referentie-implementatie van de RFC 7638-thumbprint en de sleutelset-vingerafdruk
+  (contract 1.2 §4.5) met de testvectoren uit het contract (`apps/api/tests/unit/test_keyset_fingerprint.py`); nog
+  niet gebruikt in het enroll-antwoord.
+
+### Gerepareerd — tests
+- `tests/e2e/test_wizard_inventory.py`: de controle op een klare-tekstsleutel in de vault faalde willekeurig als de
+  AES-GCM-cijfertekst een 0x00-byte bevatte (`convert_from(…, 'LATIN1')`); nu een bytevergelijking.
+
 ### Toegevoegd — web-UI (`apps/web`)
 - Next.js 16-PWA (App Router, TypeScript, Nederlands, licht/donker, toetsenbord/screenreader, aanraakdoelen ≥ 44 px):
   eerste start met setupcode, inloggen/uitloggen, onboarding-wizard D01–D18 (uitleg, gate, status, schemaformulier

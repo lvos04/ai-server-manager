@@ -15,7 +15,7 @@
     "validatie": "Sim-getest",
     "bewijs": "commits 0cfd898, 821b51b, 53e9cc0; apps/api/tests/integration/test_route_authz.py (kijker/operator/kind krijgen 403 op elke wijzigende of beheerroute, ook geheimen-routes zoals truenas/api-key en enrollment-tokens), apps/api/tests/integration/test_auth.py::test_login_rate_limit_en_logout, ::test_sessie_intrekken_en_wachtwoord_wijzigen, ::test_laatste_admin_beschermd_en_degraderen_trekt_sessies_in, ::test_csrf_vereist_voor_mutaties; apps/web/e2e/90-afsluiting.spec.ts (kijker kan niets invullen, meten of koppelen)",
     "blokkade": "Authentik OIDC (code + PKCE) hangt af van B13 en besluit D17 (domein/HTTPS) en is nog niet gebouwd; geen echte NAS.",
-    "opmerking": "Deels: lokale accounts (argon2id), rollen admin/operator/viewer/kind, korte sessies met HttpOnly/SameSite=Strict-cookie (Secure achter HTTPS) en CSRF, uitloggen en intrekken werken direct. OIDC-deel ontbreekt.",
+    "opmerking": "Deels: lokale accounts (argon2id), rollen admin/operator/viewer/kind, korte sessies met HttpOnly/SameSite=Strict-cookie (Secure achter HTTPS) en CSRF, uitloggen en intrekken werken direct. OIDC-deel ontbreekt. Contract 1.2 §4.1 vraagt daarnaast een noodlogin (break-glass) in de Hub — noodaccount met verplichte TOTP, alleen vanaf privé-bereiken, sessie ≤ 60 min, incident en rotatieplicht, zelftest zonder Authentik; nog niet gebouwd (CONTRACT_1.2_CONFORMITEIT.md H6). B13-001 in home-control-hub hangt hiervan af.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-09"
   },
@@ -195,7 +195,7 @@
     "validatie": "Vast besluit gebruiker; wizard Sim-getest",
     "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; tests/e2e/test_wizard_inventory.py",
     "blokkade": "",
-    "opmerking": "Vast besluit van de gebruiker (mini-pc uitgesloten van Home Hub-diensten); in de wizard vooraf 'Ingevuld' en niet wijzigbaar. Geen NAS-gegeven.",
+    "opmerking": "Vast besluit van de gebruiker (mini-pc uitgesloten van Home Hub-diensten); in de wizard vooraf 'Ingevuld' en niet wijzigbaar. Geen NAS-gegeven. Vastgelegd in contract 1.2 §1.1 (2026-11-09).",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-09"
   },
