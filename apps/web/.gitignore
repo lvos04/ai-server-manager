@@ -1,0 +1,10 @@
+/node_modules/
+/.next/
+/test-results/
+/playwright-report/
+/blob-report/
+/e2e/.auth/
+/coverage/
+next-env.d.ts
+*.tsbuildinfo
+/e2e/.state/
