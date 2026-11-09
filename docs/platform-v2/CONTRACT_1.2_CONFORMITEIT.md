@@ -252,7 +252,7 @@ achteraf te verhogen).
 |---|---|---|
 | JL1 | **Upgradefase vóór P4** (besluit 2, niet in de contractronde): naar de nieuwste stabiele Jellyfin 12.x (.NET 10; upstream-tags op de peildatum `v12.0`…`v12.4`, exacte versie dan opnieuw vaststellen); patches en plugins opnieuw toepassen; CI naar .NET 10 (CI is sinds `d71439da0` groen op het 9.0.x-kanaal uit `global.json`, ADR-0010; GitHub-run 42622088484). Plan: `docs/adr/ADR-0011-upgrade-12x-voor-p4.md` (in jelly-leon). | `global.json`, `.github/workflows/*`, `docs/platform-v2/FORK_STRATEGIE.md`, `docs/platform-v2/PATCHES.md`, `docs/adr/ADR-0005-versieschema.md`, `docs/adr/ADR-0006-upstream-sync.md` |
 | JL2 | Manifest §9: `joins_platform_network`, `custom_app.ports` weg; GPU als `{param: gpu}` met `privileges.gpu: intel_render` + reden + D08. | `deploy/manifest/jelly-leon.manifest.yaml` |
-| JL3 | Custom App-instructie: tag met digest, publieke image, registry-fallback; bestaande stock-Jellyfin blijft op eigen poort. | `deploy/truenas/*` |
+| JL3 | Custom App-instructie: tag met digest, publieke image, registry-fallback; een eventuele stock-Jellyfin (D07 meet dat) blijft op eigen poort. | `deploy/truenas/*` |
 | JL4 | Hub-adapter (v1): alleen openbare routes + niet-admin-gebruiker; de B03-plugin (P4) verifieert Hub-JWT's pas als er een pinmechanisme is (plugin-configuratie in het Jellyfin-dashboard, vingerafdruk §4.5) — ontwerp in P4, tot dan geen Hub-JWT accepteren. | P4-ontwerp, ADR in deze repo |
 | JL5 | `JL_SYNC_PUSH_TOKEN` blijft open (besluit 4): geen token in repo of workflow; zonder het geheim levert de sync alleen een git-bundle als artefact (zo gebouwd) — niets wijzigen tot het besluit valt. | `.github/workflows/upstream-sync.yml` |
 | JL6 | Ontwerptaal §13 is **niet** van toepassing. | — |

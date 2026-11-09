@@ -215,7 +215,7 @@ Bestaande integriteit, rollback en monitoring nooit dubbel bouwen, vervangen of 
 | MediaGuard (`media-guard-ultimate`) | `mediaguard` · `ghcr.io/lvos04/mediaguard-core:<versie>-aio` | 30080 (UI/API) + fork-API's 38989/38990 (Sonarr) en 37878/37879 (Radarr), elk gelijk | SQLite-WAL; mounts `/config` (appdata), `/work` (staging/quarantaine), `/data` (media + downloads, één dataset voor hardlinks) | Next.js-web + Android | eigen (ongewijzigd) |
 | MSO (`media-source-optimizer`) | `media-source-optimizer` · `ghcr.io/lvos04/media-source-optimizer:<versie>` | 38081 → 38081 | ingebouwde PostgreSQL, één `/appdata` (alles-in-één bestaat al) | eigen web | `{detail, code, correlation_id}` |
 | my_house (`my_house`) | `smart-home` · `ghcr.io/lvos04/my_house:<versie>` (alles-in-één, **nieuw in P3**) | 8080 → 8088 (bestaande QR-koppelingen bewaren adres mét poort) | ingebouwde PostgreSQL, één `/appdata` (P3) | React/Vite-PWA + Android | `{"detail":{"code","message"}}` |
-| Jellyfin / Jelly Leon (`jelly-leon`, `jelly-leon-web`) | `jelly-leon` · `ghcr.io/lvos04/jelly-leon:<versie>` | 8096 → 30460; een bestaande stock-Jellyfin blijft ongemoeid op zijn eigen poort | Jellyfin-eigen database in `/config`, cache `/cache` | jelly-leon-web + clients | Jellyfin-API (ongewijzigd) |
+| Jellyfin / Jelly Leon (`jelly-leon`, `jelly-leon-web`) | `jelly-leon` · `ghcr.io/lvos04/jelly-leon:<versie>` | 8096 → 30460; staat er al een stock-Jellyfin (onbekend tot D07 het meet), dan blijft die ongemoeid op zijn eigen poort | Jellyfin-eigen database in `/config`, cache `/cache` | jelly-leon-web + clients | Jellyfin-API (ongewijzigd) |
 
 Regels:
 1. **Eigen poorten, eigen database, eigen UI, eigen foutformaat op bestaande routes.** Het contractformaat (§5),
