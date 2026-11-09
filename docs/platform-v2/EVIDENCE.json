@@ -1,0 +1,262 @@
+[
+  {
+    "id": "B01-001",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commits 07cab93, 15886cb, 5eaec64; tests/e2e/test_wizard_inventory.py::test_volledige_wizard_en_inventaris_zonder_mutatie, ::test_nas_zonder_api_autorisatie_geeft_gerichte_fout, ::test_ontbrekend_leesrecht_per_onderdeel_is_unknown_niet_overgeslagen, ::test_key_met_schrijfrechten_wordt_geweigerd, ::test_nas_offline_maakt_inventaris_verouderd_en_unknown, ::test_truenas_24_10_gebruikt_zfs_snapshot_en_extra_ca; apps/api/tests/integration/test_truenas_adapter.py",
+    "blokkade": "Acceptatie op de echte NAS ontbreekt: NIET GEVALIDEERD (echte NAS). Vereist D03 + alleen-lezen-key van de gebruiker.",
+    "opmerking": "TrueNAS JSON-RPC-adapter (wss, TLS-verificatie of bevestigde vingerafdruk, capability-map per versie, reason codes), inventaris met observed_at/veroudering en dienstenregister; tegen de fake TrueNAS: MediaGuard/MSO/my_house zichtbaar zonder enige mutatie, NAS zonder autorisatie geeft auth_failed met NL-advies. Methodenamen nog niet tegen een echte TrueNAS-versie gecontroleerd. Web-UI-wizard volgt (API is klaar).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B12-001",
+    "status": "Geblokkeerd",
+    "validatie": "NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit 2dd7592; apps/api/tests/unit/test_coverage.py; tests/e2e/test_wizard_inventory.py::test_volledige_wizard_en_inventaris_zonder_mutatie (dekking)",
+    "blokkade": "Acceptatie vraagt een echte foto + app-DB uit OneDrive teruggezet in een geïsoleerde omgeving: echte NAS en OneDrive-account nodig (D04/D05).",
+    "opmerking": "Gebouwd en Sim-getest: dekkingsmatrix per app/dataset met detectie van OneDrive-cloud-sync-taken (provider ONEDRIVE, laatste job), 'synchronisatie ≠ herstelgarantie' en registratie van hersteltests als bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B12-002",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 2dd7592; apps/api/tests/unit/test_coverage.py::test_snapshotvoorstel_met_ruimtewaarschuwing, ::test_dekking_per_app_en_dataset; tests/e2e/test_wizard_inventory.py::test_volledige_wizard_en_inventaris_zonder_mutatie",
+    "blokkade": "Toepassen van snapshot-taken en snapshot vóór deploy gebeurt via de executor (fase P2); echte NAS nodig.",
+    "opmerking": "Snapshotbeleid alleen als voorstel (schema uit D16-RPO, ruimtewaarschuwing ≥80% pool). Regel afgedwongen: snapshot zonder app-consistente DB-export telt niet als volledige app-back-up (volledige_appbackup=false).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B12-003",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commits 2dd7592, 58584e2; apps/api/tests/integration/test_backup_worker.py::test_echte_backup_geverifieerd, ::test_nooit_geslaagd_op_alleen_exitcode, ::test_retentie; handmatige containerproef: hub backup-now in de alles-in-één image gaf 'geslaagd' (pg_restore --list 102 items, SHA-256 herberekend)",
+    "blokkade": "Acceptatie 'MSO en my_house database onafhankelijk in teststack starten' vraagt hun connectors/exports (fase P3).",
+    "opmerking": "Eigen database: echte pg_dump met SHA-256 + pg_restore --list-verificatie tegen PostgreSQL 16 (integratie-getest, geen simulator); status 'geslaagd' nooit op alleen een exitcode. Andere apps: export via connector-capability, nu eerlijk 'unknown' (capability_unavailable).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "I01-01-04",
+    "status": "Geblokkeerd",
+    "validatie": "NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit 07cab93; apps/api/tests/integration/test_truenas_adapter.py",
+    "blokkade": "Stap op de echte NAS: alleen-lezen-gebruiker (READONLY_ADMIN) + API-key aanmaken door de gebruiker.",
+    "opmerking": "Hub-kant gebouwd en Sim-getest: alleen leesmethoden, key met schrijfrechten wordt geweigerd (key_too_privileged).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "I23-23-02",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 58584e2; deploy/smoke.sh (lokaal geslaagd): uid's in de Hub-container 568 en 569, geen root-proces, alleen poort 30400 luistert, PostgreSQL alleen via unix-socket; ook met no-new-privileges en minimale capabilities",
+    "blokkade": "Op de echte NAS (Custom App) nog niet uitgevoerd.",
+    "opmerking": "Docker-omgeving, geen TrueNAS. Geen Docker-socket, geen privileged-modus.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "I23-23-03",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commits 07cab93, 15886cb; tests/e2e/test_wizard_inventory.py::test_volledige_wizard_en_inventaris_zonder_mutatie (fake.mutations == [])",
+    "blokkade": "Echte NAS nodig.",
+    "opmerking": "Bestaande apps worden alleen-lezen ontdekt; geen enkele schrijfmethode aangeroepen.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "I23-23-05",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commit d74d1a1; apps/executor/tests/test_executor.py::test_alles_geweigerd; deploy/smoke.sh (403 op app.restart)",
+    "blokkade": "Echte executor (handtekening, nonce, allowlist v1) volgt in fase P2.",
+    "opmerking": "Fase P0: de allowlist is leeg en weigert elke actie, ook onbekende; geen shell/sudo/Docker-routes.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D01",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py; tests/e2e/test_wizard_inventory.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "TrueNAS versie: getypt schema zonder voorbeeldwaarden; meting via system.version.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D02",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py; tests/e2e/test_wizard_inventory.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Poolnaam en datasetpaden: getypt schema zonder voorbeeldwaarden; verificatie via pool.query/pool.dataset.query.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D03",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py; tests/e2e/test_wizard_inventory.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "NAS IP en domeinen: getypt schema zonder voorbeeldwaarden; meting via geslaagde aanmelding op het D03-adres.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D04",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "OneDrive methode: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D05",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "OneDrive restore bewijs: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord + geregistreerde hersteltests foto én database.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D06",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py; tests/e2e/test_wizard_inventory.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "ZFS pool gezondheid: getypt schema zonder voorbeeldwaarden; meting via pool.query (+SMART).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D07",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py; tests/e2e/test_wizard_inventory.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Huidige appversies: getypt schema zonder voorbeeldwaarden; meting via app.query.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D08",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Intel GPU rendernodes: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D09",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Claude API-credit claim: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D10",
+    "status": "Ingevuld",
+    "validatie": "Vast besluit gebruiker; wizard Sim-getest",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; tests/e2e/test_wizard_inventory.py",
+    "blokkade": "",
+    "opmerking": "Vast besluit van de gebruiker (mini-pc uitgesloten van Home Hub-diensten); in de wizard vooraf 'Ingevuld' en niet wijzigbaar. Geen NAS-gegeven.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D11",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Netwerk router DNS fallback: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D12",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Gree type en firmware: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D13",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Zigbee hardwarestatus: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D14",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "HomeWizard meterkoppeling: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D15",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Media clients/platforms: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D16",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "RPO/RTO: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D17",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "OIDC bereikbaarheid: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "D18",
+    "status": "Open",
+    "validatie": "Wizard gebouwd, Sim-getest; waarde onbekend",
+    "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
+    "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
+    "opmerking": "Optional Navidrome: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  }
+]
