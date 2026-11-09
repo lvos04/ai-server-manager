@@ -19,7 +19,7 @@ from hub.errors import install_error_handlers
 from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
 from hub.onboarding.service import seed
-from hub.routers import auth, backups, breakglass, events, health, inventory, onboarding, services
+from hub.routers import auth, backups, breakglass, catalog, events, health, inventory, onboarding, services
 from hub.vault import Vault
 
 log = logging.getLogger("hub")
@@ -122,6 +122,10 @@ OPENAPI_TAGS = [
         "description": "Alleen-lezen inventaris met observed_at/veroudering en het dienstenregister.",
     },
     {
+        "name": "appcatalogus",
+        "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
+    },
+    {
         "name": "back-up en herstel",
         "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",
     },
@@ -207,6 +211,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         services.router,
         onboarding.router,
         inventory.router,
+        catalog.router,
         backups.router,
         events.router,
     ):

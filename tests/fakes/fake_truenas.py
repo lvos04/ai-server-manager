@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import hashlib
 import ipaddress
 import json
 import ssl
@@ -40,6 +41,7 @@ READ_METHODS = {
     "pool.query",
     "pool.dataset.query",
     "app.query",
+    "app.image.query",
     "app.gpu_choices",
     "device.get_info",
     "disk.query",
@@ -224,7 +226,22 @@ def default_data() -> dict[str, Any]:
                 "/appdata",
             ),
             _app("my-house", "RUNNING", "ghcr.io/lvos04/my_house:0.1.0", 30102, 8000, f"{mnt}/apps/my_house", "/data"),
-            _app("jellyfin", "STOPPED", "jellyfin/jellyfin:10.11.0", 30013, 8096, f"{mnt}/apps/jellyfin", "/config"),
+            _app(
+                "jellyfin",
+                "STOPPED",
+                "jellyfin/jellyfin:10.11.0",
+                30013,
+                8096,
+                f"{mnt}/apps/jellyfin",
+                "/config",
+                catalog_app="jellyfin",
+            ),
+        ],
+        "app.image.query": [
+            _image("ghcr.io/lvos04/mediaguard:1.2.2"),
+            _image("ghcr.io/lvos04/media-source-optimizer:1.6.0"),
+            _image("ghcr.io/lvos04/my_house:0.1.0"),
+            _image("jellyfin/jellyfin:10.11.0"),
         ],
         "disk.query": [
             {
@@ -334,16 +351,49 @@ def default_data() -> dict[str, Any]:
     }
 
 
-def _app(name: str, state: str, image: str, host_port: int, container_port: int, src: str, dst: str) -> dict[str, Any]:
+def _image(ref: str) -> dict[str, Any]:
+    """Image zoals ``app.image.query`` hem teruggeeft; de digest is een vaste testwaarde (geen echte image)."""
+    repo = ref.rsplit(":", 1)[0]
+    digest = "sha256:" + hashlib.sha256(ref.encode()).hexdigest()
+    return {
+        "id": "sha256:" + hashlib.sha256(("id" + ref).encode()).hexdigest(),
+        "repo_tags": [ref],
+        "repo_digests": [f"{repo}@{digest}"],
+        "size": 1000,
+        "dangling": False,
+        "update_available": False,
+        "created": "2026-11-01T00:00:00",
+        "author": "",
+        "comment": "",
+    }
+
+
+def _app(
+    name: str,
+    state: str,
+    image: str,
+    host_port: int,
+    container_port: int,
+    src: str,
+    dst: str,
+    *,
+    catalog_app: str = "ix-app",
+    custom_app: bool = False,
+) -> dict[str, Any]:
+    """Standaard Custom App = catalogus-app ``ix-app`` (``custom_app: false``); ``custom_app: true`` is een
+    compose-app (Install via YAML) — zo leest de Hub het in de broncode van TrueNAS (NIET GEVALIDEERD op een NAS)."""
     return {
         "name": name,
         "id": name,
         "state": state,
-        "version": "1.0.0",
+        "version": "1.4.8" if catalog_app == "ix-app" else "1.0.0",
         "human_version": image.rsplit(":", 1)[-1],
-        "custom_app": True,
+        "custom_app": custom_app,
         "upgrade_available": False,
-        "metadata": {"app_version": image.rsplit(":", 1)[-1]},
+        "latest_version": None,
+        "image_updates_available": False,
+        "metadata": {"app_version": image.rsplit(":", 1)[-1], "name": catalog_app, "train": "stable"},
+        "portals": {"Web UI": f"http://0.0.0.0:{host_port}/"},
         "config": {"env": {"SECRET_TOKEN": "mag-nooit-opgehaald-worden"}},
         "active_workloads": {
             "containers": 1 if state == "RUNNING" else 0,

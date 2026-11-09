@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/v1", tags=["inventaris"])
 
 PUBLIC_KINDS = {
     "apps": "apps",
+    "images": "images",
     "pools": "pools",
     "datasets": "datasets",
     "gpus": "gpus",

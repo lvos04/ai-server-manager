@@ -836,6 +836,252 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/apps": {
+      "get": {
+        "operationId": "list_apps_api_v1_apps_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Zoek in naam, app_id en image.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zoek in naam, app_id en image.",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "healthy",
+                    "degraded",
+                    "down",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "adaptertype",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Adaptertype"
+            }
+          },
+          {
+            "in": "query",
+            "name": "soort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Soort"
+            }
+          },
+          {
+            "description": "Verdwenen apps verbergen (standaard).",
+            "in": "query",
+            "name": "alleen_aanwezig",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Verdwenen apps verbergen (standaard).",
+              "title": "Alleen Aanwezig",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Apps Api V1 Apps Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Appcatalogus: alle apps met status, versie, herkomst en gezondheid (zoeken/filteren)",
+        "tags": [
+          "appcatalogus"
+        ]
+      }
+    },
+    "/api/v1/apps/discover": {
+      "post": {
+        "operationId": "run_discovery_api_v1_apps_discover_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Catalogus bijwerken uit de laatste inventaris (idempotent; niets op de NAS)",
+        "tags": [
+          "appcatalogus"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_uuid}": {
+      "get": {
+        "operationId": "get_app_api_v1_apps__app_uuid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "App Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get App Api V1 Apps  App Uuid  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Appdetail: herkomst, image/digest, opslag, poorten, gezondheid per component",
+        "tags": [
+          "appcatalogus"
+        ]
+      }
+    },
     "/api/v1/audit": {
       "get": {
         "operationId": "list_audit_api_v1_audit_get",
@@ -3739,6 +3985,10 @@
     {
       "description": "Alleen-lezen inventaris met observed_at/veroudering en het dienstenregister.",
       "name": "inventaris"
+    },
+    {
+      "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
+      "name": "appcatalogus"
     },
     {
       "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",

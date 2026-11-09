@@ -19,6 +19,7 @@ READ_CAPABILITIES: dict[str, list[tuple[str, list[Any]]]] = {
     "pools": [("pool.query", [])],
     "datasets": [("pool.dataset.query", [[], {"extra": {"flat": True, "retrieve_children": True}}])],
     "apps": [("app.query", [])],  # nooit retrieve_config: de configuratie kan geheimen bevatten
+    "images": [("app.image.query", [])],  # alleen tags/digests voor de digest-readback van de catalogus
     "disks": [("disk.query", [])],
     "smart": [("smart.test.results", [])],
     "gpus": [("app.gpu_choices", []), ("device.get_info", [{"type": "GPU"}])],

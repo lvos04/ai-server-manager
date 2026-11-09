@@ -16,6 +16,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from hub.backup.selfbackup import run_self_backup
+from hub.catalog.appstore import sync_appstore
+from hub.catalog.discovery import discover
 from hub.config import Settings
 from hub.events.envelope import emit
 from hub.inventory.store import latest_run, prune_runs, save_run
@@ -85,7 +87,28 @@ def _claim(db: Session) -> Job | None:
     return job
 
 
-def _run_job(db: Session, settings: Settings, vault: Vault, job: Job) -> dict[str, Any]:
+def _catalog_after_inventory(db: Session, settings: Settings, keyring: KeyRing | None) -> dict[str, Any]:
+    """Catalogus bijwerken (idempotent) en de appstore-koppeling verversen; fouten hier breken de inventaris niet."""
+    out: dict[str, Any] = {}
+    try:
+        out["catalogus"] = discover(db, settings).as_dict()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        log.exception("catalogus bijwerken mislukt")
+        out["catalogus"] = {"status": "failed", "fout": type(exc).__name__}
+    if keyring is not None:
+        try:
+            out["appstore"] = sync_appstore(db, settings, keyring)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            log.exception("appstore-koppeling mislukt")
+            out["appstore"] = {"status": "failed", "fout": type(exc).__name__}
+    return out
+
+
+def _run_job(db: Session, settings: Settings, vault: Vault, job: Job, keyring: KeyRing | None = None) -> dict[str, Any]:
     if job.kind == "inventory_refresh":
         started = utcnow()
         res = asyncio.run(run_collect(db, vault, settings))
@@ -105,6 +128,7 @@ def _run_job(db: Session, settings: Settings, vault: Vault, job: Job) -> dict[st
             "reason_code": res.reason_code,
             "run_id": str(run.id),
             "soorten": {k.kind: k.status for k in res.kinds},
+            **_catalog_after_inventory(db, settings, keyring),
         }
     if job.kind == "self_backup":
         row = run_self_backup(db, settings, trigger=str(job.params.get("trigger") or "manual"))
@@ -131,18 +155,31 @@ def cleanup(db: Session) -> None:
     db.commit()
 
 
+def _keyring(settings: Settings) -> KeyRing | None:
+    try:
+        return KeyRing.load(settings.secrets_dir)
+    except (OSError, ValueError):
+        return None
+
+
 def run_once(
-    factory: sessionmaker[Session], settings: Settings, vault: Vault, *, schedule: bool = True
+    factory: sessionmaker[Session],
+    settings: Settings,
+    vault: Vault,
+    *,
+    schedule: bool = True,
+    keyring: KeyRing | None = None,
 ) -> list[dict[str, Any]]:
     """Eén ronde: hartslag, plannen, alle wachtende jobs uitvoeren. Geeft de uitgevoerde jobs terug (voor tests)."""
     done: list[dict[str, Any]] = []
+    keyring = keyring or _keyring(settings)
     with factory() as db:
         heartbeat(db, {"laatste_ronde": iso(utcnow())})
         if schedule:
             _enqueue_if_due(db, settings)
         while (job := _claim(db)) is not None:
             try:
-                result = _run_job(db, settings, vault, job)
+                result = _run_job(db, settings, vault, job, keyring)
                 job.status = "done" if result.get("status") not in ("failed",) else "failed"
             except Exception as exc:
                 db.rollback()
@@ -162,7 +199,7 @@ def main(settings: Settings) -> int:
 
     engine = make_engine(settings.database_url)
     factory = make_sessionmaker(engine)
-    KeyRing.load(settings.secrets_dir)  # faalt vroeg als geheimen ontbreken
+    keyring = KeyRing.load(settings.secrets_dir)  # faalt vroeg als geheimen ontbreken
     vault = Vault.from_file(settings.secrets_dir / "vault.key")
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
@@ -170,7 +207,7 @@ def main(settings: Settings) -> int:
     log.info("worker gestart (interval %.0f s)", settings.worker_poll_seconds)
     while not stop.is_set():
         try:
-            for j in run_once(factory, settings, vault):
+            for j in run_once(factory, settings, vault, keyring=keyring):
                 log.info("job %s (%s): %s %s", j["id"], j["kind"], j.get("status"), j.get("reason_code") or "")
         except Exception:
             log.exception("worker-ronde mislukt; volgende ronde over %.0f s", settings.worker_poll_seconds)

@@ -337,3 +337,64 @@ class OutboxEvent(Base):
     trace_id: Mapped[uuid.UUID] = mapped_column(Uuid, default=uuid.uuid4)
     classification: Mapped[str] = mapped_column(String(16), default="internal")
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+# ------------------------------------------------------------------ centrale appcatalogus (B01-002)
+class CatalogApp(Base):
+    """Eén app op de NAS. Identiteit = de TrueNAS-app-id (``runtime_id``): die verandert niet bij een herstart van de
+    NAS of van de app. De Hub-UUID hoort vast bij die ``runtime_id``; discovery is idempotent en verwijdert nooit."""
+
+    __tablename__ = "catalog_app"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    runtime_id: Mapped[str] = mapped_column(String(128), unique=True)
+    naam: Mapped[str] = mapped_column(String(128))
+    app_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # herkend profiel of None
+    adaptertype: Mapped[str] = mapped_column(String(32))
+    soort: Mapped[str] = mapped_column(String(16))  # eigen|bestaand|derde|onbekend
+    installatiewijze: Mapped[str] = mapped_column(String(16))  # custom_app|catalog_app|custom_compose|onbekend
+    catalogus: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    image_repository: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    image_tag: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    image_digest: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    images: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    image_historie: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    poorten: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    opslag: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    portals: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    runtime_staat: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    service_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("service.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    appstore: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    bron: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    aanwezig: Mapped[bool] = mapped_column(Boolean, default=True)
+    eerst_gezien: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    laatst_gezien: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    verdwenen_sinds: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class HealthObservation(Base):
+    """Laatste waarneming per bron (Uptime Kuma-monitor, heartbeat of connector-health van een eigen dienst).
+    Veroudering wordt op leestijd beoordeeld (``ttl_seconds``); een verouderde waarneming telt als ``unknown``."""
+
+    __tablename__ = "health_observation"
+    __table_args__ = (UniqueConstraint("bron_type", "bron_id", "sleutel", name="uq_health_observation_bron"),)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    bron_type: Mapped[str] = mapped_column(String(16))  # uptime_kuma|heartbeat|connector
+    bron_id: Mapped[str] = mapped_column(String(64), index=True)  # bron-uuid (Kuma) of dienst-uuid
+    sleutel: Mapped[str] = mapped_column(String(200), default="")  # monitor-sleutel of ""
+    naam: Mapped[str] = mapped_column(String(200), default="")
+    subject_app_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("catalog_app.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    koppeling: Mapped[str | None] = mapped_column(String(16), nullable=True)  # automatisch|handmatig
+    status: Mapped[str] = mapped_column(String(16))
+    reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    observed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    ttl_seconds: Mapped[int] = mapped_column(Integer)
+    fouten_op_rij: Mapped[int] = mapped_column(Integer, default=0)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)

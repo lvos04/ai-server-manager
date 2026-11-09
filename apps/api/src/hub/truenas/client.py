@@ -41,6 +41,7 @@ READ_ONLY_METHODS: frozenset[str] = frozenset(
         "pool.query",
         "pool.dataset.query",
         "app.query",
+        "app.image.query",
         "app.gpu_choices",
         "device.get_info",
         "disk.query",

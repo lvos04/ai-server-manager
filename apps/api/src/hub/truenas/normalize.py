@@ -21,6 +21,10 @@ KNOWN_APPS: list[tuple[str, tuple[str, ...]]] = [
     ("my_house", ("my_house", "my-house", "myhouse")),
     ("ai-server-manager", ("ai-server-manager",)),
     ("ai-server-manager-executor", ("ai-server-manager-executor",)),
+    ("home-control-hub", ("home-control-hub",)),
+    ("appstore-en-fork", ("appstore-en-fork",)),
+    ("jelly-leon-platform", ("jelly-leon-platform",)),
+    ("zoeken-en-persoonlijke-ai", ("zoeken-en-persoonlijke-ai",)),
     ("jellyfin", ("jellyfin",)),
     ("jelly-leon", ("jelly-leon",)),
     ("plex", ("plex",)),
@@ -130,12 +134,20 @@ def parse_image(image: str | None) -> dict[str, str | None]:
 
 
 def recognize_app(name: str, images: list[str]) -> str | None:
+    """Herken een bekende app op appnaam of image-naam. Een exacte overeenkomst wint altijd; anders het **langste**
+    voorvoegsel (``ai-server-manager-executor`` is nooit de Hub, ``jelly-leon-platform`` nooit ``jelly-leon``)."""
     haystack = [name.lower()] + [str(i).lower().rsplit("/", 1)[-1].split(":")[0].split("@")[0] for i in images]
     for app_id, needles in KNOWN_APPS:
+        if any(h == needle for needle in needles for h in haystack):
+            return app_id
+    best: tuple[int, str] | None = None
+    for app_id, needles in KNOWN_APPS:
         for needle in needles:
-            if any(h == needle or h.startswith(needle + "-") or h.startswith(needle + "_") for h in haystack):
-                return app_id
-    return None
+            if any(h.startswith(needle + "-") or h.startswith(needle + "_") for h in haystack) and (
+                best is None or len(needle) > best[0]
+            ):
+                best = (len(needle), app_id)
+    return best[1] if best else None
 
 
 def pools(raw: Any) -> list[dict[str, Any]]:
@@ -252,16 +264,55 @@ def apps(raw: Any) -> list[dict[str, Any]]:
                 "versie": _str(a.get("version"), 64),
                 "app_versie": _str(meta.get("app_version") or a.get("human_version"), 128),
                 "custom_app": a.get("custom_app") if isinstance(a.get("custom_app"), bool) else None,
+                # Catalogus-app en trein uit de metadata (bij het standaard Custom App-formulier: "ix-app").
+                "catalogus_app": _str(meta.get("name"), 64),
+                "trein": _str(meta.get("train"), 32),
+                "nieuwste_versie": _str(a.get("latest_version"), 64),
                 "upgrade_beschikbaar": a.get("upgrade_available")
                 if isinstance(a.get("upgrade_available"), bool)
+                else None,
+                "image_updates_beschikbaar": a.get("image_updates_available")
+                if isinstance(a.get("image_updates_available"), bool)
                 else None,
                 "images": [parse_image(i) for i in images],
                 "poorten": ports,
                 "opslag": mounts,
+                "portals": portals(a.get("portals")),
                 "herkend_als": recognize_app(name, images),
             }
         )
     out.sort(key=lambda x: str(x["naam"]))
+    return out
+
+
+def portals(raw: Any) -> list[dict[str, Any]]:
+    """Webportalen van een app (``{"Web UI": "http://0.0.0.0:30080/"}``): alleen http(s), poort en pad; de host is in
+    TrueNAS vaak een plaatshouder en wordt nooit overgenomen (de Hub gebruikt het NAS-adres uit D03)."""
+    out: list[dict[str, Any]] = []
+    for label, url in list(_dict(raw).items())[:10]:
+        if not isinstance(url, str):
+            continue
+        m = re.match(r"^(https?)://[^/:]+(?::(\d{1,5}))?(/[^\s?#]*)?", url.strip())
+        if not m:
+            continue
+        port = int(m.group(2)) if m.group(2) else (443 if m.group(1) == "https" else 80)
+        out.append({"naam": str(label)[:64], "schema": m.group(1), "poort": port, "pad": (m.group(3) or "/")[:256]})
+    return out
+
+
+def images(raw: Any) -> list[dict[str, Any]]:
+    """``app.image.query``: alleen tags en digests (voor de digest-readback van de catalogus)."""
+    out = []
+    for i in raw or []:
+        if not isinstance(i, dict):
+            continue
+        out.append(
+            {
+                "id": _str(i.get("id"), 80),
+                "repo_tags": [str(t)[:256] for t in _list(i.get("repo_tags"))[:20]],
+                "repo_digests": [str(d)[:330] for d in _list(i.get("repo_digests"))[:20]],
+            }
+        )
     return out
 
 
