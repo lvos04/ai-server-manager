@@ -226,32 +226,11 @@ test.describe.configure({ mode: "parallel" });
 
 let werker = 0;
 
+// Kijker en kind maakt review/00-gebruikers.spec.ts één keer aan (vóór de parallelle breedtes: gelijktijdig
+// aanmaken gaf een UniqueViolation/500 in de API). Hier logt elke werker alleen zelf in.
 test.beforeAll(async ({ browser }, info) => {
   werker = info.workerIndex;
   mkdirSync(AUTH, { recursive: true });
-  // Kijker en kind aanmaken via de echte API (zoals de beheerder in Instellingen → Toegang doet).
-  const ctx = await browser.newContext({ storageState: ADMIN_STATE });
-  const p = await ctx.newPage();
-  await p.goto("/instellingen/toegang");
-  for (const [u, rol] of [
-    [VIEWER, "viewer"],
-    [KIND, "kind"],
-  ] as const) {
-    const status = await p.evaluate(
-      async ({ username, password, role }) => {
-        const csrf = decodeURIComponent((document.cookie.split("; ").find((c) => c.startsWith("hub_csrf=")) ?? "=").split("=")[1] ?? "");
-        const r = await fetch("/api/v1/users", {
-          method: "POST",
-          headers: { "content-type": "application/json", "X-CSRF-Token": csrf, "Idempotency-Key": crypto.randomUUID() },
-          body: JSON.stringify({ username, password, role }),
-        });
-        return r.status;
-      },
-      { username: u.username, password: u.password, role: rol },
-    );
-    expect([200, 201, 409]).toContain(status);
-  }
-  await ctx.close();
   await inlog(browser, VIEWER, path.join(AUTH, `kijker-${werker}.json`));
   await inlog(browser, KIND, path.join(AUTH, `kind-${werker}.json`));
 });

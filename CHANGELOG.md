@@ -4,6 +4,21 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — ontwerpreview van de gebouwde Hub-UI (ADR-0025, `docs/ontwerp/PEIL_REVIEW.md`)
+- **Meetgereedschap** `apps/web/review` + `make web-review`. Het meet alle schermen (beheerder, kijker, kind,
+  publiek, executor-statuspagina, NAS offline en browser offline) op 320–1440 in licht en donker: axe, gerenderd
+  contrast, Tab-doorloop, doelen, overloop, Peil-semantiek en woordenlijst. Draait ook in CI. Na herstel: 59
+  schermen, 700 metingen, 0 harde bevindingen, axe 0 (Sim-getest).
+- **Grafieken:** het querypad was bij elke weergave anders (eindeloos ophalen) en elke grafiek zei ten onrechte
+  "Geen meting". Nu is het pad stabiel en werkt de grafiek volgens C-32: toetsenbord-draadkruis met voorlezen,
+  eindpunt met label, gat-arcering, bronregel en kleine waarden nooit als 0.
+- **Toegankelijkheid:** focusring op datumvelden; kindschil zonder focus achter de ondernavigatie; gebruikersmenu
+  niet-modaal (axe); zijbalkring niet afgesneden; losse links 44 px; geen overloop op 1024; koppen zonder sprong.
+- **Peil-woorden en iconen:** iconen volgens §7 (Huis = sofa), geen badge "Gemeten" bij een verse waarde, echte
+  meervouden, geen ruwe Engelse statuswoorden, sessies in kindertaal op Ik, intrekken en verwijderen geen rode knop.
+- **Niet gerepareerd (overgedragen):** koppelen via de executor-statuspagina mislukt in een echte browser
+  (`Origin: null` door `Referrer-Policy: no-referrer`).
+
 ### Toegevoegd — fase P1 webstap: Hub-UI in Peil en de P1-schermen (ADR-0024; contract 1.2 H5/H6/H12)
 - **Peil (H12):** Tailwind 4 + shadcn/ui-componenten (Button, Tabs, AlertDialog, Sheet, DropdownMenu, met de
   Peil-codemod) + lucide-react 1.66.0; tokens als versie-gepinde kopie `src/app/peil/ontwerptaal.css` (sha256-test);

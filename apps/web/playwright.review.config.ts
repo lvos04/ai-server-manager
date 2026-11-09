@@ -23,17 +23,23 @@ export default defineConfig({
   projects: [
     ...(zonderOpzet ? [] : [{ name: "opzet", testMatch: /e2e\/0[0-9]-.*\.spec\.ts/, workers: 1, use: { viewport: { width: 1440, height: 900 } } }]),
     {
+      // Kijker en kind één keer aanmaken (gelijktijdig aanmaken door meerdere werkers gaf een 500 in de API).
+      name: "review-opzet",
+      testMatch: /review\/00-.*\.spec\.ts/,
+      dependencies: zonderOpzet ? [] : ["opzet"],
+    },
+    {
       // Breedtes parallel (alleen lezen); de toestanden (NAS offline) daarna apart, zodat ze niets anders beïnvloeden.
       name: "review",
-      testMatch: /review\/.*\.spec\.ts/,
+      testMatch: /review\/peil-review\.spec\.ts/,
       grepInvert: /Peil-review toestanden/,
       fullyParallel: true,
-      dependencies: zonderOpzet ? [] : ["opzet"],
+      dependencies: ["review-opzet"],
       timeout: 60 * 60_000,
     },
     {
       name: "review-toestanden",
-      testMatch: /review\/.*\.spec\.ts/,
+      testMatch: /review\/peil-review\.spec\.ts/,
       grep: /Peil-review toestanden/,
       dependencies: ["review"],
       timeout: 60 * 60_000,
