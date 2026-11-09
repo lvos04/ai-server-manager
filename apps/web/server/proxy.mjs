@@ -85,6 +85,36 @@ export function downstreamHeaders(headers) {
   return out;
 }
 
+/** Contract 1.2 §5: hooguit 1 MiB per verzoek, ook chunked. */
+export const MAX_BODY_BYTES = 1024 * 1024;
+
+/** Te grote `Content-Length`: direct 413, zonder de body naar de API te sturen. */
+export function declaredTooLarge(headers) {
+  const raw = headers?.["content-length"];
+  const value = String((Array.isArray(raw) ? raw[0] : raw) ?? "").trim();
+  return /^\d+$/.test(value) && Number(value) > MAX_BODY_BYTES;
+}
+
+/**
+ * Teller voor een gestreamde body (chunked): geeft `true` zodra er in totaal meer dan `max` bytes zijn gezien.
+ * De doorgang antwoordt dan zelf met 413. Doet de API dat, dan sluit uvicorn de verbinding terwijl de doorgang nog
+ * schrijft, en wordt het antwoord een 502.
+ */
+export function bodyCounter(max = MAX_BODY_BYTES) {
+  let seen = 0;
+  return (n) => (seen += n) > max;
+}
+
+/** Foutbody 413 in het contractformaat (§5), gelijk aan die van de API. */
+export function payloadTooLargeBody(traceId) {
+  return {
+    code: "payload_too_large",
+    message: "Het verzoek is te groot (maximaal 1 MiB).",
+    details: { max_bytes: MAX_BODY_BYTES },
+    trace_id: traceId,
+  };
+}
+
 /** Nederlandse foutbody (contractformaat §5) als de API niet bereikbaar is. */
 export function unavailableBody(traceId) {
   return {

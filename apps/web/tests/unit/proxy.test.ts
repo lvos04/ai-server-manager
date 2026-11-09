@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- JavaScript-module van de webserver (zonder typedeclaraties)
-import { downstreamHeaders, isApiPath, normalizeIp, parseTrusted, unavailableBody, upstreamHeaders } from "../../server/proxy.mjs";
+import { MAX_BODY_BYTES, bodyCounter, declaredTooLarge, downstreamHeaders, isApiPath, normalizeIp, parseTrusted, payloadTooLargeBody, unavailableBody, upstreamHeaders } from "../../server/proxy.mjs";
 
 describe("API-doorgang van de webserver", () => {
   it("alleen API-paden gaan naar de API", () => {
@@ -38,5 +38,26 @@ describe("API-doorgang van de webserver", () => {
     expect(body.code).toBe("api_unavailable");
     expect(body.message).toContain("Logs");
     expect(body.trace_id).toBe("t-1");
+  });
+
+  it("1 MiB-grens (contract 1.2 §5): Content-Length en chunked tellen; 413 in het contractformaat", () => {
+    expect(MAX_BODY_BYTES).toBe(1048576);
+    expect(declaredTooLarge({ "content-length": "1048577" })).toBe(true);
+    expect(declaredTooLarge({ "content-length": "1048576" })).toBe(false);
+    expect(declaredTooLarge({ "content-length": ["2000000"] })).toBe(true);
+    expect(declaredTooLarge({})).toBe(false); // chunked: geen header, de teller beslist
+    expect(declaredTooLarge({ "content-length": "abc" })).toBe(false); // ongeldig: de API geeft 400
+    const over = bodyCounter();
+    expect(over(1024 * 1024)).toBe(false); // precies 1 MiB mag
+    expect(over(1)).toBe(true); // één byte meer niet
+    const small = bodyCounter(10);
+    expect([small(4), small(6), small(1)]).toEqual([false, false, true]);
+    const body = payloadTooLargeBody("t-2");
+    expect(body).toEqual({
+      code: "payload_too_large",
+      message: "Het verzoek is te groot (maximaal 1 MiB).",
+      details: { max_bytes: 1048576 },
+      trace_id: "t-2",
+    });
   });
 });

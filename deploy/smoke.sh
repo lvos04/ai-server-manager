@@ -48,15 +48,21 @@ test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X POST -H 'content
   -d '{"action_id":"app.restart"}' http://127.0.0.1:30410/api/v1/execute)" = 403
 # Contract 1.2 §5: > 1 MiB → 413 vóór routering en aanmelding, ook chunked (zonder Content-Length). Hub via de webpoort
 # (Node-doorgang → API), executor rechtstreeks; beide op een route zonder aanmelding.
-big413() {  # big413 <url> → HTTP-status van een chunked POST van 1 MiB + 1 byte
-  head -c 1048577 /dev/zero | curl -sS --noproxy '*' -o "$WORK/413.json" -w '%{http_code}' -X POST \
+big413() {  # big413 <url> <bytes> → HTTP-status van een chunked POST van <bytes> bytes
+  head -c "$2" /dev/zero | curl -sS --noproxy '*' -o "$WORK/413.json" -w '%{http_code}' -X POST \
     -H 'Transfer-Encoding: chunked' -H 'content-type: application/json' --data-binary @- "$1" || true
 }
+# Ook een veel grotere body, een paar keer: een vroeg 413-antwoord mag via de doorgang nooit een 502 worden.
 for url in http://127.0.0.1:30400/api/v1/services/00000000-0000-4000-8000-000000000000/rotate \
            http://127.0.0.1:30410/connector/v1/hub-link/unlink; do
-  code="$(big413 "$url")"
-  test "$code" = 413 || { echo "FOUT: chunked > 1 MiB naar $url gaf $code i.p.v. 413" >&2; exit 1; }
-  expect "413 chunked ($url)" "$(cat "$WORK/413.json")" '"max_bytes":1048576'
+  for size in 1048577 3000000 3000000 3000000 3000000 3000000; do
+    code="$(big413 "$url" "$size")"
+    test "$code" = 413 || { echo "FOUT: chunked $size bytes naar $url gaf $code i.p.v. 413" >&2; exit 1; }
+    expect "413 chunked $size bytes ($url)" "$(cat "$WORK/413.json")" '"max_bytes":1048576'
+  done
+  code="$(head -c 1048577 /dev/zero | curl -sS --noproxy '*' -o "$WORK/413.json" -w '%{http_code}' -X POST \
+    -H 'content-type: application/json' --data-binary @- "$url" || true)"
+  test "$code" = 413 || { echo "FOUT: Content-Length > 1 MiB naar $url gaf $code i.p.v. 413" >&2; exit 1; }
 done
 # Geen root-processen meer en de AI-runner als aparte gebruiker:
 uids="$(docker exec -u 568 asm-smoke-hub sh -c 'for p in /proc/[0-9]*; do awk "/^Uid:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' ')"

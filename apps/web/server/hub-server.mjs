@@ -9,7 +9,16 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { downstreamHeaders, isApiPath, parseTrusted, unavailableBody, upstreamHeaders } from "./proxy.mjs";
+import {
+  bodyCounter,
+  declaredTooLarge,
+  downstreamHeaders,
+  isApiPath,
+  parseTrusted,
+  payloadTooLargeBody,
+  unavailableBody,
+  upstreamHeaders,
+} from "./proxy.mjs";
 
 const require = createRequire(import.meta.url);
 const dev = process.argv.includes("--dev") || process.env.HUB_WEB_DEV === "1";
@@ -45,8 +54,21 @@ const next = require("next");
 const app = next({ dev, dir, hostname, port, conf, customServer: true });
 const handle = app.getRequestHandler();
 
+// 413 in het contractformaat; de rest van de body wordt weggegooid zodat de client het antwoord gewoon kan lezen.
+function sendTooLarge(req, res, traceId) {
+  res.writeHead(413, { "content-type": "application/json", "cache-control": "no-store", "x-trace-id": traceId });
+  res.end(JSON.stringify(payloadTooLargeBody(traceId)));
+  req.resume();
+}
+
 function proxy(req, res) {
   const traceId = randomUUID();
+  // Contract 1.2 §5: > 1 MiB → 413, vóór de API (en dus vóór routering en aanmelding), ook chunked.
+  if (declaredTooLarge(req.headers)) {
+    sendTooLarge(req, res, traceId);
+    return;
+  }
+  let rejected = false;
   const upstream = httpRequest(
     {
       protocol: api.protocol,
@@ -62,11 +84,16 @@ function proxy(req, res) {
       timeout: API_TIMEOUT_MS,
     },
     (up) => {
+      if (rejected) {
+        up.resume();
+        return;
+      }
       res.writeHead(up.statusCode || 502, downstreamHeaders(up.headers));
       up.pipe(res);
     },
   );
   const fail = (err) => {
+    if (rejected) return; // al met 413 beantwoord; de afgebroken verbinding naar de API is verwacht
     if (res.headersSent) {
       res.destroy(err);
       return;
@@ -78,6 +105,15 @@ function proxy(req, res) {
   upstream.on("timeout", () => upstream.destroy(new Error("timeout")));
   upstream.on("error", fail);
   req.on("aborted", () => upstream.destroy());
+  // Vóór pipe() registreren: deze teller ziet elk stuk vóórdat het naar de API gaat.
+  const over = bodyCounter();
+  req.on("data", (chunk) => {
+    if (rejected || !over(chunk.length)) return;
+    rejected = true;
+    req.unpipe(upstream);
+    upstream.destroy();
+    if (!res.headersSent) sendTooLarge(req, res, traceId);
+  });
   req.pipe(upstream);
 }
 
