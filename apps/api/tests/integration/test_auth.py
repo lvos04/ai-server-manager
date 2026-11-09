@@ -264,5 +264,42 @@ def test_verzoek_groter_dan_1_mib_geeft_413_ook_zonder_content_length(admin: Any
     # Ook op een publieke route (vóór aanmelding).
     r = admin.post("/api/v1/auth/login", content=chunks(), headers={"content-type": "application/json"})
     assert r.status_code == 413
+    # Contractformaat §5: details.max_bytes en dezelfde trace_id als de header.
+    assert r.json()["details"] == {"max_bytes": 1048576}
+    assert r.json()["trace_id"] == r.headers["X-Trace-Id"]
     # Gewone verzoeken blijven werken.
     assert admin.get("/api/v1/decisions/D03").status_code == 200
+
+
+def test_413_valt_voor_routering_en_aanmelding_ook_chunked(client: Any) -> None:
+    """Contract 1.2 §5: de grens zit vóór routering en authenticatie — ook bij een route die de body zelf niet leest,
+    zonder aanmelding, of op een pad/methode die niet bestaat (nooit eerst 401/404/405)."""
+
+    def chunks(total: int) -> Any:
+        sent = 0
+        while sent < total:
+            n = min(64 * 1024, total - sent)
+            sent += n
+            yield b"x" * n
+
+    over = 1024 * 1024 + 1
+    for method, path in (
+        ("POST", "/api/v1/services/00000000-0000-4000-8000-000000000000/rotate"),  # admin-route zonder body
+        ("POST", "/api/v1/auth/logout"),  # route zonder body-parameter
+        ("POST", "/api/v1/services/enroll"),  # publieke route met body
+        ("POST", "/healthz"),  # methode bestaat niet (anders 405)
+        ("PUT", "/api/v1/bestaat-niet"),  # route bestaat niet (anders 404)
+    ):
+        r = client.request(method, path, content=chunks(over), headers={**idem(), "content-type": "application/json"})
+        assert r.status_code == 413, f"{method} {path}: {r.status_code} {r.text[:120]}"
+        assert r.json()["code"] == "payload_too_large" and r.json()["details"]["max_bytes"] == 1048576
+        # Met een te grote Content-Length: direct, zonder de body te lezen.
+        r = client.request(method, path, content=b"x" * over, headers=idem())
+        assert r.status_code == 413, f"{method} {path} (Content-Length): {r.status_code}"
+    # Precies 1 MiB is toegestaan: dan bepaalt de route het antwoord (hier: geen aanmelding → 401).
+    r = client.post(
+        "/api/v1/services/00000000-0000-4000-8000-000000000000/rotate",
+        content=chunks(1024 * 1024),
+        headers={**idem(), "content-type": "application/json"},
+    )
+    assert r.status_code == 401 and r.json()["code"] == "unauthorized"

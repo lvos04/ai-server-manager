@@ -8,14 +8,14 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hub import __version__
 from hub.config import Settings, get_settings
 from hub.db import make_engine, make_sessionmaker
-from hub.errors import error_body, install_error_handlers
+from hub.errors import install_error_handlers
 from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
 from hub.onboarding.service import seed
@@ -27,29 +27,80 @@ MAX_BODY_BYTES = 1024 * 1024
 
 
 class BodyLimit:
-    """Harde grens van 1 MiB per verzoek, ook zonder ``Content-Length`` (chunked): de body wordt tijdens het lezen
-    geteld en bij overschrijding afgebroken met 413 ``payload_too_large`` (nooit eerst alles in het geheugen)."""
+    """Harde grens van 1 MiB per verzoek (contract §5), **vóór routering en authenticatie**, ook zonder
+    ``Content-Length`` (chunked).
+
+    Een te grote ``Content-Length`` wordt direct geweigerd. Anders leest deze laag de body (tellend, hooguit 1 MiB in
+    het geheugen) vóórdat de app iets doet, en breekt af met ``413 payload_too_large`` zodra er meer binnenkomt. Zo
+    krijgt ook een route die de body zelf niet leest, of een verzoek zonder aanmelding, altijd 413 en nooit eerst
+    401/404/405. Daarna krijgt de app de gebufferde body.
+    """
 
     def __init__(self, app: ASGIApp, max_bytes: int = MAX_BODY_BYTES) -> None:
         self.app, self.max_bytes = app, max_bytes
+
+    async def _too_large(self, scope: Scope, send: Send) -> None:
+        state = scope.get("state") or {}
+        trace = str(state.get("trace_id") or uuid.uuid4()) if isinstance(state, dict) else str(uuid.uuid4())
+        body = {
+            "code": "payload_too_large",
+            "message": "Het verzoek is te groot (maximaal 1 MiB).",
+            "details": {"max_bytes": self.max_bytes},
+            "trace_id": trace,
+        }
+        await JSONResponse(body, status_code=413, headers={"Connection": "close"})(scope, _no_receive, send)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        total = 0
-
-        async def limited() -> Message:
-            nonlocal total
+        for name, value in scope.get("headers") or []:
+            if name == b"content-length":
+                text = value.decode("latin-1").strip()
+                if not text.isdigit():
+                    await JSONResponse(
+                        {"code": "bad_request", "message": "Ongeldige Content-Length.", "details": {},
+                         "trace_id": str(uuid.uuid4())},
+                        status_code=400,
+                    )(scope, _no_receive, send)  # fmt: skip
+                    return
+                if int(text) > self.max_bytes:
+                    await self._too_large(scope, send)
+                    return
+        chunks: list[bytes] = []
+        total, more = 0, True
+        while more:
             message = await receive()
-            if message["type"] == "http.request":
-                total += len(message.get("body", b""))
-                if total > self.max_bytes:
-                    # FastAPI's HTTPException wordt door de body-parser doorgegeven (en niet tot 400 gemaakt).
-                    raise HTTPException(status_code=413)
-            return message
+            if message["type"] == "http.disconnect":
+                # Client is weg vóór de body compleet was: niets uitvoeren, alleen netjes afsluiten.
+                await JSONResponse(
+                    {"code": "bad_request", "message": "Verbinding verbroken.", "details": {},
+                     "trace_id": str(uuid.uuid4())},
+                    status_code=400,
+                )(scope, _no_receive, send)  # fmt: skip
+                return
+            part = message.get("body", b"")
+            total += len(part)
+            if total > self.max_bytes:
+                await self._too_large(scope, send)
+                return
+            chunks.append(part)
+            more = bool(message.get("more_body", False))
+        buffered: Message = {"type": "http.request", "body": b"".join(chunks), "more_body": False}
+        delivered = False
 
-        await self.app(scope, limited, send)
+        async def replay() -> Message:
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return buffered
+            return await receive()  # daarna alleen nog http.disconnect
+
+        await self.app(scope, replay, send)
+
+
+async def _no_receive() -> Message:
+    return {"type": "http.disconnect"}
 
 
 OPENAPI_TAGS = [
@@ -138,9 +189,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ValueError:
             trace = str(uuid.uuid4())
         request.state.trace_id = trace
-        length = request.headers.get("content-length")
-        if length and length.isdigit() and int(length) > MAX_BODY_BYTES:
-            return JSONResponse(error_body(request, "payload_too_large", "Het verzoek is te groot."), status_code=413)
         response = await call_next(request)
         response.headers["X-Trace-Id"] = trace
         if getattr(request.state, "hub_token_rotation", False):
