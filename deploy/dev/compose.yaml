@@ -1,0 +1,31 @@
+# ALLEEN VOOR ONTWIKKELING EN CI — dit is GEEN installatiemethode.
+# Op TrueNAS installeer je uitsluitend als standaard Custom App (zie deploy/truenas/CUSTOM_APP.md); nooit via YAML.
+#
+#   docker compose -f deploy/dev/compose.yaml up --build
+#
+# Bouwt beide images lokaal en start ze met een tijdelijke map. Hub: http://127.0.0.1:30400, executor: :30410.
+name: asm-dev
+services:
+  hub:
+    build:
+      context: ../..
+      dockerfile: deploy/allinone/Dockerfile
+    image: ai-server-manager:dev
+    ports: ["127.0.0.1:30400:30400"]
+    volumes: ["hub-appdata:/appdata"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
+  executor:
+    build:
+      context: ../..
+      dockerfile: deploy/executor/Dockerfile
+    image: ai-server-manager-executor:dev
+    ports: ["127.0.0.1:30410:30410"]
+    volumes: ["executor-appdata:/appdata"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
+volumes:
+  hub-appdata: {}
+  executor-appdata: {}

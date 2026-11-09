@@ -1,4 +1,4 @@
-# Exacte runtime-versies voor de executor-image.
+# Exacte runtime-versies (incl. transitieve pakketten) voor de executor-image. Bijwerken: zie Makefile 'lock'.
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.16.0
@@ -8,6 +8,7 @@ cryptography==50.0.2
 fastapi==0.162.2
 h11==0.16.0
 idna==3.20
+opentelemetry-api==1.45.2
 pycparser==3.12
 pydantic-settings==2.16.2
 pydantic==2.14.3
