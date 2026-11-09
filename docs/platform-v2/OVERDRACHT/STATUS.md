@@ -1,16 +1,12 @@
-# Stand bij overdracht — 9 november 2026, ±11:45 (Nederlandse tijd)
+# Stand bij overdracht — definitief 2026-11-09 12:56 (Nederlandse tijd)
 
 Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment nog commits hebben gepusht).
 
 ## Afstemming tussen de twee machines
 
-- **Overdrachtsstatus: OUDE MACHINE NOG BEZIG.** Zolang deze regel er staat werkt de oude sessie nog in: ai-server-manager,
-  jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients (bijgewerkt 12:35).
-  Daar niets committen of pushen (alleen lezen).
-- Vrij voor de nieuwe machine: home-control-hub, media-guard-ultimate, media-source-optimizer, my_house, appstore-en-fork,
-  zoeken-en-persoonlijke-ai (P0 + review klaar en gepusht).
-- Als de oude sessie klaar is, vervangt ze de regel hierboven door **OVERDRACHT VOLTOOID** (met tijdstip) en werkt ze
-  deze STATUS.md bij met de definitieve P0-stand. Controleer met `git -C ai-server-manager pull` (bijv. elk kwartier).
+- **Overdrachtsstatus: OVERDRACHT VOLTOOID (2026-11-09 12:56 Nederlandse tijd).** De oude sessie werkt nergens meer. Alle 11 repos waren
+  op dat moment schoon en gepusht (geen lokale of ongecommitte wijzigingen). Alle repos zijn vrij voor de nieuwe machine.
+- Volgende stap: OVERDRACHT_PROMPT.md sectie 4 — contract 1.2 verwerken, open besluiten vragen, dan P1 (script `workflows/p1.js`).
 
 ## Klaar en gepusht (branch `ccr-c133d7a0-kuz1cv`)
 
@@ -33,10 +29,21 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
     218 tests). **P0 klaar.**
   - zoeken-en-persoonlijke-ai: scaffold + B07-001 gebouwd en gereviewd (8 reparaties, o.a. geen ingetrokken bron in
     back-ups en zoekgeschiedenis). **P0 klaar.**
-  - jelly-leon-platform: scaffold, TrueNAS-simulator, INSTALLATIE.md, TRUENAS_APP_API.md, CI (4 commits); review nog niet.
-  - jelly-leon: FORK_STRATEGIE, INVENTARIS, bouwverificatie, CI/upstream-sync (7 commits); review nog niet.
-  - jelly-leon-web: P0 werd nog gebouwd → controleren; review nog niet.
-  - jelly-leon-clients: inventaris, CI per client, desktop-build in container gelukt (8 commits); review nog niet.
+  - jelly-leon-platform: **P0 klaar** — lifecycle-scaffold, alles-in-één image, INSTALLATIE.md (2 Custom Apps), TRUENAS_APP_API.md
+    (bronnen: middleware TS-25.04.2.6/25.10.8, apps f142a16), TrueNAS-simulator (profielen 25.04/25.10, ix-app, nepcatalogus,
+    weigert compose, foutinjectie), Hub-simulator, e2e/README.md. Review repareerde een **kritieke auth-bypass** (JWKS van een
+    niet-gekoppelde 'Hub' werd vertrouwd) en ongeldige ci.yml. GitHub Actions nog niet waargenomen.
+  - jelly-leon: **P0 klaar** — FORK_STRATEGIE, PATCHES-register, INVENTARIS, CI + upstream-sync; build 0 fouten, tests 2544/2555
+    (4 falen door omgeving: geen DNS jellyfin.org / geen IPv6), OpenAPI byte-gelijk. Review: 6 reparaties. Volledige image
+    (met web) kon hier niet: npm-archief classList.js geblokkeerd door de proxy.
+  - jelly-leon-web: **P0 klaar** — vitest 160/160, productiebuild, smoketest fork 30/30 / stock 24/24; GitHub Actions-runs
+    42610233474 en 42611569594 groen (7/7 jobs). Review: 5 reparaties.
+  - jelly-leon-clients: **P0 klaar** — subtrees byte-gelijk aan upstream (mpvqt als extra subtree voor desktop, JLC-0001), CI per
+    client, desktop-build in container gelukt; Android/Android TV lokaal geblokkeerd (Android SDK/Gradle via proxy),
+    Swiftfin NIET GEVALIDEERD (Mac/Xcode). Review: 6 reparaties.
+- **Excel** bijgewerkt (tools/excel/update_excel.py + docs/platform-v2/EVIDENCE_PROGRAMMA.json): Werkpakketten 48 Bezig /
+  16 Geblokkeerd / 241 Niet gestart; Testmatrix 6 Bezig; Besluiten 17 Open + D10 Ingevuld; Fasen P0 Bezig (NAS-gate open);
+  Releases bijgewerkt (MSO v1.6.0 is getagd; my_house 0.2.0 niet gepubliceerd). Nergens Gereed/Geslaagd.
 
 ## Openstaande besluiten voor de gebruiker (via keuzemenu vragen)
 

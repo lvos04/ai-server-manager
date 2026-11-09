@@ -1,0 +1,24 @@
+{
+ "fasen": [
+  {"id": "P0", "status": "Bezig", "validatie": "Code + CI + simulator-E2E (Sim-getest); NIET GEVALIDEERD (echte NAS)",
+   "bewijs": "Alle 11 repos: P0 gebouwd en onafhankelijk gereviewd, zie docs/platform-v2/EVIDENCE.json per repo en ai-server-manager/docs/platform-v2/OVERDRACHT/STATUS.md",
+   "blokkade": "P0-gate vraagt echte NAS: inventaris, ZFS-snapshots, OneDrive-hersteltest foto + DB (D04/D05/D06); D01–D18 nog niet ingevuld",
+   "bijgewerkt": "2026-11-09"},
+  {"id": "P1", "status": "Niet gestart", "validatie": "", "bewijs": "", "blokkade": "", "bijgewerkt": "2026-11-09"}
+ ],
+ "releases": [
+  {"project": "MediaGuard Ultimate", "gecontroleerde_stand": "1.2.2 (tag v1.2.2 → 30f7415 = de710c7 + 2 CI-commits)",
+   "bewijsstatus": "GitHub-release; GHCR-digests gemeten (core-aio sha256:14e540ba…52dc6); versie op NAS onbekend",
+   "peildatum": "2026-11-09", "commit": "30f7415"},
+  {"project": "Media Source Optimizer", "gecontroleerde_stand": "1.6.0 (tag v1.6.0 → 018b119; release/VERSION 1.6.0)",
+   "bewijsstatus": "Getagd; hardware-/live-acceptatie nog niet gedaan; versie op NAS onbekend",
+   "peildatum": "2026-11-09", "commit": "018b119"},
+  {"project": "my_house", "gecontroleerde_stand": "0.2.0 op HEAD b0a6a98 (laatste tag v0.1.0)",
+   "bewijsstatus": "0.2.0 niet gepubliceerd: release-run faalde op Gradle-download (HTTP 504); echte hardware niet getest",
+   "peildatum": "2026-11-09", "commit": "b0a6a98"}
+ ],
+ "instructies": [
+  {"onderwerp": "Kolom Validatie (toegevoegd)", "instructie": "Sim-getest = code + CI + simulator-test geslaagd; NIET GEVALIDEERD (echte NAS|hardware|account|Mac/Xcode) = nog niet op de echte omgeving getest. Status 'Gereed'/'Geslaagd' alleen na echte acceptatie op de NAS; het hulpmiddel tools/excel/update_excel.py zet die nooit."},
+  {"onderwerp": "Bron van de statussen", "instructie": "Per repo docs/platform-v2/EVIDENCE.json; samengevoegd met tools/excel/update_excel.py. Bij meerdere bronnen voor één ID wint de voorzichtigste status."}
+ ]
+}
