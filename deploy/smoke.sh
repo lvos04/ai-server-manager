@@ -50,16 +50,19 @@ case " $uids" in *" 569 "*) ;; *) echo "FOUT: AI-runner draait niet als aparte g
 socks="$(docker exec -u 568 asm-smoke-hub sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk "NR>1 && \$4==\"0A\" {print \$2}"' | sort -u | tr '\n' ' ')"
 echo "luisterende sockets (hex ip:poort): $socks"
 test "$socks" = "00000000:76C0 0100007F:20D0 "
-# no-new-privileges (contract §10; het standaardformulier kan dat niet zetten, de images doen het zelf). Processen van
-# 'docker exec' zelf (deze shell en zijn kinderen) tellen niet mee.
-nnp() {
+# no-new-privileges en geen capabilities (contract 1.2 §2.2/§10; het standaardformulier zet geen no-new-privileges en
+# geen cap_drop, de images doen het zelf). Voor elk proces, ook PID 1. Processen van 'docker exec' zelf (deze shell en
+# zijn kinderen) tellen niet mee.
+privs() {  # privs <container> <veld>: unieke waarden van <veld> in /proc/<pid>/status over alle processen
   docker exec -u 568 "$1" sh -c 'me=$$; for p in /proc/[0-9]*; do pid=${p#/proc/}; [ "$pid" = "$me" ] && continue;
     pp=$(awk "/^PPid:/{print \$2}" $p/status 2>/dev/null); [ "$pp" = "$me" ] && continue; [ "$pp" = 0 ] && [ "$pid" != 1 ] && continue;
-    awk "/^NoNewPrivs:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' '
+    awk -v f="$0:" "\$1==f{print \$2}" $p/status 2>/dev/null; done' "$2" | sort -u | tr '\n' ' '
 }
 for c in asm-smoke-hub asm-smoke-exec; do
-  v="$(nnp "$c")"; echo "NoNewPrivs in $c: $v"
+  v="$(privs "$c" NoNewPrivs)"; echo "NoNewPrivs in $c: $v"
   test "$v" = "1 " || { echo "FOUT: niet alle processen in $c hebben no-new-privileges" >&2; exit 1; }
+  v="$(privs "$c" CapEff)"; echo "CapEff in $c: $v"
+  test "$v" = "0000000000000000 " || { echo "FOUT: een proces in $c heeft nog effectieve capabilities" >&2; exit 1; }
 done
 
 # Herstart zonder dataverlies: eerste beheerder via de setupcode uit de log, dan herstart en harde kill.
