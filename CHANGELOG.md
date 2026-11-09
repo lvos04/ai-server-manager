@@ -27,7 +27,8 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   groen). De bestaande noodlogin is hergebruikt en blijft werken als de issuer uitvalt.
 - **Auditspoor:** append-only met hash-ketting (`ketting_nr`, `prev_hash`, `hash`), trigger tegen wijzigen/verwijderen,
   `GET /api/v1/audit/verify`, anker in `/appdata/audit/anker.jsonl`, dagelijkse controle.
-- Migraties 0006–0008; worker-taken `incidenten_bijwerken`, `logs_onderhoud`, `audit_verankeren`, `audit_controleren`;
+- Migraties 0006–0009 (0009: partiële index voor het verzegelen; verzegelen kiest de rijen in de database, ook na een
+  teruggedraaid savepoint); worker-taken `incidenten_bijwerken`, `logs_onderhoud`, `audit_verankeren`, `audit_controleren`;
   OpenAPI, `.env.example`, `docs/INCIDENTEN.md`, `docs/SSO.md`; de rooktest controleert de nieuwe routes en het anker.
 - Tests: unit (regels, schoning, runbooks, OIDC, audit), integratie (auditketting incl. manipulatie en gelijktijdige
   schrijvers) en dienst-E2E met fakes (OIDC in de vorm van Authentik, home-control-hub, Uptime Kuma, Gotify, TrueNAS).

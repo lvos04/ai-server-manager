@@ -65,8 +65,10 @@ zelf (bv. noodlogin pas na rotatie + bevestiging). `onbekend` sluit nooit iets.
 ### 5. Auditspoor: append-only met hash-ketting en anker buiten de database
 - Elke auditrij krijgt bij de commit een doorlopend `ketting_nr`, `prev_hash` en `hash = SHA-256(prev_hash + "\n" +
   canonieke JSON v1)`. Het verzegelen gebeurt in `before_commit` onder een transactie-advisory-lock: kort (geen
-  netwerk), gatloos, en één ketting over API en worker heen. De hash rekent met de rij zoals de database hem bewaart
-  (JSONB), zodat verificatie exact dezelfde vorm gebruikt. Bestaande rijen zijn in migratie 0006 verzegeld (bevroren
+  netwerk), gatloos, en één ketting over API en worker heen. Welke rijen verzegeld worden, bepaalt de database
+  (`hash IS NULL`, partiële index, migratie 0009): elke vastgelegde rij is verzegeld en onverzegelde rijen van andere
+  transacties zijn onzichtbaar, dus dat zijn precies de eigen rijen — ook als een savepoint ertussen terugdraaide. De
+  hash rekent met de rij zoals de database hem bewaart (JSONB), zodat verificatie exact dezelfde vorm gebruikt. Bestaande rijen zijn in migratie 0006 verzegeld (bevroren
   kopie van het algoritme).
 - Een trigger weigert `DELETE` en elke `UPDATE` behalve het eenmalig verzegelen. De database-eigenaar kan de trigger
   omzeilen; daarom ook: `GET /api/v1/audit/verify` (nummering, koppeling, inhoud) en een **anker** in
@@ -102,7 +104,7 @@ operator met reden + audit.
 
 ## Gevolgen
 - Nieuwe routes: `/api/v1/incidents…`, `/api/v1/runbooks…`, `/api/v1/logs…`, `/api/v1/audit/verify`,
-  `/api/v1/monitoring/out-of-band…`; migraties 0006 en 0007; worker-taken `incidenten_bijwerken`, `logs_onderhoud`,
+  `/api/v1/monitoring/out-of-band…`; migraties 0006, 0007 en 0009; worker-taken `incidenten_bijwerken`, `logs_onderhoud`,
   `audit_verankeren`, `audit_controleren`.
 - De UI (inbox, bewijs, runbook-knoppen, logs zoeken, out-of-band-kaart) volgt in de P1-webstap met ontwerpstap (§13).
 - Alles is Sim-getest; echte Kuma/Gotify/telefoon en een echte NAS-uitval zijn NIET GEVALIDEERD.

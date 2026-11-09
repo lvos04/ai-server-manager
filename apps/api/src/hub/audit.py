@@ -28,6 +28,7 @@ from typing import Any
 
 from sqlalchemy import event, func, select, text
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from hub.models import AuditEvent
 from hub.redact import redact
@@ -105,10 +106,11 @@ def chain_hash(prev_hash: str, canonical: bytes) -> str:
     return hashlib.sha256(prev_hash.encode("ascii") + b"\n" + canonical).hexdigest()
 
 
-_SELECT_BY_IDS = (
+_SELECT_UNSEALED = (
     "SELECT id, at, actor_type, actor_id, action, target_type, target_id, details, trace_id "
-    "FROM audit_event WHERE id = ANY(:ids)"
+    "FROM audit_event WHERE hash IS NULL ORDER BY id"
 )
+_SEAL = "UPDATE audit_event SET ketting_nr = :nr, prev_hash = :p, hash = :h WHERE id = :id AND hash IS NULL"
 _SELECT_BATCH = (
     "SELECT id, at, actor_type, actor_id, action, target_type, target_id, details, trace_id, "
     "ketting_nr, prev_hash, hash FROM audit_event WHERE ketting_nr > :after ORDER BY ketting_nr LIMIT :n"
@@ -137,26 +139,35 @@ def head(db: Session) -> tuple[int, str]:
 
 
 def seal_pending(session: Session) -> int:
-    """Verzegel de nieuwe auditrijen van deze transactie (aangeroepen vlak vóór commit)."""
-    pending: list[AuditEvent] = [e for e in session.info.get(PENDING_KEY, []) if e.hash is None]
+    """Verzegel alle nog onverzegelde auditrijen van deze transactie (aangeroepen vlak vóór commit).
+
+    Gekozen wordt op de database, niet op de ORM-objecten: elke vastgelegde rij is verzegeld (invariant) en
+    onverzegelde rijen van andere transacties zijn hier onzichtbaar, dus ``hash IS NULL`` zijn precies de eigen rijen —
+    ook als een savepoint ertussen terugdraaide."""
+    pending: list[AuditEvent] = list(session.info.get(PENDING_KEY, []))
     if not pending:
-        session.info.pop(PENDING_KEY, None)
         return 0
     session.flush()  # ids toekennen; de rijen staan nu (onverzegeld) in deze transactie
+    session.info.pop(PENDING_KEY, None)
+    rows = list(session.execute(text(_SELECT_UNSEALED)))
+    if not rows:
+        return 0
     session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": AUDIT_LOCK_KEY})
     nr, prev = head(session)
-    ids = sorted(e.id for e in pending)
-    # Lees de rijen zoals de database ze bewaart (JSONB-normalisatie), zodat verify() exact dezelfde vorm hasht.
-    stored = {r.id: r for r in session.execute(text(_SELECT_BY_IDS), {"ids": ids})}
-    by_id = {e.id: e for e in pending}
-    for rid in ids:
+    sealed: dict[int, tuple[int, str, str]] = {}
+    for r in rows:  # in id-volgorde; JSONB zoals de database hem bewaart, zodat verify() exact dezelfde vorm hasht
         nr += 1
-        h = chain_hash(prev, _row_canonical(stored[rid], nr))
-        ev = by_id[rid]
-        ev.ketting_nr, ev.prev_hash, ev.hash = nr, prev, h
+        h = chain_hash(prev, _row_canonical(r, nr))
+        session.execute(text(_SEAL), {"nr": nr, "p": prev, "h": h, "id": r.id})
+        sealed[int(r.id)] = (nr, prev, h)
         prev = h
-    session.info.pop(PENDING_KEY, None)
-    return len(ids)
+    for e in pending:  # ORM-objecten bijwerken zonder ze 'dirty' te maken
+        if e in session and e.id in sealed:
+            n, p, h = sealed[e.id]
+            set_committed_value(e, "ketting_nr", n)
+            set_committed_value(e, "prev_hash", p)
+            set_committed_value(e, "hash", h)
+    return len(sealed)
 
 
 @event.listens_for(Session, "before_commit")

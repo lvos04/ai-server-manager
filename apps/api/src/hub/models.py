@@ -170,6 +170,7 @@ class IdempotencyRecord(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_event"
+    __table_args__ = (Index("ix_audit_event_onverzegeld", "id", postgresql_where=text("hash IS NULL")),)
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     at: Mapped[datetime] = mapped_column(TS, default=utcnow, index=True)
     actor_type: Mapped[str] = mapped_column(String(16))  # user|service|system

@@ -200,3 +200,26 @@ def test_migratie_verzegelt_bestaande_rijen(pg_url: str) -> None:
     finally:
         with psycopg.connect(admin_url, autocommit=True) as conn:
             conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+def test_teruggedraaid_savepoint_laat_geen_gat_of_fout(app: Any, settings: Any) -> None:
+    """Een auditrij in een savepoint dat terugdraait (bv. een mislukte incidenthaak) wordt niet verzegeld en breekt de
+    commit van de rest niet."""
+    with app.state.sessionmaker() as db:
+        audit.record(db, actor_type="system", actor_id="test", action="test.voor")
+        try:
+            with db.begin_nested():
+                audit.record(db, actor_type="system", actor_id="test", action="test.weg")
+                db.flush()
+                raise RuntimeError("haak faalt")
+        except RuntimeError:
+            pass
+        audit.record(db, actor_type="system", actor_id="test", action="test.na")
+        db.commit()
+        res = audit.verify(db, settings.data_dir)
+        from sqlalchemy import select
+
+        from hub.models import AuditEvent
+
+        acties = list(db.scalars(select(AuditEvent.action).order_by(AuditEvent.ketting_nr)))
+    assert res["status"] == "intact" and acties == ["test.voor", "test.na"], (res, acties)
