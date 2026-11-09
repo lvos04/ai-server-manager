@@ -140,6 +140,7 @@ jobs:
             apps/web/test-results
             apps/web/review/uit/samenvatting.json
             apps/web/review/uit/samenvatting.txt
+            apps/web/review/uit/test-results
             docs/screenshots/p1
           retention-days: 14
           if-no-files-found: ignore

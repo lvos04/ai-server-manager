@@ -92,19 +92,26 @@ function Tegel({ id, titel, icon, m, fmt, unit, status, extra }: { id: string; t
 
 function useReeks(type: string, oid: string, metriek: string, periode: Periode) {
   const list = useApi<{ items: Series[] }>(`/api/v1/metrics/series?onderwerp_type=${type}&onderwerp_id=${encodeURIComponent(oid)}&metriek=${metriek}&limit=10`);
-  const s = list.data?.items.sort((a, b) => (a.bron.startsWith("truenas") ? -1 : 0) - (b.bron.startsWith("truenas") ? -1 : 0))[0] ?? null;
+  const s = [...(list.data?.items ?? [])].sort((a, b) => (a.bron.startsWith("truenas") ? -1 : 0) - (b.bron.startsWith("truenas") ? -1 : 0))[0] ?? null;
   const q = useApi<QueryResult>(s ? queryPath(s.id, periode) : null);
-  return { s, q, loaded: Boolean(list.data) };
+  // Een mislukte lijst is ook "klaar": dan eerlijk Onbekend, nooit eindeloos laden (review: in CI bleef een skelet staan).
+  return { s, q, loaded: Boolean(list.data) || Boolean(list.error), fout: !list.data && Boolean(list.error) };
 }
 
+const ONBEKEND_REEKS = "Onbekend — de lijst met meetreeksen kon niet worden opgehaald. We tonen geen lege grafiek.";
+
 function Grafiek({ type, oid, metriek, titel, eenheid, domein, periode, testId }: { type: string; oid: string; metriek: string; titel: string; eenheid: string; domein?: [number, number]; periode: Periode; testId?: string }) {
-  const { s, q, loaded } = useReeks(type, oid, metriek, periode);
+  const { s, q, loaded, fout } = useReeks(type, oid, metriek, periode);
   if (!loaded) return <Loading regels={2} />;
   if (!s) {
     return (
       <div className="flex flex-col gap-2" data-testid={testId}>
         <p className="font-semibold">{titel}</p>
-        <div className="arcering-gat flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown px-3 py-2 text-center text-unknown-ink">Geen meting — er is nog geen reeks.</div>
+        {fout ? (
+          <div className="flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown bg-unknown-bg px-3 py-2 text-center text-unknown-ink">{ONBEKEND_REEKS}</div>
+        ) : (
+          <div className="arcering-gat flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown px-3 py-2 text-center text-unknown-ink">Geen meting — er is nog geen reeks.</div>
+        )}
       </div>
     );
   }
@@ -128,6 +135,9 @@ function NetwerkGrafiek({ periode }: { periode: Periode }) {
   const rx = useReeks("nas", "nas", "netwerk.ontvangen", periode);
   const tx = useReeks("nas", "nas", "netwerk.verzonden", periode);
   if (!rx.loaded || !tx.loaded) return <Loading regels={2} />;
+  if (!rx.s && !tx.s && (rx.fout || tx.fout)) {
+    return <div className="flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown bg-unknown-bg px-3 py-2 text-center text-unknown-ink">{ONBEKEND_REEKS}</div>;
+  }
   if (!rx.s && !tx.s) {
     return <div className="arcering-gat flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown px-3 py-2 text-center text-unknown-ink">Geen meting — er is nog geen reeks voor netwerkverkeer.</div>;
   }

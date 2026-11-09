@@ -120,6 +120,10 @@ Ernst: **Blokkerend** · **Hoog** (WCAG-fout of onware uitspraak) · **Middel** 
 | R-23 | Middel | Metrieken, Netwerk | Een gemeten kleine waarde las als 0: de tegel zei "0 Mbit/s" en de y-as "0, 0, 0, 0, 0" (één decimaal). | Peil §1 (nooit 0 voor iets dat niet 0 is), dataviz | Kleine waarden met 2 significante cijfers ("0,03 Mbit/s"), op de as en in de labels. |
 | R-24 | Laag | Metrieken, Opslag | Poolmeter boven de drempel had alleen een kleur en een tekst zonder icoon; "Onbekend" stond als losse tekst. | Peil §4.2/§10 (nooit alleen kleur) | `triangle-alert` + "… gebruikt — boven de drempel van 90%" in `degraded-ink`; Onbekend als StatusBadge. |
 | R-25 | Laag | Besluiten (schemaformulier) | "Verwijder" bij een rij in een nog niet opgeslagen formulier was een rode gevaarknop; de knop "Meet D01" stond in de gebiedende wijs. | Peil §4.1 regel 2, §11 | Gewone knop "Verwijderen" met prullenbak; "D01 meten". |
+| R-26 | Middel | Monitoring (1024), Server bij NAS offline (320) | Met een breder systeemlettertype (DejaVu Sans, het standaardlettertype van de Ubuntu-runner in CI) liep het meldingenlogboek op 1024 9 px over. Op 320 liepen lange woorden zonder breekpunt ('pool.snapshottask.query', 'ConnectionRefusedError') 5 px over. Lokaal (Noto Sans) gebeurde dat niet. | WCAG 1.4.10, Peil §5 (systeemfont) | Logboektabel pas vanaf 1280; `main` krijgt `overflow-wrap: break-word`. De review kan een lettertype afdwingen (`PEIL_REVIEW_LETTER`); met DejaVu Sans: 0 harde bevindingen. |
+
+R-26 vond pas de CI-run: daar is het systeemlettertype breder. Daarna is de volledige review lokaal ook met
+DejaVu Sans gedraaid: 59 schermen en toestanden, 700 metingen, 0 harde bevindingen.
 
 Tijdens het herstel kwam R-13 terug in een nieuwe vorm: de nieuwe ankerlinks waren 39–43 px breed. Dat is direct
 gerepareerd (`min-w-touch`) en opnieuw gemeten.
@@ -133,6 +137,7 @@ gerepareerd (`min-w-touch`) en opnieuw gemeten.
 | N-03 | Laag | De tabs in het appdetail hebben geen iconen (het prototype wel). | Cosmetisch; de tabs zijn duidelijk. | Bij de volgende webstap `activity`, `chart-line`, `logs`, `tag` en `list-checks`. |
 | N-04 | Laag | Nog een paar inline styles in P0-schermen (`DecisionScreen`, `ValueView`, `RefreshInventory`). Geen kleuren: alleen afstanden. | Fase 3 "opruimen" (ADR-0024 punt 3). | Vervangen door utilities. |
 | N-05 | Laag | Gezondheid per onderdeel in het appdetail is op mobiel een stapel kaarten met de labels "Onderdeel/Status/Toelichting"; het prototype heeft compacte rijen (naam, bron, pil rechts). | Werkt en is toegankelijk; het is een dichtheidskeuze. | Compacte rijen zoals in `appdetail-p1.html` (minder scrollen op 360). |
+| N-06 | Laag | Backend: twee gelijktijdige `POST /api/v1/users` met dezelfde naam geven een 500 (UniqueViolation) in plaats van 409 `username_taken`. De controle "bestaat al" en de insert zijn niet atomair. Zo gevonden in CI-run 42711876495: drie reviewwerkers maakten tegelijk dezelfde kijker aan. | API-code, buiten het mandaat. | `IntegrityError` op `app_user_username_key` vertalen naar 409 `username_taken`. De review maakt de gebruikers nu één keer aan (`review-opzet`). |
 
 ## Ontwerpkritiek (design-critique)
 
@@ -244,5 +249,9 @@ staat nog open: NIET GEVALIDEERD.
 - De web-E2E-suite (Playwright, 360/390/768/1440 × licht/donker met axe) blijft groen: 179 geslaagd. Eén eerdere run
   faalde op een wedloop in de opzettest: het incident stond er al met ×32, terwijl de worker de 100 events nog
   verwerkte. De test wacht nu tot alle 100 meetellen. Het was geen fout in de Hub.
+- CI (GitHub Actions) op deze branch:
+  - run 42711876495 faalde in de nieuwe reviewstap: de gebruikers werden gelijktijdig aangemaakt (N-06);
+  - run 42715050190 faalde op overloop met DejaVu Sans (R-26);
+  - de uitkomst van de run na beide reparaties staat in EVIDENCE.json (I23-23-08).
 - `docs/screenshots/p1` toont nog de stand vóór deze review (`333de88`). De actuele afdrukken maakt `make web-review`
   (`apps/web/review/uit/shots`, niet in Git); de voor/na-selectie staat in `docs/ontwerp/review/`.

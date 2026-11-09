@@ -161,7 +161,8 @@ async function wachtKlaar(page: Page, s: Scherm): Promise<void> {
   } else {
     await expect(page.locator("main h1").first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Aanmelding controleren…")).toHaveCount(0);
-    await expect(page.getByTestId("loading")).toHaveCount(0, { timeout: 30_000 });
+    // CI-runners zijn trager (drie browsers + API + worker op 4 vCPU): ruim wachten op het laden.
+    await expect(page.getByTestId("loading")).toHaveCount(0, { timeout: 60_000 });
   }
   await page.evaluate(() => document.fonts.ready);
 }

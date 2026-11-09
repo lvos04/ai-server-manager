@@ -74,5 +74,8 @@ uiterlijk, tekst of toegankelijkheid. Er verandert geen API en geen gedrag van d
 - Op de gebouwde UI geeft de review 0 harde bevindingen over 6 breedtes × 2 thema's (zie PEIL_REVIEW.md). Dat geldt
   voor de schermen van beheerder, kijker en kind, de publieke pagina's, de executor-statuspagina en de toestanden
   NAS offline en browser offline.
+- De review draait in CI met het systeemlettertype van de runner (DejaVu Sans, breder dan lokaal Noto Sans). Lokaal
+  kun je dat nadoen met `PEIL_REVIEW_LETTER="DejaVu Sans"`. Peil gebruikt bewust het systeemfont, dus reflow moet
+  met elk gangbaar systeemfont kloppen.
 - Alles is **Sim-getest** in Chromium. NIET GEVALIDEERD: echte schermlezer (NVDA/TalkBack), echte Android-telefoon in
   fel licht, tv, echte NAS.
