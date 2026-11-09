@@ -634,6 +634,45 @@
         "title": "HeartbeatIn",
         "type": "object"
       },
+      "InschakelenIn": {
+        "additionalProperties": false,
+        "properties": {
+          "ingeschakeld": {
+            "title": "Ingeschakeld",
+            "type": "boolean"
+          },
+          "verplicht": {
+            "default": false,
+            "title": "Verplicht",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ingeschakeld"
+        ],
+        "title": "InschakelenIn",
+        "type": "object"
+      },
+      "Koppeling": {
+        "additionalProperties": false,
+        "properties": {
+          "groep": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Groep",
+            "type": "string"
+          },
+          "rol": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "groep",
+          "rol"
+        ],
+        "title": "Koppeling",
+        "type": "object"
+      },
       "LogsIn": {
         "additionalProperties": false,
         "properties": {
@@ -667,6 +706,86 @@
           "tekst"
         ],
         "title": "NotitieIn",
+        "type": "object"
+      },
+      "OidcIn": {
+        "additionalProperties": false,
+        "properties": {
+          "client_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._~:-]+$",
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alleen schrijven",
+            "title": "Client Secret"
+          },
+          "client_secret_wissen": {
+            "default": false,
+            "title": "Client Secret Wissen",
+            "type": "boolean"
+          },
+          "groepen_claim": {
+            "default": "groups",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Groepen Claim",
+            "type": "string"
+          },
+          "issuer": {
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Issuer",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "maxLength": 512,
+            "minLength": 10,
+            "title": "Redirect Uri",
+            "type": "string"
+          },
+          "rolkoppelingen": {
+            "items": {
+              "$ref": "#/components/schemas/Koppeling"
+            },
+            "maxItems": 50,
+            "title": "Rolkoppelingen",
+            "type": "array"
+          },
+          "scopes": {
+            "default": "openid profile email",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9_:. -]+$",
+            "title": "Scopes",
+            "type": "string"
+          },
+          "sessie_minuten": {
+            "default": 480,
+            "maximum": 720.0,
+            "minimum": 15.0,
+            "title": "Sessie Minuten",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "issuer",
+          "client_id",
+          "redirect_uri"
+        ],
+        "title": "OidcIn",
         "type": "object"
       },
       "OplosIn": {
@@ -923,6 +1042,22 @@
           "uitgevoerd_op"
         ],
         "title": "RestoreTestIn",
+        "type": "object"
+      },
+      "RevokeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reden": {
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Reden",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reden"
+        ],
+        "title": "RevokeIn",
         "type": "object"
       },
       "Role": {
@@ -3153,6 +3288,354 @@
           }
         },
         "summary": "Huidige gebruiker",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc": {
+      "get": {
+        "operationId": "get_oidc_api_v1_auth_oidc_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Oidc Api V1 Auth Oidc Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "SSO-instellingen en -status (admin; clientgeheim nooit terug)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      },
+      "put": {
+        "operationId": "put_oidc_api_v1_auth_oidc_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OidcIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SSO instellen (admin); wijzigen van issuer/client zet SSO uit",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/beschikbaar": {
+      "get": {
+        "operationId": "available_api_v1_auth_oidc_beschikbaar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Available Api V1 Auth Oidc Beschikbaar Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Openbaar: is inloggen via SSO beschikbaar (zonder geheimen)?",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/callback": {
+      "get": {
+        "operationId": "oidc_callback_api_v1_auth_oidc_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "State",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Openbaar: terugkeer van de identity provider (code + state)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/discover": {
+      "post": {
+        "operationId": "discover_api_v1_auth_oidc_discover_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discovery en JWKS van de issuer nu ophalen en controleren (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/inschakelen": {
+      "post": {
+        "operationId": "enable_api_v1_auth_oidc_inschakelen_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InschakelenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SSO aan/uit en 'OIDC verplicht' (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/login": {
+      "get": {
+        "operationId": "oidc_login_api_v1_auth_oidc_login_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "terug",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "maxLength": 256,
+              "title": "Terug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "naar de identity provider"
+          },
+          "303": {
+            "description": "terug met sso_fout"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Openbaar: aanmelden via SSO starten (302 naar de identity provider)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/test": {
+      "post": {
+        "operationId": "oidc_test_start_api_v1_auth_oidc_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Testlogin starten (admin): volledige aanmelding zonder sessie",
         "tags": [
           "aanmelden en gebruikers"
         ]
@@ -7211,6 +7694,29 @@
         ]
       }
     },
+    "/api/v1/sessions": {
+      "get": {
+        "operationId": "all_sessions_api_v1_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response All Sessions Api V1 Sessions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Alle actieve sessies (admin): gebruiker, bron (lokaal/oidc), noodlogin",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
     "/api/v1/setup/admin": {
       "post": {
         "operationId": "setup_admin_api_v1_setup_admin_post",
@@ -7268,6 +7774,29 @@
           }
         },
         "summary": "Is de eerste setup nog nodig?",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/sso/status": {
+      "get": {
+        "operationId": "sso_status_api_v1_sso_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sso Status Api V1 Sso Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "SSO-advies van home-control-hub (admin): least privilege en rechtenkaart, nooit groen op aannames",
         "tags": [
           "aanmelden en gebruikers"
         ]
@@ -7644,6 +8173,73 @@
           }
         },
         "summary": "Rol/status wijzigen (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/sessions/revoke": {
+      "post": {
+        "operationId": "revoke_user_sessions_api_v1_users__user_id__sessions_revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alle sessies van een gebruiker intrekken (admin)",
         "tags": [
           "aanmelden en gebruikers"
         ]

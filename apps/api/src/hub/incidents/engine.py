@@ -425,8 +425,14 @@ def _attach_correlated(db: Session, settings: Settings, ev: EventIn) -> bool:
     return True
 
 
+def _hooks() -> list[Hook]:
+    from hub.oidc.service import handle_event as oidc_revocation  # laat import: oidc gebruikt deze regels
+
+    return [oidc_revocation, *HOOKS]
+
+
 def handle(db: Session, settings: Settings, ev: EventIn, now: datetime, stats: Stats) -> None:
-    for hook in HOOKS:
+    for hook in _hooks():
         try:
             with db.begin_nested():
                 hook(db, settings, ev, now)

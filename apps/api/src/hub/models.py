@@ -59,6 +59,8 @@ class User(Base):
     break_glass_rotation_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     break_glass_reconfirmed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     break_glass_last_used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    # lokaal | oidc (B01-006): een OIDC-account heeft geen bruikbaar wachtwoord en logt alleen via de issuer in.
+    auth_bron: Mapped[str] = mapped_column(String(8), default="lokaal", server_default="lokaal")
 
 
 class WebSession(Base):
@@ -74,6 +76,7 @@ class WebSession(Base):
     user_agent: Mapped[str] = mapped_column(String(256), default="")
     client_ip: Mapped[str] = mapped_column(String(64), default="")
     break_glass: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    auth_bron: Mapped[str] = mapped_column(String(8), default="lokaal", server_default="lokaal")
 
 
 class LoginAttempt(Base):
@@ -709,3 +712,69 @@ class LogEntry(Base):
     bericht: Mapped[str] = mapped_column(Text)
     trace_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     velden: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+# ------------------------------------------------------------------ OIDC (B01-006, Hub-kant van B13)
+class OidcConfig(Base):
+    """Eén rij (id=1): issuer, client, scopes, groep→rol-koppelingen en de laatst gemeten discovery/JWKS. Het
+    clientgeheim staat alleen als vault-referentie. ``config_versie`` stijgt bij elke wijziging die een nieuwe testlogin
+    vereist (issuer, client, redirect, koppelingen)."""
+
+    __tablename__ = "oidc_config"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    ingeschakeld: Mapped[bool] = mapped_column(Boolean, default=False)
+    verplicht: Mapped[bool] = mapped_column(Boolean, default=False)
+    issuer: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    client_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_secret_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    redirect_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    scopes: Mapped[str] = mapped_column(String(256), default="openid profile email")
+    groepen_claim: Mapped[str] = mapped_column(String(64), default="groups")
+    rolkoppelingen: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    sessie_minuten: Mapped[int] = mapped_column(Integer, default=480)
+    discovery: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    discovery_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    jwks: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    jwks_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_test: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    laatste_test_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    config_versie: Mapped[int] = mapped_column(Integer, default=1)
+    bijgewerkt_door: Mapped[str] = mapped_column(String(80), default="system")
+    bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class OidcTransaction(Base):
+    """Eén lopende aanmelding (state/nonce/PKCE), eenmalig en hooguit 10 minuten geldig; gebonden aan de browser via
+    een apart cookie (alleen de SHA-256 staat hier)."""
+
+    __tablename__ = "oidc_transaction"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    browser_hash: Mapped[str] = mapped_column(String(64))
+    nonce_hash: Mapped[str] = mapped_column(String(64))
+    code_verifier: Mapped[str] = mapped_column(String(128))
+    doel: Mapped[str] = mapped_column(String(8))  # login|test
+    gestart_door: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    terug: Mapped[str] = mapped_column(String(256), default="/")
+    config_versie: Mapped[int] = mapped_column(Integer)
+    bron_ip: Mapped[str] = mapped_column(String(64), default="")
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    verloopt_op: Mapped[datetime] = mapped_column(TS, index=True)
+    gebruikt_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+
+
+class OidcIdentity(Base):
+    """Koppeling (issuer, sub) → Hub-gebruiker. Nooit automatisch gekoppeld aan een bestaand lokaal account."""
+
+    __tablename__ = "oidc_identity"
+    __table_args__ = (UniqueConstraint("issuer", "sub", name="uq_oidc_identity_issuer_sub"),)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    issuer: Mapped[str] = mapped_column(String(512))
+    sub: Mapped[str] = mapped_column(String(255))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), unique=True)
+    gebruikersnaam: Mapped[str] = mapped_column(String(255), default="", index=True)
+    groepen: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    laatste_login_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    ingetrokken_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)

@@ -124,15 +124,26 @@ def user_dict(u: User) -> dict[str, Any]:
         "role": u.role,
         "disabled": u.disabled,
         "break_glass": u.break_glass,
+        "auth_bron": u.auth_bron,
         "created_at": iso(u.created_at),
         "updated_at": iso(u.updated_at),
         "version": u.version,
     }
 
 
-def start_session(
-    request: Request, db: Any, settings: Any, user: User, *, ttl_seconds: int | None = None, break_glass: bool = False
-) -> JSONResponse:
+def create_session(
+    request: Request,
+    db: Any,
+    settings: Any,
+    user: User,
+    *,
+    ttl_seconds: int | None = None,
+    break_glass: bool = False,
+    auth_bron: str = "lokaal",
+    action: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> tuple[str, str, WebSession, int]:
+    """Nieuwe websessie (alleen hashes in de database) + audit; commit. Geeft (token, csrf, sessie, ttl)."""
     from hub.security import new_token
 
     token, csrf = new_token("ses"), new_token("csrf", 24)
@@ -148,41 +159,40 @@ def start_session(
         user_agent=request.headers.get("user-agent", "")[:256],
         client_ip=client_ip(request),
         break_glass=break_glass,
+        auth_bron=auth_bron,
     )
     db.add(sess)
     audit.record(
         db,
         actor_type="user",
         actor_id=user.username,
-        action="auth.break_glass_login" if break_glass else "auth.login",
+        action=action or ("auth.break_glass_login" if break_glass else "auth.login"),
         target_type="session",
         target_id=str(sess.id),
+        details=details,
         trace_id=str(getattr(request.state, "trace_id", "")),
     )
     db.commit()
+    return token, csrf, sess, ttl
+
+
+def set_session_cookies(resp: Response, request: Request, settings: Any, token: str, csrf: str, ttl: int) -> None:
     secure = settings.cookie_secure == "true" or (settings.cookie_secure == "auto" and request.url.scheme == "https")
+    resp.set_cookie(SESSION_COOKIE, token, max_age=ttl, httponly=True, secure=secure, samesite="strict", path="/")
+    resp.set_cookie(CSRF_COOKIE, csrf, max_age=ttl, httponly=False, secure=secure, samesite="strict", path="/")
+
+
+def start_session(
+    request: Request, db: Any, settings: Any, user: User, *, ttl_seconds: int | None = None, break_glass: bool = False
+) -> JSONResponse:
+    token, csrf, sess, ttl = create_session(
+        request, db, settings, user, ttl_seconds=ttl_seconds, break_glass=break_glass
+    )
     body: dict[str, Any] = {"user": user_dict(user), "csrf_token": csrf, "sessie_verloopt_op": iso(sess.expires_at)}
     if break_glass:
         body["noodlogin"] = True
     resp = JSONResponse(body, headers={"Cache-Control": "no-store"})
-    resp.set_cookie(
-        SESSION_COOKIE,
-        token,
-        max_age=ttl,
-        httponly=True,
-        secure=secure,
-        samesite="strict",
-        path="/",
-    )
-    resp.set_cookie(
-        CSRF_COOKIE,
-        csrf,
-        max_age=ttl,
-        httponly=False,
-        secure=secure,
-        samesite="strict",
-        path="/",
-    )
+    set_session_cookies(resp, request, settings, token, csrf, ttl)
     return resp
 
 
@@ -255,6 +265,15 @@ def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep) -> JSO
     username = body.username.strip().lower()
     key = f"login:{username}:{client_ip(request)}"
     _rate_check(db, key, settings)
+    from hub.oidc.service import effective_required
+
+    if effective_required(db):
+        # Geen wachtwoordcontrole (geen orakel); het noodaccount logt via /auth/break-glass/login in.
+        raise HubError(
+            403,
+            "oidc_verplicht",
+            "Inloggen gaat via SSO (Authentik). Lokaal inloggen staat uit; bij nood: de noodlogin op het thuisnetwerk.",
+        )
     user = db.scalars(select(User).where(User.username == username)).first()
     ok = verify_password(user.password_hash if user else None, body.password)
     # Het noodaccount logt alleen in via /auth/break-glass/login (met TOTP, alleen privé-adressen).
@@ -355,6 +374,8 @@ def change_password(body: PasswordIn, db: DB, settings: SettingsDep, principal: 
     assert user is not None
     if user.break_glass:
         raise HubError(409, "use_break_glass_rotate", "Het noodaccount wijzig je via 'noodaccount roteren'.")
+    if user.auth_bron == "oidc":
+        raise HubError(409, "sso_account", "Dit is een SSO-account: het wachtwoord beheer je in Authentik.")
     # Zelfde rate-limit als bij inloggen: met een overgenomen sessie mag het huidige wachtwoord niet te raden zijn.
     key = f"password:{user.id}"
     _rate_check(db, key, settings)

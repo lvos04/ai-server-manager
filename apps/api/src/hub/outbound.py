@@ -22,7 +22,7 @@ import ssl
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 DEFAULT_MAX_BYTES = 2 * 1024 * 1024
 
@@ -123,6 +123,7 @@ def request(
     policy: OutboundPolicy,
     headers: dict[str, str] | None = None,
     json_body: Any = None,
+    form_body: dict[str, str] | None = None,
     query: dict[str, str] | None = None,
     max_bytes: int = DEFAULT_MAX_BYTES,
 ) -> Response:
@@ -142,6 +143,9 @@ def request(
     if json_body is not None:
         data = json.dumps(json_body, separators=(",", ":")).encode()
         hdrs["Content-Type"] = "application/json"
+    elif form_body is not None:
+        data = urlencode(form_body).encode()
+        hdrs["Content-Type"] = "application/x-www-form-urlencoded"
     conn: http.client.HTTPConnection
     if parts.scheme == "https":
         ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -172,3 +176,16 @@ def request(
     if 300 <= resp.status < 400:
         raise OutboundError("redirect_niet_gevolgd", f"HTTP {resp.status}")
     return Response(resp.status, raw, {k.lower(): v for k, v in resp.getheaders()})
+
+
+def split_url(url: str, *, allow_loopback: bool = False) -> tuple[str, str]:
+    """Volledige URL → (basisadres, pad + query) voor ``request``; zelfde adresregels als ``validate_base_url``."""
+    parts = urlsplit((url or "").strip())
+    if parts.scheme not in ("http", "https") or not parts.hostname or parts.fragment:
+        raise OutboundError("adres_ongeldig", "alleen http:// of https:// zonder fragment")
+    base = f"{parts.scheme}://{parts.netloc}"
+    validate_base_url(base, allow_loopback=allow_loopback)
+    path = parts.path or "/"
+    if parts.query:
+        path += "?" + parts.query
+    return base, path
