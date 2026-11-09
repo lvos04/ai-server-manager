@@ -50,6 +50,11 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
     `OVERDRACHT_PROMPT.md` §4; ADR-0016…0020.
   - Brondata: `08_EXCEL/tasks.json`, `e2e_cases.json`, `EXCEL_TAKEN.json` en `08_EXCEL/b03/`; Excel bijgewerkt
     (66 nieuwe en 6 vervangen B03-rijen, JLT-01…74, rij P4-0, bewijs samengevoegd).
+  - Onafhankelijke controle: de HARDE EIS staat nu ook letterlijk vooraan in de **acceptatie** van B03-015 (akkoord van
+    de gebruiker op elk verschil, ook door upstream-migraties; de bestaande installatie blijft ongewijzigd als terugval;
+    de overname raakt de MediaGuard-database niet en elke MediaGuard-release bewijst een upgrade op een gevulde database
+    van de vorige versie) — in het bouwplan, `tasks.json`, `EXCEL_TAKEN.json`, `08_EXCEL/b03/` en de Excel (alleen die
+    cel). `B03_BESLUITEN.md`: in het overzicht staat bij BG-38 dat het besluit afwijkt van het advies.
 - Ontwerptaal **Peil** 1.1.0 als bron van waarheid: `docs/platform-v2/ONTWERPTAAL.md` + `design/ontwerptaal/` (tokens, CSS voor Tailwind 4 + shadcn/ui, statuspagina-sjabloon, aliaslagen, prototypes, schermafdrukken, contrast- en axe-controle) en ADR-0015 (vervangt ADR-0009 punt 1 deels).
 
 ### Gerepareerd — onafhankelijke review van contract 1.2 in Hub en executor (ADR-0014)
