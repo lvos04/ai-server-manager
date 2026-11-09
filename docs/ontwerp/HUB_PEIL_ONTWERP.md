@@ -10,6 +10,10 @@
 gedraaid, §6), `design:ux-copy` (microcopy in §4), `design:accessibility-review` en `design:design-critique` (op de
 nieuwe prototypes en hun schermafdrukken, §9), `design:design-handoff` (opbouw van dit document).
 
+> **Uitvoering (P1-webstap, 9 november 2026):** dit ontwerp is gebouwd in `apps/web`; de besluiten OB-01 t/m OB-14 en
+> de afwijkingen bij het bouwen staan in `docs/adr/ADR-0024-hub-ui-in-peil-en-p1-schermen.md`, de schermafdrukken in
+> `docs/screenshots/p1/`. De tekst hieronder is het ontwerp zoals het vooraf was.
+
 > **Eerlijkheid.** Dit is een ontwerp, geen gebouwde UI. De prototypes zijn statische HTML met **fictieve data**
 > (gemarkeerd met "Voorbeeld"). Ze zijn automatisch gecontroleerd (axe, contrast in de DOM, overloop, doelen, focus;
 > §9). **NIET GEVALIDEERD:** echte schermlezer (NVDA/TalkBack), echte Android-telefoon in fel licht, echte NAS,

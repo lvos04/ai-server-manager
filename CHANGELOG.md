@@ -4,6 +4,36 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — fase P1 webstap: Hub-UI in Peil en de P1-schermen (ADR-0024; contract 1.2 H5/H6/H12)
+- **Peil (H12):** Tailwind 4 + shadcn/ui-componenten (Button, Tabs, AlertDialog, Sheet, DropdownMenu, met de
+  Peil-codemod) + lucide-react 1.66.0; tokens als versie-gepinde kopie `src/app/peil/ontwerptaal.css` (sha256-test);
+  themascript zet altijd het opgeloste thema (ook bij Systeem); de P0-klassen `.btn`/`.badge`/`.tone-*`/`.notice`/`.choice`
+  en `Icon.tsx` zijn weg. Productnaam **TrueNAS Home Platform** (merk, titels, PWA-manifest en -iconen).
+- **Statussen in Peil:** groen alleen voor gemeten en goed; Gekoppeld/Draait/Geslaagd/Aan/Ingesteld zijn neutraal,
+  open besluiten en dichte gates geen storing (slot), totaal Storing > Beperkt > Deels onbekend > Alles gezond.
+- **O-03:** bij een fout blijft de laatst bekende waarde staan, gedempt ("Laatst bekend · 10:12") met status Onbekend /
+  Verouderd — nooit gewist, nooit als actueel (vervangt ADR-0009 punt 3).
+- **Nieuwe schermen:** Apps-catalogus (filter met aantallen, slechtste status eerst) en appdetail met tabs in de URL
+  (Status · Metrieken · Logs · Versies · Acties; acties `aria-disabled` "Volgt in fase P2", geen RisicoBadge);
+  Problemen-inbox (master-detail ≥ 1280) en incidentdetail (hypothese als woord, Toon bewijs, Onderzoek, alleen-lezen
+  herstelvoorstel, erkennen/uitstellen/oplossen met `nog_actief`, veilige modus, supportbundel, tijdlijn); Server →
+  Metrieken (nu-tegels, CPU-grafiek, GPU's als small multiples met temperatuur altijd Onbekend, opslagmeters, netwerk),
+  Meetdekking en Logs; Home met P1-bronnen (catalogus, incidenten, monitoring, meldingen, gates).
+- **Instellingen** als index + subpagina's: Account (thema, wachtwoord, sessies), Gebruikers en toegang (rollen incl.
+  kind, alle sessies, SSO met gate D17, issuercontrole en testlogin), **Noodaccount (H6)** (instellen/vernieuwen met TOTP
+  één keer tonen + bevestigen, zelftest met bron-IP), **Diensten (H5)** (vingerafdruk + publieke sleutelset, koppelcode
+  met aftellen of enrollment-token met `HUB_URL`/`HUB_ENROLLMENT_TOKEN`/`HUB_KEY_FINGERPRINT`, register, rotatie,
+  ontkoppelen met eerlijke fout, intrekken met getypte app-id), Monitoring en meldingen (bronnen met "Opslaan en testen",
+  alertregels, Gotify-testmelding, out-of-band, meldingenlogboek), Apparaat, Auditspoor (ketting controleren) en Over.
+- **Noodlogin-pagina** `/inloggen/nood`, SSO-knop en `sso_fout`-meldingen op `/inloggen`; **kindschil** Home · Kijken ·
+  Zoeken · Ik met kindvriendelijke 403; onboarding-stap executor met koppelcode (30 min).
+- **Executor-statuspagina** in het Peil-sjabloon (C-55, versie-gepinde kopie + driftest), velden per contract 1.2,
+  veldfouten met skiplink; "Gekoppeld" neutraal. TOTP-issuer van het noodaccount is nu "TrueNAS Home Platform".
+- **Tests:** vitest (Peil-statussen, Home-afleiding, componenten, tokenkopie, 401-afhandeling); Playwright tegen de
+  echte API met simulators (TrueNAS, Uptime Kuma, Beszel, Gotify, OIDC-issuer, simulator-dienst): alle schermen op
+  360/390/768/1440 in licht én donker met axe, plus P1-gedrag (catalogus, bronnen, diensten, 100 events → één incident,
+  noodaccount, SSO-testlogin, kind, intrekken). Schermafdrukken in `docs/screenshots/p1/`.
+
 ### Toegevoegd — fase P1 deel 2 (backend): incidenten, logs, runbooks, out-of-band, SSO en auditketting (ADR-0022/0023)
 - **Incidenten-inbox (B01-005):** `/api/v1/incidents…` met inbox per prioriteit, samenvatting en groepen per oorzaak,
   detail (ETag), gebeurtenissen, bewijs, erkennen (met verval), snoozen (kritiek ≤ 24 uur), oplossen alleen als de
