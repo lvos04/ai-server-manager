@@ -35,6 +35,7 @@ from hub.errors import HubError
 from hub.keys import KeyRing
 from hub.models import CatalogApp, HealthObservation, MonitorSource, PeriodicTask, Service, VaultSecret
 from hub.monitoring import heartbeat as hb
+from hub.monitoring.coverage import compute as coverage_compute
 from hub.monitoring.health import MELDINGEN, Component, freshen
 from hub.monitoring.periodic import TASKS, task_dict
 from hub.monitoring.sources import poll_all, upsert_observation
@@ -455,3 +456,8 @@ def status(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
         for s in db.scalars(select(MonitorSource).order_by(MonitorSource.naam))
     ]
     return {"taken": tasks, "bronnen": sources, "observed_at": iso(utcnow())}
+
+
+@router.get("/coverage", summary="Meetdekking: welke bron welke metriek levert (kan/levert) en de hiaten (B09-001)")
+def coverage(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
+    return coverage_compute(db, settings)

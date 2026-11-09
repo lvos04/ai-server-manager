@@ -54,6 +54,8 @@ READ_METHODS = {
     "alert.list",
     "network.general.summary",
     "interface.query",
+    "core.subscribe",
+    "core.unsubscribe",
 }
 WRITE_METHODS = {
     "app.create",
@@ -343,6 +345,32 @@ def default_data() -> dict[str, Any]:
                 "dismissed": False,
             }
         ],
+        # Event source reporting.realtime (vorm volgens middleware TS-25.10.8, realtime_reporting/*).
+        "reporting.realtime": {
+            "cpu": {
+                "cpu": {"usage": 23.5, "temp": 51.0},
+                **{f"cpu{i}": {"usage": 20.0 + i, "temp": 50.0 + i} for i in range(4)},
+            },
+            "memory": {
+                "arc_size": 6 * 1024**3,
+                "arc_free_memory": 1024**3,
+                "arc_available_memory": 2 * 1024**3,
+                "physical_memory_total": 32 * 1024**3,
+                "physical_memory_available": 24 * 1024**3,
+            },
+            "disks": {"busy": 3.5, "read_bytes": 4096.0, "write_bytes": 8192.0, "read_ops": 1.0, "write_ops": 2.0},
+            "interfaces": {
+                "eth0": {
+                    "link_state": "LINK_STATE_UP",
+                    "speed": 1000,
+                    "received_bytes_rate": 1250.0,
+                    "sent_bytes_rate": 250.0,
+                },
+                "eth1": {"link_state": "LINK_STATE_DOWN", "speed": 0, "received_bytes_rate": 0, "sent_bytes_rate": 0},
+            },
+            "zfs": {"demand_data_hit_percentage": 97},
+            "pools": {},
+        },
         "network.general.summary": {
             "ips": {"eth0": {"IPV4": ["127.0.0.1/8"]}},
             "default_routes": [],
@@ -431,6 +459,9 @@ class FakeTrueNAS:
         self.data = data or default_data()
         self.noise = noise
         self.delays: dict[str, float] = {}
+        self.subscriptions: list[str] = []
+        self.unsubscribed: list[str] = []
+        self.realtime_silent = False  # True: abonnement aangenomen maar nooit gegevens (time-out-test)
         self.calls: list[tuple[str, Any]] = []
         self.mutations: list[str] = []
         self.paths: list[str] = []
@@ -552,6 +583,43 @@ class FakeTrueNAS:
                     continue
                 if method not in self.methods:
                     await self._reply(ws, mid, error={"code": -32601, "message": "Method not found"})
+                    continue
+                if method == "core.subscribe":
+                    event = str(params[0]) if params else ""
+                    if event != "reporting.realtime" or "reporting.realtime" in profile.deny:
+                        await self._reply(
+                            ws,
+                            mid,
+                            error={
+                                "code": -32001,
+                                "message": "Method call error",
+                                "data": {"error": 13, "errname": "EACCES", "reason": "Not authorized"},
+                            },
+                        )
+                        continue
+                    ident = f"sub-{len(self.subscriptions) + 1}"
+                    self.subscriptions.append(ident)
+                    await self._reply(ws, mid, result=ident)
+                    if self.realtime_silent:
+                        continue
+                    await asyncio.sleep(0.05)
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "method": "collection_update",
+                                "params": {
+                                    "msg": "added",
+                                    "collection": "reporting.realtime",
+                                    "fields": self.data["reporting.realtime"],
+                                },
+                            }
+                        )
+                    )
+                    continue
+                if method == "core.unsubscribe":
+                    self.unsubscribed.append(str(params[0]) if params else "")
+                    await self._reply(ws, mid, result=None)
                     continue
                 if method in profile.deny or method in WRITE_METHODS:
                     await self._reply(

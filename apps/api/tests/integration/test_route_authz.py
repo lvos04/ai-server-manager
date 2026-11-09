@@ -57,6 +57,8 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/monitoring/health"): "viewer",
     ("POST", "/api/v1/monitoring/heartbeat"): SERVICE,
     ("GET", "/api/v1/monitoring/status"): "viewer",
+    ("GET", "/api/v1/monitoring/coverage"): "viewer",
+    ("GET", "/api/v1/observability/nas"): "viewer",
     ("GET", "/api/v1/metrics/series"): "viewer",
     ("GET", "/api/v1/metrics/query"): "viewer",
     ("GET", "/api/v1/alerts"): "viewer",

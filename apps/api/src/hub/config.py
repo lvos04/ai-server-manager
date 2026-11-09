@@ -90,6 +90,8 @@ class Settings(BaseSettings):
 
     # Monitoring (B09): pollinterval van de bronnen, veroudering en tijdreeksen.
     monitoring_interval_seconds: int = Field(default=60, ge=10, le=3600)
+    nas_metrics_interval_seconds: int = Field(default=30, ge=10, le=3600)  # reporting.realtime
+    nas_metrics_ttl_seconds: int = Field(default=180, ge=30, le=3600)  # ouder → unknown in de observability
     health_record_interval_seconds: int = Field(default=60, ge=10, le=3600)
     monitor_ttl_seconds: int = Field(default=300, ge=30, le=24 * 3600)  # Uptime Kuma/Beszel-waarneming
     connector_fail_threshold: int = Field(default=2, ge=1, le=10)  # opeenvolgende fouten vóór 'down'

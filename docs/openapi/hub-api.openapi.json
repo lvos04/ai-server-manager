@@ -4327,6 +4327,29 @@
         ]
       }
     },
+    "/api/v1/monitoring/coverage": {
+      "get": {
+        "operationId": "coverage_api_v1_monitoring_coverage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Coverage Api V1 Monitoring Coverage Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Meetdekking: welke bron welke metriek levert (kan/levert) en de hiaten (B09-001)",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
     "/api/v1/monitoring/health": {
       "get": {
         "operationId": "list_observations_api_v1_monitoring_health_get",
@@ -5130,6 +5153,29 @@
         "summary": "Testmelding echt versturen (admin) en het echte resultaat tonen",
         "tags": [
           "meldingen"
+        ]
+      }
+    },
+    "/api/v1/observability/nas": {
+      "get": {
+        "operationId": "nas_api_v1_observability_nas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Nas Api V1 Observability Nas Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live NAS-metingen met bron en observed_at; verouderd of zonder bron → unknown",
+        "tags": [
+          "observability"
         ]
       }
     },
@@ -6383,6 +6429,10 @@
     {
       "description": "Bronnen (Uptime Kuma, Beszel), healthchecks en heartbeat van eigen diensten (B09-002).",
       "name": "monitoring"
+    },
+    {
+      "description": "Live NAS-metingen met bron en laatst bijgewerkt; alleen TrueNAS (B01-004).",
+      "name": "observability"
     },
     {
       "description": "Genormaliseerde reeksen met bron en veroudering; ruw → 5 min → 1 uur met retentie (B09-003).",

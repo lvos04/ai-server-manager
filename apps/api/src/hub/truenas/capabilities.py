@@ -30,6 +30,8 @@ READ_CAPABILITIES: dict[str, list[tuple[str, list[Any]]]] = {
     "alerts": [("alert.list", [])],
     "network": [("network.general.summary", []), ("interface.query", [])],
     "key_scope": [("auth.me", [])],
+    # Live metingen: event source reporting.realtime via core.subscribe (rol REPORTING_READ).
+    "realtime": [("core.subscribe", [])],
 }
 
 # Alleen ter informatie (fase P2, executor): welke schrijfmethode deze versie aanbiedt.

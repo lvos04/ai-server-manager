@@ -137,3 +137,29 @@ def test_connector_health_beoordeling() -> None:
     assert judge_connector_health(far, NOW)[2] == NOW  # klok van de dienst niet vertrouwen bij grote afwijking
     assert judge_connector_health({"status": "groen"}, NOW)[:2] == ("unknown", "antwoord_ongeldig")
     assert judge_connector_health(None, NOW)[:2] == ("unknown", "antwoord_ongeldig")
+
+
+def test_truenas_realtime_normalisatie_zonder_verzonnen_waarden() -> None:
+    from hub.truenas.realtime import normalize
+
+    fields = {
+        "cpu": {"cpu": {"usage": 140, "temp": None}, "cpu0": {}, "cpu1": {}},
+        "memory": {"physical_memory_total": 0, "physical_memory_available": 5, "arc_size": 0},
+        "disks": {"read_bytes": "veel", "busy": 3},
+        "interfaces": {
+            "eth0": {"link_state": "LINK_STATE_UP", "speed": 1000, "received_bytes_rate": 10, "sent_bytes_rate": 1},
+            "br0": {"link_state": "LINK_STATE_UP", "speed": 1000, "received_bytes_rate": 10, "sent_bytes_rate": 1},
+            "../x": {"link_state": "LINK_STATE_UP"},
+        },
+    }
+    res = normalize(fields, NOW)
+    by = {(s.onderwerp_type, s.onderwerp_id, s.metriek): s.waarde for s in res.samples}
+    assert ("nas", "nas", "cpu.gebruik") not in by  # 140 % is ongeldig
+    assert ("nas", "nas", "cpu.temperatuur") not in by  # geen sensor → geen meting, nooit 0
+    assert ("nas", "nas", "geheugen.totaal") not in by and ("nas", "nas", "zfs.arc") not in by
+    assert ("nas", "nas", "schijf.lezen") not in by and by[("nas", "nas", "schijf.bezet")] == 3
+    assert ("nas", "nas", "netwerk.ontvangen") not in by  # twee actieve interfaces: geen dubbel getelde som
+    assert by[("interface", "br0", "netwerk.ontvangen")] == 10
+    assert res.threads == 2 and [i["naam"] for i in res.interfaces] == ["br0", "eth0"]
+    legacy = normalize({"cpu": {"average": {"usage": 12.0}}}, NOW)
+    assert [(s.metriek, s.waarde) for s in legacy.samples] == [("cpu.gebruik", 12.0)]

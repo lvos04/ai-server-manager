@@ -31,6 +31,7 @@ from hub.routers import (
     metrics,
     monitoring,
     notifications,
+    observability,
     onboarding,
     services,
 )
@@ -144,6 +145,10 @@ OPENAPI_TAGS = [
         "description": "Bronnen (Uptime Kuma, Beszel), healthchecks en heartbeat van eigen diensten (B09-002).",
     },
     {
+        "name": "observability",
+        "description": "Live NAS-metingen met bron en laatst bijgewerkt; alleen TrueNAS (B01-004).",
+    },
+    {
         "name": "tijdreeksen",
         "description": "Genormaliseerde reeksen met bron en veroudering; ruw → 5 min → 1 uur met retentie (B09-003).",
     },
@@ -243,6 +248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         inventory.router,
         catalog.router,
         monitoring.router,
+        observability.router,
         metrics.router,
         alerts.router,
         notifications.router,

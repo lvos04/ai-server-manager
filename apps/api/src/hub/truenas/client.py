@@ -54,8 +54,13 @@ READ_ONLY_METHODS: frozenset[str] = frozenset(
         "alert.list",
         "network.general.summary",
         "interface.query",
+        # Abonneren op een alleen-lezen event source (reporting.realtime); verandert niets op de NAS.
+        "core.subscribe",
+        "core.unsubscribe",
     }
 )
+# Event sources die de Hub mag volgen (alleen lezen; rol REPORTING_READ).
+READ_ONLY_EVENTS: frozenset[str] = frozenset({"reporting.realtime"})
 
 API_PATH = "/api/current"
 MAX_MESSAGE_BYTES = 64 * 1024 * 1024  # app.query/pool.dataset.query kunnen groot zijn
@@ -272,6 +277,46 @@ class TrueNASClient:
             ws, self._ws = self._ws, None
             with contextlib.suppress(OSError, ConnectionClosed):
                 await ws.close()
+
+    async def first_event(self, event: str, timeout: float) -> dict[str, Any]:
+        """Abonneer op een alleen-lezen event source, wacht op de eerste ``collection_update`` met ``fields`` en zeg
+        het abonnement weer op. Bron: ``core.subscribe``/``core.unsubscribe`` en ``send_event`` in de middleware
+        (TS-25.10.8); NIET GEVALIDEERD op een echte NAS."""
+        if event not in READ_ONLY_EVENTS:
+            raise PermissionError(f"event {event} is niet toegestaan")
+        if self._ws is None:
+            raise TrueNASError("unreachable", "geen open verbinding")
+        ident = await self.call("core.subscribe", [event])
+        try:
+            async with asyncio.timeout(timeout):
+                while True:
+                    raw = await self._ws.recv()
+                    try:
+                        msg = json.loads(raw)
+                    except (TypeError, ValueError) as exc:
+                        raise TrueNASError("protocol_error", f"{event}: geen geldige JSON") from exc
+                    if not isinstance(msg, dict):
+                        continue
+                    params = _dict(msg.get("params"))
+                    if msg.get("method") == "notify_unsubscribed" and params.get("collection") == event:
+                        err = _dict(params.get("error"))
+                        reason = "permission_denied" if err.get("errname") in ("EACCES", "EPERM") else "protocol_error"
+                        raise TrueNASError(reason, f"{event}: abonnement beëindigd door TrueNAS")
+                    if (
+                        msg.get("method") == "collection_update"
+                        and params.get("collection") == event
+                        and params.get("msg") in ("added", "changed")
+                        and isinstance(params.get("fields"), dict)
+                    ):
+                        return dict(params["fields"])
+        except TimeoutError as exc:
+            raise TrueNASError("timeout", f"{event}: geen gegevens binnen {timeout:.0f} s") from exc
+        except ConnectionClosed as exc:
+            raise TrueNASError("unreachable", f"{event}: verbinding verbroken") from exc
+        finally:
+            if self._ws is not None and isinstance(ident, str):
+                with contextlib.suppress(TrueNASError):
+                    await self.call("core.unsubscribe", [ident])
 
     async def call(self, method: str, params: list[Any] | None = None) -> Any:
         if method not in READ_ONLY_METHODS:

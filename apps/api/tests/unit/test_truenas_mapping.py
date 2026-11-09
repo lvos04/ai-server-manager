@@ -7,6 +7,7 @@ import pytest
 from hub.truenas import normalize as norm
 from hub.truenas.capabilities import build_capability_map, parse_version
 from hub.truenas.client import (
+    READ_ONLY_EVENTS,
     READ_ONLY_METHODS,
     build_ws_url,
     display_fingerprint,
@@ -49,6 +50,9 @@ def test_capabilities_terugval_op_versietabel() -> None:
     assert m.source == "geen" and all(v is None for v in m.methods.values())
 
 
+SUBSCRIBE = {"core.subscribe", "core.unsubscribe"}
+
+
 def test_alleen_leesmethoden_toegestaan() -> None:
     assert all(
         m.endswith(
@@ -66,9 +70,22 @@ def test_alleen_leesmethoden_toegestaan() -> None:
                 ".login_with_api_key",
             )
         )
-        for m in READ_ONLY_METHODS
+        for m in READ_ONLY_METHODS - SUBSCRIBE
     )
     assert not {"app.create", "app.delete", "pool.snapshot.create", "app.redeploy"} & READ_ONLY_METHODS
+    # Abonneren mag alleen op alleen-lezen event sources (reporting.realtime); verder niets.
+    assert SUBSCRIBE <= READ_ONLY_METHODS
+    assert set(READ_ONLY_EVENTS) == {"reporting.realtime"}
+
+
+def test_abonneren_alleen_op_toegestane_events() -> None:
+    import asyncio
+
+    from hub.truenas.client import TrueNASClient
+
+    client = TrueNASClient("wss://192.0.2.5/api/current", "x")
+    with pytest.raises(PermissionError):
+        asyncio.run(client.first_event("app.query", 1))
 
 
 def test_url_en_adresvalidatie() -> None:

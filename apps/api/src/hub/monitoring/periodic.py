@@ -7,6 +7,7 @@ vastgelegd (nooit stil).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Callable
@@ -123,6 +124,37 @@ def _task_maintenance(db: Session, ctx: Context) -> dict[str, Any]:
     return {"aggregatie": timeseries.rollup(db, since=since), "retentie": timeseries.prune(db, now=ctx.now)}
 
 
+def _task_nas(db: Session, ctx: Context) -> dict[str, Any]:
+    """Live NAS-metingen via ``reporting.realtime`` (alleen TrueNAS). Zonder koppeling: niets gemeten, eerlijk
+    ``not_configured`` (de observability toont dan ``unknown``)."""
+    from hub.truenas import realtime
+    from hub.truenas.connection import API_KEY_REF, connection_row, tls_for
+
+    target = current_target(db)
+    api_key = ctx.vault.get(db, API_KEY_REF) if target is not None else None
+    if target is None or not api_key:
+        return {"meting": "unknown", "reden": "not_configured"}
+    res = asyncio.run(
+        realtime.fetch(
+            target.url,
+            api_key,
+            tls=tls_for(connection_row(db), target, ctx.settings),
+            connect_timeout=ctx.settings.truenas_connect_timeout,
+            read_timeout=ctx.settings.truenas_read_timeout,
+        )
+    )
+    if res.status != "ok":
+        return {"meting": "unknown", "reden": res.reason_code, "detail": res.detail}
+    rec = timeseries.record(db, ctx.settings, res.samples, now=ctx.now)
+    return {
+        "meting": "ok",
+        "observed_at": iso(res.observed_at),
+        "metingen": rec.as_dict(),
+        "threads": res.threads,
+        "interfaces": res.interfaces,
+    }
+
+
 def _task_sources(db: Session, ctx: Context) -> dict[str, Any]:
     from hub.monitoring.sources import poll_all
 
@@ -139,6 +171,7 @@ def _task_notify(db: Session, ctx: Context) -> dict[str, Any]:
 
 
 TASKS: list[Task] = [
+    Task("nas_meten", lambda s: s.nas_metrics_interval_seconds, _task_nas),
     Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
     Task("gezondheid_vastleggen", lambda s: s.health_record_interval_seconds, _task_health),
     Task("alerts_evalueren", lambda s: s.alert_interval_seconds, _task_alerts),
