@@ -175,6 +175,37 @@
   .legenda-lijn { @apply inline-block h-0.5 w-4 shrink-0 rounded-full; }
   .legenda-vlak { @apply inline-block size-3 shrink-0 rounded-sm; }
 
+  /* ── Hub P1-ontwerpstap (docs/ontwerp/HUB_PEIL_ONTWERP.md, COMPONENTEN.md §27) ───────────────────── */
+  /* Neutrale pil voor toestanden die geen gezondheid zijn (Gekoppeld, Werkend, Ingetrokken, Rol). Nooit groen. */
+  .status-neutraal { @apply border-border-strong text-foreground; }
+  .status-neutraal svg { @apply text-foreground; }
+  /* Lopend proces of informatie (Rotatie aangevraagd, Wacht op koppeling): info-rol, geen storing. */
+  .status-info { @apply border-info bg-info-bg text-info-ink; }
+  .status-info svg { @apply text-info; }
+  /* TestResultaat (C-58): uitkomst van een eenmalige test/zelftest. Geslaagd = neutraal vinkje (geen gezondheid),
+     mislukt = gemeten falen (down), onbekend = gestippeld, beleid = slot (gate). */
+  .controles { @apply flex flex-col divide-y divide-border border-y border-border; }
+  .controle { @apply flex flex-wrap items-start gap-x-3 gap-y-1 py-2.5; }
+  .controle > svg { @apply mt-0.5 size-5 shrink-0; }
+  .controle-ok > svg { @apply text-foreground; }
+  .controle-fout > svg { @apply text-down; }
+  .controle-fout .controle-naam { @apply text-down-ink; }
+  .controle-onbekend > svg { @apply text-unknown; }
+  .controle-beleid > svg { @apply text-gate; }
+  .controle-naam { @apply font-semibold; }
+  .controle-detail { @apply basis-full text-sm text-foreground sm:basis-auto sm:flex-1; }
+  /* NogNietBeschikbaar inline (C-12, T-08a): rustig neutraal paneel met zandloper; geen storing, geen nepdata. */
+  .melding-nogniet { @apply border-border-strong bg-muted text-foreground; }
+  .melding-nogniet > svg { @apply text-foreground; }
+  /* CodeWeergave (C-40): koppelcode in groepen, groot en mono, breekt nooit midden in een groep. */
+  .code-groot { @apply block font-mono text-2xl leading-9 font-semibold tracking-wider break-words text-foreground; }
+  /* Subnavigatie binnen een sectie (Server, Instellingen): links, geen tabs. */
+  .sub-item { @apply inline-flex min-h-touch items-center gap-2 rounded-lg border border-border-strong bg-card px-3.5 font-semibold text-foreground no-underline hover:bg-accent; }
+  .sub-item[aria-current="page"] { @apply border-2 border-primary bg-accent; }
+  .zij-sub { @apply flex min-h-touch items-center gap-3 rounded-lg px-3 font-medium text-foreground no-underline hover:bg-accent; }
+  .zij-sub svg { @apply size-5 shrink-0 text-muted-foreground; }
+  .zij-sub[aria-current="page"] { @apply bg-accent font-bold shadow-[inset_4px_0_0_var(--primary)]; }
+
   /* ── Voorbeeldmarkering (prototypes) ────────────────────────────────────────────────────── */
   .voorbeeld { @apply inline-flex items-center rounded-sm border-2 border-dashed border-border-strong px-1.5 text-sm font-semibold text-foreground; }
 }

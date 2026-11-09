@@ -1,7 +1,7 @@
 {
   "naam": "Peil",
   "versie": "1.1.0",
-  "gegenereerd": "2026-11-09T15:36:52.819Z",
+  "gegenereerd": "2026-11-09T19:40:51.548Z",
   "methode": "WCAG 2.x relatieve luminantie (npm wcag-contrast); ΔE = Euclidische afstand in OKLab ×100 (culori); paletcontrole: dataviz-skill validate_palette.js (Machado 2009 CVD).",
   "eisen": {
     "AAA": "7:1 (beide tekstniveaus en alle statustekst)",

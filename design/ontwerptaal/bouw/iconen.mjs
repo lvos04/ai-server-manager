@@ -11,7 +11,8 @@ circle-slash lock lock-open file-diff eye undo-2 clipboard-check flask-conical l
 circle-help octagon-x triangle-alert circle-check check x copy refresh-cw square-arrow-out-up-right chevron-right chevron-left
 chevron-down arrow-left plus minus search menu bot inbox layout-grid house server clapperboard sofa network workflow database-backup
 wallet settings circle-user bell log-out user sparkles filter hourglass database siren messages-square file-text play pause circle-x
-download film tv cpu memory-stick list-checks book-open tag fan ellipsis circle-dot shield-check package hash calendar-clock link-2`.split(/\s+/).filter(Boolean);
+download film tv cpu memory-stick list-checks book-open tag fan ellipsis circle-dot shield-check package hash calendar-clock link-2
+fingerprint-pattern unlink shield-x smartphone user-plus send plug-zap key-square life-buoy log-in`.split(/\s+/).filter(Boolean);
 const uit = {};
 for (const n of namen) {
   let mod = await import(DIR + n + '.mjs');

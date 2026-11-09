@@ -587,7 +587,7 @@
    "afgekapt": [],
    "tekstFout": [],
    "minTekst": 4.73,
-   "aantalTekst": 82,
+   "aantalTekst": 81,
    "structuur": {
     "h1": 1,
     "sprong": [],
@@ -709,7 +709,7 @@
    "afgekapt": [],
    "tekstFout": [],
    "minTekst": 4.73,
-   "aantalTekst": 84,
+   "aantalTekst": 83,
    "scrollPadding": "12px",
    "focus": {
     "aantal": 28,
@@ -1317,7 +1317,7 @@
    "afgekapt": [],
    "tekstFout": [],
    "minTekst": 5.23,
-   "aantalTekst": 82,
+   "aantalTekst": 81,
    "structuur": {
     "h1": 1,
     "sprong": [],
@@ -1439,7 +1439,7 @@
    "afgekapt": [],
    "tekstFout": [],
    "minTekst": 5.23,
-   "aantalTekst": 84,
+   "aantalTekst": 83,
    "scrollPadding": "12px",
    "focus": {
     "aantal": 28,
@@ -1464,5 +1464,5 @@
   }
  ],
  "bewegingBijReduce": [],
- "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"Hub\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Apps\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Appstore\":\n          - /url: \"#\"\n      - listitem: Voorbeeld-app installeren\n  - heading \"Voorbeeld-app installeren\" [level=1]\n  - paragraph: Je wijzigt nog niets. Pas na de preview en de goedkeuring wordt er iets geïnstalleerd.\n  - navigation \"Stappen van de installatie\":\n    - list:\n      - listitem: App kiezen (klaar)\n      - listitem: Parameters\n      - listitem: Controle vooraf\n      - listitem: Preview\n      - listitem: Goedkeuring\n      - listitem: Uitvoeren\n      - listitem: Controle na uitvoering\n  - 'form \"Stap 2 van 7: Parameters\"':\n    - 'heading \"Stap 2 van 7: Parameters\" [level=2]'\n    - alert \"2 velden hebben aandacht nodig\":\n      - heading \"2 velden hebben aandacht nodig\" [level=3]\n      - list:\n        - listitem:\n          - 'link \"Poort: 30480 is al in gebruik\"':\n            - /url: \"#poort\"\n        - listitem:\n          - 'link \"GPU gebruiken: kies ja of nee\"':\n            - /url: \"#gpu-ja\"\n    - group \"Datamap (verplicht)\":\n      - text: Datamap (verplicht)\n      - paragraph:\n        - text: Kies een dataset met de rol\n        - emphasis: data\n        - text: \". Hier komt /appdata van de app. bron: datasetkiezer\"\n      - radio \"voorbeeldpool/apps/voorbeeld-app rol data · 1,8 TiB vrij\" [checked]\n      - text: voorbeeldpool/apps/voorbeeld-app rol data · 1,8 TiB vrij\n      - 'radio \"voorbeeldpool/media Niet te kiezen: mediadatasets zijn geen appdata.\" [disabled]'\n      - text: \"voorbeeldpool/media Niet te kiezen: mediadatasets zijn geen appdata.\"\n      - 'radio \"/mnt Niet te kiezen: geen dataset (beleid weigert hostpad /mnt).\" [disabled]'\n      - text: \"/mnt Niet te kiezen: geen dataset (beleid weigert hostpad /mnt).\"\n    - text: Poort (verplicht)\n    - paragraph: \"Hostpoort op de NAS. Voorstel van het manifest; de Hub controleert conflicten. bron: wizard\"\n    - textbox \"Poort (verplicht)\" [invalid]: \"30480\"\n    - paragraph: Poort 30480 is al in gebruik door Voorbeeld-dienst. Kies een andere poort, bijvoorbeeld 30481.\n    - group \"GPU (Intel render) gebruiken? (verplicht)\":\n      - text: GPU (Intel render) gebruiken? (verplicht)\n      - paragraph: De app krijgt dan toegang tot /dev/dri. Er is geen standaardantwoord.\n      - radio \"Ja, GPU gebruiken\"\n      - text: Ja, GPU gebruiken\n      - radio \"Nee, alleen CPU\"\n      - text: Nee, alleen CPU\n      - paragraph: Kies ja of nee.\n    - text: Beheerderswachtwoord van de app\n    - paragraph: \"De app maakt dit zelf bij de eerste start in /appdata/secrets. Je ziet de waarde nooit, ook niet in de Hub. bron: gegenereerd\"\n    - text: Tijdzone\n    - paragraph: \"Standaardwaarde van het platform; je mag hem aanpassen. bron: standaard\"\n    - combobox \"Tijdzone\":\n      - option \"Europe/Amsterdam\" [selected]\n      - option \"UTC\"\n    - paragraph:\n      - text: Ingevulde waarden worden bewaard. Je kunt later verder via\n      - strong: Apps → Installaties\n      - text: .\n    - button \"Vorige\"\n    - 'button \"Volgende: controle vooraf\"'\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: appdetail.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Apps\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Appstore\":\n          - /url: \"#\"\n      - listitem: Voorbeeld-app installeren\n  - heading \"Voorbeeld-app installeren\" [level=1]\n  - paragraph: Je wijzigt nog niets. Pas na de preview en de goedkeuring wordt er iets geïnstalleerd.\n  - navigation \"Stappen van de installatie\":\n    - list:\n      - listitem: App kiezen (klaar)\n      - listitem: Parameters\n      - listitem: Controle vooraf\n      - listitem: Preview\n      - listitem: Goedkeuring\n      - listitem: Uitvoeren\n      - listitem: Controle na uitvoering\n  - 'form \"Stap 2 van 7: Parameters\"':\n    - 'heading \"Stap 2 van 7: Parameters\" [level=2]'\n    - alert \"2 velden hebben aandacht nodig\":\n      - heading \"2 velden hebben aandacht nodig\" [level=3]\n      - list:\n        - listitem:\n          - 'link \"Poort: 30480 is al in gebruik\"':\n            - /url: \"#poort\"\n        - listitem:\n          - 'link \"GPU gebruiken: kies ja of nee\"':\n            - /url: \"#gpu-ja\"\n    - group \"Datamap (verplicht)\":\n      - text: Datamap (verplicht)\n      - paragraph:\n        - text: Kies een dataset met de rol\n        - emphasis: data\n        - text: \". Hier komt /appdata van de app. bron: datasetkiezer\"\n      - radio \"voorbeeldpool/apps/voorbeeld-app rol data · 1,8 TiB vrij\" [checked]\n      - text: voorbeeldpool/apps/voorbeeld-app rol data · 1,8 TiB vrij\n      - 'radio \"voorbeeldpool/media Niet te kiezen: mediadatasets zijn geen appdata.\" [disabled]'\n      - text: \"voorbeeldpool/media Niet te kiezen: mediadatasets zijn geen appdata.\"\n      - 'radio \"/mnt Niet te kiezen: geen dataset (beleid weigert hostpad /mnt).\" [disabled]'\n      - text: \"/mnt Niet te kiezen: geen dataset (beleid weigert hostpad /mnt).\"\n    - text: Poort (verplicht)\n    - paragraph: \"Hostpoort op de NAS. Voorstel van het manifest; de Hub controleert conflicten. bron: wizard\"\n    - textbox \"Poort (verplicht)\" [invalid]: \"30480\"\n    - paragraph: Poort 30480 is al in gebruik door Voorbeeld-dienst. Kies een andere poort, bijvoorbeeld 30481.\n    - group \"GPU (Intel render) gebruiken? (verplicht)\":\n      - text: GPU (Intel render) gebruiken? (verplicht)\n      - paragraph: De app krijgt dan toegang tot /dev/dri. Er is geen standaardantwoord.\n      - radio \"Ja, GPU gebruiken\"\n      - text: Ja, GPU gebruiken\n      - radio \"Nee, alleen CPU\"\n      - text: Nee, alleen CPU\n      - paragraph: Kies ja of nee.\n    - text: Beheerderswachtwoord van de app\n    - paragraph: \"De app maakt dit zelf bij de eerste start in /appdata/secrets. Je ziet de waarde nooit, ook niet in de Hub. bron: gegenereerd\"\n    - text: Tijdzone\n    - paragraph: \"Standaardwaarde van het platform; je mag hem aanpassen. bron: standaard\"\n    - combobox \"Tijdzone\":\n      - option \"Europe/Amsterdam\" [selected]\n      - option \"UTC\"\n    - paragraph:\n      - text: Ingevulde waarden worden bewaard. Je kunt later verder via\n      - strong: Apps → Installaties\n      - text: .\n    - button \"Vorige\"\n    - 'button \"Volgende: controle vooraf\"'\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
 }

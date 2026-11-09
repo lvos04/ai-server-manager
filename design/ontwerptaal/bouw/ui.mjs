@@ -82,7 +82,7 @@ export const kopieer = (label, waarde, { klein } = {}) => {
 };
 
 // ── Foutpaneel (C-14) ───────────────────────────────────────────────────────────────────────────────────────────────
-export const foutpaneel = ({ titel, waarom, doen, code, trace, kop = 'h3', opnieuw = true }) => `
+export const foutpaneel = ({ titel, waarom, doen, code, trace, kop = 'h3', opnieuw = true, details = 'HTTP 504 · GET /api/v1/apps/voorbeeld-app/logs?voor=10:02', knoppen = '' }) => `
 <div class="melding melding-fout flex-col sm:flex-row" data-testid="error-panel">
   ${i('octagon-x')}
   <div class="flex min-w-0 flex-1 flex-col gap-3">
@@ -90,7 +90,7 @@ export const foutpaneel = ({ titel, waarom, doen, code, trace, kop = 'h3', opnie
     <p>${waarom} ${doen}</p>
     <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm"><dt class="font-semibold">Code</dt><dd><code class="code-inline text-foreground">${code}</code></dd></dl>
     ${kopieer('Trace-ID', trace)}
-    ${opnieuw ? `<div class="flex flex-wrap gap-2">${knop('Opnieuw proberen', { ic: 'refresh-cw' })}<details class="w-full"><summary class="inline-flex min-h-touch cursor-pointer items-center gap-2 font-semibold">${i('chevron-down', 'size-5 klap-icoon')}Technische details</summary><pre class="mt-2 overflow-x-auto rounded-md bg-card p-3 text-sm text-foreground">HTTP 504 · GET /api/v1/apps/voorbeeld-app/logs?voor=10:02</pre></details></div>` : ''}
+    ${opnieuw ? `<div class="flex flex-wrap gap-2">${knop('Opnieuw proberen', { ic: 'refresh-cw' })}${knoppen}<details class="w-full"><summary class="inline-flex min-h-touch cursor-pointer items-center gap-2 font-semibold">${i('chevron-down', 'size-5 klap-icoon')}Technische details</summary><pre class="mt-2 overflow-x-auto rounded-md bg-card p-3 text-sm text-foreground break-all whitespace-pre-wrap">${details}</pre></details></div>` : ''}
   </div>
 </div>`;
 
@@ -104,10 +104,10 @@ export const melding = (soort, ic, inhoud, { rol = '', actie = '' } = {}) => `
 export const gate = (titel, nodig, actie) => melding('gate', 'lock', `<p class="font-bold">${titel}</p><p class="mt-1">Nodig: ${nodig}</p><p class="mt-1 text-sm">Dit is geen storing; er wacht een voorwaarde. Doorgaan zonder kan niet.</p>`, { actie });
 
 // ── App-schil (C-01) ────────────────────────────────────────────────────────────────────────────────────────────────
-const ZIJ = [['home', 'Home', 'house', 'home.html'], ['server', 'Server', 'server', 'appdetail-metrieken.html'], ['media', 'Media', 'clapperboard', '#'],
+const ZIJ = [['home', 'Home', 'house', 'home.html'], ['server', 'Server', 'server', 'server-metrieken.html'], ['media', 'Media', 'clapperboard', '#'],
   ['huis', 'Huis', 'sofa', 'huis.html'], ['netwerk', 'Netwerk', 'network', '#'], ['automatisering', 'Automatisering', 'workflow', '#'],
-  ['backups', 'Backups', 'database-backup', '#'], ['kosten', 'Kosten', 'wallet', '#'], ['instellingen', 'Instellingen', 'settings', 'wizardstap.html']];
-const ONDER = [['home', 'Home', 'house', 'home.html'], ['apps', 'Apps', 'layout-grid', 'appdetail.html'], ['problemen', 'Problemen', 'inbox', 'problemen.html', 3],
+  ['backups', 'Backups', 'database-backup', '#'], ['kosten', 'Kosten', 'wallet', '#'], ['instellingen', 'Instellingen', 'settings', 'instellingen-toegang.html']];
+const ONDER = [['home', 'Home', 'house', 'home.html'], ['apps', 'Apps', 'layout-grid', 'apps.html'], ['problemen', 'Problemen', 'inbox', 'problemen.html', 3],
   ['ai', 'AI', 'bot', '#'], ['meer', 'Meer', 'menu', '#', 1]];
 // Review 1.1.0: de violette goedkeuringsteller staat mobiel op "Meer" (eerste item in de Meer-sheet: Goedkeuringen), niet op
 // "AI" — goedkeuringen komen ook van gebruikers en flows. Op de goedkeuringspagina is "Meer" het huidige item.
@@ -116,7 +116,7 @@ export function shell({ pagina, titel, inhoud, live = 'aan', banner = '', kind =
   const zij = ZIJ.map(([k, l, ic, href]) => {
     const huidig = (zijHuidig || pagina) === k;
     const ouder = huidig && pagina === 'apps';
-    return `<li><a href="${href}" class="zij-item${ouder ? ' zij-ouder' : ''}"${huidig && !ouder ? ' aria-current="page"' : ''}>${i(ic)}${l}</a>${k === 'server' && pagina === 'apps' ? `<ul class="mt-1 ml-6 border-l-2 border-border pl-2"><li><a href="appdetail.html" class="zij-item" aria-current="page">${i('layout-grid')}Apps</a></li></ul>` : ''}</li>`;
+    return `<li><a href="${href}" class="zij-item${ouder ? ' zij-ouder' : ''}"${huidig && !ouder ? ' aria-current="page"' : ''}>${i(ic)}${l}</a>${k === 'server' && pagina === 'apps' ? `<ul class="mt-1 ml-6 border-l-2 border-border pl-2"><li><a href="apps.html" class="zij-item" aria-current="page">${i('layout-grid')}Apps</a></li></ul>` : ''}</li>`;
   }).join('');
   const onder = ONDER.map(([k, l, ic, href, n]) => `<a href="${href}" class="onder-item"${k === pagina || (k === 'meer' && pagina === 'goedkeuringen') ? ' aria-current="page"' : ''}><span class="relative">${i(ic)}${n ? `<span class="teller ${k === 'meer' ? 'teller-goedkeuring' : ''} absolute -top-2 -right-4" aria-hidden="true">${n}</span>` : ''}</span>${l}${n ? `<span class="sr-only">, ${n} ${k === 'meer' ? 'goedkeuring wacht' : 'open'}</span>` : ''}</a>`).join('');
   const liveEl = live === 'aan'
@@ -128,7 +128,7 @@ export function shell({ pagina, titel, inhoud, live = 'aan', banner = '', kind =
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${titel} — Hub (voorbeeld)</title>
+<title>${titel} — TrueNAS Home Platform (voorbeeld)</title>
 <link rel="stylesheet" href="css/peil.css">
 <script src="js/proto.js" defer></script>
 <script>(function(){var h=location.hash,d=document.documentElement;var t=/thema=donker/.test(h)?'donker':/thema=licht/.test(h)?'licht':(matchMedia('(prefers-color-scheme: dark)').matches?'donker':'licht');d.classList.toggle('dark',t==='donker');if(/thema=/.test(h))d.setAttribute('data-afdruk','');})();</script>
@@ -140,7 +140,7 @@ export function shell({ pagina, titel, inhoud, live = 'aan', banner = '', kind =
     <div class="sticky top-0 flex max-h-dvh flex-col gap-6 overflow-y-auto p-4">
       <a href="home.html" class="flex min-h-touch items-center gap-3 px-2 text-xl font-bold text-foreground no-underline">
         <span class="flex size-10 items-center justify-center rounded-lg bg-foreground text-background">${i('server', 'size-6')}</span>
-        <span class="leading-tight">Hub<span class="block text-sm font-semibold text-muted-foreground">Thuisplatform</span></span>
+        <span class="text-lg leading-6">TrueNAS Home Platform</span>
       </a>
       <nav aria-label="Hoofdnavigatie"><ul class="flex flex-col gap-1">${zij}</ul></nav>
       <p class="mt-auto text-sm text-muted-foreground">Hub 0.2.0 · ${voorbeeld()}</p>
@@ -149,7 +149,7 @@ export function shell({ pagina, titel, inhoud, live = 'aan', banner = '', kind =
   <div class="flex min-h-dvh min-w-0 flex-col">
     <header class="sticky top-0 z-30 border-b border-border bg-card">
       <div class="flex min-h-16 items-center gap-2 px-3 lg:px-6">
-        <a href="${kind ? 'kind.html' : 'home.html'}" class="flex min-h-touch items-center gap-2 pr-1 text-lg font-bold text-foreground no-underline ${kind ? '' : 'lg:hidden'}"><span class="flex size-9 items-center justify-center rounded-lg bg-foreground text-background">${i(kind ? 'monitor-play' : 'server')}</span>${kind ? 'Thuis' : 'Hub'}</a>
+        <a href="${kind ? 'kind.html' : 'home.html'}" class="flex min-h-touch min-w-0 items-center gap-2 pr-1 font-bold text-foreground no-underline ${kind ? '' : 'lg:hidden'}"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">${i('server')}</span><span class="max-w-[8.5rem] text-base leading-5">TrueNAS Home Platform</span></a>
         ${kind ? '' : `<button type="button" class="knop knop-secundair hidden w-56 justify-start font-normal whitespace-nowrap text-muted-foreground xl:inline-flex 2xl:w-72" aria-keyshortcuts="Control+K">${i('search')}<span>Zoeken</span><kbd class="ml-auto whitespace-nowrap text-foreground">Ctrl K</kbd></button>`}
         <div class="ml-auto flex min-w-0 items-center gap-1">
           ${kind ? '' : `<span class="hidden xl:inline-flex">${liveEl.replace(' role="status"', '')}</span>
@@ -207,7 +207,7 @@ export const tabpaneel = (id, k, actief, inhoud) => `<div role="tabpanel" id="${
 
 // ── Lijngrafiek (C-32) — HTML-labels (vaste lettergrootte) + SVG-plot met non-scaling-stroke ─────────────────────
 // punten: [{t:'10:00', v:Number|null}] gelijk verdeeld; grens: {v, label}; ymax; eenheid; gat-index-bereiken worden automatisch afgeleid
-export function lijngrafiek({ id, titel, beschrijving, punten, ymax, ystap, eenheid, grens, bron, bijgewerkt, reeksnaam }) {
+export function lijngrafiek({ id, titel, beschrijving, punten, ymax, ystap, eenheid, grens, bron, bijgewerkt, reeksnaam, verouderd }) {
   const n = punten.length, W = 1000, H = 1000;
   const x = (k) => (k / (n - 1)) * 100, y = (v) => 100 - (v / ymax) * 100;
   const segs = []; let cur = [];
@@ -225,6 +225,8 @@ export function lijngrafiek({ id, titel, beschrijving, punten, ymax, ystap, eenh
   const xs = punten.map((p, k) => [p, k]).filter(([, k]) => k % Math.ceil(n / 6) === 0 || k === n - 1);
   const xlab = xs.map(([p, k]) => `<span class="grafiek-xlabel ${k !== 0 && k !== n - 1 ? 'hidden sm:inline' : ''}" style="left:${x(k)}%;${k === 0 ? 'translate:0 0' : k === n - 1 ? 'translate:-100% 0' : ''}">${p.t}</span>`).join('');
   const laatste = [...punten.keys()].reverse().find((k) => punten[k].v != null);
+  // Verouderd (ONTWERPTAAL §10): de lijn stopt bij het laatste punt; daarna arcering met label (rechts uitgelijnd, mag omlopen).
+  const staart = laatste < n - 1 ? `<div class="arcering-gat absolute inset-y-0 border-l-2 border-dashed border-stale" style="left:${x(laatste)}%;width:${100 - x(laatste)}%"><span class="absolute top-2 right-1 max-w-40 rounded-sm bg-card px-1.5 text-right text-sm font-semibold text-foreground">${verouderd || 'Geen meting'}</span></div>` : '';
   const grensEl = grens ? `<line x1="0" x2="${W}" y1="${(y(grens.v) * H / 100).toFixed(1)}" y2="${(y(grens.v) * H / 100).toFixed(1)}" stroke="var(--chart-limit)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : '';
   const grensLabel = grens ? `<span class="absolute right-0 -translate-y-full pb-0.5 text-sm font-semibold text-foreground" style="top:${y(grens.v)}%">${grens.label}</span>` : '';
   const samenvatting = `${titel}. ${beschrijving}`;
@@ -238,7 +240,7 @@ export function lijngrafiek({ id, titel, beschrijving, punten, ymax, ystap, eenh
   <div class="pl-12 pb-7 pt-5">
     <div class="grafiek-vlak" id="${id}" role="img" tabindex="0" aria-label="${esc(samenvatting)} Gebruik de pijltjestoetsen om per meetpunt te lezen." data-grafiek='${JSON.stringify({ punten, ymax, eenheid, reeksnaam })}'>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="absolute inset-0 size-full overflow-visible" aria-hidden="true" focusable="false">${raster}${vlakken}${paden}${grensEl}</svg>
-      ${gatEl}${ylab}${xlab}${grensLabel}
+      ${gatEl}${staart}${ylab}${xlab}${grensLabel}
       <span class="grafiek-punt bg-chart-1" style="left:${x(laatste)}%;top:${y(punten[laatste].v)}%"></span>
       <span class="absolute -translate-y-1/2 text-sm font-semibold whitespace-nowrap text-foreground" style="${x(laatste) > 50 ? `right:${100 - x(laatste)}%` : `left:${x(laatste)}%`};top:${y(punten[laatste].v) + 8}%">${nb(punten[laatste].v.toLocaleString('nl-NL') + ' ' + eenheid)}</span>
       <div class="pointer-events-none absolute inset-y-0 hidden w-px bg-foreground" data-kruis></div>
