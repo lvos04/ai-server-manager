@@ -2,14 +2,15 @@
 
 De Hub van het platform: **B01** (centrale web-UI en beheer-API), **B02** (AI-beheer met risicobeleid en executor),
 **B09** (monitoring/incidenten) en **B12** (back-up en herstel). Taal: Nederlands. Bron van waarheid voor de
-platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.1).
+platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.2;
+wat elke repo moet veranderen: [`CONTRACT_1.2_CONFORMITEIT.md`](docs/platform-v2/CONTRACT_1.2_CONFORMITEIT.md)).
 
-## Stand (versie 0.1.0, fase P0 — backend en web-UI)
+## Stand (versie 0.1.0, fase P0 + contract 1.2 — backend en web-UI)
 
 | Onderdeel | Stand | Validatie |
 |---|---|---|
-| Hub-API (`apps/api`, pakket `hub`) | first-start-init, setupcode → eerste admin, login/rollen/CSRF, JWKS + dienst-JWT, enrollment + service-tokens, onboarding-wizard D01–D18, gates, alleen-lezen TrueNAS-inventaris, dienstenregister, back-updekking, eigen pg_dump, events-inbox, connectorcontract | Sim-getest (fake TrueNAS), echte PostgreSQL 16 |
-| Executor (`apps/executor`) | healthz/readyz, statuspagina "nog niet gekoppeld", allowlist die **alles weigert** | Unit-getest + image-rooktest |
+| Hub-API (`apps/api`, pakket `hub`) | first-start-init, setupcode → eerste admin, login/rollen/CSRF, JWKS + gebruikers-JWT (`token_use: user`) en dienst-JWT (`token_use: hub_service`), enrollment volgens contract 1.2 (exact schema, vingerafdruk, toegestane herhaling, `services/self`, rotatie na eerste gebruik, rotatie aanvragen, ontkoppelen via de dienst), noodlogin met TOTP, onboarding-wizard D01–D18, gates, alleen-lezen TrueNAS-inventaris, dienstenregister met bevestigde TrueNAS-appnaam, back-updekking, eigen pg_dump, events-inbox, connectorcontract | Sim-getest (fake TrueNAS), echte PostgreSQL 16 |
+| Executor (`apps/executor`) | healthz/readyz, statuspagina met koppelen (koppelcode + Hub-vingerafdruk, pinning in `hub-link.json`), controle van inkomende Hub-JWT's, allowlist die **alles weigert**; TrueNAS-schrijfkey volgt in P2 | Unit-getest + Sim-getest tegen de echte Hub-API + image-rooktest |
 | Web-UI (`apps/web`, Next.js-PWA) | eerste start met setupcode, inloggen/uitloggen, onboarding-wizard D01–D18, TrueNAS-koppeling met vingerafdruk, Server-inventaris, Apps, Backups-dekking, Home, Instellingen; latere fasen eerlijk "nog niet beschikbaar" | Unit-getest (vitest) + Sim-getest (Playwright 360/390/768/1440 + axe, ook tegen de image) |
 | Images | `deploy/allinone` (Hub + web-UI, alles-in-één, één poort 30400) en `deploy/executor` | gebouwd en gestart in Docker; **NIET GEVALIDEERD (echte NAS)** |
 | Policy/AI | volgt in P2; AI staat standaard uit, geen modellen, geen betaalde aanroepen | — |
@@ -20,7 +21,9 @@ Echte NAS-, hardware- en accounttests zijn in deze bouwomgeving niet mogelijk. Z
 ## Installeren (gebruiker)
 
 Uitsluitend als **standaard TrueNAS Custom App** (formulier: image + tag, poort, opslag) — nooit via YAML of compose.
-Twee formulieren: [`deploy/truenas/CUSTOM_APP.md`](deploy/truenas/CUSTOM_APP.md). Daarna open je de Hub in de browser;
+De tag is `<versie>@sha256:<digest>` uit `release/digests.json` (of alleen de exacte versie als het formulier `@` niet
+accepteert; NIET GEVALIDEERD op een echte NAS). De images zijn publiek na de scan van besluit 3; registry-login is
+alleen een terugval. Twee formulieren: [`deploy/truenas/CUSTOM_APP.md`](deploy/truenas/CUSTOM_APP.md). Daarna open je de Hub in de browser;
 de pagina **Eerste start** vraagt de setupcode uit de app-log (TrueNAS → Apps → ai-server-manager → Logs) en maakt het
 eerste beheerdersaccount, waarna de onboarding-wizard volgt.
 

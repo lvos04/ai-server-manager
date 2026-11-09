@@ -16,12 +16,26 @@ geen compose-bestand, geen terminal en geen `install.sh`.
 > **Nog niet uitgebracht:** de tag `0.1.0` bestaat op GHCR pas nadat release `v0.1.0` is gemaakt (`release.yml`; zie
 > `CHANGELOG.md`). Tot dan kan TrueNAS de image niet ophalen; vul dus geen andere tag (en zeker niet `latest`) in.
 
-## 0. Eenmalig: images openbaar maken op GitHub
+## 0. Image en tag (publiek, met digest)
 
-Een nieuw GHCR-pakket is standaard privé. Ga naar `https://github.com/lvos04?tab=packages` → pakket
-**ai-server-manager** → *Package settings* → *Change visibility* → **Public**. Herhaal dit voor
-**ai-server-manager-executor**. Controle: `https://ghcr.io/token?scope=repository:lvos04/ai-server-manager:pull` geeft
-HTTP 200.
+De images staan op GHCR en worden **publiek** zodra de scan van besluit 3 klaar is (contract 1.2 §2.1); dan heb je
+**geen** registry-login nodig. De exacte tag én digest van een release staan in de release-bijlage
+`release/digests.json` (gemaakt door `release.yml`). Vul de tag in het formulier in als
+**`<versie>@sha256:<64 hex>`**, bijvoorbeeld `0.1.0@sha256:<digest uit digests.json>`. Dat is geldige Docker-syntax:
+TrueNAS maakt er `ghcr.io/lvos04/ai-server-manager:<versie>@sha256:…` van en haalt dan precies die image op.
+
+> **NIET GEVALIDEERD (echte NAS):** of het TrueNAS-formulier een tag met `@` accepteert en of TrueNAS met zo'n tag nog
+> updates detecteert, is niet op een echte NAS getest (contract 1.2 §2.2). Weigert het formulier de tag, vul dan
+> alleen de exacte versie in (bv. `0.1.0`, nooit `latest`). De Hub leest na elke installatie of update via de
+> executor de digest terug en stopt bij een afwijking (vanaf fase P2).
+
+**Terugval: registry-login (alleen als de image nog privé is).** Zolang het pakket nog niet publiek is, kan TrueNAS het
+alleen ophalen met een registry-login: TrueNAS → **Apps → Configuration → Docker Registries → Add** (menunamen verschillen per versie), registry
+`ghcr.io`, je GitHub-gebruikersnaam en een token dat **alleen pakketten mag lezen** (`read:packages`). Dat token is een
+geheim van jou in TrueNAS: nooit in een formulierveld van de app, in een manifest, in Git of in een log. Gedrag van
+TrueNAS met GHCR-tokens: **NIET GEVALIDEERD (account/echte NAS)**. Beheerder van de repo: pakket publiek maken gaat via
+`https://github.com/lvos04?tab=packages` → pakket → *Package settings* → *Change visibility* → **Public** (pas na de
+scan uit besluit 3).
 
 ## 1. Twee datasets maken
 
@@ -43,7 +57,7 @@ submappen en verder van niets.
 |---|---|---|
 | Application Name | | `ai-server-manager` |
 | Image Configuration | Repository | `ghcr.io/lvos04/ai-server-manager` |
-| | Tag | `0.1.0` (altijd een exacte versie, nooit `latest`) |
+| | Tag | `<versie>@sha256:<digest>` uit `release/digests.json` (stap 0); terugval: alleen de exacte versie, nooit `latest` |
 | | Pull Policy | *Pull the image if it is not already present on host* |
 | Container Configuration | Entrypoint / Command | **leeg laten** |
 | | Timezone | je eigen tijdzone |
@@ -97,7 +111,7 @@ die alleen binnen de container (127.0.0.1) luistert. Je hoeft dus geen tweede po
 |---|---|---|
 | Application Name | | `ai-server-manager-executor` |
 | Image Configuration | Repository | `ghcr.io/lvos04/ai-server-manager-executor` |
-| | Tag | `0.1.0` |
+| | Tag | `<versie>@sha256:<digest>` van de executor uit `release/digests.json` (stap 0); terugval: alleen de exacte versie |
 | | Pull Policy | *Pull the image if it is not already present on host* |
 | Container Configuration | Entrypoint / Command / Environment Variables | **leeg laten** |
 | | Timezone | je eigen tijdzone |
@@ -110,10 +124,26 @@ die alleen binnen de container (127.0.0.1) luistert. Je hoeft dus geen tweede po
 | | Mount Path | `/appdata` |
 | | Host Path | `/mnt/<pool>/<apps-map>/ai-server-manager-executor` (eigen dataset, **niet** die van de Hub) |
 
-**Install.** De statuspagina `http://<NAS-adres>:30410` toont **"nog niet gekoppeld"**. In deze versie (fase P0) is
-er nog geen koppelformulier en voert de executor **niets** uit (de allowlist is leeg). Voer hier dus nog geen
-TrueNAS-API-key in. Koppelen (koppelcode uit de Hub + TrueNAS-key met schrijfrechten, alleen op deze pagina) volgt in
-fase P2.
+**Install.** De statuspagina `http://<NAS-adres>:30410` toont **"nog niet gekoppeld"**. De executor voert **niets**
+uit (de allowlist is leeg tot fase P2). Er zijn geen omgevingsvariabelen nodig: de executor koppelt nooit met een
+`HUB_ENROLLMENT_TOKEN`, alleen met een koppelcode op zijn eigen statuspagina (contract 1.2 §3.9).
+
+**Koppelen met de Hub (eenmalig):**
+
+1. Maak in de Hub een **koppelcode voor `ai-server-manager-executor`** (30 minuten geldig). De Hub toont daarbij de
+   **Hub-vingerafdruk** (`XXXX-XXXX-XXXX-XXXX`). Zolang het scherm "Diensten" in de Hub-UI er nog niet is (dat wacht
+   op de ontwerpstap, contract §13), maak je de code via de API-documentatie van de Hub (`/api/docs`,
+   `POST /api/v1/services/pairing-codes` met `{"app_id": "ai-server-manager-executor"}`) terwijl je als beheerder bent
+   ingelogd.
+2. Open de statuspagina van de executor en vul **Hub-adres** (`http://<NAS-adres>:<hostpoort van de Hub>`),
+   **koppelcode** en **Hub-vingerafdruk** in → **Koppelen**. De executor controleert de vingerafdruk zelf; klopt die
+   niet, dan slaat hij niets op.
+3. Daarna toont de statuspagina "gekoppeld", het Hub-adres en dezelfde vingerafdruk. Het koppelformulier verdwijnt:
+   ontkoppelen of opnieuw koppelen gaat via de Hub (en op deze pagina pas met een live geverifieerde TrueNAS-schrijfkey,
+   fase P2).
+
+Voer hier nog **geen** TrueNAS-API-key in: dat formulier volgt in fase P2. Sim-getest tegen de echte Hub-API in de
+bouwomgeving; op een echte NAS **NIET GEVALIDEERD**.
 
 ## 4. Alleen-lezen-koppeling met TrueNAS (in de Hub-web-UI)
 
@@ -132,15 +162,19 @@ fase P2.
 5. **Inventaris ophalen en meten:** daarna haal je de inventaris op (Server) en laat je D01, D03, D06 en D07 alleen-lezen
    meten. D02 kies je zelf uit de gemeten pools en datasets.
 
-De executor (formulier 2) koppel je in deze versie nog **niet**; de onboarding legt dat uit (volgt in fase P2).
+De executor (formulier 2) koppel je met een koppelcode zoals in stap 3; de TrueNAS-schrijfkey op de executorpagina
+volgt in fase P2.
 
 ## Updaten en terugdraaien
 
-- **Updaten:** app → **Edit** → Tag naar de nieuwe versie → **Update**. Zijn er databasewijzigingen, dan maakt de Hub bij
+- **Updaten:** app → **Edit** → Tag naar de nieuwe `<versie>@sha256:<digest>` (of alleen de versie, zie stap 0) →
+  **Update**. Zijn er databasewijzigingen, dan maakt de Hub bij
   de start eerst een geverifieerde back-up (`/appdata/backups`, *pre-upgrade*) en voert daarna de migraties uit. Een
   mislukte migratie laat de oude database ongemoeid. Een ZFS-snapshot vooraf blijft verstandig.
-- **Terugdraaien:** alleen naar een tag met hetzelfde databaseschema, of eerst de back-up/snapshot van vóór de update
-  terugzetten (tag-only rollback is niet veilig bij schemawijzigingen).
+- **Terugdraaien:** een Custom App heeft geen catalogusversies: TrueNAS' *Roll Back* werkt hier niet voor een andere
+  image-tag (contract 1.2 §2.2, NIET GEVALIDEERD op een echte NAS). Terugdraaien = **Edit** → de vorige tag (met
+  digest) weer invullen → **Update**, alleen naar een tag met hetzelfde databaseschema; anders eerst de
+  back-up/snapshot van vóór de update terugzetten (tag-only rollback is niet veilig bij schemawijzigingen).
 
 ## Problemen
 
@@ -153,7 +187,8 @@ De executor (formulier 2) koppel je in deze versie nog **niet**; de onboarding l
 | Web-UI meldt "Offline-schil: niet actief" | Verwacht via `http://`: offline gebruik en installeren als app vereisen HTTPS (volgt met D17). |
 | `oude postmaster.pid ... verwijderd` | Geen fout: de vorige stop was onverwacht (stroom/kill). |
 | Poort bezet bij opslaan | Kies een andere vrije **Host Port**; de Container Port blijft `30400` / `30410`. |
-| Image kan niet worden opgehaald | Stap 0: het GHCR-pakket staat nog op privé. |
+| Image kan niet worden opgehaald | Stap 0: het GHCR-pakket staat nog op privé (registry-login als terugval), of de digest hoort niet bij deze versie. |
+| Formulier weigert de tag met `@sha256:` | Vul alleen de exacte versie in (stap 0); de digest-readback blijft de controle. |
 
 ## Niet doen
 

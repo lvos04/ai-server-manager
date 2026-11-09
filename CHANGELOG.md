@@ -4,6 +4,27 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — contract 1.2 toegepast in de Hub en de executor (ADR-0013)
+- **Enrollment (H1/H2):** `POST /api/v1/services/enroll` volgt §3.3 exact (strikte JWK, token- en koppelcodeformaat,
+  `version`/`base_url`/`public_key_jwk` verplicht); antwoord met `schema_version`, `keyset_fingerprint`,
+  `key_rotation_url` en `enrollment_replayed`; toegestane herhaling na een herstart halverwege; nieuw
+  `GET /api/v1/services/self`; executor alleen met een koppelcode van 30 min; exacte `Retry-After` bij 429.
+- **Rotatie (H3):** oud token vervalt 10 min na het eerste gebruik van het nieuwe (hooguit 24 uur);
+  `Hub-Token-Rotation: required`; `POST /services/{id}/rotate` vraagt alleen aan (`202`, `Idempotency-Key`, geen token);
+  na 180 dagen alleen een melding.
+- **JWT's (H4):** `token_use: "user"` in gebruikers-JWT's; dienst-JWT `token_use: "hub_service"` voor Hub → dienst;
+  `GET /api/v1/auth/key-rotations` (lege lijst) en `GET /api/v1/auth/keyset`.
+- **Koppelbeheer (H5-backend, H14):** `POST /services/{id}/unlink` (via de dienst, daarna intrekken) en
+  `PUT /services/{id}/truenas-app` (gemeten appnaam bevestigen). Het UI-scherm "Diensten" wacht op de ontwerpstap (§13).
+- **Noodlogin (H6-backend):** `/api/v1/auth/break-glass` (status, setup, rotate, confirm, login, selftest) met TOTP,
+  privé-bereiken, sessie ≤ 60 min, event `auth.break_glass.used` en rotatieplicht. UI wacht op de ontwerpstap.
+- **Executor (H7, deel):** koppelen op de statuspagina met koppelcode + vingerafdruk, pinning in `hub-link.json`,
+  controle van inkomende Hub-JWT's (`GET /connector/v1/hub-link`); ontkoppelen geeft eerlijk `501` tot P2.
+- **Manifesten (H8)** zonder `joins_platform_network`/`custom_app.ports`; **Custom App-instructies (H9)** met tag
+  `<versie>@sha256:<digest>`, publieke image en registry-login als terugval.
+- Migratie `0002`; OpenAPI bijgewerkt; rooktest controleert ook het enroll-schema, de lege sleutelrotaties en de
+  executor-weigering zonder koppeling.
+
 ### Gewijzigd — onafhankelijke review van contract 1.2
 - `docs/platform-v2/PLATFORM_CONTRACTEN.md` blijft `contracts 1.2`, met correcties R1–R12 (zie
   `docs/adr/ADR-0012-review-contract-1-2.md`): `app_id` vast per image; `pending` naast `state` in `hub-link.json`;
