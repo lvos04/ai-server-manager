@@ -191,3 +191,61 @@ def test_formulier_beveiliging_en_throttle(admin: Any, hub: Served, executor: tu
     assert _submit(c, hub.url, "ABCD-EFGH-JKMP", fp).status_code == 400
     assert _submit(c, hub.url, "ABCD-EFGH-JKMQ", fp).status_code == 429
     assert json.loads((ex_settings.secrets_dir / "hub-link.json").read_text())["state"] == "nooit_gekoppeld"
+
+
+def test_koppelen_na_eerste_koppeling_geweigerd_ook_met_geldige_formuliercode(
+    admin: Any, app: Any, hub: Served, executor: tuple[Any, Any], clean_db: str
+) -> None:
+    """§3.7/§3.9: het koppelformulier bestaat alleen zolang de executor nooit gekoppeld is. Wie vóór de koppeling een
+    geldige formuliercode (CSRF-cookie) ophaalde, kan daarna niet alsnog naar een andere Hub koppelen — ook niet na
+    ontkoppelen of intrekken; de Hub krijgt dan geen enroll-verzoek."""
+    import psycopg
+
+    ex_app, ex_settings = executor
+    late = _page_client(ex_app)
+    m = re.search(r'name="csrf" value="([^"]+)"', late.get("/").text)
+    assert m is not None
+    stale_csrf = m.group(1)  # cookie + formuliercode van vóór de koppeling
+    grant = _pairing(admin)
+    assert _submit(_page_client(ex_app), hub.url, grant["koppelcode"], grant["keyset_fingerprint"]).status_code == 200
+    second = _pairing(admin)
+    with psycopg.connect(clean_db) as conn:
+        before = conn.execute("SELECT count(*) FROM audit_event WHERE action LIKE 'enrollment.%'").fetchone()
+    form = {"csrf": stale_csrf, "hub_url": hub.url, "koppelcode": second["koppelcode"],
+            "vingerafdruk": second["keyset_fingerprint"]}  # fmt: skip
+    r = late.post("/koppelen", data=form, headers={"Origin": "http://executor.test"})
+    assert r.status_code == 409 and "al eens gekoppeld" in r.text
+    with psycopg.connect(clean_db) as conn:
+        after = conn.execute("SELECT count(*) FROM audit_event WHERE action LIKE 'enrollment.%'").fetchone()
+    assert after == before  # geen verzoek naar de Hub
+    link_file = ex_settings.secrets_dir / "hub-link.json"
+    linked = json.loads(link_file.read_text())
+    # Ook na intrekken (first_linked_at blijft staan) geen formulier en geen herkoppelen via de statuspagina.
+    from executor.hublink import HubLinkStore
+
+    with HubLinkStore(ex_settings.secrets_dir).update() as link:
+        link.update(state="ingetrokken", service_token=None, last_error={"code": "ingetrokken_door_hub", "at": "x"})
+    page = late.get("/")
+    assert 'name="csrf"' not in page.text and "gaat via de Hub" in page.text
+    r = late.post("/koppelen", data=form, headers={"Origin": "http://executor.test"})
+    assert r.status_code == 409
+    after_revoke = json.loads(link_file.read_text())
+    assert after_revoke["first_linked_at"] == linked["first_linked_at"] and after_revoke["state"] == "ingetrokken"
+    assert after_revoke["hub_url"] == linked["hub_url"] and after_revoke["pins"] == linked["pins"]
+
+
+def test_verlopen_executor_koppelcode_wordt_geweigerd(
+    admin: Any, hub: Served, executor: tuple[Any, Any], clean_db: str
+) -> None:
+    """§3.4: de koppelcode van de executor is 30 minuten geldig; daarna 401 invalid_enrollment en niets opgeslagen."""
+    import psycopg
+
+    ex_app, ex_settings = executor
+    grant = _pairing(admin)
+    with psycopg.connect(clean_db, autocommit=True) as conn:
+        conn.execute("UPDATE enrollment_grant SET expires_at = now() - interval '1 second'")
+    r = _submit(_page_client(ex_app), hub.url, grant["koppelcode"], grant["keyset_fingerprint"])
+    assert r.status_code == 400 and "weigerde de koppelcode" in r.text
+    link = json.loads((ex_settings.secrets_dir / "hub-link.json").read_text())
+    assert link["state"] == "nooit_gekoppeld" and link["last_error"]["code"] == "hub_weigerde"
+    assert link["service_token"] is None and link["first_linked_at"] is None

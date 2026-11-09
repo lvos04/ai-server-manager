@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     def secrets_dir(self) -> Path:
         return self.data_dir / "secrets"
 
+    @property
+    def replay_db(self) -> Path:
+        """Persistente jti-replaycache (contract 1.2 §4.6); SQLite in de eigen datamap, nooit in ``secrets``."""
+        return self.data_dir / "executor.sqlite3"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

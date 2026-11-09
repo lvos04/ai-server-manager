@@ -527,9 +527,11 @@ def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: i
         raise AuthFailed("invalid_token") from None
     t = int(datetime.now(UTC).timestamp()) if now is None else now
     numbers = ("iat", "nbf", "exp")
-    if any(not isinstance(claims.get(k), int) for k in numbers) or claims.get("iss") != "hub":
+    if any(type(claims.get(k)) is not int for k in numbers) or claims.get("iss") != "hub":  # bool telt niet als getal
         raise AuthFailed("invalid_token")
-    if claims.get("aud") != audience or claims["exp"] - claims["iat"] > 120 or claims["nbf"] > t + CLOCK_SKEW:
+    if claims.get("aud") != audience or claims["exp"] - claims["iat"] > 120 or claims["exp"] < claims["iat"]:
+        raise AuthFailed("invalid_token")
+    if claims["nbf"] > t + CLOCK_SKEW or claims["iat"] > t + CLOCK_SKEW:  # nog niet geldig of uit de toekomst
         raise AuthFailed("invalid_token")
     if claims["exp"] + CLOCK_SKEW < t:
         raise AuthFailed("token_expired")

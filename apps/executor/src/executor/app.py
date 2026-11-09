@@ -8,6 +8,7 @@ dat ``capability_unavailable``, nooit gesimuleerd succes.
 
 from __future__ import annotations
 
+import contextlib
 import hmac
 import os
 import secrets
@@ -30,6 +31,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from executor import APP_ID, __version__
 from executor.allowlist import ALLOWLIST, check
+from executor.bodylimit import BodyLimit
 from executor.config import Settings, get_settings
 from executor.firststart import IDENTITY, VAULT_KEY, public_jwk
 from executor.hublink import (
@@ -47,6 +49,7 @@ from executor.hublink import (
     validate_hub_url,
     verify_hub_jwt,
 )
+from executor.replay import ReplayCache, ReplayUnavailable
 
 CSRF_COOKIE = "executor_csrf"
 MAX_FORM_BYTES = 4096
@@ -59,7 +62,17 @@ AUTH_MESSAGES = {
     "invalid_token": "Ongeldig token.",
     "token_use_invalid": "Dit soort token is hier niet toegestaan.",
     "jti_missing": "Het token heeft geen jti.",
+    "token_replayed": "Dit token is al gebruikt voor een andere wijziging.",
 }
+# Rollen in een gebruikers-JWT (contract §4.2); 'kind' wint altijd van andere rollen in dezelfde JWT.
+ROLE_RANK = {"kind": 0, "viewer": 1, "operator": 2, "admin": 3}
+
+
+def user_rank(claims: dict[str, Any]) -> int:
+    roles = [r for r in claims.get("roles") or [] if r in ROLE_RANK]
+    if not roles or "kind" in roles:
+        return 0
+    return max(ROLE_RANK[r] for r in roles)
 
 
 class ExecuteIn(BaseModel):
@@ -69,9 +82,12 @@ class ExecuteIn(BaseModel):
     action_id: str = Field(min_length=1, max_length=128)
 
 
+def _err_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {"code": code, "message": message, "details": details or {}, "trace_id": str(uuid.uuid4())}
+
+
 def _err(code: str, message: str, status: int, details: dict[str, Any] | None = None) -> JSONResponse:
-    body = {"code": code, "message": message, "details": details or {}, "trace_id": str(uuid.uuid4())}
-    return JSONResponse(body, status_code=status)
+    return JSONResponse(_err_body(code, message, details), status_code=status)
 
 
 class PairingThrottle:
@@ -101,6 +117,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     store = HubLinkStore(settings.secrets_dir)
     rotations = KeyRotationPoller(store)
+    replays = ReplayCache(settings.replay_db)
     stop = threading.Event()
 
     def poll_loop() -> None:
@@ -151,11 +168,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             {"fouten": [{"veld": ".".join(str(p) for p in e["loc"]), "fout": e["msg"]} for e in exc.errors()]},
         )
 
+    # 1 MiB vóór routering en authenticatie, ook chunked (contract §5); binnen de header-middleware hieronder.
+    app.add_middleware(BodyLimit)
+
     @app.middleware("http")
     async def _headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        length = request.headers.get("content-length")
-        if length and length.isdigit() and int(length) > 1024 * 1024:
-            return _err("payload_too_large", "Het verzoek is te groot.", 413, {"max_bytes": 1024 * 1024})
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
@@ -231,7 +248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         claims = _hub_auth(request)
         if isinstance(claims, JSONResponse):
             return claims
-        if claims.get("token_use") == "user" and not set(claims.get("roles") or []) & {"viewer", "operator", "admin"}:
+        if claims.get("token_use") == "user" and user_rank(claims) < ROLE_RANK["viewer"]:
             return _err("forbidden", "Hiervoor is minimaal de rol 'viewer' nodig.", 403)
         link = store.read()
         pins = link.get("pins") or {}
@@ -246,23 +263,70 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             }
         )
 
+    def _mutation_guard(request: Request, claims: dict[str, Any]) -> tuple[str, JSONResponse | None]:
+        """Mutatie met een Hub-JWT: ``Idempotency-Key`` verplicht, daarna de jti-replaycontrole (§4.6, fail-closed)."""
+        key = request.headers.get("idempotency-key", "")
+        if not key:
+            return key, _err("idempotency_key_required", "Header Idempotency-Key (UUID) is verplicht.", 400)
+        try:
+            key = str(uuid.UUID(key))
+        except ValueError:
+            return key, _err("idempotency_key_invalid", "Idempotency-Key moet een UUID zijn.", 400)
+        try:
+            claim = replays.claim(
+                iss=str(claims["iss"]),
+                jti=str(claims["jti"]),
+                exp=int(claims["exp"]),
+                method=request.method,
+                path=request.url.path,
+                idempotency_key=key,
+            )
+        except ReplayUnavailable:
+            return key, _err(
+                "replay_check_unavailable",
+                "De replaycontrole is niet beschikbaar; er is niets uitgevoerd. Controleer de opslag in /appdata.",
+                503,
+            )
+        if claim.kind == "replayed":
+            return key, _err("unauthorized", AUTH_MESSAGES["token_replayed"], 401, {"reason": "token_replayed"})
+        if claim.kind == "in_progress":
+            return key, _err("idempotency_in_progress", "Een verzoek met dit token en deze sleutel loopt al.", 409)
+        if claim.kind == "repeat":
+            status = claim.status or 500
+            return key, JSONResponse(claim.body, status_code=status, headers={"Idempotent-Replay": "true"})
+        return key, None
+
     @app.post(
         "/connector/v1/hub-link/unlink",
         tags=["connector"],
         status_code=501,
         summary="Ontkoppelen: nog niet beschikbaar voor de executor (vraagt een live geverifieerde schrijfkey, P2)",
-        responses={501: {"description": "capability_unavailable"}},
+        responses={
+            400: {"description": "Idempotency-Key ontbreekt of is geen UUID"},
+            401: {"description": "unauthorized (reden §4.7, ook token_replayed)"},
+            403: {"description": "gebruikers-JWT zonder rol admin"},
+            501: {"description": "capability_unavailable"},
+            503: {"description": "replay_check_unavailable"},
+        },
     )
     def hub_link_unlink(request: Request) -> JSONResponse:
         claims = _hub_auth(request)
         if isinstance(claims, JSONResponse):
             return claims
-        return _err(
+        if claims.get("token_use") == "user" and user_rank(claims) < ROLE_RANK["admin"]:
+            return _err("forbidden", "Ontkoppelen vraagt de rol 'admin' (of een dienst-JWT van de Hub).", 403)
+        _, refused = _mutation_guard(request, claims)
+        if refused is not None:
+            return refused
+        body = _err_body(
             "capability_unavailable",
             "Ontkoppelen van de executor vraagt een live geverifieerde TrueNAS-schrijfkey tegen het vastgelegde "
             "NAS-adres (contract §3.9); dat volgt in fase P2. Er is niets ontkoppeld.",
-            501,
         )
+        # Er is niets uitgevoerd; lukt vastleggen niet, dan krijgt een herhaling 409 (loopt nog) i.p.v. dit antwoord.
+        with contextlib.suppress(ReplayUnavailable):
+            replays.store_result(iss=str(claims["iss"]), jti=str(claims["jti"]), status=501, body=body)
+        return JSONResponse(body, status_code=501)
 
     @app.post(
         "/api/v1/execute",

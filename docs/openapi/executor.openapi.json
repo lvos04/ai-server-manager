@@ -165,6 +165,15 @@
       "post": {
         "operationId": "hub_link_unlink_connector_v1_hub_link_unlink_post",
         "responses": {
+          "400": {
+            "description": "Idempotency-Key ontbreekt of is geen UUID"
+          },
+          "401": {
+            "description": "unauthorized (reden §4.7, ook token_replayed)"
+          },
+          "403": {
+            "description": "gebruikers-JWT zonder rol admin"
+          },
           "501": {
             "content": {
               "application/json": {
@@ -172,6 +181,9 @@
               }
             },
             "description": "capability_unavailable"
+          },
+          "503": {
+            "description": "replay_check_unavailable"
           }
         },
         "summary": "Ontkoppelen: nog niet beschikbaar voor de executor (vraagt een live geverifieerde schrijfkey, P2)",
