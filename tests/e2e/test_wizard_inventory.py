@@ -148,8 +148,9 @@ def test_volledige_wizard_en_inventaris_zonder_mutatie(
     with psycopg.connect(clean_db) as conn:
         dump = json.dumps([r[0] for r in conn.execute("SELECT data FROM inventory_snapshot")])
         assert "GEHEIM" not in dump and "mag-nooit-opgehaald-worden" not in dump
+        # Bytevergelijking: AES-GCM-cijfertekst kan 0x00 bevatten, dus niet via een tekstcodering (convert_from).
         secrets_in_db = conn.execute(
-            "SELECT count(*) FROM vault_secret WHERE convert_from(ciphertext, 'LATIN1') LIKE %s", (f"%{READONLY_KEY}%",)
+            "SELECT count(*) FROM vault_secret WHERE position(%s::bytea IN ciphertext) > 0", (READONLY_KEY.encode(),)
         ).fetchone()
         assert secrets_in_db is not None and secrets_in_db[0] == 0
 
