@@ -1,12 +1,12 @@
 # Overdrachtsprompt — TrueNAS Home Platform V2 (verhuizing naar eigen Ubuntu-machine)
 
 Plak alles onder de streep in een nieuwe Claude Code-sessie op de Ubuntu-desktop (via SSH in de Claude-app).
-De machine heeft passwordless sudo.
+De machine heeft sudo-rechten.
 
 ---
 
 Je neemt een lopend project over: **TrueNAS Home Platform V2**. De vorige sessie draaide in een cloud-sandbox met maar 4 CPU's.
-Deze machine is van de gebruiker (Ubuntu-desktop, passwordless sudo, meer CPU's). Antwoord in het Nederlands. Stel vragen via een
+Deze machine is van de gebruiker (Ubuntu-desktop, sudo-rechten, meer CPU's). Antwoord in het Nederlands. Stel vragen via een
 keuzemenu als iets onduidelijk is en gok niets. ai-factory niet aanraken. Maak geen PR's zonder te vragen.
 
 ## 0. Eerst doen (in deze volgorde)

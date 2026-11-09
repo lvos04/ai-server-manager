@@ -1,4 +1,4 @@
-# Ontwikkelmachine opzetten (Ubuntu 24.04, passwordless sudo)
+# Ontwikkelmachine opzetten (Ubuntu 24.04, sudo-rechten)
 
 Dit is de **ontwikkel-/testmachine** voor de bouwer (Claude Code via SSH), niet de TrueNAS. Niets hiervan draait op de NAS.
 Controleer de Ubuntu-versie met `lsb_release -a`; bij 22.04 zijn de PGDG- en NodeSource-repos verplicht (zie onder).

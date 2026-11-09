@@ -64,12 +64,28 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
    de statuspagina's van de nieuwe diensten en het **uiterlijk** van MediaGuard, MSO en my_house (functies/routes blijven).
    Jelly Leon web/clients vallen erbuiten. De design-agent beslist zelfstandig; resultaat wordt achteraf getoond.
 
+## Vervolgbesluiten van de gebruiker (2026-11-09, middag)
+
+- **Ontwerptaal Peil** (bron: `docs/platform-v2/ONTWERPTAAL.md` + `design/ontwerptaal/`, ADR-0015): productnaam in de Hub
+  "TrueNAS Home Platform"; rol kind ziet Home · Kijken · Zoeken · Ik; in MediaGuard/MSO/my_house mogen een link "Terug naar de
+  Hub", een themaknop (my_house) en een tabelweergave bij grafieken (MG/MSO) erbij; ook de native Android-apps van MediaGuard en
+  my_house krijgen Peil; my_house fase 2 op Tailwind 4 + shadcn in de React 18-variant.
+- **Openbaarheid** (na de scan van alle historie): 10 repos publiek; media-guard-ultimate niet (echte NAS-rapporten, volledige
+  naam, LAN-adressen in de historie) → huidige repo wordt `media-guard-ultimate-archief` (privé), een nieuwe publieke
+  `media-guard-ultimate` met schone historie volgt na de Peil-ronde. De openbare sideload-signingsleutel van MediaGuard blijft
+  (bewuste keuze, risico geaccepteerd). Licentie voor de eigen repos: **GPL-3.0** (forks houden hun upstream-licenties).
+- **my_house 0.2.0** is gepubliceerd (release-run opnieuw gestart, alle jobs groen).
+- **B03 uitgebreid** met zes functies (Watch Together, aanbevelingen, NL-ondertitelvertaling, mediakwaliteitscontrole,
+  apparaatprofielen, intro/outro/recap); plan en Excel-rijen volgen.
+- **Sync-token** (`JL_SYNC_PUSH_TOKEN`): nog open — fine-grained token alleen via de GitHub-web-UI; deploysleutels aanmaken vraagt
+  uitdrukkelijke toestemming in de sessie.
+
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 
-- Ubuntu 26.04.1, 22 CPU's, 14,5 GiB RAM + 4 GiB swap (geheugen is de grens), Docker 29 (systeemdaemon), PostgreSQL 16.15 +
+- Ubuntu-ontwikkelmachine (geheugen is de grens voor parallelle builds), Docker 29 (systeemdaemon), PostgreSQL 16.15 +
   pgvector 0.8.7 (PGDG, alleen 127.0.0.1), python3.12 (deadsnakes), Node 22, pnpm 10, Java 21, .NET 9 via image,
   Android SDK (platform 36, build-tools 36.0.0), Playwright-Chromium, actionlint. Geen proxy of eigen CA meer.
-- Workflow-scripts `workflows/p0.js` en `p1.js`: `OMGEVING:` aangepast aan deze machine, werkmap `/home/transcode/truenas-v2`,
+- Workflow-scripts `workflows/p0.js` en `p1.js`: `OMGEVING:` aangepast aan deze machine, werkmap `<WERKMAP>`,
   filter per repo (`args.keys`), `git pull --rebase` vóór elke push, `flock` voor Gradle-, image- en stackbuilds, commits
   eindigen met alleen de Co-Authored-By-regel van de sessie.
 - CI-stand bij overname (GitHub Actions, branch `ccr-c133d7a0-kuz1cv`): rood in jelly-leon (setup-dotnet vindt SDK 9.0.0 uit
