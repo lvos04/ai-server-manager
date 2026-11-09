@@ -113,6 +113,23 @@ for how in restart kill; do
 done
 expect "harde kill: oude postmaster.pid opgeruimd" "$(docker logs asm-smoke-hub 2>&1)" 'oude postmaster.pid'
 
+# P1 (ADR-0021): migraties 0003–0005 in de image, periodieke worker-taken draaien, zonder NAS alles 'unknown'.
+JAR="$WORK/cookies"
+test "$(api -c "$JAR" -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" \
+  http://127.0.0.1:30400/api/v1/auth/login)" = 200
+for _ in $(seq 1 30); do
+  st="$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/monitoring/status)"
+  case "$st" in *'"naam":"meldingen_versturen"'*'"status":"ok"'*) break ;; esac
+  sleep 2
+done
+expect "worker: periodieke taken draaien" "$st" '"status":"ok"'
+expect "catalogus zonder NAS: leeg en alleen-lezen" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/apps)" '"alleen_lezen":true'
+expect "observability zonder NAS: unknown (geen bron)" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/observability/nas)" '"reden":"geen_bron"'
+expect "standaard-alertregels gezaaid" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/alerts/rules)" '"standaard_sleutel":"app-down"'
+
 docker stop -t 30 asm-smoke-hub >/dev/null
 expect "netjes gestopt" "$(docker logs asm-smoke-hub 2>&1 | tail -n 5)" '[hub] gestopt'
 echo "rooktest geslaagd"

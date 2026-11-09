@@ -14,6 +14,7 @@ wat elke repo moet veranderen: [`CONTRACT_1.2_CONFORMITEIT.md`](docs/platform-v2
 | Web-UI (`apps/web`, Next.js-PWA) | eerste start met setupcode, inloggen/uitloggen, onboarding-wizard D01–D18, TrueNAS-koppeling met vingerafdruk, Server-inventaris, Apps, Backups-dekking, Home, Instellingen; latere fasen eerlijk "nog niet beschikbaar" | Unit-getest (vitest) + Sim-getest (Playwright 360/390/768/1440 + axe, ook tegen de image) |
 | Images | `deploy/allinone` (Hub + web-UI, alles-in-één, één poort 30400) en `deploy/executor` | gebouwd en gestart in Docker; **NIET GEVALIDEERD (echte NAS)** |
 | Policy/AI | volgt in P2; AI staat standaard uit, geen modellen, geen betaalde aanroepen | — |
+| P1 deel 1 (backend, ADR-0021) | **appcatalogus** (B01-002: identiteit = TrueNAS-app-id, idempotente discovery, installatiewijze, image/tag/digest + readback, opslag → dataset, deep-link, appstore-koppeling), **gezondheidsmodel** (truenas/buitenkant/binnenkant, verouderd = unknown), **bronnen** Uptime Kuma, Beszel (alleen het NAS-systeem), connector-health en heartbeat van eigen diensten (B09-002), **tijdreeksen** ruw → 5 min → 1 uur met retentie, **alerts** met drempel/duur/hysterese en **Gotify**-meldingen zonder pushstorm (B09-003, `notification.send` R0), **live NAS-metingen** uit `reporting.realtime` (B01-004) en **meetdekking** (B09-001). Uitleg: [`docs/MONITORING.md`](docs/MONITORING.md) | Sim-getest (fakes TrueNAS, Uptime Kuma, Beszel, Gotify, appstore, eigen dienst); **NIET GEVALIDEERD** tegen echte installaties; UI-schermen volgen in de P1-webstap |
 
 Echte NAS-, hardware- en accounttests zijn in deze bouwomgeving niet mogelijk. Zie
 [`docs/platform-v2/EVIDENCE.json`](docs/platform-v2/EVIDENCE.json) voor de status per Excel-ID.
@@ -51,7 +52,7 @@ waarden; de Custom App heeft geen verplichte variabelen).
 | `apps/api` | Hub-API: `src/hub`, Alembic-migraties, unit- en integratietests |
 | `apps/executor` | executor (eigen image/app) |
 | `apps/web` | web-UI (Next.js-PWA), eigen webserver met API-doorgang, vitest en Playwright |
-| `tests/e2e`, `tests/fakes` | dienst-E2E, teststack voor de web-E2E (`web_stack.py`) en de fake TrueNAS-WebSocketserver |
+| `tests/e2e`, `tests/fakes` | dienst-E2E, teststack voor de web-E2E (`web_stack.py`), de fake TrueNAS-WebSocketserver en HTTP-fakes (Uptime Kuma, Beszel, Gotify, appstore, eigen dienst) |
 | `deploy/allinone`, `deploy/executor` | Dockerfiles, procesbewaker, healthchecks |
 | `deploy/truenas` | formuliervelden van de twee Custom Apps |
 | `deploy/manifest` | manifesten (manifeststandaard v1, `install.method: custom_app`) |

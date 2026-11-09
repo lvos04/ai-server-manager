@@ -3,6 +3,40 @@
 Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact deze tag (nooit `latest`).
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
+
+### Toegevoegd — fase P1 deel 1 (backend): catalogus, monitoring, alerts en meldingen (ADR-0021)
+- **Appcatalogus (B01-002):** `GET /api/v1/apps` (zoeken/filteren op status, adaptertype, soort), `GET /api/v1/apps/{id}`
+  (ETag, acties per rol) en `POST /api/v1/apps/discover`. Identiteit = TrueNAS-app-id (stabiel over een NAS-herstart);
+  idempotente discovery alleen uit een verse inventaris, nooit verwijderen (`aanwezig=false` + `verdwenen_sinds`);
+  installatiewijze (`ix-app` = standaard Custom App, `custom_app: true` = compose/YAML, anders catalogusapp);
+  image/tag/digest met readback via `app.image.query` en geschiedenis; opslag → dataset; deep-link uit D03 + poort;
+  resourcegrenzen eerlijk `unknown` (app-configuratie wordt nooit gelezen); appstore-koppeling via het
+  dienstenregister en een dienst-JWT, anders `unknown`.
+- **Gezondheidsmodel (B09-002):** componenten TrueNAS-staat, buitenkant (Uptime Kuma) en binnenkant (heartbeat,
+  connector-health, worker van de Hub); verouderd = `unknown`; `RUNNING` alleen is nooit gezond; apps met eigen taken pas
+  gezond met een verse binnenkant (MediaGuard/MSO/my_house: binnenkant volgt in P3 → `unknown`).
+- **Bronnen (B09-002):** `/api/v1/monitoring/sources` (Uptime Kuma: `/metrics` met API-key en/of statuspagina,
+  versie-detectie, automatische en handmatige koppeling; Beszel: readonly-gebruiker, alleen het NAS-systeem, mini-pc
+  uitgesloten), `/poll`, `/health`, `/status` en de dienstroute `POST /api/v1/monitoring/heartbeat` (Hub-uitbreiding).
+  Connector-health (§6) van eigen diensten met dienst-JWT en grace. Ingetrokken key → direct `unknown` + event (EX16).
+- **Tijdreeksen en alerts (B09-003):** reeksen in de eigen PostgreSQL met grenzen, aggregatie ruw → 5 min → 1 uur en
+  retentie per reeks (`/api/v1/metrics/series`, `/query`); alertregels met drempel, duur en hysterese, standaardregels,
+  dempen per alert en per regel (`/api/v1/alerts…`); verouderde data geeft geen overgang.
+- **Meldingen (Gotify, `notification.send` R0):** kanalen met applicatietoken in de vault, echte testmelding,
+  rate-limit per kanaal met één samenvatting, stille uren (kritiek altijd), backoff + dead-letter, token geweigerd →
+  kanaal stil tot vervanging (`/api/v1/notifications…`).
+- **Observability (B01-004) en meetdekking (B09-001):** `GET /api/v1/observability/nas` (live CPU/geheugen/ARC/
+  schijven/netwerk uit `reporting.realtime`, GPU's op PCI-slot, bron + `observed_at`, verouderd → `unknown`) en
+  `GET /api/v1/monitoring/coverage` (kan leveren volgens de broncode vs. levert nu, hiaten met alternatief).
+- Migraties 0003–0005; periodieke worker-taken (`periodic_task`); `.env.example`, OpenAPI, `docs/MONITORING.md`;
+  rooktest controleert ook de nieuwe routes en taken in de image.
+- Tests: unit, integratie en dienst-E2E met fakes (TrueNAS met `reporting.realtime`, Uptime Kuma, Beszel, Gotify,
+  appstore, eigen dienst). Prometheus-achtige testbelasting: 200 reeksen met 60 000 metingen → 10 berichten en één
+  samenvatting (de commitboodschap noemde abusievelijk 72 000).
+
+### Gerepareerd — herkenning van apps
+- De executor werd als Hub herkend en `jelly-leon-platform` als `jelly-leon` (eerste voorvoegsel won); nu wint een
+  exacte naam en anders het langste voorvoegsel. Eigen nieuwe diensten worden herkend.
 - **B03 2.0 (goedgekeurd) en Excel-bijwerker (Δ-ASM-EXCEL):**
   - `tools/excel/update_excel.py` voegt werkpakketrijen (`--werkpakketten`, `tasks.json`-formaat; bestaand ID = inhoud
     vervangen met behoud van status en bewijs), testrijen (`--testen`/`--testmeta`, `e2e_cases`-formaat) en faserijen

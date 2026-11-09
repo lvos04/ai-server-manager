@@ -13,9 +13,9 @@
     "id": "B01-002",
     "status": "Bezig",
     "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
-    "bewijs": "commit 7c37471; apps/api/tests/integration/test_service_link.py::test_truenas_appnaam_bevestigen_alleen_als_gemeten, ::test_registeradres_uit_d03_en_gemeten_hostpoort; apps/api/tests/unit/test_contract_1_2.py::test_appnaam_kandidaten_op_image_repository; tests/e2e/test_wizard_inventory.py (registry/services uit app.query met observed_at/verouderd)",
-    "blokkade": "Geen echte NAS: identiteit na een NAS-reboot en echte app.query-gegevens zijn niet gemeten.",
-    "opmerking": "Deels (contract 1.2 H14): het dienstenregister houdt de vaste app_id apart van de werkelijke TrueNAS-appnaam; een beheerder bevestigt alleen een naam die app.query met de eigen image (ghcr.io/lvos04/<app_id>) heeft gemeten; het adres is altijd D03 + gemeten hostpoort, nooit een aangenomen waarde. Adaptertype, tag/digest-registratie en 'laatst getest' per app volgen later (P2/P3).",
+    "bewijs": "commit 9585741 (catalogus, migratie 0003), 9168195 (koppeling met monitors/heartbeat); tests/e2e/test_catalogus.py::test_catalogus_ontdekt_bestaande_apps_zonder_mutatie, ::test_identiteit_stabiel_na_nas_herstart_en_offline_nooit_gezond, ::test_appstore_koppeling_via_dienstenregister, ::test_kind_ziet_de_catalogus_niet_en_kijker_kan_niet_ontdekken; apps/api/tests/unit/test_catalogus.py (herkenning, installatiewijze, digest-readback, opslag → dataset, deep-link, gezondheidsmodel); apps/api/tests/integration/test_route_authz.py (nieuwe routes); deploy/smoke.sh (catalogus in de image, lokaal geslaagd); eerder: commit 7c37471; apps/api/tests/integration/test_service_link.py::test_truenas_appnaam_bevestigen_alleen_als_gemeten, ::test_registeradres_uit_d03_en_gemeten_hostpoort; apps/api/tests/unit/test_contract_1_2.py::test_appnaam_kandidaten_op_image_repository; tests/e2e/test_wizard_inventory.py (registry/services uit app.query met observed_at/verouderd)",
+    "blokkade": "Geen echte NAS: identiteit na een echte NAS-herstart, echte app.query/app.image.query-gegevens en de appstore-koppeling tegen een echte appstore-installatie zijn niet gemeten.",
+    "opmerking": "Backend gebouwd (ADR-0021): register met adaptertype, runtime_id (= TrueNAS-app-id, stabiel), image/tag/digest (tagveld + readback via app.image.query, geschiedenis), installatiewijze (ix-app = standaard Custom App, custom_app=true = compose, anders catalogusapp), metadata, deep-link (D03 + poort), datasets, eigenaar, documentatie, laatst getest; idempotente discovery uit de inventaris zonder installatie of mutatie (fake.mutations leeg); offline/verouderd → unknown met laatst-gezien-tijd, nooit gezond; verdwenen app blijft met aanwezig=false. Resourcegrenzen eerlijk unknown (app-configuratie wordt nooit gelezen; geheimen). Appstore-koppeling via dienstenregister + dienst-JWT, anders unknown. Gerepareerd: executor werd als Hub herkend. Zoekbare UI met knoppen volgt in de P1-webstap; logs/herstart volgen in P2.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-09"
   },
@@ -73,7 +73,7 @@
     "id": "I23-23-02",
     "status": "Bezig",
     "validatie": "Sim-getest",
-    "bewijs": "commit 58584e2; deploy/smoke.sh (lokaal geslaagd): uid's in de Hub-container 568 en 569, geen root-proces, alleen poort 30400 luistert, PostgreSQL alleen via unix-socket; ook met no-new-privileges en minimale capabilities; met web-UI (commit 5c66b00): rooktest geslaagd, processen 568 (web, api, worker, postgres) en 569 (ai-runner), luisterende sockets precies 0.0.0.0:30400 en 127.0.0.1:8400, /opt/hub-web alleen-lezen voor 568; review P0: commit c5063f0 (deploy/smoke.sh): NoNewPrivs 1 voor elk proces in Hub en executor, eerste beheerder via de setupcode uit de log, setupcode eenmalig (409), docker restart én harde kill zonder dataverlies (setup blijft afgerond, inloggen werkt, geen nieuwe setupcode, executor-identiteit gelijk, oude postmaster.pid opgeruimd) — lokaal geslaagd met de opnieuw gebouwde images; dezelfde rooktest geslaagd in GitHub Actions ci run 42608437675 (job images, commit c5063f0; ook jobs python en web geslaagd); review contract 1.2: commit fb33197 (deploy/smoke.sh): ook CapEff 0000000000000000 voor elk proces in Hub en executor, inclusief PID 1 — lokaal geslaagd met opnieuw gebouwde images; dezelfde rooktest met CapEff-controle geslaagd in GitHub Actions ci run 42627362084 (jobs python, web en images); contract 1.2: commit ba9517e (deploy/smoke.sh): ook oud enroll-verzoek → 422, key-rotations → lege lijst, executor weigert Hub-JWT zonder koppeling — lokaal geslaagd met opnieuw gebouwde images (Hub met migratie 0002); review contract 1.2 (ADR-0014): commits db58d0d en 10cc5f9 (deploy/smoke.sh): chunked > 1 MiB (1 MiB + 1 byte en 5× 3 MB) en een te grote Content-Length geven 413 met max_bytes, naar de Hub via de webpoort (Node-doorgang) en naar de executor — lokaal geslaagd met opnieuw gebouwde images, net als de bestaande controles (uid's 568/569, CapEff 0 en NoNewPrivs 1 per proces, herstart en harde kill zonder dataverlies); dezelfde rooktest met chunked 413 geslaagd in GitHub Actions ci run 42640839030 (commit 208ae6c; jobs python (302 tests), web en images geslaagd)",
+    "bewijs": "commit 58584e2; deploy/smoke.sh (lokaal geslaagd): uid's in de Hub-container 568 en 569, geen root-proces, alleen poort 30400 luistert, PostgreSQL alleen via unix-socket; ook met no-new-privileges en minimale capabilities; met web-UI (commit 5c66b00): rooktest geslaagd, processen 568 (web, api, worker, postgres) en 569 (ai-runner), luisterende sockets precies 0.0.0.0:30400 en 127.0.0.1:8400, /opt/hub-web alleen-lezen voor 568; review P0: commit c5063f0 (deploy/smoke.sh): NoNewPrivs 1 voor elk proces in Hub en executor, eerste beheerder via de setupcode uit de log, setupcode eenmalig (409), docker restart én harde kill zonder dataverlies (setup blijft afgerond, inloggen werkt, geen nieuwe setupcode, executor-identiteit gelijk, oude postmaster.pid opgeruimd) — lokaal geslaagd met de opnieuw gebouwde images; dezelfde rooktest geslaagd in GitHub Actions ci run 42608437675 (job images, commit c5063f0; ook jobs python en web geslaagd); review contract 1.2: commit fb33197 (deploy/smoke.sh): ook CapEff 0000000000000000 voor elk proces in Hub en executor, inclusief PID 1 — lokaal geslaagd met opnieuw gebouwde images; dezelfde rooktest met CapEff-controle geslaagd in GitHub Actions ci run 42627362084 (jobs python, web en images); contract 1.2: commit ba9517e (deploy/smoke.sh): ook oud enroll-verzoek → 422, key-rotations → lege lijst, executor weigert Hub-JWT zonder koppeling — lokaal geslaagd met opnieuw gebouwde images (Hub met migratie 0002); review contract 1.2 (ADR-0014): commits db58d0d en 10cc5f9 (deploy/smoke.sh): chunked > 1 MiB (1 MiB + 1 byte en 5× 3 MB) en een te grote Content-Length geven 413 met max_bytes, naar de Hub via de webpoort (Node-doorgang) en naar de executor — lokaal geslaagd met opnieuw gebouwde images, net als de bestaande controles (uid's 568/569, CapEff 0 en NoNewPrivs 1 per proces, herstart en harde kill zonder dataverlies); dezelfde rooktest met chunked 413 geslaagd in GitHub Actions ci run 42640839030 (commit 208ae6c; jobs python (302 tests), web en images geslaagd); P1 deel 1 (ADR-0021): deploy/smoke.sh controleert ook migraties 0003–0005 in de image, periodieke worker-taken (status ok), catalogus en observability zonder NAS (unknown) en de standaard-alertregels — lokaal geslaagd met opnieuw gebouwde images",
     "blokkade": "Op de echte NAS (Custom App) nog niet uitgevoerd.",
     "opmerking": "Docker-omgeving, geen TrueNAS. Geen Docker-socket, geen privileged-modus. Review: images zetten no-new-privileges zelf (prctl) omdat het standaardformulier dat niet betrouwbaar kan. Contract 1.2 §2.2: de rooktest draait zonder --security-opt/--cap-drop (zoals het formulier) en kijkt naar elk proces; de bewaker is PID 1 en wisselt zelf, er blijft geen root-init over.",
     "repo": "ai-server-manager",
@@ -286,6 +286,66 @@
     "bewijs": "commit 15886cb; apps/api/tests/unit/test_catalog_gates.py; apps/api/tests/integration/test_events_decisions.py",
     "blokkade": "Waarde onbekend: in te vullen of te meten door de gebruiker op de echte NAS.",
     "opmerking": "Wizard gebouwd; waarde onbekend tot de gebruiker hem invult of de wizard hem meet. Optional Navidrome: getypt schema zonder voorbeeldwaarden; Getest alleen met expliciet bewijsrecord.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B01-004",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware)",
+    "bewijs": "commits efb7f3b (reporting.realtime, observability, dekking), 9168195 (Beszel), b4c7a0e (tijdreeksen); tests/e2e/test_observability.py::test_live_metingen_uit_truenas_met_bron_en_tijd (waarde + eenheid + bron + observed_at, abonnement opgezegd, NAS offline + TTL → unknown met laatst bekend), ::test_beszel_als_tweede_bron_gpu_op_pci_slot_en_mini_pc_uitgesloten, ::test_realtime_zonder_leesrecht_of_zonder_antwoord_is_onbekend, ::test_zonder_koppeling_alles_onbekend; tests/e2e/test_monitoring_bronnen.py::test_beszel_alleen_nas_gpu_op_naam_en_geen_nul_graden (render-node-wissel verwisselt A310 en UHD 770 niet); apps/api/tests/unit/test_bronnen.py (realtime-normalisatie, GPU-koppeling op naam); deploy/smoke.sh (observability zonder NAS → unknown)",
+    "blokkade": "Echte NAS (TrueNAS-versie D01, reporting.realtime met de alleen-lezen-key) en echte GPU's (A310/UHD 770, intel_gpu_top in Beszel) niet beschikbaar in deze bouwomgeving.",
+    "opmerking": "API GET /api/v1/observability/nas: live CPU/temperatuur/geheugen/ZFS ARC/schijf-I/O/netwerk per interface uit TrueNAS reporting.realtime (core.subscribe, bronwaarneming middleware TS-25.10.8), pools uit pool.query, GPU's op PCI-slot (nooit render-node) met gebruik/vermogen uit Beszel; per metriek bron + laatst bijgewerkt; TrueNAS vóór Beszel; ouder dan 180 s → unknown met laatst bekend; mini-pc nooit gebruikt (alleen 'uitgesloten'). GPU-temperatuur: geen bron → altijd unknown (nooit 0 °C). Tijdreeksen met beperkte retentie (B09-003). Trendgrafieken en scherm volgen in de P1-webstap.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B09-001",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware)",
+    "bewijs": "commits efb7f3b, 9168195; tests/e2e/test_observability.py (GET /api/v1/monitoring/coverage: cpu.gebruik gedekt door TrueNAS én Beszel, gpu.gebruik per PCI-slot, gpu.temperatuur en schijftemperatuur als hiaat met alternatief, apps zonder gezondheidsbron); tests/e2e/test_monitoring_bronnen.py::test_beszel_alleen_nas_gpu_op_naam_en_geen_nul_graden; apps/api/tests/unit/test_bronnen.py::test_gpu_alleen_eenduidig_op_naam, ::test_gpu_dubbelzinnig_wordt_niet_gekoppeld, ::test_beszel_stats_eenheden_en_geen_nul_graden",
+    "blokkade": "Wat TrueNAS en Beszel op de echte NAS (i7, A310, UHD 770) werkelijk leveren is niet gemeten.",
+    "opmerking": "Dekkingsmatrix per metriek en bron: kan_leveren (bronwaarneming uit de broncode van TrueNAS TS-25.10.8, Beszel v0.21.1, Uptime Kuma 2.5.9) en levert (gemeten: verse reeks binnen de TTL); hiaten zichtbaar met alternatief. Capability flags: GPU-temperatuur niet geleverd → unknown, nooit 0 °C; temperaturen ≤ 0 of > 150 °C ongeldig. A310 en UHD 770 onderscheiden op PCI-slot (app.gpu_choices) en Beszel-namen alleen bij eenduidig modelnummer. Geen alternatieve privileged collector voor intel_gpu_top (bewust niet gebouwd). Scherm 'Meetdekking' volgt in de P1-webstap.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B09-002",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commits 9168195, 9585741; tests/e2e/test_monitoring_bronnen.py::test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded (200 met falende worker-controle → degraded jobs_staan_stil; heartbeat met stilstaande jobs → degraded; grace: eerste fout unknown, tweede down; 401 → nooit gezond; verouderd → unknown), ::test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_ingetrokken_key (versie-detectie 2.5.9, /metrics met API-key + statuspagina, automatische en handmatige koppeling, verouderd → unknown met laatste status, ingetrokken key → direct unknown + event), ::test_kuma_zonder_monitor_id_en_validatie (geen redirect gevolgd); apps/api/tests/unit/test_bronnen.py, apps/api/tests/unit/test_catalogus.py (gezondheidsmodel)",
+    "blokkade": "Geen echte Uptime Kuma/Beszel en geen echte eigen diensten op de NAS; diensten sturen nog geen heartbeat (Hub-uitbreiding, niet in contract 1.2).",
+    "opmerking": "Gezondheid healthy/degraded/down/unknown met observed_at per component (TrueNAS-staat, buitenkant via Uptime Kuma, binnenkant via heartbeat/connector-health/worker van de Hub); RUNNING alleen is nooit gezond; apps met eigen taken pas gezond met verse binnenkant. MediaGuard/MSO/my_house: alleen buitenkant tot hun adapter via bestaande routes met gescopete sleutel (contract 1.2 §2.3, P3) → unknown, geen enrollment. Laatste 24 u als reeks app.status/monitor.latentie. Scherm volgt in de P1-webstap.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "B09-003",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit b4c7a0e (migratie 0004); tests/e2e/test_alerts_gotify.py::test_prometheus_achtige_testload_geeft_geen_meldingenstorm (200 reeksen, 60 000 metingen: flapperen → geen alert, aanhoudend → precies één melding per alert, hysterese → geen hersteldmelding; kanaal 10 berichten + één samenvatting), ::test_keten_truenas_naar_gotify_app_down_en_dempen (fake TrueNAS → catalogus → gezondheid → app.status → standaardregel → Gotify; dempen; verouderde data herstelt niets), ::test_gotify_storingen_herhalen_dead_letter_en_token_fail_closed, ::test_stille_uren_alleen_kritiek_direct, ::test_notification_send_r0_via_wachtrij_en_rechten, ::test_kanaal_beheren_testmelding_echt_en_token_nooit_terug; apps/api/tests/integration/test_tijdreeksen.py (grenzen, aggregatie 5 min/1 u, retentie, API); apps/api/tests/unit/test_alerts_meldingen.py; GitHub Actions ci run 42657727814 geslaagd op b4c7a0e",
+    "blokkade": "Geen echte NAS-belasting en geen echte Gotify/telefoon (I13-13-03 'outage push arriveert' is NIET GEVALIDEERD).",
+    "opmerking": "Opslag in de eigen PostgreSQL: begrensde, genormaliseerde reeksen; retentie per reeks (48 u ruw, 30 d per 5 min, 400 d per uur); aggregatie met date_bin. Alertregels met drempel, duur, herstelgrens en herstelduur; dedupe per overgang en kanaal, dempen per alert/regel, rate-limit per kanaal met samenvatting, stille uren (kritiek altijd), backoff + dead-letter, token geweigerd → fail-closed. Standaardregels voor pool vol/ongezond, app onbereikbaar, CPU, temperatuur en geheugen. Gotify-adapter = notification.send (R0). Grafieken volgen in de P1-webstap.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "EX16",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd",
+    "bewijs": "commits 9168195, b4c7a0e; tests/e2e/test_monitoring_bronnen.py::test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_ingetrokken_key (ingetrokken Kuma-API-key → monitors direct unknown bron_credential_geweigerd + event monitoring.source.failed + NL-melding), ::test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded (dienst weigert de Hub → unknown, nooit gezond); tests/e2e/test_alerts_gotify.py::test_gotify_storingen_herhalen_dead_letter_en_token_fail_closed (ingetrokken Gotify-token → kanaal fout, geen herhaalde pogingen tot een nieuw token)",
+    "blokkade": "Een echte run (echte keys intrekken op de NAS) is nog niet gedaan.",
+    "opmerking": "Deels: monitoringbronnen, meldingskanaal en connector-health van eigen diensten. De adapters voor MediaGuard/MSO/my_house (gescopete sleutels) volgen in P3; het incident in de inbox volgt in P1 deel 2 (nu: outbox-event + melding op de bron).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "I23-23-06",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commits 9168195, efb7f3b; tests/e2e/test_monitoring_bronnen.py (Uptime Kuma, Beszel, connector-health, heartbeat, verouderd → unknown); tests/e2e/test_catalogus.py (fake.mutations leeg, alleen GET naar de appstore)",
+    "blokkade": "Echte NAS en echte Uptime Kuma/Beszel nodig; connectors voor MediaGuard, MSO, my_house, DNS en workflow volgen in latere fasen (P3).",
+    "opmerking": "Deels: Beszel en Uptime Kuma live (alleen lezen) met stale states; geen enkele schrijfactie van de Hub naar een eigenaar (alle bronroutes zijn GET of auth).",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-09"
   }

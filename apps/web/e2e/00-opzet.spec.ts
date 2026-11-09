@@ -156,11 +156,14 @@ test.describe("met beheerderssessie", () => {
     await ready(page);
     await page.getByLabel("Nieuwe API-key (vervangt de huidige)").fill(st.write_key);
     await page.getByTestId("key-opslaan").click();
+    // Eerst wachten tot de key echt is opgeslagen; anders test de knop soms nog de vorige key (wedloop in de test).
+    await expect(page.getByTestId("key-status")).toContainText(st.write_key.slice(-4));
     await page.getByTestId("verbinding-testen").click();
     await expect(page.getByTestId("test-resultaat")).toHaveAttribute("data-reason", "key_too_privileged");
     // Terug naar de alleen-lezen-key.
     await page.getByLabel("Nieuwe API-key (vervangt de huidige)").fill(st.readonly_key);
     await page.getByTestId("key-opslaan").click();
+    await expect(page.getByTestId("key-status")).toContainText(st.readonly_key.slice(-4));
     await page.getByTestId("verbinding-testen").click();
     await expect(page.getByTestId("test-resultaat")).toHaveAttribute("data-reason", "ok");
   });
