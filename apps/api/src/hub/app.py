@@ -35,6 +35,7 @@ from hub.routers import (
     notifications,
     observability,
     onboarding,
+    runbooks,
     services,
 )
 from hub.vault import Vault
@@ -272,6 +273,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         notifications.router,
         backups.router,
         incidents.router,
+        runbooks.router,
         logs.router,
         events.router,
     ):

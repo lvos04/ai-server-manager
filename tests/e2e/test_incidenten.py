@@ -189,7 +189,7 @@ def test_herstel_sluit_alleen_het_eigen_incident(admin: Any, app: Any, periodic_
     assert any("ouder dan het laatste probleem" in e["samenvatting"] for e in evs)
 
 
-def test_heropenen_binnen_venster_en_hersteldmelding(
+def test_heropenen_binnen_venster_hersteldmelding_en_veilige_modus(
     admin: Any, app: Any, periodic_run: Any, gotify: FakeGotify
 ) -> None:
     channel(admin, gotify)
@@ -225,6 +225,12 @@ def test_heropenen_binnen_venster_en_hersteldmelding(
     assert inc["heropend"] == 2 and inc["aantal_gebeurtenissen"] == 3
     soorten = [n.soort for n in incident_notifications(app, inc["id"])]
     assert soorten.count("hersteld") == 2, soorten  # elk herstel na een melding krijgt een hersteldmelding
+    # B09-006: herhaald falen → veilige modus (één melding) en geen herstartvoorstel meer.
+    assert inc["veilige_modus"]["actief"] is True and inc["runbook_id"] == "service_offline"
+    titles = [n.titel for n in incident_notifications(app, inc["id"])]
+    assert sum(1 for t in titles if t.startswith("Veilige modus")) == 1
+    r = admin.post(f"/api/v1/incidents/{inc['id']}/herstel-voorstellen", headers=idem())
+    assert r.status_code == 200 and r.json()["voorstel"] is None and r.json()["reden"] == "veilige_modus"
 
 
 def test_erkennen_snoozen_oplossen_met_readback_en_rechten(
@@ -495,3 +501,83 @@ def test_alert_overgang_wordt_incident_zonder_dubbele_melding(
     assert out["opgelost"] == 1 and active(admin) == []
     done = admin.get(f"/api/v1/incidents/{inc['id']}").json()
     assert done["readback"]["toestand"] == "hersteld" and done["readback"]["bron"] == "alert"
+
+
+def test_onderzoek_en_herstel_voorstellen_zonder_uitvoering(admin: Any, app: Any, periodic_run: Any) -> None:
+    """'Onderzoek' toont het runbook met ingevulde routes; 'Herstel voorstellen' geeft alleen een ActionProposal
+    (uitvoerbaar: false), na herhaald falen geen herstart (veilige modus); opheffen kan alleen met reden + audit."""
+    from hub.events.envelope import emit
+    from hub.models import CatalogApp
+
+    with app.state.sessionmaker() as db:
+        cat = CatalogApp(
+            runtime_id="prowlarr",
+            naam="prowlarr",
+            adaptertype="truenas",
+            soort="derde",
+            installatiewijze="catalog_app",
+            runtime_staat="CRASHED",
+            image_digest="sha256:" + "a" * 64,
+        )
+        db.add(cat)
+        db.flush()
+        cid = str(cat.id)
+        rule = str(uuid.uuid4())
+        t0 = datetime.now(UTC) - timedelta(minutes=30)
+
+        def alert(kind: str, at: datetime) -> None:
+            emit(
+                db,
+                f"alert.instance.{kind}",
+                "alert_instance",
+                "a1",
+                {
+                    "regel_id": rule,
+                    "regel_sleutel": "app-down",
+                    "regel_naam": "App onbereikbaar",
+                    "ernst": "kritiek",
+                    "onderwerp_type": "app",
+                    "onderwerp_id": cid,
+                    "onderwerp_naam": "prowlarr",
+                },
+                timestamp=at,
+            )
+
+        alert("fired", t0)
+        db.commit()
+    periodic_run("incidenten_bijwerken")
+    inc = active(admin)[0]
+    assert inc["hypothese"]["sleutel"] == "app:crasht" and inc["hypothese"]["zekerheid"] == 0.7
+    ond = admin.get(f"/api/v1/incidents/{inc['id']}/onderzoek").json()
+    assert ond["runbook"]["id"] == "service_offline"
+    bronnen = [st["bron"] for st in ond["runbook"]["fasen"]["observeren"] if st["bron"]]
+    assert f"/api/v1/apps/{cid}" in bronnen and any(inc["id"] in b for b in bronnen)
+    r = admin.post(f"/api/v1/incidents/{inc['id']}/herstel-voorstellen", headers=idem())
+    out = r.json()
+    assert r.status_code == 200 and out["uitvoerbaar"] is False and out["reden"] == "policy_engine_niet_beschikbaar"
+    v = out["voorstel"]
+    assert v["action_id"] == "app.restart" and v["target"] == {"host_id": "nas-primary", "app_id": "prowlarr"}
+    assert v["expected_version"] == "sha256:" + "a" * 64 and v["risk_claim"] == "R1"
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(func.count()).select_from(Job)) == 0  # niets uitgevoerd of ingepland
+        for k in range(2):
+            alert("resolved", t0 + timedelta(minutes=2 * k + 1))
+            alert("fired", t0 + timedelta(minutes=2 * k + 2))
+        db.commit()
+    periodic_run("incidenten_bijwerken")
+    inc = admin.get(f"/api/v1/incidents/{inc['id']}").json()
+    assert inc["heropend"] == 2 and inc["veilige_modus"]["actief"] is True
+    r = admin.post(f"/api/v1/incidents/{inc['id']}/herstel-voorstellen", headers=idem())
+    assert r.json()["voorstel"] is None and r.json()["reden"] == "veilige_modus"
+    make_user(admin, "kijker2", "viewer")
+    kijker = login_as(app, "kijker2")
+    body = {"actief": False, "reden": "geheugenlimiet verhoogd"}
+    assert kijker.post(f"/api/v1/incidents/{inc['id']}/veilige-modus", json=body, headers=idem()).status_code == 403
+    r = admin.post(f"/api/v1/incidents/{inc['id']}/veilige-modus", json=body, headers=idem())
+    assert r.status_code == 200 and r.json()["veilige_modus"]["actief"] is False
+    again = admin.post(f"/api/v1/incidents/{inc['id']}/veilige-modus", json=body, headers=idem())
+    assert again.status_code == 409
+    rb = admin.get("/api/v1/runbooks").json()
+    assert len(rb["items"]) == 8 and len(rb["runbook_hash"]) == 64
+    acties = {a["actie"] for a in admin.get("/api/v1/audit", params={"limit": 200}).json()["items"]}
+    assert {"incident.fix_proposed", "incident.safe_mode_cleared"} <= acties

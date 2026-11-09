@@ -1773,6 +1773,29 @@
         "title": "ValueIn",
         "type": "object"
       },
+      "VeiligeModusIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actief": {
+            "const": false,
+            "description": "Alleen opheffen; de veilige modus aanzetten doet de Hub zelf.",
+            "title": "Actief",
+            "type": "boolean"
+          },
+          "reden": {
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Reden",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actief",
+          "reden"
+        ],
+        "title": "VeiligeModusIn",
+        "type": "object"
+      },
       "Worker": {
         "additionalProperties": false,
         "properties": {
@@ -4515,6 +4538,63 @@
         ]
       }
     },
+    "/api/v1/incidents/{incident_id}/herstel-voorstellen": {
+      "post": {
+        "operationId": "propose_fix_api_v1_incidents__incident_id__herstel_voorstellen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Herstel voorstellen (operator): alleen een ActionProposal, nooit uitvoering; veilige modus: geen herstart",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
     "/api/v1/incidents/{incident_id}/notities": {
       "post": {
         "operationId": "add_note_api_v1_incidents__incident_id__notities_post",
@@ -4577,6 +4657,51 @@
           }
         },
         "summary": "Notitie toevoegen (operator; geschoond opgeslagen)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/onderzoek": {
+      "get": {
+        "operationId": "investigate_api_v1_incidents__incident_id__onderzoek_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Investigate Api V1 Incidents  Incident Id  Onderzoek Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Onderzoek (operator): runbook, hypothese, readback en veilige modus",
         "tags": [
           "incidenten"
         ]
@@ -4787,6 +4912,73 @@
           }
         },
         "summary": "Geschoonde supportbundel (operator): incident, gebeurtenissen en gerelateerde logregels",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/veilige-modus": {
+      "post": {
+        "operationId": "clear_safe_mode_api_v1_incidents__incident_id__veilige_modus_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VeiligeModusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Veilige modus opheffen (operator, met reden en audit)",
         "tags": [
           "incidenten"
         ]
@@ -6405,6 +6597,73 @@
         "summary": "Dienstenregister: app → basis-URL (NAS-adres uit D03 + hostpoort uit app.query)",
         "tags": [
           "inventaris"
+        ]
+      }
+    },
+    "/api/v1/runbooks": {
+      "get": {
+        "operationId": "list_runbooks_api_v1_runbooks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Runbooks Api V1 Runbooks Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Runbooks per scenario (observeren → isoleren → mitigeren → terugdraaien → bewijs → oorzaak)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/runbooks/{runbook_id}": {
+      "get": {
+        "operationId": "get_runbook_api_v1_runbooks__runbook_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runbook_id",
+            "required": true,
+            "schema": {
+              "title": "Runbook Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Runbook Api V1 Runbooks  Runbook Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén runbook",
+        "tags": [
+          "incidenten"
         ]
       }
     },

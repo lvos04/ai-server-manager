@@ -40,6 +40,7 @@ from hub.logsink import MATCHERS
 from hub.logsink import to_dict as log_dict
 from hub.models import Incident, IncidentEvent, LogEntry
 from hub.redact import redact_log_text, redact_log_value
+from hub.runbooks import engine as runbook_engine
 from hub.security import Role
 from hub.timeutil import iso, utcnow
 from hub.vault import Vault
@@ -74,6 +75,11 @@ class OplosIn(Strict):
 
 class NotitieIn(Strict):
     tekst: str = Field(min_length=1, max_length=2000)
+
+
+class VeiligeModusIn(Strict):
+    actief: Literal[False] = Field(description="Alleen opheffen; de veilige modus aanzetten doet de Hub zelf.")
+    reden: str = Field(min_length=3, max_length=300)
 
 
 def _get(db: DB, incident_id: uuid.UUID, *, lock: bool = False) -> Incident:
@@ -461,3 +467,70 @@ def support_bundle(
             "Cache-Control": "no-store",
         },
     )
+
+
+@router.get("/{incident_id}/onderzoek", summary="Onderzoek (operator): runbook, hypothese, readback en veilige modus")
+def investigate(incident_id: uuid.UUID, db: DB, settings: SettingsDep, _: Operator) -> dict[str, Any]:
+    inc = _get(db, incident_id)
+    return runbook_engine.onderzoek(db, settings, inc, utcnow())
+
+
+@router.post(
+    "/{incident_id}/herstel-voorstellen",
+    summary="Herstel voorstellen (operator): alleen een ActionProposal, nooit uitvoering; veilige modus: geen herstart",
+)
+def propose_fix(incident_id: uuid.UUID, db: DB, settings: SettingsDep, principal: Operator, idem: Idem) -> JSONResponse:
+    if (replay := idem.replay()) is not None:
+        return replay
+    inc = _get(db, incident_id, lock=True)
+    now = utcnow()
+    out = runbook_engine.herstel_voorstellen(db, settings, inc, principal.actor, now)
+    voorstel = out.get("voorstel")
+    add_event(
+        db,
+        inc,
+        ref=f"status:{uuid.uuid4()}",
+        soort="status",
+        op=now,
+        actor=principal.actor,
+        force=True,
+        samenvatting=f"Herstelvoorstel opgevraagd: {voorstel['action_id'] if voorstel else 'geen'} "
+        f"({out['reden']}); niet uitgevoerd.",
+    )
+    _audit(
+        db,
+        principal,
+        "incident.fix_proposed",
+        inc,
+        {"action_id": voorstel["action_id"] if voorstel else None, "reden": out["reden"]},
+    )
+    db.flush()
+    return idem.save(200, out)
+
+
+@router.post("/{incident_id}/veilige-modus", summary="Veilige modus opheffen (operator, met reden en audit)")
+def clear_safe_mode(
+    incident_id: uuid.UUID, body: VeiligeModusIn, db: DB, settings: SettingsDep, principal: Operator, idem: Idem
+) -> JSONResponse:
+    if (replay := idem.replay()) is not None:
+        return replay
+    inc = _get(db, incident_id, lock=True)
+    if not inc.veilige_modus:
+        raise HubError(409, "not_in_safe_mode", "Dit incident staat niet in de veilige modus.")
+    now = utcnow()
+    inc.veilige_modus, inc.veilige_modus_sinds = False, None
+    inc.heropeningen = []
+    _touch(inc)
+    add_event(
+        db,
+        inc,
+        ref=f"status:{uuid.uuid4()}",
+        soort="status",
+        op=now,
+        actor=principal.actor,
+        force=True,
+        samenvatting=f"Veilige modus opgeheven door {principal.name}: {body.reden}",
+    )
+    _audit(db, principal, "incident.safe_mode_cleared", inc, {"reden": body.reden})
+    db.flush()
+    return idem.save(200, _view(db, settings, inc, principal))

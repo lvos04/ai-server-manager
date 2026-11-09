@@ -288,10 +288,6 @@ def resolve(db: Session, inc: Incident, *, door: str, reden: str, op: datetime) 
     inc.bijgewerkt_op, inc.version = utcnow(), inc.version + 1
 
 
-SafeModeCheck = Callable[[Session, Settings, Incident, datetime], bool]
-SAFE_MODE: list[SafeModeCheck] = []
-
-
 def apply_signal(db: Session, settings: Settings, sig: Signaal, ev: EventIn, now: datetime, stats: Stats) -> None:
     inc = active_for(db, sig.vingerafdruk)
     common: dict[str, Any] = {
@@ -354,10 +350,12 @@ def apply_signal(db: Session, settings: Settings, sig: Signaal, ev: EventIn, now
             **common,
         )
         hypothesis.refresh(db, settings, inc, now)
-        if reopened:
-            for check in SAFE_MODE:
-                if check(db, settings, inc, now):
-                    stats.meldingen += notify(db, inc, "veilige_modus", now)
+        from hub.runbooks.engine import check_safe_mode, runbook_for  # laat import: runbooks gebruikt deze module
+
+        rb = runbook_for(inc)
+        inc.runbook_id = rb.id if rb is not None else None
+        if reopened and check_safe_mode(db, settings, inc, now):
+            stats.meldingen += notify(db, inc, "veilige_modus", now)
         if opened or reopened or sig.meldt_elke_keer:
             stats.meldingen += notify(
                 db, inc, "actief", now, suffix="" if not sig.meldt_elke_keer else f":{inc.aantal}"
