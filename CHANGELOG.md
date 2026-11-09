@@ -3,6 +3,19 @@
 Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact deze tag (nooit `latest`).
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
+- **B03 2.0 (goedgekeurd) en Excel-bijwerker (Δ-ASM-EXCEL):**
+  - `tools/excel/update_excel.py` voegt werkpakketrijen (`--werkpakketten`, `tasks.json`-formaat; bestaand ID = inhoud
+    vervangen met behoud van status en bewijs), testrijen (`--testen`/`--testmeta`, `e2e_cases`-formaat) en faserijen
+    (`--fasen`, P4-0 na P3) toe; tabelbereiken, dropdowns, voorwaardelijke opmaak, samengevoegde cellen en formules op
+    Dashboard/Appoverzicht lopen mee; formuleresultaten worden herberekend; ongewijzigde onderdelen blijven byte-gelijk;
+    idempotent; weigert Gereed/Geslaagd. `JLT-…` gaat naar de Testmatrix, `P4-0` naar Fasen. Pytest (klein test-werkboek
+    + de echte Excel in een tijdelijke kopie) in de nieuwe CI-job `excel`.
+  - `02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md` versie 2.0 met de HARDE EIS van de gebruiker (kijkgeschiedenis en
+    MediaGuard-voortgang altijd beschikbaar) en de overname vanuit **Emby** (B03-015, JLT-70…74, P0, golf 0; controlelijst
+    "Emby verwijderen"); `B03_FASERING.md`, `B03_BESLUITEN.md`; fase P4-0 en nieuwe gates in `06_FASERING_EN_GATES.md` en
+    `OVERDRACHT_PROMPT.md` §4; ADR-0016…0020.
+  - Brondata: `08_EXCEL/tasks.json`, `e2e_cases.json`, `EXCEL_TAKEN.json` en `08_EXCEL/b03/`; Excel bijgewerkt
+    (66 nieuwe en 6 vervangen B03-rijen, JLT-01…74, rij P4-0, bewijs samengevoegd).
 - Ontwerptaal **Peil** 1.1.0 als bron van waarheid: `docs/platform-v2/ONTWERPTAAL.md` + `design/ontwerptaal/` (tokens, CSS voor Tailwind 4 + shadcn/ui, statuspagina-sjabloon, aliaslagen, prototypes, schermafdrukken, contrast- en axe-controle) en ADR-0015 (vervangt ADR-0009 punt 1 deels).
 
 ### Gerepareerd — onafhankelijke review van contract 1.2 in Hub en executor (ADR-0014)

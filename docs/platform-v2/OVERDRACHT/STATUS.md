@@ -76,9 +76,55 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   (bewuste keuze, risico geaccepteerd). Licentie voor de eigen repos: **GPL-3.0** (forks houden hun upstream-licenties).
 - **my_house 0.2.0** is gepubliceerd (release-run opnieuw gestart, alle jobs groen).
 - **B03 uitgebreid** met zes functies (Watch Together, aanbevelingen, NL-ondertitelvertaling, mediakwaliteitscontrole,
-  apparaatprofielen, intro/outro/recap); plan en Excel-rijen volgen.
+  apparaatprofielen, intro/outro/recap); plan en Excel-rijen zijn verwerkt (zie "B03 2.0 verwerkt" hieronder).
 - **Sync-token** (`JL_SYNC_PUSH_TOKEN`): nog open — fine-grained token alleen via de GitHub-web-UI; deploysleutels aanmaken vraagt
   uitdrukkelijke toestemming in de sessie.
+
+## B03 2.0 verwerkt (2026-11-09, avond)
+
+- **Plan (goedgekeurd door de gebruiker):** `02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md` versie 2.0 (versie 1 letterlijk
+  behouden; hoofdstukken 8–19 en bijlagen nieuw; 72 werkpakketten: 66 nieuw B03-014…079 en 6 uitgebreid B03-004/005/007/
+  009/010/013; 74 testrijen JLT-01…74), `B03_FASERING.md` (P4-0, golven 0–4, gates, prioriteiten) en `B03_BESLUITEN.md`
+  (genomen besluiten bovenaan, open besluiten per fase/golf). Overgenomen in `OVERDRACHT_PROMPT.md` §2/§4 en
+  `01_ARCHITECTUUR/06_FASERING_EN_GATES.md` (fase P4-0, P4/P5 aangevuld, nieuwe gates). ADR's die platform en Hub raken:
+  ADR-0016 (foutcatalogus), ADR-0017 (Hub-koppeling/privacy), ADR-0018 (MediaGuard-grens + Δ-MG-DUAL), ADR-0019
+  (optionele model-apps), ADR-0020 (HARDE EIS en Emby-overname). De overige ADR-voorstellen (ADR-B03-01…04, 07, 08, 10–12)
+  horen bij de forks.
+- **HARDE EIS van de gebruiker (letterlijk):** alle kijkgeschiedenis (gezien-status, hervatpunten, favorieten,
+  beoordelingen, onthouden spoorkeuzes, gebruikers, rechten) en de MediaGuard-voortgang blijven altijd beschikbaar.
+  Geen cutover zonder vóór/na-rapport per gebruiker en uitdrukkelijk akkoord van de gebruiker op elk verschil (ook door
+  upstream-migraties); de bestaande installatie blijft ongewijzigd als terugval. Elke MediaGuard-release (ook de eerste uit
+  de nieuwe publieke repo) bewijst een upgrade op een gevulde database van de vorige versie zonder gegevensverlies.
+  Staat in bouwplan §10.9 en B03-015 (acceptatie) en in ADR-0020.
+- **Emby (gebruiker):** de huidige mediaserver is **Emby**; de kijkgeschiedenis staat daar. "Het belangrijkste is mijn
+  kijkgeschiedenis; als alles werkt verwijder ik Emby." Daarom: B03-015 = "Overname vanuit de bestaande mediaserver (Emby;
+  ook Jellyfin als D07 dat meet)", prioriteit P0 en al in golf 0 tegen stock 12.4 met een echte Emby-container
+  (`emby/embyserver:4.10.2.0@sha256:7082c63b…65cc1`, stabiel op 2026-11-09); alleen lezen uit Emby; koppelen op
+  provider-ID's en pad met een afhandellijst; doel 100 % van gezien-status en hervatpunten; eerst JellyPlex-Watched (GPL-3.0)
+  beoordelen. Nieuwe testen JLT-70…74 (P0; JLT-74 echte NAS = Geblokkeerd). Δ-MG-AUTH wordt per server (Emby houdt
+  `X-Emby-Token`) en nieuw Δ-MG-DUAL: MediaGuard volgt Emby én Jelly Leon; de Emby-koppeling onderbreekt nooit. Controlelijst
+  "Emby verwijderen" (bouwplan §10.9.2); de gebruiker verwijdert Emby zelf. APP-02 en I26-26-02 blijven gelden.
+- **Genomen BG-besluiten (2026-11-09, keuzemenu):** BG-01 MediaGuard naar `Authorization: MediaBrowser Token=…`
+  (Δ-MG-AUTH), legacy-auth blijft uit, derden-apps eerst testen; BG-02 geen release meer op 10.11.11, eerste Jelly
+  Leon-release op 12.x, P4-0 als eigen fase (rij op het blad Fasen); BG-32 Intro Skipper alleen als ongewijzigde
+  vergelijkingsbasis in een testcontainer, externe segmentdatabases uit, bestaande segmenten eenmalig als hint met
+  voorbeeld; BG-34 de gebruiker (of een aangewezen persoon) labelt de echte afleveringen, met een eenvoudig labelscherm;
+  BG-37 MovieLens en Pioneer One alleen lokaal, eenmalige evaluatie op de echte kijkhistorie (na B03-039; samengevat,
+  afmelden kan, kinderen nooit), TMDb in een wegwerpcontainer, geen Netflix-masters zolang de schijf vol is; BG-38
+  tijdelijke meetdata opgeruimd, testsets on demand, Android-images blijven, `transcode` in de groepen render en kvm.
+- **Later te vragen (per fase/golf; tot dan geldt de veiligste stand):** P4-0 (overname): BG-22 · vóór golf 1: BG-03,
+  BG-04 · na golf 1: BG-07 · golf 2: BG-16, BG-27, BG-33, BG-35, BG-36 · vóór golf 3: BG-05 · golf 3: BG-10, BG-11,
+  BG-13, BG-14, BG-19, BG-21, BG-23, BG-24, BG-25, en vóór B03-027 BG-09 · vóór golf 4: BG-08 · golf 4: BG-12, BG-15,
+  BG-26, BG-28, BG-29, BG-30, BG-31 · bij B03-006: BG-17 · vóór P5: BG-06, BG-18 · P5: BG-20. Zonder BG-ID: akkoord op
+  elk verschil per gebruiker (bij elke overnamerun), nieuw wachtwoord of SSO per gebruiker (vóór de echte overname), Emby
+  uit (na JLT-74 en de controlelijst).
+- **Excel (Δ-ASM-EXCEL opgeleverd):** `tools/excel/update_excel.py` voegt werkpakketten, testrijen en faserijen toe op
+  XML-niveau (tabellen, dropdowns, voorwaardelijke opmaak, databar en Dashboard-formules lopen mee; idempotent; weigert
+  Gereed/Geslaagd), met pytest op een klein test-werkboek en op de echte Excel (CI-job `excel`). Invoer:
+  `08_EXCEL/b03/`. Brondata: `tasks.json` (439 rijen), `e2e_cases.json` (124), `EXCEL_TAKEN.json` van deze repo (+10
+  B03-rijen, +5 testrijen). Werkboek na de B03-rijen en de EVIDENCE-samenvoeging: Werkpakketten 371 (48 Bezig / 21
+  Geblokkeerd / 302 Niet gestart), Testmatrix 124 (9 Bezig / 8 Geblokkeerd / 107 Niet gestart), Besluiten 18 (17 Open /
+  1 Ingevuld), Fasen 8 met P4-0 tussen P3 en P4 (P0 Bezig, rest Niet gestart). Nergens Gereed of Geslaagd.
 
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 
@@ -148,4 +194,5 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - Proxy blokkeerde: GHCR-blobs (pkg-containers.githubusercontent.com), dl.google.com + downloads.gradle.org (Android),
   invent.kde.org (mpvqt; GitHub-spiegel gebruikt), classList.js-archief (npm ci jelly-leon-web), officiële TrueNAS-docs.
   → Op de Ubuntu-machine opnieuw proberen en EVIDENCE bijwerken.
-- Excel-bijwerker: `ai-server-manager/tools/excel/update_excel.py` (getest; nog niet op de echte Excel gedraaid).
+- Excel-bijwerker: `ai-server-manager/tools/excel/update_excel.py` — sinds 2026-11-09 ook rijen toevoegen (Δ-ASM-EXCEL);
+  getest op een test-werkboek en op de echte Excel (CI-job `excel`).
