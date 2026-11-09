@@ -5,9 +5,10 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 ## Afstemming tussen de twee machines
 
 - **Overdrachtsstatus: OUDE MACHINE NOG BEZIG.** Zolang deze regel er staat werkt de oude sessie nog in: ai-server-manager,
-  appstore-en-fork, zoeken-en-persoonlijke-ai, jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients.
+  jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients (bijgewerkt 12:00).
   Daar niets committen of pushen (alleen lezen).
-- Vrij voor de nieuwe machine: home-control-hub, media-guard-ultimate, media-source-optimizer, my_house.
+- Vrij voor de nieuwe machine: home-control-hub, media-guard-ultimate, media-source-optimizer, my_house, appstore-en-fork,
+  zoeken-en-persoonlijke-ai (P0 + review klaar en gepusht).
 - Als de oude sessie klaar is, vervangt ze de regel hierboven door **OVERDRACHT VOLTOOID** (met tijdstip) en werkt ze
   deze STATUS.md bij met de definitieve P0-stand. Controleer met `git -C ai-server-manager pull` (bijv. elk kwartier).
 
@@ -25,9 +26,12 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   - ai-server-manager: backend P0 klaar (12 commits: scaffold, first-start-init, auth/enrollment, wizard D01–D18 + gates,
     TrueNAS-adapter, inventaris, back-updekking, events-inbox, EVIDENCE). PWA (apps/web) werd nog gebouwd → controleer of die
     gecommit is; daarna nog de **review**.
-  - appstore-en-fork: B08-001 manifeststandaard + validator gebouwd (5 commits); review liep.
-  - home-control-hub: scaffold + B13-001 gebouwd en gereviewd (ADR-0006).
-  - zoeken-en-persoonlijke-ai: scaffold + B07-001 gebouwd; review nog niet (controleren).
+  - appstore-en-fork: B08-001 manifeststandaard + validator gebouwd en gereviewd (review dichtte o.a. omzeiling via
+    //mnt/.ix-apps; CI-run 42602759898 groen: 350 unit, 53 integratie, 2 dienst-E2E, 8 image-E2E). **P0 klaar.**
+  - home-control-hub: scaffold + B13-001 gebouwd en gereviewd (fail-closed migratie bij mislukte pg_dump, 1 MiB-limiet;
+    218 tests). **P0 klaar.**
+  - zoeken-en-persoonlijke-ai: scaffold + B07-001 gebouwd en gereviewd (8 reparaties, o.a. geen ingetrokken bron in
+    back-ups en zoekgeschiedenis). **P0 klaar.**
   - jelly-leon-platform: scaffold, TrueNAS-simulator, INSTALLATIE.md, TRUENAS_APP_API.md, CI (4 commits); review nog niet.
   - jelly-leon: FORK_STRATEGIE, INVENTARIS, bouwverificatie, CI/upstream-sync (7 commits); review nog niet.
   - jelly-leon-web: P0 werd nog gebouwd → controleren; review nog niet.
