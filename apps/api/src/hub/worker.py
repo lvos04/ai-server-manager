@@ -22,7 +22,17 @@ from hub.config import Settings
 from hub.events.envelope import emit
 from hub.inventory.store import latest_run, prune_runs, save_run
 from hub.keys import KeyRing
-from hub.models import EnrollmentGrant, IdempotencyRecord, Job, LoginAttempt, SelfBackup, WebSession, WorkerHeartbeat
+from hub.models import (
+    EnrollmentGrant,
+    IdempotencyRecord,
+    Job,
+    LoginAttempt,
+    Notification,
+    SelfBackup,
+    WebSession,
+    WorkerHeartbeat,
+)
+from hub.monitoring import periodic
 from hub.timeutil import iso, utcnow
 from hub.truenas.connection import current_target, run_collect
 from hub.vault import Vault
@@ -88,8 +98,16 @@ def _claim(db: Session) -> Job | None:
 
 
 def _catalog_after_inventory(db: Session, settings: Settings, keyring: KeyRing | None) -> dict[str, Any]:
-    """Catalogus bijwerken (idempotent) en de appstore-koppeling verversen; fouten hier breken de inventaris niet."""
+    """Catalogus bijwerken (idempotent), pool-metingen als tijdreeks vastleggen en de appstore-koppeling verversen;
+    fouten hier breken de inventaris niet."""
     out: dict[str, Any] = {}
+    try:
+        out["metingen"] = periodic.record_inventory_metrics(db, settings)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        log.exception("pool-metingen vastleggen mislukt")
+        out["metingen"] = {"status": "failed", "fout": type(exc).__name__}
     try:
         out["catalogus"] = discover(db, settings).as_dict()
         db.commit()
@@ -151,6 +169,12 @@ def cleanup(db: Session) -> None:
     db.execute(delete(WebSession).where(WebSession.expires_at < now - timedelta(days=7)))
     db.execute(delete(EnrollmentGrant).where(EnrollmentGrant.expires_at < now - timedelta(days=30)))
     db.execute(delete(Job).where(Job.status.in_(("done", "failed")), Job.created_at < now - timedelta(days=14)))
+    db.execute(
+        delete(Notification).where(
+            Notification.status.in_(("verzonden", "onderdrukt", "mislukt")),
+            Notification.aangemaakt_op < now - timedelta(days=30),
+        )
+    )
     prune_runs(db, keep=50)
     db.commit()
 
@@ -191,6 +215,11 @@ def run_once(
             db.commit()
             done.append({"id": str(job.id), "kind": job.kind, **result})
         cleanup(db)
+    if schedule:
+        # Periodieke taken (meten, tijdreeksen, alerts, meldingen) staan in periodic_task, niet in de joblijst.
+        for t in periodic.run_due(factory, settings, vault, keyring):
+            if t.get("status") != "ok":
+                log.warning("periodieke taak %s: %s", t["taak"], t.get("fout") or t.get("status"))
     return done
 
 

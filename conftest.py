@@ -77,6 +77,10 @@ def settings(clean_db: str, tmp_path: Path) -> Any:
         truenas_read_timeout=3,
         login_max_failures=5,
         service_token_rotation_grace_seconds=600,
+        # Alleen tests: de fakes (Uptime Kuma, Beszel, Gotify) draaien op 127.0.0.1.
+        outbound_allow_loopback=True,
+        service_call_connect_timeout=2,
+        service_call_read_timeout=3,
     )
 
 
@@ -150,6 +154,26 @@ def fake_nas() -> Iterator[Any]:
     nas = FakeTrueNAS().start()
     yield nas
     nas.stop()
+
+
+@pytest.fixture
+def periodic_run(app: Any, settings: Any) -> Any:
+    """Periodieke worker-taken direct draaien met een vaste 'nu' (``force`` negeert het interval)."""
+    from hub.monitoring import periodic
+
+    def run(*names: str, now: Any = None) -> dict[str, Any]:
+        out = periodic.run_due(
+            app.state.sessionmaker,
+            settings,
+            app.state.vault(),
+            app.state.keyring(),
+            now=now,
+            force=True,
+            only=set(names) if names else None,
+        )
+        return {r["taak"]: r for r in out}
+
+    return run
 
 
 @pytest.fixture

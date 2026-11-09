@@ -19,7 +19,20 @@ from hub.errors import install_error_handlers
 from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
 from hub.onboarding.service import seed
-from hub.routers import auth, backups, breakglass, catalog, events, health, inventory, onboarding, services
+from hub.routers import (
+    alerts,
+    auth,
+    backups,
+    breakglass,
+    catalog,
+    events,
+    health,
+    inventory,
+    metrics,
+    notifications,
+    onboarding,
+    services,
+)
 from hub.vault import Vault
 
 log = logging.getLogger("hub")
@@ -126,6 +139,18 @@ OPENAPI_TAGS = [
         "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
     },
     {
+        "name": "tijdreeksen",
+        "description": "Genormaliseerde reeksen met bron en veroudering; ruw → 5 min → 1 uur met retentie (B09-003).",
+    },
+    {
+        "name": "alerts",
+        "description": "Alertregels met drempel, duur en hysterese; dempen; geen pushstorm (B09-003).",
+    },
+    {
+        "name": "meldingen",
+        "description": "Meldingskanalen (Gotify) en notification.send (R0) met rate-limit en stille uren.",
+    },
+    {
         "name": "back-up en herstel",
         "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",
     },
@@ -212,6 +237,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         onboarding.router,
         inventory.router,
         catalog.router,
+        metrics.router,
+        alerts.router,
+        notifications.router,
         backups.router,
         events.router,
     ):

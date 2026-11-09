@@ -14,6 +14,8 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from hub.outbound import OutboundPolicy
+
 DEFAULT_SOCKET_DIR = "/tmp/asm-pg"  # noqa: S108 — map 0700 van uid 568, alleen unix-socket, geen netwerkpoort
 
 
@@ -81,8 +83,38 @@ class Settings(BaseSettings):
 
     worker_poll_seconds: float = Field(default=5.0, gt=0, le=300)
 
+    # Uitgaande aanroepen naar monitoringbronnen en meldingskanalen (contract §5; nooit redirects of proxy).
+    # Loopback/link-local alleen met deze ontwikkelvlag (tests); nooit in de image.
+    outbound_allow_loopback: bool = False
+    outbound_extra_ca_file: Path | None = None  # optioneel eigen CA voor https-bronnen
+
+    # Monitoring (B09): pollinterval van de bronnen, veroudering en tijdreeksen.
+    monitoring_interval_seconds: int = Field(default=60, ge=10, le=3600)
+    health_record_interval_seconds: int = Field(default=60, ge=10, le=3600)
+    monitor_ttl_seconds: int = Field(default=300, ge=30, le=24 * 3600)  # Uptime Kuma/Beszel-waarneming
+    connector_fail_threshold: int = Field(default=2, ge=1, le=10)  # opeenvolgende fouten vóór 'down'
+    metrics_max_series: int = Field(default=2000, ge=10, le=100_000)
+    metrics_raw_retention_seconds: int = Field(default=48 * 3600, ge=3600, le=30 * 24 * 3600)
+    metrics_5m_retention_seconds: int = Field(default=30 * 24 * 3600, ge=24 * 3600, le=400 * 24 * 3600)
+    metrics_1h_retention_seconds: int = Field(default=400 * 24 * 3600, ge=7 * 24 * 3600, le=5 * 365 * 24 * 3600)
+    metrics_maintenance_interval_seconds: int = Field(default=300, ge=30, le=3600)
+    alert_interval_seconds: int = Field(default=30, ge=5, le=3600)
+    alert_stale_seconds: int = Field(default=600, ge=60, le=24 * 3600)  # zonder verse meting geen overgang
+
+    # Meldingen (Gotify): pogingen, veroudering van de wachtrij.
+    notify_max_attempts: int = Field(default=8, ge=1, le=50)
+    notify_expire_seconds: int = Field(default=24 * 3600, ge=600, le=7 * 24 * 3600)
+
     # AI is standaard uit (lokale modellen optioneel en standaard uit; geen betaalde overage)
     ai_enabled: bool = False
+
+    def outbound_policy(self) -> OutboundPolicy:
+        return OutboundPolicy(
+            connect_timeout=self.service_call_connect_timeout,
+            read_timeout=self.service_call_read_timeout,
+            allow_loopback=self.outbound_allow_loopback,
+            extra_ca_file=self.outbound_extra_ca_file,
+        )
 
     @property
     def secrets_dir(self) -> Path:

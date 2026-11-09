@@ -44,6 +44,196 @@
         "title": "ApiKeyIn",
         "type": "object"
       },
+      "ChannelIn": {
+        "additionalProperties": false,
+        "properties": {
+          "basis_url": {
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Basis Url",
+            "type": "string"
+          },
+          "ingeschakeld": {
+            "default": true,
+            "title": "Ingeschakeld",
+            "type": "boolean"
+          },
+          "max_per_venster": {
+            "default": 10,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Per Venster",
+            "type": "integer"
+          },
+          "min_ernst": {
+            "default": "info",
+            "enum": [
+              "info",
+              "waarschuwing",
+              "kritiek"
+            ],
+            "title": "Min Ernst",
+            "type": "string"
+          },
+          "naam": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Naam",
+            "type": "string"
+          },
+          "soort": {
+            "const": "gotify",
+            "default": "gotify",
+            "title": "Soort",
+            "type": "string"
+          },
+          "stille_uren": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuietHours"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "token": {
+            "description": "Gotify-applicatietoken (nooit een client-token).",
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Token",
+            "type": "string"
+          },
+          "venster_s": {
+            "default": 900,
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Venster S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "naam",
+          "basis_url",
+          "token"
+        ],
+        "title": "ChannelIn",
+        "type": "object"
+      },
+      "ChannelPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "basis_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Url"
+          },
+          "ingeschakeld": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingeschakeld"
+          },
+          "max_per_venster": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Per Venster"
+          },
+          "min_ernst": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "waarschuwing",
+                  "kritiek"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Ernst"
+          },
+          "naam": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naam"
+          },
+          "stille_uren": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuietHours"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stille_uren_wissen": {
+            "default": false,
+            "title": "Stille Uren Wissen",
+            "type": "boolean"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "venster_s": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 60.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venster S"
+          }
+        },
+        "title": "ChannelPatch",
+        "type": "object"
+      },
       "ConfirmIn": {
         "additionalProperties": false,
         "properties": {
@@ -356,6 +546,34 @@
         "title": "PasswordIn",
         "type": "object"
       },
+      "QuietHours": {
+        "additionalProperties": false,
+        "properties": {
+          "tijdzone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Tijdzone",
+            "type": "string"
+          },
+          "tot": {
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "title": "Tot",
+            "type": "string"
+          },
+          "van": {
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "title": "Van",
+            "type": "string"
+          }
+        },
+        "required": [
+          "van",
+          "tot",
+          "tijdzone"
+        ],
+        "title": "QuietHours",
+        "type": "object"
+      },
       "RestoreTestIn": {
         "additionalProperties": false,
         "properties": {
@@ -496,6 +714,314 @@
         "title": "RotateIn",
         "type": "object"
       },
+      "RuleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "bron": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bron"
+          },
+          "drempel": {
+            "title": "Drempel",
+            "type": "number"
+          },
+          "duur_s": {
+            "default": 300,
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Duur S",
+            "type": "integer"
+          },
+          "ernst": {
+            "default": "waarschuwing",
+            "enum": [
+              "info",
+              "waarschuwing",
+              "kritiek"
+            ],
+            "title": "Ernst",
+            "type": "string"
+          },
+          "herhaal_na_s": {
+            "anyOf": [
+              {
+                "maximum": 604800.0,
+                "minimum": 900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Herhaal Na S"
+          },
+          "herstel_drempel": {
+            "title": "Herstel Drempel",
+            "type": "number"
+          },
+          "herstel_duur_s": {
+            "default": 120,
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Herstel Duur S",
+            "type": "integer"
+          },
+          "ingeschakeld": {
+            "default": true,
+            "title": "Ingeschakeld",
+            "type": "boolean"
+          },
+          "kanalen": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Kanalen",
+            "type": "array"
+          },
+          "metriek": {
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$",
+            "title": "Metriek",
+            "type": "string"
+          },
+          "naam": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Naam",
+            "type": "string"
+          },
+          "onderwerp_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onderwerp Id"
+          },
+          "onderwerp_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onderwerp Type"
+          },
+          "operator": {
+            "enum": [
+              "gt",
+              "ge",
+              "lt",
+              "le"
+            ],
+            "title": "Operator",
+            "type": "string"
+          }
+        },
+        "required": [
+          "naam",
+          "metriek",
+          "operator",
+          "drempel",
+          "herstel_drempel"
+        ],
+        "title": "RuleIn",
+        "type": "object"
+      },
+      "RulePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "drempel": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drempel"
+          },
+          "duur_s": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duur S"
+          },
+          "ernst": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "waarschuwing",
+                  "kritiek"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ernst"
+          },
+          "herhaal_na_s": {
+            "anyOf": [
+              {
+                "maximum": 604800.0,
+                "minimum": 900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Herhaal Na S"
+          },
+          "herhaling_uit": {
+            "default": false,
+            "title": "Herhaling Uit",
+            "type": "boolean"
+          },
+          "herstel_drempel": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Herstel Drempel"
+          },
+          "herstel_duur_s": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Herstel Duur S"
+          },
+          "ingeschakeld": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingeschakeld"
+          },
+          "kanalen": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kanalen"
+          },
+          "naam": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naam"
+          }
+        },
+        "title": "RulePatch",
+        "type": "object"
+      },
+      "SendIn": {
+        "additionalProperties": false,
+        "description": "Getypte parameters van ``notification.send`` (R0) met harde grenzen.",
+        "properties": {
+          "bericht": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Bericht",
+            "type": "string"
+          },
+          "ernst": {
+            "default": "info",
+            "enum": [
+              "info",
+              "waarschuwing",
+              "kritiek"
+            ],
+            "title": "Ernst",
+            "type": "string"
+          },
+          "kanaal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kanaal Id"
+          },
+          "titel": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Titel",
+            "type": "string"
+          }
+        },
+        "required": [
+          "titel",
+          "bericht"
+        ],
+        "title": "SendIn",
+        "type": "object"
+      },
       "ServiceJwtIn": {
         "additionalProperties": false,
         "properties": {
@@ -587,6 +1113,35 @@
           "password"
         ],
         "title": "SetupIn",
+        "type": "object"
+      },
+      "SnoozeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "minuten": {
+            "description": "0 = dempen opheffen; maximaal 7 dagen.",
+            "maximum": 10080.0,
+            "minimum": 0.0,
+            "title": "Minuten",
+            "type": "integer"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          }
+        },
+        "required": [
+          "minuten"
+        ],
+        "title": "SnoozeIn",
         "type": "object"
       },
       "StatusIn": {
@@ -836,6 +1391,389 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/alerts": {
+      "get": {
+        "operationId": "list_alerts_api_v1_alerts_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "toestand",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ok",
+                    "pending",
+                    "firing"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Toestand"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Alerts Api V1 Alerts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alerts per regel en onderwerp (actief eerst), met laatste waarde en veroudering",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/rules": {
+      "get": {
+        "operationId": "list_rules_api_v1_alerts_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Rules Api V1 Alerts Rules Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Alertregels (standaardregels en eigen regels)",
+        "tags": [
+          "alerts"
+        ]
+      },
+      "post": {
+        "operationId": "create_rule_api_v1_alerts_rules_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alertregel toevoegen (admin)",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/rules/{rule_id}": {
+      "patch": {
+        "operationId": "update_rule_api_v1_alerts_rules__rule_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alertregel wijzigen (admin; If-Match met de versie optioneel)",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/rules/{rule_id}/snooze": {
+      "post": {
+        "operationId": "snooze_rule_api_v1_alerts_rules__rule_id__snooze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hele regel dempen of dempen opheffen (operator)",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/{alert_id}/snooze": {
+      "post": {
+        "operationId": "snooze_alert_api_v1_alerts__alert_id__snooze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Alert Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alert dempen of dempen opheffen (operator); evaluatie gaat door",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
     "/api/v1/apps": {
       "get": {
         "operationId": "list_apps_api_v1_apps_get",
@@ -2743,6 +3681,631 @@
         ]
       }
     },
+    "/api/v1/metrics/query": {
+      "get": {
+        "operationId": "query_series_api_v1_metrics_query_get",
+        "parameters": [
+          {
+            "description": "Reeks-id uit /api/v1/metrics/series.",
+            "in": "query",
+            "name": "series",
+            "required": true,
+            "schema": {
+              "description": "Reeks-id uit /api/v1/metrics/series.",
+              "minimum": 1,
+              "title": "Series",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "van",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Van"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tot",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tot"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resolutie",
+            "required": false,
+            "schema": {
+              "default": "auto",
+              "enum": [
+                "auto",
+                "ruw",
+                "5m",
+                "1u"
+              ],
+              "title": "Resolutie",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_punten",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 2000,
+              "minimum": 10,
+              "title": "Max Punten",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Query Series Api V1 Metrics Query Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Punten van één reeks (auto: ≤ 6 u ruw, ≤ 7 d per 5 min, anders per uur)",
+        "tags": [
+          "tijdreeksen"
+        ]
+      }
+    },
+    "/api/v1/metrics/series": {
+      "get": {
+        "operationId": "list_series_api_v1_metrics_series_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "onderwerp_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Onderwerp Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "onderwerp_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Onderwerp Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metriek",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Metriek"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bron",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 96,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bron"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Series Api V1 Metrics Series Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reeksen (onderwerp × metriek × bron) met laatste waarde, bron en veroudering",
+        "tags": [
+          "tijdreeksen"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "list_notifications_api_v1_notifications_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "wachtrij",
+                    "uitgesteld",
+                    "verzonden",
+                    "onderdrukt",
+                    "mislukt"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kanaal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kanaal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bron",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(alert|handmatig|test|samenvatting)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bron"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Notifications Api V1 Notifications Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Meldingen (nieuwste eerst) met status: wachtrij, uitgesteld, verzonden, onderdrukt, mislukt",
+        "tags": [
+          "meldingen"
+        ]
+      },
+      "post": {
+        "operationId": "send_notification_api_v1_notifications_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "notification.send (R0): bericht in de wachtrij (operator, Idempotency-Key)",
+        "tags": [
+          "meldingen"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels": {
+      "get": {
+        "operationId": "list_channels_api_v1_notifications_channels_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Channels Api V1 Notifications Channels Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Meldingskanalen (token nooit terug, alleen de laatste 4 tekens)",
+        "tags": [
+          "meldingen"
+        ]
+      },
+      "post": {
+        "operationId": "create_channel_api_v1_notifications_channels_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gotify-kanaal toevoegen (admin; applicatietoken in de vault)",
+        "tags": [
+          "meldingen"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels/{channel_id}": {
+      "patch": {
+        "operationId": "update_channel_api_v1_notifications_channels__channel_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kanaal wijzigen (admin); een nieuw token heft 'token geweigerd' op",
+        "tags": [
+          "meldingen"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels/{channel_id}/test": {
+      "post": {
+        "operationId": "test_channel_api_v1_notifications_channels__channel_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Testmelding echt versturen (admin) en het echte resultaat tonen",
+        "tags": [
+          "meldingen"
+        ]
+      }
+    },
     "/api/v1/registry/services": {
       "get": {
         "operationId": "registry_api_v1_registry_services_get",
@@ -3989,6 +5552,18 @@
     {
       "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
       "name": "appcatalogus"
+    },
+    {
+      "description": "Genormaliseerde reeksen met bron en veroudering; ruw → 5 min → 1 uur met retentie (B09-003).",
+      "name": "tijdreeksen"
+    },
+    {
+      "description": "Alertregels met drempel, duur en hysterese; dempen; geen pushstorm (B09-003).",
+      "name": "alerts"
+    },
+    {
+      "description": "Meldingskanalen (Gotify) en notification.send (R0) met rate-limit en stille uren.",
+      "name": "meldingen"
     },
     {
       "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",

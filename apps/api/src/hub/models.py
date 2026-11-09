@@ -10,11 +10,13 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Identity,
     Index,
     Integer,
     LargeBinary,
+    PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -398,3 +400,174 @@ class HealthObservation(Base):
     fouten_op_rij: Mapped[int] = mapped_column(Integer, default=0)
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+# ------------------------------------------------------------------ periodieke taken van de worker
+class PeriodicTask(Base):
+    """Laatste uitvoering per periodieke taak (meten, tijdreeksonderhoud, alerts, meldingen)."""
+
+    __tablename__ = "periodic_task"
+    naam: Mapped[str] = mapped_column(String(48), primary_key=True)
+    laatst_gestart: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatst_klaar: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    laatste_reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    duur_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+# ------------------------------------------------------------------ tijdreeksen (B09-003)
+class MetricSeries(Base):
+    """Eén genormaliseerde reeks: onderwerp (nas|pool|app|gpu|interface|monitor) × metriek × bron."""
+
+    __tablename__ = "metric_series"
+    __table_args__ = (Index("ix_metric_series_onderwerp", "onderwerp_type", "onderwerp_id"),)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    sleutel: Mapped[str] = mapped_column(String(255), unique=True)
+    onderwerp_type: Mapped[str] = mapped_column(String(16))
+    onderwerp_id: Mapped[str] = mapped_column(String(128))
+    metriek: Mapped[str] = mapped_column(String(64), index=True)
+    eenheid: Mapped[str] = mapped_column(String(16))
+    bron: Mapped[str] = mapped_column(String(96))
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    retentie_ruw_s: Mapped[int] = mapped_column(Integer)
+    retentie_5m_s: Mapped[int] = mapped_column(Integer)
+    retentie_1u_s: Mapped[int] = mapped_column(Integer)
+    laatste_waarde: Mapped[float | None] = mapped_column(Float, nullable=True)
+    laatste_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class MetricSample(Base):
+    __tablename__ = "metric_sample"
+    __table_args__ = (PrimaryKeyConstraint("series_id", "ts", name="pk_metric_sample"),)
+    series_id: Mapped[int] = mapped_column(ForeignKey("metric_series.id", ondelete="CASCADE"))
+    ts: Mapped[datetime] = mapped_column(TS)
+    waarde: Mapped[float] = mapped_column(Float)
+
+
+class MetricRollup(Base):
+    """Aggregaat per 5 min (resolutie 300) of per uur (3600): aantal, min, max, som (gemiddelde = som/n), laatste."""
+
+    __tablename__ = "metric_rollup"
+    __table_args__ = (PrimaryKeyConstraint("series_id", "resolutie", "bucket", name="pk_metric_rollup"),)
+    series_id: Mapped[int] = mapped_column(ForeignKey("metric_series.id", ondelete="CASCADE"))
+    resolutie: Mapped[int] = mapped_column(Integer)
+    bucket: Mapped[datetime] = mapped_column(TS)
+    n: Mapped[int] = mapped_column(Integer)
+    min: Mapped[float] = mapped_column(Float)
+    max: Mapped[float] = mapped_column(Float)
+    som: Mapped[float] = mapped_column(Float)
+    laatste: Mapped[float] = mapped_column(Float)
+
+
+# ------------------------------------------------------------------ alertregels en alerts (B09-003)
+class AlertRule(Base):
+    __tablename__ = "alert_rule"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    standaard_sleutel: Mapped[str | None] = mapped_column(String(48), unique=True, nullable=True)
+    naam: Mapped[str] = mapped_column(String(120))
+    metriek: Mapped[str] = mapped_column(String(64))
+    onderwerp_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    onderwerp_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    bron: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    operator: Mapped[str] = mapped_column(String(2))  # gt|ge|lt|le
+    drempel: Mapped[float] = mapped_column(Float)
+    herstel_drempel: Mapped[float] = mapped_column(Float)
+    duur_s: Mapped[int] = mapped_column(Integer)
+    herstel_duur_s: Mapped[int] = mapped_column(Integer)
+    ernst: Mapped[str] = mapped_column(String(16))  # info|waarschuwing|kritiek
+    herhaal_na_s: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kanalen: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    ingeschakeld: Mapped[bool] = mapped_column(Boolean, default=True)
+    gedempt_tot: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    aangemaakt_door: Mapped[str] = mapped_column(String(64))
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    bijgewerkt_door: Mapped[str] = mapped_column(String(64))
+    bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class AlertInstance(Base):
+    """Toestand van één regel voor één onderwerp (ok → pending → firing → ok), met hysterese en dempen."""
+
+    __tablename__ = "alert_instance"
+    __table_args__ = (
+        UniqueConstraint("rule_id", "onderwerp_type", "onderwerp_id", name="uq_alert_instance_onderwerp"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    rule_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("alert_rule.id", ondelete="CASCADE"), index=True)
+    onderwerp_type: Mapped[str] = mapped_column(String(16))
+    onderwerp_id: Mapped[str] = mapped_column(String(128))
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("metric_series.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    toestand: Mapped[str] = mapped_column(String(16), default="ok")  # ok|pending|firing
+    sinds: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    pending_sinds: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    firing_sinds: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    herstel_sinds: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_waarde: Mapped[float | None] = mapped_column(Float, nullable=True)
+    laatste_sample_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_eval_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    gegevens_verouderd: Mapped[bool] = mapped_column(Boolean, default=False)
+    gedempt_tot: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    gedempt_door: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    melding_teller: Mapped[int] = mapped_column(Integer, default=0)
+    laatst_gemeld_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatst_opgelost_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+
+
+# ------------------------------------------------------------------ meldingskanalen en meldingen (Gotify)
+class NotificationChannel(Base):
+    __tablename__ = "notification_channel"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    soort: Mapped[str] = mapped_column(String(16))  # gotify
+    naam: Mapped[str] = mapped_column(String(64))
+    basis_url: Mapped[str] = mapped_column(String(512))
+    token_ref: Mapped[str] = mapped_column(String(200))
+    min_ernst: Mapped[str] = mapped_column(String(16))
+    stille_uren: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    max_per_venster: Mapped[int] = mapped_column(Integer)
+    venster_s: Mapped[int] = mapped_column(Integer)
+    ingeschakeld: Mapped[bool] = mapped_column(Boolean, default=True)
+    laatste_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    laatste_reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    laatste_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    laatste_versie: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    onderdrukt_teller: Mapped[int] = mapped_column(Integer, default=0)
+    onderdrukt_sinds: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    aangemaakt_door: Mapped[str] = mapped_column(String(64))
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    bijgewerkt_door: Mapped[str] = mapped_column(String(64))
+    bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class Notification(Base):
+    """Melding in de wachtrij of verstuurd. ``dedupe_sleutel`` is uniek per kanaal: één overgang → één melding."""
+
+    __tablename__ = "notification"
+    __table_args__ = (
+        UniqueConstraint("kanaal_id", "dedupe_sleutel", name="uq_notification_dedupe"),
+        Index("ix_notification_status_volgende", "status", "volgende_poging_op"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    kanaal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notification_channel.id", ondelete="CASCADE"))
+    dedupe_sleutel: Mapped[str] = mapped_column(String(255))
+    bron: Mapped[str] = mapped_column(String(16))  # alert|handmatig|test|samenvatting
+    alert_instance_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("alert_instance.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    soort: Mapped[str] = mapped_column(String(16), default="bericht")  # actief|hersteld|herhaling|bericht
+    ernst: Mapped[str] = mapped_column(String(16))
+    titel: Mapped[str] = mapped_column(String(160))
+    bericht: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16))  # wachtrij|uitgesteld|verzonden|onderdrukt|mislukt
+    reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pogingen: Mapped[int] = mapped_column(Integer, default=0)
+    volgende_poging_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    aangemaakt_door: Mapped[str] = mapped_column(String(64), default="system")
+    verzonden_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    extern_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
