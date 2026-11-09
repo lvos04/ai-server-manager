@@ -22,6 +22,10 @@ def _psycopg_url(url: str) -> str:
     return url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
+def _libpq(url: str) -> str:
+    return url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
 @pytest.fixture(scope="session")
 def pg_url() -> Iterator[str]:
     import psycopg
@@ -31,6 +35,9 @@ def pg_url() -> Iterator[str]:
         with psycopg.connect(ADMIN_URL, autocommit=True, connect_timeout=5) as conn:
             conn.execute(f'CREATE DATABASE "{name}"')
     except psycopg.OperationalError as exc:
+        if os.environ.get("CI") or os.environ.get("HUB_TEST_REQUIRE_PG"):
+            # In CI nooit stil overslaan: zonder database zouden de integratie- en E2E-tests 'groen' lijken.
+            pytest.fail(f"PostgreSQL vereist (CI) maar niet bereikbaar: {exc}")
         pytest.skip(f"geen PostgreSQL voor integratietests: {exc}")
     base = ADMIN_URL.rsplit("/", 1)[0]
     url = f"{base}/{name}"
@@ -105,7 +112,12 @@ def idem() -> dict[str, str]:
 def admin(client: Any, setup_code: str) -> Any:
     """Client die als eerste beheerder is aangemeld (via de setupcode), met CSRF-header."""
     r = client.post(
-        "/api/v1/setup/admin", json={"setup_code": setup_code, "username": "beheerder", "password": STRONG_PASSWORD}
+        "/api/v1/setup/admin",
+        json={
+            "setup_code": setup_code,
+            "username": "beheerder",
+            "password": STRONG_PASSWORD,
+        },
     )
     assert r.status_code == 200, r.text
     client.headers["X-CSRF-Token"] = r.json()["csrf_token"]
@@ -114,7 +126,9 @@ def admin(client: Any, setup_code: str) -> Any:
 
 def make_user(admin_client: Any, username: str, role: str) -> None:
     r = admin_client.post(
-        "/api/v1/users", json={"username": username, "password": STRONG_PASSWORD, "role": role}, headers=idem()
+        "/api/v1/users",
+        json={"username": username, "password": STRONG_PASSWORD, "role": role},
+        headers=idem(),
     )
     assert r.status_code == 201, r.text
 
