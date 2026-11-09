@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "executor"
+version = "0.1.0"
+description = "AI Server Manager — executor (enige component met TrueNAS-schrijfrechten; fase P0: nog niet gekoppeld)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.162.2",
+  "uvicorn==0.54.0",
+  "pydantic==2.14.3",
+  "pydantic-settings==2.16.2",
+  "cryptography==50.0.2",
+]
+
+[project.scripts]
+executor = "executor.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/executor"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
+ignore = ["S101", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S104", "S108"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+packages = ["executor"]
