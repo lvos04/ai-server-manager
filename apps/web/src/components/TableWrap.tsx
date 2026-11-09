@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 export function TableWrap({ label, children }: { label: string; children: ReactNode }) {
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollbaar kader moet focusbaar zijn (axe: scrollable-region-focusable)
-    <div className="table-wrap max-w-full overflow-x-auto rounded-lg border border-border bg-card" role="region" aria-label={label} tabIndex={0}>
+    <div className="table-wrap min-h-touch max-w-full overflow-x-auto rounded-lg border border-border bg-card" role="region" aria-label={label} tabIndex={0}>
       {children}
     </div>
   );

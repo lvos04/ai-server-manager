@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, CircleUserRound, KeyRound, LifeBuoy, LogOut, Server, Sparkles, WifiOff } from "lucide-react";
+import { Bot, CircleUserRound, Inbox, KeyRound, LifeBuoy, LogOut, Server, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -108,7 +108,9 @@ function UserMenu() {
     router.replace("/inloggen");
   };
   return (
-    <Menu>
+    // Niet-modaal: een modaal menu zet aria-hidden op de rest van de pagina terwijl daar focusbare elementen blijven
+    // (axe aria-hidden-focus). Esc, Tab en klikken buiten het menu sluiten het gewoon.
+    <Menu modal={false}>
       <MenuTrigger className={buttonVariants({ variant: "stil" })} data-testid="gebruikersmenu">
         <CircleUserRound aria-hidden="true" />
         <span className="max-w-[9rem] truncate max-sm:sr-only">{u.display_name || u.username}</span>
@@ -172,7 +174,8 @@ function Navigation({ pathname, problemen }: { pathname: string; problemen: numb
         <div className="px-1">
           <Brand />
         </div>
-        <nav aria-label="Hoofdmenu" className="flex-1 overflow-y-auto">
+        {/* Scrollkader iets ruimer dan de items: de focusring (3 px + 2 px spleet) valt anders aan de randen weg. */}
+        <nav aria-label="Hoofdmenu" className="-mx-1.5 flex-1 overflow-y-auto px-1.5 py-1.5">
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {DESKTOP_NAV.map((item) => {
               const Icon = NAV_ICON[item.icon];
@@ -246,7 +249,7 @@ function Header({ problemen }: { problemen: number | null }) {
           aria-current={pathname.startsWith("/problemen") ? "page" : undefined}
           data-testid="kop-problemen"
         >
-          <CircleAlert aria-hidden="true" />
+          <Inbox aria-hidden="true" />
           Problemen
           <ProblemenTeller count={problemen} />
         </Link>
@@ -255,7 +258,7 @@ function Header({ problemen }: { problemen: number | null }) {
           className="hidden min-h-touch items-center gap-2 rounded-lg px-3 font-semibold text-foreground no-underline hover:bg-accent lg:inline-flex [&_svg]:size-5"
           aria-current={pathname === "/ai" ? "page" : undefined}
         >
-          <Sparkles aria-hidden="true" />
+          <Bot aria-hidden="true" />
           AI
         </Link>
         <UserMenu />
@@ -336,6 +339,10 @@ function KindShell({ pathname, children }: { pathname: string; children: ReactNo
 
 /** Kindvriendelijke 403 (de API weigert kind al op elke beheerroute; de UI is nooit de poortwachter). */
 function KindNietVoorJou() {
+  // De routetitel ("Server — …") is een beheerterm; een kind ziet in de tab dezelfde woorden als op het scherm.
+  useEffect(() => {
+    document.title = "Niet voor jou — TrueNAS Home Platform";
+  }, []);
   return (
     <section className="flex flex-col gap-4" data-testid="kind-403">
       <h1 className="text-2xl font-bold">Dit scherm is niet voor jou</h1>
@@ -420,7 +427,9 @@ function NietVoorRol() {
       <h1 className="text-2xl font-bold">Pagina niet gevonden</h1>
       <p>Deze pagina hoort bij het kinderprofiel.</p>
       <p>
-        <Link href="/">Naar Home</Link>
+        <Link href="/" className={buttonVariants({ variant: "secundair" })}>
+          Naar Home
+        </Link>
       </p>
     </section>
   );

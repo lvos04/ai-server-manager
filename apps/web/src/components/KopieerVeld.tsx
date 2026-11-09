@@ -38,14 +38,15 @@ export function KopieerVeld({ label, waarde, ingekort, testId, groot }: { label:
       <span className="text-sm font-semibold" id={`${id}-label`}>
         {label}
       </span>
+      {/* Smal (< ± 22 rem): de knop springt onder het veld, zodat een digest niet in een kolom van 12 tekens breekt. */}
       <div className="flex min-w-0 flex-wrap items-start gap-2">
         <code
           ref={ref}
           aria-labelledby={`${id}-label`}
           className={
             groot
-              ? "block min-w-0 flex-1 rounded-sm border-2 border-dashed border-border-strong bg-card px-2.5 py-2 font-mono text-2xl leading-9 font-semibold tracking-wider break-words select-all"
-              : "block min-w-0 flex-1 rounded-sm border-2 border-dashed border-border-strong bg-card px-2.5 py-2 font-mono text-sm break-all text-foreground select-all"
+              ? "block min-w-0 flex-[1_1_12rem] rounded-sm border-2 border-dashed border-border-strong bg-card px-2.5 py-2 font-mono text-2xl leading-9 font-semibold tracking-wider break-words select-all"
+              : "block min-w-0 flex-[1_1_12rem] rounded-sm border-2 border-dashed border-border-strong bg-card px-2.5 py-2 font-mono text-sm break-all text-foreground select-all"
           }
           title={ingekort ? waarde : undefined}
           data-waarde={testId ? waarde : undefined}

@@ -144,7 +144,9 @@ export function BackupsScreen() {
                             <>
                               <StatusBadge view={{ tone: "unknown", label: "Geen doel" }} />
                               <div className="meta">
-                                <Link href="/onboarding/besluit/D16">Leg RPO/RTO vast in D16</Link>
+                                <Link href="/onboarding/besluit/D16" className="losse-link">
+                                  Leg RPO/RTO vast in D16
+                                </Link>
                               </div>
                             </>
                           )}

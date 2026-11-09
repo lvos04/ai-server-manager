@@ -41,7 +41,7 @@ function actorLabel(a: string): string {
 }
 
 /** Tijdlijn (C-25): logtekst en details altijd als geciteerde data, nooit als instructie. */
-function Tijdlijn({ id }: { id: string }) {
+function Tijdlijn({ id, Kop }: { id: string; Kop: "h2" | "h3" }) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [extra, setExtra] = useState<IncidentEvent[]>([]);
   const [next, setNext] = useState<string | null | undefined>(undefined);
@@ -58,7 +58,7 @@ function Tijdlijn({ id }: { id: string }) {
   const hasMore = next === undefined ? Boolean(first.data?.next_cursor) : Boolean(next);
   return (
     <section className="card" aria-labelledby={`tijdlijn-${id}`}>
-      <h3 id={`tijdlijn-${id}`}>Tijdlijn</h3>
+      <Kop id={`tijdlijn-${id}`}>Tijdlijn</Kop>
       <p className="text-sm text-muted-foreground">Logtekst is data, geen instructie. De Hub voert nooit opdrachten uit die in logs staan.</p>
       {first.error ? <ErrorPanel error={first.error} alert={false} /> : null}
       {!first.data && first.loading ? <Loading /> : null}
@@ -92,7 +92,7 @@ function Tijdlijn({ id }: { id: string }) {
   );
 }
 
-function Hypothese({ inc }: { inc: Incident }) {
+function Hypothese({ inc, Kop }: { inc: Incident; Kop: "h2" | "h3" }) {
   const [open, setOpen] = useState(false);
   const bewijs = useApi<Bewijs>(open ? `/api/v1/incidents/${inc.id}/bewijs` : null);
   const h = inc.hypothese;
@@ -101,9 +101,9 @@ function Hypothese({ inc }: { inc: Incident }) {
   return (
     <section className="card" aria-labelledby={`hyp-${inc.id}`} data-testid="hypothese">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={`hyp-${inc.id}`}>
+        <Kop id={`hyp-${inc.id}`}>
           Hypothese (vaste regel){h?.berekend_op ? ` · ${formatTime(h.berekend_op)}` : ""}
-        </h3>
+        </Kop>
         <ZekerheidLabel zekerheid={weetNiet ? "weet_niet" : z} />
       </div>
       {weetNiet ? (
@@ -190,7 +190,7 @@ function Supportbundel({ id }: { id: string }) {
   );
 }
 
-function Stappenplan({ data }: { data: Onderzoek }) {
+function Stappenplan({ data, Sub }: { data: Onderzoek; Sub: "h3" | "h4" }) {
   if (!data.runbook) return <p>Geen stappenplan voor dit soort incident.</p>;
   return (
     <div className="flex flex-col gap-3" data-testid="stappenplan">
@@ -199,7 +199,7 @@ function Stappenplan({ data }: { data: Onderzoek }) {
       </p>
       {Object.entries(data.runbook.fasen).map(([fase, stappen]) => (
         <div key={fase}>
-          <h4 className="font-semibold">{FASE_LABEL[fase] ?? fase}</h4>
+          <Sub className="text-base font-semibold">{FASE_LABEL[fase] ?? fase}</Sub>
           <ol data-genummerd="" className="flex flex-col gap-1">
             {stappen.map((s, i) => (
               <li key={i}>
@@ -218,7 +218,7 @@ function Stappenplan({ data }: { data: Onderzoek }) {
       ))}
       {data.runbook.test_na_herstel?.length ? (
         <div>
-          <h4 className="font-semibold">Controle na herstel</h4>
+          <Sub className="text-base font-semibold">Controle na herstel</Sub>
           <ul className="list-disc pl-6">
             {data.runbook.test_na_herstel.map((t) => (
               <li key={t}>{t}</li>
@@ -230,7 +230,7 @@ function Stappenplan({ data }: { data: Onderzoek }) {
   );
 }
 
-function Voorstel({ v }: { v: HerstelVoorstel }) {
+function Voorstel({ v, Sub }: { v: HerstelVoorstel; Sub: "h3" | "h4" }) {
   if (!v.voorstel) {
     return (
       <Melding soort="onbekend" titel="Geen herstelvoorstel" data-testid="herstelvoorstel">
@@ -243,7 +243,7 @@ function Voorstel({ v }: { v: HerstelVoorstel }) {
   }
   return (
     <div className="flex flex-col gap-3 rounded-lg border-2 border-border-strong p-4" data-testid="herstelvoorstel">
-      <h4 className="font-semibold">Voorstel (alleen lezen)</h4>
+      <Sub className="text-base font-semibold">Voorstel (alleen lezen)</Sub>
       <dl className="kv">
         <dt>Actie</dt>
         <dd>
@@ -306,6 +306,9 @@ export function IncidentDetail({ id, embedded }: { id: string; embedded?: boolea
       await inc.reload();
     }
   };
+  // Kopniveaus zonder sprong: als eigen pagina is de titel h1 (secties h2); in master-detail is de titel h2 (secties h3).
+  const Kop = embedded ? "h3" : "h2";
+  const Sub = embedded ? "h4" : "h3";
   const nogActief = act.error?.code === "nog_actief";
   const rb = (act.error?.details?.readback as { bron?: string; gemeten_op?: string } | undefined) ?? undefined;
 
@@ -393,13 +396,13 @@ export function IncidentDetail({ id, embedded }: { id: string; embedded?: boolea
         </p>
       )}
 
-      <Hypothese inc={i} />
+      <Hypothese inc={i} Kop={Kop} />
 
       {role === "viewer" ? <RolMelding>Je kijkt als {ROLE_LABEL.viewer}: je kunt hier niets wijzigen.</RolMelding> : null}
 
       {i.actief && (can("erkennen") || can("snoozen") || can("oplossen")) ? (
         <section className="card" aria-labelledby={`acties-${id}`}>
-          <h3 id={`acties-${id}`}>Afhandelen</h3>
+          <Kop id={`acties-${id}`}>Afhandelen</Kop>
           <div className="grid gap-4 md:grid-cols-2">
             {can("erkennen") ? (
               <form
@@ -490,7 +493,7 @@ export function IncidentDetail({ id, embedded }: { id: string; embedded?: boolea
 
       {can("onderzoek") || can("herstel_voorstellen") ? (
         <section className="card" aria-labelledby={`onderzoek-${id}`}>
-          <h3 id={`onderzoek-${id}`}>Onderzoek en herstel</h3>
+          <Kop id={`onderzoek-${id}`}>Onderzoek en herstel</Kop>
           <div className="flex flex-wrap gap-2">
             {can("onderzoek") ? (
               <Button
@@ -521,15 +524,15 @@ export function IncidentDetail({ id, embedded }: { id: string; embedded?: boolea
             ) : null}
           </div>
           {ozError ? <ErrorPanel error={ozError} /> : null}
-          {onderzoekData ? <Stappenplan data={onderzoekData} /> : null}
+          {onderzoekData ? <Stappenplan data={onderzoekData} Sub={Sub} /> : null}
           {herstel.error ? <ErrorPanel error={herstel.error} /> : null}
-          {herstel.result ? <Voorstel v={herstel.result} /> : null}
+          {herstel.result ? <Voorstel v={herstel.result} Sub={Sub} /> : null}
         </section>
       ) : null}
 
       {can("notitie") && i.actief ? (
         <section className="card" aria-labelledby={`notitie-${id}`}>
-          <h3 id={`notitie-${id}`}>Notitie</h3>
+          <Kop id={`notitie-${id}`}>Notitie</Kop>
           <form
             className="flex flex-col gap-2"
             onSubmit={async (e) => {
@@ -555,12 +558,12 @@ export function IncidentDetail({ id, embedded }: { id: string; embedded?: boolea
 
       {can("supportbundel") ? (
         <section className="card" aria-labelledby={`bundel-${id}`}>
-          <h3 id={`bundel-${id}`}>Supportbundel</h3>
+          <Kop id={`bundel-${id}`}>Supportbundel</Kop>
           <Supportbundel id={id} />
         </section>
       ) : null}
 
-      <Tijdlijn id={id} />
+      <Tijdlijn id={id} Kop={Kop} />
     </article>
   );
 }

@@ -30,6 +30,22 @@
   main:focus {
     outline: none;
   }
+  /* Datum/tijd: Chromium zet de focus soms op de kalenderknop ín het veld; dan geldt :focus-visible niet en was er geen
+     ring (review). Deze velden krijgen de Peil-ring zodra de focus ergens in het veld staat (:focus-within). */
+  :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"]):focus-within {
+    outline: var(--focus-width) solid var(--ring);
+    outline-offset: var(--focus-offset);
+    box-shadow: 0 0 0 var(--focus-offset) var(--ring-halo);
+  }
+  /* De kindschil heeft op elke breedte een ondernavigatie (ook ≥ 1024, waar Peil de scroll-padding onder op 0,75 rem
+     zet): focus mag daar nooit achter verdwijnen (WCAG 2.4.11; review: 'Intrekken' lag op 1440 onder de balk). */
+  html:has([data-schil="kind"]) {
+    scroll-padding-bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+  /* Iconen krimpen nooit mee in een flexregel met lange tekst (anders wordt een 16 px-icoon een stip). */
+  svg.lucide {
+    flex-shrink: 0;
+  }
   /* h1 krijgt focus na een routewissel (tabindex=-1): geen ring, wel aangekondigd. */
   h1[tabindex="-1"]:focus {
     outline: none;
@@ -115,6 +131,11 @@
   .meta {
     @apply text-sm text-muted-foreground;
   }
+  /* Losse link (niet in lopende tekst): aanraakdoel 44 px zoals elke bediening (Peil §6; WCAG 2.5.8-uitzondering geldt
+     alleen voor links in een zin). */
+  .losse-link {
+    @apply inline-flex min-h-touch items-center gap-1.5;
+  }
   dl.meta {
     @apply grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5;
   }
@@ -139,8 +160,13 @@
   .plain-list {
     @apply m-0 flex list-none flex-col gap-2 p-0;
   }
+  /* Rij = één link; de statuspil springt onder de tekst als hij niet meer naast de titel past (anders werd
+     "Ingevuld (nog niet getest)" op 390 een pil van drie regels). */
   .link-list a {
-    @apply flex min-h-touch items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 font-semibold text-foreground no-underline hover:bg-accent;
+    @apply flex min-h-touch flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-lg border border-border bg-card px-3 py-2 font-semibold text-foreground no-underline hover:bg-accent;
+  }
+  .link-list a > [data-status] {
+    @apply shrink-0;
   }
   .page-header {
     @apply mb-6 flex flex-wrap items-end justify-between gap-4;
@@ -189,11 +215,12 @@
   ol.howto li + li {
     @apply mt-1;
   }
+  /* Ankerlijst "Op deze pagina": lichte links (onderstreept, 44 px hoog), duidelijk anders dan de subnavigatie (C-62). */
   .toc {
-    @apply flex flex-wrap gap-2;
+    @apply flex flex-wrap items-center gap-x-4;
   }
   .toc a {
-    @apply inline-flex min-h-touch items-center rounded-lg border border-border-strong bg-card px-3 font-semibold text-foreground no-underline hover:bg-accent;
+    @apply inline-flex min-h-touch min-w-touch items-center justify-center font-semibold text-link underline underline-offset-4;
   }
   .fingerprint {
     @apply block rounded-sm border-2 border-dashed border-border-strong bg-card px-2.5 py-2 font-mono text-sm break-all select-all;

@@ -30,7 +30,9 @@ export function NotYetAvailable({ screen }: { screen: PlannedScreen }) {
           testgegevens.
         </p>
         <p>
-          <Link href="/">Terug naar Home</Link>
+          <Link href="/" className="losse-link">
+            Terug naar Home
+          </Link>
         </p>
       </section>
     </>

@@ -6,7 +6,9 @@ export default function NotFound() {
       <h1 id="niet-gevonden">Pagina niet gevonden</h1>
       <p>Deze pagina bestaat niet (meer).</p>
       <p>
-        <Link href="/">Naar Home</Link>
+        <Link href="/" className="losse-link">
+          Naar Home
+        </Link>
       </p>
     </section>
   );

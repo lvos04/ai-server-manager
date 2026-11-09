@@ -64,13 +64,11 @@ export function TrueNasScreen() {
   return (
     <>
       <PageHeader
+        kruimel={[{ label: "Onboarding", href: "/onboarding" }, { label: "TrueNAS koppelen" }]}
         title="TrueNAS koppelen (alleen-lezen)"
         intro="De Hub leest je NAS uit met een aparte alleen-lezen-gebruiker. Hij kan daarmee niets wijzigen; een key met schrijfrechten wordt geweigerd."
         actions={<StatusBadge view={truenasView(c)} testId="koppeling-status" />}
       />
-      <p>
-        <Link href="/onboarding">← Terug naar de onboarding</Link>
-      </p>
       {conn.error ? <ErrorPanel error={conn.error} onRetry={() => void conn.reload()} /> : null}
       <ol className="steps">
         <li>
@@ -537,7 +535,7 @@ function QuickMeasure() {
               <span className="row">
                 {r && !(r instanceof HubApiError) ? <StatusBadge view={measurementStatus(r.status)} /> : null}
                 <Button variant="secundair" onClick={() => void run(q.id)} bezig={busy !== null} data-testid={`meet-${q.id}`}>
-                  {busy === q.id ? "Meten…" : `Meet ${q.id}`}
+                  {busy === q.id ? "Meten…" : `${q.id} meten`}
                 </Button>
               </span>
             </li>

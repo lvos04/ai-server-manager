@@ -180,7 +180,7 @@ export function AppsScreen() {
                 kop: "App",
                 cel: (a) => (
                   <span className="flex flex-col">
-                    <Link href={`/apps/${a.id}`} className="font-semibold">
+                    <Link href={`/apps/${a.id}`} className="losse-link font-semibold">
                       {a.titel}
                     </Link>
                     <code className="text-sm">{a.runtime_id}</code>
@@ -204,7 +204,7 @@ export function AppsScreen() {
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <span className="flex min-w-0 flex-col">
-                    <Link href={`/apps/${a.id}`} className="font-semibold">
+                    <Link href={`/apps/${a.id}`} className="losse-link font-semibold">
                       {a.titel}
                     </Link>
                     <code className="text-sm">{a.runtime_id}</code>

@@ -171,7 +171,9 @@ export function DecisionScreen({ id, prev, next }: { id: string; prev?: string; 
                 <Button variant="primair" onClick={() => void runMeasure()} bezig={busy !== null} data-testid="meten">
                   {busy === "meten" ? "Bezig met meten…" : "Meten via TrueNAS"}
                 </Button>
-                <Link href="/onboarding/truenas">TrueNAS-koppeling</Link>
+                <Link href="/onboarding/truenas" className="losse-link">
+                  TrueNAS-koppeling
+                </Link>
               </div>
             ) : (
               <p className="meta">Meten kan vanaf de rol operator.</p>

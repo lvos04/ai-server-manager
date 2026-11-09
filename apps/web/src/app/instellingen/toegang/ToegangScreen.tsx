@@ -14,7 +14,7 @@ import { RolMelding } from "@/components/RolMelding";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api";
-import { formatDateTime, formatTime } from "@/lib/format";
+import { aantal, formatDateTime, formatTime } from "@/lib/format";
 import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
 import type { Role, User } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
@@ -383,9 +383,10 @@ function Sso() {
           </div>
           <fieldset>
             <legend>Groep → rol</legend>
-            <div className="flex flex-col gap-2">
+            {/* Containerquery: naast elkaar pas als de kolom zelf breed genoeg is (op 1024 staat er ook een subnavigatie). */}
+            <div className="@container flex flex-col gap-2">
               {f.rolkoppelingen.map((k, i) => (
-                <div key={i} className="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_12rem_auto]">
+                <div key={i} className="grid items-end gap-2 @xl:grid-cols-[minmax(0,1fr)_12rem_auto]">
                   <div className="field">
                     <label htmlFor={`sso-groep-${i}`}>Groep {i + 1}</label>
                     <input id={`sso-groep-${i}`} value={k.groep} onChange={(e) => setForm({ ...f, rolkoppelingen: f.rolkoppelingen.map((x, j) => (j === i ? { ...x, groep: e.target.value } : x)) })} />
@@ -446,7 +447,7 @@ function Sso() {
                 id: "sleutels",
                 naam: "Sleutels alleen asymmetrisch",
                 uitkomst: c.jwks.sleutels.length ? "ok" : "onbekend",
-                detail: c.jwks.sleutels.length ? `${c.jwks.sleutels.length} sleutel(s): ${c.jwks.sleutels.map((k) => k.alg ?? k.kty).join(", ")}` : undefined,
+                detail: c.jwks.sleutels.length ? `${aantal(c.jwks.sleutels.length, "sleutel", "sleutels")}: ${c.jwks.sleutels.map((k) => k.alg ?? k.kty).join(", ")}` : undefined,
               },
             ]}
           />

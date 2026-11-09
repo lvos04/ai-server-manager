@@ -165,6 +165,14 @@ export function ProblemenScreen({ selectedId }: { selectedId?: string }) {
           {inbox}
           <IncidentDetail id={selectedId} embedded />
         </div>
+      ) : wide && list.data?.items.length ? (
+        // Master-detail (Peil §9) ook zonder keuze: dezelfde indeling als met een gekozen incident, zonder sprong.
+        <div className="grid grid-cols-[24rem_minmax(0,1fr)] items-start gap-6">
+          {inbox}
+          <section className="rounded-lg border border-border bg-card p-6" aria-label="Details van een incident" data-testid="geen-incident-gekozen">
+            <p className="max-w-prose">Kies links een incident. Hier zie je dan de feiten, de hypothese met bewijs, het stappenplan en de tijdlijn.</p>
+          </section>
+        </div>
       ) : (
         inbox
       )}

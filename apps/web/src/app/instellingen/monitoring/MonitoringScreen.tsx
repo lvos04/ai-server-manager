@@ -106,7 +106,7 @@ function BronKaart({ b, admin, onWijziging }: { b: Bron; admin: boolean; onWijzi
         {fout ? (
           <StatusBadge view={{ tone: "down", label: "Uitlezen mislukt" }} />
         ) : b.status.status === "ok" && !b.status.verouderd ? (
-          <StatusBadge view={{ tone: "neutral", label: `Uitgelezen om ${formatTime(b.status.laatste_ok)}`, icon: "aan" }} />
+          <StatusBadge view={{ tone: "neutral", label: `Uitgelezen om ${formatTime(b.status.laatste_ok)}`, icon: "geslaagd" }} />
         ) : (
           <StatusBadge view={{ tone: b.status.laatste_ok ? "stale" : "unknown", label: b.status.laatste_ok ? "Verouderd" : "Nog niet uitgelezen" }} />
         )}
@@ -497,6 +497,8 @@ export function MonitoringScreen() {
             <ResponsiveList
               items={regels.data.items}
               label="Alertregels"
+              // Vijf kolommen passen naast de subnavigatie van Instellingen pas vanaf 1280 (op 1024: 42 px overloop).
+              tabelVanaf={1280}
               sleutel={(r) => r.id}
               kolommen={[
                 {
@@ -577,8 +579,8 @@ export function MonitoringScreen() {
                 ]}
               />
             ) : null}
-            <p className="flex items-center gap-2 text-sm">
-              <CircleSlash aria-hidden="true" className="size-4" />
+            <p className="flex items-start gap-2 text-sm">
+              <CircleSlash aria-hidden="true" className="mt-0.5 size-4" />
               ‘Door Gotify aangenomen’ betekent niet dat hij op je telefoon aankwam: dat kan de Hub niet zien.
             </p>
           </section>
