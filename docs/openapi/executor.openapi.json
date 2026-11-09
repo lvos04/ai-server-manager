@@ -74,7 +74,7 @@
     }
   },
   "info": {
-    "description": "Executor van TrueNAS Home Platform V2. Fase P0: nog niet gekoppeld; de allowlist is leeg en elke actie wordt geweigerd. Geen shell, sudo of Docker.",
+    "description": "Executor van TrueNAS Home Platform V2. Koppelen met de Hub via de statuspagina (koppelcode + vingerafdruk, contract 1.2 §3.9). De allowlist is leeg tot P2: elke actie wordt geweigerd. Geen shell, sudo of Docker.",
     "title": "AI Server Manager — executor",
     "version": "0.1.0"
   },
@@ -113,7 +113,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Weigert alles (allowlist leeg in P0)",
+        "summary": "Weigert alles (allowlist leeg tot P2)",
         "tags": [
           "uitvoeren"
         ]
@@ -136,9 +136,47 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Koppelstatus en (lege) allowlist",
+        "summary": "Koppelstatus (witte lijst) en (lege) allowlist",
         "tags": [
           "status"
+        ]
+      }
+    },
+    "/connector/v1/hub-link": {
+      "get": {
+        "operationId": "hub_link_connector_v1_hub_link_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Koppelstatus (witte lijst §3.5 + gepinde kid's); dienst-JWT of gebruikers-JWT viewer+",
+        "tags": [
+          "connector"
+        ]
+      }
+    },
+    "/connector/v1/hub-link/unlink": {
+      "post": {
+        "operationId": "hub_link_unlink_connector_v1_hub_link_unlink_post",
+        "responses": {
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "capability_unavailable"
+          }
+        },
+        "summary": "Ontkoppelen: nog niet beschikbaar voor de executor (vraagt een live geverifieerde schrijfkey, P2)",
+        "tags": [
+          "connector"
         ]
       }
     },

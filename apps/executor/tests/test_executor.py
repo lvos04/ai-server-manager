@@ -60,7 +60,14 @@ def test_alles_geweigerd(client: TestClient, action: str) -> None:
 
 def test_geen_shell_of_docker_routes(client: TestClient) -> None:
     paths = set(client.get("/api/openapi.json").json()["paths"])
-    assert paths == {"/healthz", "/readyz", "/api/v1/status", "/api/v1/execute"}
+    assert paths == {
+        "/healthz",
+        "/readyz",
+        "/api/v1/status",
+        "/api/v1/execute",
+        "/connector/v1/hub-link",
+        "/connector/v1/hub-link/unlink",
+    }
     assert client.post("/api/v1/shell", json={"cmd": "id"}).status_code == 404
 
 

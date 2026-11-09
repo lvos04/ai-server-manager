@@ -39,6 +39,11 @@ expect "web-UI CSP" "$(curl -fsS --noproxy '*' -D - -o /dev/null http://127.0.0.
 expect "PWA-manifest" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/manifest.webmanifest)" '"lang": "nl"'
 expect "API-fout via web-poort (NL)" "$(curl -sS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/me)" '"code":"unauthorized"'
 expect "executor niet gekoppeld" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/readyz)" '"gekoppeld":false'
+expect "executor weigert Hub-JWT zonder koppeling (contract 1.2 §4.7)" \
+  "$(curl -sS --noproxy '*' -H 'Authorization: Bearer a.b.c' http://127.0.0.1:30410/connector/v1/hub-link)" '"reason":"not_linked"'
+expect "enroll-schema 1.2: oud verzoek → 422" "$(curl -sS --noproxy '*' -H 'content-type: application/json' \
+  -d '{"app_id":"home-control-hub","enrollment_token":"x"}' http://127.0.0.1:30400/api/v1/services/enroll)" '"code":"validation_error"'
+expect "sleutelrotaties: lege lijst" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/key-rotations)" '"items":[]'
 test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' \
   -d '{"action_id":"app.restart"}' http://127.0.0.1:30410/api/v1/execute)" = 403
 # Geen root-processen meer en de AI-runner als aparte gebruiker:
