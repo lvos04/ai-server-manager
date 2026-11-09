@@ -1,0 +1,162 @@
+"""Setupcode → eerste admin, login/logout, CSRF, rollen, rate-limit, sessies, JWKS en dienst-JWT."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import jwt
+import pytest
+from conftest import STRONG_PASSWORD, idem, login_as, make_user
+
+pytestmark = pytest.mark.integration
+
+
+def test_setup_status_en_foute_code_met_rate_limit(client: Any, setup_code: str) -> None:
+    assert client.get("/api/v1/setup/status").json()["setup_vereist"] is True
+    for _ in range(5):
+        r = client.post(
+            "/api/v1/setup/admin",
+            json={"setup_code": "AAAA-BBBB-CCCC", "username": "beheerder", "password": STRONG_PASSWORD},
+        )
+        assert r.status_code == 401 and r.json()["code"] == "invalid_setup_code"
+        assert r.json()["trace_id"]
+    r = client.post(
+        "/api/v1/setup/admin", json={"setup_code": setup_code, "username": "beheerder", "password": STRONG_PASSWORD}
+    )
+    assert r.status_code == 429 and r.headers["Retry-After"]
+
+
+def test_setup_maakt_admin_en_sessie(client: Any, setup_code: str) -> None:
+    r = client.post("/api/v1/setup/admin", json={"setup_code": setup_code, "username": "beheerder", "password": "kort"})
+    assert r.status_code == 422 and r.json()["code"] == "weak_password"
+    r = client.post(
+        "/api/v1/setup/admin",
+        json={"setup_code": setup_code.lower(), "username": "beheerder", "password": STRONG_PASSWORD},
+    )
+    assert r.status_code == 200, r.text
+    cookie = r.headers.get_list("set-cookie")
+    assert any("hub_session=" in c and "HttpOnly" in c and "SameSite=strict" in c and "Secure" in c for c in cookie)
+    assert r.json()["user"]["role"] == "admin"
+    assert client.get("/api/v1/auth/me").json()["user"]["username"] == "beheerder"
+    r = client.post(
+        "/api/v1/setup/admin", json={"setup_code": setup_code, "username": "tweede", "password": STRONG_PASSWORD}
+    )
+    assert r.status_code == 409
+    assert client.get("/api/v1/setup/status").json()["setup_vereist"] is False
+
+
+def test_csrf_vereist_voor_mutaties(admin: Any) -> None:
+    token = admin.headers.pop("X-CSRF-Token")
+    r = admin.post("/api/v1/inventory/refresh", headers=idem())
+    assert r.status_code == 403 and r.json()["code"] == "csrf_failed"
+    admin.headers["X-CSRF-Token"] = token
+    assert admin.post("/api/v1/inventory/refresh", headers=idem()).status_code == 202
+
+
+def test_rollen_viewer_en_kind(admin: Any, app: Any) -> None:
+    make_user(admin, "kijker", "viewer")
+    make_user(admin, "kind1", "kind")
+    make_user(admin, "operator1", "operator")
+    viewer = login_as(app, "kijker")
+    assert viewer.get("/api/v1/inventory").status_code == 200
+    assert viewer.get("/api/v1/gates").status_code == 200
+    r = viewer.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}}, headers=idem())
+    assert r.status_code == 403 and r.json()["code"] == "forbidden"
+    assert viewer.post("/api/v1/inventory/refresh", headers=idem()).status_code == 403
+    assert viewer.put("/api/v1/truenas/api-key", json={"api_key": "x" * 20}, headers=idem()).status_code == 403
+    assert viewer.get("/api/v1/users").status_code == 403
+    assert viewer.get("/api/v1/audit").status_code == 403
+    kind = login_as(app, "kind1")
+    assert kind.get("/api/v1/inventory").status_code == 403
+    assert kind.get("/api/v1/decisions").status_code == 403
+    assert kind.get("/api/v1/auth/me").status_code == 200
+    op = login_as(app, "operator1")
+    assert op.post("/api/v1/inventory/refresh", headers=idem()).status_code == 202
+    assert (
+        op.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}}, headers=idem()).status_code
+        == 403
+    )
+
+
+def test_niet_aangemeld_is_401(client: Any) -> None:
+    for path in (
+        "/api/v1/inventory",
+        "/api/v1/decisions",
+        "/api/v1/gates",
+        "/api/v1/backups/coverage",
+        "/connector/v1/discover",
+    ):
+        r = client.get(path)
+        assert r.status_code == 401 and r.json()["code"] == "unauthorized", path
+
+
+def test_login_rate_limit_en_logout(admin: Any, app: Any) -> None:
+    make_user(admin, "gebruiker", "viewer")
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app, base_url="https://testserver")
+    for _ in range(5):
+        assert c.post("/api/v1/auth/login", json={"username": "gebruiker", "password": "fout"}).status_code == 401
+    assert c.post("/api/v1/auth/login", json={"username": "gebruiker", "password": STRONG_PASSWORD}).status_code == 429
+    other = login_as(app, "beheerder")
+    assert other.post("/api/v1/auth/logout").status_code == 204
+    assert other.get("/api/v1/auth/me").status_code == 401
+
+
+def test_sessie_intrekken_en_wachtwoord_wijzigen(admin: Any, app: Any) -> None:
+    second = login_as(app, "beheerder")
+    sessions = admin.get("/api/v1/auth/sessions").json()["items"]
+    assert len(sessions) == 2
+    other_id = next(s["id"] for s in sessions if not s["huidige"])
+    assert admin.post(f"/api/v1/auth/sessions/{other_id}/revoke", headers=idem()).status_code == 200
+    assert second.get("/api/v1/auth/me").status_code == 401
+    third = login_as(app, "beheerder")
+    r = admin.post(
+        "/api/v1/auth/password",
+        json={"huidig_wachtwoord": STRONG_PASSWORD, "nieuw_wachtwoord": "Een-Ander-Sterk-Wachtwoord-7"},
+    )
+    assert r.status_code == 200
+    assert third.get("/api/v1/auth/me").status_code == 401
+    assert admin.get("/api/v1/auth/me").status_code == 200
+
+
+def test_laatste_admin_beschermd_en_degraderen_trekt_sessies_in(admin: Any, app: Any) -> None:
+    me = admin.get("/api/v1/auth/me").json()["user"]["id"]
+    r = admin.patch(f"/api/v1/users/{me}", json={"role": "viewer"}, headers=idem())
+    assert r.status_code == 409 and r.json()["code"] == "last_admin"
+    make_user(admin, "operator2", "operator")
+    op = login_as(app, "operator2")
+    users = {u["username"]: u for u in admin.get("/api/v1/users").json()["items"]}
+    assert (
+        admin.patch(f"/api/v1/users/{users['operator2']['id']}", json={"disabled": True}, headers=idem()).status_code
+        == 200
+    )
+    assert op.get("/api/v1/auth/me").status_code == 401
+    assert "password_hash" not in str(users)
+
+
+def test_jwks_en_dienst_jwt(admin: Any) -> None:
+    jwks = admin.get("/api/v1/auth/jwks").json()
+    r = admin.post("/api/v1/auth/service-jwt", json={"audience": "zoeken-en-persoonlijke-ai"})
+    assert r.status_code == 200, r.text
+    token = r.json()["token"]
+    key = jwt.PyJWK(jwks["keys"][0]).key
+    claims = jwt.decode(token, key, algorithms=["EdDSA"], audience="zoeken-en-persoonlijke-ai", issuer="hub")
+    assert claims["roles"] == ["admin"] and claims["exp"] - claims["iat"] <= 120
+    assert admin.post("/api/v1/auth/service-jwt", json={"audience": "onbekend-iets"}).status_code == 404
+
+
+def test_gezondheid_en_statuspagina(client: Any) -> None:
+    assert client.get("/healthz").json()["status"] == "ok"
+    r = client.get("/readyz")
+    assert r.status_code == 200 and r.json()["status"] == "ready"
+    page = client.get("/")
+    assert page.status_code == 200 and "setupcode" in page.text and "TrueNAS → Apps" in page.text
+    assert client.get("/healthz").headers["X-Trace-Id"]
+
+
+def test_uniform_foutformaat(admin: Any) -> None:
+    r = admin.get("/api/v1/bestaat-niet")
+    assert r.status_code == 404 and set(r.json()) == {"code", "message", "details", "trace_id"}
+    r = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}})
+    assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required"
