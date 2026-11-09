@@ -76,7 +76,8 @@ test("uitloggen en weer inloggen (met foute en goede gegevens)", async ({ page }
   await page.getByRole("button", { name: "Inloggen" }).click();
   await expect(page).toHaveURL(/\/$/);
   await ready(page);
-  await page.getByTestId("sidebar").getByTestId("logout").click();
+  await page.getByTestId("gebruikersmenu").click();
+  await page.getByTestId("logout").click();
   await expect(page).toHaveURL(/\/inloggen$/);
   await page.goto("/server");
   await expect(page).toHaveURL(/\/inloggen\?terug=%2Fserver$/);
@@ -97,7 +98,7 @@ test.describe("met beheerderssessie", () => {
     await expect(page.getByTestId("totaalstatus")).not.toContainText("In orde");
     await expect(page.getByTestId("waarde-opslag")).toHaveText("onbekend");
     await expect(page.getByTestId("waarde-apps")).toHaveText("onbekend");
-    await expect(page.getByTestId("acties")).toContainText("Koppel TrueNAS");
+    await expect(page.getByTestId("acties")).toContainText("TrueNAS koppelen");
     await shot(page, info, "home-voor-koppeling");
   });
 

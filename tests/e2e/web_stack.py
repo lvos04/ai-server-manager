@@ -6,8 +6,13 @@ Alleen voor ontwikkeling/CI (Sim-getest, geen echte NAS). Start:
   test hem kan "aflezen", in ``<state>/setupcode.txt``;
 - de fake TrueNAS (wss, zelfondertekend certificaat, alleen-lezen-key);
 - de Hub-API (uvicorn) op 127.0.0.1:``HUB_E2E_API_PORT`` en een worker-lus (jobs: inventaris vernieuwen);
-- een kleine besturingspoort (127.0.0.1:``HUB_E2E_CONTROL_PORT``) om de fake NAS uit/aan te zetten.
-Er worden geen successen gesimuleerd: alle antwoorden komen van de echte API; alleen de NAS is een simulator.
+- een kleine besturingspoort (127.0.0.1:``HUB_E2E_CONTROL_PORT``) om de fake NAS uit/aan te zetten, een app aan de
+  fake NAS toe te voegen en een simulator-dienst te laten koppelen (koppelcode) en events te laten sturen;
+- fakes voor Uptime Kuma, Beszel, Gotify en een OIDC-issuer (Authentik-vorm) op loopback, met hun adressen en
+  testsleutels in ``state.json`` (alleen testgeheimen);
+- de periodieke worker-taken (meten, bronnen, gezondheid, alerts, incidenten, meldingen) met korte intervallen.
+Er worden geen successen gesimuleerd: alle antwoorden komen van de echte API; alleen NAS, bronnen, Gotify, de OIDC-
+issuer en de simulator-dienst zijn simulators.
 
 Met ``--alleen-nas`` start alleen de fake TrueNAS + besturingspoort (voor de web-E2E tegen de alles-in-één image, die
 zijn eigen API, database en setupcode heeft).
@@ -25,7 +30,7 @@ import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))  # tests/ → fakes
@@ -36,7 +41,51 @@ CONTROL_PORT = int(os.environ.get("HUB_E2E_CONTROL_PORT", "39402"))
 STATE_DIR = Path(os.environ.get("HUB_E2E_STATE_DIR", str(HERE / ".web-e2e-state")))
 READONLY_KEY = "readonly-test-key-0123456789"
 WRITE_KEY = "write-test-key-0123456789abc"
+KUMA_KEY = "uk1_testkey_abcdef"
+GOTIFY_TOKEN = "AppTokenHub123"
+BESZEL_USER = "hub-lezer"
+BESZEL_PW = "Lees-Alleen-Wachtwoord-1"
 STOP = threading.Event()
+# Basis van de Hub voor de besturingsroutes (simulator-dienst): de eigen API of, tegen de image, de web-UI-poort.
+API_URL = os.environ.get("HUB_E2E_API_URL", f"http://127.0.0.1:{API_PORT}")
+
+
+def _api(method: str, path: str, body: dict[str, Any] | None = None, token: str | None = None) -> tuple[int, Any]:
+    """Aanroep van de echte Hub-API als simulator-dienst (alleen voor de testbesturing)."""
+    import http.client
+    from urllib.parse import urlsplit
+
+    u = urlsplit(API_URL)
+    conn = http.client.HTTPConnection(u.hostname or "127.0.0.1", u.port or 80, timeout=10)
+    headers = {"Content-Type": "application/json", "Idempotency-Key": str(uuid.uuid4())}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    conn.request(method, path, body=json.dumps(body) if body is not None else None, headers=headers)
+    res = conn.getresponse()
+    raw = res.read()
+    conn.close()
+    try:
+        return res.status, json.loads(raw or b"null")
+    except ValueError:
+        return res.status, raw.decode(errors="replace")
+
+
+def _service_jwk() -> dict[str, str]:
+    import base64
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from hub.keys import jwk_thumbprint
+
+    raw = (
+        Ed25519PrivateKey.generate()
+        .public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    )
+    jwk = {"kty": "OKP", "crv": "Ed25519", "x": base64.urlsafe_b64encode(raw).rstrip(b"=").decode()}
+    jwk["kid"] = jwk_thumbprint(jwk)
+    return jwk
 
 
 def log(msg: str) -> None:
@@ -45,6 +94,7 @@ def log(msg: str) -> None:
 
 class _Control(BaseHTTPRequestHandler):
     nas: Any = None
+    tokens: ClassVar[dict[str, str]] = {}  # app_id → service-token van de simulator-dienst
 
     def _reply(self, body: dict[str, Any], status: int = 200) -> None:
         data = json.dumps(body).encode()
@@ -53,11 +103,86 @@ class _Control(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _body(self) -> dict[str, Any]:
+        n = int(self.headers.get("content-length") or 0)
+        return json.loads(self.rfile.read(n) or b"{}") if n else {}
+
     def do_POST(self) -> None:
         if self.path == "/nas/offline":
             self.nas.offline()
         elif self.path == "/nas/online":
             self.nas.online()
+        elif self.path == "/nas/app":
+            # Extra app op de fake NAS (bv. een eigen dienst met een hostpoort waar niets luistert).
+            from fakes.fake_truenas import _app
+
+            b = self._body()
+            name = str(b["naam"])
+            self.nas.data["app.query"] = [a for a in self.nas.data["app.query"] if a.get("name") != name]
+            app = _app(
+                name,
+                b.get("staat", "RUNNING"),
+                str(b["image"]),
+                int(b["poort"]),
+                int(b.get("container_poort", 30420)),
+                f"/mnt/testpool/apps/{name}",
+                "/appdata",
+            )
+            self.nas.data["app.query"].append(app)
+        elif self.path == "/dienst/koppel":
+            # Simulator-dienst koppelt met een koppelcode via de echte API (contract 1.2 §3.3).
+            b = self._body()
+            status, res = _api(
+                "POST",
+                "/api/v1/services/enroll",
+                {
+                    "app_id": b["app_id"],
+                    "pairing_code": b["code"],
+                    "version": "0.1.0",
+                    "base_url": None,
+                    "public_key_jwk": _service_jwk(),
+                },
+            )
+            if status == 200 and isinstance(res, dict):
+                self.tokens[str(b["app_id"])] = str(res["service_token"])
+            self._reply(
+                {
+                    "status": status,
+                    "antwoord": {k: v for k, v in (res or {}).items() if k != "service_token"}
+                    if isinstance(res, dict)
+                    else res,
+                },
+                200 if status == 200 else 409,
+            )
+            return
+        elif self.path == "/dienst/events":
+            # Events van de simulator-dienst naar de events-inbox (contract §7), bv. 100 identieke crashes.
+            b = self._body()
+            token = self.tokens.get(str(b["app_id"]))
+            if token is None:
+                self._reply({"fout": "dienst niet gekoppeld"}, 409)
+                return
+            ok = 0
+            for _ in range(int(b.get("aantal", 1))):
+                eid = str(uuid.uuid4())
+                ev = {
+                    "schema_version": "1.0",
+                    "event_id": eid,
+                    "source_app": b["app_id"],
+                    "source_event_id": eid,
+                    "event_type": b.get("event_type", "app.process.crashed"),
+                    "entity": {"type": "app", "id": b.get("entity", "node-red")},
+                    "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "trace_id": str(uuid.uuid4()),
+                    "correlation_id": None,
+                    "actor": {"type": "system", "id": b["app_id"]},
+                    "classification": "internal",
+                    "payload": b.get("payload", {"naam": "Node-RED", "exit_code": 137}),
+                }
+                status, _res = _api("POST", "/api/v1/events/inbox", ev, token)
+                ok += status in (200, 202)
+            self._reply({"verstuurd": ok})
+            return
         else:
             self._reply({"fout": "onbekend pad"}, 404)
             return
@@ -81,6 +206,38 @@ def _start_nas() -> Any:
     return nas, control
 
 
+def _start_fakes() -> dict[str, Any]:
+    """Simulators voor monitoring, meldingen en SSO (alleen loopback, alleen testsleutels)."""
+    from fakes.fake_gotify import FakeGotify
+    from fakes.fake_monitoring import FakeBeszel, FakeUptimeKuma
+    from fakes.fake_oidc import FakeOidc
+
+    kuma = FakeUptimeKuma(api_keys={KUMA_KEY}).start()
+    kuma.add(1, "MediaGuard", url="http://127.0.0.1:30101/api/v1/health", ping=18.0)
+    kuma.add(2, "Jellyfin", url="http://127.0.0.1:30013/health", status=0)
+    kuma.add(3, "Externe site", url="https://example.org/", ping=40.0)
+    beszel = FakeBeszel(users={BESZEL_USER: BESZEL_PW}).start()
+    gotify = FakeGotify(tokens={GOTIFY_TOKEN}).start()
+    oidc = FakeOidc().start()
+    log(f"fakes: Uptime Kuma {kuma.url}, Beszel {beszel.url}, Gotify {gotify.url}, OIDC {oidc.issuer}")
+    return {"kuma": kuma, "beszel": beszel, "gotify": gotify, "oidc": oidc}
+
+
+def _fake_state(f: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "kuma_url": f["kuma"].url,
+        "kuma_key": KUMA_KEY,
+        "beszel_url": f["beszel"].url,
+        "beszel_user": BESZEL_USER,
+        "beszel_pw": BESZEL_PW,
+        "gotify_url": f["gotify"].url,
+        "gotify_token": GOTIFY_TOKEN,
+        "oidc_issuer": f["oidc"].issuer,
+        "oidc_client_id": f["oidc"].client_id,
+        "oidc_client_secret": f["oidc"].client_secret,
+    }
+
+
 def _write_state(extra: dict[str, Any]) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     (STATE_DIR / "state.json").write_text(json.dumps(extra, indent=2))
@@ -98,6 +255,7 @@ def _wait_for_stop() -> None:
 
 def main_nas_only() -> int:
     nas, control = _start_nas()
+    fakes = _start_fakes()
     try:
         _write_state(
             {
@@ -105,12 +263,15 @@ def main_nas_only() -> int:
                 "fake_nas_port": nas.port,
                 "readonly_key": READONLY_KEY,
                 "write_key": WRITE_KEY,
+                **_fake_state(fakes),
             }
         )
         _wait_for_stop()
     finally:
         control.shutdown()
         nas.stop()
+        for f in fakes.values():
+            f.stop()
         log("gestopt")
     return 0
 
@@ -151,12 +312,20 @@ def main() -> int:
             truenas_read_timeout=5,
             login_max_failures=20,
             cookie_secure="false",
+            # Alleen in de teststack: bronnen, Gotify en de OIDC-issuer draaien als simulator op loopback.
+            outbound_allow_loopback=True,
+            nas_metrics_interval_seconds=10,
+            monitoring_interval_seconds=10,
+            health_record_interval_seconds=10,
+            alert_interval_seconds=5,
+            incident_interval_seconds=5,
         )
         res = ensure_secrets(settings.secrets_dir, new_setup_code=True)
         assert res.setup_code
         log(f"SETUPCODE (eenmalig, voor het eerste beheerdersaccount): {res.setup_code}")
 
         nas, control = _start_nas()
+        fakes = _start_fakes()
         (STATE_DIR / "setupcode.txt").parent.mkdir(parents=True, exist_ok=True)
         (STATE_DIR / "setupcode.txt").write_text(res.setup_code)
         _write_state(
@@ -167,6 +336,7 @@ def main() -> int:
                 "readonly_key": READONLY_KEY,
                 "write_key": WRITE_KEY,
                 "database": db_name,
+                **_fake_state(fakes),
             }
         )
 
@@ -186,10 +356,14 @@ def main() -> int:
         api_thread.start()
 
         def worker_loop() -> None:
+            from hub.monitoring import periodic
+
             vault = app.state.vault()
             while not STOP.is_set():
                 try:
                     worker.run_once(app.state.sessionmaker, settings, vault, schedule=False)
+                    # Periodieke taken (meten, bronnen, alerts, incidenten, meldingen) volgens hun interval.
+                    periodic.run_due(app.state.sessionmaker, settings, vault, app.state.keyring())
                 except Exception as exc:  # de lus mag de teststack niet stoppen
                     log(f"worker-ronde mislukt: {type(exc).__name__}: {exc}")
                 STOP.wait(1)
@@ -206,6 +380,8 @@ def main() -> int:
             control.shutdown()
         if nas is not None:
             nas.stop()
+        for f in (locals().get("fakes") or {}).values():
+            f.stop()
         with psycopg.connect(ADMIN_URL, autocommit=True) as conn:
             conn.execute(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)')
         tmp.cleanup()

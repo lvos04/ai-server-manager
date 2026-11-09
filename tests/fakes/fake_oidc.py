@@ -18,7 +18,7 @@ import secrets
 import time
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -143,6 +143,10 @@ class FakeOidc(FakeHTTP):
 
     def handle(self, seen: Seen) -> Reply:
         p = seen.path
+        if p == "/application/o/authorize/" and seen.method == "GET":
+            # Browserstroom (web-E2E): de gebruiker "logt in" en wordt met code + state teruggestuurd naar de Hub.
+            query = "&".join(f"{k}={quote(v[0], safe='')}" for k, v in seen.query.items())
+            return Reply(302, "", {"Location": self.authorize(f"{self.url}{p}?{query}")})
         if p == f"/application/o/{SLUG}/.well-known/openid-configuration":
             return Reply(200, self.metadata())
         if p == f"/application/o/{SLUG}/jwks/":

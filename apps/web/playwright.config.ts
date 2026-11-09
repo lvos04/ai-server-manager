@@ -39,6 +39,7 @@ const viewportProjects: Project[] = viewports.map((v) => ({
 }));
 
 const stackEnv = {
+  ...(external ? { HUB_E2E_API_URL: external } : {}),
   HUB_E2E_API_PORT: String(API_PORT),
   HUB_E2E_CONTROL_PORT: String(CONTROL_PORT),
   HUB_E2E_STATE_DIR: STATE_DIR,
@@ -96,7 +97,7 @@ export default defineConfig({
         },
       ],
   projects: [
-    { name: "opzet", testMatch: /00-.*\.spec\.ts/, use: { viewport: { width: 1440, height: 900 } } },
+    { name: "opzet", testMatch: /0[0-9]-.*\.spec\.ts/, use: { viewport: { width: 1440, height: 900 } } },
     ...viewportProjects,
     {
       name: "afsluiting",

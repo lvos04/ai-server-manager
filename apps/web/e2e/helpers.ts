@@ -1,13 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo } from "@playwright/test";
-import { mkdirSync, readFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export const STATE_DIR = process.env.HUB_E2E_STATE_DIR ?? path.join(__dirname, ".state");
 export const ADMIN_STATE = path.join(__dirname, ".auth", "beheerder.json");
-export const SCREENSHOT_DIR = path.resolve(__dirname, "..", "..", "..", "docs", "screenshots", "p0");
+export const SCREENSHOT_DIR = path.resolve(__dirname, "..", "..", "..", "docs", "screenshots", "p1");
 export const ADMIN = { username: "beheerder", password: "Correct-Paard-Batterij-Nietje-42" };
 export const VIEWER = { username: "kijker", password: "Kijker-Wachtwoord-Lang-2026" };
+export const KIND = { username: "kind", password: "Kind-Wachtwoord-Lang-2026" };
+export const NOOD = { username: "nood", password: "Paraplu-Vuurtoren-Lang-Genoeg-2026!" };
 
 export interface StackState {
   api_url?: string;
@@ -15,6 +18,55 @@ export interface StackState {
   fake_nas_port: number;
   readonly_key: string;
   write_key: string;
+  kuma_url?: string;
+  kuma_key?: string;
+  beszel_url?: string;
+  beszel_user?: string;
+  beszel_pw?: string;
+  gotify_url?: string;
+  gotify_token?: string;
+  oidc_issuer?: string;
+  oidc_client_id?: string;
+  oidc_client_secret?: string;
+}
+
+/** Gedeelde gegevens tussen de opzet en de schermtests (ids van een app en een incident). */
+export interface P1State {
+  app_id?: string;
+  incident_id?: string;
+}
+
+export function p1State(): P1State {
+  try {
+    return JSON.parse(readFileSync(path.join(STATE_DIR, "p1.json"), "utf8")) as P1State;
+  } catch {
+    return {};
+  }
+}
+
+export function saveP1State(extra: P1State): void {
+  writeFileSync(path.join(STATE_DIR, "p1.json"), JSON.stringify({ ...p1State(), ...extra }, null, 2));
+}
+
+/** Besturingspoort van de teststack (fake NAS, simulator-dienst). */
+export async function control(pad: string, body: unknown = {}): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await fetch(`${stackState().control_url}${pad}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+}
+
+/** TOTP (RFC 6238: SHA-1, 30 s, 6 cijfers) uit een base32-geheim — alleen in de test, zoals een authenticator-app. */
+export function totp(secretB32: string, now = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = secretB32.replace(/[\s=]/g, "").toUpperCase();
+  let bits = "";
+  for (const c of clean) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  const bytes = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(now / 1000 / 30)));
+  const h = createHmac("sha1", bytes).update(counter).digest();
+  const o = h[h.length - 1]! & 0xf;
+  const code = ((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).toString().padStart(6, "0");
+  return code;
 }
 
 export function stackState(): StackState {
@@ -67,12 +119,14 @@ export async function expectTouchTargets(page: Page, label: string): Promise<voi
   const small = await page.evaluate(() => {
     const sel = [
       "button",
-      ".btn",
+      "[data-slot=button]",
+      "[role=tab]",
       "input:not([type=checkbox]):not([type=radio]):not([type=hidden])",
       "select",
       "summary",
       "nav a",
       ".link-list a",
+      "label.keuze",
       "label.choice",
     ].join(",");
     const out: string[] = [];
@@ -91,8 +145,26 @@ export async function expectTouchTargets(page: Page, label: string): Promise<voi
 export async function shot(page: Page, info: TestInfo, name: string, fullPage = true): Promise<void> {
   const dir = path.join(SCREENSHOT_DIR, info.project.name);
   mkdirSync(dir, { recursive: true });
-  // JPEG (kwaliteit 70) houdt de repo klein; volledige pagina als bewijs.
-  await page.screenshot({ path: path.join(dir, `${name}.jpg`), fullPage, animations: "disabled", type: "jpeg", quality: 70 });
+  // JPEG (kwaliteit 60, CSS-pixels) houdt de repo klein; volledige pagina als bewijs. In de afdrukmodus staat de vaste
+  // ondernavigatie onderaan de pagina (anders tekent de browser hem midden in een lange afbeelding).
+  await page.evaluate(() => document.documentElement.setAttribute("data-afdruk", ""));
+  try {
+    await page.screenshot({ path: path.join(dir, `${name}.jpg`), fullPage, animations: "disabled", type: "jpeg", quality: 60, scale: "css" });
+  } finally {
+    await page.evaluate(() => document.documentElement.removeAttribute("data-afdruk"));
+  }
+}
+
+/** Thema zetten zoals de gebruiker het kiest (Peil: het themascript zet altijd het opgeloste thema). */
+export async function setTheme(page: Page, thema: "licht" | "donker"): Promise<void> {
+  // Geen kleurovergangen tijdens de meting (anders meet axe een kleur halverwege de 150 ms-overgang).
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate((t) => {
+    localStorage.setItem("hub-thema", t);
+    window.dispatchEvent(new Event("hub-thema-gewijzigd"));
+  }, thema);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", thema === "donker" ? "dark" : "light");
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))));
 }
 
 /** Wacht tot de app-schil klaar is met laden (aanmelding gecontroleerd, geen 'Laden…' meer in de kop). */
