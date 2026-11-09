@@ -88,6 +88,14 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   als bronwaarneming, ook PID 1 niet als root, executor-bewijs tegen vastgelegd NAS-adres. Conformiteitslijst
   bijgewerkt naar de echte stand per repo (commits genoemd). Eigen reparaties: `deploy/smoke.sh` controleert nu ook
   `CapEff`, EVIDENCE.json D01–D18 volgens §11 + test.
+- **Contract 1.2 toegepast in ai-server-manager (2026-11-09, ADR-0013):** Hub H1–H4 (enroll-schema exact, herhaling,
+  `services/self`, rotatie na eerste gebruik, rotatie aanvragen 202, dienst-JWT, `key-rotations` leeg), H6-backend
+  (noodlogin met TOTP), H5/H14-backend (ontkoppelen via de dienst, sleutelset kopiëren, TrueNAS-appnaam bevestigen),
+  H7-deel (executor koppelt met koppelcode + vingerafdruk, pinning, inkomende JWT-controle; schrijfkey en ontkoppelen
+  op de executor in P2), H8 (manifesten, gecontroleerd met de validator M1–M6 van appstore-en-fork) en H9
+  (Custom App-tag met digest). Niet gedaan: UI-schermen "Diensten" en "Noodaccount" (wachten op de ontwerpstap, §13),
+  H10/H11 (P2/P3), H12 (ontwerptaal nog niet in de repo), H13 (open punt). De diensten kunnen nu tegen de echte Hub
+  testen; Sim-getest, niets op een echte NAS.
 - CI-stand na de P0-afronding (gezien in de review): groen in jelly-leon, jelly-leon-platform,
   zoeken-en-persoonlijke-ai, home-control-hub, appstore-en-fork, jelly-leon-clients en jelly-leon-web.
 
