@@ -1,6 +1,6 @@
 "use client";
 
-import { Cpu, Gauge, HardDrive, MemoryStick, Network, Thermometer } from "lucide-react";
+import { Cpu, Gauge, HardDrive, MemoryStick, Network, Thermometer, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { ErrorPanel } from "@/components/ErrorPanel";
@@ -9,11 +9,12 @@ import { Loading } from "@/components/Loading";
 import { Melding } from "@/components/Melding";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { SERVER_SUBNAV, Subnav } from "@/components/Subnav";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatPercent, formatTime } from "@/lib/format";
 import { gpuLabel } from "@/lib/home";
-import { mergeRows, PERIODES, queryPath, RESOLUTIE_LABEL, toRows, type Periode, type QueryResult, type Series } from "@/lib/metrics";
+import { bronLabel, mergeRows, PERIODES, queryPath, RESOLUTIE_LABEL, toRows, type Periode, type QueryResult, type Series } from "@/lib/metrics";
 import type { StatusView } from "@/lib/status";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
@@ -57,8 +58,11 @@ const REDEN: Record<string, string> = {
 const UNKNOWN: StatusView = { tone: "unknown", label: "Onbekend" };
 const STALE: StatusView = { tone: "stale", label: "Verouderd" };
 
+/** Mbit/s; kleine gemeten waarden houden hun cijfers ("0,03"), zodat een meting nooit als 0 leest. */
 function mbit(bps: number | null | undefined): string {
-  return typeof bps === "number" ? `${new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format((bps * 8) / 1_000_000)}` : "";
+  if (typeof bps !== "number") return "";
+  const v = (bps * 8) / 1_000_000;
+  return new Intl.NumberFormat("nl-NL", v !== 0 && Math.abs(v) < 10 ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: 1 }).format(v);
 }
 
 /** Tegel voor één meting: vers = waarde; verouderd = laatst bekend (O-03); geen bron = Onbekend zonder getal. */
@@ -73,7 +77,8 @@ function Tegel({ id, titel, icon, m, fmt, unit, status, extra }: { id: string; t
       value={ok ? fmt(m.waarde!) : stale && m.laatst_bekend?.waarde != null ? fmt(m.laatst_bekend.waarde) : null}
       unit={unit}
       kwaliteit={ok ? "gemeten" : undefined}
-      status={ok ? (status ?? { tone: "neutral", label: "Gemeten", icon: "geslaagd" }) : stale ? [UNKNOWN, STALE] : UNKNOWN}
+      // Peil §4.4 / K3: een verse waarde krijgt géén badge (de tijd en "· gemeten" zeggen genoeg); alleen afwijkingen.
+      status={ok ? (status ?? []) : stale ? [UNKNOWN, STALE] : UNKNOWN}
       bron={m.bron ?? m.laatst_bekend?.bron ?? "geen bron"}
       observedAt={ok ? m.observed_at : (m.laatst_bekend?.observed_at ?? null)}
       verouderd={stale}
@@ -99,7 +104,7 @@ function Grafiek({ type, oid, metriek, titel, eenheid, domein, periode, testId }
     return (
       <div className="flex flex-col gap-2" data-testid={testId}>
         <p className="font-semibold">{titel}</p>
-        <div className="arcering-gat flex h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown text-unknown-ink">Geen meting — er is nog geen reeks.</div>
+        <div className="arcering-gat flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown px-3 py-2 text-center text-unknown-ink">Geen meting — er is nog geen reeks.</div>
       </div>
     );
   }
@@ -107,10 +112,13 @@ function Grafiek({ type, oid, metriek, titel, eenheid, domein, periode, testId }
     <LineChart
       titel={titel}
       reeksen={[{ key: "v", label: titel, kleur: "var(--chart-1)" }]}
-      punten={toRows(q.data, "v")}
+      punten={q.data ? toRows(q.data, "v") : null}
+      onbekend={q.error ? "Onbekend — de meetreeks kon niet worden opgehaald. We tonen geen lege grafiek." : undefined}
       eenheid={eenheid}
       domein={domein}
       verouderdSinds={s.verouderd && s.observed_at ? Date.parse(s.observed_at) : null}
+      bron={bronLabel(s.bron)}
+      bijgewerkt={s.observed_at}
       testId={testId}
     />
   );
@@ -121,7 +129,7 @@ function NetwerkGrafiek({ periode }: { periode: Periode }) {
   const tx = useReeks("nas", "nas", "netwerk.verzonden", periode);
   if (!rx.loaded || !tx.loaded) return <Loading regels={2} />;
   if (!rx.s && !tx.s) {
-    return <div className="arcering-gat flex h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown text-unknown-ink">Geen meting — er is nog geen reeks voor netwerkverkeer.</div>;
+    return <div className="arcering-gat flex min-h-24 items-center justify-center rounded-md border-2 border-dashed border-unknown px-3 py-2 text-center text-unknown-ink">Geen meting — er is nog geen reeks voor netwerkverkeer.</div>;
   }
   const toMbit = (rows: ReturnType<typeof toRows>, key: string) => rows.map((r) => ({ ...r, [key]: typeof r[key] === "number" ? ((r[key] as number) * 8) / 1_000_000 : null }));
   return (
@@ -131,8 +139,11 @@ function NetwerkGrafiek({ periode }: { periode: Periode }) {
         { key: "rx", label: "Ontvangen", kleur: "var(--chart-1)" },
         { key: "tx", label: "Verzonden", kleur: "var(--chart-2)" },
       ]}
-      punten={mergeRows(toMbit(toRows(rx.q.data, "rx"), "rx"), toMbit(toRows(tx.q.data, "tx"), "tx"))}
+      punten={(!rx.s || rx.q.data) && (!tx.s || tx.q.data) ? mergeRows(toMbit(toRows(rx.q.data, "rx"), "rx"), toMbit(toRows(tx.q.data, "tx"), "tx")) : null}
+      onbekend={rx.q.error || tx.q.error ? "Onbekend — de meetreeks kon niet worden opgehaald. We tonen geen lege grafiek." : undefined}
       eenheid="Mbit/s"
+      bron={bronLabel(rx.s?.bron ?? tx.s?.bron)}
+      bijgewerkt={rx.s?.observed_at ?? tx.s?.observed_at ?? null}
       testId="grafiek-netwerk"
     />
   );
@@ -152,7 +163,7 @@ export function MetriekenScreen() {
         title="Metrieken"
         kruimel={[{ label: "Server", href: "/server" }, { label: "Metrieken" }]}
         intro="Live metingen van je NAS met bron en tijd. TrueNAS (reporting.realtime) gaat voor Beszel; ouder dan de TTL is onbekend, nooit 0."
-        meta={o ? `Bijgewerkt ${formatTime(o.observed_at)} · TTL ${o.ttl_seconden} s · realtime: ${o.realtime.meting}${o.realtime.reden ? ` (${o.realtime.reden})` : ""}` : undefined}
+        meta={o ? `Bijgewerkt ${formatTime(o.observed_at)} · verouderd na ${o.ttl_seconden} s · live-meting (reporting.realtime): ${o.realtime.meting === "ok" ? "werkt" : "onbekend"}${o.realtime.reden ? ` (${o.realtime.reden})` : ""}` : undefined}
       />
       <Subnav items={SERVER_SUBNAV} label="Server" />
       <div className="mb-4 flex flex-col gap-2">
@@ -255,7 +266,17 @@ export function MetriekenScreen() {
                   <li key={p.naam} className="flex flex-col gap-1">
                     <span className="flex flex-wrap justify-between gap-2">
                       <strong>{p.naam}</strong>
-                      <span>{pct !== null ? `${formatPercent(pct)} gebruikt${over ? " · Beperkt: boven de drempel van 90%" : ""}` : "Onbekend"}</span>
+                      {pct === null ? (
+                        <StatusBadge view={{ tone: "unknown", label: "Onbekend" }} />
+                      ) : over ? (
+                        // Meter boven de drempel (Peil §10): icoon + woord + tekst, nooit alleen de kleur van de vulling.
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-degraded-ink">
+                          <TriangleAlert aria-hidden="true" className="size-4 text-degraded" />
+                          {formatPercent(pct)} gebruikt — boven de drempel van 90%
+                        </span>
+                      ) : (
+                        <span>{formatPercent(pct)} gebruikt</span>
+                      )}
                     </span>
                     {pct !== null ? (
                       <div className="h-3 w-full overflow-hidden rounded-full bg-chart-meter-track" role="meter" aria-label={`Gebruik pool ${p.naam}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
@@ -306,7 +327,9 @@ export function MetriekenScreen() {
               <p className="text-sm">Het Beszel-systeem van de mini-pc telt nooit mee (D10).</p>
             )}
             <p>
-              <Link href="/server/meetdekking">Meetdekking per metriek en bron</Link>
+              <Link href="/server/meetdekking" className="losse-link">
+                Meetdekking per metriek en bron
+              </Link>
             </p>
           </section>
           {o.realtime.meting !== "ok" ? (

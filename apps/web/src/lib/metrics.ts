@@ -36,12 +36,15 @@ export const PERIODES: { id: Periode; label: string; ms: number }[] = [
 
 export const RESOLUTIE_LABEL: Record<string, string> = { ruw: "ruwe metingen", "5m": "gemiddelde per 5 minuten", "1u": "gemiddelde per uur" };
 
-/** Pad voor /metrics/query met van/tot in UTC. */
+/**
+ * Pad voor /metrics/query. `van` staat op de hele minuut en `tot` ontbreekt (de Hub neemt dan "nu"): het pad blijft
+ * zo binnen een minuut gelijk. Review: met `van`/`tot` op de milliseconde veranderde het pad bij elke weergave, haalde
+ * useApi eindeloos opnieuw op (± 1300 aanvragen in 6 s) en zei elke grafiek ten onrechte "Geen meting in deze periode".
+ */
 export function queryPath(seriesId: number, periode: Periode, now = Date.now()): string {
   const ms = PERIODES.find((p) => p.id === periode)?.ms ?? 6 * 3_600_000;
-  const van = new Date(now - ms).toISOString();
-  const tot = new Date(now).toISOString();
-  return `/api/v1/metrics/query?series=${seriesId}&van=${encodeURIComponent(van)}&tot=${encodeURIComponent(tot)}`;
+  const van = new Date(Math.floor((now - ms) / 60_000) * 60_000).toISOString();
+  return `/api/v1/metrics/query?series=${seriesId}&van=${encodeURIComponent(van)}`;
 }
 
 const STAP: Record<string, number> = { "5m": 300_000, "1u": 3_600_000 };
@@ -72,4 +75,13 @@ export function mergeRows(a: Punt[], b: Punt[]): Punt[] {
   const map = new Map<number, Punt>();
   for (const r of [...a, ...b]) map.set(r.t, { ...(map.get(r.t) ?? { t: r.t }), ...r });
   return [...map.values()].sort((x, y) => x.t - y.t);
+}
+
+/** Bron-id van een reeks → leesbaar ("truenas.reporting.realtime" → "TrueNAS (reporting.realtime)"). */
+export function bronLabel(bron: string | null | undefined): string | null {
+  if (!bron) return null;
+  const [soort, ...rest] = bron.split(".");
+  const naam: Record<string, string> = { truenas: "TrueNAS", beszel: "Beszel", uptime_kuma: "Uptime Kuma", kuma: "Uptime Kuma", hub: "Hub" };
+  const n = naam[soort ?? ""];
+  return n ? (rest.length ? `${n} (${rest.join(".")})` : n) : bron;
 }

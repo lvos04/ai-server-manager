@@ -93,3 +93,8 @@ export function orUnknown(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === "") return "onbekend";
   return String(v);
 }
+
+/** "1 pool" / "3 pools": getal + juist enkelvoud of meervoud (geen "pool(s)" of "kanaal/kanalen" in de UI). */
+export function aantal(n: number, enkelvoud: string, meervoud: string): string {
+  return `${formatNumber(n)} ${n === 1 ? enkelvoud : meervoud}`;
+}

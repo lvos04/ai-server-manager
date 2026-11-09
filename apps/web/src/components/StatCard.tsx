@@ -59,11 +59,13 @@ export function StatCard({
         {Icon ? <Icon aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" /> : null}
         {title}
       </h3>
-      <div className="flex flex-wrap gap-2">
-        {badges.map((b, i) => (
-          <StatusBadge key={i} view={b} />
-        ))}
-      </div>
+      {badges.length ? (
+        <div className="flex flex-wrap gap-2">
+          {badges.map((b, i) => (
+            <StatusBadge key={i} view={b} />
+          ))}
+        </div>
+      ) : null}
       {value !== null && verouderd ? (
         <div className="arcering rounded-md border-2 border-dashed border-stale px-3 py-2">
           <p className="text-sm font-semibold text-unknown-ink">Laatst bekend{observedAt ? ` · ${formatTime(observedAt)}` : ""}</p>

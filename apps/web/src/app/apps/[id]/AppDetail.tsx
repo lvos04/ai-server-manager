@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleSlash, Hourglass, Power, SquareArrowOutUpRight } from "lucide-react";
+import { CircleSlash, Hourglass, Info, SquareArrowOutUpRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -108,9 +108,12 @@ function Metrieken({ app }: { app: CatalogDetail }) {
           <LineChart
             titel="Reactietijd (Uptime Kuma)"
             reeksen={[{ key: "ms", label: "Reactietijd", kleur: "var(--chart-1)" }]}
-            punten={toRows(q.data, "ms")}
+            punten={q.data ? toRows(q.data, "ms") : null}
+            onbekend={q.error ? "Onbekend — de meetreeks kon niet worden opgehaald. We tonen geen lege grafiek." : undefined}
             eenheid="ms"
             verouderdSinds={mine.verouderd && mine.observed_at ? Date.parse(mine.observed_at) : null}
+            bron="Uptime Kuma"
+            bijgewerkt={mine.observed_at}
             testId="grafiek-latentie"
           />
         </>
@@ -282,7 +285,7 @@ export function AppDetail({ id }: { id: string }) {
               </dd>
             </div>
             <div>
-              <dt>Data-dataset(s)</dt>
+              <dt>{a.datasets.length === 1 ? "Data-dataset" : "Data-datasets"}</dt>
               <dd>{a.datasets.length ? a.datasets.map((d) => <code key={d} className="block">{d}</code>) : "geen gevonden"}</dd>
             </div>
             <div>
@@ -333,8 +336,8 @@ export function AppDetail({ id }: { id: string }) {
               <StatusBadge view={a.runtime_staat ? appState(a.runtime_staat) : { tone: "unknown", label: "Onbekend" }} />
             </dd>
           </dl>
-          <p className="flex items-center gap-2 text-sm">
-            <Power aria-hidden="true" className="size-4" />
+          <p className="flex items-start gap-2 text-sm">
+            <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-info" />
             Uptime over 30 dagen: alleen als Uptime Kuma die meet; nu niet getoond.
           </p>
         </TabsContent>
