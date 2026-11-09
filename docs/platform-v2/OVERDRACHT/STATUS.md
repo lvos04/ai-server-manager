@@ -5,7 +5,7 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 ## Afstemming tussen de twee machines
 
 - **Overdrachtsstatus: OUDE MACHINE NOG BEZIG.** Zolang deze regel er staat werkt de oude sessie nog in: ai-server-manager,
-  jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients (bijgewerkt 12:00).
+  jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients (bijgewerkt 12:35).
   Daar niets committen of pushen (alleen lezen).
 - Vrij voor de nieuwe machine: home-control-hub, media-guard-ultimate, media-source-optimizer, my_house, appstore-en-fork,
   zoeken-en-persoonlijke-ai (P0 + review klaar en gepusht).
@@ -23,9 +23,10 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   - my_house: 125 claims (109 bevestigd, 15 weerlegd, 14 nieuw), ADR-0001…0006.
   - Elke DELTA_MATRIX.md eindigt met een geprioriteerde bouwlijst voor P3.
 - **P0 nieuwe repos (op het moment van schrijven):**
-  - ai-server-manager: backend P0 klaar (12 commits: scaffold, first-start-init, auth/enrollment, wizard D01–D18 + gates,
-    TrueNAS-adapter, inventaris, back-updekking, events-inbox, EVIDENCE). PWA (apps/web) werd nog gebouwd → controleer of die
-    gecommit is; daarna nog de **review**.
+  - ai-server-manager: **P0 klaar** — backend (12 commits), web-UI Next.js 16-PWA met P0-schermen en Playwright op 4 breedtes
+    (6 commits), review (5 commits: setupcode echt eenmalig bij gelijktijdige verzoeken, 1 MiB ook bij chunked, rate-limit op
+    wachtwoord, no-new-privileges in de image zelf, key nooit naar NAS bij onvertrouwd certificaat). GitHub Actions-run
+    42608437675 groen (python, web, images). ai-server-manager blijft gereserveerd tot OVERDRACHT VOLTOOID (Excel-update).
   - appstore-en-fork: B08-001 manifeststandaard + validator gebouwd en gereviewd (review dichtte o.a. omzeiling via
     //mnt/.ix-apps; CI-run 42602759898 groen: 350 unit, 53 integratie, 2 dienst-E2E, 8 image-E2E). **P0 klaar.**
   - home-control-hub: scaffold + B13-001 gebouwd en gereviewd (fail-closed migratie bij mislukte pg_dump, 1 MiB-limiet;
