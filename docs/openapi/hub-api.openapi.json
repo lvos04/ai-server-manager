@@ -1,0 +1,3159 @@
+{
+  "components": {
+    "schemas": {
+      "Actor": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "system",
+              "user",
+              "ai",
+              "flow"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "Actor",
+        "type": "object"
+      },
+      "ApiKeyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "maxLength": 512,
+            "minLength": 16,
+            "title": "Api Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "title": "ApiKeyIn",
+        "type": "object"
+      },
+      "EnrollIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "title": "App Id",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "pattern": "^https?://[^\\s/]+(:\\d+)?(/.*)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "enrollment_token": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Token"
+          },
+          "pairing_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairing Code"
+          },
+          "public_key_jwk": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key Jwk"
+          },
+          "version": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "EnrollIn",
+        "type": "object"
+      },
+      "Entity": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_.-]+$",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "Entity",
+        "type": "object"
+      },
+      "EventEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "classification": {
+            "enum": [
+              "public",
+              "internal",
+              "sensitive"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/Entity"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "maxLength": 128,
+            "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+\\.[a-z0-9_]+$",
+            "title": "Event Type",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "payload_ref": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload Ref"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_app": {
+            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "title": "Source App",
+            "type": "string"
+          },
+          "source_event_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Event Id",
+            "type": "string"
+          },
+          "timestamp_utc": {
+            "format": "date-time",
+            "title": "Timestamp Utc",
+            "type": "string"
+          },
+          "trace_id": {
+            "format": "uuid",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "event_id",
+          "source_app",
+          "source_event_id",
+          "event_type",
+          "entity",
+          "timestamp_utc",
+          "trace_id",
+          "actor",
+          "classification"
+        ],
+        "title": "EventEnvelope",
+        "type": "object"
+      },
+      "EvidenceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "omschrijving": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Omschrijving",
+            "type": "string"
+          },
+          "referentie": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Referentie",
+            "type": "string"
+          },
+          "resultaat": {
+            "enum": [
+              "geslaagd",
+              "mislukt"
+            ],
+            "title": "Resultaat",
+            "type": "string"
+          },
+          "soort": {
+            "enum": [
+              "handmatige_test",
+              "meting_extern",
+              "document",
+              "hersteltest",
+              "screenshot"
+            ],
+            "title": "Soort",
+            "type": "string"
+          },
+          "uitgevoerd_op": {
+            "format": "date",
+            "title": "Uitgevoerd Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "soort",
+          "omschrijving",
+          "resultaat",
+          "uitgevoerd_op"
+        ],
+        "title": "EvidenceIn",
+        "type": "object"
+      },
+      "GrantIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "title": "App Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id"
+        ],
+        "title": "GrantIn",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoginIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginIn",
+        "type": "object"
+      },
+      "PasswordIn": {
+        "additionalProperties": false,
+        "properties": {
+          "huidig_wachtwoord": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Huidig Wachtwoord",
+            "type": "string"
+          },
+          "nieuw_wachtwoord": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Nieuw Wachtwoord",
+            "type": "string"
+          }
+        },
+        "required": [
+          "huidig_wachtwoord",
+          "nieuw_wachtwoord"
+        ],
+        "title": "PasswordIn",
+        "type": "object"
+      },
+      "RestoreTestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
+          },
+          "duur_minuten": {
+            "anyOf": [
+              {
+                "maximum": 20160.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duur Minuten"
+          },
+          "omgeving": {
+            "description": "Geïsoleerde omgeving (nooit productie).",
+            "maxLength": 256,
+            "minLength": 3,
+            "title": "Omgeving",
+            "type": "string"
+          },
+          "omschrijving": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Omschrijving",
+            "type": "string"
+          },
+          "referentie": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Referentie",
+            "type": "string"
+          },
+          "resultaat": {
+            "enum": [
+              "geslaagd",
+              "mislukt"
+            ],
+            "title": "Resultaat",
+            "type": "string"
+          },
+          "soort": {
+            "enum": [
+              "foto",
+              "database",
+              "dataset",
+              "config"
+            ],
+            "title": "Soort",
+            "type": "string"
+          },
+          "uitgevoerd_op": {
+            "format": "date-time",
+            "title": "Uitgevoerd Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "soort",
+          "resultaat",
+          "omgeving",
+          "omschrijving",
+          "uitgevoerd_op"
+        ],
+        "title": "RestoreTestIn",
+        "type": "object"
+      },
+      "Role": {
+        "enum": [
+          "admin",
+          "operator",
+          "viewer",
+          "kind"
+        ],
+        "title": "Role",
+        "type": "string"
+      },
+      "ServiceJwtIn": {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "title": "Audience",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audience"
+        ],
+        "title": "ServiceJwtIn",
+        "type": "object"
+      },
+      "SetupAdminIn": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "setup_code": {
+            "maxLength": 32,
+            "minLength": 4,
+            "title": "Setup Code",
+            "type": "string"
+          },
+          "username": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "setup_code",
+          "username",
+          "password"
+        ],
+        "title": "SetupAdminIn",
+        "type": "object"
+      },
+      "StatusIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reden": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Reden",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "Open",
+              "Geblokkeerd",
+              "N.v.t."
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StatusIn",
+        "type": "object"
+      },
+      "TrustIn": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint_sha256": {
+            "maxLength": 128,
+            "minLength": 64,
+            "title": "Fingerprint Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint_sha256"
+        ],
+        "title": "TrustIn",
+        "type": "object"
+      },
+      "UserIn": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "username": {
+            "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "role"
+        ],
+        "title": "UserIn",
+        "type": "object"
+      },
+      "UserPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "UserPatch",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "ValueIn": {
+        "additionalProperties": false,
+        "properties": {
+          "waarde": {
+            "additionalProperties": true,
+            "title": "Waarde",
+            "type": "object"
+          }
+        },
+        "required": [
+          "waarde"
+        ],
+        "title": "ValueIn",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Centrale Hub van TrueNAS Home Platform V2 (B01/B02/B09/B12). Fouten: `{code, message, details, trace_id}`; mutaties vereisen `Idempotency-Key` (UUID).",
+    "title": "AI Server Manager — Hub API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/audit": {
+      "get": {
+        "operationId": "list_audit_api_v1_audit_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Audit Api V1 Audit Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Globaal auditspoor (admin)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/api/v1/auth/jwks": {
+      "get": {
+        "operationId": "jwks_api_v1_auth_jwks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Publieke sleutels (JWKS) voor dienst-JWT's",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Aanmelden (argon2id, rate-limit)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Afmelden (sessie intrekken)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Me Api V1 Auth Me Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Huidige gebruiker",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "operationId": "change_password_api_v1_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Change Password Api V1 Auth Password Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eigen wachtwoord wijzigen (trekt andere sessies in)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/service-jwt": {
+      "post": {
+        "operationId": "service_jwt_api_v1_auth_service_jwt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceJwtIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kortlevende JWT met gebruikerscontext voor een dienst (exp ≤ 120 s)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "operationId": "my_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response My Sessions Api V1 Auth Sessions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Eigen actieve sessies",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}/revoke": {
+      "post": {
+        "operationId": "revoke_session_api_v1_auth_sessions__session_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sessie intrekken (eigen; admin: iedere)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/backups/coverage": {
+      "get": {
+        "operationId": "get_coverage_api_v1_backups_coverage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Coverage Api V1 Backups Coverage Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dekking per app en dataset (lokaal, extern, DB-export, hersteltest, RPO/RTO)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/restore-tests": {
+      "get": {
+        "operationId": "list_restore_tests_api_v1_backups_restore_tests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Restore Tests Api V1 Backups Restore Tests Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Vastgelegde hersteltests (bewijsrecords)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      },
+      "post": {
+        "operationId": "add_restore_test_api_v1_backups_restore_tests_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hersteltest vastleggen (expliciet bewijs; de Hub herstelt zelf niets)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/self": {
+      "get": {
+        "operationId": "list_self_api_v1_backups_self_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Self Api V1 Backups Self Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Eigen database-exports (pg_dump) met verificatie",
+        "tags": [
+          "back-up en herstel"
+        ]
+      },
+      "post": {
+        "operationId": "run_self_api_v1_backups_self_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Nu een eigen database-export maken (job)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/self/{backup_id}/verify": {
+      "post": {
+        "operationId": "verify_self_api_v1_backups_self__backup_id__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Backup Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bestaande export opnieuw verifiëren (checksum + inhoudsopgave)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/snapshot-policy/proposal": {
+      "get": {
+        "operationId": "get_policy_proposal_api_v1_backups_snapshot_policy_proposal_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Policy Proposal Api V1 Backups Snapshot Policy Proposal Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Snapshotbeleid als voorstel (wordt niet toegepast)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/decisions": {
+      "get": {
+        "operationId": "list_decisions_api_v1_decisions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Decisions Api V1 Decisions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Alle besluiten D01–D18 met status",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/decisions/{decision_id}": {
+      "get": {
+        "operationId": "get_decision_api_v1_decisions__decision_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "pattern": "^D(0[1-9]|1[0-8])$",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén besluit, met JSON-schema van de waarde",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/decisions/{decision_id}/bewijs": {
+      "post": {
+        "operationId": "post_evidence_api_v1_decisions__decision_id__bewijs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "pattern": "^D(0[1-9]|1[0-8])$",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Expliciet bewijsrecord vastleggen (geslaagd → Getest)",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/decisions/{decision_id}/meting": {
+      "post": {
+        "operationId": "post_measure_api_v1_decisions__decision_id__meting_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "pattern": "^D(0[1-9]|1[0-8])$",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Meten via TrueNAS-readback (D01, D02, D03, D06, D07)",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/decisions/{decision_id}/status": {
+      "post": {
+        "operationId": "post_status_api_v1_decisions__decision_id__status_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "pattern": "^D(0[1-9]|1[0-8])$",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open / Geblokkeerd / N.v.t. (met reden)",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/decisions/{decision_id}/waarde": {
+      "put": {
+        "operationId": "put_value_api_v1_decisions__decision_id__waarde_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "pattern": "^D(0[1-9]|1[0-8])$",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValueIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Waarde invullen (gevalideerd) → Ingevuld",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "operationId": "list_events_api_v1_events_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_app",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source App"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Events Api V1 Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ontvangen events (nieuwste eerst, cursor)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/api/v1/events/inbox": {
+      "post": {
+        "operationId": "inbox_api_v1_events_inbox_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventEnvelope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Event ontvangen (service-token); dedupe op event_id en bron-id",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/api/v1/gates": {
+      "get": {
+        "operationId": "get_gates_api_v1_gates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Gates Api V1 Gates Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Wat mag nu? Afgeleid uit besluiten + gemeten toestand",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/gates/{gate_id}": {
+      "get": {
+        "operationId": "get_gate_api_v1_gates__gate_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "gate_id",
+            "required": true,
+            "schema": {
+              "title": "Gate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Gate Api V1 Gates  Gate Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén gate met redenen",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/inventory": {
+      "get": {
+        "operationId": "inventory_summary_api_v1_inventory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inventory Summary Api V1 Inventory Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Overzicht per soort: status, observed_at, veroudering",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/inventory/refresh": {
+      "post": {
+        "operationId": "refresh_api_v1_inventory_refresh_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inventaris vernieuwen (job; alleen-lezen op de NAS)",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/inventory/{soort}": {
+      "get": {
+        "operationId": "inventory_kind_api_v1_inventory__soort__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "soort",
+            "required": true,
+            "schema": {
+              "title": "Soort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inventory Kind Api V1 Inventory  Soort  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén soort uit de inventaris (alleen-lezen)",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "operationId": "list_jobs_api_v1_jobs_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Jobs Api V1 Jobs Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recente jobs",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Job Api V1 Jobs  Job Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status van een job",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/registry/services": {
+      "get": {
+        "operationId": "registry_api_v1_registry_services_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Registry Api V1 Registry Services Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dienstenregister: app → basis-URL (NAS-adres uit D03 + hostpoort uit app.query)",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/services": {
+      "get": {
+        "operationId": "list_services_api_v1_services_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Services Api V1 Services Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Register van diensten en tokens (alleen laatste 4 tekens)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/enroll": {
+      "post": {
+        "operationId": "enroll_api_v1_services_enroll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dienst meldt zich aan met enrollment-token of koppelcode (eenmalig)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/enrollment-tokens": {
+      "post": {
+        "operationId": "create_enrollment_token_api_v1_services_enrollment_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eenmalig enrollment-token (60 min) voor een app (admin)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/pairing-codes": {
+      "post": {
+        "operationId": "create_pairing_code_api_v1_services_pairing_codes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Koppelcode voor een handmatig geïnstalleerde app (admin)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/self/rotate": {
+      "post": {
+        "operationId": "rotate_self_api_v1_services_self_rotate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dienst roteert zijn eigen token (Bearer)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/{service_id}/revoke": {
+      "post": {
+        "operationId": "revoke_api_v1_services__service_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dienst en al zijn tokens intrekken (admin)",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/services/{service_id}/rotate": {
+      "post": {
+        "operationId": "rotate_api_v1_services__service_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service-token roteren (admin); nieuw token wordt één keer getoond",
+        "tags": [
+          "diensten en enrollment"
+        ]
+      }
+    },
+    "/api/v1/setup/admin": {
+      "post": {
+        "operationId": "setup_admin_api_v1_setup_admin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupAdminIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eerste beheerder aanmaken met de setupcode uit de app-log",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/setup/status": {
+      "get": {
+        "operationId": "setup_status_api_v1_setup_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Setup Status Api V1 Setup Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Is de eerste setup nog nodig?",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/truenas": {
+      "get": {
+        "operationId": "get_truenas_api_v1_truenas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Truenas Api V1 Truenas Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status van de TrueNAS-koppeling (nooit de key zelf)",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/truenas/api-key": {
+      "put": {
+        "operationId": "put_api_key_api_v1_truenas_api_key_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Alleen-lezen-API-key instellen (versleuteld in de vault)",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/truenas/test": {
+      "post": {
+        "operationId": "test_truenas_api_v1_truenas_test_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verbinding testen: TLS, aanmelden, rechten, versie, capability-map",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/truenas/tls/trust": {
+      "post": {
+        "operationId": "trust_tls_api_v1_truenas_tls_trust_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrustIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Zelfondertekend certificaat vertrouwen na vingerafdruk-bevestiging",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/truenas/tls/untrust": {
+      "post": {
+        "operationId": "untrust_tls_api_v1_truenas_tls_untrust_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bevestigde vingerafdruk intrekken",
+        "tags": [
+          "onboarding en gates"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "list_users_api_v1_users_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Users Api V1 Users Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Gebruikers (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_api_v1_users_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gebruiker aanmaken (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}": {
+      "patch": {
+        "operationId": "patch_user_api_v1_users__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rol/status wijzigen (admin)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
+    "/connector/v1/apply": {
+      "post": {
+        "operationId": "apply_connector_v1_apply_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connector: niet beschikbaar (501)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/discover": {
+      "get": {
+        "operationId": "discover_connector_v1_discover_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Discover Connector V1 Discover Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connector: capabilities van de Hub",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/events": {
+      "get": {
+        "operationId": "outbox_connector_v1_events_get",
+        "parameters": [
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Outbox Connector V1 Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector: outbox van de Hub (cursor)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/evidence/{evidence_id}": {
+      "get": {
+        "operationId": "evidence_connector_v1_evidence__evidence_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evidence_id",
+            "required": true,
+            "schema": {
+              "title": "Evidence Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Evidence Connector V1 Evidence  Evidence Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector: geredigeerd bewijs",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/health": {
+      "get": {
+        "operationId": "health_connector_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Connector V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connector: gezondheid van de Hub",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/items": {
+      "get": {
+        "operationId": "items_connector_v1_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "pattern": "^(decision|backup\\.self)$",
+              "title": "Type",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Items Connector V1 Items Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector: eigen data (gepagineerd)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/propose": {
+      "post": {
+        "operationId": "propose_connector_v1_propose_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connector: niet beschikbaar (501)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/connector/v1/rollback": {
+      "post": {
+        "operationId": "rollback_connector_v1_rollback_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connector: niet beschikbaar (501)",
+        "tags": [
+          "events en connector"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Healthz Healthz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Proces leeft",
+        "tags": [
+          "gezondheid"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Afhankelijkheden in orde (database, migraties, geheimen)",
+        "tags": [
+          "gezondheid"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "healthz/readyz zonder auth en zonder geheimen.",
+      "name": "gezondheid"
+    },
+    {
+      "description": "Setupcode → eerste admin, sessies + CSRF, rollen, JWKS, dienst-JWT.",
+      "name": "aanmelden en gebruikers"
+    },
+    {
+      "description": "Eenmalige enrollment-tokens/koppelcodes en service-tokens (alleen hashes).",
+      "name": "diensten en enrollment"
+    },
+    {
+      "description": "Besluiten D01–D18, metingen, bewijs, gates en de alleen-lezen TrueNAS-koppeling.",
+      "name": "onboarding en gates"
+    },
+    {
+      "description": "Alleen-lezen inventaris met observed_at/veroudering en het dienstenregister.",
+      "name": "inventaris"
+    },
+    {
+      "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",
+      "name": "back-up en herstel"
+    },
+    {
+      "description": "Events-inbox met dedupe, audit en het connectorcontract van de Hub.",
+      "name": "events en connector"
+    }
+  ]
+}
