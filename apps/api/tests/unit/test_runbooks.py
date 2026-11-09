@@ -70,3 +70,12 @@ def test_koppeling_incident_naar_runbook() -> None:
         rb = runbook_for(_inc(soort, bron))
         assert rb is not None and rb.id == want, (soort, bron)
     assert runbook_for(_inc("sso.authentik_sync", "home-control-hub")) is None  # eerlijk: geen runbook
+
+
+def test_runbooks_md_actueel() -> None:
+    from pathlib import Path
+
+    from hub.runbooks.export import export
+
+    out = Path(__file__).resolve().parents[4] / "docs" / "RUNBOOKS.md"
+    assert export(out, check=True) == 0, "draai `make runbooks`"

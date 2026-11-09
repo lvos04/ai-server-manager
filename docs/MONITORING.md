@@ -56,4 +56,7 @@ en de meetdekking in `GET /api/v1/monitoring/coverage` (welke bron wat levert en
 - MediaGuard, MSO en my_house: alleen bereikbaarheid via Uptime Kuma; hun binnenkant (jobs) volgt in fase P3 via hun
   bestaande routes met een gescopete sleutel. Tot dan zijn ze **onbekend**, nooit groen.
 - Out-of-band: Uptime Kuma en Gotify alarmeren ook als de Hub zelf uit staat; bij volledige NAS-uitval meldt niets op
-  de NAS zelf (daarvoor is een externe host nodig) — zie fase P1 deel 2 (B09-005).
+  de NAS zelf (daarvoor is een externe host nodig). Inrichten en de eerlijke status (EX22/EX23):
+  [`INCIDENTEN.md`](INCIDENTEN.md#out-of-band-melden-b09-005-ex22-ex23).
+- Incidenten-inbox, log-index, auditketting en runbooks (P1 deel 2): [`INCIDENTEN.md`](INCIDENTEN.md),
+  [`RUNBOOKS.md`](RUNBOOKS.md); SSO-login: [`SSO.md`](SSO.md).

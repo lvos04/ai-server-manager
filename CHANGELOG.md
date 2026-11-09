@@ -4,6 +4,34 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — fase P1 deel 2 (backend): incidenten, logs, runbooks, out-of-band, SSO en auditketting (ADR-0022/0023)
+- **Incidenten-inbox (B01-005):** `/api/v1/incidents…` met inbox per prioriteit, samenvatting en groepen per oorzaak,
+  detail (ETag), gebeurtenissen, bewijs, erkennen (met verval), snoozen (kritiek ≤ 24 uur), oplossen alleen als de
+  readback het niet tegenspreekt (`409 nog_actief`), notities en een geschoonde supportbundel. Dedupe en correlatie per
+  vingerafdruk (100 identieke crashes → één incident), herstel sluit alleen het eigen incident en nooit met een ouder
+  herstel, heropenen binnen een uur, escalatie, één melding per opening en een hersteldmelding; alert-incidenten melden
+  niet dubbel. Hypothese met zekerheid en bewijs of "Ik weet het niet". Nieuwe outbox-events
+  `alert.instance.fired|resolved`, `notification.channel.failed|recovered` en `audit.chain.broken`; SSO-events van
+  home-control-hub (ADR-0009 daar) worden incidenten.
+- **Log-index (B09-004):** `POST /api/v1/logs` (diensten), `GET /api/v1/logs` en `/logs/bronnen` (operator); eigen
+  WARNING-logs met `trace_id`; schonen vóór opslag (geheimen, tokens, JWT, PEM, hex/base64, e-mail, IP-adressen en de
+  exacte waarde van vault-geheimen en Hub-tokens), grenzen, rate-limit en retentie.
+- **Out-of-band (B09-005, EX22/EX23):** `GET /api/v1/monitoring/out-of-band` en `…/bevestiging`; de Hub zit niet in het
+  meldpad van Uptime Kuma en noemt volledige NAS-uitval nooit "gedekt".
+- **Runbooks (B09-006):** acht getypeerde runbooks (`/api/v1/runbooks`, `docs/RUNBOOKS.md` gegenereerd met drift-check),
+  "Onderzoek", "Herstel voorstellen" (alleen een `ActionProposal`, niet uitvoerbaar tot P2) en de veilige modus na
+  herhaald falen (geen eindeloze herstarts).
+- **SSO-login (B01-006):** OIDC Authorization Code + PKCE tegen een instelbare issuer (Authentik), groep→rol (kind wint),
+  testlogin + gate D17 vóór inschakelen, "OIDC verplicht" alleen met werkend noodaccount, sessie-intrekking (admin,
+  uitzetten, `sso.access.revoked`, rolwijziging), `/api/v1/sessions` en het advies `GET /api/v1/sso/status` (nooit
+  groen). De bestaande noodlogin is hergebruikt en blijft werken als de issuer uitvalt.
+- **Auditspoor:** append-only met hash-ketting (`ketting_nr`, `prev_hash`, `hash`), trigger tegen wijzigen/verwijderen,
+  `GET /api/v1/audit/verify`, anker in `/appdata/audit/anker.jsonl`, dagelijkse controle.
+- Migraties 0006–0008; worker-taken `incidenten_bijwerken`, `logs_onderhoud`, `audit_verankeren`, `audit_controleren`;
+  OpenAPI, `.env.example`, `docs/INCIDENTEN.md`, `docs/SSO.md`; de rooktest controleert de nieuwe routes en het anker.
+- Tests: unit (regels, schoning, runbooks, OIDC, audit), integratie (auditketting incl. manipulatie en gelijktijdige
+  schrijvers) en dienst-E2E met fakes (OIDC in de vorm van Authentik, home-control-hub, Uptime Kuma, Gotify, TrueNAS).
+
 ### Toegevoegd — fase P1 deel 1 (backend): catalogus, monitoring, alerts en meldingen (ADR-0021)
 - **Appcatalogus (B01-002):** `GET /api/v1/apps` (zoeken/filteren op status, adaptertype, soort), `GET /api/v1/apps/{id}`
   (ETag, acties per rol) en `POST /api/v1/apps/discover`. Identiteit = TrueNAS-app-id (stabiel over een NAS-herstart);

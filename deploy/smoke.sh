@@ -130,6 +130,33 @@ expect "observability zonder NAS: unknown (geen bron)" \
 expect "standaard-alertregels gezaaid" \
   "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/alerts/rules)" '"standaard_sleutel":"app-down"'
 
+# P1 deel 2 (ADR-0022/0023): migraties 0006–0008, incidenten, runbooks, auditketting, out-of-band, SSO standaard uit.
+expect "incidenten-inbox bereikbaar" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/incidents/samenvatting)" '"per_status"'
+expect "runbooks: acht scenario's met hash" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/runbooks)" '"runbook_hash"'
+for _ in $(seq 1 15); do
+  st="$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/monitoring/status)"
+  case "$st" in *'"naam":"audit_verankeren"'*) break ;; esac
+  sleep 2
+done
+expect "auditketting intact" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/audit/verify)" '"status":"intact"'
+# Het eerste anker komt pas na het interval (15 min) na de eerste auditrij; bestaat het, dan 568 en 0600.
+if docker exec asm-smoke-hub test -f /appdata/audit/anker.jsonl; then
+  [ "$(docker exec asm-smoke-hub stat -c '%u %a' /appdata/audit/anker.jsonl)" = "568 600" ] \
+    || { echo "FOUT: auditanker niet van 568 met 0600"; exit 1; }
+  echo "ok: auditanker in /appdata/audit (568, 0600)"
+else
+  echo "ok: nog geen auditanker (eerste anker na het interval)"
+fi
+expect "out-of-band: Hub niet in het meldpad, NAS-uitval niet gedekt" \
+  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/monitoring/out-of-band)" '"hub_in_meldpad":false'
+expect "SSO standaard uit" \
+  "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/oidc/beschikbaar)" '"ingeschakeld":false'
+expect "SSO-login uit → terug naar inloggen" \
+  "$(curl -sS --noproxy '*' -D - -o /dev/null http://127.0.0.1:30400/api/v1/auth/oidc/login)" 'sso_fout=sso_uit'
+
 docker stop -t 30 asm-smoke-hub >/dev/null
 expect "netjes gestopt" "$(docker logs asm-smoke-hub 2>&1 | tail -n 5)" '[hub] gestopt'
 echo "rooktest geslaagd"

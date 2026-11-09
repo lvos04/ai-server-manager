@@ -13,7 +13,7 @@ WEB := apps/web
 NPM := cd $(WEB) && NEXT_TELEMETRY_DISABLED=1
 
 .PHONY: venv lint format type test test-unit test-integration test-e2e migrate-check openapi openapi-check audit \
-        image-hub image-executor images smoke lock clean \
+        image-hub image-executor images smoke lock clean runbooks \
         web-install web-lint web-test web-build web-e2e web-audit web-schema-fixture
 
 venv:
@@ -52,6 +52,9 @@ openapi:
 openapi-check:
 	$(BIN)/python -m hub export-openapi --out docs/openapi/hub-api.openapi.json --check
 	$(BIN)/python -m executor export-openapi --out docs/openapi/executor.openapi.json --check
+
+runbooks:
+	$(BIN)/python -m hub export-runbooks --out docs/RUNBOOKS.md
 
 audit:
 	$(BIN)/pip-audit --strict -r $(API)/requirements.lock -r $(EXE)/requirements.lock

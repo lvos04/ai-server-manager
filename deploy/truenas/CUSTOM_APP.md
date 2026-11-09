@@ -43,7 +43,7 @@ scan uit besluit 3).
 
 | Dataset | Voor |
 |---|---|
-| `<pool>/<apps-map>/ai-server-manager` | Hub: ingebouwde database, `secrets/`, `backups/` |
+| `<pool>/<apps-map>/ai-server-manager` | Hub: ingebouwde database, `secrets/`, `backups/`, `audit/` (anker van het auditspoor) |
 | `<pool>/<apps-map>/ai-server-manager-executor` | executor: eigen identiteit en vault (gescheiden van de Hub) |
 
 Rechten hoef je niet aan te passen: bij de eerste start maakt de app gebruiker `568` (apps) eigenaar van zijn eigen

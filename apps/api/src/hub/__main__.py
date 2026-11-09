@@ -110,6 +110,12 @@ def cmd_export_openapi(args: argparse.Namespace) -> int:
     return export(Path(args.out), check=args.check)
 
 
+def cmd_export_runbooks(args: argparse.Namespace) -> int:
+    from hub.runbooks.export import export
+
+    return export(Path(args.out), check=args.check)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="hub", description="AI Server Manager — Hub")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -130,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
     e = sub.add_parser("export-openapi", help="OpenAPI exporteren of op drift controleren")
     e.add_argument("--out", default="docs/openapi/hub-api.openapi.json")
     e.add_argument("--check", action="store_true")
+    rb = sub.add_parser("export-runbooks", help="runbooks als Markdown exporteren of op drift controleren")
+    rb.add_argument("--out", default="docs/RUNBOOKS.md")
+    rb.add_argument("--check", action="store_true")
     args = p.parse_args(argv)
     _logging(get_settings().log_level)
     handlers = {
@@ -140,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         "migrate": cmd_migrate,
         "backup-now": cmd_backup_now,
         "export-openapi": cmd_export_openapi,
+        "export-runbooks": cmd_export_runbooks,
     }
     return handlers[args.cmd](args)
 
