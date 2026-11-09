@@ -191,6 +191,16 @@
         if (r.width > 0 && r.right > cw + 1 && !el.closest(".table-wrap")) breed.push(`${desc(el)} right=${Math.round(r.right)}`);
         if (breed.length > 6) break;
       }
+      // Tekst die buiten zijn eigen vak loopt (lang woord zonder breekpunt) verbreedt de pagina zonder dat een
+      // elementvak te breed is: meld ook die tekstknopen.
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let n = walker.nextNode(); n && breed.length < 10; n = walker.nextNode()) {
+        if (!n.textContent.trim() || !n.parentElement || n.parentElement.closest(".table-wrap") || isSrOnly(n.parentElement)) continue;
+        range.selectNodeContents(n);
+        const r = range.getBoundingClientRect();
+        if (r.width > 0 && r.right > cw + 1) breed.push(`tekst in ${desc(n.parentElement)} "${n.textContent.trim().slice(0, 40)}" right=${Math.round(r.right)}`);
+      }
     }
     const afgekapt = [];
     for (const el of document.querySelectorAll("body *")) {

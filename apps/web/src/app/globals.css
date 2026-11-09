@@ -30,6 +30,12 @@
   main:focus {
     outline: none;
   }
+  /* Lange woorden zonder breekpunt (bron "pool.snapshottask.query", "ConnectionRefusedError" uit een foutmelding)
+     breken liever dan dat ze de pagina verbreden (WCAG 1.4.10). Gevonden met een breder systeemlettertype (DejaVu
+     Sans, standaard op Ubuntu) op 320 px. */
+  main {
+    overflow-wrap: break-word;
+  }
   /* Datum/tijd: Chromium zet de focus soms op de kalenderknop ín het veld; dan geldt :focus-visible niet en was er geen
      ring (review). Deze velden krijgen de Peil-ring zodra de focus ergens in het veld staat (:focus-within). */
   :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"]):focus-within {

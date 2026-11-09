@@ -59,6 +59,7 @@ Wil je de executor-statuspagina ook meten? Start dan de executor (`python -m exe
 
 ## Bestanden
 
+- `00-gebruikers.spec.ts`: maakt kijker en kind één keer aan (project `review-opzet`), vóór de parallelle breedtes.
 - `peil-review.spec.ts`: schermen, rollen, toestanden en de meetlus. Elke breedte is één test; drie draaien tegelijk.
 - `in-pagina.js`: de metingen in de pagina (init-script, gewone JavaScript). Afgeleid van
   `design/ontwerptaal/bouw/controle.cjs` en aangevuld met de Peil-semantiek, de woordenlijst en tekstoverlap.

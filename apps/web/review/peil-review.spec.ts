@@ -26,6 +26,12 @@ const THEMES = ["licht", "donker"] as const;
 const FOCUS_WIDTHS = new Set([390, 1440]);
 const ALLEEN = process.env.PEIL_REVIEW_ALLEEN ? new RegExp(process.env.PEIL_REVIEW_ALLEEN) : null;
 const EXECUTOR_URL = process.env.PEIL_REVIEW_EXECUTOR_URL ?? "";
+// Optioneel een ander systeemlettertype afdwingen (bv. "DejaVu Sans", het brede standaardlettertype van Ubuntu-CI),
+// om reflow te meten met een breder lettertype dan lokaal (Peil gebruikt het systeemfont: Roboto, Segoe UI, DejaVu …).
+const LETTER = process.env.PEIL_REVIEW_LETTER ?? "";
+const LETTER_SCRIPT = LETTER
+  ? `document.addEventListener("DOMContentLoaded",()=>{const s=document.createElement("style");s.textContent=':root:root{--font-sans:${JSON.stringify(LETTER).slice(1, -1)},sans-serif !important}';document.head.appendChild(s);});`
+  : "";
 
 type Rol = "beheerder" | "kijker" | "kind" | "anoniem";
 interface Scherm {
@@ -335,6 +341,7 @@ for (const breedte of WIDTHS) {
             timezoneId: "Europe/Amsterdam",
           });
           await ctx.addInitScript({ path: INIT });
+          if (LETTER_SCRIPT) await ctx.addInitScript({ content: LETTER_SCRIPT });
           contexts.set(s.rol, ctx);
         }
         await meetScherm(ctx, s, breedte, uit);
@@ -367,6 +374,7 @@ test("Peil-review toestanden: NAS offline (verouderd) en browser offline", async
     for (const breedte of WIDTHS) {
       const ctx = await browser.newContext({ storageState: ADMIN_STATE, viewport: { width: breedte, height: 900 }, hasTouch: breedte < 1024, locale: "nl-NL", timezoneId: "Europe/Amsterdam" });
       await ctx.addInitScript({ path: INIT });
+      if (LETTER_SCRIPT) await ctx.addInitScript({ content: LETTER_SCRIPT });
       for (const s of [
         { naam: "home", rol: "beheerder", pad: "/" },
         { naam: "server", rol: "beheerder", pad: "/server" },
@@ -388,6 +396,7 @@ test("Peil-review toestanden: NAS offline (verouderd) en browser offline", async
   for (const breedte of [390, 1440]) {
     const ctx = await browser.newContext({ storageState: ADMIN_STATE, viewport: { width: breedte, height: 900 }, hasTouch: breedte < 1024 });
     await ctx.addInitScript({ path: INIT });
+    if (LETTER_SCRIPT) await ctx.addInitScript({ content: LETTER_SCRIPT });
     const page = await ctx.newPage();
     await page.goto("/server");
     await expect(page.locator("main h1").first()).toBeVisible();

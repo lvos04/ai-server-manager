@@ -570,6 +570,8 @@ export function MonitoringScreen() {
               <ResponsiveList
                 items={log.data.items}
                 label="Meldingenlogboek"
+                // Vier kolommen naast de subnavigatie: op 1024 met een breder systeemlettertype (DejaVu in CI) 9 px te breed.
+                tabelVanaf={1280}
                 sleutel={(m) => m.id}
                 kolommen={[
                   { kop: "Wanneer", cel: (m) => formatDateTime(m.aangemaakt_op) },
