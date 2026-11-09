@@ -27,7 +27,7 @@ from hub.timeutil import iso, utcnow
 TOTP_PERIOD = 30
 TOTP_DIGITS = 6
 TOTP_WINDOW = 1  # één tijdstap speling naar voren en naar achteren (klokverschil telefoon)
-ISSUER = "AI Server Manager"
+ISSUER = "TrueNAS Home Platform"  # productnaam (besluit gebruiker O-07)
 
 PRIVATE_NETWORKS = tuple(
     ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7")

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
-import { StatusBadge } from "@/components/StatusBadge";
+import { Melding } from "@/components/Melding";
+import { ExecutorKoppelen } from "./ExecutorKoppelen";
 
 export const metadata: Metadata = { title: "Executor" };
 
@@ -14,14 +15,10 @@ export default function Page() {
       />
       <div className="stack">
         <section className="card stack" aria-labelledby="status" data-testid="executor-status">
-          <div className="stat-head">
-            <h2 id="status">Status</h2>
-            <StatusBadge view={{ tone: "neutral", label: "Koppelen volgt in fase P2" }} />
-          </div>
+          <h2 id="status">Status</h2>
           <p>
-            <strong>Eerlijk:</strong> in deze versie (fase P0) kan de Hub de executor nog niet koppelen en weet hij dus ook
-            niet of de executor draait: de status is <strong>onbekend</strong>. De executor zelf voert in P0 niets uit; zijn
-            lijst met toegestane acties is leeg en weigert alles.
+            In deze fase voert de executor nog niets uit: zijn lijst met toegestane acties is leeg en weigert alles. Koppelen kan wel
+            al (hieronder); uitvoeren volgt in fase P2 met voorstel, beleid en goedkeuring.
           </p>
           <p>
             Daardoor blijven de gates ‘Apps installeren’ en ‘R2/R3-acties’ dicht. Zie <Link href="/onboarding">Wat mag nu?</Link>
@@ -57,16 +54,18 @@ export default function Page() {
           </p>
         </section>
         <section className="card stack" aria-labelledby="koppelen">
-          <h2 id="koppelen">2. Koppelen (volgt in fase P2)</h2>
-          <ol className="howto">
-            <li>De Hub toont hier straks een eenmalige koppelcode (30 minuten geldig).</li>
+          <h2 id="koppelen">2. Koppelen met een koppelcode (30 minuten)</h2>
+          <ol className="howto" data-genummerd="">
+            <li>Maak hieronder een koppelcode. Hij werkt één keer en verloopt na 30 minuten.</li>
+            <li>Open de statuspagina van de executor en vul daar de koppelcode in; controleer dat de vingerafdruk gelijk is.</li>
             <li>
-              Je opent de statuspagina van de executor en vult daar de koppelcode én een TrueNAS-API-key met schrijfrechten in.
-              Die key voer je <strong>alleen</strong> op de executorpagina in; de Hub ziet hem nooit.
+              De TrueNAS-API-key met schrijfrechten vul je <strong>alleen</strong> op de executorpagina in; de Hub ziet hem nooit.
             </li>
-            <li>Executor en Hub wisselen publieke sleutels uit; daarna toont de executor alleen de laatste 4 tekens van de key.</li>
           </ol>
-          <p className="muted">Deze stap is nog niet gebouwd; er staat daarom geen knop of invoerveld.</p>
+          <ExecutorKoppelen />
+          <Melding soort="nogniet" titel="Acties uitvoeren volgt in fase P2">
+            <p>Ook gekoppeld voert de executor niets uit tot de policy-engine en goedkeuring er zijn.</p>
+          </Melding>
         </section>
       </div>
     </>

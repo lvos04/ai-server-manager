@@ -101,6 +101,8 @@ def test_totp_verificatie_venster_en_eenmalig() -> None:
     assert breakglass.verify_totp(RFC6238_SECRET, "abcdef", now, None) is None
     secret = breakglass.generate_secret()
     assert len(secret) == 32 and breakglass.otpauth_uri(secret, "nood").startswith("otpauth://totp/")
+    # Productnaam in de authenticator-app (besluit gebruiker O-07), niet meer de oude werknaam.
+    assert "issuer=TrueNAS%20Home%20Platform" in breakglass.otpauth_uri(secret, "nood")
 
 
 # ------------------------------------------------------------------ bron-IP
