@@ -18,7 +18,6 @@ import uuid
 from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from html import escape
 from typing import Any
 from urllib.parse import parse_qs
 
@@ -50,6 +49,7 @@ from executor.hublink import (
     verify_hub_jwt,
 )
 from executor.replay import ReplayCache, ReplayUnavailable
+from executor.statuspagina import executor_page
 
 CSRF_COOKIE = "executor_csrf"
 MAX_FORM_BYTES = 4096
@@ -344,54 +344,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             {"action_id": body.action_id, "gekoppeld": link_status()["state"] == "gekoppeld"},
         )
 
-    def _page(message: str | None = None, *, error: bool = False, status_code: int = 200) -> HTMLResponse:
-        s = status()
-        link = s["koppeling"]
+    def _page(
+        message: str | None = None,
+        *,
+        error: bool = False,
+        status_code: int = 200,
+        veld: dict[str, str] | None = None,
+    ) -> HTMLResponse:
+        """Statuspagina in het Peil-sjabloon (C-55). ``message`` komt altijd uit vaste teksten, nooit uit invoer."""
+        link = link_status()
         show_form = not link.get("first_linked_at")
         csrf = secrets.token_urlsafe(32) if show_form else ""
-        rows = "".join(
-            f"<tr><th scope='row'>{escape(label)}</th><td>{escape(str(link.get(key) or '—'))}</td></tr>"
-            for label, key in (
-                ("Toestand", "state"),
-                ("Hub-adres", "hub_url"),
-                ("Hub-vingerafdruk", "keyset_fingerprint"),
-                ("Gekoppeld op", "linked_at"),
-                ("Token (laatste 4)", "service_token_last4"),
-            )
-        )
         last = link.get("last_error")
-        note = f"<p class='melding fout' role='alert'>{escape(last['melding'] or last['code'])}</p>" if last else ""
-        msg = f"<p class='melding{' fout' if error else ''}' role='status'>{escape(message)}</p>" if message else ""
-        if show_form:
-            form = f"""<h2>Koppelen met de Hub</h2>
-<p>Maak in de Hub-UI een koppelcode voor de executor (30 minuten geldig). Vul hieronder het adres van de Hub, de
-koppelcode en de vingerafdruk in die de Hub-UI ernaast toont.</p>
-<form method="post" action="/koppelen">
-<input type="hidden" name="csrf" value="{csrf}">
-<label for="hub_url">Hub-adres</label><input id="hub_url" name="hub_url" required inputmode="url"
- placeholder="http://NAS-adres:poort" autocomplete="off">
-<label for="code">Koppelcode</label><input id="code" name="koppelcode" required autocomplete="off" maxlength="32">
-<label for="fp">Hub-vingerafdruk</label><input id="fp" name="vingerafdruk" required autocomplete="off" maxlength="32">
-<button type="submit">Koppelen</button></form>"""
-        else:
-            form = """<p>Ontkoppelen of opnieuw koppelen gaat via de Hub. Op deze pagina kan dat pas met een live
-geverifieerde TrueNAS-schrijfkey (volgt in fase P2).</p>"""
-        badge = "gekoppeld" if s["gekoppeld"] else "nog niet gekoppeld"
-        html = f"""<!doctype html><html lang="nl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Executor — {escape(badge)}</title>
-<style>body{{font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem;line-height:1.5}}
-.badge{{display:inline-block;padding:.1rem .5rem;border-radius:.5rem;background:#e5e7eb}}
-label{{display:block;margin-top:.75rem;font-weight:600}}input{{width:100%;min-height:44px;font-size:1rem}}
-button{{margin-top:1rem;min-height:44px;padding:0 1rem;font-size:1rem}}.fout{{color:#991b1b}}
-th{{text-align:left;padding-right:1rem}}</style></head><body>
-<h1>AI Server Manager — executor</h1>
-<p>Versie {escape(__version__)} · <span class="badge">{escape(badge)}</span></p>
-<p>{escape(s["toelichting"])}</p>{msg}{note}
-<table>{rows}</table>{form}
-<p>Voer hier <strong>geen</strong> TrueNAS-API-key in: dat formulier volgt in fase P2. Toegestane acties:
-<strong>geen</strong> (de allowlist is leeg).</p>
-<p>Gezondheid: <a href="/healthz">/healthz</a> · <a href="/readyz">/readyz</a></p>
-</body></html>"""
+        melding: dict[str, str] | None = None
+        if message:
+            melding = {
+                "toon": "fout" if error else "info",
+                "titel": "Koppelen is mislukt" if error else message.split(".")[0] + ".",
+                "tekst": message if error else "Controleer dat de vingerafdruk hieronder gelijk is aan de Hub-UI.",
+            }
+        elif last:
+            melding = {
+                "toon": "fout",
+                "titel": "Laatste koppelpoging mislukt",
+                "tekst": str(last.get("melding") or last.get("code")),
+            }
+        secrets_ok = all((settings.secrets_dir / n).exists() for n in (IDENTITY, VAULT_KEY))
+        ready = [
+            {"name": "geheimen", "status": "ok" if secrets_ok else "down"},
+            {"name": "datamap", "status": "ok" if os.access(settings.data_dir, os.W_OK) else "down"},
+        ]
+        html = executor_page(
+            versie=__version__, link=link, ready_checks=ready, csrf=csrf, melding=melding, veldfout=veld
+        )
         resp = HTMLResponse(html, status_code=status_code)
         if csrf:
             resp.set_cookie(CSRF_COOKIE, csrf, httponly=True, samesite="strict", path="/", max_age=3600)
@@ -420,14 +405,24 @@ th{{text-align:left;padding-right:1rem}}</style></head><body>
                          status_code=409)  # fmt: skip
         if not throttle.allow(ip):
             return _page("Te veel pogingen; probeer het over een kwartier opnieuw.", error=True, status_code=429)
-        code, fingerprint = form.get("koppelcode", ""), form.get("vingerafdruk", "")
+        # Veldnamen van het Peil-sjabloon (hub_adres, hub_vingerafdruk); de oude namen blijven geldig.
+        code = form.get("koppelcode", "")
+        fingerprint = form.get("hub_vingerafdruk") or form.get("vingerafdruk", "")
         try:
-            hub_url = validate_hub_url(form.get("hub_url", ""), allow_loopback=settings.allow_loopback_hub)
+            hub_url = validate_hub_url(
+                form.get("hub_adres") or form.get("hub_url", ""), allow_loopback=settings.allow_loopback_hub
+            )
         except ValueError:
-            return _page("Het Hub-adres is ongeldig: alleen http(s)://adres[:poort].", error=True, status_code=422)
-        if not valid_pairing_code(code) or not valid_fingerprint(fingerprint):
+            msg = "Het Hub-adres is ongeldig: alleen http(s)://adres[:poort]."
+            return _page(msg, error=True, status_code=422, veld={"hub_adres": msg})
+        bad: dict[str, str] = {}
+        if not valid_pairing_code(code):
+            bad["koppelcode"] = "Koppelcode: 12 tekens in groepen van 4 (XXXX-XXXX-XXXX)."
+        if not valid_fingerprint(fingerprint):
+            bad["vingerafdruk"] = "Vingerafdruk: 16 tekens in groepen van 4 (XXXX-XXXX-XXXX-XXXX)."
+        if bad:
             return _page("Koppelcode (12 tekens) of vingerafdruk (16 tekens) heeft niet het juiste formaat.",
-                         error=True, status_code=422)  # fmt: skip
+                         error=True, status_code=422, veld=bad)  # fmt: skip
         identity = public_jwk(settings.secrets_dir)
         if identity is None:
             return _page("De eigen sleutel ontbreekt; herstart de executor.", error=True, status_code=503)
@@ -449,6 +444,13 @@ th{{text-align:left;padding-right:1rem}}</style></head><body>
         if result["state"] == "gekoppeld":
             return _page("Gekoppeld met de Hub. Controleer dat de vingerafdruk hierboven gelijk is aan de Hub-UI.")
         err = result.get("last_error") or {}
-        return _page(ERRORS_NL.get(str(err.get("code")), "Koppelen mislukt."), error=True, status_code=400)
+        code_err = str(err.get("code"))
+        text = ERRORS_NL.get(code_err, "Koppelen mislukt.")
+        field = {
+            "hub_vingerafdruk_onjuist": "vingerafdruk",
+            "hub_weigerde": "koppelcode",
+            "hub_onbereikbaar": "hub_adres",
+        }
+        return _page(text, error=True, status_code=400, veld={field[code_err]: text} if code_err in field else None)
 
     return app

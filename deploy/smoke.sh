@@ -37,6 +37,13 @@ expect "setupcode in de log" "$(docker logs asm-smoke-hub 2>&1)" 'SETUPCODE (een
 expect "web-UI eerste start" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/eerste-start)" 'lang="nl"'
 expect "web-UI CSP" "$(curl -fsS --noproxy '*' -D - -o /dev/null http://127.0.0.1:30400/inloggen)" "frame-ancestors 'none'"
 expect "PWA-manifest" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/manifest.webmanifest)" '"lang": "nl"'
+# Peil (ADR-0024): productnaam, Tailwind-CSS met de Peil-tokens in de build, noodlogin-pagina publiek.
+expect "web-UI productnaam" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen)" 'TrueNAS Home Platform'
+expect "PWA-manifest productnaam" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/manifest.webmanifest)" '"short_name": "Home Platform"'
+css_pad="$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen | grep -o '/_next/static/[^"]*\.css' | head -1)"
+expect "Peil-tokens in de CSS" "$(curl -fsS --noproxy '*' "http://127.0.0.1:30400${css_pad}")" '--healthy-ink'
+expect "noodlogin-pagina" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen/nood)" 'Noodlogin'
+expect "executor-statuspagina in Peil" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/)" 'Onderdeel van TrueNAS Home Platform'
 expect "API-fout via web-poort (NL)" "$(curl -sS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/me)" '"code":"unauthorized"'
 expect "executor niet gekoppeld" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/readyz)" '"gekoppeld":false'
 expect "executor weigert Hub-JWT zonder koppeling (contract 1.2 §4.7)" \

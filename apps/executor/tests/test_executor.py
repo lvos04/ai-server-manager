@@ -29,7 +29,12 @@ def test_gezondheid_en_status(client: TestClient) -> None:
     assert st["gekoppeld"] is False and st["allowlist"] == [] and st["identiteit"]["crv"] == "Ed25519"
     assert "d" not in st["identiteit"]
     page = client.get("/")
-    assert page.status_code == 200 and "nog niet gekoppeld" in page.text and 'lang="nl"' in page.text
+    assert page.status_code == 200 and "Niet gekoppeld" in page.text and 'lang="nl"' in page.text
+    # Peil-statuspaginasjabloon (C-55): platformnaam, geen groen voor 'niet gekoppeld', koppelformulier met de
+    # drie velden van contract 1.2 §3.7.
+    assert "Onderdeel van TrueNAS Home Platform" in page.text and 'pil-gezond">Niet gekoppeld' not in page.text
+    for veld in ('name="hub_adres"', 'name="koppelcode"', 'name="hub_vingerafdruk"'):
+        assert veld in page.text
 
 
 def test_readyz_zonder_geheimen(tmp_path: Path) -> None:
