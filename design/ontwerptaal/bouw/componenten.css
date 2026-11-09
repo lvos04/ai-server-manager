@@ -1,0 +1,191 @@
+/* Peil — componentrecepten (referentie voor de cva-varianten van de shadcn/platformcomponenten; zie COMPONENTEN.md).
+   In de Hub worden dit React-componenten; deze klassen bestaan alleen in de prototypes. Alle kleuren via tokens. */
+@layer components {
+  /* ── Knop (shadcn Button) ─────────────────────────────────────────────────────────────── */
+  .knop {
+    @apply inline-flex min-h-touch cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-transparent px-4 py-2 text-base leading-5 font-semibold no-underline transition-colors select-none;
+  }
+  .knop svg { @apply size-5 shrink-0; }
+  .knop-primair { @apply bg-primary text-primary-foreground hover:bg-primary-hover; }
+  .knop-secundair { @apply border-border-strong bg-card text-foreground hover:bg-accent; }
+  .knop-stil { @apply bg-transparent text-foreground hover:bg-accent; }
+  .knop-gevaar { @apply bg-destructive text-destructive-foreground hover:bg-destructive-hover; }
+  .knop-icoon { @apply size-touch px-0; }
+  .knop-blok { @apply w-full justify-between; }
+  .knop:is([disabled], [aria-disabled="true"]) { @apply cursor-not-allowed border-dashed border-border-strong bg-muted text-disabled-foreground hover:bg-muted; }
+  .knop-klein { @apply px-3 text-sm; }
+
+  /* ── Statusbadge (T-01, C-03) — pil, icoon + woord. Gezond zonder vlak; onbekend/verouderd gestippeld ─ */
+  .status {
+    @apply inline-flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-full border-2 border-transparent px-2.5 py-0.5 text-sm leading-5 font-semibold;
+  }
+  .status svg { @apply size-4.5 shrink-0; }
+  .status-gezond { @apply text-healthy-ink; }
+  .status-gezond svg { @apply text-healthy; }
+  .status-beperkt { @apply border-degraded bg-degraded-bg text-degraded-ink; }
+  .status-beperkt svg { @apply text-degraded; }
+  .status-storing { @apply border-down bg-down-bg text-down-ink; }
+  .status-storing svg { @apply text-down; }
+  .status-onbekend, .status-nietgekoppeld, .status-nietbeschikbaar { @apply border-dashed border-unknown bg-unknown-bg text-unknown-ink; }
+  .status-onbekend svg, .status-nietgekoppeld svg, .status-nietbeschikbaar svg { @apply text-unknown; }
+  .status-verouderd { @apply arcering border-dashed border-stale text-unknown-ink; }
+  .status-verouderd svg { @apply text-stale; }
+  .status-gepauzeerd { @apply border-paused bg-paused-bg text-paused-ink; }
+  .status-gepauzeerd svg { @apply text-paused; }
+  .status-nogniet { @apply border-border-strong bg-muted text-foreground; }
+  .status-groot { @apply min-h-10 px-3.5 text-base; }
+  .status-groot svg { @apply size-5; }
+
+  /* ── Risicobadge (T-04, C-08) — hoekig: codeblok met treden-glyph + woord ─────────────────── */
+  .risico { @apply inline-flex w-fit max-w-full items-stretch overflow-hidden rounded-sm border-2 text-sm leading-5 font-semibold; }
+  .risico-code { @apply inline-flex shrink-0 items-center gap-1 px-1.5 font-mono; }
+  .risico-woord { @apply inline-flex items-center px-2 py-1; }
+  .risico-0 { @apply border-risk-0; }
+  .risico-0 .risico-code { @apply bg-risk-0-solid text-risk-0-on-solid; }
+  .risico-0 .risico-woord { @apply bg-risk-0-bg text-risk-0-ink; }
+  .risico-1 { @apply border-risk-1; }
+  .risico-1 .risico-code { @apply bg-risk-1-solid text-risk-1-on-solid; }
+  .risico-1 .risico-woord { @apply bg-risk-1-bg text-risk-1-ink; }
+  .risico-2 { @apply border-risk-2; }
+  .risico-2 .risico-code { @apply bg-risk-2-solid text-risk-2-on-solid; }
+  .risico-2 .risico-woord { @apply bg-risk-2-bg text-risk-2-ink; }
+  .risico-3 { @apply border-risk-3; }
+  .risico-3 .risico-code { @apply bg-risk-3-solid text-risk-3-on-solid; }
+  .risico-3 .risico-woord { @apply bg-risk-3-bg text-risk-3-ink; }
+
+  /* ── Ernst (T-20) — rechthoek met dikke linkerbalk, alleen tekst ─────────────────────────── */
+  .ernst { @apply inline-flex w-fit min-h-8 items-center rounded-sm border-l-[6px] py-0.5 pr-2.5 pl-2 text-sm leading-5 font-semibold; }
+  .ernst-kritiek { @apply border-l-down-ink bg-destructive text-destructive-foreground; }
+  .ernst-hoog { @apply border-l-down bg-down-bg text-down-ink; }
+  .ernst-middel { @apply border-l-foreground bg-muted text-foreground; }
+  .ernst-laag { @apply border-l-unknown bg-unknown-bg text-unknown-ink; }
+  .ernst-info { @apply border-l-info bg-info-bg text-info-ink; }
+
+  /* ── AI-zekerheid (T-24) — 3 stippen + woord, geen statuskleur ───────────────────────────── */
+  .zekerheid { @apply inline-flex min-h-8 items-center gap-2 rounded-full border-2 border-border-strong px-2.5 text-sm font-semibold text-foreground; }
+  .stip { @apply inline-block size-2.5 rounded-full border-2 border-foreground; }
+  .stip-vol { @apply bg-foreground; }
+
+  /* ── Validatielabel (T-07, C-09) — gestippeld, mono, kolf ────────────────────────────────── */
+  .validatie { @apply inline-flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-sm border-2 border-dashed border-validation bg-validation-bg px-2 font-mono text-sm leading-5 text-validation-ink; }
+  .validatie svg { @apply size-4 shrink-0; }
+
+  /* ── Meetkwaliteit (T-03, C-07) — inline tekstlabel bij het getal ────────────────────────── */
+  .kwaliteit { @apply text-sm font-semibold text-muted-foreground; }
+
+  /* ── Kaart (shadcn Card) en StatKaart (C-05) ─────────────────────────────────────────────── */
+  .kaart { @apply flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-4; }
+  .kaart-onbekend { @apply border-2 border-dashed border-unknown; }
+  .kaart-verouderd { @apply border-2 border-dashed border-stale; }
+  .kaart-titel { @apply flex items-center gap-2 text-lg leading-7 font-semibold; }
+  .kaart-titel svg { @apply size-5 shrink-0 text-muted-foreground; }
+  .waarde { @apply text-3xl leading-9 font-semibold; }
+  .eenheid { @apply text-lg font-semibold text-muted-foreground; }
+  .waardevak-verouderd { @apply arcering rounded-md border-2 border-dashed border-stale px-3 py-2; }
+  .waardevak-verouderd .waarde, .waardevak-verouderd .eenheid { @apply font-normal text-stale-ink; }
+  .meta { @apply grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm text-muted-foreground; }
+  .meta dt { @apply font-semibold; }
+  .reden { @apply text-sm text-foreground; }
+
+  /* ── Meldingen (shadcn Alert): fout, beperkt, onbekend, info, gate ───────────────────────── */
+  .melding { @apply flex gap-3 rounded-lg border-2 p-4 text-base; }
+  .melding > svg { @apply mt-0.5 size-5 shrink-0; }
+  .melding-fout { @apply border-down bg-down-bg text-down-ink; }
+  .melding-fout > svg { @apply text-down; }
+  .melding-beperkt { @apply border-degraded bg-degraded-bg text-degraded-ink; }
+  .melding-beperkt > svg { @apply text-degraded; }
+  .melding-onbekend { @apply border-dashed border-unknown bg-unknown-bg text-unknown-ink; }
+  .melding-onbekend > svg { @apply text-unknown; }
+  .melding-info { @apply border-info bg-info-bg text-info-ink; }
+  .melding-info > svg { @apply text-info; }
+  .melding-gate { @apply border-gate bg-gate-bg text-gate-ink; }
+  .melding-gate > svg { @apply text-gate; }
+  .melding-beleid { @apply border-gate bg-gate-bg text-gate-ink; }
+  .melding a:not(.knop) { @apply font-semibold text-current; }
+
+  /* ── Trace-ID / code / digest (C-15 CopyField) ───────────────────────────────────────────── */
+  .code-veld { @apply block min-w-0 rounded-sm border-2 border-dashed border-border-strong bg-card px-2.5 py-2 font-mono text-sm break-all text-foreground select-all; }
+  .code-inline { @apply rounded-sm bg-muted px-1.5 py-0.5 font-mono text-sm; }
+  kbd { @apply rounded-sm border border-border-strong px-1.5 font-mono text-sm; }
+
+  /* ── Navigatie (C-01) ────────────────────────────────────────────────────────────────────── */
+  .zij-item { @apply flex min-h-touch items-center gap-3 rounded-lg px-3 font-medium text-foreground no-underline hover:bg-accent; }
+  .zij-item svg { @apply size-5 shrink-0 text-muted-foreground; }
+  .zij-item[aria-current="page"] { @apply bg-accent font-bold shadow-[inset_4px_0_0_var(--primary)]; }
+  .zij-item[aria-current="page"] svg { @apply text-foreground; }
+  .zij-ouder { @apply font-semibold; }
+  .onder-item { @apply relative flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-sm font-medium text-muted-foreground no-underline; }
+  .onder-item svg { @apply size-6; }
+  .onder-item[aria-current="page"] { @apply font-bold text-foreground shadow-[inset_0_3px_0_var(--primary)]; }
+  .teller { @apply inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-foreground px-1.5 text-sm leading-none font-bold text-background; }
+  .teller-goedkeuring { @apply bg-risk-2-solid text-risk-2-on-solid; }
+  .kop-item { @apply inline-flex min-h-touch items-center gap-2 rounded-lg px-3 font-semibold text-foreground no-underline hover:bg-accent; }
+  .kop-item svg { @apply size-5; }
+  .kop-item[aria-current="page"] { @apply bg-accent shadow-[inset_0_-3px_0_var(--primary)]; }
+  .live { @apply inline-flex min-h-8 items-center whitespace-nowrap gap-1.5 rounded-full border-2 border-transparent px-2 text-sm font-semibold text-muted-foreground; }
+  .live svg { @apply size-4; }
+  .live-onderbroken { @apply border-dashed border-unknown bg-unknown-bg text-unknown-ink; }
+  .skiplink { @apply absolute top-2 left-2 z-50 -translate-y-24 focus:translate-y-0; }
+
+  /* ── Tabs (shadcn Tabs) — telefoon: omlopende knoppen; ≥ md: rij met onderstreping ───────── */
+  .tablijst { @apply flex flex-wrap gap-2 md:gap-1 md:border-b-2 md:border-border; }
+  .tab { @apply inline-flex min-h-touch cursor-pointer items-center gap-2 rounded-lg border border-border-strong bg-card px-3.5 font-semibold text-foreground; }
+  .tab[aria-selected="true"] { @apply border-foreground bg-foreground text-background; }
+  @media (width >= 48rem) {
+    .tab { @apply -mb-0.5 rounded-none border-0 border-b-4 border-transparent bg-transparent; }
+    .tab[aria-selected="true"] { @apply border-primary bg-transparent text-foreground; }
+    .tab:hover { @apply bg-accent; }
+  }
+
+  /* ── Diff (C-20) — geen rood/groen: was doorgestreept/neutraal, wordt vet/info, tekens ~ + − ─ */
+  .diff-teken { @apply inline-flex size-6 shrink-0 items-center justify-center rounded-sm border-2 border-border-strong font-mono text-sm font-bold text-foreground; }
+  .diff-was { @apply rounded-sm bg-diff-old-bg px-1.5 font-mono text-sm text-diff-old-ink line-through decoration-2; }
+  .diff-wordt { @apply rounded-sm bg-diff-new-bg px-1.5 font-mono text-sm font-bold text-diff-new-ink; }
+
+  /* ── Wizard / stepper (C-36) ─────────────────────────────────────────────────────────────── */
+  .stap-bol { @apply inline-flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-border-strong bg-card text-sm font-bold text-foreground; }
+  .stap-klaar .stap-bol { @apply border-foreground bg-foreground text-background; }
+  .stap-huidig .stap-bol { @apply border-primary bg-primary text-primary-foreground; }
+  .stap-geblokkeerd .stap-bol { @apply border-dashed border-gate bg-gate-bg text-gate; }
+
+  /* ── Formulier (C-37) ───────────────────────────────────────────────────────────────────── */
+  .veld-label { @apply block font-semibold text-foreground; }
+  .veld-hulp { @apply text-sm text-muted-foreground; }
+  .invoer { @apply block min-h-touch w-full rounded-lg border border-input bg-card px-3 py-2 text-base text-foreground; }
+  .invoer[aria-invalid="true"] { @apply border-2 border-down; }
+  .veldfout { @apply flex items-start gap-1.5 text-sm font-semibold text-down-ink; }
+  .veldfout svg { @apply mt-0.5 size-4 shrink-0 text-down; }
+  .keuze { @apply flex min-h-touch cursor-pointer items-center gap-3 rounded-lg border border-border-strong bg-card px-3 py-2; }
+  .keuze:has(input:checked) { @apply border-2 border-primary bg-accent; }
+  .keuze:has(input:disabled) { @apply cursor-not-allowed border-dashed bg-muted text-disabled-foreground; }
+  .keuze input { @apply size-5 shrink-0 accent-primary; }
+  .bron-tag { @apply inline-flex items-center rounded-sm border border-border-strong px-1.5 font-mono text-sm text-muted-foreground; }
+
+  /* ── Laden (T-11) ───────────────────────────────────────────────────────────────────────── */
+  .skelet { @apply rounded-md bg-muted; animation: peil-puls 1.6s ease-in-out infinite; }
+  @keyframes peil-puls { 50% { opacity: 0.55; } }
+
+  /* ── Grafiek (C-32) ─────────────────────────────────────────────────────────────────────── */
+  .grafiek-vlak { @apply relative h-56 sm:h-64; }
+  .grafiek-vlak:focus-visible { outline-offset: 4px; }
+  .grafiek-ylabel { @apply absolute right-full mr-2 -translate-y-1/2 text-sm whitespace-nowrap text-chart-label cijfers; }
+  .grafiek-xlabel { @apply absolute top-full mt-1 -translate-x-1/2 text-sm whitespace-nowrap text-chart-label cijfers; }
+  .grafiek-punt { @apply pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card; }
+  .grafiek-tip { @apply pointer-events-none absolute top-0 z-10 hidden min-w-40 rounded-md border border-border-strong bg-popover p-2 text-sm shadow-md; }
+  .legenda-lijn { @apply inline-block h-0.5 w-4 shrink-0 rounded-full; }
+  .legenda-vlak { @apply inline-block size-3 shrink-0 rounded-sm; }
+
+  /* ── Voorbeeldmarkering (prototypes) ────────────────────────────────────────────────────── */
+  .voorbeeld { @apply inline-flex items-center rounded-sm border-2 border-dashed border-border-strong px-1.5 text-sm font-semibold text-foreground; }
+}
+
+/* Afdrukmodus voor volledige-pagina-schermafdrukken (shot.mjs zet #thema=…): ondernavigatie niet zwevend. */
+[data-afdruk] .onder-nav { position: static; }
+[data-afdruk] [data-actiebalk] { position: static; }
+/* Review 1.1.0: zichtbare uitklapaanwijzing bij <summary> zonder eigen icoon (inline-flex verbergt de standaardmarker). */
+@layer components {
+  details > summary .klap-icoon { transition: rotate var(--duration-fast) var(--ease-standard); }
+  details[open] > summary .klap-icoon { rotate: 180deg; }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+}

@@ -1,0 +1,600 @@
+{
+ "richting": "peil",
+ "pagina": "statuspagina-gekoppeld.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 4,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 4,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 4,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Onbekend",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Hub openen",
+     "w": 93,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 4,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - paragraph: Onderdeel van TrueNAS Home Platform · Voorbeeld\n  - heading \"Voorbeelddienst\" [level=1]\n  - paragraph: Voorbeeld van een nieuwe dienst met alleen een statuspagina; alle schermen staan in de Hub.\n- main:\n  - region \"Status\":\n    - heading \"Status\" [level=2]\n    - paragraph: Beperkt Gereed; één controle is beperkt en één is onbekend.\n    - list \"Controles\":\n      - listitem:\n        - text: Proces Gezond\n        - time: 11:56\n      - listitem:\n        - text: Eigen database Gezond\n        - time: 11:56\n      - listitem:\n        - text: Bron Voorbeeld-API Beperkt\n        - time: 11:55\n        - text: Antwoordt traag (8 s); de dienst probeert het met wachttijd opnieuw.\n      - listitem:\n        - text: Gebeurtenissen naar de Hub Onbekend\n        - time: 11:50\n        - text: Laatste levering 11:50; nieuwere stand nog niet bevestigd.\n    - term: Gereed\n    - definition: Ja\n    - term: Versie\n    - definition:\n      - code: 0.1.0\n    - term: Bron\n    - definition:\n      - code: /readyz\n      - text: en\n      - code: /healthz\n      - text: van deze dienst\n    - term: Bijgewerkt\n    - definition:\n      - time: 9 nov 2026, 11:56\n      - text: (bij het laden van deze pagina). Laad de pagina opnieuw voor een nieuwe stand.\n  - region \"Koppeling met de Hub\":\n    - heading \"Koppeling met de Hub\" [level=2]\n    - paragraph: Gekoppeld\n    - term: Sinds\n    - definition: 8 nov 2026, 20:14\n    - term: Hub\n    - definition:\n      - code: http://voorbeeld-nas.invalid:30400\n    - term: Vingerafdruk\n    - definition:\n      - code: MEGG-8GFG-2E4Y-K2RQ\n    - paragraph:\n      - text: Alle schermen van deze dienst staan in de Hub. Ontkoppelen of opnieuw koppelen gaat via de Hub.\n      - link \"Hub openen\":\n        - /url: http://voorbeeld-nas.invalid:30400\n  - region \"Wat deze dienst doet\":\n    - heading \"Wat deze dienst doet\" [level=2]\n    - list:\n      - listitem: Voorbeeldfunctie Wacht op besluit Gaat pas aan na besluit D99 in de Hub (voorbeeld). Dit is geen storing; er wacht een voorwaarde.\n- contentinfo:\n  - list:\n    - listitem:\n      - link \"/healthz (proces leeft)\":\n        - /url: /healthz\n    - listitem:\n      - link \"/readyz (afhankelijkheden)\":\n        - /url: /readyz\n  - paragraph: Voorbeelddienst 0.1.0 · Alle schermen staan in de Hub."
+}

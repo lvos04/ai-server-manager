@@ -1,0 +1,15 @@
+{
+  "name": "peil-ontwerptaal-bouw",
+  "private": true,
+  "description": "Bouw en controle van de ontwerptaal Peil (tokens, CSS, aliaslagen, prototypes, schermafdrukken, contrast, axe). Gebruik: npm ci && node alles.mjs [--shots] [--controle]",
+  "type": "module",
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.5",
+    "axe-core": "4.14.0",
+    "culori": "4.0.2",
+    "lucide-react": "1.66.0",
+    "playwright": "1.65.0",
+    "tailwindcss": "4.3.5",
+    "wcag-contrast": "3.0.0"
+  }
+}

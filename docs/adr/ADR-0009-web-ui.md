@@ -1,5 +1,9 @@
 # ADR-0009 — Web-UI: Next.js-PWA met eigen webserver en strikte API-doorgang
 
+> **Bijgewerkt 2026-11-09:** het deel "geen CSS-framework, geen iconenbibliotheek" van punt 1 is vervangen door
+> [ADR-0015](ADR-0015-ontwerptaal-peil.md) (ontwerptaal Peil op Tailwind 4 + shadcn/ui + lucide, besluit van de gebruiker).
+
+
 Status: aangenomen · 2026-11-09 · fase P0 (deel 2)
 
 ## Context

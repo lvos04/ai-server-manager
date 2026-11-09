@@ -1,0 +1,6 @@
+/* Prototype-invoer: precies zoals een app de ontwerptaal importeert. */
+@import "tailwindcss";
+@import "../ontwerptaal.css";
+@import "./componenten.css";
+@source "../prototypes/*.html";
+@source "./*.mjs";

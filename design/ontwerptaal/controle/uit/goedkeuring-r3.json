@@ -1,0 +1,820 @@
+{
+ "richting": "peil",
+ "pagina": "goedkeuring-r3.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 7.61,
+   "aantalTekst": 55,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 7.61,
+   "aantalTekst": 55,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 7.61,
+   "aantalTekst": 55,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 16,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.81,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 7.61,
+   "aantalTekst": 55,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 7.61,
+   "aantalTekst": 66,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 7.61,
+   "aantalTekst": 68,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 23,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.81,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 55,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 55,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 55,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 16,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.97,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 55,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 66,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#bevestig.invoer.font-mono",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-4.code-veld.flex-1.basis-56",
+     "t": "snap-voorbeeldpool-apps-voorbeeld-app-20",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "button#bevestig-knop.knop.knop-gevaar",
+     "t": "Data definitief verwijderen",
+     "bw": 2,
+     "buiten": 6.11,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 68,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 23,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 5.97,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"Hub\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Goedkeuringen\":\n          - /url: \"#\"\n      - listitem: Data verwijderen\n  - heading \"Data van Voorbeeld-app verwijderen\" [level=1]\n  - paragraph: Aangevraagd door Beheerder om 11:58 · deze actie is nooit door de AI voorgesteld.\n  - text: R3 · Destructief — extra bevestiging Goedkeuring geldig tot\n  - time: 12:13\n  - text: (nog 9:41)\n  - list \"Stappen van de goedkeuring\":\n    - listitem: Voorstel controleren (klaar)\n    - listitem: Bevestigen (huidige stap)\n  - 'heading \"Stap 2 van 2: bevestigen\" [level=2]'\n  - region \"Wat er gebeurt\":\n    - heading \"Wat er gebeurt\" [level=3]\n    - list:\n      - listitem:\n        - text: De app\n        - strong: Voorbeeld-app\n        - text: wordt verwijderd (container en instellingen).\n      - listitem:\n        - text: De dataset voorbeeldpool/apps/voorbeeld-app wordt\n        - strong: gewist\n        - text: (4,2 GiB).\n      - listitem: Dit kun je niet ongedaan maken, behalve met het herstelpunt hieronder.\n      - listitem: Andere apps, media en foto's worden niet aangeraakt.\n  - text: Herstelpunt (gemaakt om 11:59)\n  - code: snap-voorbeeldpool-apps-voorbeeld-app-2026-11-09T1159Z\n  - button \"Kopiëren Herstelpunt (gemaakt om 11:59)\"\n  - paragraph\n  - group: Gebonden velden\n  - text: Typ voorbeeld-app om te bevestigen\n  - paragraph: Zo weet je zeker dat je de juiste app verwijdert.\n  - textbox \"Typ voorbeeld-app om te bevestigen\"\n  - paragraph: Typ eerst de naam van de app om te bevestigen.\n  - button \"Annuleren\"\n  - button \"Weigeren…\"\n  - button \"Data definitief verwijderen\" [disabled]\n  - paragraph:\n    - text: \"Na goedkeuren voert de executor de stappen uit:\"\n    - strong: gecontroleerd → uitgevoerd → controle na uitvoering\n    - text: . Dubbel drukken leidt tot één uitvoering.\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: appdetail.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

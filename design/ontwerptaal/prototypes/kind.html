@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home (kinderprofiel) — Hub (voorbeeld)</title>
+<link rel="stylesheet" href="css/peil.css">
+<script src="js/proto.js" defer></script>
+<script>(function(){var h=location.hash,d=document.documentElement;var t=/thema=donker/.test(h)?'donker':/thema=licht/.test(h)?'licht':(matchMedia('(prefers-color-scheme: dark)').matches?'donker':'licht');d.classList.toggle('dark',t==='donker');if(/thema=/.test(h))d.setAttribute('data-afdruk','');})();</script>
+</head>
+<body>
+<a href="#inhoud" class="skiplink knop knop-primair">Naar inhoud</a>
+<div class="min-h-dvh lg:grid lg:grid-cols-[var(--spacing-sidebar)_minmax(0,1fr)]">
+  
+  <div class="flex min-h-dvh min-w-0 flex-col">
+    <header class="sticky top-0 z-30 border-b border-border bg-card">
+      <div class="flex min-h-16 items-center gap-2 px-3 lg:px-6">
+        <a href="kind.html" class="flex min-h-touch items-center gap-2 pr-1 text-lg font-bold text-foreground no-underline "><span class="flex size-9 items-center justify-center rounded-lg bg-foreground text-background"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true" focusable="false"><path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z"/><path d="M12 17v4"/><path d="M8 21h8"/><rect x="2" y="3" width="20" height="14" rx="2"/></svg></span>Thuis</a>
+        
+        <div class="ml-auto flex min-w-0 items-center gap-1">
+          
+          <button type="button" class="knop knop-stil px-2 lg:px-3" aria-label="Gebruikersmenu: Sam (kinderprofiel)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg><span class="hidden lg:inline">Sam</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden size-4 lg:block" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button>
+        </div>
+      </div>
+      
+    </header>
+    
+    <aside aria-label="Voorbeeldgegevens" class="border-b border-dashed border-border-strong bg-muted px-4 py-2 text-sm lg:px-8"><p><span class="voorbeeld">Voorbeeld</span> Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.</p></aside>
+    <main id="inhoud" tabindex="-1" class="mx-auto w-full max-w-content flex-1 px-4 pt-6 pb-10 sm:px-6 lg:px-8">
+
+<h1 class="mb-1 text-2xl font-bold">Hoi Sam</h1>
+<p class="mb-6 text-muted-foreground">Hier zie je wat je kunt kijken.</p>
+<section aria-labelledby="verder" class="mb-6 flex flex-col gap-3">
+  <h2 id="verder" class="text-xl font-bold">Verder kijken</h2>
+  <ul class="flex flex-col gap-2"><li><a href="#" class="flex min-h-touch items-center gap-3 rounded-lg border border-border bg-card p-3 text-foreground no-underline hover:bg-accent"><span class="flex size-12 shrink-0 items-center justify-center rounded-md bg-muted"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6 text-muted-foreground" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg></span><span class="min-w-0 flex-1"><span class="block font-semibold">Ruimteavontuur</span><span class="text-sm text-muted-foreground">Aflevering 4 · nog 12 minuten</span></span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6 shrink-0" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg><span class="sr-only"> (opent Jelly Leon in een nieuw tabblad)</span></a></li><li><a href="#" class="flex min-h-touch items-center gap-3 rounded-lg border border-border bg-card p-3 text-foreground no-underline hover:bg-accent"><span class="flex size-12 shrink-0 items-center justify-center rounded-md bg-muted"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6 text-muted-foreground" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg></span><span class="min-w-0 flex-1"><span class="block font-semibold">Dierenbos</span><span class="text-sm text-muted-foreground">Film · halverwege</span></span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6 shrink-0" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg><span class="sr-only"> (opent Jelly Leon in een nieuw tabblad)</span></a></li></ul>
+</section>
+<section aria-labelledby="vragen" class="mb-6 flex flex-col gap-3">
+  <h2 id="vragen" class="text-xl font-bold">Wat je hebt gevraagd</h2>
+  <ul class="flex flex-col gap-2">
+    <li class="kaart flex-row items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6 shrink-0 text-info" aria-hidden="true" focusable="false"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg><span><span class="block font-semibold">Robotvrienden</span><span class="text-sm">Een volwassene kijkt ernaar.</span></span></li>
+    <li class="kaart flex-row items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-6 shrink-0 text-foreground" aria-hidden="true" focusable="false"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg><span><span class="block font-semibold">Zeehondenklas</span><span class="text-sm">Je kunt kijken.</span></span></li>
+  </ul>
+</section>
+<section aria-labelledby="mis" class="flex flex-col gap-3">
+  <h2 id="mis" class="text-xl font-bold">Even niet</h2>
+  <div class="melding melding-onbekend flex-col sm:flex-row"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><div><p class="font-semibold">Zoeken werkt nu even niet.</p><p class="mt-1">Er ging iets mis. Vraag het aan een volwassene.</p>
+    <details class="mt-2"><summary class="inline-flex min-h-touch cursor-pointer items-center gap-2 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 klap-icoon" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>Details voor een volwassene</summary><p class="text-sm">Code <code class="code-inline">upstream_timeout</code> · Trace-ID</p><code class="code-veld mt-1">2b9f6c10-8d4e-4a71-b3c5-6e0d9a2f7b18</code></details></div></div>
+</section>
+<p class="mt-6 text-sm text-muted-foreground"><span class="voorbeeld">Voorbeeld</span> Kinderprofiel: alleen titels die voor jou zijn toegestaan.</p>
+    </main>
+    <nav class="onder-nav sticky bottom-0 z-30 flex border-t border-border bg-card pb-[env(safe-area-inset-bottom)]" aria-label="Hoofdnavigatie">
+      <a href="kind.html" class="onder-item" aria-current="page"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home</a>
+      <a href="#" class="onder-item"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true" focusable="false"><path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z"/><path d="M12 17v4"/><path d="M8 21h8"/><rect x="2" y="3" width="20" height="14" rx="2"/></svg>Kijken</a>
+      <a href="#" class="onder-item"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>Zoeken</a>
+      <a href="#" class="onder-item"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true" focusable="false"><path d="M15 10V9"/><path d="M16.472 15a6 6 0 01-8.943 0"/><path d="M9 10V9"/><circle cx="12" cy="12" r="10"/></svg>Ik</a>
+    </nav>
+  </div>
+</div>
+</body>
+</html>

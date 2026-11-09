@@ -1,0 +1,1240 @@
+{
+ "richting": "peil",
+ "pagina": "statuspagina.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 6.92,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 6.92,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 6.92,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 61,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 8,
+    "eerste": "a \"Naar de koppelcode (fout)\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 7.79,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 6.92,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 6.92,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 6.92,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 5.89,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 61,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 8,
+    "eerste": "a \"Naar de koppelcode (fout)\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 7.79,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 8.75,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 8.75,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 8.75,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 61,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 8,
+    "eerste": "a \"Naar de koppelcode (fout)\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.04,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 8.75,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 8.75,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 61,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#hub",
+     "type": "url",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    },
+    {
+     "el": "input#koppelcode",
+     "type": "text",
+     "rand": 8.75,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#vingerafdruk",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1,
+     "bw": 2,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code.selecteer",
+     "t": "3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gereed",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet ingesteld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-onbekend",
+     "t": "Niet gekoppeld",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [
+    {
+     "el": "a",
+     "t": "Naar het veld Koppelcode",
+     "w": 205,
+     "h": 22,
+     "inline": true
+    }
+   ],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 61,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 8,
+    "eerste": "a \"Naar de koppelcode (fout)\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.04,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar de koppelcode (fout)\":\n  - /url: \"#koppelcode\"\n- banner:\n  - paragraph: Onderdeel van TrueNAS Home Platform · Voorbeeld\n  - heading \"Executor\" [level=1]\n  - paragraph: Voert alleen door de Hub ondertekende acties uit op TrueNAS. Enige dienst met een schrijfsleutel.\n- main:\n  - alert \"Koppelen is mislukt\":\n    - paragraph:\n      - strong: Koppelen is mislukt\n    - paragraph:\n      - text: \"De Hub weigerde de koppelcode: verlopen, al gebruikt of ongeldig. Maak in de Hub een nieuwe koppelcode en probeer het opnieuw.\"\n      - link \"Naar het veld Koppelcode\":\n        - /url: \"#koppelcode\"\n    - paragraph:\n      - text: Code\n      - code: hub_weigerde_code\n      - text: · Trace-ID (selecteer en kopieer)\n    - code: 3d8a1f4e-6b2c-4e95-a7d0-91c5b8e2f364\n  - region \"Status\":\n    - heading \"Status\" [level=2]\n    - paragraph: Niet gereed Deels onbekend — wacht op koppeling met de Hub.\n    - list \"Controles\":\n      - listitem:\n        - text: Proces Gezond\n        - time: 11:56\n      - listitem:\n        - text: Eigen database Gezond\n        - time: 11:56\n      - listitem:\n        - text: Koppeling met de Hub Niet gekoppeld\n        - time: 11:56\n        - text: Zonder koppeling weet de executor niet welke acties zijn ondertekend.\n      - listitem:\n        - text: TrueNAS-schrijfsleutel Niet ingesteld\n        - time: 11:56\n        - text: Wordt gevraagd zodra de executor gekoppeld is.\n    - term: Gereed\n    - definition: Nee — wacht op koppeling\n    - term: Versie\n    - definition:\n      - code: 0.1.0\n    - term: Bron\n    - definition:\n      - code: /readyz\n      - text: en\n      - code: /healthz\n      - text: van deze dienst\n    - term: Bijgewerkt\n    - definition:\n      - time: 9 nov 2026, 11:56\n      - text: (bij het laden van deze pagina). Laad de pagina opnieuw voor een nieuwe stand.\n  - region \"Koppeling met de Hub\":\n    - heading \"Koppeling met de Hub\" [level=2]\n    - paragraph: Niet gekoppeld\n    - paragraph: Deze dienst is nog niet met de Hub gekoppeld. Tot dan voert hij niets uit en staan zijn schermen niet in de Hub.\n    - list:\n      - listitem:\n        - text: \"Maak in de Hub een koppelcode:\"\n        - strong: Instellingen → Diensten → Koppelcode maken\n        - text: . De Hub toont de koppelcode en de vingerafdruk samen.\n      - listitem: Vul hieronder het adres van de Hub, de koppelcode en de vingerafdruk in.\n  - region \"Koppelen\":\n    - heading \"Koppelen\" [level=2]\n    - text: Adres van de Hub\n    - paragraph: \"Vorm: http(s)://<NAS-adres>:<poort>. Geen localhost.\"\n    - textbox \"Adres van de Hub\"\n    - text: Koppelcode\n    - paragraph: 12 tekens in groepen van 4 (XXXX-XXXX-XXXX). Geldig 30 minuten, één keer te gebruiken.\n    - textbox \"Koppelcode\" [invalid]\n    - paragraph: Deze koppelcode is verlopen of al gebruikt. Maak een nieuwe in de Hub.\n    - text: Vingerafdruk van de Hub\n    - paragraph: 16 tekens in groepen van 4 (XXXX-XXXX-XXXX-XXXX). Staat in de Hub naast de koppelcode. Zo weet je zeker dat je met jouw Hub koppelt.\n    - textbox \"Vingerafdruk van de Hub\"\n    - button \"Koppelen met de Hub\"\n  - region \"Wat deze versie uitvoert\":\n    - heading \"Wat deze versie uitvoert\" [level=2]\n    - list:\n      - listitem: Toegestane acties 0 · voert niets uit De lijst met toegestane acties is in deze fase leeg. Acties komen pas na koppelen en in fase P2.\n- contentinfo:\n  - list:\n    - listitem:\n      - link \"/healthz (proces leeft)\":\n        - /url: /healthz\n    - listitem:\n      - link \"/readyz (afhankelijkheden)\":\n        - /url: /readyz\n  - paragraph: Executor 0.1.0 · Alle schermen staan in de Hub."
+}

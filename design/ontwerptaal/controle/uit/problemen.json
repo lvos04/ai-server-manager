@@ -1,0 +1,1072 @@
+{
+ "richting": "peil",
+ "pagina": "problemen.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.38,
+   "aantalTekst": 142,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.38,
+   "aantalTekst": 142,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.38,
+   "aantalTekst": 142,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 24,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.38,
+   "aantalTekst": 142,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.38,
+   "aantalTekst": 153,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 4.86,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 5.61,
+     "kleur": "#566070"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.38,
+   "aantalTekst": 155,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 31,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.1,
+   "aantalTekst": 142,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.1,
+   "aantalTekst": 142,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.1,
+   "aantalTekst": 142,
+   "scrollPadding": "76px",
+   "focus": {
+    "aantal": 24,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.1,
+   "aantalTekst": 142,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.1,
+   "aantalTekst": 153,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input#zoek.invoer.mt-1",
+     "type": "search",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.live.live-onderbroken",
+     "t": "Onderbroken · stand van 11:56",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.border-b-2.border-dashed.border-unknown.bg-unknown-bg",
+     "t": "Live-updates onderbroken — opnieuw verbi",
+     "bw": 0,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "code#kopieer-1.code-veld.flex-1.basis-56",
+     "t": "7c1e0b52-4f3a-4d2e-9b61-0a8f5c3e1d27",
+     "bw": 2,
+     "buiten": 5.69,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "div.kaart.border-2.border-dashed.border-unknown",
+     "t": "Zekerheid: Ik weet het niet Waarom het g",
+     "bw": 2,
+     "buiten": 8.57,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "div.melding.melding-onbekend.flex-col.sm:flex-row",
+     "t": "Veilige modus: niet beschikbaar. Voorbee",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 8.1,
+   "aantalTekst": 155,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 31,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.63,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 2
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"Hub\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Onderbroken · stand van 11:56\n- status:\n  - paragraph:\n    - strong: Live-updates onderbroken\n    - text: — opnieuw verbinden over 10 s. De lijst toont de stand van 11:56.\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - heading \"Problemen\" [level=1]\n  - paragraph: Eén inbox voor alle meldingen. Gelijke meldingen worden samengevoegd tot één incident.\n  - paragraph:\n    - text: Stand van\n    - time: 11:56\n    - text: · live-updates onderbroken\n  - region \"Inbox\":\n    - heading \"Inbox\" [level=2]\n    - search \"Problemen filteren\":\n      - text: Zoeken\n      - searchbox \"Zoeken\"\n      - button \"Filters 2 actief\"\n    - paragraph: \"4 problemen · filter: alle bronnen, laatste 24 u\"\n    - list:\n      - listitem:\n        - 'link \"Ernst: Hoog Voorbeeld-app start steeds opnieuw Voorbeeld-app · 10:02–11:54 · ×100 gebeurtenissen Status: Open\"':\n          - /url: \"#incident\"\n      - listitem:\n        - 'link \"Ernst: Middel MediaGuard rondt geen taken af MediaGuard · 09:40–11:50 · ×12 gebeurtenissen Status: Erkend\"':\n          - /url: \"#incident\"\n      - listitem:\n        - 'link \"Ernst: Laag Snapshot voorbeeldpool/data mislukt TrueNAS · 08:00 Status: Uitgesteld tot 14:00\"':\n          - /url: \"#incident\"\n      - listitem:\n        - 'link \"Ernst: Info Testmelding Gotify afgeleverd Gotify · 11:30 Status: Opgelost\"':\n          - /url: \"#incident\"\n  - article \"Voorbeeld-app start steeds opnieuw\":\n    - text: \"Ernst: Hoog Status: Open\"\n    - heading \"Voorbeeld-app start steeds opnieuw\" [level=2]\n    - term: Bron\n    - definition: Voorbeeld-app (via TrueNAS-API)\n    - term: Eerste gebeurtenis\n    - definition:\n      - time: 9 nov 2026, 10:02\n    - term: Laatste gebeurtenis\n    - definition:\n      - time: 11:54\n      - text: (2 min geleden)\n    - term: Onderliggende gebeurtenissen\n    - definition: 100, samengevoegd tot één incident\n    - button \"Erkennen\"\n    - button \"Uitstellen…\"\n    - button \"Oplossen\"\n    - link \"Openen in Voorbeeld-app (opent in een nieuw tabblad)\":\n      - /url: \"#\"\n    - paragraph: R0 · Alleen lezen Erkennen, uitstellen en oplossen veranderen niets aan de app.\n    - region \"Mogelijke oorzaak\":\n      - heading \"Mogelijke oorzaak\" [level=3]\n      - text: \"Zekerheid: Waarschijnlijk AI-hypothese · 11:55\"\n      - paragraph: \"Het geheugen raakt vol: de app stopt telkens bij ongeveer 510 MiB, net onder de limiet van 512 MiB.\"\n      - group: Toon bewijs (3)\n      - button \"Onderzoek met AI\"\n      - link \"Herstel voorstellen\":\n        - /url: appdetail.html\n      - paragraph: \"\\\"Herstel voorstellen\\\" opent eerst een voorstel met preview. Er wordt niets uitgevoerd zonder dat je het ziet.\"\n      - text: \"Zekerheid: Ik weet het niet\"\n      - paragraph:\n        - text: Waarom het geheugengebruik sinds 10:00 stijgt,\n        - strong: weet ik niet\n        - text: . Er zijn geen logregels van vóór 10:02 en geen metrieken per proces. Met de logs van Voorbeeld-app kan ik dit nagaan.\n      - link \"Logs van Voorbeeld-app openen\":\n        - /url: \"#\"\n    - region \"Al geprobeerd\":\n      - heading \"Al geprobeerd\" [level=3]\n      - list:\n        - listitem: 10:02 R1 · Omkeerbaar Automatisch herstarten Gezond na 40 s, om 10:08 opnieuw gestopt.\n        - listitem: 10:09 R1 · Omkeerbaar Automatisch herstarten Mislukt.\n        - listitem:\n          - text: 10:09\n          - strong: Herstelreeks gestopt\n          - text: na 2 pogingen (crashloop-regel). Geen nieuwe pogingen tot 12:09.\n      - paragraph:\n        - strong: \"Veilige modus: niet beschikbaar.\"\n        - text: Voorbeeld-app ondersteunt dit niet.\n        - code: capability_unavailable\n    - 'region \"Stappenplan: app start steeds opnieuw\"':\n      - 'heading \"Stappenplan: app start steeds opnieuw\" [level=3]'\n      - list:\n        - listitem: Observeren (klaar)\n        - listitem: Isoleren — huidige stap\n        - listitem: Mitigeren\n        - listitem: Terugdraaien\n        - listitem: Bewijs vastleggen\n        - listitem: Oorzaak vastleggen\n    - region \"Tijdlijn\":\n      - heading \"Tijdlijn\" [level=3]\n      - list:\n        - listitem:\n          - time: 11:55\n          - text: \"AI Hub-AI Hypothese toegevoegd: geheugen vol (waarschijnlijk).\"\n        - listitem:\n          - time: 10:09\n          - text: Systeem Hub-beleid Herstelreeks gestopt (crashloop-regel, 2 pogingen).\n        - listitem:\n          - time: 10:09\n          - text: \"Systeem Executor Herstart uitgevoerd — readback: niet gezond.\"\n        - listitem:\n          - time: 10:02\n          - text: Systeem TrueNAS Status Gezond → Storing.\n      - button \"Geschoonde incidentgegevens kopiëren\"\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: appdetail.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

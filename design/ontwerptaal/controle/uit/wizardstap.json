@@ -1,0 +1,1468 @@
+{
+ "richting": "peil",
+ "pagina": "wizardstap.html",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1.13,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.73,
+   "aantalTekst": 62,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1.13,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.73,
+   "aantalTekst": 62,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1.13,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.73,
+   "aantalTekst": 62,
+   "scrollPadding": "148px",
+   "focus": {
+    "aantal": 19,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 7.31,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1.13,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.73,
+   "aantalTekst": 63,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1.13,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.73,
+   "aantalTekst": 82,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 14.86,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 4.73,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#5c6675",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 6.11,
+     "vlak": 1.13,
+     "bw": 2,
+     "kleur": "#b3141b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 19.22,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#0b0f14",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 5.2,
+     "vlak": 1.13,
+     "bw": 1,
+     "kleur": "#5b6575",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.89,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 4.79,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 4.73,
+   "aantalTekst": 84,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 28,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 7.31,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 9.65,
+     "vlak": 1.1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.23,
+   "aantalTekst": 62,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 9.65,
+     "vlak": 1.1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.23,
+   "aantalTekst": 62,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 9.65,
+     "vlak": 1.1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.23,
+   "aantalTekst": 62,
+   "scrollPadding": "148px",
+   "focus": {
+    "aantal": 19,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 6.55,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 9.65,
+     "vlak": 1.1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.23,
+   "aantalTekst": 63,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 9.65,
+     "vlak": 1.1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.23,
+   "aantalTekst": 82,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 12.24,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input",
+     "type": "radio",
+     "rand": 5.23,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#8d97a5",
+     "h": 20
+    },
+    {
+     "el": "input#poort.invoer.max-w-48.cijfers",
+     "type": "text",
+     "rand": 9.65,
+     "vlak": 1.1,
+     "bw": 2,
+     "kleur": "#ff9b9b",
+     "h": 44
+    },
+    {
+     "el": "input#gpu-ja",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "input#gpu-nee",
+     "type": "radio",
+     "rand": 16.13,
+     "vlak": 1,
+     "bw": 0,
+     "kleur": "#f2f5f8",
+     "h": 20
+    },
+    {
+     "el": "select#tz.invoer.max-w-72",
+     "type": "select-one",
+     "rand": 6.74,
+     "vlak": 1.1,
+     "bw": 1,
+     "kleur": "#8e99a8",
+     "h": 44
+    }
+   ],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.4,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "aside.border-b.border-dashed.border-border-strong.bg-muted",
+     "t": "Voorbeeld Alle namen, adressen en waarde",
+     "bw": 0,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.35,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "voorbeeldpool/mediaNiet te kiezen: media",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    },
+    {
+     "el": "label.keuze",
+     "t": "/mntNiet te kiezen: geen dataset (beleid",
+     "bw": 1,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "tekstFout": [],
+   "minTekst": 5.23,
+   "aantalTekst": 84,
+   "scrollPadding": "12px",
+   "focus": {
+    "aantal": 28,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 6.55,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 1
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"Hub\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Live · 11:56\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - navigation \"Kruimelpad\":\n    - list:\n      - listitem:\n        - link \"Apps\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Appstore\":\n          - /url: \"#\"\n      - listitem: Voorbeeld-app installeren\n  - heading \"Voorbeeld-app installeren\" [level=1]\n  - paragraph: Je wijzigt nog niets. Pas na de preview en de goedkeuring wordt er iets geïnstalleerd.\n  - navigation \"Stappen van de installatie\":\n    - list:\n      - listitem: App kiezen (klaar)\n      - listitem: Parameters\n      - listitem: Controle vooraf\n      - listitem: Preview\n      - listitem: Goedkeuring\n      - listitem: Uitvoeren\n      - listitem: Controle na uitvoering\n  - 'form \"Stap 2 van 7: Parameters\"':\n    - 'heading \"Stap 2 van 7: Parameters\" [level=2]'\n    - alert \"2 velden hebben aandacht nodig\":\n      - heading \"2 velden hebben aandacht nodig\" [level=3]\n      - list:\n        - listitem:\n          - 'link \"Poort: 30480 is al in gebruik\"':\n            - /url: \"#poort\"\n        - listitem:\n          - 'link \"GPU gebruiken: kies ja of nee\"':\n            - /url: \"#gpu-ja\"\n    - group \"Datamap (verplicht)\":\n      - text: Datamap (verplicht)\n      - paragraph:\n        - text: Kies een dataset met de rol\n        - emphasis: data\n        - text: \". Hier komt /appdata van de app. bron: datasetkiezer\"\n      - radio \"voorbeeldpool/apps/voorbeeld-app rol data · 1,8 TiB vrij\" [checked]\n      - text: voorbeeldpool/apps/voorbeeld-app rol data · 1,8 TiB vrij\n      - 'radio \"voorbeeldpool/media Niet te kiezen: mediadatasets zijn geen appdata.\" [disabled]'\n      - text: \"voorbeeldpool/media Niet te kiezen: mediadatasets zijn geen appdata.\"\n      - 'radio \"/mnt Niet te kiezen: geen dataset (beleid weigert hostpad /mnt).\" [disabled]'\n      - text: \"/mnt Niet te kiezen: geen dataset (beleid weigert hostpad /mnt).\"\n    - text: Poort (verplicht)\n    - paragraph: \"Hostpoort op de NAS. Voorstel van het manifest; de Hub controleert conflicten. bron: wizard\"\n    - textbox \"Poort (verplicht)\" [invalid]: \"30480\"\n    - paragraph: Poort 30480 is al in gebruik door Voorbeeld-dienst. Kies een andere poort, bijvoorbeeld 30481.\n    - group \"GPU (Intel render) gebruiken? (verplicht)\":\n      - text: GPU (Intel render) gebruiken? (verplicht)\n      - paragraph: De app krijgt dan toegang tot /dev/dri. Er is geen standaardantwoord.\n      - radio \"Ja, GPU gebruiken\"\n      - text: Ja, GPU gebruiken\n      - radio \"Nee, alleen CPU\"\n      - text: Nee, alleen CPU\n      - paragraph: Kies ja of nee.\n    - text: Beheerderswachtwoord van de app\n    - paragraph: \"De app maakt dit zelf bij de eerste start in /appdata/secrets. Je ziet de waarde nooit, ook niet in de Hub. bron: gegenereerd\"\n    - text: Tijdzone\n    - paragraph: \"Standaardwaarde van het platform; je mag hem aanpassen. bron: standaard\"\n    - combobox \"Tijdzone\":\n      - option \"Europe/Amsterdam\" [selected]\n      - option \"UTC\"\n    - paragraph:\n      - text: Ingevulde waarden worden bewaard. Je kunt later verder via\n      - strong: Apps → Installaties\n      - text: .\n    - button \"Vorige\"\n    - 'button \"Volgende: controle vooraf\"'\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: appdetail.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+}

@@ -1,0 +1,18 @@
+{
+ "tabs_pijl_links": {
+  "focus": "app-tab-versies",
+  "versiesZichtbaar": true,
+  "actiesVerborgen": true
+ },
+ "tabs_home": "app-tab-status",
+ "tabs_end": "app-tab-acties",
+ "kopieer_melding": "Tekst geselecteerd. Kopieer via het menu van je browser.",
+ "grafiek_voorlees": "11:00: 503 MiB",
+ "grafiek_gat": "09:30: Geen meting",
+ "r3_start": "true",
+ "r3_fout": "true",
+ "r3_goed": null,
+ "r3_reden": "De naam klopt. Je kunt nu goedkeuren.",
+ "forced_colors_stippel": "dashed 2px rgb(0, 0, 0)",
+ "zoom200_overloop": 0
+}

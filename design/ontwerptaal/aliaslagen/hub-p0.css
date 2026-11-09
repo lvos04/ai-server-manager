@@ -1,0 +1,30 @@
+/* Peil 1.1.0 — aliaslaag voor de Hub P0 (apps/web/src/app/globals.css) (migratiefase 1: alleen uiterlijk; routes, functies, teksten en testids blijven).
+   GEGENEREERD door ai-server-manager/design/ontwerptaal/bouw/aliaslagen.mjs. Kopie in de app met deze kop + sha256 (O-14); niet met de hand wijzigen.
+   Stappen vooraf: (1) themascript dat ALTIJD data-theme="light|dark" + .dark zet (ook bij Systeem); (2) codemod: elke var(--muted) in de Hub-CSS → var(--muted-foreground); (3) verwijder in globals.css de DRIE eigen kleurblokken volledig (:root, @media (prefers-color-scheme: dark) :root:not([data-theme=light]) en :root[data-theme=dark]) — anders wint het media-blok (specificiteit 0,2,0) van deze laag en krijg je een half donker thema.
+   Zie ONTWERPTAAL.md §13 voor het volledige migratiepad (fase 2 componenten, fase 3 opruimen). */
+
+:root, :root[data-theme] {
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--muted);
+  --text: var(--foreground);
+  --on-primary: var(--primary-foreground);
+  --focus: var(--ring);
+  --danger: var(--down);
+  --ok-bg: var(--healthy-bg);
+  --ok-fg: var(--healthy-ink);
+  --info-fg: var(--info-ink);
+  --warn-bg: var(--degraded-bg);
+  --warn-fg: var(--degraded-ink);
+  --bad-bg: var(--down-bg);
+  --bad-fg: var(--down-ink);
+  --unknown-fg: var(--unknown-ink);
+  --neutral-bg: var(--muted);
+  --neutral-fg: var(--foreground);
+  --font: var(--font-sans);
+  --mono: var(--font-mono);
+  --shadow: var(--shadow-sm);
+  --bottom-nav-h: var(--bottomnav-h);
+}
+/* Veldranden 1,42:1 → >= 3:1 (WCAG 1.4.11) */
+input, select, textarea, fieldset { border-color: var(--input); }
