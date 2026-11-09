@@ -26,6 +26,7 @@ from hub.errors import HubError
 from hub.models import Notification, NotificationChannel, VaultSecret
 from hub.monitoring.alerts import ERNST, ERNST_RANK
 from hub.notify import gotify
+from hub.notify.dispatch import mark_channel
 from hub.outbound import OutboundError, validate_base_url
 from hub.timeutil import iso, utcnow
 from hub.vault import Vault, make_ref
@@ -295,7 +296,7 @@ def test_channel(
         n.status, n.verzonden_op, n.extern_id = "verzonden", now, res.extern_id
     else:
         n.status, n.reden = "mislukt", res.reden
-    ch.laatste_status, ch.laatste_reden, ch.laatste_op = ("ok" if res.ok else "fout"), res.reden, now
+    mark_channel(db, ch, res.ok, res.reden, now)
     if versie:
         ch.laatste_versie = versie
     audit.record(

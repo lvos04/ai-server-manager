@@ -21,6 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -313,7 +314,10 @@ class RestoreTest(Base):
 # ------------------------------------------------------------------ events (contract §7)
 class InboxEvent(Base):
     __tablename__ = "event_inbox"
-    __table_args__ = (UniqueConstraint("source_app", "source_event_id", name="uq_inbox_source_event"),)
+    __table_args__ = (
+        UniqueConstraint("source_app", "source_event_id", name="uq_inbox_source_event"),
+        Index("ix_event_inbox_onverwerkt", "seq", postgresql_where=text("incident_verwerkt_op IS NULL")),
+    )
     seq: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     event_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True)
     source_app: Mapped[str] = mapped_column(String(64))
@@ -330,10 +334,16 @@ class InboxEvent(Base):
     payload_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
     received_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
     received_from_service: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    # Verwerkt door de incidentenmotor (B01-005); NULL = nog te verwerken (geen watermerk: geen gaten bij
+    # gelijktijdige commits).
+    incident_verwerkt_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
 
 
 class OutboxEvent(Base):
     __tablename__ = "event_outbox"
+    __table_args__ = (
+        Index("ix_event_outbox_onverwerkt", "seq", postgresql_where=text("incident_verwerkt_op IS NULL")),
+    )
     seq: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     event_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
     event_type: Mapped[str] = mapped_column(String(128))
@@ -343,6 +353,7 @@ class OutboxEvent(Base):
     trace_id: Mapped[uuid.UUID] = mapped_column(Uuid, default=uuid.uuid4)
     classification: Mapped[str] = mapped_column(String(16), default="internal")
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    incident_verwerkt_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
 
 
 # ------------------------------------------------------------------ centrale appcatalogus (B01-002)
@@ -575,6 +586,9 @@ class Notification(Base):
     aangemaakt_door: Mapped[str] = mapped_column(String(64), default="system")
     verzonden_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     extern_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    incident_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("incident.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 # ------------------------------------------------------------------ monitoringbronnen (B09-002)
@@ -602,3 +616,96 @@ class MonitorSource(Base):
     bijgewerkt_door: Mapped[str] = mapped_column(String(64))
     bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
     version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+# ------------------------------------------------------------------ incidenten (B01-005, B09-004…006)
+class Incident(Base):
+    """Eén doorlopend probleem per ``vingerafdruk`` (soort × bron × onderwerp). Hooguit één niet-opgelost incident per
+    vingerafdruk (partiële unieke index); herhaling binnen het heropenvenster heropent hetzelfde incident."""
+
+    __tablename__ = "incident"
+    __table_args__ = (
+        Index(
+            "uq_incident_actief",
+            "vingerafdruk",
+            unique=True,
+            postgresql_where=text("status <> 'opgelost'"),
+        ),
+        Index("ix_incident_status_laatste", "status", "laatste_op"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    vingerafdruk: Mapped[str] = mapped_column(String(255), index=True)
+    soort: Mapped[str] = mapped_column(String(64), index=True)
+    titel: Mapped[str] = mapped_column(String(200))
+    ernst: Mapped[str] = mapped_column(String(16))  # info|waarschuwing|kritiek
+    status: Mapped[str] = mapped_column(String(16))  # open|erkend|gesnoozed|opgelost
+    bron: Mapped[str] = mapped_column(String(64))
+    onderwerp_type: Mapped[str] = mapped_column(String(64), default="")
+    onderwerp_id: Mapped[str] = mapped_column(String(200), default="")
+    onderwerp_naam: Mapped[str] = mapped_column(String(200), default="")
+    eerste_op: Mapped[datetime] = mapped_column(TS)
+    laatste_op: Mapped[datetime] = mapped_column(TS)
+    geopend_op: Mapped[datetime] = mapped_column(TS)
+    aantal: Mapped[int] = mapped_column(Integer, default=1)
+    heropend: Mapped[int] = mapped_column(Integer, default=0)
+    heropeningen: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    erkend_door: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    erkend_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    erkend_tot: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    gesnoozed_door: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    gesnoozed_tot: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    opgelost_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    opgelost_door: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    oplos_reden: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    hypothese: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    oorzaak_sleutel: Mapped[str | None] = mapped_column(String(96), nullable=True, index=True)
+    runbook_id: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    veilige_modus: Mapped[bool] = mapped_column(Boolean, default=False)
+    veilige_modus_sinds: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    trace_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    correlatie_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    meldt: Mapped[bool] = mapped_column(Boolean, default=True)
+    melding_teller: Mapped[int] = mapped_column(Integer, default=0)
+    laatst_gemeld_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    escalaties: Mapped[int] = mapped_column(Integer, default=0)
+    classificatie: Mapped[str] = mapped_column(String(16), default="internal")
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class IncidentEvent(Base):
+    """Onderliggende gebeurtenis van een incident (probleem, herstel, info, gecorreleerd, status of notitie).
+    ``bron_ref`` is uniek: dezelfde bron-gebeurtenis wordt nooit twee keer verwerkt."""
+
+    __tablename__ = "incident_event"
+    __table_args__ = (Index("ix_incident_event_incident_op", "incident_id", "op"),)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    incident_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("incident.id", ondelete="CASCADE"))
+    bron_ref: Mapped[str] = mapped_column(String(200), unique=True)
+    soort: Mapped[str] = mapped_column(String(16))  # probleem|herstel|info|gecorreleerd|status|notitie
+    op: Mapped[datetime] = mapped_column(TS)
+    ontvangen_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    event_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    bron: Mapped[str] = mapped_column(String(64), default="")
+    samenvatting: Mapped[str] = mapped_column(String(500), default="")
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    classificatie: Mapped[str] = mapped_column(String(16), default="internal")
+    trace_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    actor: Mapped[str | None] = mapped_column(String(160), nullable=True)
+
+
+# ------------------------------------------------------------------ log-index (B09-004): alleen geschoond en begrensd
+class LogEntry(Base):
+    __tablename__ = "log_entry"
+    __table_args__ = (Index("ix_log_entry_bron_op", "bron", "op"),)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    op: Mapped[datetime] = mapped_column(TS, index=True)
+    ontvangen_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    bron: Mapped[str] = mapped_column(String(64))  # hub-api|hub-worker|<app_id van een dienst>
+    niveau: Mapped[str] = mapped_column(String(8))  # debug|info|warning|error|critical
+    logger: Mapped[str] = mapped_column(String(96), default="")
+    bericht: Mapped[str] = mapped_column(Text)
+    trace_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    velden: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)

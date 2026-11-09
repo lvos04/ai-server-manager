@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from hub import __version__
+from hub import __version__, logsink
 from hub.config import Settings, get_settings
 from hub.db import make_engine, make_sessionmaker
 from hub.errors import install_error_handlers
@@ -27,7 +27,9 @@ from hub.routers import (
     catalog,
     events,
     health,
+    incidents,
     inventory,
+    logs,
     metrics,
     monitoring,
     notifications,
@@ -161,6 +163,14 @@ OPENAPI_TAGS = [
         "description": "Meldingskanalen (Gotify) en notification.send (R0) met rate-limit en stille uren.",
     },
     {
+        "name": "incidenten",
+        "description": "Incidenten-inbox (B01-005): dedupe, correlatie, hypothese met bewijs, readback, snooze.",
+    },
+    {
+        "name": "logs",
+        "description": "Log-index (B09-004): alleen geschoonde, begrensde regels; zoeken en supportbundel.",
+    },
+    {
         "name": "back-up en herstel",
         "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",
     },
@@ -198,8 +208,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 db.commit()
         except Exception as exc:
             log.warning("besluiten nog niet geïnitialiseerd: %s", type(exc).__name__)
-        yield
-        engine.dispose()
+        handler = logsink.install(factory, "hub-api", vault, settings.log_hub_level)
+        try:
+            yield
+        finally:
+            logsink.uninstall(handler)
+            engine.dispose()
 
     app = FastAPI(
         title="AI Server Manager — Hub API",
@@ -228,7 +242,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ValueError:
             trace = str(uuid.uuid4())
         request.state.trace_id = trace
-        response = await call_next(request)
+        token = logsink.current_trace.set(trace)
+        try:
+            response = await call_next(request)
+        finally:
+            logsink.current_trace.reset(token)
         response.headers["X-Trace-Id"] = trace
         if getattr(request.state, "hub_token_rotation", False):
             response.headers["Hub-Token-Rotation"] = "required"
@@ -253,6 +271,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         alerts.router,
         notifications.router,
         backups.router,
+        incidents.router,
+        logs.router,
         events.router,
     ):
         app.include_router(r)

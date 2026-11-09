@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub.config import Settings
+from hub.events.envelope import emit
 from hub.models import AlertInstance, AlertRule, MetricSample, MetricSeries, Notification, NotificationChannel
 from hub.timeutil import iso, utcnow
 
@@ -218,6 +219,33 @@ def queue_alert_notifications(
     return made
 
 
+def emit_transition(
+    db: Session, rule: AlertRule, inst: AlertInstance, series: MetricSeries | None, change: str, ts: datetime
+) -> None:
+    """Elke overgang ook als outbox-event (bron voor de incidenten-inbox; B01-005)."""
+    labels = (series.labels or {}) if series is not None else {}
+    emit(
+        db,
+        "alert.instance.fired" if change == "actief" else "alert.instance.resolved",
+        "alert_instance",
+        str(inst.id),
+        {
+            "regel_id": str(rule.id),
+            "regel_sleutel": rule.standaard_sleutel,
+            "regel_naam": rule.naam,
+            "ernst": rule.ernst,
+            "onderwerp_type": inst.onderwerp_type,
+            "onderwerp_id": inst.onderwerp_id,
+            "onderwerp_naam": labels.get("naam"),
+            "metriek": rule.metriek,
+            "waarde": inst.laatste_waarde,
+            "drempel": rule.drempel if change == "actief" else rule.herstel_drempel,
+            "bron": series.bron if series is not None else None,
+        },
+        timestamp=ts,
+    )
+
+
 def step(rule: AlertRule, inst: AlertInstance, ts: datetime, value: float) -> str | None:
     """Verwerk één meting; geeft ``"actief"`` of ``"hersteld"`` bij een overgang, anders None."""
     inst.laatste_waarde, inst.laatste_sample_op = value, ts
@@ -302,6 +330,7 @@ def evaluate(db: Session, settings: Settings, *, now: datetime | None = None) ->
                 if change is not None:
                     stats["overgangen"] += 1
                     stats["meldingen"] += queue_alert_notifications(db, rule, inst, series, change, now)
+                    emit_transition(db, rule, inst, series, change, ts)
             if (
                 inst.toestand == "firing"
                 and rule.herhaal_na_s

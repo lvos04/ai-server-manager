@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from hub.config import Settings
 from hub.events.envelope import emit
-from hub.models import AlertInstance, Notification, NotificationChannel
+from hub.models import AlertInstance, Incident, Notification, NotificationChannel
 from hub.notify import gotify
 from hub.timeutil import utcnow
 from hub.vault import Vault
@@ -88,8 +88,19 @@ def _send(db: Session, settings: Settings, vault: Vault, ch: NotificationChannel
     )
 
 
-def _mark_channel(ch: NotificationChannel, ok: bool, reason: str | None, now: datetime) -> None:
+def mark_channel(db: Session, ch: NotificationChannel, ok: bool, reason: str | None, now: datetime) -> None:
+    """Kanaalstatus bijwerken; bij een overgang (ok ↔ fout of een andere reden) een outbox-event (→ incident)."""
+    before = (ch.laatste_status, ch.laatste_reden)
     ch.laatste_status, ch.laatste_reden, ch.laatste_op = ("ok" if ok else "fout"), reason, now
+    if before != (ch.laatste_status, ch.laatste_reden) and (before[0] is not None or not ok):
+        emit(
+            db,
+            "notification.channel.recovered" if ok else "notification.channel.failed",
+            "notification_channel",
+            str(ch.id),
+            {"kanaal_id": str(ch.id), "naam": ch.naam, "soort": ch.soort, "reden": reason, "vorige": before[1]},
+            timestamp=now,
+        )
 
 
 def _digest(db: Session, settings: Settings, vault: Vault, ch: NotificationChannel, now: datetime) -> bool:
@@ -116,10 +127,10 @@ def _digest(db: Session, settings: Settings, vault: Vault, ch: NotificationChann
     if res.ok:
         n.status, n.verzonden_op, n.extern_id = "verzonden", now, res.extern_id
         ch.onderdrukt_teller, ch.onderdrukt_sinds = 0, None
-        _mark_channel(ch, True, None, now)
+        mark_channel(db, ch, True, None, now)
     else:
         n.status, n.reden = "mislukt", res.reden
-        _mark_channel(ch, False, res.reden, now)
+        mark_channel(db, ch, False, res.reden, now)
     db.flush()
     return res.ok
 
@@ -165,6 +176,12 @@ def dispatch(db: Session, settings: Settings, vault: Vault, *, now: datetime | N
                     n.status, n.reden = "onderdrukt", "achterhaald"
                     stats["onderdrukt"] += 1
                     continue
+            if n.bron == "incident" and n.soort == "actief" and n.incident_id and n.status == "uitgesteld":
+                inc = db.get(Incident, n.incident_id)
+                if inc is not None and inc.status == "opgelost":
+                    n.status, n.reden = "onderdrukt", "achterhaald"
+                    stats["onderdrukt"] += 1
+                    continue
             if quiet_end is not None and n.ernst != "kritiek":
                 n.status, n.reden, n.volgende_poging_op = "uitgesteld", "stille_uren", quiet_end
                 stats["uitgesteld"] += 1
@@ -179,11 +196,11 @@ def dispatch(db: Session, settings: Settings, vault: Vault, *, now: datetime | N
             n.pogingen += 1
             if res.ok:
                 n.status, n.reden, n.verzonden_op, n.extern_id = "verzonden", None, now, res.extern_id
-                _mark_channel(ch, True, None, now)
+                mark_channel(db, ch, True, None, now)
                 sent += 1
                 stats["verzonden"] += 1
                 continue
-            _mark_channel(ch, False, res.reden, now)
+            mark_channel(db, ch, False, res.reden, now)
             if res.reden == TOKEN_GEWEIGERD:
                 n.reden = TOKEN_GEWEIGERD  # blijft in de wachtrij; kanaal staat stil tot het token vervangen is
                 break

@@ -98,7 +98,7 @@ def test_anker_vindt_afgeknipte_staart(admin: Any, app: Any, settings: Any, peri
         headers=idem(),
     ).raise_for_status()
     out = periodic_run("audit_verankeren")["audit_verankeren"]
-    assert out["status"] == "geschreven" and out["nr"] >= 2
+    assert out["status"] == "ok" and out["anker"] == "geschreven" and out["nr"] >= 2
     path = audit.anchor_path(settings.data_dir)
     assert path.exists() and oct(path.stat().st_mode & 0o777) == "0o600"
     assert admin.get("/api/v1/audit/verify").json()["anker"]["status"] == "ok"
@@ -109,7 +109,7 @@ def test_anker_vindt_afgeknipte_staart(admin: Any, app: Any, settings: Any, peri
     assert res["fouten"][0]["soort"] == "staart_ontbreekt" and res["anker"]["status"] == "afgeknipt"
     # De dagelijkse controle maakt er één event van (en niet bij elke volgende ronde opnieuw).
     first = periodic_run("audit_controleren")["audit_controleren"]
-    assert first["status"] == "verbroken"
+    assert first["ketting"] == "verbroken"
     periodic_run("audit_controleren")
     with app.state.sessionmaker() as db:
         from sqlalchemy import func, select

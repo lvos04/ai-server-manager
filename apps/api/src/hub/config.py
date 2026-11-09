@@ -111,6 +111,25 @@ class Settings(BaseSettings):
     audit_anchor_interval_seconds: int = Field(default=15 * 60, ge=60, le=24 * 3600)
     audit_verify_interval_seconds: int = Field(default=24 * 3600, ge=300, le=7 * 24 * 3600)
 
+    # Incidenten (B01-005, B09-005/006): verwerking, heropenvenster, erkenning/snooze, escalatie, retentie.
+    incident_interval_seconds: int = Field(default=15, ge=5, le=3600)
+    incident_batch: int = Field(default=500, ge=10, le=10_000)
+    incident_reopen_window_seconds: int = Field(default=3600, ge=60, le=7 * 24 * 3600)
+    incident_max_events: int = Field(default=500, ge=50, le=10_000)  # per incident; daarboven alleen tellen
+    incident_snooze_max_kritiek_minutes: int = Field(default=24 * 60, ge=15, le=7 * 24 * 60)
+    incident_escalation_seconds: int = Field(default=30 * 60, ge=60, le=7 * 24 * 3600)
+    incident_max_escalations: int = Field(default=3, ge=0, le=20)
+    incident_retention_days: int = Field(default=180, ge=7, le=3650)
+    incident_safe_mode_max_restarts: int = Field(default=2, ge=1, le=10)  # B09-006: daarna veilige modus
+    incident_safe_mode_window_seconds: int = Field(default=3600, ge=300, le=7 * 24 * 3600)
+
+    # Log-index (B09-004): alleen geschoonde regels, begrensd.
+    log_hub_level: Literal["debug", "info", "warning", "error"] = "warning"
+    log_retention_seconds: int = Field(default=14 * 24 * 3600, ge=3600, le=90 * 24 * 3600)
+    log_max_rows: int = Field(default=50_000, ge=1000, le=1_000_000)
+    log_ingest_max_per_minute: int = Field(default=1000, ge=10, le=100_000)
+    log_maintenance_interval_seconds: int = Field(default=3600, ge=60, le=24 * 3600)
+
     # AI is standaard uit (lokale modellen optioneel en standaard uit; geen betaalde overage)
     ai_enabled: bool = False
 

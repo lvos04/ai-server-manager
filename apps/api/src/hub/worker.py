@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from hub import logsink
 from hub.backup.selfbackup import run_self_backup
 from hub.catalog.appstore import sync_appstore
 from hub.catalog.discovery import discover
@@ -230,6 +231,7 @@ def main(settings: Settings) -> int:
     factory = make_sessionmaker(engine)
     keyring = KeyRing.load(settings.secrets_dir)  # faalt vroeg als geheimen ontbreken
     vault = Vault.from_file(settings.secrets_dir / "vault.key")
+    handler = logsink.install(factory, "hub-worker", lambda: vault, settings.log_hub_level)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
@@ -241,6 +243,7 @@ def main(settings: Settings) -> int:
         except Exception:
             log.exception("worker-ronde mislukt; volgende ronde over %.0f s", settings.worker_poll_seconds)
         stop.wait(settings.worker_poll_seconds)
-    engine.dispose()
     log.info("worker gestopt")
+    logsink.uninstall(handler)
+    engine.dispose()
     return 0

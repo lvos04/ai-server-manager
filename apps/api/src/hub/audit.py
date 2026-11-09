@@ -204,10 +204,10 @@ def write_anchor(db: Session, data_dir: Path, now: datetime | None = None) -> di
     """Schrijf de kop van de ketting naar het ankerbestand als die veranderd is (worker, periodiek)."""
     nr, h = head(db)
     if nr == 0:
-        return {"status": "leeg"}
+        return {"anker": "leeg"}
     anchors = read_anchors(data_dir)
     if anchors and anchors[-1]["nr"] == nr and anchors[-1]["hash"] == h:
-        return {"status": "ongewijzigd", "nr": nr}
+        return {"anker": "ongewijzigd", "nr": nr}
     p = anchor_path(data_dir)
     p.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     item = {"nr": nr, "hash": h, "op": iso(now or utcnow())}
@@ -227,7 +227,7 @@ def write_anchor(db: Session, data_dir: Path, now: datetime | None = None) -> di
             fh.write(json.dumps(item, separators=(",", ":")) + "\n")
             fh.flush()
             os.fsync(fh.fileno())
-    return {"status": "geschreven", "nr": nr}
+    return {"anker": "geschreven", "nr": nr}
 
 
 def verify(db: Session, data_dir: Path | None = None, *, batch: int = 1000) -> dict[str, Any]:

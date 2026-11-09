@@ -183,10 +183,22 @@ def _task_audit_verify(db: Session, ctx: Context) -> dict[str, Any]:
 
     res = audit.verify(db, ctx.settings.data_dir)
     row = db.get(PeriodicTask, "audit_controleren")
-    before = (row.details or {}).get("status") if row is not None else None
+    before = (row.details or {}).get("ketting") if row is not None else None
     if res["status"] == "verbroken" and before != "verbroken":
         emit(db, "audit.chain.broken", "audit_chain", "hub", {"fouten": res["fouten"], "anker": res["anker"]})
-    return {"status": res["status"], "gecontroleerd": res["gecontroleerd"], "fouten": res["fouten"][:3]}
+    return {"ketting": res["status"], "gecontroleerd": res["gecontroleerd"], "fouten": res["fouten"][:3]}
+
+
+def _task_incidents(db: Session, ctx: Context) -> dict[str, Any]:
+    from hub.incidents import engine
+
+    return engine.run(db, ctx.settings, ctx.now)
+
+
+def _task_logs(db: Session, ctx: Context) -> dict[str, Any]:
+    from hub.logsink import prune
+
+    return prune(db, ctx.settings.log_retention_seconds, ctx.settings.log_max_rows, ctx.now)
 
 
 TASKS: list[Task] = [
@@ -194,8 +206,10 @@ TASKS: list[Task] = [
     Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
     Task("gezondheid_vastleggen", lambda s: s.health_record_interval_seconds, _task_health),
     Task("alerts_evalueren", lambda s: s.alert_interval_seconds, _task_alerts),
+    Task("incidenten_bijwerken", lambda s: s.incident_interval_seconds, _task_incidents),
     Task("meldingen_versturen", lambda s: 0, _task_notify),
     Task("tijdreeksen_onderhoud", lambda s: s.metrics_maintenance_interval_seconds, _task_maintenance),
+    Task("logs_onderhoud", lambda s: s.log_maintenance_interval_seconds, _task_logs),
     Task("audit_verankeren", lambda s: s.audit_anchor_interval_seconds, _task_audit_anchor),
     Task("audit_controleren", lambda s: s.audit_verify_interval_seconds, _task_audit_verify),
 ]

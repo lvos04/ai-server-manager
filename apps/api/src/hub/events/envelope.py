@@ -143,13 +143,14 @@ def emit(
     *,
     classification: str = "internal",
     trace_id: uuid.UUID | None = None,
+    timestamp: datetime | None = None,
 ) -> OutboxEvent:
     ev = OutboxEvent(
         event_id=uuid.uuid4(),
         event_type=event_type,
         entity_type=entity_type,
         entity_id=entity_id,
-        timestamp_utc=utcnow(),
+        timestamp_utc=timestamp or utcnow(),
         trace_id=trace_id or uuid.uuid4(),
         classification=classification,
         payload=redact(payload),

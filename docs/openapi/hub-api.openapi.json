@@ -378,6 +378,33 @@
         "title": "Entity",
         "type": "object"
       },
+      "ErkenIn": {
+        "additionalProperties": false,
+        "properties": {
+          "minuten": {
+            "default": 240,
+            "description": "Erkenning verloopt daarna (escalatie).",
+            "maximum": 10080.0,
+            "minimum": 5.0,
+            "title": "Minuten",
+            "type": "integer"
+          },
+          "notitie": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notitie"
+          }
+        },
+        "title": "ErkenIn",
+        "type": "object"
+      },
       "EventEnvelope": {
         "additionalProperties": false,
         "properties": {
@@ -607,6 +634,57 @@
         "title": "HeartbeatIn",
         "type": "object"
       },
+      "LogsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "regels": {
+            "items": {
+              "$ref": "#/components/schemas/RegelIn"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Regels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "regels"
+        ],
+        "title": "LogsIn",
+        "type": "object"
+      },
+      "NotitieIn": {
+        "additionalProperties": false,
+        "properties": {
+          "tekst": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Tekst",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tekst"
+        ],
+        "title": "NotitieIn",
+        "type": "object"
+      },
+      "OplosIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reden": {
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Reden",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reden"
+        ],
+        "title": "OplosIn",
+        "type": "object"
+      },
       "PasswordIn": {
         "additionalProperties": false,
         "properties": {
@@ -656,6 +734,63 @@
           "tijdzone"
         ],
         "title": "QuietHours",
+        "type": "object"
+      },
+      "RegelIn": {
+        "additionalProperties": false,
+        "properties": {
+          "bericht": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Bericht",
+            "type": "string"
+          },
+          "logger": {
+            "default": "",
+            "maxLength": 96,
+            "title": "Logger",
+            "type": "string"
+          },
+          "niveau": {
+            "enum": [
+              "debug",
+              "info",
+              "warning",
+              "error",
+              "critical"
+            ],
+            "title": "Niveau",
+            "type": "string"
+          },
+          "op": {
+            "format": "date-time",
+            "title": "Op",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          },
+          "velden": {
+            "additionalProperties": true,
+            "title": "Velden",
+            "type": "object"
+          }
+        },
+        "required": [
+          "op",
+          "niveau",
+          "bericht"
+        ],
+        "title": "RegelIn",
         "type": "object"
       },
       "RestoreTestIn": {
@@ -1199,35 +1334,6 @@
         "title": "SetupIn",
         "type": "object"
       },
-      "SnoozeIn": {
-        "additionalProperties": false,
-        "properties": {
-          "minuten": {
-            "description": "0 = dempen opheffen; maximaal 7 dagen.",
-            "maximum": 10080.0,
-            "minimum": 0.0,
-            "title": "Minuten",
-            "type": "integer"
-          },
-          "reden": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reden"
-          }
-        },
-        "required": [
-          "minuten"
-        ],
-        "title": "SnoozeIn",
-        "type": "object"
-      },
       "SourceIn": {
         "additionalProperties": false,
         "properties": {
@@ -1731,6 +1837,35 @@
         "title": "Worker",
         "type": "object"
       },
+      "hub__routers__alerts__SnoozeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "minuten": {
+            "description": "0 = dempen opheffen; maximaal 7 dagen.",
+            "maximum": 10080.0,
+            "minimum": 0.0,
+            "title": "Minuten",
+            "type": "integer"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          }
+        },
+        "required": [
+          "minuten"
+        ],
+        "title": "SnoozeIn",
+        "type": "object"
+      },
       "hub__routers__auth__LoginIn": {
         "additionalProperties": false,
         "properties": {
@@ -1782,6 +1917,35 @@
           "totp"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "hub__routers__incidents__SnoozeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "minuten": {
+            "description": "0 = snooze opheffen; kritiek hooguit 24 uur.",
+            "maximum": 10080.0,
+            "minimum": 0.0,
+            "title": "Minuten",
+            "type": "integer"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          }
+        },
+        "required": [
+          "minuten"
+        ],
+        "title": "SnoozeIn",
         "type": "object"
       }
     }
@@ -2077,7 +2241,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SnoozeIn"
+                "$ref": "#/components/schemas/hub__routers__alerts__SnoozeIn"
               }
             }
           },
@@ -2144,7 +2308,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SnoozeIn"
+                "$ref": "#/components/schemas/hub__routers__alerts__SnoozeIn"
               }
             }
           },
@@ -3904,6 +4068,730 @@
         ]
       }
     },
+    "/api/v1/incidents": {
+      "get": {
+        "operationId": "list_incidents_api_v1_incidents_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "actief",
+              "enum": [
+                "actief",
+                "open",
+                "erkend",
+                "gesnoozed",
+                "opgelost",
+                "alle"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ernst",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "info",
+                    "waarschuwing",
+                    "kritiek"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ernst"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bron",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bron"
+            }
+          },
+          {
+            "in": "query",
+            "name": "soort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Soort"
+            }
+          },
+          {
+            "description": "Groepeer op oorzaak-sleutel",
+            "in": "query",
+            "name": "oorzaak",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 96,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Groepeer op oorzaak-sleutel",
+              "title": "Oorzaak"
+            }
+          },
+          {
+            "description": "Zoek in titel en onderwerp",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zoek in titel en onderwerp",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Incidents Api V1 Incidents Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Incidenten-inbox per prioriteit (actief eerst, dan ernst en laatste gebeurtenis)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/samenvatting": {
+      "get": {
+        "operationId": "summary_api_v1_incidents_samenvatting_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Summary Api V1 Incidents Samenvatting Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Aantallen per status en ernst, en groepen per oorzaak-hypothese",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}": {
+      "get": {
+        "operationId": "get_incident_api_v1_incidents__incident_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Incident met hypothese, readback en de laatste gebeurtenissen (ETag)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/bewijs": {
+      "get": {
+        "operationId": "evidence_api_v1_incidents__incident_id__bewijs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Evidence Api V1 Incidents  Incident Id  Bewijs Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Toon bewijs: de gegevens achter de hypothese en de readback",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/erkennen": {
+      "post": {
+        "operationId": "acknowledge_api_v1_incidents__incident_id__erkennen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErkenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erkennen (operator); verloopt na 'minuten' (escalatie)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/events": {
+      "get": {
+        "operationId": "list_incident_events_api_v1_incidents__incident_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Incident Events Api V1 Incidents  Incident Id  Events Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Onderliggende gebeurtenissen (nieuwste eerst, cursor)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/notities": {
+      "post": {
+        "operationId": "add_note_api_v1_incidents__incident_id__notities_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotitieIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Notitie toevoegen (operator; geschoond opgeslagen)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/oplossen": {
+      "post": {
+        "operationId": "resolve_incident_api_v1_incidents__incident_id__oplossen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OplosIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "nog_actief: de bron meldt het probleem nog"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Handmatig oplossen (operator); geweigerd als de readback van de bron nog 'actief' meldt",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/snooze": {
+      "post": {
+        "operationId": "snooze_api_v1_incidents__incident_id__snooze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hub__routers__incidents__SnoozeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Snoozen of snooze opheffen (operator); meldingen worden onderdrukt",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/{incident_id}/supportbundel": {
+      "get": {
+        "operationId": "support_bundle_api_v1_incidents__incident_id__supportbundel_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Geschoonde supportbundel (operator): incident, gebeurtenissen en gerelateerde logregels",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
     "/api/v1/inventory": {
       "get": {
         "operationId": "inventory_summary_api_v1_inventory_get",
@@ -4141,6 +5029,263 @@
         "summary": "Status van een job",
         "tags": [
           "inventaris"
+        ]
+      }
+    },
+    "/api/v1/logs": {
+      "get": {
+        "operationId": "search_logs_api_v1_logs_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Tekst (geschoonde berichten)",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tekst (geschoonde berichten)",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bron",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bron"
+            }
+          },
+          {
+            "in": "query",
+            "name": "niveau",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "debug",
+                    "info",
+                    "warning",
+                    "error",
+                    "critical"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Niveau"
+            }
+          },
+          {
+            "in": "query",
+            "name": "trace_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trace Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "incident_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Incident Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "van",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Van"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tot",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tot"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Search Logs Api V1 Logs Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logregels zoeken (operator): op incident, bron, niveau, tekst, trace_id en tijd",
+        "tags": [
+          "logs"
+        ]
+      },
+      "post": {
+        "operationId": "logs_ingest_api_v1_logs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "rate_limited (per dienst per minuut)"
+          }
+        },
+        "summary": "Logregels van een eigen dienst opnemen (service-token; geschoond en begrensd vóór opslag)",
+        "tags": [
+          "logs"
+        ]
+      }
+    },
+    "/api/v1/logs/bronnen": {
+      "get": {
+        "operationId": "sources_api_v1_logs_bronnen_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sources Api V1 Logs Bronnen Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Welke logbronnen de Hub heeft (en welke niet: eerlijk onbekend)",
+        "tags": [
+          "logs"
         ]
       }
     },
@@ -6506,6 +7651,14 @@
     {
       "description": "Meldingskanalen (Gotify) en notification.send (R0) met rate-limit en stille uren.",
       "name": "meldingen"
+    },
+    {
+      "description": "Incidenten-inbox (B01-005): dedupe, correlatie, hypothese met bewijs, readback, snooze.",
+      "name": "incidenten"
+    },
+    {
+      "description": "Log-index (B09-004): alleen geschoonde, begrensde regels; zoeken en supportbundel.",
+      "name": "logs"
     },
     {
       "description": "Dekking, snapshotbeleid (voorstel), eigen pg_dump-export, hersteltests.",
