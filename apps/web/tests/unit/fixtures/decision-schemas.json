@@ -1,0 +1,887 @@
+{
+  "D01": {
+    "additionalProperties": false,
+    "properties": {
+      "api_versie": {
+        "anyOf": [
+          {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "API-versie-endpoint, indien bekend.",
+        "title": "Api Versie"
+      },
+      "versie": {
+        "description": "Exacte TrueNAS-versie/build zoals de NAS die meldt (System → General).",
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Versie",
+        "type": "string"
+      }
+    },
+    "required": [
+      "versie"
+    ],
+    "title": "D01Waarde",
+    "type": "object"
+  },
+  "D02": {
+    "additionalProperties": false,
+    "properties": {
+      "appdata_datasets": {
+        "items": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 64,
+        "minItems": 1,
+        "title": "Appdata Datasets",
+        "type": "array"
+      },
+      "media_datasets": {
+        "items": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 64,
+        "title": "Media Datasets",
+        "type": "array"
+      },
+      "pools": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 16,
+        "minItems": 1,
+        "title": "Pools",
+        "type": "array"
+      }
+    },
+    "required": [
+      "pools",
+      "appdata_datasets"
+    ],
+    "title": "D02Waarde",
+    "type": "object"
+  },
+  "D03": {
+    "additionalProperties": false,
+    "properties": {
+      "hostnamen": {
+        "items": {
+          "maxLength": 253,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 16,
+        "title": "Hostnamen",
+        "type": "array"
+      },
+      "https_poort": {
+        "anyOf": [
+          {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Leeg = standaard HTTPS-poort.",
+        "title": "Https Poort"
+      },
+      "nas_adres": {
+        "description": "LAN-IP of hostnaam van TrueNAS (zonder http:// of poort).",
+        "maxLength": 253,
+        "minLength": 1,
+        "title": "Nas Adres",
+        "type": "string"
+      },
+      "open_poorten_firewall": {
+        "items": {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maxItems": 64,
+        "title": "Open Poorten Firewall",
+        "type": "array"
+      },
+      "tunnel": {
+        "anyOf": [
+          {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Tunnel"
+      },
+      "vpn": {
+        "anyOf": [
+          {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Vpn"
+      }
+    },
+    "required": [
+      "nas_adres"
+    ],
+    "title": "D03Waarde",
+    "type": "object"
+  },
+  "D04": {
+    "additionalProperties": false,
+    "properties": {
+      "herstel_credentials_locatie": {
+        "description": "Wáár de herstelgegevens bewaard worden (nooit de sleutel of het wachtwoord zelf).",
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Herstel Credentials Locatie",
+        "type": "string"
+      },
+      "methode": {
+        "enum": [
+          "truenas_cloud_sync",
+          "rclone",
+          "restic",
+          "onedrive_client",
+          "anders"
+        ],
+        "title": "Methode",
+        "type": "string"
+      },
+      "retentie": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Retentie",
+        "type": "string"
+      },
+      "scope": {
+        "description": "Datasets/paden die worden meegenomen.",
+        "items": {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 64,
+        "minItems": 1,
+        "title": "Scope",
+        "type": "array"
+      },
+      "taken": {
+        "description": "Namen/omschrijvingen van de taken.",
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 32,
+        "minItems": 1,
+        "title": "Taken",
+        "type": "array"
+      },
+      "versleuteld": {
+        "title": "Versleuteld",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "methode",
+      "taken",
+      "versleuteld",
+      "scope",
+      "retentie",
+      "herstel_credentials_locatie"
+    ],
+    "title": "D04Waarde",
+    "type": "object"
+  },
+  "D05": {
+    "additionalProperties": false,
+    "properties": {
+      "db_export_hersteld": {
+        "title": "Db Export Hersteld",
+        "type": "boolean"
+      },
+      "foto_hersteld": {
+        "title": "Foto Hersteld",
+        "type": "boolean"
+      },
+      "omgeving": {
+        "description": "Geïsoleerde omgeving waarin is teruggezet.",
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Omgeving",
+        "type": "string"
+      },
+      "referentie": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Referentie",
+        "type": "string"
+      },
+      "uitgevoerd_op": {
+        "format": "date",
+        "title": "Uitgevoerd Op",
+        "type": "string"
+      }
+    },
+    "required": [
+      "foto_hersteld",
+      "db_export_hersteld",
+      "omgeving",
+      "uitgevoerd_op",
+      "referentie"
+    ],
+    "title": "D05Waarde",
+    "type": "object"
+  },
+  "D06": {
+    "$defs": {
+      "PoolGezondheid": {
+        "additionalProperties": false,
+        "properties": {
+          "gebruik_pct": {
+            "anyOf": [
+              {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gebruik Pct"
+          },
+          "gezond": {
+            "title": "Gezond",
+            "type": "boolean"
+          },
+          "laatste_scrub": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Laatste Scrub"
+          },
+          "naam": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Naam",
+            "type": "string"
+          },
+          "scrub_fouten": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scrub Fouten"
+          },
+          "status": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "naam",
+          "status",
+          "gezond"
+        ],
+        "title": "PoolGezondheid",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "pools": {
+        "items": {
+          "$ref": "#/$defs/PoolGezondheid"
+        },
+        "maxItems": 16,
+        "minItems": 1,
+        "title": "Pools",
+        "type": "array"
+      },
+      "smart_ok": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Smart Ok"
+      },
+      "snapshot_capaciteit_ok": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Snapshot Capaciteit Ok"
+      }
+    },
+    "required": [
+      "pools"
+    ],
+    "title": "D06Waarde",
+    "type": "object"
+  },
+  "D07": {
+    "$defs": {
+      "AppVersie": {
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image"
+          },
+          "naam": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Naam",
+            "type": "string"
+          },
+          "staat": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Staat"
+          },
+          "versie": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Versie"
+          }
+        },
+        "required": [
+          "naam"
+        ],
+        "title": "AppVersie",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "apps": {
+        "items": {
+          "$ref": "#/$defs/AppVersie"
+        },
+        "maxItems": 256,
+        "minItems": 1,
+        "title": "Apps",
+        "type": "array"
+      }
+    },
+    "required": [
+      "apps"
+    ],
+    "title": "D07Waarde",
+    "type": "object"
+  },
+  "D08": {
+    "$defs": {
+      "GpuNode": {
+        "additionalProperties": false,
+        "properties": {
+          "pci_slot": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Pci Slot",
+            "type": "string"
+          },
+          "render_node": {
+            "pattern": "^/dev/dri/renderD\\d{3}$",
+            "title": "Render Node",
+            "type": "string"
+          },
+          "rol": {
+            "enum": [
+              "a310",
+              "uhd770",
+              "anders"
+            ],
+            "title": "Rol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rol",
+          "pci_slot",
+          "render_node"
+        ],
+        "title": "GpuNode",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "gpus": {
+        "items": {
+          "$ref": "#/$defs/GpuNode"
+        },
+        "maxItems": 8,
+        "minItems": 1,
+        "title": "Gpus",
+        "type": "array"
+      },
+      "qsv_apps": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 32,
+        "title": "Qsv Apps",
+        "type": "array"
+      }
+    },
+    "required": [
+      "gpus"
+    ],
+    "title": "D08Waarde",
+    "type": "object"
+  },
+  "D09": {
+    "additionalProperties": false,
+    "properties": {
+      "account_gekoppeld": {
+        "title": "Account Gekoppeld",
+        "type": "boolean"
+      },
+      "harde_stop": {
+        "const": true,
+        "description": "Verplicht: harde stop bij 0 resterend tegoed.",
+        "title": "Harde Stop",
+        "type": "boolean"
+      },
+      "inbegrepen_maandbudget": {
+        "anyOf": [
+          {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Zoals de officiële console het toont.",
+        "title": "Inbegrepen Maandbudget"
+      },
+      "overage_toegestaan": {
+        "const": false,
+        "description": "Verplicht onwaar: nooit betaalde overage.",
+        "title": "Overage Toegestaan",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "account_gekoppeld",
+      "harde_stop",
+      "overage_toegestaan"
+    ],
+    "title": "D09Waarde",
+    "type": "object"
+  },
+  "D10": {
+    "additionalProperties": false,
+    "properties": {
+      "doel": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Doel",
+        "type": "string"
+      },
+      "mini_pc_uitgesloten": {
+        "const": true,
+        "title": "Mini Pc Uitgesloten",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "mini_pc_uitgesloten",
+      "doel"
+    ],
+    "title": "D10Waarde",
+    "type": "object"
+  },
+  "D11": {
+    "additionalProperties": false,
+    "properties": {
+      "huidige_dns": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 8,
+        "minItems": 1,
+        "title": "Huidige Dns",
+        "type": "array"
+      },
+      "poort53_eigenaar": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Poort53 Eigenaar",
+        "type": "string"
+      },
+      "rollback_toegang": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Rollback Toegang",
+        "type": "string"
+      },
+      "routermodel": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Routermodel",
+        "type": "string"
+      }
+    },
+    "required": [
+      "routermodel",
+      "huidige_dns",
+      "poort53_eigenaar",
+      "rollback_toegang"
+    ],
+    "title": "D11Waarde",
+    "type": "object"
+  },
+  "D12": {
+    "additionalProperties": false,
+    "properties": {
+      "firmware": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Firmware",
+        "type": "string"
+      },
+      "gree_type": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Gree Type",
+        "type": "string"
+      },
+      "lokaal_udp": {
+        "enum": [
+          "ondersteund",
+          "niet_ondersteund",
+          "onbekend"
+        ],
+        "title": "Lokaal Udp",
+        "type": "string"
+      }
+    },
+    "required": [
+      "gree_type",
+      "firmware",
+      "lokaal_udp"
+    ],
+    "title": "D12Waarde",
+    "type": "object"
+  },
+  "D13": {
+    "additionalProperties": false,
+    "properties": {
+      "adapter": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Adapter",
+        "type": "string"
+      },
+      "dongle": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Dongle",
+        "type": "string"
+      },
+      "sensortypes": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 32,
+        "minItems": 1,
+        "title": "Sensortypes",
+        "type": "array"
+      },
+      "serial_by_id": {
+        "pattern": "^/dev/serial/by-id/[A-Za-z0-9_.:+-]+$",
+        "title": "Serial By Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "dongle",
+      "adapter",
+      "serial_by_id",
+      "sensortypes"
+    ],
+    "title": "D13Waarde",
+    "type": "object"
+  },
+  "D14": {
+    "additionalProperties": false,
+    "properties": {
+      "airco_1fase_meter": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Airco 1Fase Meter"
+      },
+      "energy_socket_boiler_alleen_meten": {
+        "const": true,
+        "description": "Boiler wordt nooit geschakeld (EX27).",
+        "title": "Energy Socket Boiler Alleen Meten",
+        "type": "boolean"
+      },
+      "p1_meter": {
+        "title": "P1 Meter",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "p1_meter",
+      "energy_socket_boiler_alleen_meten"
+    ],
+    "title": "D14Waarde",
+    "type": "object"
+  },
+  "D15": {
+    "additionalProperties": false,
+    "properties": {
+      "offline_gedrag": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Offline Gedrag",
+        "type": "string"
+      },
+      "spelers": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 16,
+        "title": "Spelers",
+        "type": "array"
+      },
+      "telefoons": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 16,
+        "title": "Telefoons",
+        "type": "array"
+      },
+      "tvs": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 16,
+        "title": "Tvs",
+        "type": "array"
+      }
+    },
+    "required": [
+      "offline_gedrag"
+    ],
+    "title": "D15Waarde",
+    "type": "object"
+  },
+  "D16": {
+    "$defs": {
+      "AppRpoRto": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+            "title": "App Id",
+            "type": "string"
+          },
+          "rpo_uren": {
+            "exclusiveMinimum": 0,
+            "maximum": 8760,
+            "title": "Rpo Uren",
+            "type": "number"
+          },
+          "rto_uren": {
+            "exclusiveMinimum": 0,
+            "maximum": 8760,
+            "title": "Rto Uren",
+            "type": "number"
+          }
+        },
+        "required": [
+          "app_id",
+          "rpo_uren",
+          "rto_uren"
+        ],
+        "title": "AppRpoRto",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "per_app": {
+        "items": {
+          "$ref": "#/$defs/AppRpoRto"
+        },
+        "maxItems": 256,
+        "minItems": 1,
+        "title": "Per App",
+        "type": "array"
+      }
+    },
+    "required": [
+      "per_app"
+    ],
+    "title": "D16Waarde",
+    "type": "object"
+  },
+  "D17": {
+    "additionalProperties": false,
+    "properties": {
+      "domeinnaam": {
+        "maxLength": 253,
+        "minLength": 1,
+        "title": "Domeinnaam",
+        "type": "string"
+      },
+      "https": {
+        "title": "Https",
+        "type": "boolean"
+      },
+      "recovery_account": {
+        "title": "Recovery Account",
+        "type": "boolean"
+      },
+      "rollen": {
+        "items": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maxItems": 16,
+        "minItems": 1,
+        "title": "Rollen",
+        "type": "array"
+      }
+    },
+    "required": [
+      "domeinnaam",
+      "https",
+      "recovery_account",
+      "rollen"
+    ],
+    "title": "D17Waarde",
+    "type": "object"
+  },
+  "D18": {
+    "additionalProperties": false,
+    "properties": {
+      "navidrome_gewenst": {
+        "title": "Navidrome Gewenst",
+        "type": "boolean"
+      },
+      "toelichting": {
+        "maxLength": 500,
+        "minLength": 1,
+        "title": "Toelichting",
+        "type": "string"
+      }
+    },
+    "required": [
+      "navidrome_gewenst",
+      "toelichting"
+    ],
+    "title": "D18Waarde",
+    "type": "object"
+  }
+}
