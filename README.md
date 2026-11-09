@@ -60,4 +60,4 @@ waarden; de Custom App heeft geen verplichte variabelen).
 | `docs/screenshots/p0` | schermafbeeldingen (mobiel en desktop) uit de Playwright-suite |
 | `docs/platform-v2` | pakketdocumentatie, contracten, Excel-taken en `EVIDENCE.json` |
 
-Geen licentie toegevoegd (contract §10: alleen na vraag aan de gebruiker).
+Licentie: **GPL-3.0** (zie [`LICENSE`](LICENSE); besluit van de eigenaar, 2026-11-09).
