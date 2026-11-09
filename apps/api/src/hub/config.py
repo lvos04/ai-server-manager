@@ -1,0 +1,91 @@
+"""Instellingen (pydantic-settings, prefix ``HUB_``).
+
+De standaard TrueNAS Custom App heeft géén verplichte variabelen: alle standaardwaarden hieronder werken in de
+alles-in-één image. Variabelen zijn er voor ontwikkeling/CI (zie ``.env.example``). Er staan nooit NAS-gegevens
+(IP, poolnaam, versie) in de instellingen: die komen uit de onboarding-wizard (D01–D18) of uit gemeten readback.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_SOCKET_DIR = "/tmp/asm-pg"  # noqa: S108 — map 0700 van uid 568, alleen unix-socket, geen netwerkpoort
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="HUB_", extra="ignore")
+
+    data_dir: Path = Path("/appdata")
+    database_url: str = f"postgresql+psycopg://hub@/hub?host={DEFAULT_SOCKET_DIR}"
+
+    host: str = "0.0.0.0"  # noqa: S104 — de container publiceert precies één poort
+    port: int = 30400
+    # Achter de (latere) ingebouwde web-UI luistert de API alleen op 127.0.0.1:<internal_api_port>.
+    internal_api_port: int = 8400
+    forwarded_allow_ips: str = "127.0.0.1"
+
+    log_level: Literal["debug", "info", "warning", "error"] = "info"
+
+    # Sessies en login
+    cookie_secure: Literal["auto", "true", "false"] = "auto"
+    session_ttl_seconds: int = Field(default=12 * 3600, ge=300, le=7 * 24 * 3600)
+    session_idle_seconds: int = Field(default=2 * 3600, ge=300, le=24 * 3600)
+    login_max_failures: int = Field(default=5, ge=1, le=100)
+    login_window_seconds: int = Field(default=15 * 60, ge=60, le=24 * 3600)
+    password_min_length: int = Field(default=12, ge=8, le=128)
+    setup_code_ttl_seconds: int = Field(default=24 * 3600, ge=600, le=7 * 24 * 3600)
+
+    # JWT voor gebruikerscontext naar diensten (contract §4: exp ≤ 120 s)
+    jwt_ttl_seconds: int = Field(default=120, ge=10, le=120)
+
+    # Enrollment (contract §3)
+    enrollment_token_ttl_seconds: int = Field(default=60 * 60, ge=60, le=60 * 60)
+    pairing_code_ttl_seconds: int = Field(default=60 * 60, ge=60, le=60 * 60)
+    service_token_rotation_grace_seconds: int = Field(default=10 * 60, ge=0, le=24 * 3600)
+
+    # TrueNAS JSON-RPC (contract §5: 5 s connect / 15 s read)
+    truenas_connect_timeout: float = Field(default=5.0, gt=0, le=60)
+    truenas_read_timeout: float = Field(default=15.0, gt=0, le=120)
+    truenas_extra_ca_file: Path | None = None  # optioneel eigen CA; anders systeem-CA of vingerafdruk
+
+    # Inventaris
+    inventory_ttl_seconds: int = Field(default=15 * 60, ge=30, le=24 * 3600)
+    inventory_interval_seconds: int = Field(default=5 * 60, ge=30, le=24 * 3600)
+
+    # Eigen back-up (pg_dump) van de ingebouwde database
+    self_backup_interval_seconds: int = Field(default=24 * 3600, ge=300, le=7 * 24 * 3600)
+    self_backup_keep: int = Field(default=7, ge=1, le=365)
+    pg_dump_bin: str = "pg_dump"
+    pg_restore_bin: str = "pg_restore"
+
+    worker_poll_seconds: float = Field(default=5.0, gt=0, le=300)
+
+    # AI is standaard uit (lokale modellen optioneel en standaard uit; geen betaalde overage)
+    ai_enabled: bool = False
+
+    @property
+    def secrets_dir(self) -> Path:
+        return self.data_dir / "secrets"
+
+    @property
+    def backups_dir(self) -> Path:
+        return self.data_dir / "backups"
+
+    @property
+    def libpq_url(self) -> str:
+        """URL voor pg_dump/pg_restore (zonder SQLAlchemy-driverdeel)."""
+        url = self.database_url
+        for prefix in ("postgresql+psycopg://", "postgresql+psycopg2://"):
+            if url.startswith(prefix):
+                return "postgresql://" + url[len(prefix) :]
+        return url
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()

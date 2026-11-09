@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+**/__pycache__
+**/*.pyc
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/node_modules
+**/.next
+docs/platform-v2/pakket
+docs/platform-v2/08_EXCEL
+tests
+apps/api/tests
+apps/executor/tests
+appdata

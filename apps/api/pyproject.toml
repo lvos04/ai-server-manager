@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hub"
+version = "0.1.0"
+description = "AI Server Manager — centrale Hub (API, worker, AI-runner) van TrueNAS Home Platform V2"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+# Exacte versies: de image installeert bovendien uit requirements.lock (incl. transitieve pakketten).
+dependencies = [
+  "fastapi==0.162.2",
+  "uvicorn==0.54.0",
+  "sqlalchemy==2.1.8",
+  "alembic==1.20.1",
+  "psycopg[binary]==3.3.8",
+  "pydantic==2.14.3",
+  "pydantic-settings==2.16.2",
+  "argon2-cffi==25.1.0",
+  "cryptography==50.0.2",
+  "pyjwt==2.15.1",
+  "websockets==17.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "pytest==9.2.0",
+  "ruff==0.17.4",
+  "mypy==2.4.1",
+  "pip-audit==2.10.1",
+]
+
+[project.scripts]
+hub = "hub.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hub"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# Alembic-migraties gaan mee in het pakket zodat de image ze zonder broncode kan uitvoeren.
+"alembic" = "hub/_alembic"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
+ignore = [
+  "S101",   # assert in tests
+  "S603",   # subprocess zonder shell: bewust (vaste argumentlijsten)
+  "S607",   # pg_dump/pg_restore via PATH in de image
+  "RUF001", "RUF002", "RUF003",  # Nederlandse tekst met typografische tekens
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S104", "S105", "S106", "S108", "S311", "C408"]
+"../../tests/**" = ["S104", "S105", "S106", "S108", "S311", "C408"]
+"../../conftest.py" = ["S105"]
+"alembic/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+packages = ["hub"]
+
+[[tool.mypy.overrides]]
+module = ["argon2.*", "alembic.*"]
+ignore_missing_imports = true
