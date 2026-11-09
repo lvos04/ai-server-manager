@@ -81,6 +81,15 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - Vastgesteld in `ai-server-manager` met `CONTRACT_1.2_CONFORMITEIT.md` (wat elke repo moet veranderen) en
   `docs/adr/ADR-0011-contract-1-2.md` (keuzes). **Nog niet** naar de andere repos gekopieerd (volgende stap) en
   nog nergens in code doorgevoerd. De punten hieronder waren de invoer.
+- **Onafhankelijke review (2026-11-09):** `docs/adr/ADR-0012-review-contract-1-2.md`. Blijft `contracts 1.2`
+  (sectie "Correcties uit de onafhankelijke review" R1–R12): `app_id` vast per image, `pending` naast `state`, strikte
+  JWK-regels, rotatie zonder buitensluiten en zonder automatische rotatie (R2), 401 pas na `services/self` als
+  intrekking, sleutelrotatie per doel, vaste `reason`-tabel, geen `action_id` voor koppelbeheer, TrueNAS-uitspraken
+  als bronwaarneming, ook PID 1 niet als root, executor-bewijs tegen vastgelegd NAS-adres. Conformiteitslijst
+  bijgewerkt naar de echte stand per repo (commits genoemd). Eigen reparaties: `deploy/smoke.sh` controleert nu ook
+  `CapEff`, EVIDENCE.json D01–D18 volgens §11 + test.
+- CI-stand na de P0-afronding (gezien in de review): groen in jelly-leon, jelly-leon-platform,
+  zoeken-en-persoonlijke-ai, home-control-hub, appstore-en-fork, jelly-leon-clients en jelly-leon-web.
 
 
 - **Bestaande apps** (MediaGuard, MSO, my_house, Jellyfin): eigen poorten (MG 30080 + fork-poorten, MSO 38081), eigen DB

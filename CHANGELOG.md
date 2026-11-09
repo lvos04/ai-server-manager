@@ -4,6 +4,20 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — onafhankelijke review van contract 1.2
+- `docs/platform-v2/PLATFORM_CONTRACTEN.md` blijft `contracts 1.2`, met correcties R1–R12 (zie
+  `docs/adr/ADR-0012-review-contract-1-2.md`): `app_id` vast per image; `pending` naast `state` in `hub-link.json`;
+  strikte JWK-regels in het enroll-verzoek; rotatie van service-tokens zonder buitensluiten en alleen op verzoek van
+  een beheerder; intrekking pas na `services/self`; sleutelrotatie per doel en zonder authenticatie; vaste
+  `reason`-tabel; koppelbeheer is geen `action_id`; TrueNAS-uitspraken als bronwaarneming (NIET GEVALIDEERD); ook
+  PID 1 niet als root; executor-bewijs tegen het vastgelegde NAS-adres.
+- `docs/platform-v2/CONTRACT_1.2_CONFORMITEIT.md` bijgewerkt naar de echte stand per repo (gecontroleerde commits),
+  met nieuwe punten A7, AS8, JP12, H14 en root-PID 1 (A6).
+- `deploy/smoke.sh`: controleert nu voor elk proces in Hub en executor ook `CapEff 0000000000000000` (naast
+  `NoNewPrivs 1`), zoals contract §2.2 vraagt.
+- `docs/platform-v2/EVIDENCE.json`: `validatie` van D01–D18 alleen nog met waarden uit de vaste lijst van §11
+  (toelichting naar `opmerking`); nieuwe test `apps/api/tests/unit/test_evidence_contract.py` bewaakt dat.
+
 ### Gewijzigd — platformcontract 1.2 (alleen documentatie)
 - `docs/platform-v2/PLATFORM_CONTRACTEN.md` naar `contracts 1.2` met wijzigingslog: exact enroll-schema, dienst-JWT
   voor Hub → dienst, sleutelpinning met sleutelset-vingerafdruk, `jti`-replaycache, opslag in
