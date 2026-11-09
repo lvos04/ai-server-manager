@@ -9,7 +9,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 
 from hub import audit
 from hub.deps import (
@@ -42,6 +42,8 @@ from hub.timeutil import iso, utcnow
 router = APIRouter(prefix="/api/v1", tags=["aanmelden en gebruikers"])
 
 USERNAME_PATTERN = r"^[a-z0-9][a-z0-9._-]{2,63}$"
+# Vaste sleutel voor pg_advisory_xact_lock rond het aanmaken van de eerste beheerder (setupcode is eenmalig).
+SETUP_LOCK_KEY = 0x48554253_45545550  # "HUBSETUP"
 # Platformdiensten die gebruikerscontext-JWT's mogen ontvangen (naast ingeschreven diensten).
 KNOWN_AUDIENCES = {
     "home-control-hub",
@@ -176,9 +178,23 @@ def _start_session(request: Request, db: Any, settings: Any, user: User) -> JSON
     return resp
 
 
+def _has_admin(db: Any) -> bool:
+    return db.scalars(select(User.id).where(User.role == "admin")).first() is not None
+
+
+def _heal_setup_marker(db: Any, settings: Any) -> bool:
+    """Er is al een beheerder maar de markering ontbreekt (bv. stroomuitval tussen commit en markering): herstel die,
+    zodat ``hub init`` nooit meer een (onbruikbare) setupcode in de log zet. Geeft ``True`` als er een beheerder is."""
+    if not _has_admin(db):
+        return False
+    if setup_pending(settings.secrets_dir):
+        mark_setup_completed(settings.secrets_dir)
+    return True
+
+
 @router.get("/setup/status", summary="Is de eerste setup nog nodig?")
 def setup_status(db: DB, settings: SettingsDep) -> dict[str, Any]:
-    has_admin = db.scalars(select(User.id).where(User.role == "admin")).first() is not None
+    has_admin = _heal_setup_marker(db, settings)
     pending = setup_pending(settings.secrets_dir) and not has_admin
     return {
         "setup_vereist": pending,
@@ -192,9 +208,10 @@ def setup_status(db: DB, settings: SettingsDep) -> dict[str, Any]:
 def setup_admin(body: SetupAdminIn, request: Request, db: DB, settings: SettingsDep) -> JSONResponse:
     key = f"setup:{_client_ip(request)}"
     _rate_check(db, key, settings)
-    if db.scalars(select(User.id).where(User.role == "admin")).first() is not None or not setup_pending(
-        settings.secrets_dir
-    ):
+    # Eenmalig, ook bij gelijktijdige verzoeken met dezelfde code: één transactie tegelijk (advisory lock tot commit of
+    # rollback), en pas ná het verkrijgen van de lock opnieuw kijken of er al een beheerder is.
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": SETUP_LOCK_KEY})
+    if _heal_setup_marker(db, settings) or not setup_pending(settings.secrets_dir):
         raise HubError(409, "setup_already_done", "Setup is al afgerond.")
     if not verify_setup_code(settings.secrets_dir, body.setup_code):
         record_failure(db, key)
@@ -327,8 +344,14 @@ def revoke_session(session_id: uuid.UUID, db: DB, principal: AnyUser, idem: Idem
 def change_password(body: PasswordIn, db: DB, settings: SettingsDep, principal: AnyUser) -> dict[str, Any]:
     user = db.get(User, uuid.UUID(principal.id))
     assert user is not None
+    # Zelfde rate-limit als bij inloggen: met een overgenomen sessie mag het huidige wachtwoord niet te raden zijn.
+    key = f"password:{user.id}"
+    _rate_check(db, key, settings)
     if not verify_password(user.password_hash, body.huidig_wachtwoord):
+        record_failure(db, key)
+        db.commit()
         raise HubError(401, "invalid_credentials", "Huidig wachtwoord onjuist.")
+    clear_failures(db, key)
     _check_password_policy(body.nieuw_wachtwoord, settings.password_min_length, user.username)
     user.password_hash = hash_password(body.nieuw_wachtwoord)
     user.updated_at, user.version = utcnow(), user.version + 1

@@ -8,8 +8,9 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hub import __version__
 from hub.config import Settings, get_settings
@@ -23,6 +24,33 @@ from hub.vault import Vault
 
 log = logging.getLogger("hub")
 MAX_BODY_BYTES = 1024 * 1024
+
+
+class BodyLimit:
+    """Harde grens van 1 MiB per verzoek, ook zonder ``Content-Length`` (chunked): de body wordt tijdens het lezen
+    geteld en bij overschrijding afgebroken met 413 ``payload_too_large`` (nooit eerst alles in het geheugen)."""
+
+    def __init__(self, app: ASGIApp, max_bytes: int = MAX_BODY_BYTES) -> None:
+        self.app, self.max_bytes = app, max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        total = 0
+
+        async def limited() -> Message:
+            nonlocal total
+            message = await receive()
+            if message["type"] == "http.request":
+                total += len(message.get("body", b""))
+                if total > self.max_bytes:
+                    # FastAPI's HTTPException wordt door de body-parser doorgegeven (en niet tot 400 gemaakt).
+                    raise HTTPException(status_code=413)
+            return message
+
+        await self.app(scope, limited, send)
+
 
 OPENAPI_TAGS = [
     {"name": "gezondheid", "description": "healthz/readyz zonder auth en zonder geheimen."},
@@ -100,6 +128,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.keyring = keyring
     app.state.vault = vault
     install_error_handlers(app)
+    app.add_middleware(BodyLimit)
 
     @app.middleware("http")
     async def _middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

@@ -45,6 +45,75 @@ def test_setup_maakt_admin_en_sessie(client: Any, setup_code: str) -> None:
     assert client.get("/api/v1/setup/status").json()["setup_vereist"] is False
 
 
+def test_setupcode_eenmalig_ook_bij_gelijktijdige_verzoeken(
+    client: Any, app: Any, settings: Any, setup_code: str
+) -> None:
+    """Twee verzoeken tegelijk met dezelfde geldige code mogen nooit twee beheerders opleveren.
+
+    Deterministisch: een tweede verbinding houdt de setup-lock vast; het verzoek moet wachten en ná de lock opnieuw
+    controleren. Intussen ontstaat (zoals bij een gelijktijdig verzoek) al een beheerder → het verzoek krijgt 409.
+    """
+    import threading
+    import time
+
+    import psycopg
+    from conftest import _libpq
+
+    from hub.models import User
+    from hub.routers.auth import SETUP_LOCK_KEY
+    from hub.security import hash_password
+
+    holder = psycopg.connect(_libpq(settings.database_url))
+    holder.execute("SELECT pg_advisory_lock(%s)", (SETUP_LOCK_KEY,))
+    result: dict[str, Any] = {}
+
+    def attempt() -> None:
+        result["r"] = client.post(
+            "/api/v1/setup/admin", json={"setup_code": setup_code, "username": "tweede", "password": STRONG_PASSWORD}
+        )
+
+    t = threading.Thread(target=attempt)
+    t.start()
+    try:
+        time.sleep(1.0)
+        assert "r" not in result, "het verzoek wachtte niet op de setup-lock"
+        with app.state.sessionmaker() as db:
+            db.add(User(username="eerste", password_hash=hash_password(STRONG_PASSWORD), role="admin"))
+            db.commit()
+    finally:
+        holder.execute("SELECT pg_advisory_unlock(%s)", (SETUP_LOCK_KEY,))
+        holder.close()
+        t.join(30)
+    assert result["r"].status_code == 409 and result["r"].json()["code"] == "setup_already_done"
+    with app.state.sessionmaker() as db:
+        from sqlalchemy import func, select
+
+        assert db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) == 1
+    # De markering is hersteld: een nieuwe start (hub init) toont geen setupcode meer.
+    from hub.firststart import ensure_secrets, setup_pending
+
+    assert setup_pending(settings.secrets_dir) is False
+    assert ensure_secrets(settings.secrets_dir, new_setup_code=True).setup_code is None
+
+
+def test_ontbrekende_setupmarkering_wordt_hersteld(client: Any, app: Any, settings: Any, setup_code: str) -> None:
+    """Beheerder bestaat al (bv. stroomuitval vlak na de commit): geen setup meer en geen nieuwe code in de log."""
+    from hub.models import User
+    from hub.security import hash_password
+
+    with app.state.sessionmaker() as db:
+        db.add(User(username="beheerder", password_hash=hash_password(STRONG_PASSWORD), role="admin"))
+        db.commit()
+    assert client.get("/api/v1/setup/status").json()["setup_vereist"] is False
+    r = client.post(
+        "/api/v1/setup/admin", json={"setup_code": setup_code, "username": "tweede", "password": STRONG_PASSWORD}
+    )
+    assert r.status_code == 409
+    from hub.firststart import ensure_secrets
+
+    assert ensure_secrets(settings.secrets_dir, new_setup_code=True).setup_code is None
+
+
 def test_csrf_vereist_voor_mutaties(admin: Any) -> None:
     token = admin.headers.pop("X-CSRF-Token")
     r = admin.post("/api/v1/inventory/refresh", headers=idem())
@@ -120,6 +189,20 @@ def test_sessie_intrekken_en_wachtwoord_wijzigen(admin: Any, app: Any) -> None:
     assert admin.get("/api/v1/auth/me").status_code == 200
 
 
+def test_wachtwoord_wijzigen_heeft_rate_limit_op_het_huidige_wachtwoord(admin: Any) -> None:
+    for _ in range(5):  # login_max_failures in de testinstellingen
+        r = admin.post(
+            "/api/v1/auth/password", json={"huidig_wachtwoord": "fout-geraden", "nieuw_wachtwoord": "Iets-Nieuws-1234"}
+        )
+        assert r.status_code == 401 and r.json()["code"] == "invalid_credentials"
+    r = admin.post(
+        "/api/v1/auth/password",
+        json={"huidig_wachtwoord": STRONG_PASSWORD, "nieuw_wachtwoord": "Een-Ander-Sterk-Wachtwoord-7"},
+    )
+    assert r.status_code == 429 and r.headers["Retry-After"]
+    assert admin.get("/api/v1/auth/me").status_code == 200
+
+
 def test_laatste_admin_beschermd_en_degraderen_trekt_sessies_in(admin: Any, app: Any) -> None:
     me = admin.get("/api/v1/auth/me").json()["user"]["id"]
     r = admin.patch(f"/api/v1/users/{me}", json={"role": "viewer"}, headers=idem())
@@ -160,3 +243,26 @@ def test_uniform_foutformaat(admin: Any) -> None:
     assert r.status_code == 404 and set(r.json()) == {"code", "message", "details", "trace_id"}
     r = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}})
     assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required"
+
+
+def test_verzoek_groter_dan_1_mib_geeft_413_ook_zonder_content_length(admin: Any) -> None:
+    big = b'{"waarde": {"nas_adres": "' + b"a" * (1024 * 1024 + 10) + b'"}}'
+    # Met Content-Length: direct geweigerd.
+    r = admin.put("/api/v1/decisions/D03/waarde", content=big, headers={**idem(), "content-type": "application/json"})
+    assert r.status_code == 413 and r.json()["code"] == "payload_too_large"
+
+    # Zonder Content-Length (chunked): tijdens het lezen afgebroken, niet eerst alles in het geheugen.
+    def chunks() -> Any:
+        for i in range(0, len(big), 64 * 1024):
+            yield big[i : i + 64 * 1024]
+
+    r = admin.put(
+        "/api/v1/decisions/D03/waarde", content=chunks(), headers={**idem(), "content-type": "application/json"}
+    )
+    assert r.status_code == 413 and r.json()["code"] == "payload_too_large", r.text
+    assert r.json()["trace_id"]
+    # Ook op een publieke route (vóór aanmelding).
+    r = admin.post("/api/v1/auth/login", content=chunks(), headers={"content-type": "application/json"})
+    assert r.status_code == 413
+    # Gewone verzoeken blijven werken.
+    assert admin.get("/api/v1/decisions/D03").status_code == 200
