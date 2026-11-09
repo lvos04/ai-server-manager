@@ -160,11 +160,13 @@ test("problemen: 100 identieke events → één incident ×100; hypothese als wo
   await page.goto("/problemen");
   await ready(page);
   const rij = page.getByTestId("incidenten-inbox").locator('[data-testid^="incident-"]', { hasText: "Node-RED" });
+  // De worker verwerkt de 100 events in batches; de inbox ververst maar elke 30 s. Wacht dus (met herladen) tot alle
+  // 100 meetellen, anders is "×32" een wedloop in de test en geen fout in de Hub.
   await expect(async () => {
     await page.reload();
     await expect(rij).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 60_000 });
-  await expect(rij).toContainText("×100");
+    await expect(rij).toContainText("×100", { timeout: 2_000 });
+  }).toPass({ timeout: 90_000 });
   await expect(rij).toContainText("Kritiek");
   await rij.click();
   await ready(page);

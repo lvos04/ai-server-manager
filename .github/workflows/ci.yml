@@ -1,6 +1,7 @@
 # CI: ruff, mypy, pytest met PostgreSQL-service, alembic up/down, OpenAPI-drift, pip-audit; web-UI (Peil): eslint, tsc,
 # vitest, next build, npm audit (runtime) en Playwright (360/390/768/1440 × licht/donker, axe) tegen de echte API +
-# simulators (TrueNAS, Uptime Kuma, Beszel, Gotify, OIDC, simulator-dienst);
+# simulators (TrueNAS, Uptime Kuma, Beszel, Gotify, OIDC, simulator-dienst), plus de Peil-ontwerpreview
+# (320–1440 × licht/donker, apps/web/review);
 # daarna beide images bouwen, starten en de healthcheck/rooktest draaien; los daarvan de tests van de Excel-bijwerker
 # (tools/excel). Geen echte NAS: alles Sim-getest.
 name: ci
@@ -73,7 +74,7 @@ jobs:
 
   web:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 55
     services:
       postgres:
         image: docker.io/library/postgres:16.15-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
@@ -121,6 +122,14 @@ jobs:
           HUB_E2E_PYTHON: python
           CI: "true"
         run: npx playwright test
+      - name: Peil-ontwerpreview (320–1440 × licht/donker; axe, gemeten contrast, focusdoorloop, doelen, Peil-semantiek)
+        env:
+          HUB_E2E_PYTHON: python
+          CI: "true"
+        shell: bash # -eo pipefail: een harde bevinding laat de stap falen, ook met tee
+        run: |
+          npx playwright test -c playwright.review.config.ts
+          node review/samenvat.mjs --json review/uit/samenvatting.json --streng | tee review/uit/samenvatting.txt
       - name: Rapport en schermafbeeldingen bewaren
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -129,6 +138,8 @@ jobs:
           path: |
             apps/web/playwright-report
             apps/web/test-results
+            apps/web/review/uit/samenvatting.json
+            apps/web/review/uit/samenvatting.txt
             docs/screenshots/p1
           retention-days: 14
           if-no-files-found: ignore
