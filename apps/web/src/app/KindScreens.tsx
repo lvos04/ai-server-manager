@@ -79,7 +79,7 @@ export function KindIk() {
       </h1>
       <p>Je bent ingelogd als {naam}.</p>
       <ThemeSection />
-      <SessionsSection />
+      <SessionsSection kind />
       <div>
         <LogoutButton />
       </div>

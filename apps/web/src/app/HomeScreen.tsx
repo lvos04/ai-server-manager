@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ChevronRight, CircleAlert, Cpu, HardDrive, House, LayoutGrid, ListChecks, Film, History, RotateCw } from "lucide-react";
+import { ChevronRight, DatabaseBackup, Download, HardDrive, History, Inbox, LayoutGrid, ListChecks, Microchip, RotateCw, Sofa } from "lucide-react";
 import Link from "next/link";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { useNow } from "@/components/Freshness";
@@ -237,7 +237,7 @@ export function HomeScreen() {
         <StatCard
           id="gpu"
           title="GPU en AV1"
-          icon={Cpu}
+          icon={Microchip}
           value={g.fresh ? String(g.items.length) : null}
           unit={g.fresh ? (g.items.length === 1 ? "GPU gevonden" : "GPU's gevonden") : undefined}
           status={g.fresh ? { tone: "unknown", label: "Gebruik onbekend" } : g.verouderd ? [UNKNOWN, STALE] : UNKNOWN}
@@ -262,7 +262,7 @@ export function HomeScreen() {
         <StatCard
           id="problemen"
           title="Problemen"
-          icon={CircleAlert}
+          icon={Inbox}
           value={inc && !incidents.stale ? String(inc.actief) : null}
           unit={inc && !incidents.stale ? `actief${kritiek ? ` · ${kritiek} kritiek` : ""}` : undefined}
           status={inc && !incidents.stale ? summary.parts.find((x) => x.id === "problemen")!.view : incidents.stale ? [UNKNOWN, STALE] : UNKNOWN}
@@ -274,7 +274,7 @@ export function HomeScreen() {
         <StatCard
           id="backups"
           title="Veiligheid en back-ups"
-          icon={Archive}
+          icon={DatabaseBackup}
           value={cov.fresh ? `${cov.volledig} van ${cov.totaal}` : null}
           unit={cov.fresh ? "apps volledig gedekt" : undefined}
           status={backupGate ? { ...gateStatus(backupGate.status), label: `Back-upgate: ${gateStatus(backupGate.status).label.toLowerCase()}` } : UNKNOWN}
@@ -323,7 +323,7 @@ export function HomeScreen() {
         <StatCard
           id="downloads"
           title="Downloads en bibliotheek"
-          icon={Film}
+          icon={Download}
           value={null}
           status={NOT_YET}
           bron="MediaGuard en MSO — nog niet gekoppeld (fase P3)"
@@ -334,7 +334,7 @@ export function HomeScreen() {
         <StatCard
           id="huis"
           title="Huiscomfort en energie"
-          icon={House}
+          icon={Sofa}
           value={null}
           status={NOT_YET}
           bron="my_house — nog niet gekoppeld (fase P3)"

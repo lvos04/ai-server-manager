@@ -81,6 +81,14 @@ interface Enrollment {
 }
 
 /** C-57: vingerafdruk van deze Hub + publieke sleutelset (geen geheim). */
+
+/** "van vandaag" / "1 dag oud" / "12 dagen oud"; onbekend blijft onbekend (nooit "0 dagen"). */
+function tokenLeeftijd(dagen: number | null | undefined): string {
+  if (typeof dagen !== "number") return "leeftijd onbekend";
+  if (dagen < 1) return "van vandaag";
+  return dagen === 1 ? "1 dag oud" : `${dagen} dagen oud`;
+}
+
 function Vingerafdruk({ ks }: { ks: Keyset }) {
   return (
     <section className="card" aria-labelledby="vingerafdruk-titel" data-testid="vingerafdruk-hub">
@@ -310,7 +318,7 @@ function DienstKaart({ d, admin, onWijziging, statusUrl }: { d: Dienst; admin: b
         <dd>
           {token ? (
             <>
-              <code>••••{token.laatste4}</code> · {d.rotatie.token_leeftijd_dagen ?? 0} dagen oud
+              <code>••••{token.laatste4}</code> · {tokenLeeftijd(d.rotatie.token_leeftijd_dagen)}
             </>
           ) : (
             "geen geldig token"

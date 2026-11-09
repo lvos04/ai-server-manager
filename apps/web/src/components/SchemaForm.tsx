@@ -1,6 +1,6 @@
 "use client";
 
-import { OctagonX } from "lucide-react";
+import { OctagonX, Trash2 } from "lucide-react";
 import { emptyDraft, setAt, type Draft, type Errors, type FieldNode } from "@/lib/schema-form";
 import { Button } from "@/components/ui/button";
 
@@ -136,13 +136,10 @@ function FieldView({
                   update={update}
                   itemLabel={`${label} ${i + 1}`}
                 />
-                <Button
-                 
-                  variant="gevaar"
-                  uit={disabled}
-                  onClick={() => update(path, items.filter((_, j) => j !== i))}
-                >
-                  Verwijder<span className="sr-only">{` ${label} ${i + 1}`}</span>
+                {/* Een rij uit een nog niet opgeslagen formulier halen is geen gevaar: gewone knop (Peil §4.1 regel 2). */}
+                <Button uit={disabled} onClick={() => update(path, items.filter((_, j) => j !== i))}>
+                  <Trash2 aria-hidden="true" />
+                  Verwijderen<span className="sr-only">{`: ${label} ${i + 1}`}</span>
                 </Button>
               </div>
             ))}

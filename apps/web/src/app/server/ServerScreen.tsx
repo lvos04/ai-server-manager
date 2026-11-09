@@ -55,6 +55,10 @@ interface Network {
   standaardroutes: string[];
 }
 
+
+/** Uitkomst van een ophaalronde (ok|partial|unknown) in gewone woorden; nooit het ruwe Engelse woord. */
+const RUN_LABEL: Record<string, string> = { ok: "geslaagd", partial: "deels gelukt", unknown: "mislukt (stand onbekend)" };
+
 export function ServerScreen() {
   const summary = useApi<InventorySummary>("/api/v1/inventory");
   const system = useApi<InventoryKind<SystemInfo>>("/api/v1/inventory/systeem");
@@ -81,7 +85,9 @@ export function ServerScreen() {
         intro="Inventaris van je TrueNAS, alleen-lezen: de Hub wijzigt hier niets op de NAS. Onbekend of verouderd staat er ook zo."
       />
       <Subnav items={SERVER_SUBNAV} label="Server" />
+      {/* Ankers binnen deze pagina: bewust een lichte linkrij, niet nog een knoppenrij die op de subnavigatie lijkt. */}
       <nav className="toc mb-4" aria-label="Onderdelen van de inventaris">
+        <span className="text-sm font-semibold text-muted-foreground">Op deze pagina:</span>
         <a href="#overzicht">Overzicht</a>
         <a href="#systeem">Systeem</a>
         <a href="#pools">Pools</a>
@@ -103,7 +109,21 @@ export function ServerScreen() {
                 <dt>NAS-adres</dt>
                 <dd>{s.nas_url ? <code>{s.nas_url}</code> : "nog niet ingesteld (D03)"}</dd>
                 <dt>Laatste ophaalronde</dt>
-                <dd>{s.laatste_run ? `${formatDateTime(s.laatste_run.klaar)} — ${s.laatste_run.status}` : "nog nooit"}</dd>
+                <dd>
+                  {s.laatste_run ? (
+                    <>
+                      {formatDateTime(s.laatste_run.klaar)} — {RUN_LABEL[s.laatste_run.status] ?? s.laatste_run.status}
+                      {s.laatste_run.status !== "ok" && s.laatste_run.reason_code ? (
+                        <>
+                          {" "}
+                          (reden <code>{s.laatste_run.reason_code}</code>)
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    "nog nooit"
+                  )}
+                </dd>
                 <dt>TrueNAS-versie</dt>
                 <dd>{orUnknown(s.laatste_run?.nas_versie)}</dd>
                 <dt>Rechten van de key</dt>
@@ -138,11 +158,15 @@ export function ServerScreen() {
                         <td>{KIND_LABEL[k.kind] ?? k.kind}</td>
                         <td>
                           {kindStatus(k.status, k.verouderd) ? <StatusBadge view={kindStatus(k.status, k.verouderd)!} /> : <span className="text-sm">Vers</span>}
-                          {k.status !== "ok" && k.reason_code ? <div className="meta">{k.reason_code}</div> : null}
+                          {k.status !== "ok" && k.reason_code ? (
+                            <div className="meta">
+                              Reden <code>{k.reason_code}</code>
+                            </div>
+                          ) : null}
                         </td>
-                        <td>{k.aantal ?? "—"}</td>
+                        <td>{k.aantal ?? (k.status === "ok" ? "n.v.t." : "onbekend")}</td>
                         <td>{k.observed_at ? formatDateTime(k.observed_at) : "nooit"}</td>
-                        <td>{k.bron?.methode ? <code>{k.bron.methode}</code> : "—"}</td>
+                        <td>{k.bron?.methode ? <code>{k.bron.methode}</code> : "geen"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -269,7 +293,9 @@ export function ServerScreen() {
                 ))}
               </ul>
               <p>
-                <Link href="/apps">Alle details per app</Link>
+                <Link href="/apps" className="losse-link">
+                  Alle details per app
+                </Link>
               </p>
             </>
           ) : null}

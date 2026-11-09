@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { RolMelding } from "@/components/RolMelding";
 import { SERVER_SUBNAV, Subnav } from "@/components/Subnav";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/format";
+import { aantal, formatDateTime } from "@/lib/format";
 import { hasRole, useRole } from "@/lib/session";
 import { useApi } from "@/lib/use-api";
 
@@ -120,7 +120,7 @@ export function LogsScreen() {
           {logs.data ? (
             <section aria-labelledby="regels-titel">
               <h2 id="regels-titel" className="mb-2 text-lg">
-                {logs.data.items.length} regel(s)
+                {aantal(logs.data.items.length, "regel", "regels")}
               </h2>
               {logs.data.items.length ? (
                 <ol className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-border bg-card p-0 font-mono text-sm" data-testid="logregels">

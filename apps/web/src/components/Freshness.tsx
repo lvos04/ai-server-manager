@@ -46,7 +46,7 @@ export function Freshness({
         <div>
           <dt>Geprobeerd</dt>
           <dd>
-            {geprobeerd.op ? <time dateTime={geprobeerd.op}>{formatTime(geprobeerd.op, now)}</time> : "onbekend"} · {geprobeerd.uitkomst}
+            {geprobeerd.op ? <time dateTime={geprobeerd.op}>{formatTime(geprobeerd.op, now)}</time> : "onbekend"} · <Uitkomst code={geprobeerd.uitkomst} />
           </dd>
         </div>
       ) : null}
@@ -58,6 +58,31 @@ export function Freshness({
       ))}
     </dl>
   );
+}
+
+/** Redencodes van de API in gewone woorden ("Geprobeerd 11:56 · geen antwoord (unreachable)"); de code blijft erbij. */
+const UITKOMST: Record<string, string> = {
+  unreachable: "geen antwoord",
+  timeout: "geen antwoord binnen de tijd",
+  auth_failed: "aanmelden geweigerd",
+  permission_denied: "geen rechten",
+  method_unavailable: "methode niet beschikbaar",
+  tls_untrusted: "certificaat niet vertrouwd",
+  key_too_privileged: "key heeft te veel rechten",
+  not_configured: "niet ingesteld",
+  protocol_error: "onverwacht antwoord",
+  stale: "geen nieuwe meting",
+};
+
+function Uitkomst({ code }: { code: string }) {
+  const tekst = UITKOMST[code];
+  if (tekst)
+    return (
+      <>
+        {tekst} (<code>{code}</code>)
+      </>
+    );
+  return /^[a-z][a-z0-9_]*$/.test(code) && code !== "mislukt" ? <code>{code}</code> : <>{code}</>;
 }
 
 /** Huidige tijd die elke `ms` ververst (voor relatieve tijden en aftellen). */

@@ -13,6 +13,7 @@ import {
   type StatusView,
   type Tone,
 } from "./status";
+import { aantal } from "./format";
 import type { AlertInfo, Coverage, DecisionList, Gate, Gpu, InventoryKind, Pool, TrueNasStatus } from "./types";
 
 export interface Fresh<T> {
@@ -137,13 +138,13 @@ function poolPart(inp: HomeInputs): Part {
   const pools = freshItems(inp.pools);
   const base = { id: "opslag", label: "Opslag", href: "/server#pools" };
   if (!inp.pools) return { ...base, view: v("unknown", "Onbekend"), detail: "Nog niet geladen." };
-  if (pools.verouderd) return { ...base, view: v("stale", "Verouderd"), detail: `Laatst bekend: ${pools.items.length} pool(s). ${pools.melding}` };
+  if (pools.verouderd) return { ...base, view: v("stale", "Verouderd"), detail: `Laatst bekend: ${aantal(pools.items.length, "pool", "pools")}. ${pools.melding}` };
   if (!pools.fresh || pools.items.length === 0) return { ...base, view: v("unknown", "Onbekend"), detail: pools.melding || "Geen pools gemeten." };
   const down = pools.items.filter((p) => p.gezond === false || ["FAULTED", "UNAVAIL", "OFFLINE"].includes((p.status ?? "").toUpperCase()));
   const degraded = pools.items.filter((p) => (p.status ?? "").toUpperCase() === "DEGRADED");
   if (down.length) return { ...base, view: v("down", "Storing"), detail: `Storing: ${down.map((p) => p.naam).join(", ")} (pool.query).` };
   if (degraded.length) return { ...base, view: v("degraded", "Beperkt"), detail: `Beperkt: ${degraded.map((p) => p.naam).join(", ")} (DEGRADED).` };
-  return { ...base, view: v("healthy", "Gezond"), detail: `${pools.items.length} pool(s) gezond volgens pool.query.` };
+  return { ...base, view: v("healthy", "Gezond"), detail: `${aantal(pools.items.length, "pool", "pools")} gezond volgens pool.query.` };
 }
 
 function appsPart(inp: HomeInputs): Part {
@@ -204,7 +205,7 @@ function channelsPart(inp: HomeInputs): Part {
   const stopped = on.filter((c) => c.status.laatste_reden === "token_geweigerd" || c.status.laatste_status === "gestopt");
   if (stopped.length) return { ...base, view: v("down", "Storing"), detail: `Kanaal gestopt: ${stopped.map((c) => c.naam).join(", ")} (token geweigerd).` };
   // Een kanaal is geen gezondheid: neutraal "Aan", telt niet mee.
-  return { ...base, view: v("neutral", "Aan", "aan"), detail: `${on.length} kanaal/kanalen aan. Of meldingen aankomen, kan de Hub niet zien.` };
+  return { ...base, view: v("neutral", "Aan", "aan"), detail: `${aantal(on.length, "kanaal", "kanalen")} aan. Of meldingen aankomen, kan de Hub niet zien.` };
 }
 
 function backupPart(inp: HomeInputs): Part {

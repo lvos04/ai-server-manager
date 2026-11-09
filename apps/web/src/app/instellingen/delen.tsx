@@ -103,8 +103,11 @@ export function PasswordForm() {
   );
 }
 
-/** Eigen sessies (testid `sessies`). */
-export function SessionsSection() {
+/**
+ * Eigen sessies (testid `sessies`). Intrekken is geen gevaar (opnieuw inloggen kan altijd): een gewone knop, geen rode.
+ * Kindvariant (O-05): kindertaal, geen IP-adres of codes in beeld — die staan achter "Details voor een volwassene".
+ */
+export function SessionsSection({ kind }: { kind?: boolean } = {}) {
   const sessions = useApi<{ items: Session[] }>("/api/v1/auth/sessions");
   const [error, setError] = useState<HubApiError | null>(null);
   const revoke = async (id: string) => {
@@ -118,22 +121,37 @@ export function SessionsSection() {
   };
   return (
     <section className="card" id="sessies" aria-labelledby="sessies-titel" data-testid="sessies">
-      <h2 id="sessies-titel">Mijn sessies</h2>
+      <h2 id="sessies-titel">{kind ? "Waar je bent ingelogd" : "Mijn sessies"}</h2>
       {sessions.error ? <ErrorPanel error={sessions.error} alert={false} /> : null}
       {error ? <ErrorPanel error={error} /> : null}
       <ul className="plain-list">
         {(sessions.data?.items ?? []).map((s) => (
           <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-            <span>
-              {s.huidige ? <strong>Deze sessie</strong> : "Andere sessie"} · IP <code>{s.ip}</code>
-              <br />
-              <span className="meta">
-                Gestart {formatDateTime(s.aangemaakt)} · laatst gezien {formatDateTime(s.laatst_gezien)} · verloopt {formatDateTime(s.verloopt)}
+            {kind ? (
+              <span className="flex flex-col">
+                {s.huidige ? <strong>Dit apparaat</strong> : "Een ander apparaat"}
+                <span className="meta">Laatst gebruikt {formatDateTime(s.laatst_gezien)}</span>
+                <details>
+                  <summary className="min-h-touch cursor-pointer py-2 text-sm font-semibold">Details voor een volwassene</summary>
+                  <p className="text-sm">
+                    IP <code>{s.ip}</code> · gestart {formatDateTime(s.aangemaakt)} · verloopt {formatDateTime(s.verloopt)}
+                  </p>
+                </details>
               </span>
-            </span>
+            ) : (
+              <span>
+                {s.huidige ? <strong>Deze sessie</strong> : "Andere sessie"} · IP <code>{s.ip}</code>
+                <br />
+                <span className="meta">
+                  Gestart {formatDateTime(s.aangemaakt)} · laatst gezien {formatDateTime(s.laatst_gezien)} · verloopt {formatDateTime(s.verloopt)}
+                </span>
+              </span>
+            )}
             {!s.huidige ? (
-              <Button variant="gevaar" onClick={() => void revoke(s.id)}>
-                Intrekken<span className="sr-only">: sessie vanaf {s.ip}</span>
+              <Button onClick={() => void revoke(s.id)}>
+                <LogOut aria-hidden="true" />
+                {kind ? "Uitloggen op dat apparaat" : "Intrekken"}
+                {kind ? null : <span className="sr-only">: sessie vanaf {s.ip}</span>}
               </Button>
             ) : null}
           </li>

@@ -72,7 +72,7 @@ export function OnboardingScreen() {
                 <h2 id="stap-account" className="step-title">
                   Beheerder aanmaken
                 </h2>
-                <StatusBadge view={{ tone: "neutral", label: "Klaar", icon: "geslaagd" }} />
+                <StatusBadge view={{ tone: "neutral", label: "Aangemaakt", icon: "geslaagd" }} />
               </div>
               <p className="meta">Gedaan met de setupcode uit de app-log. Extra gebruikers beheer je onder Instellingen.</p>
             </section>
