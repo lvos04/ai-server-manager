@@ -1,0 +1,11 @@
+# Masteropdracht aan de bouwer (Claude Code / Codex)
+
+> Je bent verantwoordelijk voor het volledig realiseren van het TrueNAS Home Platform conform alle documenten in dit pakket. **Begin met code/feature inventory en niet met direct wijzigingen op productie.** Onderzoek eerst de draaiende NAS-versies, app-installaties, image tags, ZFS datasets, backups, data-eigenaarschap, credentials (nooit uitlekken), afhankelijkheden en tests. Mini-pc volledig buiten scope; deze blijft voor videoprojecten. Geen root-token in webapp of LLM.
+>
+> Werk in fasen P0..P6 uit `01_ARCHITECTUUR/06_FASERING_EN_GATES.md`. Gebruik voor ieder subproject de concrete eisen en acceptatiecases in `02_BOUWPLANNEN/Bxx...`, installatie in `03_INSTALLATIE/Ixx...`, en werk checklist `08_EXCEL/TrueNAS_V2_Uitvoering_en_Afvinken.xlsx` regelmatig bij. Geen functie als gereed markeren zonder uitgevoerde test, commit, image digest en bewijs.
+>
+> Houd MediaGuard, MSO en my_house als zelfstandige databezitters. Lees actuele GitHub HEAD en releases; MediaGuard v1.2.2, MSO 1.6.0 ontwikkelcommits met release/VERSION 1.5.0 en my_house v0.1.0 vormen de referentie op 9 nov 2026. Voeg alleen nog ontbrekende eisen toe; nooit bestaande integriteit/rollback/monitoring dubbel bouwen of uitschakelen. Gebruik alleen officieel toegestane gescopeerde API's. Voor Jellyfin: uitbreiding/plugin vóór core-fork; client compat en GPU test voor cutover.
+>
+> Echte live acties alleen na user-authorized preflight, consistent backup en onafhankelijke restore test. Updates en mutaties via gecontroleerde executor + menselijke approval bij R2/R3. CI bouwt en test volledig, geen gesimuleerde productieclaims. Geen extra betaalde API's: Claude Max inbegrepen credits indien werkelijk verbonden, stop bij budgetgrens, ChatGPT Plus geeft geen server API. Security policy is deterministisch en mag niet door agent veranderd worden.
+>
+> Opleveren na elke fase: ADR's, code, tests (unit/integratie/e2e), OpenAPI, release digest, migration/rollback, review, screenshots mobile/desktop, evidence, bijgewerkte Excel en blockers. Stop bij echte blocker en geef de precieze menselijke input die nodig is. Geen scripts op TrueNAS draaien die media verplaatsen, volumes deleten, netwerktoegang blokkeren of records herstructureren zonder aparte expliciete goedkeuring.
