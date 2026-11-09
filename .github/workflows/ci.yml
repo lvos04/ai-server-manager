@@ -1,5 +1,6 @@
-# CI: ruff, mypy, pytest met PostgreSQL-service, alembic up/down, OpenAPI-drift, pip-audit, beide images bouwen,
-# starten en de healthcheck/rooktest draaien. Geen echte NAS: alles met simulators (Sim-getest).
+# CI: ruff, mypy, pytest met PostgreSQL-service, alembic up/down, OpenAPI-drift, pip-audit; web-UI: eslint, tsc,
+# vitest, next build, npm audit (runtime) en Playwright (360/390/768/1440, axe) tegen de echte API + fake TrueNAS;
+# daarna beide images bouwen, starten en de healthcheck/rooktest draaien. Geen echte NAS: alles Sim-getest.
 name: ci
 on:
   push:
@@ -13,6 +14,7 @@ concurrency:
 env:
   PYTHONDONTWRITEBYTECODE: "1"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
   python:
@@ -65,10 +67,72 @@ jobs:
       - name: pip-audit (runtime-afhankelijkheden)
         run: pip-audit --strict -r apps/api/requirements.lock -r apps/executor/requirements.lock
 
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: docker.io/library/postgres:16.15-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      HUB_TEST_ADMIN_URL: postgresql://postgres@127.0.0.1:5432/postgres
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Hub-API voor de teststack (exact vastgezet)
+        working-directory: .
+        run: |
+          python -m pip install -r apps/api/requirements.lock
+          python -m pip install --no-deps -e apps/api
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+      - name: eslint (incl. jsx-a11y strict) en TypeScript
+        run: |
+          npx eslint --max-warnings=0 .
+          npx tsc --noEmit
+      - name: vitest (unit)
+        run: npx vitest run
+      - name: npm audit (runtime-afhankelijkheden)
+        run: npm audit --omit=dev --audit-level=high
+      - name: next build (standalone)
+        run: npx next build
+      - name: Playwright-Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright E2E (360/390/768/1440, axe) tegen echte API + fake TrueNAS
+        env:
+          HUB_E2E_PYTHON: python
+          CI: "true"
+        run: npx playwright test
+      - name: Rapport en schermafbeeldingen bewaren
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-rapport
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            docs/screenshots/p0
+          retention-days: 14
+          if-no-files-found: ignore
+
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: python
+    needs: [python, web]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
