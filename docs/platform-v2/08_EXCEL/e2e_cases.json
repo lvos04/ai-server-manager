@@ -298,5 +298,449 @@
     "Migratie naar andere host",
     "Restore Hub,my_house,auth op sandbox",
     "Datalinks blijven logisch na IP wisseling"
+  ],
+  [
+    "JLT-01",
+    "Watch Together drift-matrix tegen stock-standaard én stock-best op dezelfde 12.x",
+    "Stock jellyfin/jellyfin:12.x op exact de tag en digest van de forkbasis, in twee varianten: (a) standaardinstellingen en (b) stock-best met dezelfde handmatig gezette SyncPlay-waarden als het zaad; Jelly Leon met F1 aan en F5 uit; in alle drie dezelfde transcode-instellingen (handmatig QSV op /dev/dri/renderD128 van de ontwikkelmachine). Playwright Chromium, Firefox en WebKit met twee verschillende huishoudgebruikers; corpus hero.mp4 (Direct Play), Test_Jellyfin_1080p_HEVC_10bit_10M.mp4 (Chromium transcodeert), Test_Jellyfin_1080p_DV_P8.1.mp4 (Firefox tonemapt) en hero-framecode uit B03-016 (sha256-manifest); S1 loopback, S2 één transcoderende deelnemer, S3 netem 80±20 ms en 1 % verlies, S4 web + desktop onder Xvfb (alleen na een geslaagde desktop-spike); ≥ 5 runs van 5 min per scenario en systeem, afwisselend in één exclusief meetvenster (stack.lock, geen docker-build of Gradle), positie ≥ 10 Hz, nulmeting van de meetmethode en loadavg per run",
+    "S1 p95 ≤ B03-020-tweegebruikersbaseline + 20 ms en max ≤ 100 ms; S2 en S3 p95 ≤ 200 ms; 'verbetering' alleen als de bovengrens van het 95 %-interval van het p95-verschil tegen (a) én (b) onder 0 ligt, anders luidt het rapport 'betere standaardinstellingen'; afspeelsnelheid nooit boven 1,3×; geen extra stilstand t.o.v. correctie uit; runs boven de lastgrens ongeldig (niet mislukt); validatie Sim-geslaagd/Sim-mislukt, opmerking Intel-iGPU-getest (ontwikkelmachine); desktop Geblokkeerd als de spike niet slaagt"
+  ],
+  [
+    "JLT-02",
+    "Pauze, hervatten, spoelen, volgende aflevering en groepsskip",
+    "Groep van 3 (Chromium, Firefox, Android-telefoonemulator met de officiële app én de Jelly Leon-app in de webspeler) plus een tablet-AVD in een tweede run; wachtrij Pioneer One S01E02 → S01E03; elke deelnemer pauzeert, hervat en spoelt; groepsskip van de intro via /SyncPlay/Seek op B03 Testserie S01E01 (raakvlak F6, post-credit 185-197 s); tijd tot spelen uit playing-event-tijdstempels; ≥ 3 runs; zware stap onder stack.lock en daarna gradle.lock, in vaste volgorde",
+    "Elke actie bereikt alle deelnemers; tijd tot iedereen speelt ≤ 2 s p95; volgende aflevering start bij iedereen op hetzelfde item; een skip is één groepsseek waarna niemand meer dan 500 ms afwijkt; de post-credit-scène wordt niet overgeslagen; onder SyncPlay wordt nooit automatisch overgeslagen (alleen vragen); validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-03",
+    "Haperende deelnemer en racetest van het haperbeleid",
+    "Deelnemer B (Chromium of Firefox, nooit WebKit: Sintel met AC3 speelt daar niet) achter toxiproxy/tc gesmoord tot 1,5 Mbit/s bij Sintel 1080p; beleid doorgaan_na_wachttijd (10 s) en wachten; ≥ 10 haperingen per beleid; vergelijking met stock-standaard en stock-best (beide vast 30 s); integratietest tegen de echte upstream-Group: ≥ 200 gerandomiseerde reeksen met Pause, Seek, NextItem, Leave en de upstream-30-s-timer tijdens de wachttijd",
+    "Met doorgaan_na_wachttijd staat de groep ≤ 12 s stil (stock 30 s), B krijgt een melding en speelt ≤ 20 s na herstel binnen 500 ms; met 'wachten' gedraagt de groep zich als upstream; geen andere deelnemer wordt onnodig gepauzeerd; 0 keer hervat de groep tegen een waargenomen Pause in; F1 stuurt 0 IgnoreWait-verzoeken; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-04",
+    "Gemengde apparaten, transcodes, capaciteitsadvies en lane bij groepspauze",
+    "Groep met Chromium (HEVC → transcode), Firefox (HDR/DV → tonemap), WebKit-profiel en desktop; QSV aan op /dev/dri/renderD128; planner met caps op de grens (voorlopige F5-waarden, geen D08-waarden); MediaGuard-simulator met app/status vol, leeg en onbereikbaar; groepspauze van 10 min met een bezette A310-lane in de simulator; voorspelling vóór de start vergeleken met de werkelijke PlaybackInfo voor alle 25 corpusitems; zware stap onder stack.lock",
+    "De diagnose toont per deelnemer de juiste afspeelmethode, transcode-reden en hardwareversnelling; de voorspelling klopt voor ≥ 95 % van de items; op de capaciteitsgrens ziet de eigenaar in Jelly Leon-web vóór de start een advies met reden en wordt geen stock-client door F1 geweigerd (boven de grens geldt het planner-/upstreamgedrag, zichtbaar gelabeld); hervatten na de groepspauze houdt dezelfde lane; validatie Sim-geslaagd/Sim-mislukt, opmerking Intel-iGPU-getest (ontwikkelmachine); A310/UHD 770 NIET GEVALIDEERD (hardware)"
+  ],
+  [
+    "JLT-05",
+    "Privacy, uitnodigingen en kinderprofiel (chat als voorwaardelijk deel)",
+    "Volledige rollenmatrix (eigenaar, lid, genodigde, huisgenoot, gast, kind, verzorger) × groepen open, huishouden en privé × lege en gevulde wachtrij × GET /SyncPlay/List, GET /SyncPlay/{id} en POST /SyncPlay/Join (126 gevallen), plus een VPN-deelnemer voor de kindregel; uitnodigen, joinen als accepteren, laten verlopen, intrekken, deelnemer verwijderen; kind met leeftijdsgrens, geblokkeerde tag en toegangstijd die tijdens het kijken verloopt; wachtrij met een te zware titel; geforceerd inactieve decorator met ingestelde gasten; HTML/script in de groepsnaam. Voorwaardelijk deel (alleen als Chat/Reactions aan, anders N.v.t.): chat en reacties per rol",
+    "Gast en niet-uitgenodigde zien geen privé- of huishoudgroep en geen deelnemersnamen (0 lekken; B03-020 telt de upstream-lekken); Join op een onzichtbare groep = zelfde antwoord als op een niet-bestaande; een genodigde ziet en joint de groep in stock-web en de officiële app; kind: te zware wachtrij geweigerd zonder titel, nooit met VPN/extern, niet uitnodigen, buiten toegangstijd ≤ 90 s uit de groep, geen groepen of namen van niet-verzorgers; inactieve decorator → health down en advies SyncPlayAccess=None; HTML als tekst; voorwaardelijk deel: chat alleen voor leden, na herstart weg, niet in database of logbestanden; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-06",
+    "Echte NAS en echte apparaten (Watch Together)",
+    "Op de NAS na de cutover-gate: Jelly Leon op de echte TrueNAS met A310 en UHD 770 (D08), echte tv's, telefoons, tablets en streamingboxen uit D15, Swiftfin op iOS/tvOS, echte Tailscale-deling (alleen na WT-B1), bronadres achter de TrueNAS-Docker-NAT, poortscan van buiten, MediaGuard-kijkpauze bij een echte Watch Together-sessie, derden-clients die het huishouden gebruikt",
+    "Status Geblokkeerd tot een echte run; validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode); na de run: drift, volgmodus, haperbeleid en privacy volgens JLT-01…05, 07 en 08 op echte apparaten, geen nieuwe open poort, het gemeten bronadres per verbinding"
+  ],
+  [
+    "JLT-07",
+    "Volgmodus Android TV (stock-client)",
+    "Android TV-emulator API 34 x86 in een container met --device /dev/kvm en 4 GiB; emulator, server en browser in één testvenster onder gradle.lock (geen Gradle-build tegelijk); officiële androidtv 0.19.x-APK (versie en sha256 vastgelegd) en de Jelly Leon-build; webgroep in Chromium met hero-framecode; ≥ 30 acties pauze, hervatten, spoelen en volgende aflevering; tijdstempel vóór en na elke screencap; controlerende websessie beëindigd terwijl de tv volgt; poging een sessie van een andere gebruiker te koppelen; verouderde voortgangsmelding gesimuleerd",
+    "Gekoppelde sessie volgt alle acties met p95-positieverschil ≤ 2 s na correctie (met de gemeten meetonzekerheid erbij); nooit een pauze/hervat-lus (hooguit één herhaling, daarna niet_synchroon); na het einde van de controlerende sessie stopt het volgen binnen 15 s en gaat er geen commando met lege controllingSessionId naar de tv; andermans sessie geeft 403; label 'Volgen (±2 s)'; validatie Sim-geslaagd/Sim-mislukt; Swiftfin NIET GEVALIDEERD (Mac/Xcode); echte tv's NIET GEVALIDEERD (hardware)"
+  ],
+  [
+    "JLT-08",
+    "Externe deelnemer via VPN (gesimuleerd)",
+    "Deelnemer in een aparte Docker-bridge met bronadres uit 100.64.0.0/10 en netem 80±20 ms; ExternalMode uit, vpn_huishouden en een poging tot vpn_gasten met en zonder geslaagde zelftest anonieme streamroutes; huishoud- en gastaccount; daarna de VPN-share ingetrokken (EX34-variant); extra gevallen: Docker-gatewayadres als bron en 100.64.0.0/10 in LocalNetworkSubnets; gast met en zonder RemoteClientBitrateLimit",
+    "uit: een sessie met klasse vpn, extern of onbekend ziet en joint niets; vpn_huishouden: huishoudaccount doet mee met p95-drift ≤ 250 ms, gastaccount niet; vpn_gasten niet te kiezen (422) zolang anonieme streamroutes open zijn; na intrekken geen toegang en LAN blijft werken; gatewayadres → onbekend met NL-melding; 100.64.0.0/10 in LocalNetworkSubnets → waarschuwing; ACL-voorwaarde getoond als 'niet te verifiëren'; geen nieuwe open poort; validatie Sim-geslaagd/Sim-mislukt (gesimuleerd); echte Tailscale en TrueNAS-NAT in JLT-06"
+  ],
+  [
+    "JLT-09",
+    "Compatibiliteit, terugkeer naar stock en gegevensbescherming Watch Together",
+    "Drie clientrollen apart: (1) native stock-clients (androidtv-APK, native ExoPlayer-pad), (2) stock jellyfin-web 12.x uit de stock-image tegen de Jelly Leon-server (--webdir), (3) officiële Android-/desktopapp op de Jelly Leon-server (= Jelly Leon-webclient); plugin aan, Enabled=false, uit en verwijderd, daarna terug naar de stock-image (B03-013); OpenAPI-diff /SyncPlay/* en /GetUtcTime; upstream-SyncPlay-tests; differentiële controle-run: hetzelfde gescripte scenario (30 min, 3 deelnemers) op stock en op Jelly Leon, vergelijking van de verschillenverzameling per tabel en kolom in UserData, Users, Permissions, Preferences, AccessSchedules, DisplayPreferences, ItemDisplayPreferences, Devices, DeviceOptions en BaseItems; serverherstart en tweede NewGroup midden in een groep; gebruiker verwijderen; back-up en terugzetten van de plugin-data; MediaGuard-simulator met een /mediaserver/status vol namen en titels; schemacontrole van events en connector-items; grep op logbestanden",
+    "22 SyncPlay-routes identiek en upstream-tests zonder fout; met Enabled=false of 'open' zonder gasten/kinderen byte-gelijke antwoorden; per clientrol geen regressie; verschillenverzameling van Jelly Leon ⊆ die van stock (lijst toegestane F1-wijzigingen is leeg); media-mount blijft read-only; na herstart en tweede NewGroup ended-event en opruimen van wt_group_meta; na het verwijderen van een gebruiker 0 rijen met diens GUID in de wt_-tabellen; na 'uit' alleen nog door de gebruiker gezette syncPlay-waarden; na verwijderen alleen de gedocumenteerde restanten; plugin-data terug te zetten; geen naam, titel, pad, IP-adres of chattekst in events, connector-items of logbestanden, en geen MediaGuard-veld buiten de witte lijst opgeslagen; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-10",
+    "Offline-evaluatie warm: rangschikking, diversiteit en determinisme tegen stock (a) en (b)",
+    "D-ML (MovieLens ml-latest-small als stub-bibliotheek zonder online metadata, alleen na besluit O-1 (BG-37)) met één globaal splitmoment T, tags/CommunityRating/populariteit/dateadded alleen uit data vóór T; D-SYN (bevroren recept, 3 huishoudens) voor typemenging en quota; dezelfde geschiedenis gezaaid in stock op de forkbasisdigest en in Jelly Leon; hetzelfde kandidatenfilter voor alle systemen; baselines S-REC, S-REC-best, S-SIM, S-LAT, S-RND, S-TMDB, S-BEST en POP; jl-rec-eval en 20 gebruikers end-to-end via /media/v1/recommendations/home met vaste klok = T; lektest met een tussen gebruikers geschudde holdout; twee identieke verzoeken",
+    "Op D-ML: NDCG@10 >= 1,25 × S-BEST en Recall@10 >= 1,20 × S-BEST met 95 %-ondergrens van het verschil > 0, en F2 > POP en > S-LAT (ondergrens > 0), anders de lagere claim ('beter dan de standaardinstelling' of 'niet aangetoond') in het rapport; lektest: F2 niet significant boven POP; D-SYN-uitkomsten alleen als 'functioneel aangetoond (synthetisch)'; ILD >= S-REC, max 2 per serie/collectie, typequotum gehaald; top 10 via de echte route gelijk aan jl-rec-eval en 100 % gelijk bij herhaling; rapport met n, interval, dataset-sha256, image-digest, T, seed en commit; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-11",
+    "Koude start: kwaliteit en functioneel (nieuw profiel en kind)",
+    "Kwaliteit: D-ML-testgebruikers met de training ingekort tot hun laatste 0, 1 en 2 interacties vóór T, F2 met huishouden uit (standaard) en aan (k=3), tegen S-LAT, S-RND en POP. Functioneel: echt corpus read-only; nieuw profiel zonder geschiedenis en kind met MaxParentalRating=6; eerst zonder onboarding, daarna met 3 gekozen genres en 2 titels via W-3",
+    "Bij 1 en 2 interacties NDCG@10 F2 > max(S-LAT, S-RND, POP) (ondergrens > 0); bij 0 interacties F2-standaard > max(S-LAT, S-RND) en F2 met huishouden niet slechter dan POP (ondergrens >= −0,02, pre-geregistreerd); beide functionele profielen krijgen >= 10 aanbevelingen (of alle zichtbare items als dat er minder zijn), uitsluitend binnen hun toegang (Sintel NL-12 nooit bij het kind); na onboarding verwijzen de redenen naar onboarding_choice; ter vergelijking gaf stock 12.4 in dezelfde opzet 0 categorieën en 10 willekeurige suggesties"
+  ],
+  [
+    "JLT-12",
+    "Feedback, uitsluiten en typemenging via de echte route",
+    "Echt corpus read-only met de profielen volwassene (Sintel, Cosmos, Caminandes, Pioneer One E01-E03) en anime-fan (B03 Anime E01-E02); Niet interessant op het eerste aanbevolen item (item-, serie- en collectieniveau) en Minder zoals dit op een genre; daarna DELETE feedback; herhaalde POST met dezelfde Idempotency-Key en met een ander verzoek; series met een openstaande volgende aflevering",
+    "Het item verschijnt binnen 2 s niet meer in de F2-rij en niet in Meer zoals dit van de Jelly Leon-provider; minder zoals dit verlaagt het genre-aandeel in de top 10; ongedaan maken zet het terug; exacte herhaling geeft hetzelfde antwoord met Idempotent-Replay zonder tweede record, een ander verzoek 422 idempotency_key_reused; Jellyfin-Likes blijft onveranderd; series in Next Up staan niet in de rij; max 2 per serie; anime alleen bij anime-voorkeur of anime_mode=always (stock 12.4 bleef het item tonen)"
+  ],
+  [
+    "JLT-13",
+    "Kinderprofiel, toegang, uitlegprivacy en k-anonimiteit",
+    "Kind (MaxParentalRating=6, BlockedTags gezet, IsKid) en twee volwassenen met disjuncte geschiedenis; aanroepen van /home, /why, /similar, /onboarding/candidates en de provider; userId van een ander in query/body; huishoud-opt-in met vrager + 2 en met vrager + 3 delers bij k=3; PUT admin/users/{id}/settings met household_share_mine=true; twee gebruikers vragen Similar voor hetzelfde item; Hub-JWT met rol kind",
+    "0 items buiten de toegang; /why op een verborgen item geeft dezelfde 404 als een onbestaand ID; geen ref_item_id of reden uit een ander profiel; vrager + 2 → 0 household_popular, vrager + 3 → wel zonder profielnaam; beheerder kan de opt-in niet aanzetten (403); IDOR-poging werkt alleen op het eigen profiel; twee gebruikers krijgen een andere uitkomst zonder cache-overloop; rol kind → 403"
+  ],
+  [
+    "JLT-14",
+    "Stock-clients en Jelly Leon-web-clients: geen regressie, Meer zoals dit verbeterd",
+    "Stock-clients: stock jellyfin-web 12.x uit de stock-image en de Android TV-emulator met de officiële APK. Jelly Leon-web-clients: de officiële Android-app op de telefoonemulator, desktop 2.0.0 onder Xvfb (na de desktopspike). Plugin aan met en zonder gezette providervolgorde, en plugin uit; stock zelf twee keer gemeten voor de spreiding; loggende proxy",
+    "/Items/{id}/Similar houdt hetzelfde schema; met de volgorde gezet krijgt Pioneer One Meer zoals dit (stock gaf 0) en is series-similar stabiel; zonder volgorde of met de plugin uit is de uitkomst gelijk aan stock als verzameling (exacte volgorde alleen waar stock zelf stabiel bleek); inloggen, startscherm en afspelen zonder regressie in beide rollen; desktop Geblokkeerd als de spike mislukt; Swiftfin NIET GEVALIDEERD (Mac/Xcode)"
+  ],
+  [
+    "JLT-15",
+    "Echte NAS, echte historie en echte apparaten (aanbevelingen)",
+    "Op de NAS na besluit O-7 (BG-37): lokale evaluatie op de echte huishoudhistorie (alleen geaggregeerd, per-gebruiker-opt-out, kinderen uitgesloten), herberekening en latentie met de echte bibliotheek op de NAS-CPU, en de clients uit D15 (echte tv's, telefoons, tablets), Swiftfin/Safari en derden-clients",
+    "Status Geblokkeerd met validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode) tot een echte run; daarna M10 volgens M1 (claim alleen bij winst tegen S-BEST), M8 binnen het budget van de globale planner op de NAS, en geen regressie op de echte clients; in deze bouwomgeving nooit als afgerond gemarkeerd"
+  ],
+  [
+    "JLT-16",
+    "Gegevensbescherming aanbevelingen (differentiële controle-run)",
+    "Hetzelfde gescripte scenario (inloggen, bladeren, gezien markeren, afspelen, Zet bovenaan + restore) op stock en op Jelly Leon met alleen de module Recommendations aan; gesorteerde dumps vóór en na van de 12.4-tabellen UserData, BaseItems, ItemValues, ItemValuesMap, Peoples, PeopleBaseItemMap, DisplayPreferences/HomeSection, ItemDisplayPreferences, CustomItemDisplayPreferences, Users, Permissions, Preferences, LinkedChildren, BaseItemProviders en van alle options.xml; sha256sum -c van het corpus; vergeten, gebruiker verwijderen, export + restore in een nieuwe container, verkorte bewaartermijn van kopieën, migratie schema n naar n+1 en een opzettelijk mislukte migratie; mediamap tijdelijk ontkoppeld",
+    "Verschillenverzameling van Jelly Leon gelijk aan die van stock in jellyfin.db; in options.xml alleen SimilarItemProviderOrder na de klik en byte-gelijke TypeOptions na restore; media onveranderd; vergeten wist alleen F2-data incl. cache; na verwijderen binnen 60 s 0 F2-rijen; export zonder rec_interaction; restore geeft identieke feedback en instellingen; kopieën weg na de bewaartermijn; vóór de migratie een back-up met sha256 en bij een fout is het origineel intact; bij ontkoppelde media geen wezen gemarkeerd en status degraded/orphan_surge"
+  ],
+  [
+    "JLT-17",
+    "Storing, terugval, uitzetten, verwijderen en terug naar stock",
+    "Eigen db vergrendeld of corrupt (kopie met afgekapte bytes), geforceerde exception en time-out van 2 s in de provider, planner staat de herberekening niet toe, netwerkonderbreking web→server; Recommendations.Enabled=false; 'Verwijderen voorbereiden' gevolgd door het verwijderen van de plugin; terug naar de stock-image",
+    "/home geeft 503 store_unavailable en de webrij verdwijnt terwijl alle andere startschermsecties laden; Meer zoals dit valt terug op stock binnen tijdsbudget + marge; status down of degraded met reden (incl. rebuild_not_allowed met het laatste model); module uit → provider [] en gebruikersroutes 501, webrij weg; na verwijderen ziet stock alleen de gedocumenteerde restanten (geen providervolgorde meer, map recommendations tot de beheerder die wist, geen localStorage-sleutels); Jellyfin zelf en afspelen blijven werken; geen gesimuleerd succes"
+  ],
+  [
+    "JLT-18",
+    "Optionele lokale embeddings uit, aan en onbereikbaar",
+    "Embeddings.Mode=off; daarna de Ollama-app op een RFC 1918-adres met een meertalig embeddingmodel uit het aanbod van de app (revisie/digest vastgelegd, zelftest); daarna de app gestopt; een publieke URL, een 100.64-URL zonder vlag, een hostnaam met DNS-rebinding en een redirect; wisselen van model/dimensie; twee items met dezelfde canonieke tekst; proxylog op de embedding-verbinding",
+    "Off: identiek aan klassiek; publieke en 100.64-URL zonder vlag 422; rebinding en redirect geweigerd; onbereikbaar: aanbevelingen blijven en status degraded met embedding_source_unavailable; proxylog bevat alleen itemmetadata; dezelfde text_sha256 één keer ingebed; bij een andere dimensie volledige herbouw zonder gemengde dimensies; zelftest geslaagd vóór gebruik"
+  ],
+  [
+    "JLT-19",
+    "Prestatie en budget bij 10 000 items (exclusief meetslot)",
+    "Stub-bibliotheek van 10 000 items en 10 gebruikers met elk 200 interacties op de ontwikkelmachine, onder stack.lock zonder build of Gradle tegelijk, loadavg per run vastgelegd, >= 3 runs met stock en Jelly Leon afwisselend; /home koud en warm, /Items/{id}/Similar met en zonder module, PSS/RSS van het jellyfin-proces (smaps_rollup) vóór en na laden, volledige herberekening; tweede sessie eerst met Direct Play en daarna met een HEVC-HDR-transcode tijdens de herberekening; read_bytes van de F2-jobs",
+    "/home p95 <= 250 ms koud en <= 50 ms warm; Similar p95 <= 1,5 × stock; extra PSS <= 200 MiB; herberekening <= 120 s op 1 thread gemeten bij 10 000 items en pauzeert bij beide sessiesoorten; read_bytes op media = 0; runs met 1-min-loadavg > 2,0 gelden als ongeldig, niet als mislukt; validatie Sim-geslaagd of Sim-mislukt; NAS-gedrag NIET GEVALIDEERD (echte NAS) in JLT-15"
+  ],
+  [
+    "JLT-20",
+    "NL-dekking: standaard Jellyfin (twee baselines) tegen Jelly Leon",
+    "Bevroren testbibliotheek van symlinks (alleen-lezen, sha256-manifest) met 8 geschikte items: ToS-mov + TOS-en.srt, Pioneer One S01E02–E06 met hun EN-sidecars (gemeten passend bij de mp4: score 73 320–115 137, offset ≤ 0,2 s) en de recepten Sintel zonder NL-spoor en tos-multiaudio zonder NL-spoor; niet geschikt: Sintel-mkv (NL ingebed), tos-multiaudio (NL ingebed), Pioneer E01 (REDUX-EN plus NL-sidecar van een andere montage) en B03 Testserie (geen ondertitels). Eerst stock op exact dezelfde 12.x-tag en -digest als de fork, in twee varianten: standaardinstellingen, en best ingesteld zonder code. Daarna Jelly Leon met F3, mt-app aan, AutoTranslate en AutoPublish expliciet aan (testconfiguratie), wachttijd 0, MediaGuard-simulator met source = null",
+    "Stock, beide varianten: RemoteSearch nld = [] en 0 nieuwe NL-sporen. Jelly Leon: ≥ 7 van de 8 geschikte items gepubliceerd (smoke-gate, n = 8; Wilson-ondergrens in het bewijs), een eventueel restant te_beoordelen met reden; gepubliceerd en te_beoordelen apart gerapporteerd; Sintel, tos-multiaudio en Pioneer E01 overgeslagen met menselijk_aanwezig; B03 Testserie geen_bron; het dekkingsrapport klopt met de telling; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-21",
+    "Vertaalpijplijn en kwaliteitsscore: kwaliteit, leesregels, opmaak en kalibratie",
+    "Bevroren pijplijn (sha256 van werker en configuratie); mt-app met OPUS-MT en-nl revisie 8aad73b3 (CT2 int8, artefact met bekende sha256); nulmeting eerst herhaald in de image. Ontwikkelset ToS en Sintel; testset Pioneer One S01E01 REFIX-EN naar NL (556 cues, alleen lokaal). Recepten uit B03-016: SRT met <i>/<b>/<font> en gedeeltelijk cursief, SDH met [geluid], ♪, sprekerlabels en dialoogstreepjes, ASS met \\N, {\\an8}, stijl Sign en karaoke {\\k}, namen uit de Jellyfin-metadata. Kalibratiegenerators per fouttype (≥ 20 varianten per type, andere seeds); kalibratiesplit ToS + Sintel, testsplit Pioneer E01 in vensters van 25 cues; sacrebleu 2.6.0, COMET optioneel",
+    "(a) Kwaliteit op de testset: venster-chrF2 (10 cueparen) ≥ 58,1 (nulmeting 58,6); cue- en documentniveau gerapporteerd. (b) Leesregels en opmaak: 100 % cues ≤ 2 regels van 42 tekens of gemarkeerd; aandeel > 17 tps ≤ bron + 2 procentpunt; cursief, ♪, dialoogstreepjes en .sdh behouden; namen onvertaald; Sign- en karaoke-regels onveranderd; geen lege cue. (c) Kalibratie op de testsplit: 0 slechte varianten ≥ drempel (Wilson-bovengrens), ≥ 90 % goede ≥ drempel (Wilson-ondergrens), Spearman-ρ score tegen venster-chrF ≥ 0,5, vangst per fouttype; faalt een type, dan blijft AutoPublish uit. Modelrevisie, sacrebleu-signatuur en manifesten staan in het bewijs; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-22",
+    "Synchronisatie: verschoven, drift, M&E-val, te weinig cues, knip en andere montage",
+    "Ontwikkelset: ToS-mov met TOS-nl verschoven +2500 ms en −1200 ms en drift 25 naar 23,976, tos-multiaudio met verschoven NL (M&E-spoor zxx), fragment van 120 s met 4 cues, geknipte variant (gat van 30 s). Bevroren testset: Pioneer One S01E01-mp4 met REDUX-EN +2500 ms en −1200 ms (waarheid REDUX), REFIX-EN en VODO.C-EN (andere montages: op tekst gekoppelde cues wijken mediaan 221,8 s en 311,4 s af van REDUX), Sintel ingebed dut verschoven (recept). Spraakreeks één keer per spoor (.npz in /cache); één gedeelde testspecificatie met F4 (assertie per functie)",
+    "Testset: mediaan ≤ 100 ms en p95 ≤ 250 ms voor REDUX en Sintel; REFIX en VODO.C geven andere_versie of niet_te_synchroniseren en worden nooit gepubliceerd (score ≤ 0 afgekeurd). Ontwikkelset: M&E-spoor uitgesloten en dialoogspoor ≤ 100 ms; fragment niet_te_synchroniseren; knip vermoedelijke_knip en te_beoordelen. Bij hergebruik van de spraakreeks 0 extra gelezen bytes uit het mediabestand; corpus ongewijzigd (sha256 en mtime van de map); standaard Jellyfin laat alle afwijkingen ongewijzigd; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-23",
+    "Voorrang menselijke NL en wisselwerking met MediaGuard",
+    "Echte MediaGuard-app in-process met viewer-sleutel en gevulde subtitle_status (searched_at nu, 80 u geleden, leeg); mediaserver/status met source bazarr en null; policy nl_subtitles_wanted true en false; daarna een menselijke .nl.srt in een schrijfbare kopie van de testbibliotheek (simulatie van MediaGuard); verder MediaGuard onbereikbaar, 401 en 429, en een operator- en een adminsleutel",
+    "Geen vertaling vóór searched_at + 72 u (wel op gebruikersverzoek) en geen vertaling bij nl_subtitles_wanted = false; na de menselijke .nl.srt is de machinevertaling binnen één scan verborgen (hoofdkopie bewaard, event media.subtitle.superseded); MediaGuard has_nl() blijft onwaar zolang alleen de machinevertaling bestaat; operator- en adminsleutel geweigerd en niet opgeslagen; de netwerklog bevat alleen routes uit de witte lijst (geen operatorroute, geen Bazarr- of OpenSubtitles-aanroep); 'eerst menselijk zoeken' is alleen een deeplink; logs en subtitles.db bevatten geen velden buiten de veldenwitte lijst; bij 401 of onbereikbaar: MediaGuard onbekend plus incident, en afspelen blijft werken; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-24",
+    "Gegevensbescherming, publicatietransactie, spoorkeuzes en terug naar stock",
+    "Differentiële controle-run: hetzelfde gescripte scenario (3 gebruikers op tos-multiaudio met onthouden audio- en ondertitelkeuze; publiceren, corrigeren, verbergen) op stock en op Jelly Leon, op dezelfde 12.x-digest; vergelijking van de verschillenverzameling per tabel en kolom (UserData, BaseItems, MediaStreamInfos, MediaSegments, TrickplayInfos, KeyframeData, Chapters, Users, Permissions, Preferences, DisplayPreferences); RememberedSelectionPolicy hold, reset en remap; een voortgangsmelding tijdens de publicatie; een testconsumer die UserDataSaved registreert; SaveSubtitlesWithMedia = true; metadatapad in een mediamap; schrijfbaar gemounte bibliotheek; bestand zonder token en bestand met afwijkende sha256 in de metadatamap; 60 wezen tegelijk; module uit, Alles depubliceren en plugin verwijderen, daarna stock op dezelfde config; een testgebruiker verwijderen; schemamigratie van subtitles.db met een geforceerde fout; upstream-contracttests op de 12.x-runtime",
+    "0 gewijzigde bytes en 0 nieuwe bestanden in mediamappen; alleen toegestane verschillen (MediaStreamInfos en refreshkolommen van gepubliceerde items; UserData alleen de twee indexvelden van gejournaliseerde paren in reset of remap); 0 verschillen in MediaSegments, TrickplayInfos, KeyframeData en Chapters; bij hold 0 UserData-wijzigingen; de voortgangsmelding blijft volledig behouden; reset geeft 0 UserDataSaved-events; remap geeft events met ongewijzigde Played, PlayCount, positie en LastPlayedDate; storage_blocked en status rood waar verwacht; vreemde bestanden niet verwijderd maar incident; 60 wezen bevriezen het opruimen; na depubliceren en verwijderen toont stock geen Machinevertaling-spoor en blijven de hoofdkopieën; na het verwijderen van de gebruiker 0 rijen met diens GUID in subtitles.db; mislukte migratie zet de back-up terug, F3 wordt degraded en de server speelt af; de UPSTREAM_GEDRAG-contracttests slagen; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-25",
+    "Clientmatrix: gemarkeerd spoor zichtbaar, juiste standaardkeuze, geen inbranden",
+    "Gepubliceerde machinevertaling (SRT) en gesynchroniseerde kopie op ToS, met en zonder menselijke NL (stand keep). Twee rollen apart: (1) stock-clients: stock-jellyfin-web uit de stock-image, de Android TV-emulator API 34 (officiële APK en eigen ID) en de native speler van Android; (2) Jelly Leon-web-clients: jelly-leon-web in Playwright Chromium 153, Firefox 155 en WebKit 26.6 (beide layouts), de officiële Android-app en de eigen-ID-build op de phone-emulator API 35 en een tablet-AVD, en desktop 2.0.0 onder Xvfb (afhankelijk van de gemeenschappelijke desktopspike). UA-simulatie webOS en Tizen in Playwright; loggende proxy voor PlaybackInfo; offline download op Android",
+    "In elke geteste client is het spoor te kiezen en draagt het Machinevertaling in de naam; PlayMethod en TranscodeReasons zijn met en zonder het spoor gelijk; de standaardkeuze per client is vastgelegd en de gesynchroniseerde kopie is nooit de standaard; kiest een client in stand keep de machinevertaling vóór een menselijke NL, dan geeft W4 een waarschuwing; de cue-timing (5 cues ± 200 ms) is alleen in web gemeten via DOM textTracks; de download bevat het spoor waar de client externe ondertitels downloadt; desktop Geblokkeerd als de spike faalt; webOS/Tizen gelabeld als UA-simulatie zonder echte decoder; Swiftfin NIET GEVALIDEERD (Mac/Xcode); Kodi/JellyCon, Findroid, Infuse, Chromecast en DLNA NIET GEVALIDEERD (hardware); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-26",
+    "Acceptatie op de echte NAS en echte apparaten",
+    "Echte NAS met Jelly Leon 12.x (D-gegevens ingevuld), de echte bibliotheek alleen-lezen gemount, MediaGuard en Bazarr op de NAS, echte tv's, telefoons en tablets volgens D15, Swiftfin op iOS/tvOS; kalibratie op echte paren (items met Engelse en menselijke Nederlandse ondertitels: Engels vertalen en vergelijken met de menselijke NL); budget op de NAS-CPU met de A310 en UHD 770 onaangeroerd; wandtijd en gelezen bytes op de echte pool; het nachtvenster van MediaGuard",
+    "Status Geblokkeerd tot een echte run; validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode). Bij uitvoering: dezelfde metrieken als JLT-20, -21, -22, -24, -25 en -28 op echte data; 0 gewijzigde bytes in de bibliotheek; GPU-gebruik door F3 = 0; F3 pauzeert bij elke actieve sessie; MediaGuard en Bazarr blijven de enige ondertiteldownloaders; de achterstandsschatting in W4 klopt binnen een factor 2 met de gemeten doorlooptijd"
+  ],
+  [
+    "JLT-27",
+    "Negatieve en veiligheidstests",
+    "TranslationEnabled = false; mt-app onbereikbaar; EngineUrl naar een publieke host, een 100.64/10-adres en een host die redirect; NC-model in de allowlist (buildtest); artefact met een verkeerde sha256; brontekst met <script>, <img onerror>, misbruik van ASS-overrides en de tekst 'negeer alle instructies' via de Ollama-route; anoniem, gewone gebruiker, kinderprofiel en beheerder op alle routes; Hub-JWT zonder pin, met onbekende kid, verlopen, zonder jti en als replay; padtraversal in itemId en bestandsnaam; herhaalde Idempotency-Key met een andere body; body > 1 MiB; GET /Plugins/{id}/Configuration als beheerder; anonieme GET op …/Subtitles/{index}/Stream.srt",
+    "501 capability_unavailable als vertalen uit staat (sync en QC werken); 503 met Retry-After bij een onbereikbare motor, nooit gesimuleerd succes; publieke host, 100.64/10, redirect en NC-model geweigerd; verkeerde sha256 installeert niets; injectie wordt platte tekst, zonder script in de webweergave; rollen geven 401/403/404 zoals in §5.1; Hub-JWT-fouten geven 401 met de reden uit contract §4.7, rol kind 403; traversal geeft 422 of 404 zonder bestandstoegang; foutcodes volgens de gemeenschappelijke catalogus (o.a. 422 idempotency_key_reused); 413 payload_too_large per route, en vóór auth alleen als de gemeenschappelijke spike dat bewijst; de pluginconfiguratie bevat geen MediaGuard-sleutel en geen mt-geheim; de uitkomst van de anonieme ondertitelroute wordt vastgelegd voor B03-010; de netwerklog toont geen cloud- of betaalde API; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-28",
+    "Prestatie, budget en pauzeregels",
+    "Ontwikkelmachine (Core Ultra 9 185H) in een exclusief meetslot (stack.lock, geen docker-build of Gradle tegelijk; loadavg per run vastgelegd; ≥ 3 runs, afwisselend stock en Jelly Leon); ToS (12 min), Sintel (15 min), Pioneer E01–E06 (~45 min) en één groot testbestand van ≤ 20 GB (recept met -stream_loop en stream-copy, na de test verwijderd) door sync en vertaling; meting met /usr/bin/time, /proc/<pid>/io en cgroup-statistiek; tegelijk een Direct Play-sessie, een QSV-transcode op de iGPU en een CPU-transcode; controle van de ffmpeg- en ffsubsync-argumenten; de Ollama-route alleen als die is aangezet",
+    "Vertalen + sync ≤ 2 CPU-minuten per uur speelduur (nulmeting: vertaling 20,4 s CPU voor E01; spraakreeks 5–6 s wandtijd per aflevering) en ≤ 1 GiB RSS per taak; wandtijd en gelezen bytes per item per functie gerapporteerd, met gelezen bytes ≤ 2,1 × de bestandsgrootte per item; 0 GPU-gebruik door F3 (geen -hwaccel); F3 pauzeert bij elke actieve sessie (Direct Play, HW- en CPU-transcode) en hervat daarna; hooguit 1 zware batchtaak tegelijk volgens B03-018; de Ollama-route ≤ 10 CPU-minuten per uur speelduur, anders vervalt ze; een run boven de lastgrens telt als ongeldig; validatie Sim-geslaagd of Sim-mislukt; NAS NIET GEVALIDEERD (hardware)"
+  ],
+  [
+    "JLT-29",
+    "Correctie, beoordeling, vertaalgeheugen en leren",
+    "Pioneer One S01E02 en S01E03 met hun 'Previously on'-recaps (het aantal identieke broncues tussen de afleveringen wordt vooraf geteld; is dat 0, dan een synthetische herhaling); een ondertitelbeheerder corrigeert cues en 2× dezelfde term; een tweede beheerder wijzigt tegelijk; twee gebruikers geven slecht; een revisie wordt hersteld; 25 machinerevisies op één vertaling; een testgebruiker met feedback en correcties wordt verwijderd",
+    "Nieuwe revisie met QC en republicatie via de transactie; een gelijktijdige wijziging geeft 412 zonder verlies; identieke broncues die in S01E02 zijn gecorrigeerd, komen in S01E03 uit het vertaalgeheugen; het woordenlijstvoorstel wordt pas na bevestiging toegepast; 2× slecht geeft te_beoordelen en event media.subtitle.review_requested; herstel maakt een nieuwe revisie; elke menselijke revisie blijft bestaan; na het verwijderen van de gebruiker is diens feedback weg en staat de auteur gepseudonimiseerd; events bevatten geen ondertiteltekst; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-30",
+    "Beschadigd en afgekapt beeld met tijdcode (ontwikkel- en testset)",
+    "Jelly Leon 12.x + module Quality, corpus read-only. Ontwikkelset: sintel-60s-referentie, -beschadigd-midden, -afgekapt-70pct, afgekapte mp4. Testset T-QC uit de corpusgenerator (bevroren sha256-manifest; ≥ 30 varianten per codecklasse H.264/HEVC/AV1/MPEG-2/VP9/MPEG-4 in mkv/mp4/ts/webm/avi, omvang 4–256 KiB, andere seeds en posities; grondwaarheid 'effectief beschadigd' via framemd5 tegen de referentie). Daarna dezelfde ontwikkelbestanden geforceerd via VA-API/QSV op de iGPU. Stock 12.x op dezelfde tag en digest als controle",
+    "Ontwikkelset: decode_error 'hoog' met tijdcode ±1 s na lokalisatie en gereproduceerd; truncated (45,6 s van 62,1 s); container_error. Testset: recall per codecklasse met n en Wilson-95%-interval, ondergrens ≥ 0,80 (anders smoke-gate); tijdcode ±1 s bij ≥ 90 % van de gevonden gevallen; niet-effectieve varianten apart geteld. GPU-decode meldt de fout niet en telt nooit als 'in orde'; stock meldt 0. Validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-31",
+    "Audiofouten (ontwikkel- en testset)",
+    "Ontwikkelset: sintel-60s-audio-stilte-25-33s, -audio-clipping-40-43s, -zonder-audio. Recepten (corpusgenerator, testset ≥ 20 per klasse met andere posities, lengtes en codecs AC3/E-AC3/AAC/FLAC/Opus): stil centerkanaal, audio stopt vroeg, beschadigde audio (byte-beschadiging in audiopakketten), stilte en clipping op andere posities",
+    "Stilte → audio_dropout met randen ±0,25 s; clipping → audio_clipping venster ±1 s; zonder audio → no_audio_track 'hoog'; centerkanaal → channel_silent (LFE nooit); audio_shorter_than_video; beschadigde audio → decode_error in de audiostream; recall per klasse met n en Wilson-interval (ondergrens ≥ 0,70, anders smoke-gate); MG audio/inspect-oordeel zichtbaar als bron MediaGuard"
+  ],
+  [
+    "JLT-32",
+    "Verkeerde talen en ontbrekend dialoogspoor",
+    "Corpus tos-120s-verkeerde-taaltags en tos-120s-me-als-hoofdspoor plus testvarianten uit de corpusgenerator; run zonder STT (P4) en met lokale STT-app (P5, eigen container, CPU); tags vergeleken via MG audio/normalize; toolkit van de gemeenschappelijke werker aan en uit",
+    "Zonder STT: NL-tekst getagd eng → subtitle_language_mismatch; Engelse audio getagd nld → 'onbekend' (stt_disabled), nooit 'in orde'; M&E-hoofdspoor → hooguit 'aanwijzing'; toolkit uit → 'onbekend' (toolkit_unavailable). Met STT: audio_language_mismatch en dialogue_missing_in_default_track; geen audio of transcript bewaard; homevideos niet naar STT"
+  ],
+  [
+    "JLT-33",
+    "Ondertitelsynchronisatie via de ene syncmeter",
+    "ToS met TOS-nl.srt (referentie), TOS-nl +2500 ms, −1200 ms en drift 25→23,976 (ontwikkelset); testset: verschoven Sintel-varianten (ingebed eng/dut, AC3) en Pioneer One S01E01 met REDUX/REFIX/VODO.C (echte offsets ≈ 1,16 s en ≈ 89,6 s); F3 subtitle.sync in meetmodus; container zonder netwerk",
+    "Referentie geen bevinding; offsets → subtitle_offset met fout ≤ 0,10 s; drift → factor 0,959 ±0,005; offset > 30 s → subtitle_wrong_version als aanwijzing zonder automatische correctie; beeldondertitel → 'onbekend'; recall per klasse met n en interval; originele ondertitelbestanden ongewijzigd (sha256); geen tweede ffsubsync-installatie in de image (SBOM)"
+  ],
+  [
+    "JLT-34",
+    "Valse positieven en leren van feedback",
+    "N-QC (13 gave bestanden + Sintel, ToS, Pioneer One S01E01/E05 volledig) en N-QC-rommelig (TS halverwege gestart, remux met tijdstempelgat, interlaced MPEG-2, VFR H.264, gefragmenteerde MP4, later meer uit de corpusgenerator); recepten bevroren 20–35 s en zwart midden; daarna feedback 'onterecht' met bereik serie en herscan; gesimuleerde lage detectorprecisie",
+    "0 bevindingen 'hoog'/'middel' op N-QC en N-QC-rommelig (bovengrens van het FP-percentage met Wilson-interval vermeld); regels van de uitvoerkant (null-muxer) worden nooit decode_error; TS-instapfouten alleen 'aanwijzing'; zwart/bevroren/stilte alleen 'aanwijzing' en geen incident; onderdrukking werkt bij herscan; detector zakt naar 'aanwijzing' bij precisie < 0,8 na ≥ 20 labels; precisie op echte bibliotheken NIET GEVALIDEERD tot JLT-39"
+  ],
+  [
+    "JLT-35",
+    "Gegevensbescherming, alleen lezen en terug naar stock",
+    "Differentiële controle-run: hetzelfde gescripte scenario (scan, afspelen, feedback, export/import) op stock 12.x en op Jelly Leon met Quality aan, media read-only; vergelijking per tabel/kolom (BaseItems, MediaStreamInfos, UserData, Users, Permissions, Preferences, DisplayPreferences, MediaSegments, ActivityLogs); sha256 van het hele corpus vóór en na; analyzer verboden API's per namespace; schrijfpoging naar een bibliotheekpad in de opdrachtbouwer; mediamount schrijfbaar gekoppeld; geforceerde migratiefout; UserDeleted; module uit en plugin verwijderd",
+    "Verschillenverzameling Jelly Leon − stock leeg buiten de toegestane lijst (voor F4 leeg); corpus ongewijzigd en find -newer op de mediamappen leeg; analyzer schoon; opdrachtbouwer weigert het uitvoerpad; schrijfbare mount → status down en 0 jobs; mislukte migratie laat back-up en oude DB intact; import geeft gelijke tellingen en etags; na UserDeleted 0 rijen met die GUID; module uit → upstreamgedrag; plugin verwijderd → alleen de gedocumenteerde restanten; events zonder namen, titels, paden of tokens"
+  ],
+  [
+    "JLT-36",
+    "Budget en live-prioriteit binnen de globale planner",
+    "Ontwikkelmachine met meetprotocol (exclusief meetslot onder stack.lock, geen docker-build of Gradle tegelijk, loadavg vastgelegd, ≥ 3 runs, A/B afwisselend): niveau-2-scan van 4K-HEVC en Sintel terwijl een web-sessie (Chromium) een iGPU-transcode start; gesimuleerde MG app/status met bezette CPU-baan, alleen bezette GPU-baan (scenario MG-nachtvenster actief) en actieve noodstop; gesimuleerde EIO bij 3 bestanden; buiten het venster; gecombineerde belastingtest van het gemeenschappelijke werkpakket met F4 aan",
+    "Scan stopt ≤ 5 s na PlaybackStart en hervat na 10 min rust; transcode-fps ≤ 5 % lager dan zonder scan; bezette MG-CPU-baan of noodstop → geen nieuwe zware F4-taak; alleen GPU-baan bezet → CPU-scan ≤ 2 threads met gemeten doorvoer; stroomonderbreker stopt alles en geeft media.storage.read_failed; F4 opent /dev/dri nooit; extra RSS ≤ 0,5 GiB; geen OOM in de gecombineerde test; run onder te hoge last = ongeldig. Validatie Sim-geslaagd/Sim-mislukt (opmerking: Intel-iGPU-getest (ontwikkelmachine))"
+  ],
+  [
+    "JLT-37",
+    "MediaGuard-integratie zonder dubbel werk en zonder mutaties",
+    "Echte MG-app (container of in-process) met viewer-sleutel achter een loggende proxy; varianten: operator-sleutel, MG 401, 429, noodstop, dubbelzinnige koppeling, quarantaine-item met 'volledige-decode' passed, wanted-item aanwezig, geen route; gesimuleerde recovery.committed met gave en met opnieuw beschadigde nieuwe versie",
+    "0 muterende MG-aanroepen (alleen GET + audio/inspect); operator-sleutel geweigerd en niet opgeslagen; 401 → connector unknown + incident; 429 Retry-After gerespecteerd; noodstop → 409 emergency_stop_active; MG-vrijgavecontrole met uitkomst passed → geen tweede volledige decode; velden sessions/hold.reason/actions/tests/encoder.running niet in logs of DB; herstelverzoek → handmatig_in_mediaguard met deeplink (contract_not_allowed); gave nieuwe versie → readback_ok; beschadigde versie → readback_mislukt, heropend en incident; MG-mediaserverclient (TV_PROFILE) werkt ongewijzigd tegen Jelly Leon met F4"
+  ],
+  [
+    "JLT-38",
+    "Clientmatrix, Hub-kaart en stock-compatibiliteit",
+    "jelly-leon-web 12.x in Chromium 153, Firefox 155 en WebKit 26.6 (Modern en Legacy, 360/1440 px); UA-simulatie webOS en Tizen; officiële Android-app en eigen Android-app (beide Jelly Leon-web-client) in phone- (API 35) en tablet-emulator; Android TV-emulator API 34 (native, stock-client); desktop 2.0.0 onder Xvfb (na de gezamenlijke desktopspike); stock jellyfin-web uit de stock-image tegen de Jelly Leon-server; Hub-UI Playwright 360/390/768/1440 licht/donker",
+    "Beheerpagina en label met alle toestanden; niet-beheerder 403, onzichtbaar item 404 zonder label; Android TV en stock-apps ongewijzigd (inloggen + afspelen); stock-web: pluginpagina werkt, geen label; desktop: Geblokkeerd als de spike faalt; Hub-kaart 'Onbekend' zonder pin, nooit groen, zonder titels of beelden; Swiftfin/Safari/tvOS NIET GEVALIDEERD (Mac/Xcode); Kodi/JellyCon, Findroid, Infuse, Chromecast en DLNA NIET GEVALIDEERD (hardware)"
+  ],
+  [
+    "JLT-39",
+    "Validatie op de echte NAS-bibliotheek en echte apparaten",
+    "Jelly Leon op de NAS (D01–D18 ingevuld, D08 gemeten) met de echte bibliotheek: niveau 0/1/1,5 voor alles, niveau 2/3 voor nieuwe bestanden binnen het venster van de globale planner; tegelijk MG-AV1 op de A310 en een live-transcode; ZFS-scrub buiten het venster; echte tv's en telefoons voor het label",
+    "Doorvoer, CPU en gelezen bytes per uur media vastgelegd; geen haperen van live afspelen en geen vertraging van MG-AV1 boven de afgesproken grens; bevindingen steekproefsgewijs door de beheerder beoordeeld (precisie per detector met interval); 0 gewijzigde mediabestanden; status Geblokkeerd, validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware) tot echt uitgevoerd"
+  ],
+  [
+    "JLT-40",
+    "Winstmeting apparaatprofielen tegen standaard Jellyfin 12.x (twee baselines)",
+    "Harnas B03-060 in een exclusief meetslot (stack.lock, ≥ 3 runs, stock en Jelly Leon afwisselend, loadavg per run): corpus (25 bronitems uit de A5-matrix, ToS en BBB apart, 11 formaatgevallen, ASS-recept) op Chromium/Firefox/WebKit, Tizen- en webOS-UA-simulatie, Android-telefoon-, -tablet- en Android TV-emulator en desktop (Xvfb, als de gemeenschappelijke desktop-spike slaagt); baseline (a) stock standaard en (b) stock met handmatig ingestelde QSV, tonemapping en DTS/TrueHD-instellingen, op exact dezelfde 12.x-tag en -digest als de fork (12.4 = voormeting); daarna Jelly Leon met F5 aan; elk item twee keer starten; per client de rol vastleggen",
+    "Per client: onterechte Direct Plays bij de tweede start = 0; Direct Play-ratio ≥ baseline (b); onnodige transcodes ≤ baseline (b); 0 ingebrande tekstondertitels; officiële apps zonder opt-in gelijk aan de baseline; rapport K1–K9 met beide baselines naast Jelly Leon, n en Wilson-interval; runs onder te hoge last ongeldig; validatie Sim-geslaagd/Sim-mislukt; NAS en echte apparaten niet in deze test"
+  ],
+  [
+    "JLT-41",
+    "Leren na een mislukte Direct Play (gecontroleerde fouten)",
+    "Testset (bevroren sha256-manifest, los van de devset): ≥ 5 combinaties met een Playwright-init-script dat canPlayType/MediaSource.isTypeSupported laat liegen in Chromium en Firefox, de Android-telefoonemulator met een geforceerd profiel (AC3/E-AC3/DTS als Direct Play), en WebKit/Sintel 1080p mkv (AC3 5.1) plus de kopie met ASS-spoor; F5 aan; dezelfde proef met de webmodule uit (config.json) en op stock als controle; tijd tot spelend beeld met bovengrens 60 s",
+    "Eerste start: stall gedetecteerd na 8 s en terugval speelt binnen ≤ 12 s (baseline gemeten of '> 60 s'); beperkende regel actief; tweede start kiest direct remux/transcode zonder mislukte poging en zonder ingebrande ASS; met module uit en op stock: geen leren; rapport met n en Wilson-interval (bij n < 20 smoke-gate); validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-42",
+    "Actieve probe en bevestiging van een verruimende regel (voorwaardelijk)",
+    "Voorwaardelijk op spike F5-S2(c) (CDP Emulation.setEmulatedMedia voor dynamic-range) en, voor het Android TV-deel, op de optionele JLC-patch: Chromium met nagebootste HDR-media-features en een nep-probe in unit-tests; Android TV-emulator met de JLC-patch stuurt media_capabilities_report; import van een export met verruimende regels",
+    "Proberapport schema-geldig en ≤ 2 s; verruimende regel blijft 'voorgesteld' tot een gelukte bevestigingsproef én bevestiging; afwijzen = nooit toegepast; import zet verruimende regels op 'voorgesteld'; nieuwe hoofdversie van de client → 'te herbevestigen'; ontbreekt een voorwaarde, dan is dat deel Geblokkeerd met reden; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-43",
+    "Hardwareversnelling-assistent als A/B tegen stock met handmatige QSV",
+    "Ontwikkelmachine, exclusief meetslot, ≥ 3 runs afwisselend: (b) stock 12.x met handmatig ingestelde QSV (B5b) tegenover Jelly Leon 12.x met standaardconfiguratie waarop de assistent wordt uitgevoerd, in een container met --device /dev/dri en --group-add render-gid; topologie single_other, nodetoewijzing van de ontwikkelmachine bevestigen (testwaarde, geen D08-waarde), meting per werkklasse, toepassen, DV-profiel-8.1- en 4K-HEVC-HDR10-clip afspelen in Chromium, daarna terugzetten",
+    "TranscodingInfo.HardwareAccelerationType = qsv; snelheid ≥ baseline (b) − 5 % en CPU ≤ baseline (b) + 10 % per 1080p-stream; 0 handmatige encoding.xml-velden; terugzetten → encoding.xml byte-gelijk aan de back-up (zonder EncoderAppPathDisplay); zonder D08-bevestiging 409 d08_unconfirmed; meting per werkklasse met label in capabilities; validatie Sim-geslaagd/Sim-mislukt met opmerking Intel-iGPU-getest (ontwikkelmachine)"
+  ],
+  [
+    "JLT-44",
+    "Lanekeuze, sessiesleutel, terugval en fail-safe van de lanewrapper",
+    "Alle topologieën gesimuleerd (two_gpu met echte renderD128 + afwezige/defecte tweede node, a310_only, uhd770_only, none); NativeAOT-wrapper: 200 starts voor de starttijd, PID-vergelijking met TranscodingJob.Process.Id, stop met q en met Kill(); seek tijdens een transcode; planner-socket stoppen; AV1-uitvoer aanvragen; alle nodes vol; golden ffmpeg-regels per nodeklasse door de wrapper halen; imagetest op eigenaar en rechten; software-pad binnen --cpus 4 en RSS/CPU per live-transcodeklasse meten; exclusief meetslot",
+    "Extra starttijd mediaan ≤ 50 ms; zelfde PID, geen wees na stop; seek houdt de node; AV1-encode nooit op een node zonder AV1-encode; defecte node → volgende sessie binnen 15 s op een andere geschikte node, geen crashlus; alle nodes vol → upstreamgedrag, event media.gpu_lane.saturated, 0 geweigerde starts; socket weg → ongewijzigd upstreamgedrag zonder afspeelfout; golden files groen; wrapperbestanden van root en niet schrijfbaar voor 568; software-fps binnen --cpus 4 gemeten (B6b); validatie Sim-geslaagd/Sim-mislukt; echte twee-GPU-opstelling NIET GEVALIDEERD (hardware)"
+  ],
+  [
+    "JLT-45",
+    "Gedeeld GPU-budget met MediaGuard (alleen lezen, witte lijst)",
+    "MediaGuard-simulator voor GET /api/v1/app/status, /encoding/resources, /encoding/capabilities en /mediaserver/status (vol/leeg/gepauzeerd/onbereikbaar/andere node; antwoorden mét titels en gebruikers in reason_nl, running[] en sessions), in topologie two_gpu en a310_only; meetroute 'MediaGuard zelf gepauzeerd' (simulator meldt running = 0) en 'met MediaGuard-last'; daarna contract tegen de echte MediaGuard-image met een viewersleutel en met een operator-sleutel",
+    "Geen sessie naar een node boven zijn capaciteit zolang er een geschikte node met ruimte is; alle nodes vol → upstreamgedrag + event, 0 geweigerde starts; onbereikbaar → 'onbekend', A310-klasse alleen overloop, afspelen werkt; andere node → degraded + media.gpu_budget.conflict; operator-sleutel geweigerd en niet opgeslagen; /mediaserver/status hooguit 1× per uur; geen titel of gebruikersnaam uit MediaGuard in logs, devices.db of events; meting zonder pauze krijgt het label 'met MG-last'; geen enkele muterende MG-aanroep; validatie Sim-geslaagd/Sim-mislukt; echte A310 en UHD 770: NIET GEVALIDEERD (hardware) tot JLT-49"
+  ],
+  [
+    "JLT-46",
+    "Stock-clients, officiële apps en MediaGuard-afspeeltest ongewijzigd",
+    "Per rol apart: stock-web (jellyfin-web uit de stock-image, controle), officiële Android TV-APK, native ExoPlayer-speler én webspeler van de officiële Android-APK, officiële desktopapp (als de desktop-spike slaagt), MediaGuard judge_playback met TV_PROFILE, PlaybackInfo-integratietest met geladen plugin, eigenschapstest I1 over 19 DeviceProfile-JSON's × 33 MediaSourceInfo-JSON's; standen plugin uit / aan / aan + opt-in voor een ander apparaat; in alle runs een gelijke encoding.xml; vergeleken met de vaste veldenlijst (zonder PlaySessionId, tokens en DeviceId)",
+    "Identieke PlaybackInfo-beslissingen in alle drie standen voor alle niet-gekozen apparaten, inclusief de officiële Android-app zonder opt-in; MediaGuard-oordeel gelijk; I1 houdt; OpenAPI-diff alleen additief (/media/v1, /connector/v1); derden-clients met legacy-headers: afhankelijk van het P4-0-besluit, niet beweerd; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-47",
+    "HDR/DV, audio en ondertitels per apparaat",
+    "Corpus: DV-profiel 5/8.1/8.4, HDR10 HEVC/AV1, foutieve HLG-tag, Sintel AC3 5.1 en 10 SRT, ToS multi-audio + NL/EN-SRT, ASS-recept; clients met SDR- en (nagebootst) HDR-scherm; maxChannelCount 2 en 6; Jelly Leon-web en een officiële app met en zonder opt-in",
+    "DV-profiel 5 → OpenCL-tonemapping of DV-direct, nooit VPP; geen HDR zonder tonemapping naar een bevestigd SDR-scherm zonder client-tonemapping; kanalen behouden tot maxChannelCount; tekstondertitels 0× ingebrand; elk afwijkend pad heeft een label met NL-reden; officiële app zonder opt-in: label wel, afspeelbeslissing gelijk aan stock; PGS/VobSub: Geblokkeerd tot er een testbestand is; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-48",
+    "Negatief, veiligheid, prestatie, gegevensbescherming en terug naar stock",
+    "Zonder token, ander apparaat, kind, Hub zonder pin, Hub-rol kind, Hub met group_by=device, ontbrekende/hergebruikte Idempotency-Key, If-Match-mismatch, probe > 64 KiB en > 1 MiB, ongeldige JSON, socketrechten, import met verruimende regels; PlaybackInfo-latentie met/zonder plugin in een exclusief meetslot; differentiële controle-run (stock tegen Jelly Leon) over installeren, gebruiken, migreren, uitschakelen, verwijderen en terug naar de stock-image, met sha256sum -c van de mediamap; testgebruiker verwijderen; 24-uursopruiming van item_id; gesimuleerde massale verdwijning van apparaten; export controleren; logscan op titels uit het corpus",
+    "400/401 not_linked/403/422 idempotency_key_reused/412/413 (per route)/422 validation_error/429 met contractfoutvorm; socket alleen voor uid 568; PlaybackInfo p95-overhead ≤ 20 ms; in jellyfin.db geen verschil buiten de controle-run, daarbuiten alleen devices.db, pluginconfiguratie, geheimenmap, /run/jelly-leon en (na toepassen) encoding.xml; media identiek; 0 rijen met GUID of HMAC van de verwijderde gebruiker; geen item_id ouder dan 24 uur; stroomonderbreker bevriest en meldt degraded; export zonder ruwe uitkomsten, feedbacktekst of geheimen; import zet verruimende regels op voorgesteld; na elke uitzet- en verwijderstap speelt alles en zijn alleen de gedocumenteerde restanten aanwezig; geen titels in logs of events; validatie Sim-geslaagd/Sim-mislukt"
+  ],
+  [
+    "JLT-49",
+    "Echte NAS en echte apparaten",
+    "NAS met A310 + UHD 770 (D08 ingevuld; topologie vastgesteld; PCI-slot ↔ renderD na een herstart gecontroleerd), meting per werkklasse met MediaGuard zelf gepauzeerd én met MediaGuard-last, MediaGuard die AV1 encodeert, gecombineerde belasting met de andere B03-modules, echte tv's/telefoons/tablets/streamingboxen uit D15 (incl. DV- en passthroughketen via receiver), tv-browsers, Swiftfin op iOS/tvOS",
+    "Acceptatie B03-004 en B03-005 (inclusief aanvullingen) op de echte hardware; capaciteit per werkklasse gemeten; tot uitvoering: status Geblokkeerd, validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode)"
+  ],
+  [
+    "JLT-50",
+    "Segmentdetectie aantoonbaar beter dan stock Jellyfin 12.x (standaard én met Intro Skipper)",
+    "Bevroren testset (B03-070; devset uitgesloten; sha256-manifest), Pioneer One S01E01–E06 alleen met bevestigde labels; drie instanties op dezelfde 12.x-tag en -digest als de fork: stock standaard, stock + Intro Skipper ongewijzigd (standaard en ruimer venster; versie volgens spike S-IS), Jelly Leon met F6; harnas leest de kandidaatset via /media/v1/segments/{itemId}?view=candidate en op een testinstantie in publicatiemodus GET /MediaSegments; exclusief meetslot, ≥ 3 runs, loadavg vastgelegd",
+    "Stock standaard: 0 segmenten. Jelly Leon, per type n en Wilson-95 %-interval: Intro ondergrens precisie ≥ 0,90 / recall ≥ 0,80, grensfout p95 ≤ 1,5 s; Outro ≥ 0,90 / ≥ 0,75, eindfout p95 ≤ 2,0 s; Recap ≥ 0,85 / ≥ 0,65; Preview ≥ 0,80 / ≥ 0,50; gepaarde bootstrap van het F1-verschil met Intro Skipper: ondergrens ≥ −0,05 per type en > 0 op midden-intro, seizoensvariant en recap; kandidaatset = gepubliceerde set; onder de streef-n 'smoke-gate (n = …)' zonder claim; zonder werkende Intro Skipper-versie dat deel Geblokkeerd; validatie Sim-geslaagd of Sim-mislukt; eigen bibliotheek NIET GEVALIDEERD (echte NAS)"
+  ],
+  [
+    "JLT-51",
+    "Post-credit-scènes, mid-credit-scènes en previews worden nooit overgeslagen",
+    "Bevroren testset met ≥ 30 beschermde scènes: Testserie-recepten, film met mid- en post-credit-scène, anime (preview na ED), varianten met lange zwarte pauze, mid-credit tussen twee aftitelingblokken en aftiteling met beeld ernaast; actie 'Overslaan' én 'Vragen om over te slaan' in Jelly Leon-web (Chromium/Firefox/WebKit), stock jellyfin-web, Android-emulator (fork-app en officiële app: webweergave én native speler), Android TV-emulator (fork-app en officiële app) en, als de Xvfb-spike slaagt, desktop; afspeelpositie na skip gemeten",
+    "0,0 s beschermde inhoud binnen enig gepubliceerd overslaanbaar segment (Wilson-bovengrens van het schendingspercentage vermeld, bij 0/30 ≈ 11 %); na 'Sla aftiteling over' ligt de positie tussen (scènestart − guard − 0,5 s) en de scènestart en speelt de scène; ook officiële apps en stock-web slaan haar niet over; geen enkel Unknown-segment gepubliceerd; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-52",
+    "Intro's overal, varianten per seizoen/aflevering en anime-OP/ED",
+    "Bevroren testset: intro na 11:00 in een aflevering van 22 min, midden-intro, seizoensintro, anime E04 met de nieuwe OP van E03, PAL-versnelde en hergecodeerde variant, augmentatie (±6 dB, dialoog over de intro, ingekorte intro, snelheid ±2 %, andere mix), negatief geval zonder intro; partnerbegrenzing k = 8 tegen alle paren",
+    "Intro's, OP's en ED's gevonden met grensfout p95 ≤ 1,5 s en de recall-ondergrenzen van JLT-50; nieuwe OP als aparte variant zodra ≥ 2 afleveringen; PAL-variant via snelheidscompensatie; negatief geval 0 intro; geen intro-segment in een cold open; k = 8 vindt dezelfde families als alle paren; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-53",
+    "Samenvatting ('Previously on') herkend",
+    "Pioneer One S01E01–E06 met bevestigde labels (cues op 33,5 / 33,3 / 31,6 / 154,9 / 36,4 s in E02–E06), recap-recepten van de testset (ook na een cold open); met ondertitels uit, met ondertitels verschoven met +2,5 s en met een extra extern ondertitelspoor",
+    "Recap in E02–E06 binnen ±1 s van het label (E05 na cold open), E01 geen recap; zonder bevestigde labels dat deel Geblokkeerd (B8); zonder ondertitels recap via audio-overeenkomst met eerdere afleveringen; verschoven ondertitels verschuiven het segment niet; extra spoor verandert de cuebron niet; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-54",
+    "Handmatig corrigeren, overslaan-voorkeur en leren van bevestigde correcties",
+    "Editor corrigeert in de speler en op de beheerpagina de intro van 1 aflevering per variant (≥ 5 varianten van elk ≥ 4 afleveringen), daarna heranalyse; ook ongedaan maken, afwijzen, niet-editor, IsKid-profiel (correctie en melding), verouderde ETag, herhaalde Idempotency-Key; voorkeur per profiel zetten en op een tweede apparaat afspelen",
+    "Grenzen doorgegeven aan de overige leden (voorstel of toegepast volgens instelling), p95-grensfout −≥ 50 %; ongedaan maken herstelt de vorige versie; afgewezen fragment komt niet terug; 403/404/412 en idempotent herhaald resultaat; voorkeur geldt op het tweede apparaat zonder dat upstream-instellingen geschreven worden; correctie bij de volgende afspeelstart zichtbaar in stock-clients; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-55",
+    "Skipknoppen in de clientmatrix en overslaan onder SyncPlay",
+    "Aflevering met Intro, Recap en Outro; Jelly Leon-web in Chromium/Firefox/WebKit (Modern en Legacy) en met webOS-/Tizen-UA (UA-simulatie, geen echte decoder), stock jellyfin-web 12.x, Android-emulator telefoon en tablet-AVD (fork-app en officiële 2.7.x: webweergave en native speler, vóór en na het opslaan van de web-instellingen), Android TV-emulator (fork-app en officiële 0.19.x), desktop 2.0.0 onder Xvfb (voorwaardelijk op de spike); twee web-sessies in één SyncPlay-groep met Intro op 'Vragen' en op 'Overslaan' (tijdstempels van playing-events); fork-app-delen voorwaardelijk op de JLC-patches en de eigen-ID-build; Swiftfin niet uitvoerbaar",
+    "Jelly Leon-web en fork-apps: 'Sla intro over', 'Sla samenvatting over', 'Sla aftiteling over' op het juiste moment, andere talen upstream-tekst, standaard nooit automatisch overslaan; stock en officiële native speler: eigen teksten, geen crash, gedrag gedocumenteerd; in de SyncPlay-groep wordt 'Overslaan' 'Vragen', één groeps-seek, beide sessies binnen 500 ms van EndTicks, geen seek-lus; desktop loopt niet vast bij aftiteling tot het einde of is Geblokkeerd; Swiftfin NIET GEVALIDEERD (Mac/Xcode); echte tv's NIET GEVALIDEERD (hardware); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-56",
+    "Gegevensbescherming, persoonsgegevens en terug naar stock",
+    "Differentiële controle-run: hetzelfde gescripte scenario op stock (controle) en op Jelly Leon met F6, vergelijking van de verschillen per tabel en kolom van jellyfin.db (Users, UserData, BaseItems, MediaSegments, DisplayPreferences, ItemDisplayPreferences, CustomItemDisplayPreferences, Chapters, KeyframeData …); kopie-bibliotheek met (a) bestand vervangen met nieuwe mtime (zoals een MediaGuard-AV1-vervanging), (b) pad .mp4 → .mkv, (c) item verwijderd en teruggezet, (d) schemamigratie segments.db, (e) Jellyfin-back-up/restore plus plugin-export/import, (f) mediamount alleen-lezen en daarna schrijfbaar, (g) mount tijdelijk weg (massale wezen), (h) gebruiker verwijderd, (i) module uit en plugin verwijderd",
+    "Enige toegestane verschil met de controle: MediaSegments-rijen met de eigen provider-ID; (a) Jellyfin wist zelf de MediaSegments, correcties blijven en worden na heruitlijning opnieuw gepubliceerd of naar review gezet; (b)/(c) herkoppeld; (d) back-up vóór migratie, integriteitscontrole, terugzetten bij fout; (e) identieke set na import, export zonder gebruikers-GUID's en zonder meldingen; (f) 0 schrijfpogingen op media, bij een schrijfbare mount geen analyse en status rood; (g) opruimen bevroren, incident, 0 rijen gewist; (h) 0 rijen met de GUID in segments.db; (i) module uit → GET /MediaSegments gelijk aan stock, plugin verwijderd → alleen de gedocumenteerde restanten; segmenten van andere providers ongemoeid; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-57",
+    "Negatieve en robuustheidsgevallen",
+    "Kwaliteitsset (beschadigd midden, afgekapt 70 %, zonder audio, stilte), enige aflevering van een seizoen, film zonder aftiteling, ander audiospoor (nasynchronisatie), misvormde sintel_nl.srt, twee segmentproviders tegelijk (Intro Skipper + Jelly Leon) met correcties, metadata-refresh door F3/F4 ('Ververs dit item'), verboden-API-analyzer op de module, externe hints uit, lokale AI-app onbereikbaar",
+    "Geen crash en geen gok-segment (liever niets dan fout); beschadigd/afgekapt → analyse 'onvolledig', geen segment voorbij de leesbare duur; twee providers → health 'degraded' met uitleg en de segmenten van de andere provider blijven gelijk na onze correcties; een refresh zonder mtime-wijziging start geen F6-analyse; analyzer vindt 0 verboden aanroepen; 0 uitgaande verbindingen naar AniSkip, TheIntroDB of SkipMe.db; AI-app weg → klassieke terugval binnen 15 s; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-58",
+    "Rekenbudget, voorrang voor live kijken en koppeling met MediaGuard en Hub (ontwikkelmachine)",
+    "Ontwikkelmachine (Meteor Lake-iGPU, renderD128) met exclusief meetslot, ≥ 3 runs en loadavg in het bewijs: seizoensanalyse Pioneer One, de 4K HDR10-clip en een synthetisch seizoen van 200 afleveringen (alleen-fingerprint), via het CPU-pad en het VA-API-pad; optioneel groot bestand (≤ 20 GB, -stream_loop, alleen met ≥ 40 GB vrij, daarna verwijderd); tijdens de analyse start een web-sessie; MediaGuard-simulator (bezette baan, noodstop, 401, 429, sleutel met rol operator), recovery.committed-event; Hub-inbox, connector items/health, zonder pin",
+    "F6-taken binnen het plannerbudget; CPU-s per mediaseconde en gelezen bytes per item per codecklasse vastgelegd (label: bovengrens, NAS NIET GEVALIDEERD (hardware)); analyse pauzeert ≤ 5 s na sessiestart; uitlijning O(n·k) met gemeten bovengrens; geen GPU-decode op een baan die MediaGuard bezet of zonder D08; noodstop → geen nieuwe analyse; operator-sleutel → niet gebruikt (fail-closed); recovery.committed → heruitlijning rond de grenzen; events met drie segmenten geaccepteerd en gededupliceerd, alleen aantallen en ondoorzichtige ID's; zonder pin 401 not_linked; propose/apply 501 capability_unavailable; 0 MediaGuard-mutaties; validatie Sim-geslaagd of Sim-mislukt (opmerking: Intel-iGPU-getest op de ontwikkelmachine)"
+  ],
+  [
+    "JLT-59",
+    "Echte NAS en echte apparaten (F6)",
+    "Op de NAS na P4-0, Δ-MG-AUTH en D08/D15: analyse van een gelabelde steekproef uit de eigen bibliotheek (series, anime, films met post-credits; besluit B8 (BG-34)), doorlooptijd en gelezen bytes per codecklasse op de echte pool, decode per render-node (alleen UHD 770; nooit de A310 voor F6), gelijktijdig met MediaGuard-AV1 en live kijken; skipknoppen en post-credit-bescherming op de echte tv's, telefoons en tablets van het huishouden (D15) en, als beschikbaar, Swiftfin",
+    "Status Geblokkeerd tot een echte uitvoering; dezelfde drempels als JLT-50 en JLT-51 op de eigen steekproef; 0 post-credit-schendingen op echte apparaten; achterstandsschatting tegen de gemeten doorlooptijd gelegd; validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode)"
+  ],
+  [
+    "JLT-60",
+    "Upgrade 10.11.11 → 12.x met behoud van gebruikersgegevens (proefmigratie op een kopie)",
+    "Gevulde 10.11.11-datamap (corpus als bibliotheek, ≥ 5 gebruikers waaronder een kind en een gast, gezien-status, hervatpunten, favorieten, beoordelingen, onthouden spoorkeuzes, rechten, apparaten, metadata-overrides, afspeellijsten) → kopie → jelly-leon:12.x op dezelfde tag en digest als de forkbasis; vóór/na-rapport per gebruiker via de API plus de differentiële controle-run (B03-016); daarna stock-web en de Android-emulator: inloggen en hervatten",
+    "De upgrade slaagt zonder handwerk; elk verschil in het rapport is verklaard door een benoemde upstream-migratie (bijv. HarmonizeConflictingUserData, MergeDuplicatePeople, RemoveOrphanedUserPermissionsAndPreferences, MigrateRatingLevels) en staat ter goedkeuring klaar; 0 onverklaarde verschillen; clients hervatten op het juiste punt; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-61",
+    "Terugzetten na de upgrade en terug naar de stock-image",
+    "Na JLT-60: (a) terugzetten met ZFS-snapshot (in de simulatie een kopie van de map) plus de vorige image; (b) negatieve proef: alleen de vorige image op de gemigreerde DB; (c) zodra er modules zijn (bij elke module-oplevering en als eindproef in P6; niet in de P4-0-gate): Jelly Leon 12.x met alle dan bestaande modules aan → stock jellyfin/jellyfin:12.x op dezelfde datamap (plugin verwijderd); per module 'uit' en 'gegevens verwijderen'",
+    "(a) byte-gelijke jellyfin.db en afspelen werkt; (b) faalt zichtbaar met een duidelijke melding en zonder stille schade; (c) stock speelt Direct Play én transcode, hervatpunten en gezien-status gelijk, alleen de gedocumenteerde restanten per module (B03-013) aanwezig; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-62",
+    "Overname van een bestaande installatie: schrijfopties, mountcontrole en bestaande plugins",
+    "Bestaande stock-datamap met SaveSubtitlesWithMedia=true, SaveLocalMetadata=true, Intro Skipper geïnstalleerd en een ondertitel-downloadprovider; media eerst schrijfbaar en daarna alleen-lezen gekoppeld; overnamewizard van B03-015",
+    "Inventaris toont versie, plugins en schrijfopties; uitzetten gebeurt pas na bevestiging, met back-up, diff en readback; bij een schrijfbare mediamap status rood en geen batchmodule; sha256 van het hele corpus gelijk vóór en na; bestaande Intro Skipper-segmenten worden alleen met voorbeeld en na besluit als hint overgenomen; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-63",
+    "Compatibiliteit van stock-clients per rol met alle modules aan",
+    "Jelly Leon 12.x met alle modules aan tegen stock 12.x (zelfde digest); per rol apart: stock-web uit de stock-image (--webdir), officiële Android TV-APK en het native ExoPlayer-pad van de officiële Android-APK (emulator), de webweergave van de officiële Android-app, desktop (alleen na een geslaagde spike), één derden-client met legacy-headers; scenario's inloggen, bladeren, zoeken, afspelen (Direct Play en transcode), hervatten, ondertitels, SyncPlay, skipknoppen, downloaden; de MediaGuard-afspeeltest met TV_PROFILE",
+    "0 regressies tegen stock voor stock-native en stock-web; PlaybackInfo identiek over de vaste veldenlijst (zonder opt-in); de officiële app gedraagt zich als Jelly Leon-webclient zoals gedocumenteerd; de uitkomst voor derden-clients staat gemeten in de matrix; Swiftfin NIET GEVALIDEERD (Mac/Xcode); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-64",
+    "API- en gedragsregressie: alleen additief, module uit = stock",
+    "OpenAPI-export van Jelly Leon tegen die van stock 12.x; de volledige upstream-testsuite met de plugin geladen; in de P4-0-gate met de bestaande plugin; daarna bij elke module-oplevering per module apart en voor alle dan bestaande modules samen: aan, uit en plugin verwijderd; vergelijking van Jellyfin-antwoorden voor /Items, /Users/{id}/Items, PlaybackInfo, /MediaSegments, /SyncPlay/List en /Items/{id}/Similar",
+    "De diff bevat alleen nieuwe paden onder /media/v1 en /connector/v1; upstream-tests groen; module uit of plugin verwijderd geeft byte-gelijke antwoorden (vaste veldenlijst; volgorde van onstabiele upstream-lijsten als verzameling vergeleken); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-65",
+    "Gegevensbescherming integraal: differentiële controle-run met alle modules aan",
+    "Bij elke module-oplevering met de dan bestaande modules en als eindrun met alle zes: stock en Jelly Leon parallel op een kopie van dezelfde datamap en hetzelfde corpus (media alleen-lezen), met hetzelfde scenario (scannen, afspelen, alle batchjobs, publicaties, correcties, gebruiker verwijderen); vergelijking van de echte 12.x-tabellen (BaseItems, UserData, Users, Permissions, Preferences, DisplayPreferences, MediaSegments, ...) met de toegestane wijzigingslijst per module; sha256 van het hele corpus; logscan op geheimen en ruwe MediaGuard-antwoorden; export en back-up van elke module",
+    "Alleen toegestane wijzigingen (F3 alleen bij reset/remap; F6 alleen eigen MediaSegments-rijen; F5 alleen bevestigde encoding.xml); 0 bytes gewijzigd in het corpus; na UserDeleted 0 GUID's van die gebruiker in alle module-DB's; geheimen niet in XML, export of log; menselijk werk niet automatisch gewist; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-66",
+    "Gecombineerde belastingtest en live-prioriteit",
+    "Exclusief meetslot (stack.lock, ≥ 3 runs, loadavg in het bewijs); jelly-leon-image met --cpus 4 --memory 4g; alle modules aan met een gevulde achterstand; 4 live streams (2 Direct Play, 2 QSV-transcodes op /dev/dri/renderD128); MediaGuard-simulator met een bezette A310-lane; daarna één Watch Together-groepspauze en hervatten",
+    "Live-streams ≥ 1,0× realtime zonder buffering; de zware batchtaak pauzeert binnen 5 s na elke PlaybackStart; batch samen ≤ 2 threads en ≤ 1 GiB; 0 OOM-kills; 0 B03-batchjobs op de als bezet gemelde node; hervatten houdt dezelfde lane; uitkomst is meetinvoer voor BG-07; validatie Sim-geslaagd of Sim-mislukt (opmerking: Intel-iGPU-getest (ontwikkelmachine)); A310/UHD 770 NIET GEVALIDEERD (hardware)"
+  ],
+  [
+    "JLT-67",
+    "Upstream-sync-proef 12.x → 12.y met alle patches en gedragsregels",
+    "Op een tak: upstream_sync.py merge --tag <volgende 12.y> voor jelly-leon en jelly-leon-web, git subtree pull voor de clients; JL_RUNTIME_IMAGE op de nieuwe digest; alle UPSTREAM_GEDRAG-contracttests, patchregistercontrole, plugin-ABI-test en de compat-suite van JLT-63 (rooktestdeel)",
+    "Elke geregistreerde core-, web- en clientpatch herbaseert los (conflict per patch gedocumenteerd); elke gedragsregel UG-… heeft een groene test of blokkeert de sync met een duidelijke melding; plugin bouwt en laadt; geen push naar de standaardbranch; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-68",
+    "Pluginlaag en Hub-koppeling: één plugin, één connector, één foutcatalogus",
+    "Plugin met alle modules op 12.x; routetabel uit de MVC-endpointlijst; contracttests voor de foutcatalogus op elke module; Hub-simulator zonder pin, met gepinde sleutelset, met een rol kind, met een herhaalde jti en met een verlopen token; schemacontrole van alle events en connector-items",
+    "Elke route precies één keer; dezelfde foutcode voor dezelfde situatie in elke module (o.a. 422 idempotency_key_reused, 400 idempotency_key_required, 412 precondition_failed, 413 per route); zonder pin 401 unauthorized/not_linked, kind 403, replay 401 token_replayed; geen enkel event of item bevat titels, gebruikers- of apparaatnamen, paden of IP-adressen; event_type heeft precies drie segmenten; validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-69",
+    "Echte NAS en echte apparaten (gemeenschappelijk)",
+    "NAS met A310 en UHD 770 (D08 ingevuld, PCI-slot ↔ renderD na een herstart gecontroleerd), echte bibliotheek en kijkgeschiedenis, MediaGuard gekoppeld met Δ-MG-AUTH, echte tv's, telefoons, tablets en browsers (D15); overname (B03-015), upgrade, gecombineerde belasting met MediaGuard-AV1 tegelijk, compat-suite en terugzetproef",
+    "Alleen echte uitvoering telt; tot dan status Geblokkeerd met validatie NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode); in deze bouwomgeving nooit als eindstatus afgevinkt"
+  ],
+  [
+    "JLT-70",
+    "Overname vanuit Emby: proefrun met een echte Emby-container (gezien-status, hervatpunten, favorieten, gebruikers en rechten)",
+    "Echte Emby-container emby/embyserver:4.10.2.0@sha256:7082c63b10a2fcb3805a7eaebba407d5723bc57c085c9f0b29b7d0a702765cc1 (stabiel op 2026-11-09 volgens hub.docker.com; zodra D07 de NAS-versie meet, die versie op vaste digest) met het mediacorpus (B03-016, sha256-manifest) alleen-lezen als bibliotheek; ≥ 5 synthetische gebruikers (een beheerder, twee volwassenen, een kind met leeftijdsgrens en een gast met beperkte bibliotheken) met vooraf via de Emby-API gegenereerde kijkhistorie (gezien met datum en aantal, hervatpunten, favorieten, beoordelingen, taal- en ondertitelvoorkeuren) voor films en afleveringen; doel stock jellyfin/jellyfin:12.4@sha256:fea863d0…1771 (golf 0) en later jelly-leon:12.x; overnametool eerst droog (alleen rapport), daarna echt; vóór/na-rapport per gebruiker; daarna stock-web en de Android-emulator: inloggen met het nieuwe wachtwoord en hervatten",
+    "100 % van gezien-status (incl. datum en aantal) en hervatpunten (ticks exact gelijk) van de gekoppelde items overgezet; favorieten 100 %; beoordelingen en voorkeuren waar de Emby-API ze levert, anders benoemd in het rapport; gebruikers met dezelfde rechten en hetzelfde ouderlijk toezicht (een kind ziet in Jelly Leon niets wat het in Emby niet mocht zien); wachtwoorden niet overgezet en dat staat in het rapport; het rapport per gebruiker (JSON met sha256 en een leesbaar overzicht) telt per soort vóór en na en is volledig: elk Emby-item met kijkgegevens is overgezet of staat met reden op de afhandellijst; clients hervatten op het juiste punt; prioriteit P0 (gebruiker); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-71",
+    "Overname vanuit Emby: idempotentie, herhaling en laatste delta",
+    "Na JLT-70: dezelfde run nogmaals zonder wijziging in Emby; daarna in Emby voor twee gebruikers wijzigingen (nieuw gezien, hervatpunt verder, favoriet erbij en eraf) en in Jelly Leon voor één gebruiker een eigen, nieuwere wijziging op hetzelfde item; delta-run; daarna een run die halverwege wordt afgebroken (kill) en opnieuw gestart",
+    "Tweede run: 0 schrijfacties naar Jelly Leon en een inhoudelijk identiek rapport; de delta-run neemt precies de Emby-wijzigingen sinds de vorige run over; een nieuwere Jelly Leon-waarde wordt nooit stil overschreven (eens gezien blijft gezien, hervatpunt volgens het nieuwste moment, anders op de afhandellijst); een verwijderde favoriet in Emby staat ter beslissing op de afhandellijst; een afgebroken run laat geen half overgezette gebruiker achter en hervat zonder dubbele schrijfacties; prioriteit P0 (gebruiker); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-72",
+    "Overname vanuit Emby: niet-gekoppelde items en de afhandellijst",
+    "Emby-bibliotheek met opzettelijke gaten: items zonder provider-ID's, twee items met dezelfde IMDb-ID (versies), een andere mountroot (padvertaling), afleveringen met afwijkende nummering (absolute anime-nummering), een item dat in Jelly Leon ontbreekt, en een gewijzigd bestand (zelfde pad, andere grootte) met een onthouden spoorkeuze; kijkgegevens op al deze items bij meerdere gebruikers",
+    "Koppelvolgorde provider-ID → pad aantoonbaar in het rapport; elk niet of niet eenduidig gekoppeld item staat met reden (geen_id, dubbel, ontbreekt, ander_bestand) en de kijkgegevens van alle betrokken gebruikers op de afhandellijst; 0 items stil weggelaten (overgezet + afhandellijst = alle Emby-items met kijkgegevens); bij twijfel nooit een gok; de spoorkeuze van een gewijzigd bestand wordt niet overgezet en wel gemeld; prioriteit P0 (gebruiker); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-73",
+    "Overname vanuit Emby: geen enkele schrijfactie naar Emby (verkeersmeting) en MediaGuard volgt beide",
+    "Al het verkeer van de overnametool naar de Emby-container loopt via een loggende proxy in de testomgeving; vóór en na elke run (JLT-70…72) een export van alle kijkgegevens per gebruiker via de Emby-API; een opzettelijke POST/DELETE vanuit de tool (testhaak); een MediaGuard-simulator met Δ-MG-AUTH per server en Δ-MG-DUAL volgt tegelijk Emby (X-Emby-Token) en Jelly Leon (Authorization: MediaBrowser Token=…) en krijgt een kijksessie op elk van beide",
+    "0 verzoeken anders dan GET in de proxylog, ook bij fouten en herhalingen; de opzettelijke POST/DELETE wordt door de client geweigerd vóór het netwerk; alleen routes uit de witte lijst; de Emby-API-sleutel staat in geen log, rapport of export; de kijkgegevens in Emby per gebruiker zijn vóór en na identiek; de MediaGuard-kijkpauze werkt bij een sessie op Emby én bij een sessie op Jelly Leon en de Emby-koppeling valt op geen enkel moment weg; prioriteit P0 (gebruiker); validatie Sim-geslaagd of Sim-mislukt"
+  ],
+  [
+    "JLT-74",
+    "Overname vanuit Emby op de echte NAS en de controlelijst \"Emby verwijderen\"",
+    "Echte NAS met de echte Emby (D07 gemeten: versie, gebruikers, bibliotheken, plugins); ZFS-snapshot vooraf; droge proefrun; echte overname naar Jelly Leon; vóór/na-rapport per gebruiker met akkoord van de gebruiker op elk verschil; laatste delta bij de overstap; MediaGuard volgt beide (Δ-MG-DUAL) en laat daarna Emby los; controlelijst \"Emby verwijderen\": eindrapport met akkoord, ZFS-snapshot van de Emby-dataset, blijvend JSON-exportarchief met sha256 in de back-updekking (B12, Hub-kaart Back-ups) en een herimportproef uit dat archief op een lege kopie",
+    "Alleen echte uitvoering telt; tot dan status Geblokkeerd met validatie NIET GEVALIDEERD (echte NAS); Emby blijft ongewijzigd draaien tot de gebruiker zelf besluit (APP-02, I26-26-02) en de gebruiker verwijdert Emby zelf; prioriteit P0 (gebruiker); in deze bouwomgeving nooit als eindstatus afgevinkt"
   ]
 ]

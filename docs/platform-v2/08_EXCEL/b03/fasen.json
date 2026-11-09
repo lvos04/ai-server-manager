@@ -1,0 +1,9 @@
+[
+  {
+    "id": "P4-0",
+    "na": "P3",
+    "beschrijving": "Upgrade Jelly Leon server + web naar Jellyfin 12.x; overname vanuit de bestaande mediaserver (Emby; ook Jellyfin als D07 dat meet) met vóór/na-rapport per gebruiker; terugzetten (snapshot + vorige image); baselines standaard Jellyfin",
+    "go_nogo": "Geen verschil in kijkgeschiedenis of rechten zonder uitdrukkelijk akkoord van de gebruiker (HARDE EIS); Emby blijft ongewijzigd als terugval; terugzetten bewezen; Δ-MG-AUTH per server + Δ-MG-DUAL; stock-clients werken",
+    "status": "Niet gestart"
+  }
+]

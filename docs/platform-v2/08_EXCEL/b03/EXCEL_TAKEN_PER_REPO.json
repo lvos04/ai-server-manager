@@ -1,0 +1,3060 @@
+{
+ "_meta": {
+  "versie": "synthese B03 2.0, 2026-11-09; aangevuld met de Emby-overname (B03-015, JLT-70…74) en de HARDE EIS van de gebruiker",
+  "bron": "excel_taken_nieuw.json en testmatrix_nieuw.json (zelfde map); B03_UNIVERSELE_MEDIASERVER.md hoofdstuk 10.17 en 18",
+  "conventie_forks": "jelly-leon, jelly-leon-web en jelly-leon-clients houden zoals nu (13 identieke B03-rijen) de volledige B03-set; het veld waarvan_uitvoerend zegt waar het werk gebeurt",
+  "conventie_overige_repos": "media-guard-ultimate, ai-server-manager en zoeken-en-persoonlijke-ai nemen alleen de rijen op waarvoor zij zelf iets leveren; hun deltaverzoeken krijgen een ID in de eigen reeks (B04, B01/B02/B09/B12, B07/B15) door de eigenaar",
+  "uitgebreide_rijen": [
+   "B03-004",
+   "B03-005",
+   "B03-007",
+   "B03-009",
+   "B03-010",
+   "B03-013"
+  ],
+  "uitgebreide_rij_vervangt": "de bestaande rij met hetzelfde ID in tasks.json en in elke EXCEL_TAKEN.json; de rij heeft exact de 12 velden van tasks.json; de wijzigingsnotitie staat hier in per_rij.<ID>.wijziging (niet in het werkboek)",
+  "excel_keten": "update_excel.py voegt sinds 2026-11-09 werkpakket-, test- en faserijen toe en routeert JLT-… naar de Testmatrix (Δ-ASM-EXCEL, ai-server-manager); bewijs voor een JLT-rij mag nu met het eigen JLT-ID in EVIDENCE.json; bewijs_bij blijft de koppeling naar de werkpakketten",
+  "startstatus": "werkpakketten Niet gestart; testrijen zie per_test.startstatus; nooit een eindstatus in deze bouwomgeving",
+  "aantallen": {
+   "werkpakketten_nieuw": 66,
+   "werkpakketten_uitgebreid": 6,
+   "testen": 74
+  }
+ },
+ "repos": {
+  "jelly-leon": {
+   "rol": "server-fork en plugin Jellyfin.Plugin.JellyLeon: eigenaar van alle B03-modules",
+   "werkpakketten_opnemen": [
+    "B03-004",
+    "B03-005",
+    "B03-007",
+    "B03-009",
+    "B03-010",
+    "B03-013",
+    "B03-014",
+    "B03-015",
+    "B03-016",
+    "B03-017",
+    "B03-018",
+    "B03-019",
+    "B03-020",
+    "B03-021",
+    "B03-022",
+    "B03-023",
+    "B03-024",
+    "B03-025",
+    "B03-026",
+    "B03-027",
+    "B03-028",
+    "B03-029",
+    "B03-030",
+    "B03-031",
+    "B03-032",
+    "B03-033",
+    "B03-034",
+    "B03-035",
+    "B03-036",
+    "B03-037",
+    "B03-038",
+    "B03-039",
+    "B03-040",
+    "B03-041",
+    "B03-042",
+    "B03-043",
+    "B03-044",
+    "B03-045",
+    "B03-046",
+    "B03-047",
+    "B03-048",
+    "B03-049",
+    "B03-050",
+    "B03-051",
+    "B03-052",
+    "B03-053",
+    "B03-054",
+    "B03-055",
+    "B03-056",
+    "B03-057",
+    "B03-058",
+    "B03-059",
+    "B03-060",
+    "B03-061",
+    "B03-062",
+    "B03-063",
+    "B03-064",
+    "B03-065",
+    "B03-066",
+    "B03-067",
+    "B03-068",
+    "B03-069",
+    "B03-070",
+    "B03-071",
+    "B03-072",
+    "B03-073",
+    "B03-074",
+    "B03-075",
+    "B03-076",
+    "B03-077",
+    "B03-078",
+    "B03-079"
+   ],
+   "waarvan_uitvoerend": [
+    "B03-004",
+    "B03-005",
+    "B03-007",
+    "B03-009",
+    "B03-010",
+    "B03-013",
+    "B03-014",
+    "B03-015",
+    "B03-016",
+    "B03-017",
+    "B03-018",
+    "B03-019",
+    "B03-020",
+    "B03-021",
+    "B03-022",
+    "B03-023",
+    "B03-024",
+    "B03-025",
+    "B03-026",
+    "B03-027",
+    "B03-028",
+    "B03-029",
+    "B03-030",
+    "B03-031",
+    "B03-032",
+    "B03-033",
+    "B03-034",
+    "B03-035",
+    "B03-038",
+    "B03-039",
+    "B03-040",
+    "B03-041",
+    "B03-042",
+    "B03-043",
+    "B03-044",
+    "B03-045",
+    "B03-046",
+    "B03-047",
+    "B03-048",
+    "B03-049",
+    "B03-050",
+    "B03-051",
+    "B03-052",
+    "B03-053",
+    "B03-054",
+    "B03-055",
+    "B03-056",
+    "B03-057",
+    "B03-058",
+    "B03-059",
+    "B03-060",
+    "B03-061",
+    "B03-062",
+    "B03-063",
+    "B03-064",
+    "B03-066",
+    "B03-067",
+    "B03-068",
+    "B03-070",
+    "B03-071",
+    "B03-072",
+    "B03-073",
+    "B03-074",
+    "B03-075",
+    "B03-076",
+    "B03-078",
+    "B03-079"
+   ],
+   "testen_opnemen": [
+    "JLT-01",
+    "JLT-02",
+    "JLT-03",
+    "JLT-04",
+    "JLT-05",
+    "JLT-06",
+    "JLT-07",
+    "JLT-08",
+    "JLT-09",
+    "JLT-10",
+    "JLT-11",
+    "JLT-12",
+    "JLT-13",
+    "JLT-14",
+    "JLT-15",
+    "JLT-16",
+    "JLT-17",
+    "JLT-18",
+    "JLT-19",
+    "JLT-20",
+    "JLT-21",
+    "JLT-22",
+    "JLT-23",
+    "JLT-24",
+    "JLT-25",
+    "JLT-26",
+    "JLT-27",
+    "JLT-28",
+    "JLT-29",
+    "JLT-30",
+    "JLT-31",
+    "JLT-32",
+    "JLT-33",
+    "JLT-34",
+    "JLT-35",
+    "JLT-36",
+    "JLT-37",
+    "JLT-38",
+    "JLT-39",
+    "JLT-40",
+    "JLT-41",
+    "JLT-42",
+    "JLT-43",
+    "JLT-44",
+    "JLT-45",
+    "JLT-46",
+    "JLT-47",
+    "JLT-48",
+    "JLT-49",
+    "JLT-50",
+    "JLT-51",
+    "JLT-52",
+    "JLT-53",
+    "JLT-54",
+    "JLT-55",
+    "JLT-56",
+    "JLT-57",
+    "JLT-58",
+    "JLT-59",
+    "JLT-60",
+    "JLT-61",
+    "JLT-62",
+    "JLT-63",
+    "JLT-64",
+    "JLT-65",
+    "JLT-66",
+    "JLT-67",
+    "JLT-68",
+    "JLT-69",
+    "JLT-70",
+    "JLT-71",
+    "JLT-72",
+    "JLT-73",
+    "JLT-74"
+   ]
+  },
+  "jelly-leon-web": {
+   "rol": "web-fork: webhaken, webplugins en de config.json-generator",
+   "werkpakketten_opnemen": [
+    "B03-004",
+    "B03-005",
+    "B03-007",
+    "B03-009",
+    "B03-010",
+    "B03-013",
+    "B03-014",
+    "B03-015",
+    "B03-016",
+    "B03-017",
+    "B03-018",
+    "B03-019",
+    "B03-020",
+    "B03-021",
+    "B03-022",
+    "B03-023",
+    "B03-024",
+    "B03-025",
+    "B03-026",
+    "B03-027",
+    "B03-028",
+    "B03-029",
+    "B03-030",
+    "B03-031",
+    "B03-032",
+    "B03-033",
+    "B03-034",
+    "B03-035",
+    "B03-036",
+    "B03-037",
+    "B03-038",
+    "B03-039",
+    "B03-040",
+    "B03-041",
+    "B03-042",
+    "B03-043",
+    "B03-044",
+    "B03-045",
+    "B03-046",
+    "B03-047",
+    "B03-048",
+    "B03-049",
+    "B03-050",
+    "B03-051",
+    "B03-052",
+    "B03-053",
+    "B03-054",
+    "B03-055",
+    "B03-056",
+    "B03-057",
+    "B03-058",
+    "B03-059",
+    "B03-060",
+    "B03-061",
+    "B03-062",
+    "B03-063",
+    "B03-064",
+    "B03-065",
+    "B03-066",
+    "B03-067",
+    "B03-068",
+    "B03-069",
+    "B03-070",
+    "B03-071",
+    "B03-072",
+    "B03-073",
+    "B03-074",
+    "B03-075",
+    "B03-076",
+    "B03-077",
+    "B03-078",
+    "B03-079"
+   ],
+   "waarvan_uitvoerend": [
+    "B03-005",
+    "B03-007",
+    "B03-009",
+    "B03-013",
+    "B03-014",
+    "B03-016",
+    "B03-017",
+    "B03-019",
+    "B03-020",
+    "B03-024",
+    "B03-025",
+    "B03-026",
+    "B03-028",
+    "B03-036",
+    "B03-037",
+    "B03-048",
+    "B03-049",
+    "B03-057",
+    "B03-060",
+    "B03-065",
+    "B03-066",
+    "B03-067",
+    "B03-068",
+    "B03-076"
+   ],
+   "testen_opnemen": [
+    "JLT-01",
+    "JLT-02",
+    "JLT-03",
+    "JLT-04",
+    "JLT-05",
+    "JLT-06",
+    "JLT-07",
+    "JLT-08",
+    "JLT-09",
+    "JLT-10",
+    "JLT-11",
+    "JLT-12",
+    "JLT-13",
+    "JLT-14",
+    "JLT-15",
+    "JLT-16",
+    "JLT-17",
+    "JLT-18",
+    "JLT-19",
+    "JLT-20",
+    "JLT-21",
+    "JLT-22",
+    "JLT-23",
+    "JLT-24",
+    "JLT-25",
+    "JLT-26",
+    "JLT-27",
+    "JLT-28",
+    "JLT-29",
+    "JLT-30",
+    "JLT-31",
+    "JLT-32",
+    "JLT-33",
+    "JLT-34",
+    "JLT-35",
+    "JLT-36",
+    "JLT-37",
+    "JLT-38",
+    "JLT-39",
+    "JLT-40",
+    "JLT-41",
+    "JLT-42",
+    "JLT-43",
+    "JLT-44",
+    "JLT-45",
+    "JLT-46",
+    "JLT-47",
+    "JLT-48",
+    "JLT-49",
+    "JLT-50",
+    "JLT-51",
+    "JLT-52",
+    "JLT-53",
+    "JLT-54",
+    "JLT-55",
+    "JLT-56",
+    "JLT-57",
+    "JLT-58",
+    "JLT-59",
+    "JLT-60",
+    "JLT-61",
+    "JLT-62",
+    "JLT-63",
+    "JLT-64",
+    "JLT-65",
+    "JLT-66",
+    "JLT-67",
+    "JLT-68",
+    "JLT-69",
+    "JLT-70",
+    "JLT-71",
+    "JLT-72",
+    "JLT-73",
+    "JLT-74"
+   ]
+  },
+  "jelly-leon-clients": {
+   "rol": "client-forks (android, androidtv, desktop, Swiftfin): emulatortests, clientmatrix en JLC-patches",
+   "werkpakketten_opnemen": [
+    "B03-004",
+    "B03-005",
+    "B03-007",
+    "B03-009",
+    "B03-010",
+    "B03-013",
+    "B03-014",
+    "B03-015",
+    "B03-016",
+    "B03-017",
+    "B03-018",
+    "B03-019",
+    "B03-020",
+    "B03-021",
+    "B03-022",
+    "B03-023",
+    "B03-024",
+    "B03-025",
+    "B03-026",
+    "B03-027",
+    "B03-028",
+    "B03-029",
+    "B03-030",
+    "B03-031",
+    "B03-032",
+    "B03-033",
+    "B03-034",
+    "B03-035",
+    "B03-036",
+    "B03-037",
+    "B03-038",
+    "B03-039",
+    "B03-040",
+    "B03-041",
+    "B03-042",
+    "B03-043",
+    "B03-044",
+    "B03-045",
+    "B03-046",
+    "B03-047",
+    "B03-048",
+    "B03-049",
+    "B03-050",
+    "B03-051",
+    "B03-052",
+    "B03-053",
+    "B03-054",
+    "B03-055",
+    "B03-056",
+    "B03-057",
+    "B03-058",
+    "B03-059",
+    "B03-060",
+    "B03-061",
+    "B03-062",
+    "B03-063",
+    "B03-064",
+    "B03-065",
+    "B03-066",
+    "B03-067",
+    "B03-068",
+    "B03-069",
+    "B03-070",
+    "B03-071",
+    "B03-072",
+    "B03-073",
+    "B03-074",
+    "B03-075",
+    "B03-076",
+    "B03-077",
+    "B03-078",
+    "B03-079"
+   ],
+   "waarvan_uitvoerend": [
+    "B03-005",
+    "B03-007",
+    "B03-010",
+    "B03-013",
+    "B03-014",
+    "B03-016",
+    "B03-019",
+    "B03-020",
+    "B03-026",
+    "B03-029",
+    "B03-037",
+    "B03-060",
+    "B03-068",
+    "B03-069",
+    "B03-077"
+   ],
+   "testen_opnemen": [
+    "JLT-01",
+    "JLT-02",
+    "JLT-03",
+    "JLT-04",
+    "JLT-05",
+    "JLT-06",
+    "JLT-07",
+    "JLT-08",
+    "JLT-09",
+    "JLT-10",
+    "JLT-11",
+    "JLT-12",
+    "JLT-13",
+    "JLT-14",
+    "JLT-15",
+    "JLT-16",
+    "JLT-17",
+    "JLT-18",
+    "JLT-19",
+    "JLT-20",
+    "JLT-21",
+    "JLT-22",
+    "JLT-23",
+    "JLT-24",
+    "JLT-25",
+    "JLT-26",
+    "JLT-27",
+    "JLT-28",
+    "JLT-29",
+    "JLT-30",
+    "JLT-31",
+    "JLT-32",
+    "JLT-33",
+    "JLT-34",
+    "JLT-35",
+    "JLT-36",
+    "JLT-37",
+    "JLT-38",
+    "JLT-39",
+    "JLT-40",
+    "JLT-41",
+    "JLT-42",
+    "JLT-43",
+    "JLT-44",
+    "JLT-45",
+    "JLT-46",
+    "JLT-47",
+    "JLT-48",
+    "JLT-49",
+    "JLT-50",
+    "JLT-51",
+    "JLT-52",
+    "JLT-53",
+    "JLT-54",
+    "JLT-55",
+    "JLT-56",
+    "JLT-57",
+    "JLT-58",
+    "JLT-59",
+    "JLT-60",
+    "JLT-61",
+    "JLT-62",
+    "JLT-63",
+    "JLT-64",
+    "JLT-65",
+    "JLT-66",
+    "JLT-67",
+    "JLT-68",
+    "JLT-69",
+    "JLT-70",
+    "JLT-71",
+    "JLT-72",
+    "JLT-73",
+    "JLT-74"
+   ]
+  },
+  "media-guard-ultimate": {
+   "rol": "MediaGuard: alleen de rijen waarvoor MediaGuard zelf iets moet leveren (deltaverzoeken, contracttests)",
+   "werkpakketten_opnemen": [
+    "B03-009",
+    "B03-014",
+    "B03-015",
+    "B03-056",
+    "B03-064"
+   ],
+   "waarvan_uitvoerend": [
+    "B03-009",
+    "B03-014",
+    "B03-015",
+    "B03-056",
+    "B03-064"
+   ],
+   "testen_opnemen": [
+    "JLT-23",
+    "JLT-37",
+    "JLT-45",
+    "JLT-49",
+    "JLT-69",
+    "JLT-73",
+    "JLT-74"
+   ],
+   "deltaverzoeken_in_eigen_reeks": [
+    "Δ-MG-AUTH (per server; exitcriterium P4-0)",
+    "Δ-MG-DUAL (Emby én Jelly Leon tegelijk; exitcriterium P4-0)",
+    "Δ-MG-1",
+    "Δ-MG-2",
+    "Δ-MG-3",
+    "Δ-MG-4",
+    "Δ-MG-5 (optioneel)",
+    "Δ-MG-6 (optioneel)",
+    "Δ-MG-7 (optioneel)",
+    "Δ-MG-8 (optioneel)",
+    "Δ-MG-DV (optioneel)"
+   ]
+  },
+  "ai-server-manager": {
+   "rol": "Hub en Excel/contract: Hub-kaarten, Hub-adapter Jelly Leon, contractdelta's en de Excel-keten",
+   "werkpakketten_opnemen": [
+    "B03-009",
+    "B03-014",
+    "B03-015",
+    "B03-017",
+    "B03-029",
+    "B03-039",
+    "B03-049",
+    "B03-058",
+    "B03-069",
+    "B03-078"
+   ],
+   "waarvan_uitvoerend": [
+    "B03-009",
+    "B03-014",
+    "B03-015",
+    "B03-017",
+    "B03-029",
+    "B03-039",
+    "B03-049",
+    "B03-058",
+    "B03-069",
+    "B03-078"
+   ],
+   "testen_opnemen": [
+    "JLT-27",
+    "JLT-38",
+    "JLT-58",
+    "JLT-68",
+    "JLT-74"
+   ],
+   "deltaverzoeken_in_eigen_reeks": [
+    "Δ-CONTRACT-MG",
+    "Δ-CONTRACT-MT",
+    "Δ-CONTRACT-MODEL",
+    "Δ-CONTRACT-NET",
+    "Δ-HUB-1",
+    "Δ-HUB-2",
+    "Δ-HUB-3 (ook het Emby-exportarchief)",
+    "Δ-HUB-JL",
+    "Δ-ASM-EXCEL (incl. rij P4-0 op het blad Fasen; bijwerker opgeleverd 2026-11-09)"
+   ]
+  },
+  "zoeken-en-persoonlijke-ai": {
+   "rol": "zoeken (B07/B15): één embedding- en ASR-producent, herkomst van machinevertalingen",
+   "werkpakketten_opnemen": [
+    "B03-038",
+    "B03-049",
+    "B03-059",
+    "B03-079"
+   ],
+   "waarvan_uitvoerend": [
+    "B03-038",
+    "B03-049",
+    "B03-059",
+    "B03-079"
+   ],
+   "testen_opnemen": [
+    "JLT-18",
+    "JLT-32"
+   ],
+   "deltaverzoeken_in_eigen_reeks": [
+    "Δ-ZK-1",
+    "Δ-ZK-2",
+    "Δ-CONTRACT-MODEL (één ASR-producent, afstemming B07-004)"
+   ]
+  }
+ },
+ "per_rij": {
+  "B03-004": {
+   "soort": "uitgebreid",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "wijziging": "uitgebreid (F5 versie 0.2, na jury): Uitvoering, Acceptatie en Afhankelijkheid aangevuld; oorspronkelijke tekst letterlijk behouden; overige velden ongewijzigd"
+  },
+  "B03-005": {
+   "soort": "uitgebreid",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "wijziging": "uitgebreid (F5 versie 0.2, na jury): Uitvoering, Acceptatie en Afhankelijkheid aangevuld; oorspronkelijke tekst letterlijk behouden; overige velden ongewijzigd"
+  },
+  "B03-007": {
+   "soort": "uitgebreid",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "wijziging": "uitgebreid (herzien na jury 2026-11-09): Uitvoering, Acceptatie en Afhankelijkheid aangevuld; oorspronkelijke tekst letterlijk vooraan behouden; overige velden ongewijzigd"
+  },
+  "B03-009": {
+   "soort": "uitgebreid",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "media-guard-ultimate",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate",
+    "ai-server-manager"
+   ],
+   "opmerking": "media-guard-ultimate: contracttest met de viewerclient; ai-server-manager: Δ-CONTRACT-MG",
+   "wijziging": "uitgebreid (synthese 2026-11-09): Uitvoering, Acceptatie en Afhankelijkheid aangevuld met de samengevoegde aanvullingen van F3 (§12d) en F4 en de gedeelde viewerclient; oorspronkelijke tekst letterlijk vooraan behouden; overige velden ongewijzigd"
+  },
+  "B03-010": {
+   "soort": "uitgebreid",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "wijziging": "uitgebreid (synthese 2026-11-09): Uitvoering, Acceptatie en Afhankelijkheid aangevuld met de gedeelde IsKid-definitie en het vervolg op ADR-0009 (streamroutes); oorspronkelijke tekst letterlijk vooraan behouden; overige velden ongewijzigd"
+  },
+  "B03-013": {
+   "soort": "uitgebreid",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "wijziging": "uitgebreid (synthese 2026-11-09): Uitvoering, Acceptatie en Afhankelijkheid aangevuld met het gedrag per module bij uitzetten, verwijderen en terug naar stock (voorstellen uit F1–F6, jury compat); oorspronkelijke tekst letterlijk vooraan behouden; overige velden ongewijzigd"
+  },
+  "B03-014": {
+   "soort": "nieuw",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate",
+    "ai-server-manager"
+   ],
+   "opmerking": "media-guard-ultimate: Δ-MG-AUTH per server en Δ-MG-DUAL (exitcriterium); ai-server-manager: rij P4-0 op het blad Fasen"
+  },
+  "B03-015": {
+   "soort": "nieuw",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager",
+    "media-guard-ultimate"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager",
+    "media-guard-ultimate"
+   ],
+   "opmerking": "jelly-leon: overnametool en rapport (eerst JellyPlex-Watched beoordelen); media-guard-ultimate: Δ-MG-DUAL (Emby én Jelly Leon tegelijk, daarna Emby netjes loslaten); ai-server-manager: D07-meting en B12-dekking van het Emby-exportarchief (Δ-HUB-3)"
+  },
+  "B03-016": {
+   "soort": "nieuw",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-017": {
+   "soort": "nieuw",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "B03-018": {
+   "soort": "nieuw",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-019": {
+   "soort": "nieuw",
+   "functie": "gemeenschappelijk",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-020": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-021": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-022": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-023": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-024": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-025": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-026": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-027": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opmerking": "Tailscale-installatiegids samen met B10/I21 (home-control-hub, jelly-leon-platform)"
+  },
+  "B03-028": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-029": {
+   "soort": "nieuw",
+   "functie": "F1",
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "B03-030": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-031": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-032": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-033": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-034": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-035": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-036": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-037": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon-clients",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-038": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon",
+    "zoeken-en-persoonlijke-ai"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "zoeken-en-persoonlijke-ai"
+   ]
+  },
+  "B03-039": {
+   "soort": "nieuw",
+   "functie": "F2",
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "B03-040": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-041": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-042": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-043": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-044": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opmerking": "de optionele mt-app komt in de repo die BG-06/BG-18 en Δ-CONTRACT-MT aanwijzen"
+  },
+  "B03-045": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-046": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-047": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-048": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-049": {
+   "soort": "nieuw",
+   "functie": "F3",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "ai-server-manager",
+    "zoeken-en-persoonlijke-ai"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager",
+    "zoeken-en-persoonlijke-ai"
+   ]
+  },
+  "B03-050": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-051": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-052": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-053": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-054": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-055": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-056": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon",
+    "media-guard-ultimate"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ],
+   "opmerking": "media-guard-ultimate: Δ-MG-1/Δ-MG-2 (deltaverzoek)"
+  },
+  "B03-057": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-058": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "B03-059": {
+   "soort": "nieuw",
+   "functie": "F4",
+   "uitvoerend": [
+    "jelly-leon",
+    "zoeken-en-persoonlijke-ai"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "zoeken-en-persoonlijke-ai"
+   ]
+  },
+  "B03-060": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-061": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-062": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-063": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-064": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon",
+    "media-guard-ultimate"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ],
+   "opmerking": "media-guard-ultimate: Δ-MG-4 (deltaverzoek, dringend bij a310_only)"
+  },
+  "B03-065": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-066": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-067": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-068": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-069": {
+   "soort": "nieuw",
+   "functie": "F5",
+   "uitvoerend": [
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "B03-070": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-071": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-072": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-073": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-074": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-075": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-076": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-077": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "B03-078": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "B03-079": {
+   "soort": "nieuw",
+   "functie": "F6",
+   "uitvoerend": [
+    "jelly-leon",
+    "zoeken-en-persoonlijke-ai"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "zoeken-en-persoonlijke-ai"
+   ]
+  }
+ },
+ "per_test": {
+  "JLT-01": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-020",
+    "B03-024"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-02": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-021",
+    "B03-024"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-03": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-025"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-04": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-025"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-05": {
+   "functie": "F1",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-022",
+    "B03-023",
+    "B03-028"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-06": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-020",
+    "B03-021",
+    "B03-022",
+    "B03-023",
+    "B03-024",
+    "B03-025",
+    "B03-026",
+    "B03-027",
+    "B03-028",
+    "B03-029"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-07": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-026"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-08": {
+   "functie": "F1",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-027"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-09": {
+   "functie": "F1",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-021",
+    "B03-029",
+    "B03-013"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-clients",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-10": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-030",
+    "B03-032"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-11": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-030",
+    "B03-032"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-12": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-032",
+    "B03-035",
+    "B03-036"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-13": {
+   "functie": "F2",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-034"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-14": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-031",
+    "B03-036",
+    "B03-037"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-15": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-030",
+    "B03-031",
+    "B03-032",
+    "B03-033",
+    "B03-034",
+    "B03-035",
+    "B03-036",
+    "B03-037",
+    "B03-038",
+    "B03-039"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-16": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-033"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-17": {
+   "functie": "F2",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-033",
+    "B03-013"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-18": {
+   "functie": "F2",
+   "prioriteit": "P2",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-038"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "zoeken-en-persoonlijke-ai"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "zoeken-en-persoonlijke-ai"
+   ]
+  },
+  "JLT-19": {
+   "functie": "F2",
+   "prioriteit": "P2",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-039"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-20": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-040",
+    "B03-043"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-21": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-045",
+    "B03-046",
+    "B03-041"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-22": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-042"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-23": {
+   "functie": "F3",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-043",
+    "B03-009"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "media-guard-ultimate"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ]
+  },
+  "JLT-24": {
+   "functie": "F3",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-047",
+    "B03-013"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-25": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-049"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-26": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-040",
+    "B03-041",
+    "B03-042",
+    "B03-043",
+    "B03-044",
+    "B03-045",
+    "B03-046",
+    "B03-047",
+    "B03-048",
+    "B03-049"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-27": {
+   "functie": "F3",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-044",
+    "B03-048",
+    "B03-049"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "JLT-28": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-042",
+    "B03-044"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-29": {
+   "functie": "F3",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-048"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-30": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-051",
+    "B03-052"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-31": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-052"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-32": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-054",
+    "B03-059"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "zoeken-en-persoonlijke-ai"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "zoeken-en-persoonlijke-ai"
+   ]
+  },
+  "JLT-33": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-054"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-34": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-055"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-35": {
+   "functie": "F4",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-050",
+    "B03-013"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-36": {
+   "functie": "F4",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-053"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-37": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-056",
+    "B03-009"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "media-guard-ultimate",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ]
+  },
+  "JLT-38": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-057",
+    "B03-058"
+   ],
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "JLT-39": {
+   "functie": "F4",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-050",
+    "B03-051",
+    "B03-052",
+    "B03-053",
+    "B03-054",
+    "B03-055",
+    "B03-056",
+    "B03-057",
+    "B03-058",
+    "B03-059"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-40": {
+   "functie": "F5",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-060",
+    "B03-005"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-41": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-065",
+    "B03-066",
+    "B03-005"
+   ],
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-42": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-065",
+    "B03-066",
+    "B03-069"
+   ],
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-43": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-062"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-44": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-063",
+    "B03-004"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-45": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-064",
+    "B03-009"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "media-guard-ultimate",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ]
+  },
+  "JLT-46": {
+   "functie": "F5",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-061",
+    "B03-068"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-47": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-067",
+    "B03-005"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-48": {
+   "functie": "F5",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-068",
+    "B03-013"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-49": {
+   "functie": "F5",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-004",
+    "B03-005",
+    "B03-060",
+    "B03-061",
+    "B03-062",
+    "B03-063",
+    "B03-064",
+    "B03-065",
+    "B03-066",
+    "B03-067",
+    "B03-068",
+    "B03-069"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ]
+  },
+  "JLT-50": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-070",
+    "B03-007"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-51": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-073",
+    "B03-007"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-52": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-072"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-53": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-072",
+    "B03-074"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-54": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-075"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-55": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-076",
+    "B03-077",
+    "B03-007"
+   ],
+   "uitvoerend": [
+    "jelly-leon-web",
+    "jelly-leon",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-56": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-071",
+    "B03-013",
+    "B03-007"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-57": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-071",
+    "B03-074"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-58": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-078"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "JLT-59": {
+   "functie": "F6",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-007",
+    "B03-070",
+    "B03-071",
+    "B03-072",
+    "B03-073",
+    "B03-074",
+    "B03-075",
+    "B03-076",
+    "B03-077",
+    "B03-078",
+    "B03-079"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-60": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-014",
+    "B03-015"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-61": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-013",
+    "B03-014",
+    "B03-015"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-62": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-015"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-63": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-019",
+    "B03-010"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-64": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-017",
+    "B03-019"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-65": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-017"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-66": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-018"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-67": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P1",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-019",
+    "B03-014"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-68": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-017"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "ai-server-manager"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager"
+   ]
+  },
+  "JLT-69": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P1",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-014",
+    "B03-015",
+    "B03-016",
+    "B03-017",
+    "B03-018",
+    "B03-019"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ]
+  },
+  "JLT-70": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-015",
+    "B03-016"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-71": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-015"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-72": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-015"
+   ],
+   "uitvoerend": [
+    "jelly-leon"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ]
+  },
+  "JLT-73": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Niet gestart",
+   "bewijs_bij": [
+    "B03-015",
+    "B03-009"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "media-guard-ultimate",
+    "jelly-leon-web"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "media-guard-ultimate"
+   ]
+  },
+  "JLT-74": {
+   "functie": "gemeenschappelijk",
+   "prioriteit": "P0",
+   "startstatus": "Geblokkeerd",
+   "bewijs_bij": [
+    "B03-015",
+    "B03-013"
+   ],
+   "uitvoerend": [
+    "jelly-leon",
+    "ai-server-manager",
+    "media-guard-ultimate",
+    "jelly-leon-web",
+    "jelly-leon-clients"
+   ],
+   "opnemen_in": [
+    "jelly-leon",
+    "jelly-leon-web",
+    "jelly-leon-clients",
+    "ai-server-manager",
+    "media-guard-ultimate"
+   ]
+  }
+ }
+}
