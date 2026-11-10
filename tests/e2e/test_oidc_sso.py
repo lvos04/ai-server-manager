@@ -246,6 +246,48 @@ def test_uitloggen_en_intrekken_werken_direct(admin: Any, app: Any, idp: FakeOid
     assert c4.get("/api/v1/auth/me").status_code == 401
 
 
+def test_sso_access_koppelt_op_issuer_en_sub(admin: Any, app: Any, idp: FakeOidc, periodic_run: Any) -> None:
+    """C1.3-ASM-10: sso.access.revoked/changed koppelen op (issuer, sub); alleen zonder sub op de gebruikersnaam.
+    Een event trekt alleen sessies in en geeft nooit rechten."""
+    enable(admin, idp)
+    hch = service(admin, "home-control-hub")
+    base = {"issuer": idp.issuer, "preferred_username": "leon"}
+    # Zelfde gebruikersnaam maar een andere sub (een ander account bij dezelfde issuer): niets ingetrokken.
+    c1, _ = sso_login(app, idp)
+    post(admin, hch, event("home-control-hub", "sso.access.revoked", ("authentik_user", "leon"),
+                           {**base, "sub": "ander-account-0002"}))  # fmt: skip
+    periodic_run("incidenten_bijwerken")
+    assert c1.get("/api/v1/auth/me").status_code == 200
+    # Andere issuer met dezelfde sub: ook niets.
+    post(admin, hch, event("home-control-hub", "sso.access.revoked", ("authentik_user", "leon"),
+                           {**base, "issuer": "https://andere-idp.invalid/", "sub": idp.user.sub}))  # fmt: skip
+    periodic_run("incidenten_bijwerken")
+    assert c1.get("/api/v1/auth/me").status_code == 200
+    # sso.access.changed met de juiste (issuer, sub): sessies ingetrokken, maar de rol verandert niet.
+    role_before = c1.get("/api/v1/auth/me").json()["user"]["role"]
+    post(admin, hch, event("home-control-hub", "sso.access.changed", ("authentik_user", "iemand-anders"),
+                           {**base, "sub": idp.user.sub, "groepen": ["hub-beheerders"]}))  # fmt: skip
+    periodic_run("incidenten_bijwerken")
+    assert c1.get("/api/v1/auth/me").status_code == 401
+    c2, _ = sso_login(app, idp)
+    assert c2.get("/api/v1/auth/me").json()["user"]["role"] == role_before  # nooit rechten via een event
+    # sso.access.revoked met de juiste (issuer, sub) trekt in, ook als de gebruikersnaam intussen anders is.
+    nieuw = {"issuer": idp.issuer, "sub": idp.user.sub, "preferred_username": "nieuwe-naam"}
+    post(admin, hch, event("home-control-hub", "sso.access.revoked", ("authentik_user", "nieuwe-naam"), nieuw))
+    periodic_run("incidenten_bijwerken")
+    assert c2.get("/api/v1/auth/me").status_code == 401
+    details = [
+        a["details"]
+        for a in admin.get("/api/v1/audit", params={"limit": 200, "actie": "auth.oidc.sessions_revoked"}).json()[
+            "items"
+        ]
+    ]
+    assert {d["koppeling"] for d in details} == {"issuer_sub"} and {d["reden"] for d in details} == {
+        "sso.access.revoked",
+        "sso.access.changed",
+    }
+
+
 def _breakglass(admin: Any) -> str:
     left = 30 - time.time() % 30
     if left < 6:

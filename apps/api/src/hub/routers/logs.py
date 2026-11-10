@@ -28,6 +28,9 @@ class Strict(BaseModel):
 
 
 class RegelIn(Strict):
+    """Contract 1.3 §6.1 (RV11): ``op`` een tijd met tijdzone, ``trace_id`` een UUID; invoer ``bericht`` 1–8000 tekens
+    (langer → 422, nooit eerst afkappen); opslag daarna hooguit 2000 tekens, gemarkeerd als ingekort."""
+
     op: datetime
     niveau: Literal["debug", "info", "warning", "error", "critical"]
     bericht: str = Field(min_length=1, max_length=8000)

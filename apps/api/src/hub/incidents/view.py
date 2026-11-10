@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from hub.incidents.hypothesis import unknown
+from hub.incidents.rules import ernst_label
 from hub.models import Incident, IncidentEvent
 from hub.security import ROLE_RANK, Role
 from hub.timeutil import iso
@@ -48,6 +49,9 @@ def incident_dict(
         "titel": inc.titel,
         "soort": inc.soort,
         "ernst": inc.ernst,
+        # Contract 1.3 §7: de bronwaarde (Peil-woord) als die er is; het label volgt de vaste afbeelding.
+        "ernst_bron": inc.ernst_bron,
+        "ernst_label": ernst_label(inc.ernst, inc.ernst_bron),
         "status": inc.status,
         "actief": actief,
         "bron": inc.bron,

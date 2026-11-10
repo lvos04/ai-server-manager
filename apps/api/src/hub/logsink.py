@@ -95,21 +95,32 @@ class _MatcherCache:
 MATCHERS = _MatcherCache()
 
 
+INGEKORT = " … [ingekort]"
+
+
 def clean(regel: Regel, matcher: SecretMatcher | None) -> LogEntry:
+    """Schonen en daarna begrenzen voor **opslag** (contract 1.3 §6.1, K4): eerst de hele (gecontroleerde) invoer
+    schonen, dan hooguit 2000 tekens bewaren, zichtbaar gemarkeerd als ingekort (tekst + ``_bericht_ingekort``)."""
     velden = redact_log_value(regel.velden or {}, matcher)
     raw = json.dumps(velden, ensure_ascii=False, default=str)
     if len(raw.encode()) > MAX_VELDEN_BYTES:
         velden = {"_ingekort": True, "sleutels": sorted(str(k) for k in (velden or {}))[:20]}
+    if not isinstance(velden, dict):
+        velden = {"waarde": velden}
     niveau = regel.niveau.lower() if regel.niveau.lower() in NIVEAUS else "info"
+    bericht = redact_log_text(regel.bericht, matcher, max_len=1_000_000)
+    if len(bericht) > MAX_BERICHT:
+        bericht = bericht[: MAX_BERICHT - len(INGEKORT)] + INGEKORT
+        velden = {**velden, "_bericht_ingekort": True}
     return LogEntry(
         op=regel.op,
         ontvangen_op=utcnow(),
         bron=regel.bron[:64],
         niveau=niveau,
         logger=redact_log_text(regel.logger, matcher, max_len=96),
-        bericht=redact_log_text(regel.bericht, matcher, max_len=MAX_BERICHT),
+        bericht=bericht,
         trace_id=regel.trace_id[:36] if regel.trace_id else None,
-        velden=velden if isinstance(velden, dict) else {"waarde": velden},
+        velden=velden,
     )
 
 
@@ -252,6 +263,9 @@ def to_dict(r: LogEntry) -> dict[str, Any]:
         "niveau": r.niveau,
         "logger": r.logger,
         "bericht": r.bericht,
+        # Contract 1.3 §6.1: opslag hooguit 2000 tekens; ingekort is zichtbaar gemarkeerd.
+        "bericht_ingekort": bool((r.velden or {}).get("_bericht_ingekort")),
+        "velden_ingekort": bool((r.velden or {}).get("_ingekort")),
         "trace_id": r.trace_id,
         "velden": r.velden,
     }

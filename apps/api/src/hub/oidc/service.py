@@ -149,26 +149,53 @@ def revoke_sessions(db: Session, *, user_ids: list[uuid.UUID] | None = None, onl
     return int(getattr(res, "rowcount", 0) or 0)
 
 
+SSO_ACCESS_EVENTS = ("sso.access.revoked", "sso.access.changed")
+
+
 def handle_event(db: Session, settings: Settings, ev: EventIn, now: datetime) -> None:
-    """Haak uit de incidentenmotor: ``sso.access.revoked`` van home-control-hub → SSO-sessies van die gebruiker in de
-    Hub intrekken (alleen intrekken; een event kan nooit rechten geven)."""
-    if ev.stroom != "inbox" or ev.source_app != HCH or ev.event_type != "sso.access.revoked":
+    """Haak uit de incidentenmotor (contract 1.3 §7, C1.3-ASM-10): ``sso.access.revoked`` en ``sso.access.changed`` van
+    home-control-hub → SSO-sessies van die gebruiker in de Hub intrekken. Koppelen op ``(issuer, sub)``; alleen als
+    ``sub`` ontbreekt (overgang) op ``preferred_username`` (of de ``entity.id``). Zo'n event trekt alleen sessies in en
+    geeft **nooit** rechten (ook ``changed`` niet: nieuwe rechten volgen bij de volgende OIDC-login, groep → rol)."""
+    if ev.stroom != "inbox" or ev.source_app != HCH or ev.event_type not in SSO_ACCESS_EVENTS:
         return
-    name = ev.entity_id.strip()
-    if not name:
+    p = ev.payload or {}
+    issuer = p.get("issuer") if isinstance(p.get("issuer"), str) else None
+    sub = p.get("sub") if isinstance(p.get("sub"), str) and p.get("sub") else None
+    username = p.get("preferred_username") if isinstance(p.get("preferred_username"), str) else None
+    name = (username or ev.entity_id or "").strip()
+    q = select(OidcIdentity)
+    if sub is not None:
+        q = q.where(OidcIdentity.sub == sub)
+        if issuer:
+            q = q.where(OidcIdentity.issuer == issuer)
+        koppeling = "issuer_sub" if issuer else "sub"
+    elif name:
+        q = q.where(OidcIdentity.gebruikersnaam == name)
+        if issuer:
+            q = q.where(OidcIdentity.issuer == issuer)
+        koppeling = "gebruikersnaam (overgang: geen sub)"
+    else:
         return
-    idents = list(db.scalars(select(OidcIdentity).where(OidcIdentity.gebruikersnaam == name)))
+    idents = list(db.scalars(q))
     n = revoke_sessions(db, user_ids=[i.user_id for i in idents])
-    for i in idents:
-        i.ingetrokken_op = now
+    if ev.event_type == "sso.access.revoked":
+        for i in idents:
+            i.ingetrokken_op = now
     audit.record(
         db,
         actor_type="service",
         actor_id=HCH,
         action="auth.oidc.sessions_revoked",
         target_type="oidc_identity",
-        target_id=name[:128],
-        details={"reden": "sso.access.revoked", "sessies": n, "accounts": len(idents), "event": ev.ref},
+        target_id=(sub or name)[:128],
+        details={
+            "reden": ev.event_type,
+            "koppeling": koppeling,
+            "sessies": n,
+            "accounts": len(idents),
+            "event": ev.ref,
+        },
     )
 
 

@@ -116,6 +116,7 @@ def list_incidents(
     status: StatusFilter = "actief",
     ernst: Literal["info", "waarschuwing", "kritiek"] | None = None,
     bron: str | None = Query(default=None, max_length=64),
+    app: str | None = Query(default=None, max_length=64, description="Alleen incidenten van of over deze app"),
     soort: str | None = Query(default=None, max_length=64),
     oorzaak: str | None = Query(default=None, max_length=96, description="Groepeer op oorzaak-sleutel"),
     q: str | None = Query(default=None, max_length=100, description="Zoek in titel en onderwerp"),
@@ -130,6 +131,8 @@ def list_incidents(
         stmt = stmt.where(Incident.ernst == ernst)
     if bron:
         stmt = stmt.where(Incident.bron == bron)
+    if app:
+        stmt = stmt.where(or_(Incident.bron == app, Incident.onderwerp_id == app))
     if soort:
         stmt = stmt.where(Incident.soort == soort)
     if oorzaak:

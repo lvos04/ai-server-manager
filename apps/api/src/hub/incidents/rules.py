@@ -7,17 +7,24 @@ dezelfde vingerafdruk (nooit een "gerelateerd" incident van een andere app of ee
 Bronnen:
 - **eigen outbox** van de Hub (monitoringbronnen, meldingskanalen, eigen back-up, inventaris, noodlogin,
   alert-overgangen, auditketting);
-- **events-inbox** van diensten (contract §7): ``app.health.changed``, de SSO-events van ``home-control-hub``
-  (ADR-0009 daar: ``sso.authentik_sync.failed``, ``sso.authentik_upgrade_gate.evaluated``,
-  ``sso.authentik_restore_check.completed``, ``sso.anomaly.detected``) en een algemene regel op het laatste segment
-  (``…failed``/``…crashed`` → probleem, ``…succeeded``/``…recovered`` → herstel). Onbekende events maken geen incident.
+- **events-inbox** van diensten (contract 1.3 §7): ``app.health.changed`` over de eigen app, de SSO-events van
+  ``home-control-hub`` (ADR-0009 daar: ``sso.authentik_sync.failed``, ``sso.authentik_upgrade_gate.evaluated``,
+  ``sso.authentik_restore_check.completed``, ``sso.anomaly.detected``) en een algemene regel op het werkwoord (derde
+  segment): **probleem** ``failed``, ``crashed``, ``down``, ``degraded``, ``stalled``, ``blocked``, ``rejected``,
+  ``saturated``, ``conflict``; **herstel** ``recovered``, ``succeeded``, ``resolved``, ``restored``; de rest is
+  informatie. Die regels gelden alleen binnen de **domeinen van de eigenaar** (``source_app``, eerste segment); een
+  event buiten het eigen domein blijft algemene informatie en maakt geen incident. Onbekende events maken geen incident.
+- **Ernst** (§7): ``payload.ernst`` met één van de vijf Peil-woorden (``kritiek``, ``hoog``, ``middel``, ``laag``,
+  ``info``) → vaste afbeelding op de drie Hub-niveaus (``kritiek``; ``hoog``/``middel`` → ``waarschuwing``;
+  ``laag``/``info`` → ``info``); de bronwaarde blijft bewaard voor de UI. ``payload.severity`` geldt nog één
+  overgangsrelease (deze, 0.1.x) en vervalt daarna. Alleen ``kritiek`` escaleert.
 
 Teksten uit payloads zijn **gegevens**, nooit instructies: ze komen alleen geschoond en ingekort in titel/details.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
@@ -28,38 +35,74 @@ ERNST = ("info", "waarschuwing", "kritiek")
 ERNST_RANK = {"info": 0, "waarschuwing": 1, "kritiek": 2}
 HCH = "home-control-hub"
 
-PROBLEEM_WOORDEN = {
-    "failed",
-    "crashed",
-    "error",
-    "errored",
-    "down",
-    "unhealthy",
-    "timeout",
-    "stalled",
-    "offline",
-    "lost",
-    "expired",
-    "rejected",
-    "unreachable",
-    "broken",
-    "mismatch",
-}
-HERSTEL_WOORDEN = {"succeeded", "recovered", "restored", "healthy", "online", "resolved", "reachable"}
-KRITIEK_WOORDEN = {"crashed", "down", "broken", "lost"}
-ERNST_HINT = {
+# Contract 1.3 §7: vaste werkwoorden (derde segment) voor probleem en herstel; de rest is informatie.
+PROBLEEM_WOORDEN = {"failed", "crashed", "down", "degraded", "stalled", "blocked", "rejected", "saturated", "conflict"}
+HERSTEL_WOORDEN = {"recovered", "succeeded", "resolved", "restored"}
+KRITIEK_WOORDEN = {"crashed", "down"}
+
+# Contract 1.3 §7: de vijf Peil-woorden en hun vaste afbeelding op de drie Hub-niveaus.
+ERNST_WOORDEN = ("kritiek", "hoog", "middel", "laag", "info")
+ERNST_AFBEELDING = {
     "kritiek": "kritiek",
-    "critical": "kritiek",
-    "hoog": "kritiek",
-    "high": "kritiek",
-    "waarschuwing": "waarschuwing",
-    "warning": "waarschuwing",
+    "hoog": "waarschuwing",
     "middel": "waarschuwing",
-    "medium": "waarschuwing",
-    "info": "info",
     "laag": "info",
-    "low": "info",
+    "info": "info",
 }
+# Overgang (één release): payload.severity met de oude waarden → Peil-woord.
+SEVERITY_OVERGANG = {
+    "critical": "kritiek",
+    "kritiek": "kritiek",
+    "high": "hoog",
+    "hoog": "hoog",
+    "warning": "middel",
+    "waarschuwing": "middel",
+    "medium": "middel",
+    "middel": "middel",
+    "low": "laag",
+    "laag": "laag",
+    "info": "info",
+}
+# UI-label als de bron geen ernst meegaf (§7): kritiek → Kritiek, waarschuwing → Middel, info → Info.
+ERNST_LABEL = {"kritiek": "Kritiek", "waarschuwing": "Middel", "info": "Info"}
+
+# Contract 1.3 §7: domeinen per eigenaar (eerste segment). De eigenaar van een event is (source_app, domein).
+DOMEINEN: dict[str, frozenset[str]] = {
+    APP_ID: frozenset(
+        {"auth", "alert", "audit", "backup", "inventory", "monitoring", "notification", "onboarding", "action"}
+    ),
+    HCH: frozenset({"sso", "energy", "network", "automation", "flow"}),
+    "appstore-en-fork": frozenset({"catalog"}),
+    "jelly-leon-platform": frozenset({"lifecycle"}),
+    "zoeken-en-persoonlijke-ai": frozenset({"search", "voice"}),
+    "jelly-leon": frozenset({"media"}),
+    "mediaguard": frozenset({"media"}),  # via de Hub-adapter (P3); eigen regels, los van media van jelly-leon
+}
+# Gedeeld: app (alleen app.health.changed over de eigen app) en service (alleen de vaste lijst).
+SERVICE_EVENTS = frozenset(
+    {
+        "service.hub_link.linked",
+        "service.hub_link.unlinked",
+        "service.hub_link.revoked",
+        "service.token.rotated",
+        "service.key_rotation.applied",
+        "service.key_rotation.rejected",
+    }
+)
+# Oude namen: één release lang mag een dienst beide sturen (informatie, nooit een incident).
+SERVICE_EVENTS_OUD = frozenset(
+    {"service.enrollment.completed", "service.hub_link.paired", "service.hub_key.rotation_rejected"}
+)
+
+
+def eigen_domein(source_app: str, event_type: str, entity_type: str, entity_id: str) -> bool:
+    """Valt dit event onder de regels van zijn eigenaar (§7)? Buiten het eigen domein: alleen informatie."""
+    domein = event_type.split(".", 1)[0]
+    if domein == "app":
+        return event_type == "app.health.changed" and entity_id == source_app
+    if domein == "service":
+        return event_type in SERVICE_EVENTS and entity_type == "service" and entity_id == source_app
+    return domein in DOMEINEN.get(source_app, frozenset())
 
 
 @dataclass(frozen=True)
@@ -93,18 +136,34 @@ class Signaal:
     meldt_elke_keer: bool = False  # elke probleemgebeurtenis opnieuw melden (bv. noodlogin)
     samenvatting: str = ""
     details: dict[str, Any] = field(default_factory=dict)
+    ernst_bron: str | None = None  # Peil-woord uit payload.ernst (§7), voor de UI
 
 
 def _s(v: Any, n: int = 120) -> str:
     return redact_log_text(str(v), max_len=n) if v not in (None, "") else ""
 
 
+def bron_ernst(payload: dict[str, Any]) -> str | None:
+    """Het Peil-woord uit ``payload.ernst`` (§7), of tijdens de overgang uit ``payload.severity``; anders ``None``."""
+    ernst = payload.get("ernst")
+    if isinstance(ernst, str) and ernst in ERNST_WOORDEN:
+        return ernst
+    severity = payload.get("severity")
+    if isinstance(severity, str):
+        return SEVERITY_OVERGANG.get(severity.strip().lower())
+    return None
+
+
 def _ernst(payload: dict[str, Any], default: str) -> str:
-    for key in ("ernst", "severity"):
-        hint = ERNST_HINT.get(str(payload.get(key) or "").lower())
-        if hint:
-            return hint
-    return default
+    woord = bron_ernst(payload)
+    return ERNST_AFBEELDING[woord] if woord else default
+
+
+def ernst_label(ernst: str, bron: str | None) -> str:
+    """Wat de UI toont: de bronwaarde als die er is, anders de vaste afbeelding (§7)."""
+    if bron in ERNST_WOORDEN:
+        return bron.capitalize()
+    return ERNST_LABEL.get(ernst, "Info")
 
 
 def _safe_details(ev: EventIn, keys: tuple[str, ...] | None = None) -> dict[str, Any]:
@@ -499,9 +558,17 @@ def _generic(ev: EventIn) -> Signaal | None:
 def classify(ev: EventIn) -> Signaal | None:
     """Het signaal voor dit event, of ``None`` (geen incident; het event blijft wel in de inbox/outbox)."""
     if ev.source_app == APP_ID and ev.stroom == "outbox":
-        return _hub(ev)
-    if ev.source_app == HCH and ev.event_type.startswith("sso."):
+        sig = _hub(ev)
+    elif not eigen_domein(ev.source_app, ev.event_type, ev.entity_type, ev.entity_id):
+        return None  # buiten het eigen domein: algemene informatie, nooit de regels van de eigenaar (§7)
+    elif ev.source_app == HCH and ev.event_type.startswith("sso."):
         sig = _hch(ev)
-        if sig is not None or ev.event_type in ("sso.access.revoked", "sso.access.changed"):
-            return sig
-    return _generic(ev)
+        if sig is None and ev.event_type not in ("sso.access.revoked", "sso.access.changed"):
+            sig = _generic(ev)
+    else:
+        sig = _generic(ev)
+    if sig is not None and sig.ernst_bron is None:
+        woord = bron_ernst(ev.payload or {})
+        if woord is not None:
+            sig = replace(sig, ernst_bron=woord)
+    return sig

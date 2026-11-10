@@ -249,6 +249,7 @@ def _new_incident(sig: Signaal, ev: EventIn) -> Incident:
         soort=sig.soort[:64],
         titel=redact_log_text(sig.titel, max_len=200),
         ernst=sig.ernst,
+        ernst_bron=sig.ernst_bron,
         status="open",
         bron=sig.bron[:64],
         onderwerp_type=sig.onderwerp_type[:64],
@@ -332,6 +333,9 @@ def apply_signal(db: Session, settings: Settings, sig: Signaal, ev: EventIn, now
                 inc.eerste_op = ev.op
             if ERNST_RANK.get(sig.ernst, 0) > ERNST_RANK.get(inc.ernst, 0):
                 inc.ernst = sig.ernst  # automatisch alleen verhogen, nooit verlagen
+                inc.ernst_bron = sig.ernst_bron
+            elif sig.ernst == inc.ernst and sig.ernst_bron is not None:
+                inc.ernst_bron = sig.ernst_bron  # zelfde niveau: de laatste bronwaarde tonen
             if sig.details:
                 inc.details = sig.details
             inc.trace_ids = _push(inc.trace_ids, ev.trace_id)

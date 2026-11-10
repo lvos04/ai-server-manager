@@ -113,18 +113,86 @@ def test_hub_events_zelfde_vingerafdruk_voor_probleem_en_herstel() -> None:
 
 
 def test_algemene_regels_en_onbekend() -> None:
-    crash = classify(ev("mediaguard", "app.process.crashed"))
-    rec = classify(ev("mediaguard", "app.process.recovered"))
+    # mediaguard bezit het domein media (via de Hub-adapter); jelly-leon ook, met eigen regels (eigenaar = paar).
+    crash = classify(ev("mediaguard", "media.process.crashed"))
+    rec = classify(ev("mediaguard", "media.process.recovered"))
     assert crash and rec and crash.ernst == "kritiek" and crash.vingerafdruk == rec.vingerafdruk
+    jl = classify(ev("jelly-leon", "media.process.crashed"))
+    assert jl and jl.vingerafdruk != crash.vingerafdruk  # (source_app, domein): twee bronnen, nooit samengevoegd
     assert classify(ev("mediaguard", "media.download.failed")).ernst == "waarschuwing"  # type: ignore[union-attr]
     assert classify(ev("mediaguard", "media.download.failed", {"severity": "critical"})).ernst == "kritiek"  # type: ignore[union-attr]
     assert classify(ev("mediaguard", "media.item.added")) is None
     unknown = classify(ev("x", "app.health.changed", {"status": "unknown"}))
-    assert unknown and unknown.rol == "info"
+    assert unknown and unknown.rol == "info"  # unknown is nooit een herstel
     down = classify(ev("x", "app.health.changed", {"status": "down"}))
     assert down and down.rol == "probleem" and down.ernst == "kritiek"
-    long = classify(ev("x", "app.job.failed", {"naam": "A" * 500 + " token=geheim1234"}))
+    long = classify(ev("jelly-leon-platform", "lifecycle.job.failed", {"naam": "A" * 500 + " token=geheim1234"}))
     assert long and len(long.titel) < 260 and "geheim1234" not in long.titel
+
+
+@pytest.mark.parametrize(
+    ("verb", "rol"),
+    [
+        *[(v, "probleem") for v in ("failed", "crashed", "down", "degraded", "stalled", "blocked", "rejected")],
+        ("saturated", "probleem"),
+        ("conflict", "probleem"),
+        *[(v, "herstel") for v in ("recovered", "succeeded", "resolved", "restored")],
+        # Contract 1.3 §7: andere werkwoorden zijn informatie (ook die de Hub vroeger als probleem las).
+        *[(v, None) for v in ("error", "timeout", "offline", "expired", "unreachable", "healthy", "online", "added")],
+    ],
+)
+def test_vaste_werkwoorden_voor_probleem_en_herstel(verb: str, rol: str | None) -> None:
+    sig = classify(ev("appstore-en-fork", f"catalog.sync.{verb}", entity=("catalog_source", "s1")))
+    assert (sig.rol if sig else None) == rol
+
+
+@pytest.mark.parametrize(
+    ("source", "event_type", "entity"),
+    [
+        ("appstore-en-fork", "lifecycle.job.failed", ("job", "j1")),  # domein van jelly-leon-platform
+        ("home-control-hub", "media.download.failed", ("media_item", "m1")),  # domein van jelly-leon/mediaguard
+        ("zoeken-en-persoonlijke-ai", "backup.run.failed", ("self_backup", "hub")),  # domein van de Hub
+        ("onbekende-dienst", "catalog.sync.failed", ("x", "y")),  # geen eigen domein
+        ("mediaguard", "app.health.changed", ("app", "jelly-leon")),  # app.* alleen over de eigen app
+        ("home-control-hub", "app.process.crashed", ("app", "home-control-hub")),  # app: alleen health.changed
+        ("home-control-hub", "service.hub_link.rejected", ("service", "home-control-hub")),  # niet in de vaste lijst
+        ("home-control-hub", "service.key_rotation.rejected", ("service", "appstore-en-fork")),  # niet over zichzelf
+    ],
+)
+def test_buiten_het_eigen_domein_alleen_informatie(source: str, event_type: str, entity: tuple[str, str]) -> None:
+    assert classify(ev(source, event_type, entity=entity)) is None
+
+
+def test_vaste_service_events_en_oude_namen() -> None:
+    rej = classify(ev("home-control-hub", "service.key_rotation.rejected", entity=("service", "home-control-hub")))
+    assert rej and rej.rol == "probleem"
+    for oud in ("service.enrollment.completed", "service.hub_link.paired", "service.hub_key.rotation_rejected"):
+        assert classify(ev("home-control-hub", oud, entity=("service", "home-control-hub"))) is None
+
+
+@pytest.mark.parametrize(
+    ("payload", "ernst", "bron", "label"),
+    [
+        ({"ernst": "kritiek"}, "kritiek", "kritiek", "Kritiek"),
+        ({"ernst": "hoog"}, "waarschuwing", "hoog", "Hoog"),  # hoog escaleert niet (alleen kritiek)
+        ({"ernst": "middel"}, "waarschuwing", "middel", "Middel"),
+        ({"ernst": "laag"}, "info", "laag", "Laag"),
+        ({"ernst": "info"}, "info", "info", "Info"),
+        ({"ernst": "KRITIEK"}, "waarschuwing", None, "Middel"),  # geen Peil-woord: de regel bepaalt
+        ({"severity": "critical"}, "kritiek", "kritiek", "Kritiek"),  # overgang: severity
+        ({"severity": "high"}, "waarschuwing", "hoog", "Hoog"),
+        ({"ernst": "laag", "severity": "critical"}, "info", "laag", "Laag"),  # ernst wint van severity
+        ({}, "waarschuwing", None, "Middel"),
+    ],
+)
+def test_ernst_vijf_woorden_en_vaste_afbeelding(
+    payload: dict[str, Any], ernst: str, bron: str | None, label: str
+) -> None:
+    from hub.incidents.rules import ernst_label
+
+    sig = classify(ev("jelly-leon-platform", "lifecycle.job.failed", payload, ("job", "j1")))
+    assert sig and (sig.ernst, sig.ernst_bron) == (ernst, bron)
+    assert ernst_label(sig.ernst, sig.ernst_bron) == label
 
 
 def test_sso_events_van_home_control_hub() -> None:
@@ -138,5 +206,7 @@ def test_sso_events_van_home_control_hub() -> None:
     afw = classify(ev(hch, "sso.authentik_restore_check.completed", {"outcome": "afwijking"}))
     assert afw and afw.ernst == "kritiek" and afw.rol == "probleem"
     an = classify(ev(hch, "sso.anomaly.detected", {"rule_id": "login_storm", "severity": "hoog"}, ("sso_anomaly", "a")))
-    assert an and an.ernst == "kritiek"
+    assert an and an.ernst == "waarschuwing" and an.ernst_bron == "hoog"  # 1.3: hoog → waarschuwing
+    krit = classify(ev(hch, "sso.anomaly.detected", {"rule_id": "x", "ernst": "kritiek"}, ("sso_anomaly", "b")))
+    assert krit and krit.ernst == "kritiek" and krit.ernst_bron == "kritiek"
     assert classify(ev(hch, "sso.access.revoked", {}, ("authentik_user", "leon"))) is None

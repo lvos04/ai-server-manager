@@ -109,7 +109,7 @@ def test_geheimen_niet_in_index_supportbundel_of_zoekresultaat(admin: Any, app: 
     # Incident met dezelfde trace_id → supportbundel met de logregels, zonder geheimen.
     ev = event(
         "home-control-hub",
-        "app.process.crashed",
+        "automation.process.crashed",
         ("app", "n8"),
         {"naam": f"x {GOTIFY_TOKEN}"},
     )
@@ -141,12 +141,17 @@ def test_geheimen_niet_in_index_supportbundel_of_zoekresultaat(admin: Any, app: 
 
 def test_grenzen_rate_limit_en_retentie(admin: Any, app: Any, settings: Any, clean_db: str) -> None:
     svc = service(admin)
-    big = _line("x" * 8000, blob={"k": "v" * 6000})
+    big = _line("x" * 8000, **{f"veld{i}": "v" * 400 for i in range(20)})  # velden > 4 KiB na schoning
     r = admin.post("/api/v1/logs", json={"regels": [big]}, headers=svc)
     assert r.status_code == 202
     item = admin.get("/api/v1/logs").json()["items"][0]
-    assert len(item["bericht"]) <= 2000 and item["bericht"].endswith("…")
-    assert len(str(item["velden"])) < 4200
+    # Contract 1.3 §6.1 (K4): opslag hooguit 2000 tekens, zichtbaar gemarkeerd als ingekort; invoer > 8000 → 422.
+    assert len(item["bericht"]) == 2000 and item["bericht"].endswith("[ingekort]") and item["bericht_ingekort"] is True
+    assert item["velden_ingekort"] is True and len(str(item["velden"])) < 4200
+    assert admin.post("/api/v1/logs", json={"regels": [_line("x" * 8001)]}, headers=svc).status_code == 422
+    # RV11: trace_id is een UUID en op een tijd met tijdzone.
+    bad_trace = {**_line("trace"), "trace_id": "geen-uuid"}
+    assert admin.post("/api/v1/logs", json={"regels": [bad_trace]}, headers=svc).status_code == 422
     assert admin.post("/api/v1/logs", json={"regels": []}, headers=svc).status_code == 422
     assert admin.post("/api/v1/logs", json={"regels": [_line("y")] * 201}, headers=svc).status_code == 422
     # Meer dan 1 MiB → 413 vóór validatie (contract §5).

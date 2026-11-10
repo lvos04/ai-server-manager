@@ -67,7 +67,7 @@ def test_100_identieke_crashes_geven_een_doorlopend_incident(
             svc,
             event(
                 "home-control-hub",
-                "app.process.crashed",
+                "automation.node_red.crashed",
                 ("app", "node-red"),
                 {"naam": "Node-RED", "exit_code": 137},
                 at=base + timedelta(seconds=i),
@@ -80,7 +80,7 @@ def test_100_identieke_crashes_geven_een_doorlopend_incident(
         svc,
         event(
             "home-control-hub",
-            "app.process.crashed",
+            "automation.node_red.crashed",
             ("app", "node-red"),
             event_id=first_id,
         ),
@@ -109,84 +109,55 @@ def test_100_identieke_crashes_geven_een_doorlopend_incident(
 
 
 def test_herstel_sluit_alleen_het_eigen_incident(admin: Any, app: Any, periodic_run: Any) -> None:
+    """Contract 1.3 §7: domeinen per eigenaar (home-control-hub: sso, energy, network, automation, flow; app alleen
+    app.health.changed over de eigen app). Een event buiten het eigen domein maakt geen incident."""
     svc = service(admin)
+    hch = "home-control-hub"
     t0 = datetime.now(UTC) - timedelta(minutes=30)
-    post(
-        admin,
-        svc,
-        event("home-control-hub", "app.process.crashed", ("app", "a"), at=t0),
-    )
-    post(
-        admin,
-        svc,
-        event("home-control-hub", "app.process.crashed", ("app", "b"), at=t0),
-    )
-    post(admin, svc, event("home-control-hub", "backup.job.failed", ("app", "a"), at=t0))
-    post(
-        admin,
-        svc,
-        event(
-            "home-control-hub",
-            "app.health.changed",
-            ("app", "c"),
-            {"status": "down"},
-            at=t0,
-        ),
-    )
+    post(admin, svc, event(hch, "automation.process.crashed", ("app", "a"), at=t0))
+    post(admin, svc, event(hch, "automation.process.crashed", ("app", "b"), at=t0))
+    post(admin, svc, event(hch, "energy.job.failed", ("app", "a"), at=t0))
+    post(admin, svc, event(hch, "app.health.changed", ("app", hch), {"status": "down"}, at=t0))
+    # Buiten het eigen domein: alleen informatie, geen incident (backup is van de Hub, app.* gaat over de eigen app).
+    post(admin, svc, event(hch, "backup.job.failed", ("app", "a"), at=t0))
+    post(admin, svc, event(hch, "app.health.changed", ("app", "c"), {"status": "down"}, at=t0))
+    post(admin, svc, event(hch, "app.process.crashed", ("app", hch), at=t0))
     periodic_run("incidenten_bijwerken")
     assert len(active(admin)) == 4
-    # Herstel van proces A: alleen dat incident sluit; B, de back-up van A en de gezondheid van C blijven open.
-    post(
-        admin,
-        svc,
-        event(
-            "home-control-hub",
-            "app.process.recovered",
-            ("app", "a"),
-            at=t0 + timedelta(minutes=1),
-        ),
-    )
+    # Herstel van proces A: alleen dat incident sluit; B, de energietaak van A en de gezondheid blijven open.
+    post(admin, svc, event(hch, "automation.process.recovered", ("app", "a"), at=t0 + timedelta(minutes=1)))
     # 'unknown' is nooit een herstel; een te laat afgeleverd oud herstel ook niet.
-    post(
-        admin,
-        svc,
-        event(
-            "home-control-hub",
-            "app.health.changed",
-            ("app", "c"),
-            {"status": "unknown"},
-        ),
-    )
-    post(
-        admin,
-        svc,
-        event(
-            "home-control-hub",
-            "app.process.crashed",
-            ("app", "b"),
-            at=t0 + timedelta(minutes=5),
-        ),
-    )
-    post(
-        admin,
-        svc,
-        event(
-            "home-control-hub",
-            "app.process.recovered",
-            ("app", "b"),
-            at=t0 + timedelta(minutes=2),
-        ),
-    )
+    post(admin, svc, event(hch, "app.health.changed", ("app", hch), {"status": "unknown"}))
+    post(admin, svc, event(hch, "automation.process.crashed", ("app", "b"), at=t0 + timedelta(minutes=5)))
+    post(admin, svc, event(hch, "automation.process.recovered", ("app", "b"), at=t0 + timedelta(minutes=2)))
     out = periodic_run("incidenten_bijwerken")["incidenten_bijwerken"]
     assert out["opgelost"] == 1
     still = {(i["soort"], i["onderwerp"]["id"]) for i in active(admin)}
-    assert still == {("app.process", "b"), ("backup.job", "a"), ("app.gezondheid", "c")}
+    assert still == {("automation.process", "b"), ("energy.job", "a"), ("app.gezondheid", hch)}
     closed = active(admin, status="opgelost")
-    assert [(i["soort"], i["onderwerp"]["id"]) for i in closed] == [("app.process", "a")]
+    assert [(i["soort"], i["onderwerp"]["id"]) for i in closed] == [("automation.process", "a")]
     assert closed[0]["opgelost"]["door"] == "system:herstel"
     b = next(i for i in active(admin) if i["onderwerp"]["id"] == "b")
     evs = admin.get(f"/api/v1/incidents/{b['id']}/events").json()["items"]
     assert any("ouder dan het laatste probleem" in e["samenvatting"] for e in evs)
+    # C01: filter op app (bron of onderwerp).
+    assert {i["onderwerp"]["id"] for i in active(admin, app="b")} == {"b"}
+    assert len(active(admin, app=hch)) == 3  # bron home-control-hub
+
+
+def test_ernst_bronwaarde_en_vaste_afbeelding(admin: Any, app: Any, periodic_run: Any) -> None:
+    """Contract 1.3 §7 (C1.3-ASM-09): payload.ernst met de vijf Peil-woorden; hoog → waarschuwing (escaleert niet),
+    de UI krijgt de bronwaarde."""
+    svc = service(admin)
+    hch = "home-control-hub"
+    post(admin, svc, event(hch, "energy.meter.failed", ("meter", "m1"), {"ernst": "hoog"}))
+    post(admin, svc, event(hch, "network.scan.failed", ("scan", "s1"), {"ernst": "kritiek"}))
+    post(admin, svc, event(hch, "flow.run.failed", ("flow", "f9"), {"ernst": "laag"}))
+    periodic_run("incidenten_bijwerken")
+    by = {i["onderwerp"]["id"]: i for i in active(admin)}
+    assert (by["m1"]["ernst"], by["m1"]["ernst_bron"], by["m1"]["ernst_label"]) == ("waarschuwing", "hoog", "Hoog")
+    assert (by["s1"]["ernst"], by["s1"]["ernst_bron"], by["s1"]["ernst_label"]) == ("kritiek", "kritiek", "Kritiek")
+    assert (by["f9"]["ernst"], by["f9"]["ernst_bron"], by["f9"]["ernst_label"]) == ("info", "laag", "Laag")
 
 
 def test_heropenen_binnen_venster_hersteldmelding_en_veilige_modus(
@@ -201,8 +172,9 @@ def test_heropenen_binnen_venster_hersteldmelding_en_veilige_modus(
             svc,
             event(
                 "home-control-hub",
-                "app.process.crashed",
-                ("app", "x"),
+                "app.health.changed",
+                ("app", "home-control-hub"),
+                {"status": "down"},
                 at=t0 + timedelta(minutes=4 * k),
             ),
         )
@@ -213,8 +185,9 @@ def test_heropenen_binnen_venster_hersteldmelding_en_veilige_modus(
                 svc,
                 event(
                     "home-control-hub",
-                    "app.process.recovered",
-                    ("app", "x"),
+                    "app.health.changed",
+                    ("app", "home-control-hub"),
+                    {"status": "healthy"},
                     at=t0 + timedelta(minutes=4 * k + 1),
                 ),
             )
@@ -399,7 +372,7 @@ def test_escalatie_en_verlopen_erkenning(admin: Any, app: Any, periodic_run: Any
     post(
         admin,
         svc,
-        event("home-control-hub", "app.health.changed", ("app", "z"), {"status": "down"}),
+        event("home-control-hub", "app.health.changed", ("app", "home-control-hub"), {"status": "down"}),
     )
     now = datetime.now(UTC)
     periodic_run("incidenten_bijwerken", now=now)
@@ -430,7 +403,7 @@ def test_samenvatting_groepen_en_correlatie(admin: Any, app: Any, periodic_run: 
     post(
         admin,
         svc,
-        event("home-control-hub", "app.process.crashed", ("app", "q"), correlation_id=corr),
+        event("home-control-hub", "automation.process.crashed", ("app", "q"), correlation_id=corr),
     )
     periodic_run("incidenten_bijwerken")
     # Een onbekend event-type met dezelfde correlation_id hangt aan hetzelfde incident.
@@ -439,7 +412,7 @@ def test_samenvatting_groepen_en_correlatie(admin: Any, app: Any, periodic_run: 
         svc,
         event(
             "home-control-hub",
-            "app.process.diagnosed",
+            "automation.process.diagnosed",
             ("app", "q"),
             correlation_id=corr,
         ),
