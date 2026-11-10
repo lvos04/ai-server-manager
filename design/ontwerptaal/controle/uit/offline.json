@@ -1,6 +1,7 @@
 {
  "richting": "peil",
  "pagina": "offline.html",
+ "letter": "systeem (standaard)",
  "runs": [
   {
    "theme": "licht",
@@ -59,22 +60,8 @@
      "kleur": "#566070"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
@@ -172,16 +159,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 5.61,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 6.36,
      "kleur": "#566070"
     },
     {
@@ -286,6 +266,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 4.56,
    "aantalTekst": 188,
@@ -355,22 +336,8 @@
      "kleur": "#566070"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
@@ -468,16 +435,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 5.61,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 6.36,
      "kleur": "#566070"
     },
     {
@@ -582,6 +542,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 4.56,
    "aantalTekst": 188,
@@ -651,22 +612,8 @@
      "kleur": "#566070"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
@@ -764,16 +711,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 5.61,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 6.36,
      "kleur": "#566070"
     },
     {
@@ -878,6 +818,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 4.56,
    "aantalTekst": 188,
@@ -960,22 +901,8 @@
      "kleur": "#566070"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
@@ -1073,16 +1000,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 5.61,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 6.36,
      "kleur": "#566070"
     },
     {
@@ -1187,6 +1107,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 4.56,
    "aantalTekst": 188,
@@ -1263,22 +1184,8 @@
      "kleur": "#566070"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
@@ -1376,16 +1283,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 5.61,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 6.36,
      "kleur": "#566070"
     },
     {
@@ -1490,6 +1390,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 4.56,
    "aantalTekst": 198,
@@ -1566,22 +1467,8 @@
      "kleur": "#566070"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 6.36,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
@@ -1679,16 +1566,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 5.61,
-     "kleur": "#566070"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 6.36,
      "kleur": "#566070"
     },
     {
@@ -1793,6 +1673,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 4.56,
    "aantalTekst": 200,
@@ -1875,22 +1756,8 @@
      "kleur": "#a3adbb"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
@@ -1988,16 +1855,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 8.57,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 7.78,
      "kleur": "#a3adbb"
     },
     {
@@ -2102,6 +1962,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 5.01,
    "aantalTekst": 188,
@@ -2171,22 +2032,8 @@
      "kleur": "#a3adbb"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
@@ -2284,16 +2131,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 8.57,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 7.78,
      "kleur": "#a3adbb"
     },
     {
@@ -2398,6 +2238,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 5.01,
    "aantalTekst": 188,
@@ -2467,22 +2308,8 @@
      "kleur": "#a3adbb"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
@@ -2580,16 +2407,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 8.57,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 7.78,
      "kleur": "#a3adbb"
     },
     {
@@ -2694,6 +2514,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 5.01,
    "aantalTekst": 188,
@@ -2776,22 +2597,8 @@
      "kleur": "#a3adbb"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
@@ -2889,16 +2696,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 8.57,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 7.78,
      "kleur": "#a3adbb"
     },
     {
@@ -3003,6 +2803,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 5.01,
    "aantalTekst": 188,
@@ -3079,22 +2880,8 @@
      "kleur": "#a3adbb"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
@@ -3192,16 +2979,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 8.57,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 7.78,
      "kleur": "#a3adbb"
     },
     {
@@ -3306,6 +3086,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 5.01,
    "aantalTekst": 198,
@@ -3382,22 +3163,8 @@
      "kleur": "#a3adbb"
     },
     {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
-     "bw": 2,
-     "buiten": 7.78,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd",
+     "el": "span.status.status-onbekend.",
+     "t": "Onbekend",
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
@@ -3495,16 +3262,9 @@
     },
     {
      "el": "article.kaart.kaart-verouderd.",
-     "t": "Apps en uptime Verouderd · stand van 11:",
+     "t": "Apps en uptime Storing · stand van 11:52",
      "bw": 2,
      "buiten": 8.57,
-     "kleur": "#a3adbb"
-    },
-    {
-     "el": "span.status.status-verouderd.",
-     "t": "Verouderd · stand van 11:52",
-     "bw": 2,
-     "buiten": 7.78,
      "kleur": "#a3adbb"
     },
     {
@@ -3609,6 +3369,7 @@
    "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 5.01,
    "aantalTekst": 200,
@@ -3636,5 +3397,5 @@
   }
  ],
  "bewegingBijReduce": [],
- "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Offline · stand van 11:52\n- status:\n  - paragraph: Je bent offline. Gegevens zijn niet actueel; acties zijn uitgeschakeld. Zodra de verbinding terug is, halen we alles opnieuw op.\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - heading \"Home\" [level=1]\n  - paragraph: Stand van 11:52 · niet actueel (offline)\n  - button \"Vernieuwen\" [disabled]\n  - region \"Systeemstatus\":\n    - heading \"Systeemstatus\" [level=2]\n    - text: Onbekend — offline\n    - paragraph:\n      - text: \"Laatst bekend om 11:52:\"\n      - strong: Storing\n      - text: . Zonder verbinding weten we niet hoe het nu is.\n    - list:\n      - listitem:\n        - link \"Apps Verouderd Voorbeeld-app start steeds opnieuw (crashloop). Automatisch herstel is gestopt.\":\n          - /url: problemen.html\n      - listitem:\n        - link \"Media Verouderd MediaGuard antwoordt (HTTP 200), maar rondt geen taken af.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Huis Verouderd my_house reageert niet sinds 10:12 — gegevens verouderd.\":\n          - /url: huis.html\n      - listitem:\n        - link \"Opslag Verouderd voorbeeldpool ONLINE · scrub 3 dagen geleden zonder fouten.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Back-ups Verouderd Hersteltest van foto én database geslaagd op 7 nov.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Meldingen Verouderd Gotify bereikbaar · testmelding 11:30 afgeleverd.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"GPU en AV1 Verouderd MediaGuard-noodstop sinds 09:04 (door Beheerder). Geen storing.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Netwerk Nog niet beschikbaar Volgt in fase P5 (netwerk, persoonlijke AI en kosten).\":\n          - /url: \"#\"\n  - region \"Wat actie nodig heeft\":\n    - heading \"Wat actie nodig heeft\" [level=2]\n    - paragraph: Acties die iets wijzigen staan uit tot de verbinding terug is. Er wordt niets in een wachtrij gezet.\n    - list:\n      - listitem:\n        - text: \"Ernst: Hoog Voorbeeld-app start steeds opnieuw\"\n        - paragraph: Automatisch herstel is gestopt na 2 pogingen. Eerste melding 10:02, laatste 11:54 (×100).\n        - link \"Incident bekijken\":\n          - /url: problemen.html\n        - text: Toont de stand van 11:52\n      - listitem:\n        - text: R2 · Goedkeuring nodig Voorbeeld-app bijwerken naar 2.5.0\n        - paragraph: Aangevraagd door de AI · verloopt over 14:32. Back-up wordt vooraf gemaakt.\n        - link \"Voorstel beoordelen\":\n          - /url: appdetail.html\n        - text: Toont de stand van 11:52\n      - listitem:\n        - text: Gate dicht Geblokkeerd door de DNS-gate\n        - paragraph: \"Nodig: terugvalroute voor DNS getest (D11). Dit is geen storing; er wacht een voorwaarde.\"\n        - button \"Terugvalroute testen\" [disabled]\n        - text: \"Uit: je bent offline\"\n      - listitem:\n        - text: Onboarding 12 besluiten nog open\n        - paragraph: 5 van 18 besluiten getest. Zonder besluiten blijven sommige functies dicht.\n        - button \"Onboarding verder\" [disabled]\n        - text: \"Uit: je bent offline\"\n  - heading \"Overzicht\" [level=2]\n  - article \"Downloads en bibliotheek\":\n    - heading \"Downloads en bibliotheek\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 4 downloads actief · gemeten (laatst bekende waarde, verouderd)\n    - paragraph:\n      - text: \"Bibliotheek:\"\n      - strong: \"1.284\"\n      - text: titels · 3 verzoeken in behandeling.\n    - term: Bron\n    - definition: MediaGuard\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Downloads bekijken\":\n      - /url: \"#\"\n  - article \"GPU en AV1\":\n    - heading \"GPU en AV1\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph:\n      - text: De AV1-wachtrij staat stil door de\n      - strong: MediaGuard-noodstop\n      - text: (sinds 09:04, door Beheerder). Dit is een bewuste pauze, geen storing.\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 12 items in de wachtrij · gemeten (laatst bekende waarde, verouderd)\n    - paragraph: \"GPU-temperatuur: Onbekend\"\n    - paragraph: \"Niet gemeten: Beszel levert geen temperatuur voor deze GPU. We tonen geen schatting en nooit 0 °C.\"\n    - term: Bron\n    - definition: MediaGuard (wachtrij), Beszel (GPU)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Werklast bekijken\":\n      - /url: \"#\"\n  - article \"Apps en uptime\":\n    - heading \"Apps en uptime\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 13 van 14 apps gezond · gemeten (laatst bekende waarde, verouderd)\n    - paragraph: \"Voorbeeld-app: start steeds opnieuw (crashloop).\"\n    - paragraph:\n      - text: \"Uptime afgelopen 30 dagen:\"\n      - strong: 99,2%\n      - text: · gemeten\n    - term: Bron\n    - definition: TrueNAS-API, Uptime Kuma\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Apps bekijken\":\n      - /url: appdetail.html\n  - article \"Huiscomfort en energie\":\n    - heading \"Huiscomfort en energie\" [level=3]\n    - text: Onbekend Verouderd\n    - paragraph: Laatst bekend · 10:12\n    - paragraph: 20,5 °C (laatst bekende waarde, verouderd) woonkamer\n    - paragraph: my_house reageert niet sinds 10:12. Bediening staat uit tot de bron weer antwoordt.\n    - paragraph:\n      - text: \"Energie vandaag:\"\n      - strong: Onbekend\n      - text: — afgeleid van dezelfde bron, dus ook verouderd.\n    - term: Bron\n    - definition: my_house\n    - term: Bijgewerkt\n    - definition:\n      - time: 10:12\n      - text: (1 u 44 min geleden)\n    - term: Geprobeerd\n    - definition:\n      - time: 11:56 (geen antwoord)\n    - link \"Huis openen\":\n      - /url: huis.html\n  - article \"Veiligheid en back-ups\":\n    - heading \"Veiligheid en back-ups\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 8 van 8 datasets gedekt · gemeten (laatst bekende waarde, verouderd)\n    - paragraph:\n      - text: \"Laatste hersteltest:\"\n      - strong: geslaagd\n      - text: op 7 nov (foto én database, checksums gelijk).\n    - term: Bron\n    - definition: TrueNAS-snapshots, OneDrive-controle, hersteltest\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Back-ups bekijken\":\n      - /url: \"#\"\n  - article \"Nieuwste acties\":\n    - heading \"Nieuwste acties\" [level=3]\n    - list:\n      - listitem: R1 · Omkeerbaar Voorbeeld-dienst herstarten Uitgevoerd en gecontroleerd om 11:51 · gezond na 34 s\n      - listitem: R2 · Goedkeuring nodig Voorbeeld-app bijwerken naar 2.5.0 Wacht op goedkeuring · verloopt over 14:32\n      - listitem: R1 · Omkeerbaar Snapshot voorbeeldpool/data Mislukt om 08:00 · incident geopend\n    - term: Bron\n    - definition: Hub-audit\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Audit bekijken\":\n      - /url: \"#\"\n  - article \"Onboarding\":\n    - heading \"Onboarding\" [level=3]\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 5 van 18 besluiten getest (laatst bekende waarde, verouderd)\n    - progressbar \"Voortgang onboarding\"\n    - paragraph: 12 open · 1 geblokkeerd (wacht op hersteltest D05).\n    - term: Bron\n    - definition: Hub\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - button \"Onboarding verder\" [disabled]\n    - text: \"Uit: je bent offline\"\n  - article \"Kosten\":\n    - heading \"Kosten\" [level=3]\n    - text: Onbekend\n    - paragraph: Nog nooit opgehaald en je bent offline. We tonen geen schatting en geen 0.\n    - term: Bron\n    - definition: Hub (AI-tegoed, energietarief)\n    - term: Bijgewerkt\n    - definition: nog nooit\n    - term: Geprobeerd\n    - definition:\n      - time: 11:52\n      - text: (offline)\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - link \"TrueNAS Home Platform\":\n    - /url: home.html\n  - button \"Zoeken\"\n  - 'button \"Gebruikersmenu: Beheerder\"'\n  - status: Offline · stand van 11:52\n- status:\n  - paragraph: Je bent offline. Gegevens zijn niet actueel; acties zijn uitgeschakeld. Zodra de verbinding terug is, halen we alles opnieuw op.\n- complementary \"Voorbeeldgegevens\":\n  - paragraph: Voorbeeld Alle namen, adressen en waarden op dit scherm zijn fictief en dienen alleen het ontwerp.\n- main:\n  - heading \"Home\" [level=1]\n  - paragraph: Stand van 11:52 · niet actueel (offline)\n  - button \"Vernieuwen\" [disabled]\n  - region \"Systeemstatus\":\n    - heading \"Systeemstatus\" [level=2]\n    - text: Onbekend — offline\n    - paragraph:\n      - text: \"Laatst bekend om 11:52:\"\n      - strong: Storing\n      - text: . Zonder verbinding weten we niet hoe het nu is.\n    - list:\n      - listitem:\n        - link \"Apps Storing · stand van 11:52 Voorbeeld-app start steeds opnieuw (crashloop). Automatisch herstel is gestopt.\":\n          - /url: problemen.html\n      - listitem:\n        - link \"Media Beperkt · stand van 11:52 MediaGuard antwoordt (HTTP 200), maar rondt geen taken af.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Huis Onbekend my_house reageert niet sinds 10:12 — gegevens verouderd.\":\n          - /url: huis.html\n      - listitem:\n        - link \"Opslag Verouderd voorbeeldpool ONLINE · scrub 3 dagen geleden zonder fouten.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Back-ups Verouderd Hersteltest van foto én database geslaagd op 7 nov.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Meldingen Verouderd Gotify bereikbaar · testmelding 11:30 afgeleverd.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"GPU en AV1 Verouderd MediaGuard-noodstop sinds 09:04 (door Beheerder). Geen storing.\":\n          - /url: \"#\"\n      - listitem:\n        - link \"Netwerk Nog niet beschikbaar Volgt in fase P5 (netwerk, persoonlijke AI en kosten).\":\n          - /url: \"#\"\n  - region \"Wat actie nodig heeft\":\n    - heading \"Wat actie nodig heeft\" [level=2]\n    - paragraph: Acties die iets wijzigen staan uit tot de verbinding terug is. Er wordt niets in een wachtrij gezet.\n    - list:\n      - listitem:\n        - text: \"Ernst: Hoog Voorbeeld-app start steeds opnieuw\"\n        - paragraph: Automatisch herstel is gestopt na 2 pogingen. Eerste melding 10:02, laatste 11:54 (×100).\n        - link \"Incident bekijken\":\n          - /url: problemen.html\n        - text: Toont de stand van 11:52\n      - listitem:\n        - text: R2 · Goedkeuring nodig Voorbeeld-app bijwerken naar 2.5.0\n        - paragraph: Aangevraagd door de AI · verloopt over 14:32. Back-up wordt vooraf gemaakt.\n        - link \"Voorstel beoordelen\":\n          - /url: appdetail.html\n        - text: Toont de stand van 11:52\n      - listitem:\n        - text: Gate dicht Geblokkeerd door de DNS-gate\n        - paragraph: \"Nodig: terugvalroute voor DNS getest (D11). Dit is geen storing; er wacht een voorwaarde.\"\n        - button \"Terugvalroute testen\" [disabled]\n        - text: \"Uit: je bent offline\"\n      - listitem:\n        - text: Onboarding 12 besluiten nog open\n        - paragraph: 5 van 18 besluiten getest. Zonder besluiten blijven sommige functies dicht.\n        - button \"Onboarding verder\" [disabled]\n        - text: \"Uit: je bent offline\"\n  - heading \"Overzicht\" [level=2]\n  - article \"Downloads en bibliotheek\":\n    - heading \"Downloads en bibliotheek\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 4 downloads actief · gemeten (laatst bekende waarde, verouderd)\n    - paragraph:\n      - text: \"Bibliotheek:\"\n      - strong: \"1.284\"\n      - text: titels · 3 verzoeken in behandeling.\n    - term: Bron\n    - definition: MediaGuard\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Downloads bekijken\":\n      - /url: \"#\"\n  - article \"GPU en AV1\":\n    - heading \"GPU en AV1\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph:\n      - text: De AV1-wachtrij staat stil door de\n      - strong: MediaGuard-noodstop\n      - text: (sinds 09:04, door Beheerder). Dit is een bewuste pauze, geen storing.\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 12 items in de wachtrij · gemeten (laatst bekende waarde, verouderd)\n    - paragraph: \"GPU-temperatuur: Onbekend\"\n    - paragraph: \"Niet gemeten: Beszel levert geen temperatuur voor deze GPU. We tonen geen schatting en nooit 0 °C.\"\n    - term: Bron\n    - definition: MediaGuard (wachtrij), Beszel (GPU)\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Werklast bekijken\":\n      - /url: \"#\"\n  - article \"Apps en uptime\":\n    - heading \"Apps en uptime\" [level=3]\n    - text: Storing · stand van 11:52\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 13 van 14 apps gezond · gemeten (laatst bekende waarde, verouderd)\n    - paragraph: \"Voorbeeld-app: start steeds opnieuw (crashloop).\"\n    - paragraph:\n      - text: \"Uptime afgelopen 30 dagen:\"\n      - strong: 99,2%\n      - text: · gemeten\n    - term: Bron\n    - definition: TrueNAS-API, Uptime Kuma\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Apps bekijken\":\n      - /url: appdetail.html\n  - article \"Huiscomfort en energie\":\n    - heading \"Huiscomfort en energie\" [level=3]\n    - text: Onbekend Verouderd\n    - paragraph: Laatst bekend · 10:12\n    - paragraph: 20,5 °C (laatst bekende waarde, verouderd) woonkamer\n    - paragraph: my_house reageert niet sinds 10:12. Bediening staat uit tot de bron weer antwoordt.\n    - paragraph:\n      - text: \"Energie vandaag:\"\n      - strong: Onbekend\n      - text: — afgeleid van dezelfde bron, dus ook verouderd.\n    - term: Bron\n    - definition: my_house\n    - term: Bijgewerkt\n    - definition:\n      - time: 10:12\n      - text: (1 u 44 min geleden)\n    - term: Geprobeerd\n    - definition:\n      - time: 11:56 (geen antwoord)\n    - link \"Huis openen\":\n      - /url: huis.html\n  - article \"Veiligheid en back-ups\":\n    - heading \"Veiligheid en back-ups\" [level=3]\n    - text: Verouderd · stand van 11:52\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 8 van 8 datasets gedekt · gemeten (laatst bekende waarde, verouderd)\n    - paragraph:\n      - text: \"Laatste hersteltest:\"\n      - strong: geslaagd\n      - text: op 7 nov (foto én database, checksums gelijk).\n    - term: Bron\n    - definition: TrueNAS-snapshots, OneDrive-controle, hersteltest\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Back-ups bekijken\":\n      - /url: \"#\"\n  - article \"Nieuwste acties\":\n    - heading \"Nieuwste acties\" [level=3]\n    - list:\n      - listitem: R1 · Omkeerbaar Voorbeeld-dienst herstarten Uitgevoerd en gecontroleerd om 11:51 · gezond na 34 s\n      - listitem: R2 · Goedkeuring nodig Voorbeeld-app bijwerken naar 2.5.0 Wacht op goedkeuring · verloopt over 14:32\n      - listitem: R1 · Omkeerbaar Snapshot voorbeeldpool/data Mislukt om 08:00 · incident geopend\n    - term: Bron\n    - definition: Hub-audit\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - link \"Audit bekijken\":\n      - /url: \"#\"\n  - article \"Onboarding\":\n    - heading \"Onboarding\" [level=3]\n    - paragraph: Laatst bekend · 11:52\n    - paragraph: 5 van 18 besluiten getest (laatst bekende waarde, verouderd)\n    - progressbar \"Voortgang onboarding\"\n    - paragraph: 12 open · 1 geblokkeerd (wacht op hersteltest D05).\n    - term: Bron\n    - definition: Hub\n    - term: Bijgewerkt\n    - definition:\n      - time: 11:52\n      - text: (stand bij het wegvallen van de verbinding)\n    - button \"Onboarding verder\" [disabled]\n    - text: \"Uit: je bent offline\"\n  - article \"Kosten\":\n    - heading \"Kosten\" [level=3]\n    - text: Onbekend\n    - paragraph: Nog nooit opgehaald en je bent offline. We tonen geen schatting en geen 0.\n    - term: Bron\n    - definition: Hub (AI-tegoed, energietarief)\n    - term: Bijgewerkt\n    - definition: nog nooit\n    - term: Geprobeerd\n    - definition:\n      - time: 11:52\n      - text: (offline)\n- navigation \"Hoofdnavigatie\":\n  - link \"Home\":\n    - /url: home.html\n  - link \"Apps\":\n    - /url: apps.html\n  - link \"Problemen , 3 open\":\n    - /url: problemen.html\n  - link \"AI\":\n    - /url: \"#\"\n  - link \"Meer , 1 goedkeuring wacht\":\n    - /url: \"#\""
 }

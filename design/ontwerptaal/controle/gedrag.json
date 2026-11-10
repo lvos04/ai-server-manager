@@ -14,5 +14,48 @@
  "r3_goed": null,
  "r3_reden": "De naam klopt. Je kunt nu goedkeuren.",
  "forced_colors_stippel": "dashed 2px rgb(0, 0, 0)",
- "zoom200_overloop": 0
+ "zoom200_overloop": 0,
+ "forced_colors_actief_item": "underline 3px",
+ "ondernav_320": [
+  {
+   "label": "Home",
+   "past": true,
+   "gewicht": "500",
+   "actief": true
+  },
+  {
+   "label": "Apps",
+   "past": true,
+   "gewicht": "500",
+   "actief": false
+  },
+  {
+   "label": "3Problemen",
+   "past": true,
+   "gewicht": "500",
+   "actief": false
+  },
+  {
+   "label": "AI",
+   "past": true,
+   "gewicht": "500",
+   "actief": false
+  },
+  {
+   "label": "1Meer",
+   "past": true,
+   "gewicht": "500",
+   "actief": false
+  }
+ ],
+ "kind_scroll_padding_1440": "76px",
+ "home_scroll_padding_1440": "12px",
+ "statuspagina_novalidate": [
+  true
+ ],
+ "skiplink_verborgen": true,
+ "skiplink_bij_focus": {
+  "tekst": "Naar de koppelcode (fout)",
+  "binnen": true
+ }
 }

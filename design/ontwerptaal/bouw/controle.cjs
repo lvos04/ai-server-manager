@@ -13,7 +13,11 @@ const AXE = [process.env.AXE_CORE, (() => { try { return req.resolve('axe-core/a
 if (!AXE) throw new Error('axe-core niet gevonden: zet AXE_CORE=<pad naar axe.min.js>');
 const widths = (wArg || '320,360,390,768,1024,1440').split(',').map(Number);
 const themes = (tArg || 'licht,donker').split(',');
-const UIT = path.join(__dirname, '..', 'controle', 'uit'); fs.mkdirSync(UIT, { recursive: true });
+// 1.1.1 (E12): PEIL_LETTER="DejaVu Sans" meet met een ander systeemlettertype (zoals de Ubuntu-runner in CI); uitvoer
+// dan in controle/uit-letter/ zodat de standaardmeting niet wordt overschreven. Codes houden hun mono-letter.
+const LETTER = process.env.PEIL_LETTER || '';
+const LETTER_CSS = LETTER ? `:root:root{--font-sans:${JSON.stringify(LETTER)},sans-serif !important} body, body *:not(code):not(kbd):not(samp):not(pre):not(.font-mono):not(.mono){font-family:${JSON.stringify(LETTER)},sans-serif !important}` : '';
+const UIT = path.join(__dirname, '..', 'controle', LETTER ? 'uit-letter' : 'uit'); fs.mkdirSync(UIT, { recursive: true });
 
 const IN_PAGE = () => {
   const cvs = document.createElement('canvas'); cvs.width = cvs.height = 1;
@@ -65,9 +69,17 @@ const IN_PAGE = () => {
   const doelen = [];
   for (const el of document.querySelectorAll('a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=tab],[role=link],[tabindex]:not([tabindex="-1"])')) { if (!visible(el)) continue; const r = el.getBoundingClientRect(); const inline = el.tagName === 'A' && getComputedStyle(el).display === 'inline' && el.parentElement && txt(el.parentElement).length > 0; const lab = (el.type === 'radio' || el.type === 'checkbox') && el.closest('label'); const lr = lab && lab.getBoundingClientRect(); if (lr && lr.width >= 44 && lr.height >= 44) continue; if (r.width < 44 || r.height < 44) doelen.push({ el: desc(el), t: (el.innerText || el.getAttribute('aria-label') || '').replace(/\s+/g,' ').trim().slice(0, 40), w: Math.round(r.width), h: Math.round(r.height), inline }); }
   const se = document.scrollingElement; const overloop = se.scrollWidth - se.clientWidth;
+  // 1.1.1: inhoud die buiten zijn eigen knop, pil, navigatie-item of rij steekt (zonder dat de pagina overloopt);
+  // vond in my_house en appstore-en-fork fouten die de paginaoverloop niet ziet (E12, E16).
+  const uitsteek = [];
+  for (const el of document.querySelectorAll('a, button, summary, label, li, dd, td, th, .status, .pil, .onder-item, .zij-item, .kop-item, .melding, .blok, .kaart')) {
+    if (!visible(el)) continue; const cs = getComputedStyle(el);
+    if (cs.display === 'inline' || cs.display === 'contents' || cs.overflowX !== 'visible') continue;
+    const over = el.scrollWidth - el.clientWidth; if (over > 1) uitsteek.push({ el: desc(el), t: (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 40), over });
+  }
   const afgekapt = [];
   for (const el of document.querySelectorAll('body *')) { const cs = getComputedStyle(el); if (cs.textOverflow === 'ellipsis' && visible(el) && el.scrollWidth > el.clientWidth + 1) afgekapt.push({ el: desc(el), t: (el.textContent||'').replace(/\s+/g,' ').trim().slice(0, 60), title: el.getAttribute('title') || '' }); }
-  return { tekst, minFont, kleinFont, velden, stippel, doelen, overloop, afgekapt };
+  return { tekst, minFont, kleinFont, velden, stippel, doelen, overloop, afgekapt, uitsteek };
 };
 
 const FOCUS = () => {
@@ -92,9 +104,10 @@ const FOCUS = () => {
 (async () => {
   const browser = await chromium.launch();
   const file = path.join(BASE, pagina);
-  const res = { richting, pagina, runs: [] };
+  const res = { richting, pagina, letter: LETTER || 'systeem (standaard)', runs: [] };
   for (const theme of themes) for (const w of widths) {
     const page = await browser.newPage({ viewport: { width: w, height: 844 }, colorScheme: theme === 'donker' ? 'dark' : 'light', hasTouch: w < 1024 });
+    if (LETTER_CSS) await page.addInitScript((css) => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); }), LETTER_CSS);
     await page.goto('file://' + file);
     await page.evaluate((t) => document.documentElement.classList.toggle('dark', t === 'donker'), theme);
     await page.waitForTimeout(250);

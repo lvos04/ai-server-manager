@@ -1,5 +1,6 @@
 // Compacte samenvatting per richting × pagina (alle breedtes en thema's)
-const fs = require('fs'); const path = require('path'); const dir = path.join(__dirname, '..', 'controle', 'uit');
+// Gebruik: node bouw/samenvat.cjs [uit|uit-letter]
+const fs = require('fs'); const path = require('path'); const dir = path.join(__dirname, '..', 'controle', process.argv[2] || 'uit');
 const rows = [];
 for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort()) {
   const j = JSON.parse(fs.readFileSync(path.join(dir, f)));
@@ -24,6 +25,8 @@ for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort()) {
   console.log(`\n## ${f.replace('.json', '')}\n  tekst min licht ${minL} / donker ${minD}; minFont ${minFont}px; tekstfouten: ${tf.length ? tf.join(' | ') : 'geen'}`);
   if (klein.length) console.log(`  <12px: ${klein.join(' | ')}`);
   console.log(`  overloop: ${over.join(', ') || 'geen'}; afgekapt: ${afk.join(' | ') || 'geen'}`);
+  const uit = [...new Set(R.flatMap(r => (r.uitsteek || []).map(u => `${r.w}: ${u.el} "${u.t}" ${u.over}px`)))];
+  console.log(`  inhoud buiten zijn element (1.1.1): ${uit.length ? uit.slice(0, 8).join(' | ') + (uit.length > 8 ? ` (+${uit.length - 8})` : '') : 'geen'}`);
   console.log(`  doelen<44 @≤390 (excl. inline/labels): ${doel.join(' | ') || 'geen'}; @1440: ${doel1440}`);
   console.log(`  veldrand min ${veldMin === 99 ? '-' : veldMin}:1 ${velden.join(' | ')}; stippelrand<3: ${st.join(' | ') || 'geen'}`);
   console.log(`  focus: ring min ${ringMin}:1, breedtes ${[...new Set(fr.flatMap(r => r.focus.breedtes))]}, eerste ${fr[0] && fr[0].focus.eerste}; zonder ring ${zonder.join(', ') || '-'}; zwak ${zwak.join(', ') || '-'}; bedekt@390 (scroll-padding ${fr[0] && fr[0].scrollPadding}): ${bedekt.join(' | ') || 'geen'}`);

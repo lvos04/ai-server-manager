@@ -1,0 +1,433 @@
+{
+ "richting": "peil",
+ "pagina": "statuspagina-onleesbaar.html",
+ "letter": "systeem (standaard)",
+ "runs": [
+  {
+   "theme": "licht",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 3,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "licht",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "licht",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 5.2,
+     "kleur": "#5b6575"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 8.34,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 3,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 8.34,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 320,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 360,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 390,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 3,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 9.51,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  },
+  {
+   "theme": "donker",
+   "w": 768,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1024,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   }
+  },
+  {
+   "theme": "donker",
+   "w": 1440,
+   "minFont": 14,
+   "kleinFont": [],
+   "velden": [],
+   "stippel": [
+    {
+     "el": "span.voorbeeld",
+     "t": "Voorbeeld",
+     "bw": 2,
+     "buiten": 6.74,
+     "kleur": "#8e99a8"
+    }
+   ],
+   "doelen": [],
+   "overloop": 0,
+   "afgekapt": [],
+   "uitsteek": [],
+   "tekstFout": [],
+   "minTekst": 9.32,
+   "aantalTekst": 50,
+   "scrollPadding": "auto",
+   "focus": {
+    "aantal": 3,
+    "eerste": "a \"Naar inhoud\"",
+    "zonderRing": [],
+    "zwak": [],
+    "bedekt": [],
+    "ringMin": 9.51,
+    "breedtes": [
+     "3px/2"
+    ]
+   },
+   "structuur": {
+    "h1": 1,
+    "sprong": [],
+    "dubbel": [],
+    "kapot": [],
+    "main": 1,
+    "status": 0
+   },
+   "axe": []
+  }
+ ],
+ "bewegingBijReduce": [],
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - paragraph: Onderdeel van TrueNAS Home Platform · Voorbeeld\n  - heading \"Voorbeelddienst\" [level=1]\n  - paragraph: Voorbeeld van een nieuwe dienst met alleen een statuspagina; alle schermen staan in de Hub.\n- main:\n  - paragraph:\n    - strong: De koppelstatus is onleesbaar\n  - paragraph: \"Deze dienst kon zijn koppelbestand niet lezen en voert daarom niets uit. Het bestand:\"\n  - paragraph:\n    - code: /appdata/secrets/hub-link.json\n  - paragraph:\n    - text: Code\n    - code: koppelstatus_onleesbaar\n  - region \"Status\":\n    - heading \"Status\" [level=2]\n    - paragraph: \"Niet gereed : Storing — de koppelstatus is onleesbaar.\"\n    - list \"Controles\":\n      - listitem:\n        - text: \"Proces : Gezond\"\n        - time: 11:56\n      - listitem:\n        - text: \"Eigen database : Gezond\"\n        - time: 11:56\n      - listitem:\n        - text: \"Koppeling met de Hub : Onleesbaar\"\n        - time: 11:56\n        - text: Het koppelbestand is geen geldig bestand van deze dienst. Herstel staat hieronder bij Koppeling met de Hub. (code\n        - code: koppelstatus_onleesbaar\n        - text: )\n    - term: Gereed\n    - definition: Nee — koppelstatus onleesbaar\n    - term: Versie\n    - definition:\n      - code: 0.1.0\n    - term: Bron\n    - definition:\n      - code: /readyz\n      - text: en\n      - code: /healthz\n      - text: van deze dienst\n    - term: Bijgewerkt\n    - definition:\n      - time: 9 nov 2026, 11:56\n      - text: (bij het laden van deze pagina). Laad de pagina opnieuw voor een nieuwe stand.\n    - paragraph:\n      - text: \"Gereed betekent: de eigen controles zijn in orde (\"\n      - code: /readyz\n      - text: ) én de dienst is gekoppeld met de Hub.\n      - code: /readyz\n      - text: kijkt zelf niet naar de koppeling.\n  - region \"Koppeling met de Hub\":\n    - heading \"Koppeling met de Hub\" [level=2]\n    - paragraph: Onleesbaar\n    - paragraph: De koppelstatus van deze dienst is onleesbaar. Daarom vertrouwt de dienst niets van de Hub en voert hij niets uit. Hier staat bewust geen formulier.\n    - paragraph:\n      - text: \"Herstel gaat alleen met een nieuw koppeltoken: maak het in de Hub (\"\n      - strong: Instellingen → Diensten\n      - text: ). De Hub zet het in de instellingen van deze app, of je vult het zelf in bij de Custom App in TrueNAS.\n  - region \"Wat deze dienst doet\":\n    - heading \"Wat deze dienst doet\" [level=2]\n    - list:\n      - listitem: \"Voorbeeldfunctie : Wacht op koppeling Zonder geldige koppeling voert de dienst niets uit. Dit is geen storing van de functie zelf.\"\n- contentinfo:\n  - list:\n    - listitem:\n      - link \"/healthz (proces leeft)\":\n        - /url: /healthz\n    - listitem:\n      - link \"/readyz (afhankelijkheden)\":\n        - /url: /readyz\n  - paragraph: Voorbeelddienst 0.1.0 · Alle schermen staan in de Hub."
+}

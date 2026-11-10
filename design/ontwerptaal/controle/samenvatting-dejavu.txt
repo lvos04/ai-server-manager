@@ -1,0 +1,220 @@
+
+## appdetail-metrieken
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2,3px/4, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## appdetail-p1
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 5.81:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## appdetail
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 5.81:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## apps
+  tekst min licht 8.34 / donker 9.24; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.2:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## diensten
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.89:1 ; stippelrand<3: geen
+  focus: ring min 6.55:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## goedkeuring-r3
+  tekst min licht 7.61 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.89:1 ; stippelrand<3: geen
+  focus: ring min 5.81:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## home
+  tekst min licht 4.56 / donker 5.01; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## huis
+  tekst min licht 4.56 / donker 5.01; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 5.81:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 2, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## instellingen-bronnen
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.89:1 ; stippelrand<3: geen
+  focus: ring min 6.55:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 2, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## instellingen-toegang
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.89:1 ; stippelrand<3: geen
+  focus: ring min 5.81:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 2, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## kind
+  tekst min licht 9.45 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 7.17:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 0, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## noodaccount
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.89:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 2, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## offline
+  tekst min licht 4.56 / donker 5.01; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 5.13:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 2, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## problemen
+  tekst min licht 8.38 / donker 8.1; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.2:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 2, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## server-metrieken
+  tekst min licht 4.56 / donker 5.01; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2,3px/4, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 76px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## statuspagina-bezig
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding auto): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 0, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## statuspagina-gekoppeld
+  tekst min licht 8.34 / donker 9.24; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding auto): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## statuspagina-onleesbaar
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min -:1 ; stippelrand<3: geen
+  focus: ring min 8.34:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding auto): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 0, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## statuspagina
+  tekst min licht 8.34 / donker 9.32; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 5.89:1 ; stippelrand<3: geen
+  focus: ring min 7.79:1, breedtes 3px/2, eerste a "Naar de koppelcode (fout)"; zonder ring -; zwak -; bedekt@390 (scroll-padding auto): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 0, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen
+
+## wizardstap
+  tekst min licht 4.73 / donker 5.23; minFont 14px; tekstfouten: geen
+  overloop: geen; afgekapt: geen
+  inhoud buiten zijn element (1.1.1): geen
+  doelen<44 @≤390 (excl. inline/labels): geen; @1440: 0
+  veldrand min 4.73:1 ; stippelrand<3: geen
+  focus: ring min 6.55:1, breedtes 3px/2, eerste a "Naar inhoud"; zonder ring -; zwak -; bedekt@390 (scroll-padding 148px): geen
+  beweging bij reduce: geen
+  structuur: h1 1, main 1, role=status 1, sprongen geen, dubbele id geen, kapotte aria-ref geen
+  axe: 0 overtredingen

@@ -1,6 +1,7 @@
 {
  "richting": "peil",
  "pagina": "statuspagina-gekoppeld.html",
+ "letter": "systeem (standaard)",
  "runs": [
   {
    "theme": "licht",
@@ -22,29 +23,36 @@
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 8.34,
-   "aantalTekst": 50,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -67,29 +75,36 @@
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 8.34,
-   "aantalTekst": 50,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -112,22 +127,29 @@
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 8.34,
-   "aantalTekst": 50,
+   "aantalTekst": 70,
    "scrollPadding": "auto",
    "focus": {
     "aantal": 4,
@@ -146,7 +168,7 @@
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    },
    "axe": []
   },
@@ -170,29 +192,36 @@
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 8.34,
-   "aantalTekst": 50,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -215,29 +244,36 @@
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 8.34,
-   "aantalTekst": 50,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -260,22 +296,29 @@
      "bw": 2,
      "buiten": 6.36,
      "kleur": "#566070"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 6.36,
+     "kleur": "#566070"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
    "minTekst": 8.34,
-   "aantalTekst": 50,
+   "aantalTekst": 70,
    "scrollPadding": "auto",
    "focus": {
     "aantal": 4,
@@ -294,7 +337,7 @@
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    },
    "axe": []
   },
@@ -318,29 +361,36 @@
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
-   "minTekst": 9.32,
-   "aantalTekst": 50,
+   "minTekst": 9.24,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -363,29 +413,36 @@
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
-   "minTekst": 9.32,
-   "aantalTekst": 50,
+   "minTekst": 9.24,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -408,22 +465,29 @@
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
-   "minTekst": 9.32,
-   "aantalTekst": 50,
+   "minTekst": 9.24,
+   "aantalTekst": 70,
    "scrollPadding": "auto",
    "focus": {
     "aantal": 4,
@@ -442,7 +506,7 @@
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    },
    "axe": []
   },
@@ -466,29 +530,36 @@
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
-   "minTekst": 9.32,
-   "aantalTekst": 50,
+   "minTekst": 9.24,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -511,29 +582,36 @@
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
-   "minTekst": 9.32,
-   "aantalTekst": 50,
+   "minTekst": 9.24,
+   "aantalTekst": 70,
    "structuur": {
     "h1": 1,
     "sprong": [],
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    }
   },
   {
@@ -556,22 +634,29 @@
      "bw": 2,
      "buiten": 7.78,
      "kleur": "#a3adbb"
-    }
-   ],
-   "doelen": [
+    },
     {
-     "el": "a",
-     "t": "Hub openen",
-     "w": 93,
-     "h": 22,
-     "inline": true
+     "el": "span.pil.pil-niet-beschikbaar",
+     "t": "Niet beschikbaar",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
+    },
+    {
+     "el": "span.pil.pil-verouderd",
+     "t": "Verouderd · laatst bekend 10:12",
+     "bw": 2,
+     "buiten": 7.78,
+     "kleur": "#a3adbb"
     }
    ],
+   "doelen": [],
    "overloop": 0,
    "afgekapt": [],
+   "uitsteek": [],
    "tekstFout": [],
-   "minTekst": 9.32,
-   "aantalTekst": 50,
+   "minTekst": 9.24,
+   "aantalTekst": 70,
    "scrollPadding": "auto",
    "focus": {
     "aantal": 4,
@@ -590,11 +675,11 @@
     "dubbel": [],
     "kapot": [],
     "main": 1,
-    "status": 0
+    "status": 1
    },
    "axe": []
   }
  ],
  "bewegingBijReduce": [],
- "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - paragraph: Onderdeel van TrueNAS Home Platform · Voorbeeld\n  - heading \"Voorbeelddienst\" [level=1]\n  - paragraph: Voorbeeld van een nieuwe dienst met alleen een statuspagina; alle schermen staan in de Hub.\n- main:\n  - region \"Status\":\n    - heading \"Status\" [level=2]\n    - paragraph: Beperkt Gereed; één controle is beperkt en één is onbekend.\n    - list \"Controles\":\n      - listitem:\n        - text: Proces Gezond\n        - time: 11:56\n      - listitem:\n        - text: Eigen database Gezond\n        - time: 11:56\n      - listitem:\n        - text: Bron Voorbeeld-API Beperkt\n        - time: 11:55\n        - text: Antwoordt traag (8 s); de dienst probeert het met wachttijd opnieuw.\n      - listitem:\n        - text: Gebeurtenissen naar de Hub Onbekend\n        - time: 11:50\n        - text: Laatste levering 11:50; nieuwere stand nog niet bevestigd.\n    - term: Gereed\n    - definition: Ja\n    - term: Versie\n    - definition:\n      - code: 0.1.0\n    - term: Bron\n    - definition:\n      - code: /readyz\n      - text: en\n      - code: /healthz\n      - text: van deze dienst\n    - term: Bijgewerkt\n    - definition:\n      - time: 9 nov 2026, 11:56\n      - text: (bij het laden van deze pagina). Laad de pagina opnieuw voor een nieuwe stand.\n  - region \"Koppeling met de Hub\":\n    - heading \"Koppeling met de Hub\" [level=2]\n    - paragraph: Gekoppeld\n    - term: Sinds\n    - definition: 8 nov 2026, 20:14\n    - term: Hub\n    - definition:\n      - code: http://voorbeeld-nas.invalid:30400\n    - term: Vingerafdruk\n    - definition:\n      - code: MEGG-8GFG-2E4Y-K2RQ\n    - paragraph:\n      - text: Alle schermen van deze dienst staan in de Hub. Ontkoppelen of opnieuw koppelen gaat via de Hub.\n      - link \"Hub openen\":\n        - /url: http://voorbeeld-nas.invalid:30400\n  - region \"Wat deze dienst doet\":\n    - heading \"Wat deze dienst doet\" [level=2]\n    - list:\n      - listitem: Voorbeeldfunctie Wacht op besluit Gaat pas aan na besluit D99 in de Hub (voorbeeld). Dit is geen storing; er wacht een voorwaarde.\n- contentinfo:\n  - list:\n    - listitem:\n      - link \"/healthz (proces leeft)\":\n        - /url: /healthz\n    - listitem:\n      - link \"/readyz (afhankelijkheden)\":\n        - /url: /readyz\n  - paragraph: Voorbeelddienst 0.1.0 · Alle schermen staan in de Hub."
+ "aria": "- link \"Naar inhoud\":\n  - /url: \"#inhoud\"\n- banner:\n  - paragraph: Onderdeel van TrueNAS Home Platform · Voorbeeld\n  - heading \"Voorbeelddienst\" [level=1]\n  - paragraph: Voorbeeld van een nieuwe dienst met alleen een statuspagina; alle schermen staan in de Hub.\n- main:\n  - status \"Gekoppeld met de Hub\":\n    - paragraph:\n      - strong: Gekoppeld met de Hub\n    - paragraph: De Hub heeft de koppeling bevestigd. Alle schermen van deze dienst staan nu in de Hub.\n  - region \"Status\":\n    - heading \"Status\" [level=2]\n    - paragraph: \"Beperkt : Gereed. Eén controle is beperkt en één is onbekend; één functie is niet beschikbaar.\"\n    - list \"Controles\":\n      - listitem:\n        - text: \"Proces : Gezond\"\n        - time: 11:56\n      - listitem:\n        - text: \"Eigen database : Gezond\"\n        - time: 11:56\n      - listitem:\n        - text: \"Bron Voorbeeld-API : Beperkt\"\n        - time: 11:55\n        - text: Antwoordt traag (8 s); de dienst probeert het met wachttijd opnieuw. (code\n        - code: upstream_timeout\n        - text: )\n      - listitem:\n        - text: \"Gebeurtenissen naar de Hub : Onbekend\"\n        - time: 11:50\n        - text: Laatste levering 11:50; nieuwere stand nog niet bevestigd.\n    - term: Gereed\n    - definition: Ja\n    - term: Versie\n    - definition:\n      - code: 0.1.0\n    - term: Bron\n    - definition: Eigen controles (/readyz, /healthz) en de gezondheid van de koppeling met de Voorbeeld-API.\n    - term: Bijgewerkt\n    - definition:\n      - time: 9 nov 2026, 11:56\n      - text: (bij het laden van deze pagina). Laad de pagina opnieuw voor een nieuwe stand.\n    - paragraph:\n      - text: \"Gereed betekent: de eigen controles zijn in orde (\"\n      - code: /readyz\n      - text: ) én de dienst is gekoppeld met de Hub.\n      - code: /readyz\n      - text: kijkt zelf niet naar de koppeling.\n  - region \"Koppeling met de Hub\":\n    - heading \"Koppeling met de Hub\" [level=2]\n    - paragraph: Gekoppeld\n    - term: Sinds\n    - definition: 8 nov 2026, 20:14\n    - term: Hub\n    - definition:\n      - code: http://voorbeeld-nas.invalid:30400\n    - term: Vingerafdruk\n    - definition:\n      - code: MEGG-8GFG-2E4Y-K2RQ\n    - paragraph: Alle schermen van deze dienst staan in de Hub. Ontkoppelen of opnieuw koppelen gaat via de Hub.\n    - paragraph:\n      - link \"Hub openen\":\n        - /url: http://voorbeeld-nas.invalid:30400\n  - region \"Wat deze dienst doet\":\n    - heading \"Wat deze dienst doet\" [level=2]\n    - list:\n      - listitem: \"Voorbeeldfunctie : Wacht op besluit Gaat pas aan na besluit D99 in de Hub (voorbeeld). Dit is geen storing; er wacht een voorwaarde.\"\n      - listitem:\n        - text: \"Import uit de bron : Niet beschikbaar De Voorbeeld-API levert deze gegevens niet. We tonen geen schatting. (code\"\n        - code: capability_unavailable\n        - text: )\n      - listitem: \"Energiemeting : Verouderd · laatst bekend 10:12 De bron reageert niet sinds 10:12.\"\n      - listitem: \"Boiler schakelen : Alleen meten Schakelen is altijd uitgeschakeld (beleid). Er is bewust geen schakelaar.\"\n      - listitem: \"Zoekindex : Nog niet beschikbaar Volgt in fase P3.\"\n      - listitem: \"Catalogus : 2 apps Gelezen uit de eigen database om 11:56.\"\n- contentinfo:\n  - list:\n    - listitem:\n      - link \"/healthz (proces leeft)\":\n        - /url: /healthz\n    - listitem:\n      - link \"/readyz (afhankelijkheden)\":\n        - /url: /readyz\n  - paragraph: Voorbeelddienst 0.1.0 · Alle schermen staan in de Hub."
 }

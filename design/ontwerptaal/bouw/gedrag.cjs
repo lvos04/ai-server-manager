@@ -34,6 +34,27 @@ const P = (f) => 'file://' + path.join(__dirname, '..', 'prototypes', f);
   await p.screenshot({ path: path.join(__dirname, '..', 'controle', 'forced-colors-home-640.png'), fullPage: false });
   uit.forced_colors_stippel = await p.evaluate(() => { const e = document.querySelector('.status-onbekend'); const cs = getComputedStyle(e); return cs.borderTopStyle + ' ' + cs.borderTopWidth + ' ' + cs.borderTopColor; });
   uit.zoom200_overloop = await p.evaluate(() => document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth);
+  // 1.1.1 (MSO R-20): het actieve navigatie-item is in forced colors onderstreept (de inset-balk verdwijnt daar).
+  uit.forced_colors_actief_item = await p.evaluate(() => { const e = document.querySelector('.onder-item[aria-current="page"]'); const cs = getComputedStyle(e); return cs.textDecorationLine + ' ' + cs.textDecorationThickness; });
+  await p.close();
+  // 1.1.1 (E16): ondernavigatie op 320 px — elk label past in zijn item, het actieve item is niet vetter dan de rest.
+  p = await b.newPage({ viewport: { width: 320, height: 700 } });
+  await p.goto(P('home.html'));
+  uit.ondernav_320 = await p.evaluate(() => [...document.querySelectorAll('.onder-item')].map((e) => ({ label: e.textContent.replace(/\s+/g, ' ').trim().split(',')[0], past: e.scrollWidth <= e.clientWidth, gewicht: getComputedStyle(e).fontWeight, actief: e.getAttribute('aria-current') === 'page' })));
+  await p.close();
+  // 1.1.1 (Hub-review R-03): kindschil houdt ook vanaf 1024 px scroll-padding voor de ondernavigatie.
+  p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  await p.goto(P('kind.html')); uit.kind_scroll_padding_1440 = await p.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom);
+  await p.goto(P('home.html')); uit.home_scroll_padding_1440 = await p.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom);
+  await p.close();
+  // 1.1.1 (E09): statuspagina — skiplink verborgen boven de pagina en volledig zichtbaar bij focus (320 px, 200 % tekst
+  // niet nodig: de hoogte maakt niet uit); alle formulieren novalidate.
+  p = await b.newPage({ viewport: { width: 320, height: 700 } });
+  await p.goto(P('statuspagina.html'));
+  uit.statuspagina_novalidate = await p.evaluate(() => [...document.forms].map((f) => f.noValidate));
+  uit.skiplink_verborgen = await p.evaluate(() => document.querySelector('.spring').getBoundingClientRect().bottom <= 0);
+  await p.keyboard.press('Tab');
+  uit.skiplink_bij_focus = await p.evaluate(() => { const r = document.activeElement.getBoundingClientRect(); return { tekst: document.activeElement.textContent, binnen: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth }; });
   await p.close();
   fs.writeFileSync(path.join(__dirname, '..', 'controle', 'gedrag.json'), JSON.stringify(uit, null, 1));
   console.log(JSON.stringify(uit, null, 1)); await b.close();
