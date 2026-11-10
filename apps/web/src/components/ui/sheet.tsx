@@ -22,7 +22,7 @@ export function Sheet({
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
-        <D.Overlay className="fixed inset-0 z-overlay bg-black/60" />
+        <D.Overlay className="fixed inset-0 z-overlay bg-black/50" />
         <D.Content
           data-testid={testId}
           className="fixed inset-x-0 bottom-0 z-overlay flex max-h-[85dvh] flex-col gap-3 overflow-y-auto rounded-t-xl border-t border-border-strong bg-popover p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] text-popover-foreground shadow-lg"

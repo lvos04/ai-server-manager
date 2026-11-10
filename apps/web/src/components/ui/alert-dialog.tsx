@@ -28,7 +28,7 @@ export function BevestigDialoog({
   return (
     <AD.Root open={open} onOpenChange={onOpenChange}>
       <AD.Portal>
-        <AD.Overlay className="fixed inset-0 z-overlay bg-black/60" />
+        <AD.Overlay className="fixed inset-0 z-overlay bg-black/50" />
         <AD.Content
           className={cn(
             "fixed top-1/2 left-1/2 z-overlay flex w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border border-border-strong bg-popover p-6 text-popover-foreground shadow-lg",
