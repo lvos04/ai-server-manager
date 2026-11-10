@@ -173,14 +173,15 @@ class _Control(BaseHTTPRequestHandler):
                     "event_id": eid,
                     "source_app": b["app_id"],
                     "source_event_id": eid,
-                    "event_type": b.get("event_type", "app.process.crashed"),
-                    "entity": {"type": "app", "id": b.get("entity", "node-red")},
+                    # Contract 1.3 §7: app.* alleen als app.health.changed over de eigen app van de bron.
+                    "event_type": b.get("event_type", "app.health.changed"),
+                    "entity": {"type": "app", "id": b.get("entity", b["app_id"])},
                     "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                     "trace_id": str(uuid.uuid4()),
                     "correlation_id": None,
                     "actor": {"type": "system", "id": b["app_id"]},
                     "classification": "internal",
-                    "payload": b.get("payload", {"naam": "Node-RED", "exit_code": 137}),
+                    "payload": b.get("payload", {"status": "down", "naam": "Node-RED", "reden": "exit_code_137"}),
                 }
                 status, _res = _api("POST", "/api/v1/events/inbox", ev, token)
                 ok += status in (200, 202)

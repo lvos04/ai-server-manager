@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
@@ -35,6 +36,7 @@ from hub.keys import ROTATION_SEQUENCE, KeyRing, jwk_thumbprint
 from hub.models import EnrollmentGrant, Service, ServiceToken
 from hub.outbound import OutboundError, validate_base_url
 from hub.registry import app_name_candidates, app_name_for, measured_apps, service_base_url
+from hub.scopes import scopes_for
 from hub.security import (
     clear_failures,
     failures_in_window,
@@ -167,6 +169,8 @@ def _service_dict(db: Session, settings: Settings, svc: Service) -> dict[str, An
         "base_url": svc.base_url,
         # Contract 1.3 §3.3: de dienst stuurde een base_url die niet aan de regels voldoet; bewaard als null.
         "base_url_genegeerd": svc.base_url_genegeerd,
+        # Contract 1.3 §4.4: vaste leesscopes van deze dienst (in de Hub vastgelegd, niet door de dienst te kiezen).
+        "scopes": scopes_for(svc.app_id),
         "public_key_jwk": svc.public_key_jwk,
         "enrolled_via": svc.enrolled_via,
         "enrolled_at": iso(svc.enrolled_at),
@@ -533,6 +537,86 @@ def list_services(db: DB, settings: SettingsDep, _: Operator) -> dict[str, Any]:
         item["truenas_app"]["gemeten_kandidaten"] = None if apps is None else app_name_candidates(apps, s.app_id)
         items.append(item)
     return {"items": items, "inventaris": {"status": st.get("status"), "observed_at": st.get("observed_at")}}
+
+
+# Contract 1.3 §3.5: de publieke witte lijst van een dienst (een maximum); de Hub geeft nooit meer door dan dit.
+HUB_LINK_FIELDS = (
+    "state",
+    "koppelen_bezig",
+    "hub_url",
+    "service_id",
+    "via",
+    "linked_at",
+    "first_linked_at",
+    "keyset_fingerprint",
+    "service_token_last4",
+)
+
+
+def _short(value: Any, n: int = 300) -> Any:
+    return value[:n] if isinstance(value, str) else value if isinstance(value, bool | int) or value is None else None
+
+
+@router.get(
+    "/{service_id}/koppelstatus",
+    summary="Koppelstatus zoals de dienst hem zelf meldt (witte lijst §3.5, met de NL-melding van de dienst; operator)",
+)
+def koppelstatus(
+    service_id: uuid.UUID,
+    db: DB,
+    settings: SettingsDep,
+    _: Operator,
+    keyring: Annotated[KeyRing, Depends(get_keyring)],
+) -> dict[str, Any]:
+    """C1.3-ASM-16: live gelezen bij de dienst (``GET /connector/v1/hub-link`` met een dienst-JWT), nooit opgeslagen.
+    De Hub toont de **meegeleverde** NL-melding van ``last_error`` en hardcodeert geen codes. Weigert de dienst de
+    Hub (401), dan kijkt de Hub in de openbare ``/readyz`` of de dienst ``koppelstatus_onleesbaar`` meldt (storing)."""
+    svc = db.get(Service, service_id)
+    if svc is None:
+        raise HubError(404, "not_found", "Dienst niet gevonden.")
+    now = utcnow()
+    out: dict[str, Any] = {"service_id": str(svc.id), "app_id": svc.app_id, "observed_at": iso(now)}
+    if svc.status != "active":
+        return {**out, "status": "ingetrokken_in_hub", "reden": "dienst_ingetrokken"}
+    base, why = service_base_url(db, settings, svc)
+    if base is None:
+        return {**out, "status": "onbekend", "reden": "dienst_adres_onbekend", "detail": why}
+    bearer, _jti = keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))
+    ct, rt = settings.service_call_connect_timeout, settings.service_call_read_timeout
+    try:
+        res = call(base, "GET", "/connector/v1/hub-link", bearer=bearer, connect_timeout=ct, read_timeout=rt)
+    except ServiceCallError as exc:
+        return {**out, "status": "onbekend", "reden": "dienst_onbereikbaar", "detail": exc.reason}
+    if res.status == 200 and isinstance(res.body, dict):
+        body = res.body
+        link = {k: _short(body.get(k)) for k in HUB_LINK_FIELDS}
+        err = body.get("last_error")
+        link["last_error"] = (
+            {"code": _short(err.get("code"), 64), "melding": _short(err.get("melding"))}
+            if isinstance(err, dict)
+            else None
+        )
+        seq = body.get("rotation_sequence")
+        link["rotation_sequence"] = seq if type(seq) is int else None
+        fp = link.get("keyset_fingerprint")
+        return {
+            **out,
+            "status": "gelezen",
+            "koppeling": link,
+            "vingerafdruk_gelijk": None if not isinstance(fp, str) else fp == keyring.keyset_fingerprint(),
+        }
+    if res.status == 401:
+        try:
+            ready = call(base, "GET", "/readyz", bearer=bearer, connect_timeout=ct, read_timeout=rt)
+            onleesbaar = "koppelstatus_onleesbaar" in json.dumps(ready.body, default=str)
+        except ServiceCallError:
+            onleesbaar = False
+        if onleesbaar:
+            return {**out, "status": "onleesbaar", "reden": "koppelstatus_onleesbaar"}
+        return {**out, "status": "dienst_weigerde", "reden": res.reason or "unauthorized"}
+    if res.status == 404:
+        return {**out, "status": "onbekend", "reden": "capability_unavailable"}
+    return {**out, "status": "onbekend", "reden": f"http_{res.status}"}
 
 
 @router.post(

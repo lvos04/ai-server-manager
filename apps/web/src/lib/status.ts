@@ -209,9 +209,14 @@ export const TOTAAL_LABEL: Record<"healthy" | "degraded" | "down" | "unknown", s
   unknown: "Deels onbekend",
 };
 
-/** Ernst (OB-05): de API kent drie niveaus; Hoog en Laag worden in P1 niet gebruikt. */
+/**
+ * Ernst (OB-05, contract 1.3 §7): de API kent drie niveaus; de UI toont de bronwaarde (een van de vijf Peil-woorden uit
+ * payload.ernst) als die er is, anders de vaste afbeelding kritiek → Kritiek, waarschuwing → Middel, info → Info.
+ */
 export type Ernst = "kritiek" | "hoog" | "middel" | "laag" | "info";
-export function ernstVan(api: string | null | undefined): Ernst {
+const ERNST_WOORDEN: readonly string[] = ["kritiek", "hoog", "middel", "laag", "info"];
+export function ernstVan(api: string | null | undefined, bron?: string | null): Ernst {
+  if (bron && ERNST_WOORDEN.includes(bron)) return bron as Ernst;
   if (api === "kritiek") return "kritiek";
   if (api === "waarschuwing") return "middel";
   if (api === "info") return "info";

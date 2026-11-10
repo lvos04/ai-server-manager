@@ -149,6 +149,11 @@ describe("statussen in Peil: groen alleen voor gemeten en goed", () => {
     expect(ernstVan("kritiek")).toBe("kritiek");
     expect(ernstVan("waarschuwing")).toBe("middel");
     expect(ernstVan("info")).toBe("info");
+    // Contract 1.3 §7: de bronwaarde (Peil-woord) wint; een onbekend woord valt terug op de vaste afbeelding.
+    expect(ernstVan("waarschuwing", "hoog")).toBe("hoog");
+    expect(ernstVan("info", "laag")).toBe("laag");
+    expect(ernstVan("waarschuwing", "HOOG")).toBe("middel");
+    expect(ernstVan("kritiek", null)).toBe("kritiek");
     expect(zekerheidVan(0.9)).toBe("zeker");
     expect(zekerheidVan(0.85)).toBe("zeker");
     expect(zekerheidVan(0.6)).toBe("waarschijnlijk");

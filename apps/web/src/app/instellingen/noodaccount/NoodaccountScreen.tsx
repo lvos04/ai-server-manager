@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, LifeBuoy, ListChecks } from "lucide-react";
+import { KeyRound, LifeBuoy, ListChecks, Network } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Controles, type Controle } from "@/components/Controles";
 import { ErrorPanel } from "@/components/ErrorPanel";
@@ -32,6 +32,8 @@ interface Nood {
   } | null;
   werkend: boolean;
   oidc_verplicht_mogelijk: boolean;
+  /** Contract 1.3 §4.1: 100.64.0.0/10 (CGNAT, ook Tailscale) telt standaard niet als privé. */
+  cgnat?: { toegestaan: boolean; gewijzigd_door: string | null; gewijzigd_op: string | null; waarschuwing: string };
   toelichting: string;
 }
 
@@ -42,7 +44,15 @@ interface Totp {
 
 interface Selftest {
   resultaat: "ok" | "niet_ok";
-  controles: { naam: string; status: "ok" | "fout" | "waarschuwing"; detail?: string; adres?: string; prive?: boolean; lijkt_docker_gateway?: boolean }[];
+  controles: {
+    naam: string;
+    status: "ok" | "fout" | "waarschuwing";
+    detail?: string;
+    adres?: string;
+    prive?: boolean;
+    lijkt_docker_gateway?: boolean;
+    toegestaan_door_beheerder?: boolean;
+  }[];
   gemeten_op: string;
 }
 
@@ -51,6 +61,7 @@ const NAAM: Record<string, string> = {
   totp: "TOTP",
   bereik_binnen: "Privé-adres wordt toegelaten",
   bereik_buiten: "Internetadres wordt geweigerd",
+  bereik_cgnat: "Adres in 100.64.0.0/10 (CGNAT, ook Tailscale)",
   bron_ip: "Jouw adres zoals de Hub het ziet",
 };
 
@@ -77,6 +88,15 @@ function selftestControles(s: Selftest): Controle[] {
           ? "Dit adres telt als privé."
           : "Vanaf dit adres wordt noodlogin geweigerd (alleen privé-adressen).";
       return { id: c.naam, naam: <>{NAAM[c.naam]}: <code>{c.adres}</code></>, uitkomst, detail };
+    }
+    if (c.naam === "bereik_cgnat") {
+      return {
+        id: c.naam,
+        naam: <>{NAAM[c.naam]}: <code>{c.adres}</code></>,
+        // Beleid, geen storing: standaard geweigerd; alleen een beheerder kan het toestaan.
+        uitkomst: c.status !== "ok" ? "fout" : c.prive ? "ok" : "beleid",
+        detail: c.prive ? "Telt als privé: toegestaan door een beheerder." : "Telt niet als privé (standaard).",
+      };
     }
     return {
       id: c.naam,
@@ -108,7 +128,8 @@ function TotpStap({ totp, onKlaar }: { totp: Totp; onKlaar: () => void }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
-  const fout = confirm.error?.code === "invalid_totp" || confirm.error?.status === 401 ? "Deze code klopt niet. Wacht op de volgende code en probeer opnieuw." : undefined;
+  // Contract 1.3 §5: een foute code binnen een geldige sessie is 422 (nooit 401); de UI kijkt naar de status.
+  const fout = confirm.error?.status === 422 ? "Deze code klopt niet. Wacht op de volgende code en probeer opnieuw." : undefined;
   return (
     <div className="flex flex-col gap-3" data-testid="totp-stap">
       <h3>Stap 2 van 2 · Authenticator-app en code</h3>
@@ -185,7 +206,7 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
           <p>Tot je de nieuwe code bevestigt, werkt de noodlogin niet.</p>
         </Melding>
       ) : null}
-      <Field id="nood-eigen" label="Je eigen wachtwoord" help="Wijzigen vraagt je eigen wachtwoord.">
+      <Field id="nood-eigen" label="Je eigen wachtwoord" help="Wijzigen vraagt je eigen wachtwoord." error={act.error?.status === 422 ? act.error.message : undefined}>
         {(a) => <input {...a} type="password" autoComplete="current-password" value={eigen} onChange={(e) => setEigen(e.target.value)} required />}
       </Field>
       {!bestaand ? (
@@ -199,7 +220,7 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
       <Field id="nood-duur" label="Sessieduur (minuten)" help="5–240. Een noodsessie is niet te verlengen.">
         {(a) => <input {...a} type="number" min={5} max={240} value={duur} onChange={(e) => setDuur(Number(e.target.value))} />}
       </Field>
-      {act.error ? <ErrorPanel error={act.error} title="Instellen mislukt" /> : null}
+      {act.error && act.error.status !== 422 ? <ErrorPanel error={act.error} title="Instellen mislukt" /> : null}
       <div>
         <Button type="submit" variant="primair" bezig={act.busy} data-testid="nood-volgende">
           <KeyRound aria-hidden="true" />
@@ -207,6 +228,71 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Contract 1.3 §4.1: 100.64.0.0/10 standaard niet privé; alleen een beheerder kan het toestaan (audit). */
+function CgnatInstelling({ cgnat, onKlaar }: { cgnat: NonNullable<Nood["cgnat"]>; onKlaar: () => void }) {
+  const [bevestigd, setBevestigd] = useState(false);
+  const act = useAction<Nood>();
+  const zet = async (toestaan: boolean) => {
+    if (await act.run("/api/v1/auth/break-glass/cgnat", { method: "PUT", body: { toestaan } })) {
+      setBevestigd(false);
+      onKlaar();
+    }
+  };
+  return (
+    <section className="card" aria-labelledby="cgnat-titel" data-testid="noodaccount-cgnat">
+      <h2 id="cgnat-titel" className="flex items-center gap-2">
+        <Network aria-hidden="true" className="size-5 text-muted-foreground" />
+        Tailscale en CGNAT (100.64.0.0/10)
+      </h2>
+      <div className="flex flex-wrap gap-2">
+        {cgnat.toegestaan ? (
+          <StatusBadge view={{ tone: "neutral", label: "Telt als privé", icon: "ingesteld" }} testId="cgnat-stand" />
+        ) : (
+          <StatusBadge view={{ tone: "gate", label: "Telt niet als privé" }} testId="cgnat-stand" />
+        )}
+      </div>
+      <p>
+        Adressen in 100.64.0.0/10 tellen standaard niet als privé voor de noodlogin.
+        {cgnat.gewijzigd_op ? ` Laatst gewijzigd door ${cgnat.gewijzigd_door ?? "onbekend"} op ${formatDateTime(cgnat.gewijzigd_op)}.` : ""}
+      </p>
+      <Melding soort="beperkt">
+        <p>{cgnat.waarschuwing}</p>
+      </Melding>
+      {cgnat.toegestaan ? (
+        <div>
+          <Button bezig={act.busy} onClick={() => void zet(false)} data-testid="cgnat-uit">
+            Niet meer als privé tellen
+          </Button>
+        </div>
+      ) : (
+        <form
+          className="form"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            if (bevestigd) void zet(true);
+          }}
+        >
+          <label className="keuze">
+            <input type="checkbox" checked={bevestigd} onChange={(e) => setBevestigd(e.target.checked)} data-testid="cgnat-bevestig" />
+            <span>Ik deel Tailscale met niemand anders.</span>
+          </label>
+          <div>
+            <Button type="submit" uit={!bevestigd} aria-describedby={!bevestigd ? "cgnat-nodig" : undefined} bezig={act.busy} data-testid="cgnat-aan">
+              Als privé laten tellen
+            </Button>
+            {!bevestigd ? (
+              <p id="cgnat-nodig" className="help">
+                Vink eerst aan dat je Tailscale met niemand deelt.
+              </p>
+            ) : null}
+          </div>
+        </form>
+      )}
+      {act.error ? <ErrorPanel error={act.error} title="Wijzigen mislukt" /> : null}
+    </section>
   );
 }
 
@@ -265,7 +351,10 @@ export function NoodaccountScreen() {
                     {a.herbevestiging_nodig ? " Nu nodig." : ""}
                   </dd>
                   <dt>Inloggen kan</dt>
-                  <dd>Alleen vanaf privé-adressen (LAN of VPN), nooit vanaf internet.</dd>
+                  <dd>
+                    Alleen vanaf privé-adressen (LAN of VPN), nooit vanaf internet.
+                    {n.cgnat?.toegestaan ? " 100.64.0.0/10 telt mee (toegestaan door een beheerder)." : " 100.64.0.0/10 telt niet mee."}
+                  </dd>
                 </dl>
               ) : null}
             </section>
@@ -295,6 +384,7 @@ export function NoodaccountScreen() {
                 </>
               ) : null}
             </section>
+            {n.cgnat ? <CgnatInstelling cgnat={n.cgnat} onKlaar={() => void nood.reload()} /> : null}
             <section className="card" aria-labelledby="gebruik-titel">
               <h2 id="gebruik-titel">Noodlogin gebruiken</h2>
               <KopieerVeld label="Adres van de noodlogin (zet dit in je herstelkit)" waarde={adres} testId="noodlogin-adres" />

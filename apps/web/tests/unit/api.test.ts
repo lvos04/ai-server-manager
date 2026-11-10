@@ -87,7 +87,7 @@ describe("apiRequest", () => {
 });
 
 describe("401: alleen een verlopen sessie meldt af", () => {
-  it("code unauthorized → afmeld-event; invalid_totp (veldfout) → geen afmelding", async () => {
+  it("code unauthorized → afmeld-event; een 401 met een andere code (oude Hub) → geen afmelding", async () => {
     const seen: string[] = [];
     const target = new EventTarget();
     const g = globalThis as unknown as { window?: EventTarget };
@@ -101,6 +101,23 @@ describe("401: alleen een verlopen sessie meldt af", () => {
       expect(seen).toEqual([]);
       await expect(apiRequest("/api/v1/inventory", { fetchImpl: reply("unauthorized") })).rejects.toMatchObject({ code: "unauthorized" });
       expect(seen).toEqual(["uit"]);
+    } finally {
+      g.window = prev;
+    }
+  });
+
+  it("contract 1.3 §5: invalid_totp is 422 (foute invoer binnen een sessie) en meldt nooit af", async () => {
+    const seen: string[] = [];
+    const target = new EventTarget();
+    const g = globalThis as unknown as { window?: EventTarget };
+    const prev = g.window;
+    g.window = target;
+    target.addEventListener(UNAUTHORIZED_EVENT, () => seen.push("uit"));
+    try {
+      const fetchImpl = (async () =>
+        new Response(JSON.stringify({ code: "invalid_totp", message: "x", details: {}, trace_id: "t" }), { status: 422 })) as unknown as typeof fetch;
+      await expect(apiRequest("/api/v1/auth/break-glass/confirm", { method: "POST", body: {}, fetchImpl })).rejects.toMatchObject({ status: 422 });
+      expect(seen).toEqual([]);
     } finally {
       g.window = prev;
     }

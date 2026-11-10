@@ -99,7 +99,9 @@ export function sortApps(items: CatalogApp[], opNaam = false): CatalogApp[] {
 
 /** Gezondheid van een app: een verouderde bron is Onbekend + Verouderd, nooit gezond. */
 export function appHealth(g: Pick<Gezondheid, "status" | "reason_code">): StatusView {
-  if (g.reason_code === "inventaris_verouderd" || g.reason_code === "verouderd") return { tone: "stale", label: "Verouderd" };
+  if (g.reason_code === "inventaris_verouderd" || g.reason_code === "verouderd" || g.reason_code === "meting_verouderd") {
+    return { tone: "stale", label: "Verouderd" };
+  }
   return healthView(g.status);
 }
 

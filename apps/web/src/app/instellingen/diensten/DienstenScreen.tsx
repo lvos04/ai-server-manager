@@ -49,6 +49,88 @@ export interface Dienst {
   truenas_app: { naam: string | null; bevestigd: boolean; bevestigd_op: string | null; gemeten_kandidaten: string[] | null };
   rotatie: { aangevraagd_op: string | null; aangevraagd_door: string | null; aanbevolen: boolean; token_leeftijd_dagen: number | null };
   tokens: Token[];
+  /** Contract 1.3 §3.3: de dienst stuurde een base_url die niet aan de regels voldoet; bewaard als null. */
+  base_url_genegeerd?: boolean;
+  /** Contract 1.3 §4.4: vaste leesscopes (in de Hub vastgelegd). */
+  scopes?: string[];
+}
+
+/** Koppelstatus zoals de dienst hem zelf meldt (GET /api/v1/services/{id}/koppelstatus, live gelezen). */
+interface Koppelstatus {
+  status: "gelezen" | "onleesbaar" | "dienst_weigerde" | "onbekend" | "ingetrokken_in_hub";
+  reden?: string;
+  observed_at: string;
+  vingerafdruk_gelijk?: boolean | null;
+  koppeling?: {
+    state: string | null;
+    koppelen_bezig: boolean | null;
+    keyset_fingerprint: string | null;
+    last_error: { code: string | null; melding: string | null } | null;
+  };
+}
+
+const SCOPE_UITLEG: Record<string, string> = {
+  "inventaris.lezen": "inventaris lezen (apps en appdetail)",
+  "catalogus.lezen": "catalogusbeschikbaarheid lezen (route volgt in fase P2)",
+  "besluiten.lezen": "besluiten lezen",
+};
+
+/** C1.3-ASM-16: de NL-melding komt van de dienst zelf (geen codes in de Hub-UI); onleesbaar = storing. */
+function KoppelstatusBijDienst({ d }: { d: Dienst }) {
+  const [aan, setAan] = useState(false);
+  const st = useApi<Koppelstatus>(aan ? `/api/v1/services/${d.id}/koppelstatus` : null);
+  const k = st.data;
+  const err = k?.koppeling?.last_error;
+  return (
+    <div className="flex flex-col gap-2" data-testid={`koppelstatus-${d.app_id}`}>
+      {!aan ? (
+        <div>
+          <Button size="klein" onClick={() => setAan(true)} data-testid="koppelstatus-lezen">
+            Koppelstatus bij de dienst lezen<span className="sr-only">: {d.app_id}</span>
+          </Button>
+        </div>
+      ) : !k ? (
+        st.error ? <ErrorPanel error={st.error} onRetry={() => void st.reload()} alert={false} /> : <Loading />
+      ) : k.status === "onleesbaar" ? (
+        <Melding soort="fout" titel="Koppelstatus onleesbaar">
+          <p>
+            De dienst kan zijn koppelbestand niet lezen en vertrouwt de Hub daarom niet.{" "}
+            {d.app_id === EXECUTOR
+              ? "De executor koppelt niet met een token: herstel volgt in fase P2 met de TrueNAS-schrijfsleutel op de executorpagina."
+              : "Herstel: maak een nieuw enrollment-token en zet het in de instellingen van de app."}
+          </p>
+        </Melding>
+      ) : k.status === "gelezen" ? (
+        <div className="flex flex-col gap-2">
+          <p className="flex flex-wrap items-center gap-2">
+            Volgens de dienst:{" "}
+            {k.koppeling?.state === "gekoppeld" ? (
+              <StatusBadge view={{ tone: "neutral", label: "Gekoppeld", icon: "gekoppeld" }} />
+            ) : (
+              <StatusBadge view={{ tone: "unlinked", label: "Niet gekoppeld" }} />
+            )}
+            {k.vingerafdruk_gelijk === false ? <StatusBadge view={{ tone: "down", label: "Andere vingerafdruk" }} /> : null}
+            <span className="text-sm text-muted-foreground">gelezen om {formatTime(k.observed_at)}</span>
+          </p>
+          {err?.code ? (
+            <Melding soort="beperkt" titel="Laatste melding van de dienst">
+              <p>{err.melding ?? "De dienst gaf geen toelichting."}</p>
+              <p className="text-sm">
+                Code <code>{err.code}</code>
+              </p>
+            </Melding>
+          ) : null}
+        </div>
+      ) : (
+        <Melding soort="onbekend" titel="Koppelstatus onbekend">
+          <p>
+            De Hub kon de koppelstatus niet bij de dienst lezen ({k.reden ?? "onbekend"}). Dat zegt niets over de gezondheid; kijk op de statuspagina van
+            de dienst.
+          </p>
+        </Melding>
+      )}
+    </div>
+  );
 }
 
 interface Keyset {
@@ -324,6 +406,20 @@ function DienstKaart({ d, admin, onWijziging, statusUrl }: { d: Dienst; admin: b
             "geen geldig token"
           )}
         </dd>
+        <dt>Leesrechten</dt>
+        <dd data-testid="dienst-scopes">
+          {d.scopes && d.scopes.length ? (
+            <ul className="flex flex-col">
+              {d.scopes.map((sc) => (
+                <li key={sc}>
+                  <code>{sc}</code> — {SCOPE_UITLEG[sc] ?? sc}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            "geen (alleen eigen gegevens)"
+          )}
+        </dd>
         <dt>TrueNAS-app</dt>
         <dd>
           {d.truenas_app.bevestigd ? (
@@ -345,6 +441,15 @@ function DienstKaart({ d, admin, onWijziging, statusUrl }: { d: Dienst; admin: b
         </dd>
       </dl>
       {confirm.error ? <ErrorPanel error={confirm.error} /> : null}
+      {d.base_url_genegeerd ? (
+        <Melding soort="beperkt" titel="Adres van de dienst genegeerd" data-testid="base-url-genegeerd">
+          <p>
+            De dienst stuurde bij het koppelen een adres dat niet aan de regels voldoet. De Hub heeft het genegeerd en belt de dienst via het gemeten
+            adres (NAS-adres plus poort uit de inventaris). Koppelen is daardoor niet geweigerd.
+          </p>
+        </Melding>
+      ) : null}
+      {actief ? <KoppelstatusBijDienst d={d} /> : null}
       {exec ? (
         <p className="text-sm">
           Schrijfsleutel: alleen op de executorpagina; de Hub ziet hem nooit.{" "}

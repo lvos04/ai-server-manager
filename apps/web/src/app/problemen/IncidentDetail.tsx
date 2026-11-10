@@ -324,7 +324,7 @@ export function IncidentDetail({ id, embedded }: { id: string; embedded?: boolea
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <ErnstLabel ernst={ernstVan(i.ernst)} />
+        <ErnstLabel ernst={ernstVan(i.ernst, i.ernst_bron)} />
         <StatusBadge view={incidentStatusView(i, (x) => formatTime(x, now))} />
         {i.heropend ? <span className="rounded-sm border border-border-strong px-1.5 text-sm font-semibold">Heropend ({i.heropend}×)</span> : null}
       </div>

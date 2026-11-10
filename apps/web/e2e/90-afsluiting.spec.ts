@@ -3,7 +3,7 @@
  * worker, rolrechten (kijker kan niets wijzigen), client-IP niet te vervalsen via X-Forwarded-For, en nog steeds
  * geen enkele schrijfaanroep op de (fake) NAS.
  */
-import { expect, test } from "@playwright/test";
+import { expect, request as pwRequest, test } from "@playwright/test";
 import { ADMIN, KIND, VIEWER, expectAccessible, nasMutations, ready, setNas, shot, stackState } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -216,6 +216,41 @@ test("executor koppelen via de eigen statuspagina, echt verstuurd in de browser 
     });
     const eerste = await ex.goto(`${executorUrl}/`);
     expect(eerste?.headers()["referrer-policy"]).toBe("same-origin");
+    await expect(ex.getByRole("heading", { name: "Koppelen" })).toBeVisible();
+    // Contract 1.3 §3.7 punt 6: negatieve gevallen tegen de echte executor, met de echte formuliercode en cookie van
+    // deze browsercontext. Elk geweigerd verzoek → 403, gaat niet naar de Hub en telt niet als poging.
+    const csrf = await ex.locator('input[name="csrf"]').getAttribute("value");
+    const form = { csrf: csrf!, hub_adres: baseURL!, koppelcode: code!, hub_vingerafdruk: vinger! };
+    const weiger = async (headers: Record<string, string>, via = ctx.request) => {
+      const r = await via.post(`${executorUrl}/koppelen`, { form, headers, maxRedirects: 0 });
+      return { status: r.status(), tekst: await r.text() };
+    };
+    for (const [naam, headers] of [
+      ["Origin: null", { Origin: "null" }],
+      ["vreemde Origin", { Origin: "http://aanvaller.invalid" }],
+      ["Sec-Fetch-Site: same-site", { Origin: executorUrl, "Sec-Fetch-Site": "same-site" }],
+      ["Sec-Fetch-Site: cross-site", { Origin: executorUrl, "Sec-Fetch-Site": "cross-site" }],
+    ] as const) {
+      const r = await weiger(headers);
+      expect(r.status, naam).toBe(403);
+      expect(r.tekst, naam).toContain("herkomst_onjuist");
+    }
+    // Niet-toegestane Host (DNS-rebinding: Origin = Host = een publieke naam).
+    const port = new URL(executorUrl).port;
+    const host = await weiger({ Host: `rebind.example.com:${port}`, Origin: `http://rebind.example.com:${port}` });
+    expect(host.status).toBe(403);
+    expect(host.tekst).toContain("host_niet_toegestaan");
+    // Geen cookie: een losse context zonder de formuliercookie.
+    const zonderCookie = await pwRequest.newContext();
+    try {
+      const r = await weiger({ Origin: executorUrl }, zonderCookie);
+      expect(r.status).toBe(403);
+      expect(r.tekst).toContain("formuliercode_onjuist");
+    } finally {
+      await zonderCookie.dispose();
+    }
+    // Elk antwoord zette een nieuwe formuliercookie in deze context: laad de pagina opnieuw, zoals een gebruiker.
+    await ex.goto(`${executorUrl}/`);
     await expect(ex.getByRole("heading", { name: "Koppelen" })).toBeVisible();
     // Eerst een verkeerde vingerafdruk: de executor koppelt niet en zegt waarom (veldfout), niets opgeslagen.
     await ex.getByLabel("Adres van de Hub").fill(baseURL!);

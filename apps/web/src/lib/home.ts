@@ -78,6 +78,7 @@ export interface IncidentItem {
   id: string;
   titel: string;
   ernst: string;
+  ernst_bron?: string | null;
   status: string;
   actief: boolean;
   bron: string;
@@ -263,11 +264,15 @@ export function homeSummary(inp: HomeInputs): { overall: StatusView & { tone: "h
 
   // 1. Actieve incidenten, kritiek eerst.
   const inc = [...(inp.activeIncidents ?? [])].filter((i) => i.actief);
-  inc.sort((a, b) => ERNST_RANG[ernstVan(a.ernst)] - ERNST_RANG[ernstVan(b.ernst)] || Date.parse(b.laatste_gebeurtenis) - Date.parse(a.laatste_gebeurtenis));
+  inc.sort(
+    (a, b) =>
+      ERNST_RANG[ernstVan(a.ernst, a.ernst_bron)] - ERNST_RANG[ernstVan(b.ernst, b.ernst_bron)] ||
+      Date.parse(b.laatste_gebeurtenis) - Date.parse(a.laatste_gebeurtenis),
+  );
   for (const i of inc.slice(0, 5)) {
     actions.push({
       id: `incident-${i.id}`,
-      as: { soort: "ernst", ernst: ernstVan(i.ernst) },
+      as: { soort: "ernst", ernst: ernstVan(i.ernst, i.ernst_bron) },
       titel: i.titel,
       uitleg: `${i.bron} · ${i.aantal_gebeurtenissen}× gezien`,
       href: `/problemen/${i.id}`,
@@ -395,7 +400,7 @@ const AUDIT_LABEL: Record<string, string> = {
   "auth.oidc.tested": "SSO-testlogin",
   "auth.oidc.enabled": "SSO aangezet",
   "monitoring.source.tested": "Monitoringbron getest",
-  "notification.channel.tested": "Testmelding verstuurd",
+  "notification.channel.tested": "Testmelding verzonden",
   "catalog.discovery": "Appcatalogus bijgewerkt",
   "backup.self_requested": "Hub-back-up gestart",
   "backup.self_reverified": "Hub-back-up opnieuw geverifieerd",

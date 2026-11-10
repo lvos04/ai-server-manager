@@ -37,7 +37,7 @@ function IncidentRij({ inc, actief }: { inc: Incident; actief: boolean }) {
       data-testid={`incident-${inc.id}`}
     >
       <span className="flex flex-wrap items-center gap-2">
-        <ErnstLabel ernst={ernstVan(inc.ernst)} />
+        <ErnstLabel ernst={ernstVan(inc.ernst, inc.ernst_bron)} />
         <StatusBadge view={incidentStatusView(inc, (x) => formatTime(x, now))} />
         {inc.heropend ? <span className="rounded-sm border border-border-strong px-1.5 text-sm font-semibold">Heropend</span> : null}
         <span className="ml-auto font-mono text-sm font-semibold" aria-label={`${inc.aantal_gebeurtenissen} keer gezien`}>

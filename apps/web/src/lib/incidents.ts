@@ -38,6 +38,8 @@ export interface Incident {
   titel: string;
   soort: string;
   ernst: string;
+  /** Contract 1.3 §7: het Peil-woord uit payload.ernst, als de bron dat meegaf. */
+  ernst_bron?: string | null;
   status: "open" | "erkend" | "gesnoozed" | "opgelost";
   actief: boolean;
   bron: string;
@@ -121,7 +123,7 @@ export function sortIncidents(items: Incident[]): Incident[] {
   return [...items].sort(
     (a, b) =>
       Number(b.actief) - Number(a.actief) ||
-      ERNST_RANG[ernstVan(a.ernst)] - ERNST_RANG[ernstVan(b.ernst)] ||
+      ERNST_RANG[ernstVan(a.ernst, a.ernst_bron)] - ERNST_RANG[ernstVan(b.ernst, b.ernst_bron)] ||
       Date.parse(b.laatste_gebeurtenis) - Date.parse(a.laatste_gebeurtenis),
   );
 }

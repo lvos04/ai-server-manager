@@ -138,6 +138,13 @@ test("diensten (H5): koppelcode + vingerafdruk + aftellen; simulator koppelt →
   const dienst = page.getByTestId("dienst-home-control-hub");
   await expect(dienst).toContainText("Gekoppeld");
   await expect(dienst.locator('[data-status="healthy"]')).toHaveCount(0);
+  // Contract 1.3 §4.4 (C1.3-ASM-07/16): de vaste leesscopes staan per dienst in de Hub-UI.
+  await expect(dienst.getByTestId("dienst-scopes")).toContainText("catalogus.lezen");
+  await expect(dienst.getByTestId("dienst-scopes")).not.toContainText("besluiten.lezen");
+  // Koppelstatus zoals de dienst hem meldt: zonder gemeten adres eerlijk "onbekend", nooit "gekoppeld" gegokt.
+  await dienst.getByTestId("koppelstatus-lezen").click();
+  await expect(dienst.getByTestId("koppelstatus-home-control-hub")).toContainText("Koppelstatus onbekend");
+  await expect(dienst.getByTestId("koppelstatus-home-control-hub")).toContainText("dienst_adres_onbekend");
 
   await dienst.getByRole("button", { name: /Rotatie aanvragen/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Rotatie aanvragen" }).click();
@@ -232,7 +239,22 @@ test("noodaccount (H6): geheim één keer, foute code → veldfout, goede code �
   const bronIp = page.getByTestId("zelftest-controles").locator('[data-controle="bron_ip"]');
   await expect(bronIp).toContainText("127.0.0.1");
   await expect(bronIp).toHaveAttribute("data-uitkomst", "beleid");
+  // Contract 1.3 §4.1 (C1.3-ASM-05): 100.64.0.0/10 telt standaard niet als privé; de zelftest toont het.
+  const cgnatControle = page.getByTestId("zelftest-controles").locator('[data-controle="bereik_cgnat"]');
+  await expect(cgnatControle).toHaveAttribute("data-uitkomst", "beleid");
+  const cgnat = page.getByTestId("noodaccount-cgnat");
+  await expect(cgnat.getByTestId("cgnat-stand")).toContainText("Telt niet als privé");
+  await expect(cgnat).toContainText("Tailscale niet met anderen deelt");
+  await expect(cgnat.getByTestId("cgnat-aan")).toHaveAttribute("aria-disabled", "true");
   await expectAccessible(page, "noodaccount");
+  // Een beheerder kan het toestaan (na bevestigen) en weer uitzetten; de zelftest volgt de instelling.
+  await cgnat.getByTestId("cgnat-bevestig").check();
+  await cgnat.getByTestId("cgnat-aan").click();
+  await expect(cgnat.getByTestId("cgnat-stand")).toContainText("Telt als privé");
+  await page.getByTestId("zelftest-uitvoeren").click();
+  await expect(cgnatControle).toHaveAttribute("data-uitkomst", "ok");
+  await cgnat.getByTestId("cgnat-uit").click();
+  await expect(cgnat.getByTestId("cgnat-stand")).toContainText("Telt niet als privé");
 
   const ctx = await browser.newContext({ storageState: undefined });
   const p = await ctx.newPage();

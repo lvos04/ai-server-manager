@@ -443,3 +443,41 @@ def test_koppelen_bezig_onleesbaar_en_invoer_niet_afkappen(
     assert link_file.read_text() == "{kapot"  # nooit stil teruggezet
     assert cookie_client.get("/readyz").status_code == 200
     assert _enroll_count(clean_db) == before
+
+
+def test_hub_leest_de_koppelstatus_bij_de_dienst_ook_onleesbaar(
+    admin: Any, hub: Served, executor: tuple[Any, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """C1.3-ASM-16: de Hub-UI toont de koppelstatus zoals de dienst hem meldt (witte lijst, NL-melding van de dienst);
+    een onleesbaar koppelbestand bij de dienst → status onleesbaar (storing), uit de openbare /readyz."""
+    ex_app, ex_settings = executor
+    grant = _pairing(admin)
+    assert _submit(_page_client(ex_app), hub.url, grant["koppelcode"], grant["keyset_fingerprint"]).status_code == 200
+    sid = json.loads((ex_settings.secrets_dir / "hub-link.json").read_text())["service_id"]
+    served_ex = Served(ex_app)
+    try:
+        from hub.routers import services as services_router
+
+        monkeypatch.setattr(services_router, "service_base_url", lambda db, settings, s: (served_ex.url, None))
+        st = admin.get(f"/api/v1/services/{sid}/koppelstatus").json()
+        assert st["status"] == "gelezen" and st["koppeling"]["state"] == "gekoppeld"
+        assert st["vingerafdruk_gelijk"] is True and st["koppeling"]["last_error"] is None
+        assert "svc_" not in json.dumps(st) and st["koppeling"]["rotation_sequence"] == 0
+        # Een last_error van de dienst: de Hub geeft de NL-melding van de dienst door (geen eigen codes).
+        from executor.hublink import HubLinkStore, now_iso
+
+        with HubLinkStore(ex_settings.secrets_dir).update() as link:
+            link["last_error"] = {"code": "sleutelrotatie_niet_toegepast", "at": now_iso()}
+        st = admin.get(f"/api/v1/services/{sid}/koppelstatus").json()
+        assert st["koppeling"]["last_error"]["code"] == "sleutelrotatie_niet_toegepast"
+        assert "opnieuw koppelen via de Hub" in st["koppeling"]["last_error"]["melding"]
+        # Onleesbaar koppelbestand: de dienst weigert de Hub (fail-closed) en meldt het in /readyz.
+        (ex_settings.secrets_dir / "hub-link.json").write_text("{kapot")
+        st = admin.get(f"/api/v1/services/{sid}/koppelstatus").json()
+        assert st["status"] == "onleesbaar" and st["reden"] == "koppelstatus_onleesbaar"
+    finally:
+        served_ex.stop()
+    # Dienst onbereikbaar: onbekend, nooit "gekoppeld" gegokt.
+    monkeypatch.setattr(services_router, "service_base_url", lambda db, settings, s: ("http://127.0.0.1:9", None))
+    st = admin.get(f"/api/v1/services/{sid}/koppelstatus").json()
+    assert st["status"] == "onbekend" and st["reden"] == "dienst_onbereikbaar"
