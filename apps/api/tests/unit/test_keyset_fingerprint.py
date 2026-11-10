@@ -1,4 +1,4 @@
-"""Contract 1.2 §4.5: RFC 7638-thumbprint en sleutelset-vingerafdruk met de testvectoren uit het contract.
+"""Contract 1.3 §4.5: RFC 7638-thumbprint en sleutelset-vingerafdruk met de testvectoren uit het contract (C1.3-ASM-03).
 
 Deze vectoren staan letterlijk in ``docs/platform-v2/PLATFORM_CONTRACTEN.md``; elke dienst toetst er zijn eigen
 implementatie aan. Alleen publieke sleutels (RFC 8037 A.1 en twee vaste testsleutels).
@@ -40,9 +40,20 @@ def test_testvectoren_uit_het_contract() -> None:
     assert keyset_fingerprint([jwk(X_JWT2), jwk(X_RFC8037)], jwk(X_POLICY)) == "CYRC-JS8C-14AN-JR17"
 
 
+def test_testvector_1_3_twee_policy_sleutels_in_elke_volgorde() -> None:
+    """Nieuw in 1.3: tijdens een policy-rotatie telt elke gepinde policy-sleutel mee, nooit alleen de laatste."""
+    assert keyset_fingerprint([jwk(X_RFC8037)], [jwk(X_POLICY), jwk(X_JWT2)]) == "HN69-2PHK-XV2D-X85W"
+    assert keyset_fingerprint([jwk(X_RFC8037)], [jwk(X_JWT2), jwk(X_POLICY)]) == "HN69-2PHK-XV2D-X85W"
+    # Eén policy-sleutel als lijst of als losse JWK: gelijk aan 1.2.
+    assert keyset_fingerprint([jwk(X_RFC8037)], [jwk(X_POLICY)]) == "MEGG-8GFG-2E4Y-K2RQ"
+    assert keyset_fingerprint([jwk(X_RFC8037)], jwk(X_POLICY)) == "MEGG-8GFG-2E4Y-K2RQ"
+    with pytest.raises(ValueError):
+        keyset_fingerprint([jwk(X_RFC8037)], [])
+
+
 def test_contracttekst_bevat_dezelfde_vectoren() -> None:
     tekst = CONTRACT.read_text(encoding="utf-8")
-    for waarde in ("MEGG-8GFG-2E4Y-K2RQ", "CYRC-JS8C-14AN-JR17", X_RFC8037, X_POLICY, X_JWT2):
+    for waarde in ("MEGG-8GFG-2E4Y-K2RQ", "CYRC-JS8C-14AN-JR17", "HN69-2PHK-XV2D-X85W", X_RFC8037, X_POLICY, X_JWT2):
         assert waarde in tekst
 
 

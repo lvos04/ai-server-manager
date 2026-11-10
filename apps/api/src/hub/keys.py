@@ -47,6 +47,9 @@ def public_jwk(key: Ed25519PublicKey, *, use: str = "sig") -> dict[str, str]:
 
 CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 KEYSET_FINGERPRINT_PREFIX = "jl-hub-keyset-v1"
+# Contract 1.3 §3.3/§4.5: huidige reeks van de Hub-sleutelrotatie. De Hub heeft nog geen rotatie gebouwd (rotatie =
+# opnieuw koppelen; ``key-rotations`` geeft een lege lijst), dus altijd 0.
+ROTATION_SEQUENCE = 0
 
 
 def jwk_thumbprint(jwk: Mapping[str, Any]) -> str:
@@ -70,12 +73,20 @@ def _crockford(data: bytes) -> str:
     return "".join(CROCKFORD_ALPHABET[int(bits[i : i + 5], 2)] for i in range(0, len(bits), 5))
 
 
-def keyset_fingerprint(jwt_keys: Iterable[Mapping[str, Any]], policy_key: Mapping[str, Any]) -> str:
-    """Sleutelset-vingerafdruk voor mensen (contract 1.2 §4.5): 80 bit, Crockford-base32, ``XXXX-XXXX-XXXX-XXXX``."""
+def keyset_fingerprint(
+    jwt_keys: Iterable[Mapping[str, Any]], policy_keys: Mapping[str, Any] | Iterable[Mapping[str, Any]]
+) -> str:
+    """Sleutelset-vingerafdruk voor mensen (contract 1.3 §4.5): 80 bit, Crockford-base32, ``XXXX-XXXX-XXXX-XXXX``.
+
+    Over **alle** jwt- en policy-sleutels, beide lijsten gesorteerd op bytewaarde van de thumbprint. Met één
+    policy-sleutel gelijk aan 1.2; tijdens een policy-rotatie telt elke gepinde policy-sleutel mee
+    (testvector ``HN69-2PHK-XV2D-X85W``). Eén losse JWK als ``policy_keys`` blijft toegestaan (= lijst van één)."""
+    policies = [policy_keys] if isinstance(policy_keys, Mapping) else list(policy_keys)
     thumbprints = sorted(jwk_thumbprint(k) for k in jwt_keys)
-    if not thumbprints:
-        raise ValueError("minstens één JWT-sleutel nodig")
-    text = f"{KEYSET_FINGERPRINT_PREFIX}\njwt:{','.join(thumbprints)}\npolicy:{jwk_thumbprint(policy_key)}"
+    policy_thumbprints = sorted(jwk_thumbprint(k) for k in policies)
+    if not thumbprints or not policy_thumbprints:
+        raise ValueError("minstens één JWT- en één policy-sleutel nodig")
+    text = f"{KEYSET_FINGERPRINT_PREFIX}\njwt:{','.join(thumbprints)}\npolicy:{','.join(policy_thumbprints)}"
     code = _crockford(hashlib.sha256(text.encode("utf-8")).digest()[:10])
     return "-".join(code[i : i + 4] for i in range(0, 16, 4))
 
@@ -120,8 +131,8 @@ class KeyRing:
         return public_jwk(self.policy_signing.public_key())
 
     def keyset_fingerprint(self) -> str:
-        """Vingerafdruk over de JWKS + policy-sleutel die een dienst bij enrollment pint (contract 1.2 §4.5)."""
-        return keyset_fingerprint(self.jwks()["keys"], self.policy_public_jwk())
+        """Vingerafdruk over de JWKS + alle policy-sleutels die een dienst bij enrollment pint (contract 1.3 §4.5)."""
+        return keyset_fingerprint(self.jwks()["keys"], [self.policy_public_jwk()])
 
     def _sign(self, claims: dict[str, Any]) -> str:
         return jwt.encode(
