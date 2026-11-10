@@ -36,6 +36,10 @@ export default defineConfig({
       fullyParallel: true,
       dependencies: ["review-opzet"],
       timeout: 60 * 60_000,
+      // In CI één herkansing: met meerdere browsers tegelijk raakt de API-databasepool (5 + 5 verbindingen) soms vol
+      // en blijft een pagina > 30 s op "Aanmelding controleren…" staan (gemeld in PEIL_REVIEW N-07). Een echte
+      // ontwerpfout komt bij de herkansing gewoon terug.
+      retries: process.env.CI ? 1 : 0,
     },
     {
       name: "review-toestanden",

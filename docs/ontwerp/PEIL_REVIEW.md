@@ -138,6 +138,7 @@ gerepareerd (`min-w-touch`) en opnieuw gemeten.
 | N-04 | Laag | Nog een paar inline styles in P0-schermen (`DecisionScreen`, `ValueView`, `RefreshInventory`). Geen kleuren: alleen afstanden. | Fase 3 "opruimen" (ADR-0024 punt 3). | Vervangen door utilities. |
 | N-05 | Laag | Gezondheid per onderdeel in het appdetail is op mobiel een stapel kaarten met de labels "Onderdeel/Status/Toelichting"; het prototype heeft compacte rijen (naam, bron, pil rechts). | Werkt en is toegankelijk; het is een dichtheidskeuze. | Compacte rijen zoals in `appdetail-p1.html` (minder scrollen op 360). |
 | N-06 | Laag | Backend: twee gelijktijdige `POST /api/v1/users` met dezelfde naam geven een 500 (UniqueViolation) in plaats van 409 `username_taken`. De controle "bestaat al" en de insert zijn niet atomair. Zo gevonden in CI-run 42711876495: drie reviewwerkers maakten tegelijk dezelfde kijker aan. | API-code, buiten het mandaat. | `IntegrityError` op `app_user_username_key` vertalen naar 409 `username_taken`. De review maakt de gebruikers nu één keer aan (`review-opzet`). |
+| N-07 | Middel | Backend en capaciteit: Home doet ± 16 API-aanvragen tegelijk. De API heeft 10 databaseverbindingen (`pool_size=5`, `max_overflow=5`, standaard 30 s wachten). Met meerdere browsers tegelijk (CI: 3 reviewwerkers) stond een pagina > 30 s op "Aanmelding controleren…" (run 42724137831: trace en screencast bekeken; de API zelf antwoordde in < 200 ms zodra er een verbinding vrij was). | Backend en capaciteit, buiten het mandaat. | De pool laten meegroeien met de threadpool, of één samengestelde Home-route. Tot dan draait de CI-review met 2 werkers en één herkansing. |
 
 ## Ontwerpkritiek (design-critique)
 
@@ -252,6 +253,8 @@ staat nog open: NIET GEVALIDEERD.
 - CI (GitHub Actions) op deze branch:
   - run 42711876495 faalde in de nieuwe reviewstap: de gebruikers werden gelijktijdig aangemaakt (N-06);
   - run 42715050190 faalde op overloop met DejaVu Sans (R-26);
+  - runs 42721759007 en 42724137831 faalden op een pagina die > 30 s bleef laden (N-07). De eerste keer maakte dat ook
+    zichtbaar dat een grafiek bij een mislukte reekslijst eindeloos bleef laden; dat is gerepareerd;
   - de uitkomst van de run na beide reparaties staat in EVIDENCE.json (I23-23-08).
 - `docs/screenshots/p1` toont nog de stand vóór deze review (`333de88`). De actuele afdrukken maakt `make web-review`
   (`apps/web/review/uit/shots`, niet in Git); de voor/na-selectie staat in `docs/ontwerp/review/`.
