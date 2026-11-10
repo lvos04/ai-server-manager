@@ -172,6 +172,9 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
   const [totp, setTotp] = useState<Totp | null>(null);
   const act = useAction<{ totp: Totp }>();
   const tekort = pw.length > 0 && pw.length < 20 ? "Minstens 20 tekens." : undefined;
+  // Contract 1.3 §5: een fout eigen wachtwoord binnen een geldige sessie is 422 (nooit 401) → veldfout bij dat veld;
+  // andere 422's (bv. een te zwak noodwachtwoord) blijven een foutmelding onder het formulier.
+  const eigenFout = act.error?.status === 422 && act.error.code === "invalid_credentials";
   if (totp) {
     return (
       <TotpStap
@@ -206,7 +209,7 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
           <p>Tot je de nieuwe code bevestigt, werkt de noodlogin niet.</p>
         </Melding>
       ) : null}
-      <Field id="nood-eigen" label="Je eigen wachtwoord" help="Wijzigen vraagt je eigen wachtwoord." error={act.error?.status === 422 ? act.error.message : undefined}>
+      <Field id="nood-eigen" label="Je eigen wachtwoord" help="Wijzigen vraagt je eigen wachtwoord." error={eigenFout ? act.error?.message : undefined}>
         {(a) => <input {...a} type="password" autoComplete="current-password" value={eigen} onChange={(e) => setEigen(e.target.value)} required />}
       </Field>
       {!bestaand ? (
@@ -220,7 +223,7 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
       <Field id="nood-duur" label="Sessieduur (minuten)" help="5–240. Een noodsessie is niet te verlengen.">
         {(a) => <input {...a} type="number" min={5} max={240} value={duur} onChange={(e) => setDuur(Number(e.target.value))} />}
       </Field>
-      {act.error && act.error.status !== 422 ? <ErrorPanel error={act.error} title="Instellen mislukt" /> : null}
+      {act.error && !eigenFout ? <ErrorPanel error={act.error} title="Instellen mislukt" /> : null}
       <div>
         <Button type="submit" variant="primair" bezig={act.busy} data-testid="nood-volgende">
           <KeyRound aria-hidden="true" />
