@@ -81,6 +81,15 @@ en zijn gecorrigeerd. Aangevuld met de gevolgen van RV1–RV12 per repo, met reg
 Δ-HUB-2 als repowerk van ai-server-manager (groep C12 ontbrak daar) en het nieuwe punt C1.3-MH-07 (de delta-matrix van
 my_house noemt nog "enrollment via `HUB_URL`").
 
+**EVIDENCE (C1.3-ASM-15, in deze repo):** de maker kon voor de contractstap geen EVIDENCE-regel schrijven, omdat
+`test_evidence_contract.py` en `tools/excel/update_excel.py` de 1.3-waarden en -ID's nog niet kenden. De review bouwt
+dat punt (het is NU-werk van deze repo en blokkeerde het bewijs): de test kent de nieuwe waarden, de regel "`Niet getest`
+alleen bij `Niet gestart`", de consistentie `blokkade` → `validatie` en de vorm van `C1.x-…`/`REVIEW-…`; de Excel-bijwerker
+zet zulke regels in het overzicht `contractpunten_en_reviews` van zijn uitvoer in plaats van ze als "geen rij gevonden"
+te melden. Twee bestaande rijen (B01-001, I23-23-08) noemden in `blokkade` een NIET GEVALIDEERD die niet in `validatie`
+stond (één met de niet-bestaande waarde "hardware/echte NAS"); die zijn rechtgezet. Daarna kreeg `EVIDENCE.json` de regels
+`REVIEW-ai-server-manager-contract-1.3` en `C1.3-ASM-15` (status `Bezig`, validatie `Unit-getest`).
+
 ## Alternatieven
 
 - *Een versie 1.3.1 uitbrengen:* verworpen; 1.3 is nog nergens gekopieerd (C1.3-ALG-01 is de volgende stap), dus de
@@ -97,11 +106,14 @@ my_house noemt nog "enrollment via `HUB_URL`").
 - Geen enkele repo is gebroken: de correcties raken punten die nog niet gebouwd zijn (P3/P4) of leggen vast wat de
   referentie-implementatie (home-control-hub) al doet. Het werk staat per repo in de conformiteitslijst.
 - `test_contract_13.py` bewaakt het blok met de reviewcorrecties en de kernzinnen ervan.
+- ADR-0027 punt 12 ("tot dat gebouwd is, schrijft deze repo zulke regels nog niet") is hiermee ingehaald.
 - Niets hiervan is op een echte NAS, met echte accounts of op echte hardware gevalideerd; de codemetingen zijn gelezen
   (grep en bestandsinhoud), niet uitgevoerd in de andere repos.
 
 ## Verificatie
 
 - `apps/api/tests/unit/test_contract_13.py`, `test_contract_13_kandidaten.py`, `test_keyset_fingerprint.py`.
+- `apps/api/tests/unit/test_evidence_contract.py` en `tools/excel/tests/test_update_excel.py`
+  (`test_contractpunten_en_reviews_in_eigen_overzicht`).
 - Eigen traceerbaarheidsscript (alle 151 meldingen, repo, groep, klasse) en een padcontrole van de conformiteitslijst
   (alle genoemde bestanden bestaan, behalve de als "nieuw" gemarkeerde).

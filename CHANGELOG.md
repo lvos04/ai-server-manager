@@ -16,6 +16,10 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 - Conformiteitslijst: C1.3-JLP-02/-03 gecorrigeerd (de gemeten stand klopte niet), de gevolgen van RV1–RV12 per repo
   met regelnummers, Δ-HUB-2 als repowerk en het nieuwe punt C1.3-MH-07 (nu 121 punten).
 - `test_contract_13.py` bewaakt het reviewblok en de kernzin van elke correctie in de juiste paragraaf.
+- EVIDENCE volgens §11 van 1.3 (C1.3-ASM-15): `test_evidence_contract.py` kent `Intel-iGPU-getest (ontwikkelmachine)`
+  en `Niet getest`, eist dat een NIET GEVALIDEERD uit `blokkade` ook in `validatie` staat en controleert `C1.x-…`- en
+  `REVIEW-…`-ID's; `tools/excel/update_excel.py` meldt zulke regels in het overzicht `contractpunten_en_reviews`.
+  B01-001 en I23-23-08 rechtgezet; nieuwe regels `REVIEW-ai-server-manager-contract-1.3` en `C1.3-ASM-15`.
 
 ### Gewijzigd — contract 1.3 vastgesteld (`docs/platform-v2/PLATFORM_CONTRACTEN.md`, ADR-0027)
 - `PLATFORM_CONTRACTEN.md` is nu `contracts 1.3`: alle 36 contractgroepen uit de inventaris verwerkt, met een

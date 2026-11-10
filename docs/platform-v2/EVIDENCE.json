@@ -2,12 +2,12 @@
   {
     "id": "B01-001",
     "status": "Bezig",
-    "validatie": "Sim-getest",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
     "bewijs": "commits 07cab93, 15886cb, 5eaec64; tests/e2e/test_wizard_inventory.py::test_volledige_wizard_en_inventaris_zonder_mutatie, ::test_nas_zonder_api_autorisatie_geeft_gerichte_fout, ::test_ontbrekend_leesrecht_per_onderdeel_is_unknown_niet_overgeslagen, ::test_key_met_schrijfrechten_wordt_geweigerd, ::test_nas_offline_maakt_inventaris_verouderd_en_unknown, ::test_truenas_24_10_gebruikt_zfs_snapshot_en_extra_ca; apps/api/tests/integration/test_truenas_adapter.py; web-UI: commits 7756393, 3966dde, 5c66b00; apps/web/e2e/00-opzet.spec.ts (eerste start met setupcode, TrueNAS-koppeling met vingerafdruk, ::auth_failed gerichte fout, ::key_too_privileged, metingen D01/D03/D06/D07, D02 via schemaformulier), apps/web/e2e/10-schermen.spec.ts (Server: MediaGuard/MSO/my_house zichtbaar), apps/web/e2e/90-afsluiting.spec.ts (NAS offline → onbekend/verouderd, geen NAS-mutaties); 115 Playwright-tests geslaagd tegen de teststack én tegen de alles-in-één image; screenshots docs/screenshots/p0/; review P0: commits 821b51b (apps/api/tests/integration/test_route_authz.py: rechtenmatrix over alle routes), e1285d8 (test_truenas_adapter.py::test_key_nooit_verstuurd_bij_onvertrouwd_of_gewijzigd_certificaat); GitHub Actions ci run 42606054344 (jobs python, web, images) geslaagd op bd0e630 en ci run 42608437675 (python, web, images) geslaagd op c5063f0",
     "blokkade": "Acceptatie op de echte NAS ontbreekt: NIET GEVALIDEERD (echte NAS). Vereist D03 + alleen-lezen-key van de gebruiker.",
     "opmerking": "TrueNAS JSON-RPC-adapter (wss, TLS-verificatie of bevestigde vingerafdruk, capability-map per versie, reason codes), inventaris met observed_at/veroudering en dienstenregister. Web-UI-wizard gebouwd: data- en netwerkzicht alleen-lezen, ontbrekende informatie expliciet in te vullen of te meten (geen voorbeeldwaarden), gerichte NL-fout bij een geweigerde key. Tegen de fake TrueNAS: MediaGuard/MSO/my_house zichtbaar zonder enige mutatie (fake.mutations leeg na alle UI-scenario's). Methodenamen nog niet tegen een echte TrueNAS-versie gecontroleerd. Review: TLS wordt nooit stil uitgeschakeld (geen enkele aanroep bij onvertrouwd/gewijzigd certificaat, met mutatiecontrole).",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-09"
+    "bijgewerkt": "2026-11-10"
   },
   {
     "id": "B01-002",
@@ -102,9 +102,9 @@
   {
     "id": "I23-23-08",
     "status": "Bezig",
-    "validatie": "Sim-getest",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (echte NAS)",
     "bewijs": "commits 7756393, 3966dde, 5c66b00, ac2acd2; apps/web/e2e/*.spec.ts: 115 tests geslaagd (projecten opzet, mobiel-360, mobiel-390, tablet-768, desktop-1440, afsluiting) tegen tests/e2e/web_stack.py (echte Hub-API + fake TrueNAS) én tegen de alles-in-één image ai-server-manager:dev; axe (WCAG 2.2 A/AA) zonder overtredingen in licht en donker, aanraakdoelen ≥ 44 px, geen horizontaal scrollen, skiplink/toetsenbord, offline-banner en service-worker-schil, NAS offline → onbekend, kijker kan niets wijzigen (UI + API 403); vitest 61 tests; screenshots docs/screenshots/p0/; review P0: make web-e2e opnieuw 115 geslaagd (2.8m) en dezelfde suite 115 geslaagd tegen de opnieuw gebouwde alles-in-één image (HUB_E2E_BASE_URL); vitest 61 geslaagd; review contract 1.2 (ADR-0014): commit 10cc5f9 (doorgang geeft zelf 413 bij > 1 MiB): make web-e2e-equivalent (npx playwright test) 115 geslaagd en vitest 62 geslaagd; eslint, tsc, npm audit (0 kwetsbaarheden) en next build geslaagd; P1-webstap (contract 1.2 H5/H6/H12, ADR-0024): commits 2ac06e9, b61f87d, 7d15df5, 10febe1, a832329; lokaal: vitest 79 passed, Playwright 179 passed (opzet + 360/390/768/1440 × licht/donker + afsluiting) tegen de echte API met simulators én 179 passed tegen de alles-in-één image ai-server-manager:dev, pytest 473 passed, rooktest geslaagd; GitHub Actions ci run 42698728365 geslaagd op 54e44a9 (jobs python, excel, web en images); ontwerpreview Peil van de gebouwde Hub-UI (contract §13, ADR-0025, docs/ontwerp/PEIL_REVIEW.md): commits 95dbca9, 607b84a, d79edc2, 7cad4b0, 0bd4997, f1292a3, e690ef6, dcae5d8, 9c92c56, f609246; make web-review (apps/web/review): 59 schermen/toestanden (beheerder, kijker, kind, publiek, executor-statuspagina, NAS offline, browser offline) × 320/360/390/768/1024/1440 × licht/donker = 700 metingen, 0 harde bevindingen, axe 0, ook met DejaVu Sans; Playwright web-E2E 179 passed; vitest 84 passed; GitHub Actions ci run 42727322898: success (python, web met de Peil-review: 57 schermen/toestanden, 676 metingen, 0 harde bevindingen, axe 0; excel, images); QA-review P1 (ADR-0026): commits b3cf2de (executor-koppelformulier echt in Chromium), e5bce87 (safeReturnPath zonder tab/regeleinde), 55b5d2e (overlays bg-black/50 volgens ONTWERPTAAL §1); lokaal Playwright 180 passed, vitest 84 passed, eslint/tsc/next build/npm audit geslaagd; GitHub Actions ci run 42736469342",
-    "blokkade": "Acceptatie vraagt een volledige walkthrough op een echte Android-telefoon, tablet en tv/speler tegen de echte NAS: NIET GEVALIDEERD (hardware/echte NAS). Schermen van P2–P5 bestaan nog niet en tonen eerlijk 'Nog niet beschikbaar'.",
+    "blokkade": "Acceptatie vraagt een volledige walkthrough op een echte Android-telefoon, tablet en tv/speler tegen de echte NAS: NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (echte NAS). Schermen van P2–P5 bestaan nog niet en tonen eerlijk 'Nog niet beschikbaar'.",
     "opmerking": "Deels: alleen Sim-getest in Chromium (Playwright-viewports), Nederlands. De offline-schil werkt alleen via HTTPS of localhost; via http://<NAS-adres> is hij bewust niet actief (HTTPS volgt met D17). Review: één eerdere Playwright-run faalde op net::ERR_NETWORK_CHANGED (netwerkwijziging op de gedeelde bouwmachine) en één keer startte de webserver niet omdat een andere agent dezelfde testpoort gebruikte; de volledige suite is daarna op eigen poorten twee keer groen gedraaid. Hub-UI nu in Peil (H12: Tailwind 4 + shadcn/ui + lucide, tokens als versie-gepinde kopie met sha256-test); alle schermen op 360/390/768/1440 in licht én donker met axe 0, geen horizontaal scrollen, doelen ≥ 44 px; P1-schermen (Apps, appdetail, Problemen, Metrieken, Meetdekking, Logs, Instellingen-subpagina's, Diensten H5, Noodaccount H6, noodlogin, kindschil). Schermafdrukken docs/screenshots/p1/. 320 en 1024 alleen in de prototypecontrole. Ontwerpreview: 25+1 bevindingen gerepareerd (o.a. grafieken die door een ophaallus nooit gegevens toonden, focusring datumveld, focus achter de ondernavigatie in de kindschil, axe bij het gebruikersmenu, overloop op 1024/320, losse links < 44 px, iconen volgens Peil §7, kindertaal op Ik). 320 en 1024 zitten nu ook in de CI-review. Overgedragen: executor-statuspagina koppelen faalt in een echte browser (Origin: null door Referrer-Policy no-referrer).",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-10"
@@ -408,5 +408,25 @@
     "opmerking": "De Hub claimt nooit out-of-band dekking bij volledige NAS-uitval: met Kuma of Gotify op het NAS-adres 'niet_gedekt' met de tekst dat dan niemand meldt; een ander adres hooguit 'extern_onbevestigd' of 'extern_handmatig_bevestigd'; 'gedekt' is altijd false.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-09"
+  },
+  {
+    "id": "REVIEW-ai-server-manager-contract-1.3",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commits 3e5549d (contract: RV1–RV12, ADR-0028), d8d883d (conformiteitslijst gecorrigeerd), f862346 (tests), e9506bc (docs), b6a3f47 (EVIDENCE/Excel §11); apps/api/tests/unit/test_contract_13.py (27 tests, o.a. ::test_reviewcorrecties_staan_in_het_wijzigingslog en ::test_reviewcorrectie_staat_in_de_juiste_paragraaf), test_contract_13_kandidaten.py, test_keyset_fingerprint.py; eigen traceerbaarheidsscript over alle 151 meldingen (repo, groep, klasse) en een padcontrole van de conformiteitslijst; pytest tests/unit 396 passed; make lint en make type geslaagd",
+    "blokkade": "",
+    "opmerking": "Onafhankelijke review van contract 1.3: alle 36 groepen (a) verwerkt, 151 meldingen traceerbaar; twaalf correcties (o.a. bestaande Emby-koppeling van MediaGuard blijft, HARDE EIS ook bij upgrades met databasemigraties, geen kijkgedrag via de MediaGuard-adapter, service_id voor de Jelly Leon-plugin, formulier-POST's uitgezonderd van Idempotency-Key); conformiteitslijst C1.3-JLP-02/-03 gecorrigeerd en aangevuld (121 punten). Codemetingen in andere repos alleen gelezen (grep/bestandsinhoud), niet uitgevoerd. Een documentreview kent geen NAS-acceptatie; de contractinhoud zelf is nergens op een echte NAS, met echte accounts of op echte hardware gevalideerd.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-15",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commit b6a3f47; apps/api/tests/unit/test_evidence_contract.py (nieuwe waarden, Niet getest alleen bij Niet gestart, blokkade → validatie, vorm C1.x-/REVIEW-ID's); tools/excel/tests/test_update_excel.py::test_contractpunten_en_reviews_in_eigen_overzicht (11 passed in een eigen venv met tools/excel/requirements-test.txt)",
+    "blokkade": "",
+    "opmerking": "EVIDENCE §11 van contract 1.3 in deze repo; rijen B01-001 en I23-23-08 consistent gemaakt. Het werkboek zelf is in deze stap niet opnieuw samengevoegd (dat gebeurt met de EVIDENCE van alle repos samen).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
   }
 ]
