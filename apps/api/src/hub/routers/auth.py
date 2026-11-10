@@ -383,7 +383,8 @@ def change_password(body: PasswordIn, db: DB, settings: SettingsDep, principal: 
     if not verify_password(user.password_hash, body.huidig_wachtwoord):
         record_failure(db, key)
         db.commit()
-        raise HubError(401, "invalid_credentials", "Huidig wachtwoord onjuist.")
+        # Foute invoer binnen een geldige sessie: 422, nooit 401 (contract 1.3 §5: 401 alleen voor authenticatie).
+        raise HubError(422, "invalid_credentials", "Huidig wachtwoord onjuist.")
     clear_failures(db, key)
     _check_password_policy(body.nieuw_wachtwoord, settings.password_min_length, user.username)
     user.password_hash = hash_password(body.nieuw_wachtwoord)

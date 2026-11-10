@@ -113,7 +113,8 @@ def test_totp_verificatie_venster_en_eenmalig() -> None:
         ("172.16.0.5", True),
         ("172.31.255.1", True),
         ("192.168.1.20", True),
-        ("100.64.0.1", True),
+        ("100.64.0.1", False),  # contract 1.3 §4.1: CGNAT (ook Tailscale) standaard niet privé
+        ("100.127.255.254", False),
         ("fd12:3456::1", True),
         ("::ffff:192.168.1.20", True),
         ("172.32.0.1", False),
@@ -129,6 +130,15 @@ def test_totp_verificatie_venster_en_eenmalig() -> None:
 )
 def test_prive_bereiken(ip: str, private: bool) -> None:
     assert breakglass.is_private_source(ip) is private
+
+
+def test_cgnat_alleen_als_een_beheerder_het_toestaat() -> None:
+    """C1.3-ASM-05: 100.64.0.0/10 telt alleen mee met de beheerinstelling; andere bereiken veranderen niet."""
+    assert breakglass.is_private_source("100.64.0.1", allow_cgnat=True)
+    assert breakglass.is_private_source("::ffff:100.100.1.1", allow_cgnat=True)
+    assert not breakglass.is_private_source("100.128.0.1", allow_cgnat=True)  # buiten /10
+    assert not breakglass.is_private_source("203.0.113.7", allow_cgnat=True)
+    assert not breakglass.is_private_source("127.0.0.1", allow_cgnat=True)
 
 
 def test_docker_gateway_heuristiek() -> None:

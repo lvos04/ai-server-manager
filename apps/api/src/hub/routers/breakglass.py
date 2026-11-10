@@ -1,11 +1,14 @@
-"""Noodlogin (break-glass) in de Hub (contract 1.2 §4.1; Excel B01-006, voorwaarde voor B13-001).
+"""Noodlogin (break-glass) in de Hub (contract 1.3 §4.1; Excel B01-006, voorwaarde voor B13-001).
 
 - Eén lokaal noodaccount (rol ``admin``, vlag ``break_glass``): wachtwoord ≥ 20 tekens **plus** TOTP (RFC 6238).
-- Inloggen alleen vanaf privé-bereiken op basis van het echte bron-IP; sessie hooguit 60 min (instelbaar 5–240), niet
-  verlengbaar; elke noodlogin → audit + event ``auth.break_glass.used`` + rotatieplicht.
+- Inloggen alleen vanaf privé-bereiken op basis van het echte bron-IP (``100.64.0.0/10`` alleen als een beheerder dat
+  toestaat); sessie hooguit 60 min (instelbaar 5–240), niet verlengbaar; elke noodlogin → audit + event
+  ``auth.break_glass.used`` + rotatieplicht.
+- Foute invoer binnen een geldige sessie (eigen wachtwoord, TOTP-code bij bevestigen) is 422, nooit 401: 401 is alleen
+  voor authenticatie (contract 1.3 §5).
 - Instellen, roteren en bevestigen alleen door een beheerder (met zijn eigen wachtwoord); het zijn geen ``action_id``'s
   en de AI kan ze niet voorstellen. Setup en rotatie geven bewust een nieuw geheim terug (één keer, ``no-store``) en
-  zijn daarom, net als wachtwoord wijzigen, uitgezonderd van ``Idempotency-Key`` (ADR-0006, ADR-0013).
+  zijn daarom, net als wachtwoord wijzigen, uitgezonderd van ``Idempotency-Key`` (contract 1.3 §5).
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from hub import audit, breakglass
-from hub.deps import DB, Admin, Principal, SettingsDep, get_vault
+from hub.deps import DB, Admin, Idem, Principal, SettingsDep, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.models import User
@@ -62,6 +65,10 @@ class ConfirmIn(Strict):
     totp: str = Field(min_length=6, max_length=12)
 
 
+class CgnatIn(Strict):
+    toestaan: bool = Field(description="100.64.0.0/10 (CGNAT, ook Tailscale) als privé tellen voor de noodlogin")
+
+
 class LoginIn(Strict):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=256)
@@ -77,7 +84,7 @@ def _reauth(db: Any, settings: Any, principal: Principal, password: str) -> None
     if admin is None or not verify_password(admin.password_hash, password):
         record_failure(db, key)
         db.commit()
-        raise HubError(401, "invalid_credentials", "Je eigen wachtwoord is onjuist.")
+        raise HubError(422, "invalid_credentials", "Je eigen wachtwoord is onjuist.")
     clear_failures(db, key)
 
 
@@ -176,7 +183,34 @@ def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: Admin, vaul
     )
 
 
-@router.post("/confirm", summary="TOTP van het noodaccount bevestigen of herbevestigen (admin)")
+@router.put(
+    "/cgnat",
+    summary="100.64.0.0/10 (CGNAT, ook Tailscale) wel of niet als privé tellen voor de noodlogin (admin; audit)",
+)
+def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
+    """Contract 1.3 §4.1: standaard uit. Alleen een beheerder in de Hub-UI; geen ``action_id``, nooit door de AI."""
+    if (replay := idem.replay()) is not None:
+        return replay
+    before = breakglass.cgnat_allowed(db)
+    breakglass.set_cgnat(db, toestaan=body.toestaan, door=principal.name)
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=principal.name,
+        action="auth.break_glass.cgnat_toegestaan" if body.toestaan else "auth.break_glass.cgnat_uit",
+        target_type="hub_setting",
+        target_id=breakglass.SETTING_CGNAT,
+        details={"was": before, "wordt": body.toestaan},
+    )
+    db.flush()
+    return idem.save(200, breakglass.status(db, settings))
+
+
+@router.post(
+    "/confirm",
+    summary="TOTP van het noodaccount bevestigen of herbevestigen (admin); foute code → 422 invalid_totp",
+    responses={422: {"description": "invalid_totp: foute code binnen een geldige sessie (nooit 401)"}},
+)
 def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: Admin, vault: VaultDep) -> dict[str, Any]:
     user = breakglass.account(db)
     if user is None or user.totp_secret_ref is None:
@@ -190,7 +224,7 @@ def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: Admin, va
     if step is None:
         record_failure(db, key)
         db.commit()
-        raise HubError(401, "invalid_totp", "De code klopt niet (of is al gebruikt).")
+        raise HubError(422, "invalid_totp", "De code klopt niet (of is al gebruikt).")
     clear_failures(db, key)
     first = user.totp_confirmed_at is None
     user.totp_last_step = step
@@ -229,7 +263,7 @@ def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault:
             "Te veel mislukte pogingen; probeer het later opnieuw.",
             headers={"Retry-After": str(wait)},
         )
-    if not breakglass.is_private_source(ip):
+    if not breakglass.is_private_source(ip, allow_cgnat=breakglass.cgnat_allowed(db)):
         record_failure(db, key)
         audit.record(
             db, actor_type="user", actor_id=username[:64], action="auth.break_glass.refused", details={"ip": ip}

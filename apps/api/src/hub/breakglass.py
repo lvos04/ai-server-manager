@@ -1,4 +1,8 @@
-"""Noodlogin (break-glass) van de Hub (contract 1.2 §4.1): TOTP (RFC 6238), privé-bereiken en accountstatus.
+"""Noodlogin (break-glass) van de Hub (contract 1.3 §4.1): TOTP (RFC 6238), privé-bereiken en accountstatus.
+
+Privé = RFC 1918 en ``fc00::/7``. ``100.64.0.0/10`` (CGNAT, ook Tailscale) telt standaard **niet** als privé: met
+Tailscale-delen kunnen gasten in dat bereik zitten. Een beheerder kan het in de Hub-UI toestaan (``hub_setting``
+``noodlogin.cgnat_toestaan``; audit + waarschuwing); dat is geen ``action_id`` en de AI kan het niet voorstellen.
 
 Werkt zonder Authentik/OIDC en zonder enige netwerkaanroep. Het TOTP-geheim staat versleuteld in de vault; de
 database bevat alleen de vault-referentie. Een gebruikte code (tijdstap) wordt nooit een tweede keer geaccepteerd.
@@ -21,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from hub.config import Settings
 from hub.errors import HubError
-from hub.models import User
+from hub.models import HubSetting, User
 from hub.timeutil import iso, utcnow
 
 TOTP_PERIOD = 30
@@ -29,12 +33,18 @@ TOTP_DIGITS = 6
 TOTP_WINDOW = 1  # één tijdstap speling naar voren en naar achteren (klokverschil telefoon)
 ISSUER = "TrueNAS Home Platform"  # productnaam (besluit gebruiker O-07)
 
-PRIVATE_NETWORKS = tuple(
-    ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7")
+PRIVATE_NETWORKS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
+CGNAT = ipaddress.ip_network("100.64.0.0/10")
+SETTING_CGNAT = "noodlogin.cgnat_toestaan"
+CGNAT_WAARSCHUWING = (
+    "Sta 100.64.0.0/10 alleen toe als je Tailscale niet met anderen deelt: met Tailscale-delen kunnen gasten in dit "
+    "bereik zitten en dan de noodlogin bereiken."
 )
-# Deterministische zelftest: een adres binnen een privé-bereik en een documentatie-adres (RFC 5737) erbuiten.
+# Deterministische zelftest: een adres binnen een privé-bereik, een documentatie-adres (RFC 5737) erbuiten en een
+# adres in 100.64.0.0/10 (privé alleen als een beheerder dat heeft toegestaan).
 SELFTEST_INSIDE = "10.0.0.1"
 SELFTEST_OUTSIDE = "192.0.2.10"
+SELFTEST_CGNAT = "100.64.0.1"
 DOCKER_BRIDGE = ipaddress.ip_network("172.16.0.0/12")
 
 
@@ -90,10 +100,40 @@ def _address(ip: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     return addr
 
 
-def is_private_source(ip: str) -> bool:
-    """RFC 1918, 100.64.0.0/10 en fc00::/7; loopback, link-local en publieke adressen tellen niet."""
+def is_private_source(ip: str, *, allow_cgnat: bool = False) -> bool:
+    """RFC 1918 en fc00::/7; ``100.64.0.0/10`` alleen als een beheerder dat toestaat (contract 1.3 §4.1). Loopback,
+    link-local en publieke adressen tellen nooit."""
     addr = _address(ip)
-    return addr is not None and any(addr.version == n.version and addr in n for n in PRIVATE_NETWORKS)
+    if addr is None:
+        return False
+    if allow_cgnat and isinstance(addr, ipaddress.IPv4Address) and addr in CGNAT:
+        return True
+    return any(addr.version == n.version and addr in n for n in PRIVATE_NETWORKS)
+
+
+def cgnat_setting(db: Session) -> dict[str, Any]:
+    """Huidige stand van ``noodlogin.cgnat_toestaan`` (standaard uit)."""
+    row = db.get(HubSetting, SETTING_CGNAT)
+    aan = bool(row is not None and (row.waarde or {}).get("toestaan") is True)
+    return {
+        "toegestaan": aan,
+        "gewijzigd_door": row.gewijzigd_door if row is not None else None,
+        "gewijzigd_op": iso(row.gewijzigd_op) if row is not None else None,
+        "waarschuwing": CGNAT_WAARSCHUWING,
+    }
+
+
+def cgnat_allowed(db: Session) -> bool:
+    return bool(cgnat_setting(db)["toegestaan"])
+
+
+def set_cgnat(db: Session, *, toestaan: bool, door: str) -> None:
+    row = db.get(HubSetting, SETTING_CGNAT)
+    if row is None:
+        row = HubSetting(sleutel=SETTING_CGNAT, waarde={}, gewijzigd_door=door[:80])
+        db.add(row)
+    row.waarde = {"toestaan": toestaan}
+    row.gewijzigd_op, row.gewijzigd_door = utcnow(), door[:80]
 
 
 def looks_like_docker_gateway(ip: str) -> bool:
@@ -149,6 +189,7 @@ def status(db: Session, settings: Settings, now: datetime | None = None) -> dict
         "noodaccount": acc,
         "werkend": working,
         "oidc_verplicht_mogelijk": working,
+        "cgnat": cgnat_setting(db),
         "toelichting": "Noodlogin: wachtwoord (≥ 20 tekens) plus TOTP, alleen vanaf privé-adressen, sessie hooguit "
         f"{settings.break_glass_session_minutes_default} minuten (instelbaar 5–240). Zonder werkend noodaccount kan "
         "'OIDC verplicht' niet aan.",
@@ -169,6 +210,7 @@ def selftest(db: Session, source_ip: str, now: datetime | None = None) -> dict[s
     """Deterministische controle zonder in te loggen en zonder mutatie (contract 1.2 §4.1)."""
     now = now or utcnow()
     user = account(db)
+    cgnat = cgnat_allowed(db)
     checks: list[dict[str, Any]] = [
         {
             "naam": "noodaccount",
@@ -185,17 +227,28 @@ def selftest(db: Session, source_ip: str, now: datetime | None = None) -> dict[s
         {
             "naam": "bereik_binnen",
             "adres": SELFTEST_INSIDE,
-            "prive": is_private_source(SELFTEST_INSIDE),
-            "status": "ok" if is_private_source(SELFTEST_INSIDE) else "fout",
+            "prive": is_private_source(SELFTEST_INSIDE, allow_cgnat=cgnat),
+            "status": "ok" if is_private_source(SELFTEST_INSIDE, allow_cgnat=cgnat) else "fout",
         },
         {
             "naam": "bereik_buiten",
             "adres": SELFTEST_OUTSIDE,
-            "prive": is_private_source(SELFTEST_OUTSIDE),
-            "status": "ok" if not is_private_source(SELFTEST_OUTSIDE) else "fout",
+            "prive": is_private_source(SELFTEST_OUTSIDE, allow_cgnat=cgnat),
+            "status": "ok" if not is_private_source(SELFTEST_OUTSIDE, allow_cgnat=cgnat) else "fout",
+        },
+        {
+            # Contract 1.3 §4.1: de zelftest toont of 100.64.0.0/10 meetelt (standaard niet).
+            "naam": "bereik_cgnat",
+            "adres": SELFTEST_CGNAT,
+            "prive": is_private_source(SELFTEST_CGNAT, allow_cgnat=cgnat),
+            "toegestaan_door_beheerder": cgnat,
+            "status": "ok" if is_private_source(SELFTEST_CGNAT, allow_cgnat=cgnat) is cgnat else "fout",
+            "detail": "100.64.0.0/10 telt als privé: toegestaan door een beheerder. " + CGNAT_WAARSCHUWING
+            if cgnat
+            else "100.64.0.0/10 (CGNAT, ook Tailscale) telt niet als privé (standaard).",
         },
     ]
-    private = is_private_source(source_ip)
+    private = is_private_source(source_ip, allow_cgnat=cgnat)
     gateway = looks_like_docker_gateway(source_ip)
     checks.append(
         {

@@ -71,7 +71,10 @@ def test_instellen_bevestigen_en_inloggen(admin: Any, app: Any, clean_db: str) -
     assert secret not in dump
     # Voor bevestiging kan de noodlogin niet
     assert _login(app, "192.168.1.20", _code(secret)).status_code == 401
-    assert admin.post("/api/v1/auth/break-glass/confirm", json={"totp": "000000"}).status_code == 401
+    # Contract 1.3 §5: een foute code binnen een geldige sessie is 422 invalid_totp, nooit 401 (dat is aanmelden).
+    wrong = admin.post("/api/v1/auth/break-glass/confirm", json={"totp": "000000"})
+    assert wrong.status_code == 422 and wrong.json()["code"] == "invalid_totp"
+    assert admin.get("/api/v1/auth/me").status_code == 200  # de sessie van de beheerder blijft geldig
     r = admin.post("/api/v1/auth/break-glass/confirm", json={"totp": _code(secret)})
     assert r.status_code == 200, r.text
     assert r.json()["werkend"] is True and r.json()["oidc_verplicht_mogelijk"] is True
@@ -140,6 +143,9 @@ def test_zelftest_zonder_mutatie_toont_bron_ip(admin: Any, app: Any, clean_db: s
     checks = {c["naam"]: c for c in r.json()["controles"]}
     assert r.json()["resultaat"] == "niet_ok" and checks["noodaccount"]["status"] == "fout"
     assert checks["bereik_binnen"]["status"] == "ok" and checks["bereik_buiten"]["adres"] == "192.0.2.10"
+    # De zelftest toont of 100.64.0.0/10 meetelt (standaard niet, contract 1.3 §4.1).
+    assert checks["bereik_cgnat"]["prive"] is False and checks["bereik_cgnat"]["toegestaan_door_beheerder"] is False
+    assert checks["bereik_cgnat"]["status"] == "ok"
     assert checks["bron_ip"]["adres"] == "testclient" and checks["bron_ip"]["prive"] is False
     secret = _setup(admin)["totp"]["geheim"]
     admin.post("/api/v1/auth/break-glass/confirm", json={"totp": _code(secret)})
@@ -164,7 +170,8 @@ def test_negatieve_gevallen_instellen(admin: Any, app: Any) -> None:
     with Session(app.state.engine) as db, pytest.raises(Exception, match="noodaccount"):
         breakglass.assert_oidc_required_allowed(db)
     base = {"huidig_wachtwoord": STRONG_PASSWORD, "username": "nood", "password": NOOD_PW}
-    assert admin.post("/api/v1/auth/break-glass/setup", json={**base, "huidig_wachtwoord": "fout"}).status_code == 401
+    fout = admin.post("/api/v1/auth/break-glass/setup", json={**base, "huidig_wachtwoord": "fout"})
+    assert fout.status_code == 422 and fout.json()["code"] == "invalid_credentials"  # binnen een sessie: nooit 401
     r = admin.post("/api/v1/auth/break-glass/setup", json={**base, "password": "kort-maar-19-tekens"})
     assert r.status_code == 422 and r.json()["code"] == "weak_password"
     r = admin.post("/api/v1/auth/break-glass/setup", json={**base, "password": "nood-nood-nood-nood-nood"})
@@ -182,3 +189,38 @@ def test_negatieve_gevallen_instellen(admin: Any, app: Any) -> None:
 
     r = admin.patch(f"/api/v1/users/{nood['id']}", json={"role": "viewer"}, headers=idem())
     assert r.status_code == 409 and r.json()["code"] == "break_glass_stays_admin"
+
+
+def test_cgnat_standaard_niet_prive_en_alleen_beheerder_kan_het_toestaan(admin: Any, app: Any, clean_db: str) -> None:
+    """C1.3-ASM-05: 100.64.0.0/10 (CGNAT, ook Tailscale) telt standaard niet als privé; een beheerder kan het in de
+    Hub-UI toestaan (audit + waarschuwing); de zelftest toont het. Geen action_id: alleen deze beheerroute."""
+    from conftest import idem
+
+    secret = _setup(admin)["totp"]["geheim"]
+    assert admin.post("/api/v1/auth/break-glass/confirm", json={"totp": _code(secret)}).status_code == 200
+    r = _login(app, "100.64.12.34", _code(secret, 1))
+    assert r.status_code == 403 and r.json()["code"] == "source_not_private"
+    st = admin.get("/api/v1/auth/break-glass").json()["cgnat"]
+    assert st["toegestaan"] is False and "Tailscale niet met anderen deelt" in st["waarschuwing"]
+    # Zonder Idempotency-Key: 400 (het is een gewone beheermutatie).
+    assert admin.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": True}).status_code == 400
+    r = admin.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": True}, headers=idem())
+    assert r.status_code == 200, r.text
+    assert r.json()["cgnat"]["toegestaan"] is True and r.json()["cgnat"]["gewijzigd_door"] == "beheerder"
+    checks = {c["naam"]: c for c in admin.post("/api/v1/auth/break-glass/selftest").json()["controles"]}
+    assert checks["bereik_cgnat"]["prive"] is True and checks["bereik_cgnat"]["toegestaan_door_beheerder"] is True
+    ok = _login(app, "100.64.12.34", _code(secret, 1))
+    assert ok.status_code == 200, ok.text
+    # Weer uit: direct weer geweigerd.
+    admin.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": False}, headers=idem())
+    assert _login(app, "100.64.12.35", _code(secret, 2)).status_code == 403
+    with psycopg.connect(clean_db) as conn:
+        acties = [r[0] for r in conn.execute("SELECT action FROM audit_event ORDER BY id").fetchall()]
+    assert "auth.break_glass.cgnat_toegestaan" in acties and acties.index("auth.break_glass.cgnat_uit") > acties.index(
+        "auth.break_glass.cgnat_toegestaan"
+    )
+    # Alleen een beheerder: een kijker of anoniem kan het niet.
+    assert _client(app, "192.168.1.20").put("/api/v1/auth/break-glass/cgnat", json={"toestaan": True}).status_code in (
+        401,
+        403,
+    )

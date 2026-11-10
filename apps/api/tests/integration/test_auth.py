@@ -194,7 +194,8 @@ def test_wachtwoord_wijzigen_heeft_rate_limit_op_het_huidige_wachtwoord(admin: A
         r = admin.post(
             "/api/v1/auth/password", json={"huidig_wachtwoord": "fout-geraden", "nieuw_wachtwoord": "Iets-Nieuws-1234"}
         )
-        assert r.status_code == 401 and r.json()["code"] == "invalid_credentials"
+        # Contract 1.3 §5: fout huidig wachtwoord binnen een geldige sessie → 422, nooit 401.
+        assert r.status_code == 422 and r.json()["code"] == "invalid_credentials"
     r = admin.post(
         "/api/v1/auth/password",
         json={"huidig_wachtwoord": STRONG_PASSWORD, "nieuw_wachtwoord": "Een-Ander-Sterk-Wachtwoord-7"},

@@ -44,6 +44,21 @@
         "title": "ApiKeyIn",
         "type": "object"
       },
+      "CgnatIn": {
+        "additionalProperties": false,
+        "properties": {
+          "toestaan": {
+            "description": "100.64.0.0/10 (CGNAT, ook Tailscale) als privé tellen voor de noodlogin",
+            "title": "Toestaan",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "toestaan"
+        ],
+        "title": "CgnatIn",
+        "type": "object"
+      },
       "ChannelIn": {
         "additionalProperties": false,
         "properties": {
@@ -286,7 +301,7 @@
       },
       "EnrollIn": {
         "additionalProperties": false,
-        "description": "Exact schema van contract 1.2 §3.3; onbekende velden → 422.",
+        "description": "Exact schema van contract 1.3 §3.3; onbekende velden → 422. ``base_url`` alleen op type (string of null).",
         "properties": {
           "app_id": {
             "maxLength": 40,
@@ -298,8 +313,6 @@
           "base_url": {
             "anyOf": [
               {
-                "maxLength": 512,
-                "pattern": "^https?://[A-Za-z0-9.\\-\\[\\]:]+(/[^\\s?#]*)?$",
                 "type": "string"
               },
               {
@@ -2934,6 +2947,64 @@
         ]
       }
     },
+    "/api/v1/auth/break-glass/cgnat": {
+      "put": {
+        "description": "Contract 1.3 §4.1: standaard uit. Alleen een beheerder in de Hub-UI; geen ``action_id``, nooit door de AI.",
+        "operationId": "put_cgnat_api_v1_auth_break_glass_cgnat_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CgnatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "100.64.0.0/10 (CGNAT, ook Tailscale) wel of niet als privé tellen voor de noodlogin (admin; audit)",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      }
+    },
     "/api/v1/auth/break-glass/confirm": {
       "post": {
         "operationId": "confirm_api_v1_auth_break_glass_confirm_post",
@@ -2961,17 +3032,10 @@
             "description": "Successful Response"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "invalid_totp: foute code binnen een geldige sessie (nooit 401)"
           }
         },
-        "summary": "TOTP van het noodaccount bevestigen of herbevestigen (admin)",
+        "summary": "TOTP van het noodaccount bevestigen of herbevestigen (admin); foute code → 422 invalid_totp",
         "tags": [
           "aanmelden en gebruikers"
         ]
@@ -7324,7 +7388,7 @@
             "description": "rate_limited (met Retry-After)"
           }
         },
-        "summary": "Dienst meldt zich aan met enrollment-token of koppelcode (contract 1.2 §3.3)",
+        "summary": "Dienst meldt zich aan met enrollment-token of koppelcode (contract 1.3 §3.3); antwoord schema_version 1.3",
         "tags": [
           "diensten en enrollment"
         ]
@@ -7425,7 +7489,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Dienst bevestigt zijn koppeling (Bearer service-token, contract 1.2 §3.6)",
+        "summary": "Dienst bevestigt zijn koppeling (Bearer service-token, contract 1.3 §3.6)",
         "tags": [
           "diensten en enrollment"
         ]
@@ -7444,7 +7508,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Dienst roteert zijn eigen service-token (Bearer, contract 1.2 §3.8)",
+        "summary": "Dienst roteert zijn eigen service-token (Bearer, contract 1.3 §3.8)",
         "tags": [
           "diensten en enrollment"
         ]
