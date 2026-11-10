@@ -159,3 +159,55 @@ def test_paragraaf_11_kent_de_nieuwe_validatiewaarden() -> None:
     for waarde in waarden:
         assert f"`{waarde}`" in p11, waarde
     assert "C1.3-" in p11 and "REVIEW-" in p11
+
+
+ADR_REVIEW = Path(__file__).resolve().parents[4] / "docs" / "adr" / "ADR-0028-review-contract-1-3.md"
+
+
+def test_reviewcorrecties_staan_in_het_wijzigingslog() -> None:
+    """De onafhankelijke review van 1.3 (ADR-0028) blijft `contracts 1.3`: RV1–RV12 staan in het 1.3-wijzigingslog."""
+    log = _wijzigingslog()
+    assert "### Correcties uit de onafhankelijke review (2026-11-10, blijft `contracts 1.3`; ADR-0028)" in log
+    for n in range(1, 13):
+        assert f"- RV{n}. " in log, f"RV{n} ontbreekt"
+    assert ADR_REVIEW.is_file()
+    assert "ADR-0028-review-contract-1-3.md" in _tekst(CONTRACT).split("## Wijzigingslog")[0]
+
+
+@pytest.mark.parametrize(
+    ("paragraaf", "zin"),
+    [
+        # RV1: de bestaande Emby-koppeling van MediaGuard blijft; de rest van het platform schrijft nooit in Emby.
+        ("### 2.3", "De **bestaande** koppeling van MediaGuard"),
+        # RV2: de HARDE EIS dekt ook een upgrade die de database van een mediaserver migreert.
+        ("### 2.3", "geen upgrade die de database van een mediaserver migreert"),
+        # RV3: geen kijkgedrag via de MediaGuard-adapter in de Hub.
+        ("### 2.3", "de Hub-adapter volgt op deze route dezelfde veldenwitte lijst"),
+        # RV4: de Jelly Leon-plugin pint een service_id voor §4.3.
+        ("### 2.3", "ook een `service_id`"),
+        # RV5: bij my_house zet de vertaling alleen HUB_URL.
+        ("### 3.2", "voegt de vertaling alleen `HUB_URL` toe"),
+        # RV6: vervangen bij de eerste schrijfactie van de poging, vóór het verzoek.
+        ("### 3.5", "Dat gebeurt bij de eerste schrijfactie van die poging"),
+        # RV7: ook een al gekoppelde dienst telt als poging.
+        ("### 3.7", "409 `al_gekoppeld`"),
+        # RV8: apps met een geplakte sleutelset tellen mee bij een rotatie.
+        ("### 4.5", "Apps met een **geplakte** sleutelset"),
+        # RV9: rol en Idempotency-Key na de authenticatie.
+        ("### 4.7", "Rol (403) en `Idempotency-Key`"),
+        # RV10: formulier-POST's van statuspagina's zijn met reden uitgezonderd.
+        ("## 5.", "formulier-POST's van een statuspagina"),
+        # RV11: types in de log-sink.
+        ("### 6.1", "`op` (tijd met tijdzone)"),
+        # RV12: niet gekoppeld = niet pushen; eigenaar = (source_app, domein).
+        ("## 7.", "pusht hij niet en telt hij geen pogingen"),
+        ("## 7.", "het paar (`source_app`, domein)"),
+    ],
+)
+def test_reviewcorrectie_staat_in_de_juiste_paragraaf(paragraaf: str, zin: str) -> None:
+    tekst = _tekst(CONTRACT)
+    begin = tekst.index(f"\n{paragraaf}")
+    volgende = re.search(r"\n#{2,3} ", tekst[begin + 1 :])
+    eind = begin + 1 + volgende.start() if volgende else len(tekst)
+    # Regelafbrekingen en inspringing tellen als één spatie (de tekst is op 120 tekens afgebroken).
+    assert " ".join(zin.split()) in " ".join(tekst[begin:eind].split()), f"{zin!r} ontbreekt in {paragraaf}"
