@@ -92,9 +92,10 @@ export function StatusBadge({ view, groot, className, testId }: { view: StatusVi
   return (
     <span
       className={cn(
-        "inline-flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-full border-2 border-transparent px-2.5 py-0.5 text-sm leading-5 font-semibold [&_svg]:size-4.5 [&_svg]:shrink-0",
+        // Peil 1.1.1 (C-03): radius = halve regelhoogte, zodat een omlopende pil niet wordt afgesneden.
+        "inline-flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-2xl border-2 border-transparent px-2.5 py-0.5 text-sm leading-5 font-semibold [&_svg]:size-4.5 [&_svg]:shrink-0",
         TONE_CLASS[view.tone],
-        groot && "min-h-10 px-3.5 text-base [&_svg]:size-5",
+        groot && "min-h-10 rounded-[1.25rem] px-3.5 text-base [&_svg]:size-5",
         className,
       )}
       data-status={view.tone}

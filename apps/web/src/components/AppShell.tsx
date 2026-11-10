@@ -208,11 +208,12 @@ function Navigation({ pathname, problemen }: { pathname: string; problemen: numb
           {MOBILE_NAV.map((item) => {
             const Icon = NAV_ICON[item.icon];
             return (
-              <li key={item.href} className="flex min-w-0 flex-1">
+              <li key={item.href} className="flex min-w-touch flex-auto">
+                {/* Peil 1.1.1 (C-01, E16): items op labelbreedte, actief zonder extra gewicht; labels breken nooit in een woord. */}
                 <Link
                   href={item.href}
                   aria-current={mobileActive === item.href ? "page" : undefined}
-                  className="relative flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-sm font-medium text-muted-foreground no-underline aria-[current=page]:font-bold aria-[current=page]:text-foreground aria-[current=page]:shadow-[inset_0_3px_0_var(--primary)] [&_svg]:size-6"
+                  className="relative flex min-h-16 min-w-touch flex-auto flex-col items-center justify-center gap-0.5 px-1 text-sm font-medium break-keep text-muted-foreground no-underline aria-[current=page]:text-foreground aria-[current=page]:shadow-[inset_0_3px_0_var(--primary)] [&_svg]:size-6"
                 >
                   <span className="relative inline-flex">
                     <Icon aria-hidden="true" />
@@ -319,11 +320,11 @@ function KindShell({ pathname, children }: { pathname: string; children: ReactNo
           {KIND_NAV.map((item) => {
             const Icon = NAV_ICON[item.icon];
             return (
-              <li key={item.href} className="flex flex-1">
+              <li key={item.href} className="flex min-w-touch flex-auto">
                 <Link
                   href={item.href}
                   aria-current={normalizePath(pathname) === item.href ? "page" : undefined}
-                  className="flex min-h-16 flex-1 flex-col items-center justify-center gap-0.5 text-sm font-medium text-muted-foreground no-underline aria-[current=page]:font-bold aria-[current=page]:text-foreground aria-[current=page]:shadow-[inset_0_3px_0_var(--primary)] [&_svg]:size-6"
+                  className="flex min-h-16 min-w-touch flex-auto flex-col items-center justify-center gap-0.5 text-sm font-medium break-keep text-muted-foreground no-underline aria-[current=page]:text-foreground aria-[current=page]:shadow-[inset_0_3px_0_var(--primary)] [&_svg]:size-6"
                 >
                   <Icon aria-hidden="true" />
                   {item.label}

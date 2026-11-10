@@ -565,7 +565,7 @@ export function MonitoringScreen() {
           <section className="card" aria-labelledby="log-titel" data-testid="meldingenlog">
             <h2 id="log-titel">Meldingenlogboek</h2>
             {log.error ? <ErrorPanel error={log.error} alert={false} /> : null}
-            {log.data && !log.data.items.length ? <p>Nog geen meldingen verstuurd.</p> : null}
+            {log.data && !log.data.items.length ? <p>Nog geen meldingen verzonden.</p> : null}
             {log.data?.items.length ? (
               <ResponsiveList
                 items={log.data.items}

@@ -314,7 +314,7 @@ def test_channel(
         {
             "verzonden": res.ok,
             "reden": res.reden,
-            "melding": "Testmelding verstuurd." if res.ok else MELDING_KANAAL.get(res.reden or "", "Mislukt."),
+            "melding": "Testmelding verzonden." if res.ok else MELDING_KANAAL.get(res.reden or "", "Mislukt."),
             "http": res.http,
             "gotify_versie": versie,
             "versie_reden": versie_reden,
