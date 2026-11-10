@@ -77,8 +77,9 @@ privileges:
 privilege_reason: null
 healthcheck:
   type: builtin
-  # Monitorplan (§9: healthcheck.monitor met pad /healthz, 200, 10 s, 60 s) volgt zodra de validator van
-  # appstore-en-fork het veld kent (C1.3-ASF-08); de gecommitte validator weigert het nu nog als onbekend veld.
+  # Monitorplan (contract 1.3 §9, B09): /readyz (eigen geheimen en datamap; de koppeling telt niet mee, §5). De
+  # beheerder neemt het over in Uptime Kuma en bevestigt het per monitor ("handmatig bevestigd").
+  monitor: {pad: /readyz, verwachte_status: 200, timeout_s: 10, interval_s: 60}
 backup:
   db_export:
     method: none
@@ -98,7 +99,9 @@ risk:
 upgrade:
   migrations: false
   tag_only_rollback_safe: true
-  notes_nl: Geen database; hub-link.json (schema 1.2) blijft bij een oudere tag staan maar wordt dan niet gelezen.
+  notes_nl: >-
+    Geen database. hub-link.json (schema 1.3) blijft staan; een lezer accepteert elke 1.x en negeert onbekende velden
+    (contract 1.3 §3.5), dus een oudere tag leest hem gewoon.
 decisions_required: [D01, D02, D03]
 docs: [B02_AI_SERVER_MANAGER, I23_HOME_CONTROL_HUB]
 validation_status: unvalidated
@@ -110,4 +113,9 @@ provenance:
   source_repo: https://github.com/lvos04/ai-server-manager
   source_commit: null
   upstream_repo: null
-  license: null
+  license: GPL-3.0
+accepted_findings:
+  - code: digest_pending_release
+    reden_nl: >-
+      Eigen image vóór de eerste release: de release-CI vult de digest in (release/digests.json). Tot dan blokkeert
+      de vertaling de installatie via de API met digest_not_pinned; de eerste installatie gaat met het formulier.
