@@ -1,4 +1,5 @@
-"""Koppeling executor ↔ Hub (contract 1.2): testvectoren §4.5, exact enroll-verzoek §3.3, antwoordcontroles,
+"""Koppeling executor ↔ Hub (contract 1.3): testvectoren §4.5 (ook HN69-2PHK-XV2D-X85W), adresregels §3.2 (ook na
+DNS-resolutie), exact enroll-verzoek §3.3, antwoordcontroles met ``rotation_sequence``, HTTP-uitkomst per code,
 opslag in hub-link.json (§3.5), herstart (§3.6) en de controlevolgorde/redenen van §4.7."""
 
 from __future__ import annotations
@@ -14,13 +15,16 @@ from typing import Any
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from executorhelpers import linked_fields
 
+from executor.adres import AdresOngeldig, host_allowed_for_post, resolve_allowed
 from executor.hublink import (
     AuthFailed,
     EnrollFailed,
     HubLinkStore,
     check_enroll_response,
     enroll_request,
+    hub_status_code,
     jwk_thumbprint,
     keyset_fingerprint,
     public_status,
@@ -51,7 +55,16 @@ def test_testvectoren_contract_4_5() -> None:
     assert keyset_fingerprint([_okp(JWT_X)], _okp(POLICY_X)) == "MEGG-8GFG-2E4Y-K2RQ"
     assert keyset_fingerprint([_okp(JWT_X), _okp(JWT2_X)], _okp(POLICY_X)) == "CYRC-JS8C-14AN-JR17"
     assert keyset_fingerprint([_okp(JWT2_X), _okp(JWT_X)], _okp(POLICY_X)) == "CYRC-JS8C-14AN-JR17"
+    # Nieuw in 1.3: twee policy-sleutels tellen allebei mee, in elke volgorde (nooit alleen de laatst gepinde).
+    assert keyset_fingerprint([_okp(JWT_X)], [_okp(POLICY_X), _okp(JWT2_X)]) == "HN69-2PHK-XV2D-X85W"
+    assert keyset_fingerprint([_okp(JWT_X)], [_okp(JWT2_X), _okp(POLICY_X)]) == "HN69-2PHK-XV2D-X85W"
+    assert keyset_fingerprint([_okp(JWT_X)], [_okp(POLICY_X)]) == "MEGG-8GFG-2E4Y-K2RQ"
+    with pytest.raises(ValueError):
+        keyset_fingerprint([_okp(JWT_X)], [])
     assert valid_fingerprint("megg 8gfg 2e4y k2rq") and not valid_fingerprint("MEGG-8GFG-2E4Y")
+    # Invoer als geheel (≤ 64), nooit eerst afkappen: 16 tekens met veel spaties mag, 65 tekens niet.
+    assert valid_fingerprint("MEGG - 8GFG - 2E4Y - K2RQ" + " " * 39)
+    assert not valid_fingerprint("MEGG-8GFG-2E4Y-K2RQ" + " " * 46)
     assert valid_pairing_code("abcd-efgh-jkmn") and not valid_pairing_code("UUUU-UUUU-UUUU")
 
 
@@ -81,6 +94,23 @@ def test_enroll_verzoek_heeft_exact_de_velden_van_3_3() -> None:
         ("http://0.0.0.0", False),
         ("http://[::]", False),
         ("http://192.0.2.5:99999", False),
+        # Contract 1.3 §3.2: alleen canonieke IPv4-vormen; IPv6 alleen tussen [].
+        ("http://127.1", False),
+        ("http://2130706433", False),
+        ("http://0x7f000001", False),
+        ("http://010.0.0.1", False),
+        ("http://0", False),
+        ("http://192.168.001.5", False),
+        ("http://256.1.1.1", False),
+        ("http://localhost.:30400", False),
+        ("http://LOCALHOST", False),
+        ("http://[::ffff:127.0.0.1]", False),
+        ("http://[fe80::1%25eth0]", False),
+        ("http://hub_x.lan", False),
+        ("http://192.0.2.5.:30400", True),
+        ("http://nas.local.", True),
+        ("http://192.0.2.5:0", False),
+        ("http://192.0.2.5:30400#x", False),
     ],
 )
 def test_hub_adres_regels(url: str, ok: bool) -> None:
@@ -90,6 +120,78 @@ def test_hub_adres_regels(url: str, ok: bool) -> None:
         with pytest.raises(ValueError):
             validate_hub_url(url)
     assert validate_hub_url("http://127.0.0.1:1", allow_loopback=True) == "http://127.0.0.1:1"
+
+
+def test_hub_adres_genormaliseerd_en_niet_afgekapt() -> None:
+    assert validate_hub_url("http://NAS.Local.:30400") == "http://nas.local:30400"
+    assert validate_hub_url("http://192.0.2.5.:30400/") == "http://192.0.2.5:30400"
+    assert validate_hub_url("http://[FD00::5]:1") == "http://[fd00::5]:1"
+    lang = "http://" + ".".join(ch * 60 for ch in "abcd") + ".local"  # 249 tekens: een geldige lange naam
+    assert len(lang) < 512 and validate_hub_url(lang)
+    with pytest.raises(ValueError):
+        validate_hub_url("http://192.0.2.5:30400" + " " * 500)  # > 512 tekens als geheel: geweigerd, niet afgekapt
+
+
+def test_verboden_bereiken_ook_na_dns_resolutie(monkeypatch: pytest.MonkeyPatch) -> None:
+    import socket
+
+    answers = {"rebind.lan": "127.0.0.1", "ll.lan": "169.254.10.1", "nul.lan": "0.0.0.0", "ok.lan": "192.0.2.7"}
+
+    def fake(host: str, port: int, *a: Any, **k: Any) -> list[Any]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (answers[host], port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake)
+    assert resolve_allowed("ok.lan", 80) == "192.0.2.7"
+    for name in ("rebind.lan", "ll.lan", "nul.lan"):
+        with pytest.raises(AdresOngeldig):
+            resolve_allowed(name, 80)
+    assert resolve_allowed("rebind.lan", 80, allow_loopback=True) == "127.0.0.1"
+    with pytest.raises(AdresOngeldig):
+        resolve_allowed("127.1", 80)
+
+
+@pytest.mark.parametrize(
+    ("host", "ok"),
+    [
+        ("192.0.2.5:30410", True),
+        ("192.0.2.5", True),
+        ("[fd00::5]:30410", True),
+        ("nas:30410", True),
+        ("nas.:30410", True),
+        ("truenas.local:30410", True),
+        ("truenas.LAN", True),
+        ("x.internal", True),
+        ("nas.home.arpa:30410", True),
+        ("evil.example.com:30410", False),  # publieke naam: DNS-rebinding
+        ("nas.fritz.box", False),  # .box is een publieke TLD (gemeld bij K1)
+        ("127.1:30410", False),
+        ("2130706433:30410", False),
+        ("fd00::5", False),  # IPv6 zonder []
+        ("", False),
+        ("192.0.2.5:poort", False),
+        ("a_b.local", False),
+    ],
+)
+def test_host_beperking_voor_formulier_posts(host: str, ok: bool) -> None:
+    assert host_allowed_for_post(host) is ok
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (200, None),
+        (401, "hub_weigerde"),
+        (404, "enroll_endpoint_ontbreekt"),
+        (413, "hub_incompatibel"),
+        (422, "hub_incompatibel"),
+        (429, "rate_limited"),
+        (500, "hub_onbereikbaar"),
+        (503, "hub_onbereikbaar"),
+        (418, "hub_antwoord_ongeldig"),
+    ],
+)
+def test_http_uitkomst_per_vaste_code(status: int, code: str | None) -> None:
+    assert hub_status_code(status) == code
 
 
 def _jwk(x: str) -> dict[str, str]:
@@ -120,6 +222,9 @@ def _response(**change: Any) -> dict[str, Any]:
 def test_antwoordcontroles() -> None:
     pins = check_enroll_response(_response(), "ai-server-manager-executor", "megg-8gfg-2e4y-k2rq")
     assert pins["keyset_fingerprint"] == "MEGG-8GFG-2E4Y-K2RQ" and pins["rotation_sequence"] == 0
+    # 1.3: rotation_sequence uit het antwoord overnemen; een Hub 1.2 stuurt het niet (→ 0).
+    assert check_enroll_response(_response(schema_version="1.3", rotation_sequence=7), "ai-server-manager-executor",
+                                 "MEGG-8GFG-2E4Y-K2RQ")["rotation_sequence"] == 7  # fmt: skip
     assert pins["jwt"][0]["thumbprint"] == "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
     assert pins["policy"][0]["jwk"] == _okp(POLICY_X)
     with pytest.raises(EnrollFailed) as exc:
@@ -140,6 +245,10 @@ def test_antwoordcontroles() -> None:
         {"keyset_fingerprint": "CYRC-JS8C-14AN-JR17"},  # klopt niet met de sleutels zelf
         {"enrollment_replayed": "nee"},
         {"key_rotation_url": None},
+        {"rotation_sequence": -1},
+        {"rotation_sequence": "3"},
+        {"rotation_sequence": True},
+        {"rotation_sequence": None},
     ]
     for change in bad_cases:
         with pytest.raises(EnrollFailed) as exc:
@@ -154,7 +263,7 @@ def test_opslag_atomair_0600_en_witte_lijst(tmp_path: Path) -> None:
     assert store.read()["state"] == "nooit_gekoppeld"
     with store.update() as link:
         link.update(
-            state="gekoppeld",
+            linked_fields(),
             service_token="svc_" + "b" * 43,
             service_token_last4="bbbb",
             pending={
@@ -254,8 +363,7 @@ def test_sleutelrotaties_pollen_lege_lijst_en_niet_lege_lijst(tmp_path: Path, mo
     poller = hublink.KeyRotationPoller(store, min_interval=30)
     assert poller.poll(force=True) is None  # niet gekoppeld: niets ophalen
     with store.update() as link:
-        link.update(state="gekoppeld", hub_url="http://192.0.2.5:30400",
-                    pins={"jwt": [], "policy": [], "keyset_fingerprint": "X", "rotation_sequence": 0})  # fmt: skip
+        link.update(linked_fields(pins={"jwt": [], "policy": [], "keyset_fingerprint": "X", "rotation_sequence": 0}))
     seen: list[str] = []
 
     def fake(hub_url: str, method: str, path: str, **_: Any) -> hublink.HubResponse:

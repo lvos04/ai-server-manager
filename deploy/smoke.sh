@@ -54,8 +54,10 @@ expect "executor weigert Hub-JWT zonder koppeling (contract 1.2 §4.7)" \
 expect "enroll-schema 1.2: oud verzoek → 422" "$(curl -sS --noproxy '*' -H 'content-type: application/json' \
   -d '{"app_id":"home-control-hub","enrollment_token":"x"}' http://127.0.0.1:30400/api/v1/services/enroll)" '"code":"validation_error"'
 expect "sleutelrotaties: lege lijst" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/key-rotations)" '"items":[]'
-test "$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' \
-  -d '{"action_id":"app.restart"}' http://127.0.0.1:30410/api/v1/execute)" = 403
+# Contract 1.3 §4.7: eerst authenticatie — een niet-gekoppelde executor weigert /execute met 401 not_linked.
+expect "executor: execute vraagt eerst aanmelding (contract 1.3 §4.7)" "$(curl -sS --noproxy '*' -X POST \
+  -H 'content-type: application/json' -d '{"action_id":"app.restart"}' http://127.0.0.1:30410/api/v1/execute)" \
+  '"reason":"not_linked"'
 # Contract 1.2 §5: > 1 MiB → 413 vóór routering en aanmelding, ook chunked (zonder Content-Length). Hub via de webpoort
 # (Node-doorgang → API), executor rechtstreeks; beide op een route zonder aanmelding.
 big413() {  # big413 <url> <bytes> → HTTP-status van een chunked POST van <bytes> bytes

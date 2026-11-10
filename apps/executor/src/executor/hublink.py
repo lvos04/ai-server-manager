@@ -1,11 +1,16 @@
-"""Koppeling van de executor met de Hub (contract 1.2 §3.2–§3.9, §4.5, §4.7).
+"""Koppeling van de executor met de Hub (contract 1.3 §3.2–§3.9, §4.5, §4.7).
 
 - Koppelen alleen met een **koppelcode (30 min) + Hub-vingerafdruk** op de eigen statuspagina (§3.9); de Hub geeft voor
   de executor geen enrollment-token uit. Daarna geen koppelformulier meer: ontkoppelen/opnieuw koppelen vraagt een live
   geverifieerde TrueNAS-schrijfkey tegen het vastgelegde NAS-adres + certificaat, en die bestaat pas in P2.
-- Opslag in ``/appdata/secrets/hub-link.json`` (0600, atomair, onder ``hub-link.lock``), nooit in een database.
+- Opslag in ``/appdata/secrets/hub-link.json`` (0600, atomair, onder ``hub-link.lock``), nooit in een database. Een
+  onleesbaar bestand (geen geldige JSON, andere major, ontbrekende velden, verkeerde eigenaar of rechten) is
+  **fail-closed** (§3.5): geen vertrouwen, geen formulier, ``koppelstatus_onleesbaar``; een gewone schrijfactie zet
+  het nooit stil terug. De executor heeft geen env-token (§3.9): herstel volgt met de live geverifieerde schrijfsleutel
+  (P2).
 - Hub-sleutels worden gepind uit het enroll-antwoord; een via HTTP opgehaalde JWKS voegt nooit vertrouwen toe.
-- Aanroepen naar de Hub: ``http.client`` (geen redirects, geen proxy-omgeving), 5 s connect / 15 s read.
+- Aanroepen naar de Hub: ``http.client`` (geen redirects, geen proxy-omgeving), 5 s connect / 15 s read; de host
+  wordt bij elke verbinding opgelost en gecontroleerd (§3.2) en de verbinding gaat naar precies dat adres.
 """
 
 from __future__ import annotations
@@ -15,10 +20,12 @@ import contextlib
 import fcntl
 import hashlib
 import http.client
-import ipaddress
 import json
 import os
 import re
+import socket
+import ssl
+import stat
 import threading
 import time
 import uuid
@@ -32,7 +39,12 @@ from urllib.parse import urlsplit
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-SCHEMA_VERSION = "1.2"
+from executor.adres import AdresOngeldig, resolve_allowed
+from executor.adres import validate_hub_url as _validate_hub_url
+
+SCHEMA_VERSION = "1.3"
+STATES = ("nooit_gekoppeld", "gekoppeld", "ontkoppeld", "ingetrokken")
+PENDING_MAX_SECONDS = 60 * 60
 FILE_NAME = "hub-link.json"
 LOCK_NAME = "hub-link.lock"
 CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -41,10 +53,14 @@ SERVICE_TOKEN_RE = re.compile(r"^svc_[A-Za-z0-9_-]{43}$")
 MAX_USED_TOKENS = 20
 CLOCK_SKEW = 30
 
-# Vaste meldingen bij last_error (contract 1.2 §3.5); de code is voor machines, de tekst voor mensen.
+# Vaste meldingen bij last_error (contract 1.3 §3.5, open codelijst); de code is voor machines, de tekst voor mensen.
 ERRORS_NL = {
     "hub_onbereikbaar": "De Hub was niet bereikbaar. Controleer het adres en probeer het opnieuw.",
     "hub_weigerde": "De Hub weigerde de koppelcode (onbekend, verlopen of al gebruikt). Maak in de Hub een nieuwe.",
+    "hub_incompatibel": "De Hub weigerde het verzoek als ongeldig (versies passen niet bij elkaar); er is niets "
+    "opgeslagen.",
+    "koppelstatus_onleesbaar": "De koppelstatus van de executor is onleesbaar. Hij vertrouwt de Hub niet en voert "
+    "niets uit. Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina; dat volgt in fase P2.",
     "hub_antwoord_ongeldig": "Het antwoord van de Hub voldeed niet aan het contract; er is niets opgeslagen.",
     "hub_vingerafdruk_onjuist": "De vingerafdruk klopt niet met de sleutels van deze Hub; er is niets opgeslagen.",
     "enroll_endpoint_ontbreekt": "Deze Hub-versie kent aanmelden niet.",
@@ -91,11 +107,17 @@ def jwk_thumbprint(jwk: Mapping[str, Any]) -> str:
     return b64url(hashlib.sha256(canonical.encode()).digest())
 
 
-def keyset_fingerprint(jwt_keys: list[Mapping[str, Any]], policy_key: Mapping[str, Any]) -> str:
+def keyset_fingerprint(
+    jwt_keys: list[Mapping[str, Any]], policy_keys: Mapping[str, Any] | list[Mapping[str, Any]]
+) -> str:
+    """§4.5 (1.3): over **alle** jwt- en policy-sleutels, beide lijsten gesorteerd op bytewaarde. Met één
+    policy-sleutel gelijk aan 1.2 (testvectoren MEGG-…, CYRC-…; nieuw HN69-2PHK-XV2D-X85W met twee policy-sleutels)."""
+    policies = [policy_keys] if isinstance(policy_keys, Mapping) else list(policy_keys)
     thumbs = sorted(jwk_thumbprint(k) for k in jwt_keys)
-    if not thumbs:
-        raise ValueError("minstens één JWT-sleutel nodig")
-    text = f"{KEYSET_PREFIX}\njwt:{','.join(thumbs)}\npolicy:{jwk_thumbprint(policy_key)}"
+    pthumbs = sorted(jwk_thumbprint(k) for k in policies)
+    if not thumbs or not pthumbs:
+        raise ValueError("minstens één JWT- en één policy-sleutel nodig")
+    text = f"{KEYSET_PREFIX}\njwt:{','.join(thumbs)}\npolicy:{','.join(pthumbs)}"
     bits = "".join(f"{b:08b}" for b in hashlib.sha256(text.encode()).digest()[:10])
     code = "".join(CROCKFORD[int(bits[i : i + 5], 2)] for i in range(0, 80, 5))
     return "-".join(code[i : i + 4] for i in range(0, 16, 4))
@@ -113,37 +135,15 @@ def valid_pairing_code(value: str) -> bool:
 
 
 def valid_fingerprint(value: str) -> bool:
+    """Invoer ≤ 64 tekens als geheel (§3.7: nooit eerst afkappen); na normalisatie precies 16 tekens."""
     n = normalize_code(value)
-    return len(value) <= 32 and len(n) == 16 and all(ch in CROCKFORD for ch in n)
+    return len(value) <= 64 and len(n) == 16 and all(ch in CROCKFORD for ch in n)
 
 
 # ------------------------------------------------------------------ Hub-adres (§3.2)
 def validate_hub_url(value: str, *, allow_loopback: bool = False) -> str:
-    """``http(s)://<host>[:<poort>]`` zonder pad, query, fragment of inloggegevens; geen loopback/link-local/0.0.0.0."""
-    value = value.strip()
-    parts = urlsplit(value)
-    if parts.scheme not in ("http", "https") or not parts.hostname:
-        raise ValueError("adres moet beginnen met http:// of https://")
-    if parts.username or parts.password or parts.query or parts.fragment or parts.path not in ("", "/"):
-        raise ValueError("alleen http(s)://host[:poort], zonder pad, query of inloggegevens")
-    try:
-        port = parts.port
-    except ValueError as exc:
-        raise ValueError("ongeldige poort") from exc
-    host = parts.hostname
-    try:
-        addr = ipaddress.ip_address(host)
-    except ValueError:
-        addr = None
-        if host.lower() == "localhost" and not allow_loopback:
-            raise ValueError("loopback is niet toegestaan") from None
-    if addr is not None:
-        if addr.is_unspecified or addr.is_link_local:
-            raise ValueError("dit adres is niet toegestaan")
-        if addr.is_loopback and not allow_loopback:
-            raise ValueError("loopback is niet toegestaan")
-    netloc = f"[{host}]" if addr is not None and addr.version == 6 else host
-    return f"{parts.scheme}://{netloc}" + (f":{port}" if port else "")
+    """``http(s)://<host>[:<poort>]`` volgens de adresregels van §3.2 (zie :mod:`executor.adres`)."""
+    return _validate_hub_url(value, allow_loopback=allow_loopback)
 
 
 # ------------------------------------------------------------------ opslag (§3.5)
@@ -168,30 +168,91 @@ def empty_link() -> dict[str, Any]:
     }
 
 
+class KoppelstatusOnleesbaar(Exception):
+    """``hub-link.json`` is onleesbaar (§3.5): fail-closed; een gewone schrijfactie mag het niet terugzetten."""
+
+
+def _required_ok(data: Mapping[str, Any]) -> bool:
+    """Verplichte velden van §3.5; extra velden mogen (oudere lezers negeren ze)."""
+    version = data.get("schema_version")
+    if not isinstance(version, str) or version.split(".")[0] != "1":
+        return False
+    state = data.get("state")
+    if state not in STATES:
+        return False
+    if not isinstance(data.get("used_enrollment_token_sha256", []), list):
+        return False
+    if state != "nooit_gekoppeld" and not (isinstance(data.get("first_linked_at"), str) and data["first_linked_at"]):
+        return False  # zonder first_linked_at zou het formulier terugkomen (§3.7): nooit stil "nooit gekoppeld"
+    if state == "gekoppeld":
+        pins = data.get("pins")
+        if not isinstance(pins, dict) or not isinstance(pins.get("jwt"), list):
+            return False
+        for key in ("service_token", "service_id", "hub_url"):
+            if not isinstance(data.get(key), str) or not data[key]:
+                return False
+    return True
+
+
 class HubLinkStore:
-    def __init__(self, secrets_dir: Path) -> None:
+    def __init__(self, secrets_dir: Path, *, allow_loopback: bool = False) -> None:
         self.dir = secrets_dir
         self.path = secrets_dir / FILE_NAME
         self.lock_path = secrets_dir / LOCK_NAME
+        self.allow_loopback = allow_loopback
 
-    def read(self) -> dict[str, Any]:
+    def _load(self) -> dict[str, Any] | None:
+        """Inhoud, of ``None`` als het bestand onleesbaar is (§3.5). Een ontbrekend bestand = ``nooit_gekoppeld``."""
         try:
-            data = json.loads(self.path.read_text())
+            fd = os.open(self.path, os.O_RDONLY | os.O_NOFOLLOW)
         except FileNotFoundError:
             return empty_link()
-        if not isinstance(data, dict):
-            raise ValueError("hub-link.json is geen object")
+        except OSError:
+            return None  # o.a. een symlink of geen leesrecht
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or st.st_mode & 0o077:
+                return None  # verkeerde eigenaar of rechten (moet 0600 van de eigen gebruiker zijn)
+            raw = os.read(fd, 1024 * 1024 + 1)
+        finally:
+            os.close(fd)
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return None
+        if not isinstance(data, dict) or len(raw) > 1024 * 1024 or not _required_ok(data):
+            return None
         return {**empty_link(), **data}
+
+    def read(self) -> dict[str, Any]:
+        """De koppelstatus; bij een onleesbaar bestand een fail-closed toestand met ``_onleesbaar`` (nooit
+        geschreven) en ``last_error`` ``koppelstatus_onleesbaar`` — geen pins, geen token."""
+        data = self._load()
+        if data is None:
+            return {
+                **empty_link(),
+                "state": None,
+                "_onleesbaar": True,
+                "last_error": {"code": "koppelstatus_onleesbaar", "at": now_iso()},
+            }
+        return data
+
+    def unreadable(self) -> bool:
+        return bool(self.read().get("_onleesbaar"))
 
     @contextlib.contextmanager
     def update(self) -> Iterator[dict[str, Any]]:
-        """Lezen-wijzigen-schrijven onder een exclusieve vergrendeling; atomair vervangen (O_EXCL → fsync → rename)."""
+        """Lezen-wijzigen-schrijven onder een exclusieve vergrendeling; atomair vervangen (O_EXCL → fsync → rename).
+        Een onleesbaar bestand → :class:`KoppelstatusOnleesbaar` (nooit stil terugzetten, §3.5)."""
         self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            data = self.read()
+            data = self._load()
+            if data is None:
+                raise KoppelstatusOnleesbaar
             yield data
+            data["schema_version"] = SCHEMA_VERSION  # een dienst schrijft de versie van het contract dat hij volgt
             self._write(data)
         finally:
             fcntl.flock(fd, fcntl.LOCK_UN)
@@ -214,7 +275,7 @@ class HubLinkStore:
 
 
 def public_status(link: Mapping[str, Any]) -> dict[str, Any]:
-    """Witte lijst (§3.5): nooit service_token of pending.secret_sha256."""
+    """Witte lijst (§3.5, een maximum): nooit service_token of pending.secret_sha256."""
     out = {k: link.get(k) for k in PUBLIC_FIELDS}
     pins = link.get("pins") or {}
     out["koppelen_bezig"] = link.get("pending") is not None
@@ -225,13 +286,14 @@ def public_status(link: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def resume_after_restart(store: HubLinkStore) -> None:
-    """§3.6 stap 5: een koppelcode is na een herstart weg → ``koppelen_onderbroken``."""
-    if not store.path.exists() or store.read().get("pending") is None:
+    """§3.6 stap 5: een koppelcode is na een herstart weg → ``koppelen_onderbroken``. Onleesbaar: niets schrijven."""
+    link = store.read()
+    if link.get("_onleesbaar") or link.get("pending") is None:
         return
-    with store.update() as link:
-        if link.get("pending") is not None:
-            link["pending"] = None
-            link["last_error"] = {"code": "koppelen_onderbroken", "at": now_iso()}
+    with store.update() as cur:
+        if cur.get("pending") is not None:
+            cur["pending"] = None
+            cur["last_error"] = {"code": "koppelen_onderbroken", "at": now_iso()}
 
 
 # ------------------------------------------------------------------ HTTP naar de Hub
@@ -246,6 +308,28 @@ class HubUnreachable(Exception):
     pass
 
 
+class _PinnedHTTP(http.client.HTTPConnection):
+    """Verbindt met precies het gecontroleerde adres (§3.2: verboden bereiken ook na DNS-resolutie, per verbinding);
+    de ``Host``-header blijft de naam uit het Hub-adres."""
+
+    def __init__(self, host: str, port: int | None, *, ip: str, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout)
+        self._ip = ip
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection((self._ip, self.port), self.timeout)
+
+
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    def __init__(self, host: str, port: int | None, *, ip: str, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
+        self._ip = ip
+
+    def connect(self) -> None:
+        sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)  # type: ignore[attr-defined]
+
+
 def hub_request(
     hub_url: str,
     method: str,
@@ -255,10 +339,17 @@ def hub_request(
     bearer: str | None = None,
     connect_timeout: float = 5.0,
     read_timeout: float = 15.0,
+    allow_loopback: bool = False,
 ) -> HubResponse:
     parts = urlsplit(hub_url)
-    conn_cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
-    conn = conn_cls(parts.hostname or "", parts.port, timeout=connect_timeout)
+    https = parts.scheme == "https"
+    port = parts.port or (443 if https else 80)
+    try:
+        ip = resolve_allowed(parts.hostname or "", port, allow_loopback=allow_loopback)
+    except AdresOngeldig:
+        raise HubUnreachable("adres_niet_toegestaan") from None
+    conn_cls = _PinnedHTTPS if https else _PinnedHTTP
+    conn = conn_cls(parts.hostname or "", port, ip=ip, timeout=connect_timeout)
     headers = {"Accept": "application/json", "User-Agent": "ai-server-manager-executor"}
     data = None
     if body is not None:
@@ -346,12 +437,45 @@ def check_enroll_response(body: Any, app_id: str, expected_fingerprint: str) -> 
     if len({p["kid"] for p in jwt_pins}) != len(jwt_pins):
         raise EnrollFailed("hub_antwoord_ongeldig")
     policy_pin = _pin(body.get("policy_public_key"))
-    computed = keyset_fingerprint(keys, body["policy_public_key"])
+    # rotation_sequence (nieuw in 1.3): integer ≥ 0; een Hub 1.2 stuurt het niet → 0 (§3.3).
+    sequence = body.get("rotation_sequence", 0)
+    if type(sequence) is not int or sequence < 0:  # bool telt niet als getal
+        raise EnrollFailed("hub_antwoord_ongeldig")
+    computed = keyset_fingerprint(keys, [body["policy_public_key"]])
     if computed != body["keyset_fingerprint"]:
         raise EnrollFailed("hub_antwoord_ongeldig")
     if normalize_code(computed) != normalize_code(expected_fingerprint):
         raise EnrollFailed("hub_vingerafdruk_onjuist")
-    return {"jwt": jwt_pins, "policy": [policy_pin], "keyset_fingerprint": computed, "rotation_sequence": 0}
+    return {"jwt": jwt_pins, "policy": [policy_pin], "keyset_fingerprint": computed, "rotation_sequence": sequence}
+
+
+def hub_status_code(status: int) -> str | None:
+    """HTTP-uitkomst van ``POST /enroll`` → vaste ``last_error``-code (§3.3, §3.5); ``None`` bij 200."""
+    if status == 200:
+        return None
+    if status == 401:
+        return "hub_weigerde"
+    if status == 404:
+        return "enroll_endpoint_ontbreekt"
+    if status in (413, 422):
+        return "hub_incompatibel"
+    if status == 429:
+        return "rate_limited"
+    if status >= 500:
+        return "hub_onbereikbaar"
+    return "hub_antwoord_ongeldig"
+
+
+def pending_expired(link: Mapping[str, Any], now: datetime | None = None) -> bool:
+    """§3.6 stap 4: 60 min na ``pending.started_at`` zonder succes is de poging definitief mislukt."""
+    pending = link.get("pending")
+    if not isinstance(pending, dict):
+        return False
+    try:
+        started = datetime.fromisoformat(str(pending.get("started_at")).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    return ((now or datetime.now(UTC)) - started).total_seconds() > PENDING_MAX_SECONDS
 
 
 def enroll_with_pairing_code(
@@ -364,63 +488,72 @@ def enroll_with_pairing_code(
     pairing_code: str,
     fingerprint: str,
 ) -> dict[str, Any]:
-    """Koppelen via de statuspagina (eenmalig, vóór de eerste koppeling). Geeft de publieke status terug."""
+    """Koppelen via de statuspagina (eenmalig, vóór de eerste koppeling). Geeft de publieke status terug.
+
+    ``EnrollFailed`` met ``koppelstatus_onleesbaar``, ``al_gekoppeld`` of ``koppelen_bezig`` als er niets naar de Hub
+    gaat (§3.7); anders staat de uitkomst in ``last_error`` van de teruggegeven status."""
     secret_hash = hashlib.sha256(normalize_code(pairing_code).encode()).hexdigest()
-    with store.update() as link:
-        if link.get("first_linked_at"):
-            raise EnrollFailed("al_gekoppeld")
-        link["pending"] = {
-            "kind": "koppelcode",
-            "secret_sha256": secret_hash,
-            "hub_url": hub_url,
-            "started_at": now_iso(),
-            "attempts": 1,
-        }
-    code = None
+    try:
+        with store.update() as link:
+            if link.get("first_linked_at"):
+                raise EnrollFailed("al_gekoppeld")
+            if link.get("pending") is not None and not pending_expired(link):
+                raise EnrollFailed("koppelen_bezig")
+            link["pending"] = {
+                "kind": "koppelcode",
+                "secret_sha256": secret_hash,
+                "hub_url": hub_url,
+                "started_at": now_iso(),
+                "attempts": 1,
+            }
+    except KoppelstatusOnleesbaar:
+        raise EnrollFailed("koppelstatus_onleesbaar") from None
+    code: str | None = "hub_antwoord_ongeldig"
     pins: dict[str, Any] | None = None
     body: Any = None
     try:
         res = hub_request(
-            hub_url, "POST", "/api/v1/services/enroll", body=enroll_request(app_id, pairing_code, version, identity_jwk)
+            hub_url,
+            "POST",
+            "/api/v1/services/enroll",
+            body=enroll_request(app_id, pairing_code, version, identity_jwk),
+            allow_loopback=store.allow_loopback,
         )
-        if res.status == 200:
+        code = hub_status_code(res.status)
+        if code is None:
             pins = check_enroll_response(res.body, app_id, fingerprint)
             body = res.body
-        elif res.status == 404:
-            code = "enroll_endpoint_ontbreekt"
-        elif res.status == 429:
-            code = "rate_limited"
-        elif res.status >= 500:
-            code = "hub_onbereikbaar"
-        else:  # 401/413/422: definitief voor deze code
-            code = "hub_weigerde"
     except HubUnreachable:
         code = "hub_onbereikbaar"
     except EnrollFailed as exc:
         code = exc.code
-    with store.update() as link:
-        link["pending"] = None  # het adres van een mislukte poging wordt nergens bewaard
-        if pins is None or body is None:
-            link["last_error"] = {"code": code or "hub_antwoord_ongeldig", "at": now_iso()}
-            return public_status(link)
-        at = now_iso()
-        if link.get("pins"):
-            link["previous_pins"] = link["pins"]
-        link.update(
-            state="gekoppeld",
-            app_id=app_id,
-            hub_url=hub_url,
-            service_id=body["service_id"],
-            via="koppelcode",
-            first_linked_at=link.get("first_linked_at") or at,
-            linked_at=at,
-            confirmed_at=None,
-            service_token=body["service_token"],
-            service_token_last4=body["service_token"][-4:],
-            pins=pins,
-            last_error=None,
-        )
-    confirm(store)
+    finally:
+        # Altijd afsluiten, ook bij een onverwachte fout: een achtergebleven ``pending`` zou elk volgend verzoek
+        # ``koppelen_bezig`` geven.
+        with store.update() as link:
+            link["pending"] = None  # het adres van een mislukte poging wordt nergens bewaard
+            if pins is None or body is None:
+                link["last_error"] = {"code": code or "hub_antwoord_ongeldig", "at": now_iso()}
+            else:
+                at = now_iso()
+                if link.get("pins"):
+                    link["previous_pins"] = link["pins"]
+                link.update(
+                    state="gekoppeld",
+                    app_id=app_id,
+                    hub_url=hub_url,
+                    service_id=body["service_id"],
+                    via="koppelcode",
+                    first_linked_at=link.get("first_linked_at") or at,
+                    linked_at=at,
+                    confirmed_at=None,
+                    service_token=body["service_token"],
+                    service_token_last4=body["service_token"][-4:],
+                    pins=pins,
+                    last_error=None,
+                )
+    if pins is not None:
+        confirm(store)
     return public_status(store.read())
 
 
@@ -449,7 +582,12 @@ class KeyRotationPoller:
             return None
         seq = int((link.get("pins") or {}).get("rotation_sequence") or 0)
         try:
-            res = hub_request(str(link["hub_url"]), "GET", f"/api/v1/auth/key-rotations?after={seq}")
+            res = hub_request(
+                str(link["hub_url"]),
+                "GET",
+                f"/api/v1/auth/key-rotations?after={seq}",
+                allow_loopback=self.store.allow_loopback,
+            )
         except HubUnreachable:
             self.last_result = "hub_onbereikbaar"
             return self.last_result
@@ -476,7 +614,13 @@ def confirm(store: HubLinkStore) -> bool:
     if link.get("state") != "gekoppeld" or not link.get("service_token") or link.get("confirmed_at"):
         return bool(link.get("confirmed_at"))
     try:
-        res = hub_request(str(link["hub_url"]), "GET", "/api/v1/services/self", bearer=str(link["service_token"]))
+        res = hub_request(
+            str(link["hub_url"]),
+            "GET",
+            "/api/v1/services/self",
+            bearer=str(link["service_token"]),
+            allow_loopback=store.allow_loopback,
+        )
     except HubUnreachable:
         return False
     with store.update() as cur:
@@ -499,13 +643,39 @@ class AuthFailed(Exception):
         self.reason = reason
 
 
-def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: int | None = None) -> dict[str, Any]:
-    """Controlevolgorde van §4.7: state → tokensoort → handtekening/kid → claims → token_use → jti."""
+def bearer_token(authorization: str | None) -> str:
+    """``Authorization``-header → token; geen header, een ander schema dan ``Bearer`` of een lege waarde →
+    ``invalid_token`` (§4.7)."""
+    scheme, _sep, value = (authorization or "").strip().partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        raise AuthFailed("invalid_token")
+    return value.strip()
+
+
+def verify_hub_authorization(
+    authorization: str | None, link: Mapping[str, Any], *, audience: str, now: int | None = None
+) -> dict[str, Any]:
+    """§4.7 vanaf de header: eerst ``state`` (ook zonder header: ``not_linked``/``revoked``), dan de tokensoort."""
+    _check_state(link)
+    return verify_hub_jwt(bearer_token(authorization), link, audience=audience, now=now)
+
+
+def _check_state(link: Mapping[str, Any]) -> None:
     state = link.get("state")
     if state == "ingetrokken":
         raise AuthFailed("revoked")
-    if state != "gekoppeld" or not link.get("pins"):
-        raise AuthFailed("not_linked")
+    if state != "gekoppeld" or not link.get("pins") or link.get("_onleesbaar"):
+        raise AuthFailed("not_linked")  # ook een onleesbaar koppelbestand (§3.5, fail-closed)
+
+
+def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: int | None = None) -> dict[str, Any]:
+    """Controlevolgorde van §4.7: state → tokensoort → handtekening/kid → claims → token_use → jti.
+
+    ``aud`` moet precies één string zijn (§4.2): een lijst — ook met de eigen ``app_id`` erin — is ``invalid_token``.
+    Een JWS-header zonder ``kid`` is ``unknown_key``."""
+    _check_state(link)
+    if not token:
+        raise AuthFailed("invalid_token")
     if token.startswith("svc_"):
         raise AuthFailed("service_token_not_accepted")
     try:
@@ -517,7 +687,8 @@ def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: i
         raise AuthFailed("invalid_token") from None
     if not isinstance(header, dict) or not isinstance(claims, dict) or header.get("alg") != "EdDSA":
         raise AuthFailed("invalid_token")
-    pin = next((p for p in link["pins"].get("jwt", []) if p.get("kid") == header.get("kid")), None)
+    kid = header.get("kid")
+    pin = next((p for p in link["pins"].get("jwt", []) if isinstance(kid, str) and p.get("kid") == kid), None)
     if pin is None:
         raise AuthFailed("unknown_key")
     try:
@@ -529,7 +700,10 @@ def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: i
     numbers = ("iat", "nbf", "exp")
     if any(type(claims.get(k)) is not int for k in numbers) or claims.get("iss") != "hub":  # bool telt niet als getal
         raise AuthFailed("invalid_token")
-    if claims.get("aud") != audience or claims["exp"] - claims["iat"] > 120 or claims["exp"] < claims["iat"]:
+    aud = claims.get("aud")
+    if not isinstance(aud, str) or aud != audience:  # ook een lijst met de eigen app_id erin (§4.2)
+        raise AuthFailed("invalid_token")
+    if claims["exp"] - claims["iat"] > 120 or claims["exp"] < claims["iat"]:
         raise AuthFailed("invalid_token")
     if claims["nbf"] > t + CLOCK_SKEW or claims["iat"] > t + CLOCK_SKEW:  # nog niet geldig of uit de toekomst
         raise AuthFailed("invalid_token")

@@ -33,7 +33,8 @@ def main(argv: list[str] | None = None) -> int:
         from executor.hublink import HubLinkStore
 
         try:
-            state = str(HubLinkStore(s.secrets_dir).read().get("state") or "nooit_gekoppeld")
+            link = HubLinkStore(s.secrets_dir).read()
+            state = "onleesbaar (fail-closed)" if link.get("_onleesbaar") else str(link.get("state"))
         except (OSError, ValueError):
             state = "onbekend (hub-link.json onleesbaar)"
         print(f"[executor] koppelstatus: {state}. Allowlist leeg tot fase P2: er wordt niets uitgevoerd.", flush=True)
@@ -49,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
             log_level=s.log_level,
             access_log=False,
             server_header=False,
+            # Nooit X-Forwarded-* vertrouwen (§3.7: bron-IP = adres van de TCP-verbinding, schema = de verbinding).
+            proxy_headers=False,
         )
         return 0
     from executor.app import create_app

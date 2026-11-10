@@ -4,7 +4,6 @@ na een herstart), rol 'kind' wint, onbruikbare replaycache → 503 (fail-closed)
 
 from __future__ import annotations
 
-import base64
 import json
 import time
 import uuid
@@ -12,92 +11,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from fastapi.testclient import TestClient
+from executorhelpers import AUD, UNLINK, Hub
+from executorhelpers import auth as _auth
+from executorhelpers import b64 as _b64
+from executorhelpers import client as _client
 
-from executor.app import create_app
-from executor.config import Settings
-from executor.firststart import ensure_secrets
 from executor.hublink import AuthFailed, HubLinkStore, verify_hub_jwt
 from executor.replay import ReplayCache, ReplayUnavailable
-
-AUD = "ai-server-manager-executor"
-UNLINK = "/connector/v1/hub-link/unlink"
-
-
-def _b64(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-
-class Hub:
-    """Gepinde Hub-sleutel in een gekoppelde ``hub-link.json`` en ondertekende JWT's daarmee."""
-
-    def __init__(self, data_dir: Path) -> None:
-        self.key = Ed25519PrivateKey.generate()
-        self.x = _b64(self.key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
-        self.sid = str(uuid.uuid4())
-        settings = Settings(data_dir=data_dir)
-        ensure_secrets(settings.secrets_dir)
-        with HubLinkStore(settings.secrets_dir).update() as link:
-            link.update(
-                state="gekoppeld",
-                app_id=AUD,
-                hub_url="http://192.0.2.5:30400",
-                service_id=self.sid,
-                via="koppelcode",
-                first_linked_at="2026-11-09T12:00:00Z",
-                linked_at="2026-11-09T12:00:00Z",
-                confirmed_at="2026-11-09T12:00:01Z",
-                service_token="svc_" + "a" * 43,
-                service_token_last4="aaaa",
-                pins={
-                    "jwt": [{"kid": "k1", "jwk": {"kty": "OKP", "crv": "Ed25519", "x": self.x}}],
-                    "policy": [],
-                    "keyset_fingerprint": "MEGG-8GFG-2E4Y-K2RQ",
-                    "rotation_sequence": 0,
-                },
-            )
-        self.settings = settings
-
-    def jwt(self, **change: Any) -> str:
-        t = int(time.time())
-        claims: dict[str, Any] = {
-            "iss": "hub",
-            "aud": AUD,
-            "sub": "hub",
-            "token_use": "hub_service",
-            "roles": ["service"],
-            "service_id": self.sid,
-            "iat": t,
-            "nbf": t,
-            "exp": t + 60,
-            "jti": str(uuid.uuid4()),
-        }
-        claims.update(change)
-        claims = {k: v for k, v in claims.items() if v is not None}
-        head = _b64(json.dumps({"alg": "EdDSA", "typ": "JWT", "kid": "k1"}).encode())
-        body = _b64(json.dumps(claims).encode())
-        return f"{head}.{body}.{_b64(self.key.sign(f'{head}.{body}'.encode()))}"
-
-    def user_jwt(self, roles: list[str]) -> str:
-        return self.jwt(sub=str(uuid.uuid4()), token_use="user", roles=roles, service_id=None)
 
 
 @pytest.fixture
 def hub(tmp_path: Path) -> Hub:
     return Hub(tmp_path / "appdata")
-
-
-def _client(hub: Hub) -> TestClient:
-    return TestClient(create_app(hub.settings), base_url="http://executor.test")
-
-
-def _auth(token: str, key: str | None = None) -> dict[str, str]:
-    h = {"Authorization": f"Bearer {token}"}
-    if key is not None:
-        h["Idempotency-Key"] = key
-    return h
 
 
 def _chunks(total: int) -> Any:
@@ -131,8 +56,12 @@ def test_unlink_vraagt_idempotency_key_en_weigert_hergebruikte_jti(hub: Hub) -> 
     token, key = hub.jwt(), str(uuid.uuid4())
     r = c.post(UNLINK, headers=_auth(token))
     assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required"
-    r = c.post(UNLINK, headers=_auth(token, "geen-uuid"))
+    # Contract 1.3 §4.6: elke POST verbruikt de jti, ook zonder Idempotency-Key (geen exacte herhaling mogelijk).
+    r = c.post(UNLINK, headers=_auth(token, key))
+    assert r.status_code == 401 and r.json()["details"]["reason"] == "token_replayed"
+    r = c.post(UNLINK, headers=_auth(hub.jwt(), "geen-uuid"))
     assert r.status_code == 400 and r.json()["code"] == "idempotency_key_invalid"
+    token, key = hub.jwt(), str(uuid.uuid4())
     first = c.post(UNLINK, headers=_auth(token, key))
     assert first.status_code == 501 and first.json()["code"] == "capability_unavailable"
     # Exacte herhaling (zelfde jti, methode, pad en key): het opgeslagen antwoord, geen tweede uitvoering.
@@ -223,3 +152,115 @@ def test_replaycache_ruimt_op_na_exp_plus_speling(tmp_path: Path) -> None:
     assert cache.claim(**{**kw, "path": "/y"}, now=1031).kind == "new"
     with pytest.raises(ReplayUnavailable):
         ReplayCache(tmp_path / "bestaat-niet" / "r.sqlite3").claim(**kw)
+
+
+# ------------------------------------------------------------------ contract 1.3 §4.2, §4.6, §4.7 (C1.3-ASM-04)
+def test_aud_als_lijst_en_header_zonder_kid(hub: Hub) -> None:
+    c = _client(hub)
+    # aud is precies één string: een lijst — ook met de eigen app_id erin — is invalid_token (§4.2).
+    for aud in ([AUD], [AUD, "home-control-hub"]):
+        r = c.get("/connector/v1/hub-link", headers=_auth(hub.jwt(aud=aud)))
+        assert r.status_code == 401 and r.json()["details"]["reason"] == "invalid_token", aud
+    # Een JWS-header zonder kid → unknown_key (§4.7).
+    r = c.get("/connector/v1/hub-link", headers=_auth(hub.jwt(header={"alg": "EdDSA", "typ": "JWT"})))
+    assert r.status_code == 401 and r.json()["details"]["reason"] == "unknown_key"
+
+
+@pytest.mark.parametrize("header", [None, "Basic dXNlcjpwdw==", "Bearer", "Bearer   ", "Token abc"])
+def test_geen_header_ander_schema_of_lege_waarde_is_invalid_token(hub: Hub, header: str | None) -> None:
+    c = _client(hub)
+    headers = {} if header is None else {"Authorization": header}
+    r = c.get("/connector/v1/hub-link", headers=headers)
+    assert r.status_code == 401 and r.json()["details"]["reason"] == "invalid_token"
+
+
+def test_state_komt_voor_de_header(hub: Hub) -> None:
+    """Controlevolgorde §4.7: 1 MiB → state → tokensoort. Niet gekoppeld zonder header → not_linked."""
+    with HubLinkStore(hub.settings.secrets_dir).update() as link:
+        link.update(state="ingetrokken", service_token=None)
+    c = _client(hub)
+    assert c.get("/connector/v1/hub-link").json()["details"]["reason"] == "revoked"
+    with HubLinkStore(hub.settings.secrets_dir).update() as link:
+        link.update(state="ontkoppeld")
+    assert c.post(UNLINK).json()["details"]["reason"] == "not_linked"
+
+
+def test_authenticatie_voor_rol_idempotency_en_body(hub: Hub) -> None:
+    """RV9: zonder geldige authenticatie altijd 401, ook bij een ongeldige body of een ontbrekende Idempotency-Key."""
+    c = _client(hub)
+    for path in (UNLINK, "/api/v1/execute"):
+        r = c.post(path, content=b"{geen json", headers={"content-type": "application/json"})
+        assert r.status_code == 401 and r.json()["details"]["reason"] == "invalid_token", path
+        r = c.post(path, json={"onbekend": 1}, headers=_auth(hub.jwt(aud="andere-app")))
+        assert r.status_code == 401, path
+
+
+def test_execute_eerst_aanmelden_dan_sleutel_dan_body_en_weigert_alles(hub: Hub) -> None:
+    c = _client(hub)
+    # Gebruikers-JWT (ook admin) kan geen acties aanbieden: alleen de Hub met een dienst-JWT.
+    admin = _auth(hub.user_jwt(["admin"]), str(uuid.uuid4()))
+    r = c.post("/api/v1/execute", json={"action_id": "app.restart"}, headers=admin)
+    assert r.status_code == 403 and r.json()["code"] == "forbidden"
+    r = c.post("/api/v1/execute", json={"action_id": "app.restart"}, headers=_auth(hub.jwt()))
+    assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required"
+    r = c.post("/api/v1/execute", json={"zonder": "action_id"}, headers=_auth(hub.jwt(), str(uuid.uuid4())))
+    assert r.status_code == 422 and r.json()["code"] == "validation_error"
+    token, key = hub.jwt(), str(uuid.uuid4())
+    first = c.post("/api/v1/execute", json={"action_id": "shell.exec"}, headers=_auth(token, key))
+    assert first.status_code == 403 and first.json()["code"] in ("action_not_allowed", "action_forbidden")
+    again = c.post("/api/v1/execute", json={"action_id": "shell.exec"}, headers=_auth(token, key))
+    assert again.status_code == 403 and again.headers["Idempotent-Replay"] == "true"
+    assert again.json() == first.json()
+    # Geen tweede uitvoering met dezelfde jti voor een andere mutatie.
+    r = c.post(UNLINK, headers=_auth(token, key))
+    assert r.status_code == 401 and r.json()["details"]["reason"] == "token_replayed"
+
+
+# ------------------------------------------------------------------ statische Idempotency-Key-test (§5, C1.3-ASM-14)
+EXEMPT = {
+    # Formulier-POST van een statuspagina: een browserformulier kan geen header meesturen; bescherming via het
+    # formuliertoken, de herkomstcontrole, de pogingenlimiet, koppelen_bezig en de eenmaligheid van de koppelcode.
+    "pair": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.9; RV10)",
+}
+
+
+MUTATING = ("post", "put", "patch", "delete")
+
+
+def _mutating_routes() -> dict[str, Any]:
+    import ast
+
+    from executor import app as app_module
+
+    src = Path(app_module.__file__).read_text(encoding="utf-8")
+    out: dict[str, Any] = {}
+    for n in ast.walk(ast.parse(src)):
+        if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and any(
+            isinstance(d, ast.Call)
+            and isinstance(d.func, ast.Attribute)
+            and d.func.attr in ("post", "put", "patch", "delete")
+            for d in n.decorator_list
+        ):
+            out[n.name] = n
+    return out
+
+
+def test_elke_mutatie_vraagt_idempotency_key_na_de_authenticatie() -> None:
+    import ast
+
+    routes = _mutating_routes()
+    assert {"pair", "hub_link_unlink", "execute"} <= set(routes)
+    missing = []
+    for name, fn in routes.items():
+        if name in EXEMPT:
+            continue
+        names = sorted((n.lineno, n.col_offset, n.id) for n in ast.walk(fn) if isinstance(n, ast.Name))
+        calls = [name for _, _, name in names]
+        # Eerst de authenticatie (verbruikt de jti), daarna pas de sleutelcontrole (§4.7, RV9).
+        if "_authenticate" not in calls or "_idempotency_key" not in calls:
+            missing.append(name)
+        elif calls.index("_authenticate") > calls.index("_idempotency_key"):
+            missing.append(f"{name} (volgorde)")
+    assert not missing, f"muterende executor-routes zonder Idempotency-Key na authenticatie: {missing}"
+    assert set(EXEMPT) <= set(routes), "uitzondering zonder route"
+    assert all("contract 1.3 §5" in reden for reden in EXEMPT.values())
