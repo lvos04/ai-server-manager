@@ -1,0 +1,606 @@
+[
+ [
+  "jelly-leon",
+  "De Docker-HEALTHCHECK draait in alle alles-in-één images van het platform als de containergebruiker: zonder Custom User als root, met de standaard-capabilities en zonder no_new_privs. §2.2 zegt 'alle processen', en de rooktest sluit alleen de eigen docker exec-shell uit. Gekozen interpretatie: de rooktest sluit processen uit die Docker van buiten start (PPid 0: exec en healthcheck). Een oplossing (healthcheck via setpriv naar 568) moet platformbreed worden afgesproken (ADR-0012)."
+ ],
+ [
+  "jelly-leon",
+  "§2.2 eist no_new_privs ook bij 'Custom User 568', maar zegt niet dat een niet-root-proces de bounding-set niet kan legen (geen CAP_SETPCAP). Bij Custom User blijft CapBnd daarom de Docker-standaardset; met CapEff 0 en NoNewPrivs 1 levert die geen rechten op. Vastgelegd in ADR-0012."
+ ],
+ [
+  "jelly-leon",
+  "Contract §2/§10 noemen /appdata en /healthz. Jelly Leon houdt /config + /cache en /health (upstream-conventies, ADR-0008, ongewijzigd). Contract §2.3 erkent /config voor Jelly Leon al, /healthz nog niet."
+ ],
+ [
+  "jelly-leon",
+  "§9 GPU: de vertaling intel_render → use_all_gpus geeft elke niet-NVIDIA-render-GPU door. Eén specifieke render-node kiezen (A310 tegenover UHD 770) is nog een open punt voor B03/P4."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Voor ZA9 en de statuspagina bestaat geen eigen Excel-ID. Ik heb geen ID verzonnen; het bewijs staat bij EX16 (de toestand ingetrokken)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "ONTWERPTAAL §13.2 noemt een dienst die niet gekoppeld is 'Niet gereed', terwijl /readyz van deze dienst dan 200 geeft (contract 1.2: niet gekoppeld maakt de dienst niet 'niet klaar', zodat TrueNAS hem niet herstart). Veiligste keuze (ADR-0013 besluit 5): /readyz blijft 200; de statuspagina toont 'Niet gereed' en het feit 'Gereed' legt het verschil uit."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Het Peil-sjabloon heeft geen toestand voor een onleesbaar koppelbestand. Het koppelblok blijft dan leeg; de melding en een regel bij de controles tonen 'Koppelstatus onleesbaar' met de code."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Het Peil-sjabloon heeft geen hourglass-symbool voor 'Nog niet beschikbaar'. Ingest en spraak staan daarom als toon 'onbekend' met code capability_unavailable; ze tellen niet mee in het totaal (ONTWERPTAAL §4.3)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "De vaste sjabloontekst 'Bron: /readyz en /healthz' is smaller dan wat het totaal meeneemt (ook de connector-gezondheid). De regels die daaruit komen noemen hun code; de kopie zelf mag niet worden aangepast."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "De Peil-bron staat alleen op de werkbranch van ai-server-manager, niet op main. De kopie is daarom op een commit-SHA gepind, niet op een branch."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Het sjabloon gebruikt de veldnamen hub_adres, koppelcode en hub_vingerafdruk. POST /koppelen gebruikt die nu ook (was hub_url, code, fingerprint); alleen de statuspagina zelf post daarheen."
+ ],
+ [
+  "jelly-leon-platform",
+  "Peil-sjabloon 1.1.0 heeft geen koppeltoestand voor een onleesbaar of onbekend koppelbestand (ADR-0011: fail-closed). Gekozen: geen koppelblok (dus nooit het formulier) plus een foutmelding met code hub_link_onleesbaar. Voorstel aan de design-agent: een blok koppeling_onbekend (ADR-0013)."
+ ],
+ [
+  "jelly-leon-platform",
+  "Het sjabloon toont de foutcode alleen samen met een trace-ID (ALS:trace_id). Voor blijvende toestanden zonder bijbehorend verzoek (laatste mislukte koppelpoging, onleesbaar bestand) staat de code daarom in de meldingstekst. Voorstel: melding_code los van trace_id."
+ ],
+ [
+  "jelly-leon-platform",
+  "De referentie-renderer bouw/sjabloon.mjs vervangt {{x}} na het invullen van de blokken nog eens over de hele tekst, zodat een waarde met {{naam}} opnieuw wordt ingevuld. De Python-renderer doet alles in één doorgang. Melding aan de design-agent."
+ ],
+ [
+  "jelly-leon-platform",
+  "De formuliernamen in het sjabloon (hub_adres, hub_vingerafdruk) wijken af van de eerdere velden van deze dienst (hub_url, vingerafdruk); overgenomen volgens het sjabloon. Andere diensten (home-control-hub, zoeken-en-persoonlijke-ai, appstore-en-fork) moeten dat bij hun ombouw ook doen."
+ ],
+ [
+  "jelly-leon-platform",
+  "ONTWERPTAAL §13.2 zegt dat CI 'de checksum vergelijkt met de versie in ai-server-manager'. Gekozen: vergelijken met de kop van branch ccr-c133d7a0-kuz1cv (niet main, daar staat Peil niet). Gevolg: een nieuwe Peil-versie maakt de CI van deze repo rood tot de kopie is bijgewerkt (bewust, §14)."
+ ],
+ [
+  "jelly-leon-web",
+  "A1 zegt 'niet per repo zelf aanpassen', maar de orkestratie liet deze repo de kopie maken. Veiligste lezing: alleen een byte-gelijke kopie zonder enige wijziging, bewaakt door een drifttest; deze repo beslist niets over de inhoud (ADR-0010)."
+ ],
+ [
+  "jelly-leon-web",
+  "De byte-gelijke kopieën bevatten relatieve links naar ADR-0011/ADR-0012 van ai-server-manager (../adr/...). In deze repo werken die links niet. Bewust niet aangepast, omdat de kopie dan niet meer byte-gelijk is; uitgelegd in docs/platform-v2/README.md."
+ ],
+ [
+  "jelly-leon-web",
+  "De algemene kwaliteitseis (alles-in-één image, CUSTOM_APP.md-formulier, manifest, OpenAPI per repo) past niet op een webclient die volgens contract §2/§2.3 in de app 'jelly-leon' zit. Er is geen eigen API, dus ook geen OpenAPI-export. Dit blijft ADR-0008, met ADR-0010 punt 5 als aanvulling."
+ ],
+ [
+  "jelly-leon-web",
+  "A3/besluit 3 vraagt een scan vóór het publiek maken, maar lvos04/jelly-leon-web, jelly-leon en ai-server-manager stonden bij de meting (gh repo view) al publiek. De scan is dus achteraf gedaan."
+ ],
+ [
+  "appstore-en-fork",
+  "Het Peil-sjabloon 1.1.0 kent precies vier koppeltoestanden. Er is geen blok voor een onleesbaar hub-link.json (fail-closed volgens ADR-0008). Gekozen: geen koppelblok en geen formulier, wel de foutmelding koppelstatus_onleesbaar en de controle 'Koppeling met de Hub: Storing'. Voorstel voor de eigenaar van het sjabloon: een blok koppelstatus_onbekend toevoegen."
+ ],
+ [
+  "appstore-en-fork",
+  "De witte lijst van §3.5 noemt alleen 'last_error (code + vaste NL-melding)', terwijl ONTWERPTAAL §13.2 bij fouten een trace-ID vraagt. Gekozen: hub-link.json bewaart geen trace-ID. Een opgeslagen fout toont op GET / de trace-ID van dat paginaverzoek (met een logregel); een mislukte POST toont de trace-ID van de poging zelf."
+ ],
+ [
+  "appstore-en-fork",
+  "ONTWERPTAAL §13.2 zegt dat CI 'de checksum vergelijkt met de versie in ai-server-manager en faalt bij drift'. Dat botst met 'versie-gepind' zodra de bron een nieuwe versie uitbrengt. Gekozen: fout bij afwijking van de gepinde commit of bij dezelfde versie met andere inhoud; een nieuwere versie geeft alleen een waarschuwing (ADR-0009 §2)."
+ ],
+ [
+  "appstore-en-fork",
+  "Peil 1.1.0 staat in ai-server-manager alleen op branch ccr-c133d7a0-kuz1cv, nog niet op main. De kopie is daarom op commit 172ee87 gepind; de online controle probeert de bronbranch en daarna main."
+ ],
+ [
+  "appstore-en-fork",
+  "De referentie-renderer bouw/sjabloon.mjs vervangt ingevulde waarden opnieuw als sjabloon. Een bronnaam '{{csrf_token}}' zou zo de CSRF-waarde tonen. De Python-renderer doet één doorgang. De uitvoer is byte-gelijk voor de prototypes, maar wijkt bewust af bij waarden met '{{x}}'."
+ ],
+ [
+  "appstore-en-fork",
+  "De witte lijst van §3.5 staat service_token_last4 toe, maar het sjabloon heeft er geen plek voor. Daarom toont de pagina de laatste 4 tekens niet meer (CUSTOM_APP.md is aangepast)."
+ ],
+ [
+  "jelly-leon-clients",
+  "§1.1 besluit 1 en CONTRACT_1.2_CONFORMITEIT JC1 zeggen 'nooit org.jellyfin.* als ID van de fork', maar de opdracht geeft als keuze van de gebruiker org.jellyfin.mobile.jellyleon en org.jellyfin.androidtv.jellyleon. Ik heb die keuze toegepast, omdat §2.3 regel 6 de exacte ID aan ADR-0004 overlaat. Wat de contractregel beschermt, wordt in CI hard bewaakt: nooit een officiële ID, en geen accounttype, authority, permissie of sharedpref gelijk aan die van de officiële app. Voorstel aan de contracteigenaar: de regel wijzigen in 'nooit een officiële ID'. Vastgelegd in ADR-0004 en ADR-0010."
+ ],
+ [
+  "jelly-leon-clients",
+  "Over de herkomst van het besluit: de gekozen concrete ID's staan nog nergens in ai-server-manager (bv. OVERDRACHT/STATUS.md). Ze kwamen alleen via de orkestratie-opdracht binnen, en dat staat zo in ADR-0004. De contracteigenaar moet het besluit daar vastleggen of laten bevestigen. Vóór de eerste verspreiding kan de ID nog gewijzigd worden."
+ ],
+ [
+  "jelly-leon-clients",
+  "JC2 noemt alleen swiftfin/XcodeConfig/Shared.xcconfig. Het doel 'Swiftfin iOS' zet in Release echter zelf PRODUCT_BUNDLE_IDENTIFIER = org.jellyfin.swiftfin, en die doelinstelling wint van de xcconfig. Daarom moest ook project.pbxproj (één regel) mee. De Xcode-build-instellingen in CI bevestigen dat."
+ ],
+ [
+  "jelly-leon-clients",
+  "De Swiftfin-bundle-id is niet in het besluit genoemd. Ik heb hetzelfde patroon toegepast (org.jellyfin.swiftfin.jellyleon); de gebruiker moet die bevestigen vóór de eerste Apple-registratie."
+ ],
+ [
+  "jelly-leon-clients",
+  "Algemene kwaliteitseisen (alles-in-één image, CUSTOM_APP.md, manifest, .env.example, OpenAPI) blijven N.v.t. voor apparaat-apps (ADR-0008, nu getoetst aan 1.2)."
+ ],
+ [
+  "home-control-hub",
+  "§4.5: de formule voor de sleutelset-vingerafdruk gaat uit van precies één policy-sleutel. Tijdens een policy-rotatie kunnen er twee gepind zijn; gekozen: thumbprints gesorteerd en met komma's verbonden, net als appstore-en-fork (ADR-0010 besluit 14)."
+ ],
+ [
+  "home-control-hub",
+  "§4.7: de tabel geeft geen reason voor een ontbrekende of niet-Bearer Authorization-header, of voor een JWT zonder kid. Gekozen: invalid_token en unknown_key. Een gepinde kid met een andere sleutel geeft invalid_token (de handtekening klopt niet)."
+ ],
+ [
+  "home-control-hub",
+  "§2.2/§10: 'geen enkel proces als root' botst met Docker HEALTHCHECK, die als gebruiker van de image (root) start. Beperkt doordat healthcheck.py als eerste naar 568 met no-new-privileges wisselt; de rooktest slaat dat kortlevende proces over en controleert de wissel apart. Graag verduidelijken in het contract."
+ ],
+ [
+  "home-control-hub",
+  "§3.7: niet geregeld of ongeldige invoer als 'poging' telt. Gekozen: elke formulierpoging na de CSRF-controle telt mee."
+ ],
+ [
+  "home-control-hub",
+  "§3.5: de lijst last_error-codes is niet uitputtend ('o.a.'). Eigen codes toegevoegd: hub_incompatibel, token_ongeldig, vingerafdruk_ongeldig, hub_adres_ongeldig, overzetten_onvolledig. De Hub-UI moet de meegeleverde NL-melding tonen en geen codes hardcoderen."
+ ],
+ [
+  "home-control-hub",
+  "§4.6: elke POST telt als mutatie, ook lees-achtige POST's zonder Idempotency-Key (break-glass/evaluate, recovery/kit/verify). De jti wordt dan verbruikt, dus de Hub moet per POST een nieuwe JWT halen, niet alleen bij een Idempotency-Key."
+ ],
+ [
+  "home-control-hub",
+  "§3.3: een ongeldige optionele base_url laat de Hub met 422 weigeren en verbrandt het eenmalige token. De dienst stuurt dan null. Voorstel: de Hub waarschuwt bij dit informatieve veld in plaats van 422."
+ ],
+ [
+  "home-control-hub",
+  "§6/§3.8: na ontkoppelen of intrekking is GET /connector/v1/hub-link onbereikbaar, omdat elke Hub-JWT wordt geweigerd. De Hub ziet de toestand alleen via de 401-reason (not_linked/revoked)."
+ ],
+ [
+  "home-control-hub",
+  "§9/§3.2: HUB_URL, HUB_ENROLLMENT_TOKEN en HUB_KEY_FINGERPRINT zijn geen manifestparameters (parameternamen moeten lowercase zijn). De vertaling of de Hub moet ze bij app.install/app.update zelf toevoegen."
+ ],
+ [
+  "home-control-hub",
+  "Hub-route POST /api/v1/services/{id}/unlink vraagt een gemeten dienstadres (D03 + inventaris). In de interop-test is de dienst-JWT daarom met hub.keys.KeyRing gemaakt; ontkoppelen via die Hub-route is niet end-to-end getest."
+ ],
+ [
+  "jelly-leon-web",
+  "§11 eist geen consistentie tussen 'blokkade' en 'validatie'. Daardoor kon een Excel-regel 'Sim-getest; NIET GEVALIDEERD (hardware)' tonen, terwijl de blokkade ook een echte NAS noemt. Veiligste lezing, in deze repo afgedwongen (ADR-0010 punt 4): elke 'NIET GEVALIDEERD (…)' uit de blokkade staat ook in 'validatie'. Een ontbrekende of lege EVIDENCE.json is een overtreding. Andere repos hebben deze regel niet. Kandidaat voor de contracteigenaar om in §11 op te nemen."
+ ],
+ [
+  "jelly-leon-web",
+  "Blijft staan uit de bouwronde: de algemene eis van een alles-in-één image, CUSTOM_APP-formulier, manifest en OpenAPI per repo past niet op een webclient die volgens §2/§2.3 in de app 'jelly-leon' zit (ADR-0008, ADR-0010 punt 5)."
+ ],
+ [
+  "jelly-leon-web",
+  "Blijft staan: de byte-gelijke contractkopie bevat relatieve links naar ADR's van ai-server-manager (../adr/ADR-0011/0012), die in deze repo niet werken. Ik heb ze bewust niet aangepast, zodat de kopie byte-gelijk blijft."
+ ],
+ [
+  "jelly-leon",
+  "Healthcheck als root: in jelly-leon nu zo ver mogelijk opgelost (ADR-0014): curl draait als 568 zonder capabilities. Er blijft een restrisico. Docker start het healthcheckproces (en elke docker exec) als de containergebruiker, dus de sh van het script en setpriv draaien heel kort als root vóór de exec. §2.2 ('geen enkel proces meer als root') is daarom met Docker HEALTHCHECK niet letterlijk haalbaar bij een root-start. De rooktest blijft processen met PPid 0 uitsluiten. Platformbreed besluit nodig; andere images draaien hun healthcheck nog als root."
+ ],
+ [
+  "jelly-leon",
+  "§5 '/healthz en /readyz op elke dienst' botst met §2.3 voor Jellyfin (/System/Info/Public en /health). Jelly Leon houdt /health en /config + /cache in plaats van /appdata (ADR-0008/0012). De contracteigenaar moet dit expliciet vastleggen."
+ ],
+ [
+  "jelly-leon",
+  "§2.2 eist no_new_privs bij Custom User 568, maar een niet-root-proces kan de bounding-set niet legen. CapBnd blijft dan de Docker-standaardset; met CapEff 0 en NoNewPrivs 1 levert dat geen rechten op (ADR-0012/0014)."
+ ],
+ [
+  "jelly-leon-clients",
+  "Blijft open (al gemeld door de bouwer, door mij nagegaan): contract §1.1 besluit 1 en JC1 zeggen 'nooit org.jellyfin.* als ID van de fork', maar de gekozen ID's zijn org.jellyfin.mobile.jellyleon en org.jellyfin.androidtv.jellyleon. Ik heb in het workflowscript (ronde-2.js) gezien dat de bouwopdracht deze ID's uitdrukkelijk als keuze van de gebruiker uit het keuzemenu meegaf. In ai-server-manager OVERDRACHT/STATUS.md (besluit 1) staan de concrete ID's nog niet. Wat de regel beschermt, wordt in CI bewaakt: nooit een officiële ID, accounttype, authority, permissie of sharedpref. De contracteigenaar moet de regel aanpassen en het besluit vastleggen."
+ ],
+ [
+  "jelly-leon-clients",
+  "JC2 noemt alleen Shared.xcconfig, maar het doel Swiftfin iOS/Release zet de bundle-id zelf. Daarom wijzigt de patch ook één regel in project.pbxproj; dat heb ik nagekeken in de pbxproj-structuur en in het CI-log. Het contract zou die regel moeten noemen."
+ ],
+ [
+  "ai-server-manager",
+  "De heartbeat-route POST /api/v1/monitoring/heartbeat (service-token) staat niet in contract 1.2. Gekozen: een optionele Hub-uitbreiding; diensten hoeven hem niet te sturen, want de connector-health (§6) blijft gelden. Voorstel voor 1.3: schema, dedupe op observed_at en 5 s rate-limit vastleggen (ADR-0021)."
+ ],
+ [
+  "ai-server-manager",
+  "Contract §5 eist een Idempotency-Key bij elke mutatie. De heartbeat dedupliceert op observed_at, zoals de events-inbox op event_id. De uitzonderingslijst in §5 moet dit opnemen."
+ ],
+ [
+  "ai-server-manager",
+  "§6 GET /connector/v1/health heeft geen vaste namen voor controles. Om '200 maar geen jobs' te herkennen leest de Hub nu namen als worker/jobs/queue/wachtrij. Voorstel: vaste namen (worker, jobs) met observed_at per controle."
+ ],
+ [
+  "ai-server-manager",
+  "In TrueNAS app.query betekent custom_app=true een compose-app (Install via YAML). Het standaard Custom App-formulier is de catalogus-app ix-app (custom_app=false). De term 'custom_app' in het contract/manifest betekent dus iets anders dan het TrueNAS-veld. De Hub vertaalt dit expliciet; graag verduidelijken in het contract en TRUENAS_APP_API.md."
+ ],
+ [
+  "ai-server-manager",
+  "B01-002 vraagt om resourcegrenzen, maar die zijn alleen te lezen via de app-configuratie, en die kan geheimen bevatten (retrieve_config wordt nooit gebruikt). Gekozen: 'unknown' tot P2 ze uit het manifest haalt."
+ ],
+ [
+  "ai-server-manager",
+  "reporting.realtime is in TrueNAS 25.10 alleen een event source (core.subscribe, rol REPORTING_READ) en geen methode. Contract §8 noemt alleen methoden. Gekozen: core.subscribe/unsubscribe op de alleen-lezen-lijst, beperkt tot een vaste lijst events."
+ ],
+ [
+  "ai-server-manager",
+  "Beszel kent geen API-tokens. Het wachtwoord van een readonly-gebruiker staat daarom in de vault (§3.10); restrisico gemeld in ADR-0021."
+ ],
+ [
+  "ai-server-manager",
+  "Coördinatie: andere bouwers committen tegelijk in deze repo en namen ADR-0016…0020; mijn ADR is daarom ADR-0021. Graag afspraken over de ADR-nummering per bouwer."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Het Peil-sjabloon 1.1.0 heeft geen koppelblok voor een onleesbare koppelstatus. De kaart 'Koppeling met de Hub' blijft dan leeg; de dienst vangt dat op met een melding bovenaan (S-01)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Het sjabloon kent de tonen 'Nog niet beschikbaar' (hourglass, neutraal) en 'Niet beschikbaar' (circle-slash) niet, hoewel ONTWERPTAAL §4.3 ze voorschrijft. Daarom staan ingest en spraak in de onbekend-stijl (S-02)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "In het sjabloon staat role=\"alert\" vast op elke melding, ook op de info-melding 'Gekoppeld met de Hub' en bij blijvende toestanden. COMPONENTEN C-14 wil een alert alleen bij een fout die net is ontstaan (S-04)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Het veld 'reden' in het sjabloon is alleen tekst, dus codes kunnen niet in mono, terwijl §5/§11.2 dat voorschrijven. Een lange code zonder breekpunt liep daardoor in een smal vak buiten het vak (P-14/S-05)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Voor de ontwerpreview bestaat geen eigen Excel-ID. Ik heb geen ID verzonnen; het bewijs staat bij EX16, de toestand 'ingetrokken'."
+ ],
+ [
+  "appstore-en-fork",
+  "Contract §4.4 noemt voor diensten alleen 'Hub-connector-lezen' en geen inventaris-route. De Hub-appcatalogus (/api/v1/apps) vereist een gebruikerssessie (Viewer → 403 voor een service-principal). Gekozen: deze routes met het service-token gebruiken en eerlijk capability_unavailable (hub_inventaris_niet_voor_diensten) melden. Voorstel aan de eigenaar: ViewerOrService (alleen lezen) op de twee GET-routes, of alleen voor appstore-en-fork. Vastgelegd in ADR-0010."
+ ],
+ [
+  "appstore-en-fork",
+  "B08-002 vraagt herkenning op 'namespace and container labels', maar de Hub-inventaris bevat geen labels of namespace. Gekozen: alleen een exacte catalogusapp-naam (bij catalog_app) of een exacte image-repository, nooit de appnaam of de herkenning door de Hub. Het resultaat is altijd een voorstel ('kandidaat') dat een beheerder moet bevestigen."
+ ],
+ [
+  "appstore-en-fork",
+  "Een manifest volgens §9 vraagt velden die niet te meten zijn (healthcheck, backup RPO/RTO, risico, parameters); die invullen zou gokken zijn. Gekozen: een aparte documentsoort kind: adoption (installable: false, eigen schema). De validator van manifest v1 weigert die met adoption_manifest_not_installable."
+ ],
+ [
+  "appstore-en-fork",
+  "'Eigenaar' is in het pakket niet gedefinieerd. Gekozen: owner.soort (derde, bestaand, eigen_los, eigen) plus repo (alleen bij eigen repos) uit het register, aangevuld met bevestigd_door/bevestigd_op. De functionele rol staat in het voorgenomen besluit."
+ ],
+ [
+  "appstore-en-fork",
+  "Statuswoorden: de taak noemt 'adopted' en 'onbekend', de Excel 'Geïmporteerd', de P0-preview gebruikte managed/candidate/unmanaged/unknown. Gekozen: onbekend / kandidaat / adopted, met status_nl 'Geïmporteerd' voor adopted. 'onbekend' komt overeen met 'unmanaged' uit de acceptatie."
+ ],
+ [
+  "appstore-en-fork",
+  "Contract §2.3 en de release-workflow van media-guard-ultimate noemen ghcr.io/lvos04/mediaguard-core (en -web/-encode/-sonarr-fork/-radarr-fork). De fake TrueNAS van de Hub gebruikt ghcr.io/lvos04/mediaguard. De appstore herkent alleen de gepubliceerde namen, dus met de fake van de Hub blijft MediaGuard 'onbekend'."
+ ],
+ [
+  "appstore-en-fork",
+  "In de Hub-catalogus (hub.catalog.discovery._fields) hangen readback en digest_bron aan images[0], terwijl ze voor de hoofdimage (de eigen image) worden berekend; dat kan verschillen als de eigen image niet eerst staat. De appstore gebruikt de readback daarom alleen als de repository gelijk is, en de effectieve digest uit image.digest."
+ ],
+ [
+  "appstore-en-fork",
+  "De TTL van de Hub-inventaris is instelbaar (30 s tot 24 u). De appstore eist vast ≤ 15 min (gelijk aan de standaard-TTL van de Hub en de conflictanalyse). Is de TTL van de Hub groter, dan meldt de appstore 'unknown' terwijl de Hub 'ok' zegt. Dat is bewust de voorzichtige kant."
+ ],
+ [
+  "appstore-en-fork",
+  "A06 zegt 'geen afleiding uit appnaam', maar de community-trein van TrueNAS heeft een catalogusapp 'snapotter' (ghcr.io/snapotter-hq/snapotter). Gekozen: geen automatische herkenning voor Snapotter, Teeltboek en Uren; alleen handmatig koppelen door een beheerder."
+ ],
+ [
+  "home-control-hub",
+  "Peil-sjabloon 1.1.0 kent geen toestand voor een onleesbaar koppelbestand (fail-closed). Gekozen: geen van de vier koppelblokken (het koppelblok heeft dan alleen zijn kop), wel een foutmelding met code koppelstatus_onleesbaar en trace-ID, plus de controle 'Koppeling met de Hub' = Storing met de herstelweg. Voorstel: in Peil een eigen blok voor deze toestand toevoegen."
+ ],
+ [
+  "home-control-hub",
+  "Peil-sjabloon 1.1.0 koppelt het formulier en de status 'Niet gekoppeld' aan één vlag, dus een lopende koppelpoging (pending) kan het formulier niet apart verbergen. Gekozen: het formulier blijft staan en verzenden geeft 409 koppelen_bezig zonder verzoek naar de Hub. Contract §3.7 vraagt alleen 'zolang nooit gekoppeld'; dit vervangt het deel 'en er geen koppelpoging loopt' van ADR-0010 besluit 10."
+ ],
+ [
+  "home-control-hub",
+  "ONTWERPTAAL §13.2 ('CI faalt bij drift') zegt niet of een nieuwere bronversie als drift telt. Gekozen: alleen dezelfde versie met andere inhoud, of een afwijking van de gepinde commit, is een fout; een nieuwere versie is een CI-waarschuwing, omdat een versie-gepinde kopie bewust wordt bijgewerkt."
+ ],
+ [
+  "home-control-hub",
+  "Het contract definieert 'gereed' voor de statuspagina niet. Gekozen is de strengste lezing: database, schema, sleutels én een door de Hub bevestigde koppeling. Dat is strenger dan /readyz (verkeer kunnen aannemen); de pagina noemt dat verschil in de regel 'Gereed'."
+ ],
+ [
+  "home-control-hub",
+  "Het sjabloon toont van de koppeling alleen sinds, Hub-adres en vingerafdruk. service_id, via en service_token_last4 (toegestaan volgens de witte lijst van §3.5) staan daarom niet meer op de statuspagina, wel in GET /connector/v1/hub-link."
+ ],
+ [
+  "jelly-leon-platform",
+  "De manifeststandaard (§9) kent geen geaccepteerde, beredeneerde waarschuwing per manifest. --strict kan daardoor nooit schoon zijn voor (a) SQLite-apps zonder export (backup_db_export_none), (b) catalogusapps met verplichte privé-waarden zoals Authentik db_password/secret_key (secret_in_form) en (c) eigen images vóór de release (digest_pending_release). Gekozen: een exacte uitzonderingenlijst die CI bewaakt (ADR-0014). Voorstel aan appstore-en-fork: een veld zoals accepted_findings, of db_export: stopped_snapshot."
+ ],
+ [
+  "jelly-leon-platform",
+  "De manifeststandaard kent geen I-document zonder installatie (I01/I02). Gekozen: een eigen formaat checklist v1 met JSON Schema en regels (ADR-0015). Voorstel: dit type opnemen in de standaard (bijv. install.method: none + checklist)."
+ ],
+ [
+  "jelly-leon-platform",
+  "Contract §1 ('apps met meerdere containers via de catalogusapp …; anders een standaard Custom App') is dubbelzinnig voor apps met één container waarvoor wel een catalogusapp bestaat. Gekozen: een Custom App met digest in het manifest, als 568:568 en onafhankelijk van verdwijnende catalogusversies. Op de peildatum verdwenen authentik 1.3.63 en immich 1.14.62 al. Restrisico: zonder no-new-privileges kunnen setuid-programma's in een upstream-image binnen de container root worden (ADR-0014)."
+ ],
+ [
+  "jelly-leon-platform",
+  "I01 stap 3 schrijft shellopdrachten voor (ls/stat /dev/dri); dat botst met contract §1 (geen terminal). Gekozen: app.gpu_choices plus een bewijsrecord D08."
+ ],
+ [
+  "jelly-leon-platform",
+  "Upstream-apps hebben een open eerste-gebruik-venster: Gotify admin/admin, de first-run van Beszel en de setup van Uptime Kuma en Authentik. Contract §3.1 verbiedt geheimen in het formulier, dus vooraf instellen kan niet. De standaard heeft geen veld voor verplichte controles na installatie. Gekozen: beschreven in install/manifests/README.md, met controles waar dat via HTTP kan (en in de simulators). Voorstel: een post_install_checks-veld."
+ ],
+ [
+  "jelly-leon-platform",
+  "§9 network.ports eist een vaste container_port. Bij de Authentik-catalogusapp luistert de container op het gekozen hostpoortnummer zelf. Gekozen: de standaardpoort als container_port, met uitleg in purpose_nl/description."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "§3.7 schrijft een Origin-controle voor, maar de Peil-statuspagina zet Referrer-Policy: no-referrer. Daardoor stuurt de eigen formulier-POST volgens de Fetch-spec 'Origin: null', en kan de controle 'null' niet weigeren. Daarnaast is een andere app op hetzelfde NAS-adres dezelfde site (SameSite-cookies gaan mee, cookies gelden voor alle poorten). Veiligste keuze (ADR-0015 besluit 3): ook Sec-Fetch-Site controleren, en alles behalve same-origin/none weigeren. Voorstel voor het contract en Peil: dit voor alle vijf statuspagina's vastleggen."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "§11 noemt geen validatiewaarde voor een taak die 'Niet gestart' is en waaraan dus niets gevalideerd is. Deze repo liet die waarde leeg; dat is geen lijstwaarde (A4), en de test van de contracteigenaar weigert het. Gekozen: de NIET GEVALIDEERD-waarde(n) die de acceptatie nodig heeft, met uitleg in 'opmerking' (ADR-0015 besluit 7)."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "De referentie-renderer van Peil (bouw/sjabloon.mjs) vervangt een {{x}} ook binnen een waarde die al is ingevuld. De Python-renderer doet bewust hetzelfde (byte-gelijk). Hier is dat niet uit te buiten, omdat alle waarden vast of gecontroleerd zijn; voorstel S-09 gaat naar ai-server-manager."
+ ],
+ [
+  "zoeken-en-persoonlijke-ai",
+  "Voor de statuspagina en deze QA-ronde bestaat nog steeds geen eigen Excel-ID. Ik heb geen ID verzonnen; het bewijs staat bij EX16 (toestand ingetrokken/ontkoppeld)."
+ ],
+ [
+  "home-control-hub",
+  "Contract §13 en Peil geven geen TTL voor bronmetingen op een statuspagina. Gekozen is 15 minuten, gelijk aan inventory_ttl_seconds van de Hub. Een oudere meting is Onbekend ('laatst bekend …') en nooit de laatst bekende stand (ADR-0012 besluit 2)."
+ ],
+ [
+  "home-control-hub",
+  "Peil-prototype statuspagina.html toont in de lijst met controles '(?) Niet gekoppeld' met het icoon van Onbekend (circle-help). Dat botst met ONTWERPTAAL §7 ('één icoon per betekenis'). Gekozen is de regel boven het prototype: de pil zegt Onbekend of Storing, en de precieze toestand staat aan het begin van de reden."
+ ],
+ [
+  "home-control-hub",
+  "Peil-sjabloon 1.1.0 heeft geen symbool ban voor beleid. Daardoor toont 'Alleen meten' (boiler) het slot van een gate, terwijl ONTWERPTAAL §4.6/§7 ban voorschrijft (S-1)."
+ ],
+ [
+  "home-control-hub",
+  "Peil-sjabloon 1.1.0 zet role=\"alert\" vast op elke melding. Ook de infomelding 'Gekoppeld met de Hub' en een fout die bij het laden al bestond krijgen dus alert; WCAG 4.1.3 en COMPONENTEN C-14 vragen daar status of geen rol (S-3)."
+ ],
+ [
+  "home-control-hub",
+  "Peil-sjabloon 1.1.0 breekt lopende tekst in meldingen niet. Een woord van 20 tekens gaf daardoor op 320 px 9 px overloop met de tekstafstand van WCAG 1.4.12. Dat is hier opgelost door de tekst te verplaatsen (R-8); voorstel overflow-wrap:anywhere (S-8)."
+ ],
+ [
+  "home-control-hub",
+  "Peil-sjabloon 1.1.0 heeft geen blok voor een onleesbaar koppelbestand en geen aparte weergave voor koppelen bezig. Bij onleesbaar blijft het blok leeg, en bij koppelen bezig staat het formulier er terwijl verzenden 409 geeft (S-4). Dit was al gemeld in ADR-0011."
+ ],
+ [
+  "home-control-hub",
+  "Contract §13 noemt voor de ontwerpreview 360/390/768/1440 px en WCAG 2.1 AA; deze opdracht noemt 320 px en WCAG 2.2 AA. Gebruikt is de strengste combinatie: 320–1440 px en WCAG 2.2 AA."
+ ],
+ [
+  "home-control-hub",
+  "In het Peil-prototype statuspagina-gekoppeld.html maakt een beperkte bron het totaal Beperkt. In home-control-hub tellen de bronnen niet mee in het totaal (ADR-0011 besluit 5). Dat is een inhoudelijke keuze en is daarom niet veranderd; aanbeveling A-1 in PEIL_REVIEW.md."
+ ],
+ [
+  "appstore-en-fork",
+  "Opdracht 'repareer alleen uiterlijk, teksten en toegankelijkheid' tegenover een blokkerende functionele fout: Referrer-Policy no-referrer maakte elke echte formulier-POST 403. Gekozen: toch gerepareerd, omdat het formulier anders onbruikbaar is en het om één header gaat (same-origin). De Origin-controle is niet versoepeld. Vastgelegd in ADR-0011 §3."
+ ],
+ [
+  "appstore-en-fork",
+  "ONTWERPTAAL §13.2 en het sjabloon zeggen niets over Referrer-Policy of de Origin-controle bij de formulier-POST. De diensten verschillen: appstore was streng met no-referrer (kapot), home-control-hub en zoeken-en-persoonlijke-ai accepteren Origin null, en de executor in ai-server-manager eist Origin = eigen adres met no-referrer. Dat laatste lijkt hetzelfde probleem; alleen gelezen, niet getest. Voorstel: in het sjabloon vastleggen dat de policy same-origin is en Origin: null wordt geweigerd."
+ ],
+ [
+  "appstore-en-fork",
+  "Peil §4.1 regel 1 (groen nooit voor 'beschikbaar') tegenover het sjabloon: rijen in het dienstblok kunnen alleen een gezondheidstoon hebben, er is geen neutrale pil met icoon voor feiten. Gekozen: met tekst opgelost ('Catalogusgegevens — Gelezen uit de eigen database: …')."
+ ],
+ [
+  "appstore-en-fork",
+  "COMPONENTEN §4 koppelt 'Niet gekoppeld' aan link-2-off, maar ELK:checks in het sjabloon gebruikt altijd #i-<toon> (circle-help). Gekozen: het sjabloon niet lokaal gewijzigd en gemeld."
+ ],
+ [
+  "appstore-en-fork",
+  "Peil §5 vraagt paden en codes in mono met <wbr>, maar {{melding_tekst}} is platte tekst zonder overflow-wrap. Een lange naam stak op 320 px buiten de melding. Gekozen: geen paden of variabelenamen in meldingstekst; voorstel aan de eigenaar voor een mono-plek in meldingen."
+ ],
+ [
+  "appstore-en-fork",
+  "Het sjabloon kent geen koppeltoestand voor een onleesbaar hub-link.json, waardoor het blok 'Koppeling met de Hub' leeg blijft. Eerder ook al gemeld in ADR-0009 §9; nu als bevinding #9 in de review."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-01: het sjabloon gebruikt native browservalidatie (type=url, required). Die gaat vóór de NL-veldfout en blokkeert '192.168.1.10:30400' met een browsermelding ('Please enter a URL.' / 'Voer een URL in.') zonder vormhint; 'nas.local:30400' gaat wél door en krijgt de NL-fout. Voorstel: novalidate op alle statuspaginaformulieren (de diensten valideren al server-side)."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-02: een controlerij kan alleen het icoon van zijn toon tonen. Daardoor kunnen Niet gekoppeld (link-2-off), Nog niet beschikbaar (hourglass) en beleid (ban) niet met hun eigen Peil-icoon. Voorstel: tonen nog-niet en beleid, of een optionele plek {{icoon}} uit een vaste lijst."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-03: de melding heeft altijd role=\"alert\", ook bij een blijvende toestand die bij het laden al bestaat. COMPONENTEN §13 zegt: geen alert bij laden. Voorstel: een plek voor de rol."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-04 (al gemeld in ADR-0013): de code verschijnt alleen samen met een trace-ID. Voorstel: melding_code los van trace_id."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-05: .spring wordt verborgen met top:-4rem, waardoor een skiplinktekst die omloopt onder de bovenrand uitsteekt. Voorstel: verbergen met translateY(-100%) of clip-path tot :focus."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-06: het Peil-prototype statuspagina.html toont zelf 'Niet gekoppeld' met twee iconen op één pagina (circle-help in de controles, link-2-off in het koppelblok). Gekozen: vaste statuswoorden in de controles (ADR-0017). Prototype en COMPONENTEN §25 zouden mee moeten."
+ ],
+ [
+  "jelly-leon-platform",
+  "S-07 (al gemeld): bouw/sjabloon.mjs vervangt {{x}} twee keer."
+ ],
+ [
+  "jelly-leon-platform",
+  "Gekozen bij een tegenstrijdigheid: 'Nog niet beschikbaar' houdt het vaste woord uit §11.1, maar krijgt tot S-02 het slot van de gate-toon in plaats van hourglass."
+ ],
+ [
+  "ai-server-manager",
+  "§7 kent geen vaste vorm voor crash en herstel. De Hub leest het laatste segment van event_type (failed/crashed/… tegenover succeeded/recovered/…) en app.health.changed met payload.status. Voorstel 1.3: vaste werkwoorden en een stabiele entity (de taak, niet de run), zodat probleem en herstel dezelfde vingerafdruk krijgen."
+ ],
+ [
+  "ai-server-manager",
+  "§7 kent geen ernst in de payload; de Hub gebruikt payload.ernst of payload.severity als hint. Voorstel: een optioneel veld."
+ ],
+ [
+  "ai-server-manager",
+  "POST /api/v1/logs (log-sink voor diensten, service-token) staat niet in het contract en is een optionele Hub-uitbreiding zoals de heartbeat (ADR-0021). Idempotency-Key past niet (logregels zijn geen beheerhandeling). Voorstel 1.3: opnemen, met de grenzen 2000 tekens, 4 KiB, 200 regels en 1000 per minuut."
+ ],
+ [
+  "ai-server-manager",
+  "sso.access.revoked van home-control-hub noemt alleen de Authentik-gebruikersnaam (entity.id). De Hub koppelt daarom op preferred_username en trekt alleen sessies in, nooit rechten erbij. Voorstel: ook de OIDC-sub meesturen."
+ ],
+ [
+  "ai-server-manager",
+  "§4.1 zegt niet wie de groep→rol-koppeling voor de Hub beheert. Gekozen: de Hub (beheerder, met audit); home-control-hub levert alleen advies."
+ ],
+ [
+  "ai-server-manager",
+  "§4.1 noemt geen duur voor SSO-sessies. Gekozen: 15–720 min (standaard 8 uur), nooit langer dan de lokale sessieduur, met dezelfde inactiviteitsgrens."
+ ],
+ [
+  "ai-server-manager",
+  "D17 vraagt HTTPS, maar zonder TLS-route (B10/B13) kan de Hub-redirect nog http zijn. Gekozen: de issuer altijd https; redirect_uri mag http (de code is beschermd door PKCE en het browsercookie), met een waarschuwing in de status."
+ ],
+ [
+  "ai-server-manager",
+  "B09-006 vraagt 'typed runbook templates in policy engine', maar de policy-engine komt pas in P2. Gekozen: een getypeerde, read-only catalogus in het Hub-pakket met runbook_hash; P2 verwijst ernaar."
+ ],
+ [
+  "ai-server-manager",
+  "§5 Idempotency-uitzonderingen: het starten van een OIDC-(test)login en de callback zijn inloggen-achtig en daarom uitgezonderd (zoals login, ADR-0006). Graag toevoegen aan de lijst in §5."
+ ],
+ [
+  "ai-server-manager",
+  "Contract §7 laat een dienst event_types van de Hub zelf versturen (bv. auth.break_glass.used). De Hub past zijn eigen regels alleen toe op zijn eigen outbox; via de inbox geldt de algemene regel. Voorstel: domeinen per eigenaar vastleggen."
+ ],
+ [
+  "home-control-hub",
+  "§3.5 zegt niet wat een dienst met een onleesbaar hub-link.json moet doen. Gekozen is de veiligste lezing: onbekend telt als 'al eens gekoppeld' (geen formulier, niets vertrouwd), ook nadat het bestand bij een schrijfactie vervangen is. Het origineel blijft bewaard en het veld unreadable_replaced_at is een aanvulling op het schema. Herstel gaat alleen via een nieuw env-token. Voorstel: in §3.5 vastleggen, met de code koppelstatus_onleesbaar (ADR-0013 besluit 1)."
+ ],
+ [
+  "home-control-hub",
+  "§4.2/§4.3 schrijven aud:\"<app_id>\" voor, maar zeggen niet expliciet dat een lijst ongeldig is. Standaard-PyJWT accepteert een lijst-aud waarin de eigen app_id staat; zo'n JWT is dan bij meerdere diensten bruikbaar, terwijl elke dienst een eigen replaycache heeft. Gekozen: precies één string, anders invalid_token. Voorstel: dit voor alle diensten in het contract zetten."
+ ],
+ [
+  "home-control-hub",
+  "§3.2 zegt niet in welke vorm een IP-adres in HUB_URL of op de statuspagina mag staan. Verkorte, decimale en hexadecimale vormen omzeilden de loopback-, link-local- en 0.0.0.0-regels. Gekozen: alleen a.b.c.d (of IPv6 tussen []); een punt achteraan telt niet mee."
+ ],
+ [
+  "home-control-hub",
+  "ADR-0012/PEIL_REVIEW V-1 noemde /readyz, maar /readyz heeft geen controle op bronnen. Het ging om GET /connector/v1/health (controle bronnen), GET /integrations/v1/sources en de connector-items. Dat is nu opgelost met dezelfde grens van 15 minuten. Het contract noemt voor bronmetingen nog steeds geen TTL; gekozen is 15 minuten, gelijk aan inventory_ttl_seconds van de Hub."
+ ],
+ [
+  "appstore-en-fork",
+  "Contract §6 zegt niet hoe het totaal van /connector/v1/health uit de checks volgt. Gekozen (ADR-0012): het slechtste van healthy < unknown < degraded < down, zoals de Peil-totaalstatus (§4.3) en contract §1 ('onbekend nooit groen'). De Hub neemt het totaal over (judge_connector_health). Voorstel: dit vastleggen in het contract voor alle diensten."
+ ],
+ [
+  "appstore-en-fork",
+  "De Hub-appcatalogus pagineert met een offset over de laatste meting en zegt niet per pagina welke snapshot het is. De client eist daarom dat elke pagina dezelfde inventaris en hetzelfde totaal meldt, en dat het aantal gelezen apps gelijk is aan totaal. Voorstel aan ai-server-manager: een snapshot- of meting-ID in de cursor, of één consistente snapshot per cursor."
+ ],
+ [
+  "appstore-en-fork",
+  "Contract §3.7 noemt als restrisico dat iemand op het LAN de dienst vóór de eerste koppeling aan een eigen Hub kan koppelen. Via DNS-rebinding kan dat ook een website die een gebruiker op het LAN bezoekt, want Origin = Host. De dienst kent zijn eigen adres niet, dus een Host-allowlist kan pas met gegevens uit de wizard. Vastgelegd in ADR-0012 en niet gewijzigd."
+ ],
+ [
+  "appstore-en-fork",
+  "Peil §4.3 kent 'Niet beschikbaar' (capability_unavailable, telt als Onbekend), maar de statuspagina toont de importstatus niet. Zij kan dus 'Alles gezond' tonen terwijl B08-002 op elke echte installatie capability_unavailable geeft. Een extra rij is een UI-wijziging die eerst een ontwerpstap vraagt (contract §13); daarom alleen gemeld."
+ ],
+ [
+  "jelly-leon-platform",
+  "Acceptatie I08-08-03 ('elk endpoint krijgt juiste expected status + timeout') heeft geen eigenaar. Het contract zegt niet wie het monitorplan maakt (endpoint, verwachte status, time-out per app uit het dienstenregister). De Hub gebruikt de Socket.IO-beheer-API van Uptime Kuma niet. Gekozen: eerlijk NIET GEVALIDEERD, met de reden in EVIDENCE (ADR-0018). Voorstel: de Hub (B09) of de lifecycle (P2) maakt het plan; de gebruiker neemt het over in de Uptime Kuma-UI en bevestigt."
+ ],
+ [
+  "jelly-leon-platform",
+  "Contract §9 heeft geen veld voor een runtime-kenmerk van een upstream-image dat pas bij echt starten blijkt, zoals 'niet-schrijfbare /tmp als 568' bij de Beszel-agent of 'verse installatie heeft admin/admin' bij Gotify. Gekozen: vastleggen in BESZEL_MEETDEKKING.md en install/manifests/README.md, bewaakt door tools/upstream_rooktest.py. Sluit aan bij het eerdere voorstel voor een veld post_install_checks."
+ ],
+ [
+  "ai-server-manager",
+  "Ernst: de API (incidenten, Gotify) kent drie niveaus (info/waarschuwing/kritiek), Peil vijf woorden (Kritiek/Hoog/Middel/Laag/Info). Gekozen (OB-05): kritiek → Kritiek, waarschuwing → Middel, info → Info. Graag vastleggen in het contract, of de API uitbreiden."
+ ],
+ [
+  "ai-server-manager",
+  "De zekerheid van een hypothese is in de API een getal (0,3–0,9) per vaste regel. Peil verbiedt percentages zonder model. Gekozen (OB-04): een woord via drempels (≥ 0,85 Zeker, ≥ 0,6 Waarschijnlijk, anders Onzeker, leeg Ik weet het niet). Het getal staat alleen in 'Toon bewijs'."
+ ],
+ [
+  "ai-server-manager",
+  "Volgens contract §8 bepaalt de policy de risicoklasse. In P1 geeft 'Herstel voorstellen' alleen een risk_claim. Gekozen (OB-10): geen RisicoBadge maar de tekst 'risico bepaalt het beleid (P2)'; de claim wordt alleen als informatie getoond."
+ ],
+ [
+  "ai-server-manager",
+  "Contract §3.7 laat koppelcodes los van elkaar bestaan. Een nieuwe code maakt de vorige dus niet ongeldig, en de UI zegt dat. Er is geen route voor openstaande codes of tokens (zonder geheim), dus na herladen is een code niet meer te zien. Dat is veilig, maar een lijstroute zou het register eerlijker maken."
+ ],
+ [
+  "ai-server-manager",
+  "otpauth-issuer van het noodaccount: de backend gebruikt 'AI Server Manager'. Na besluit O-07 hoort dat 'TrueNAS Home Platform' te zijn."
+ ],
+ [
+  "ai-server-manager",
+  "De API levert alleen pool.gezond (ja/nee). Peil T-14a/§4.3 wil DEGRADED als Beperkt en FAULTED als Storing. Daarvoor is een poolstatusveld nodig."
+ ],
+ [
+  "ai-server-manager",
+  "GET /api/v1/apps sorteert op naam; Peil wil status eerst. Gekozen (OB-08): de UI haalt limit=200 op en sorteert zelf, met een melding bij meer dan 200 apps. Voorstel: een parameter sorteer=status."
+ ],
+ [
+  "ai-server-manager",
+  "Contract §11 staat alleen Excel-ID's toe in EVIDENCE.json. Daardoor kunnen H5, H6 en H12 er niet als eigen regel in. Gekozen: het bewijs staat in I23-23-08 en B01-006, met een standnotitie in CONTRACT_1.2_CONFORMITEIT.md. Voorstel: contractpunten (H/HC/AS) als ID toestaan."
+ ],
+ [
+  "ai-server-manager",
+  "De API gebruikt 401 voor een niet-aangemelde sessie én voor een inhoudelijk foute code (invalid_totp bij POST /auth/break-glass/confirm). De UI onderscheidt nu op code (alleen 'unauthorized' meldt af). Voorstel: 422/400 voor foute invoer binnen een geldige sessie."
+ ],
+ [
+  "ai-server-manager",
+  "Ernst: de API kent 3 niveaus, Peil 5 woorden. Gekozen (OB-05): kritiek → Kritiek, waarschuwing → Middel, info → Info. Graag vastleggen in het contract."
+ ],
+ [
+  "ai-server-manager",
+  "Zekerheid is in de API een getal (0,3–0,9). Peil verbiedt percentages zonder model. Gekozen (OB-04): drempels naar Zeker/Waarschijnlijk/Onzeker/Ik weet het niet; het getal staat alleen in 'Toon bewijs'."
+ ],
+ [
+  "ai-server-manager",
+  "GET /api/v1/incidents kan niet filteren per app. Appdetail zoekt nu met q=<appnaam>, wat bij benadering werkt. Voorstel: een filter onderwerp_id/app_id."
+ ],
+ [
+  "ai-server-manager",
+  "Er is geen lijst van openstaande koppelcodes en enrollment-tokens (zonder geheim). Na herladen is een code dus weg; dat is veilig, maar het register is daardoor onvolledig."
+ ],
+ [
+  "ai-server-manager",
+  "GET /api/v1/apps sorteert op naam. De UI haalt limit=200 op en sorteert zelf op status (OB-08). Voorstel: sorteer=status."
+ ],
+ [
+  "ai-server-manager",
+  "Het statuspagina-sjabloon gebruikt de veldnamen hub_adres en hub_vingerafdruk, terwijl de executor hub_url en vingerafdruk gebruikte. De executor accepteert nu beide; de andere diensten moeten hetzelfde doen."
+ ],
+ [
+  "ai-server-manager",
+  "Contract §13 vraagt een ontwerpreview op 360/390/768/1440 volgens WCAG 2.1 AA. De opdracht en ONTWERPTAAL §12 vragen 320–1440 en WCAG 2.2 AA. Gekozen: de strengste set (6 breedtes, axe met wcag22aa, focus niet bedekt). Voorstel: §13 gelijktrekken met ONTWERPTAAL §12."
+ ],
+ [
+  "ai-server-manager",
+  "De statuspagina's (§3.7/§3.9) leggen niet vast hoe CSRF bij een formulier zonder JavaScript werkt. De executor eist een exacte Origin, maar zet zelf Referrer-Policy no-referrer, waardoor de browser Origin: null stuurt. De vier andere diensten accepteren Origin: null en vertrouwen op het SameSite=Strict-cookie met de formuliertoken. Voorstel 1.3: dat laatste als regel opnemen, plus een browsertest op elk koppelformulier."
+ ],
+ [
+  "ai-server-manager",
+  "Contract §11 staat alleen Excel-ID's toe in EVIDENCE.json. De ontwerpreview heeft geen eigen ID, dus het bewijs staat bij I23-23-08 (UI) en B01-004 (grafieken). Voorstel: contractpunten of reviewstappen als ID toestaan."
+ ],
+ [
+  "ai-server-manager",
+  "Peil gebruikt het systeemfont, maar zegt niet met welk lettertype reflow getest moet worden. In CI (DejaVu Sans, breder dan Noto Sans) kwamen twee overlopen boven die lokaal niet optraden. Gekozen: de review draait in CI met het lettertype van de runner, en lokaal kan dat met PEIL_REVIEW_LETTER (ADR-0025)."
+ ],
+ [
+  "ai-server-manager",
+  "ONTWERPTAAL §6 eist 44 px voor elk bedienbaar element, behalve inline links in lopende tekst. De bestaande Playwright-helper controleerde alleen knoppen en navigatie, zodat losse links (22–24 px) erdoor glipten. Vastgelegd in COMPONENTEN §28 als recept .losse-link (C-63)."
+ ],
+ [
+  "ai-server-manager",
+  "§3.7/§3.9 (CSRF op statuspagina's): het contract eist een Origin-controle, maar zegt niets over de Referrer-Policy. Met no-referrer stuurt elke browser `Origin: null`. Andere diensten accepteren daarom `Origin: null`. Gekozen voor de executor (ADR-0026): `Referrer-Policy: same-origin` en een exacte Origin-controle (fail-closed). Voorstel 1.3: dat als regel voor alle statuspagina's, plus een verplichte browsertest op elk koppelformulier."
+ ],
+ [
+  "ai-server-manager",
+  "§5 Idempotency-uitzonderingen: in de code (en nu afgedwongen door de statische test `test_idempotency_routes.py`) zijn ook uitgezonderd: noodaccount instellen/roteren/bevestigen (ADR-0013), heartbeat (ADR-0021), POST /api/v1/logs (ADR-0022), het starten van een OIDC-testlogin (ADR-0023) en connector propose/apply/rollback zolang ze 501 geven. Graag zo in de lijst van §5 opnemen."
+ ],
+ [
+  "ai-server-manager",
+  "§4.1 noemt geen regel voor het terugkeerpad na (SSO-)inloggen. Gekozen: alleen zichtbare ASCII, begint met één '/', geen backslash of '://', hooguit 256 tekens (ADR-0026). Voorstel: als gemeenschappelijke regel vastleggen voor elke dienst met een eigen login."
+ ]
+]
