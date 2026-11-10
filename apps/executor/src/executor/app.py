@@ -176,7 +176,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        # same-origin, niet no-referrer: met no-referrer stuurt elke browser bij het POST-formulier `Origin: null`,
+        # waardoor de exacte Origin-controle van /koppelen koppelen altijd weigerde (review N-01). Met same-origin
+        # krijgt een POST van deze pagina de echte Origin; van een andere oorsprong blijft het `null` (→ 403).
+        response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault("Cache-Control", "no-store")
         response.headers.setdefault(
             "Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'"

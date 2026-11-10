@@ -44,6 +44,9 @@ css_pad="$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen | grep -o '/_
 expect "Peil-tokens in de CSS" "$(curl -fsS --noproxy '*' "http://127.0.0.1:30400${css_pad}")" '--healthy-ink'
 expect "noodlogin-pagina" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen/nood)" 'Noodlogin'
 expect "executor-statuspagina in Peil" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/)" 'Onderdeel van TrueNAS Home Platform'
+# ADR-0026 (N-01): same-origin, zodat de browser bij het koppelformulier de echte Origin stuurt (niet `null`).
+expect "executor-statuspagina Referrer-Policy" "$(curl -fsS --noproxy '*' -D - -o /dev/null http://127.0.0.1:30410/)" \
+  'referrer-policy: same-origin'
 expect "API-fout via web-poort (NL)" "$(curl -sS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/me)" '"code":"unauthorized"'
 expect "executor niet gekoppeld" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/readyz)" '"gekoppeld":false'
 expect "executor weigert Hub-JWT zonder koppeling (contract 1.2 §4.7)" \

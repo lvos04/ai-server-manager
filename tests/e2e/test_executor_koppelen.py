@@ -182,6 +182,10 @@ def test_formulier_beveiliging_en_throttle(admin: Any, hub: Served, executor: tu
     # Origin ontbreekt of is vreemd → 403 (geen verzoek naar de Hub)
     assert _submit(c, hub.url, "ABCD-EFGH-JKMN", fp, origin="http://aanvaller.test").status_code == 403
     assert c.post("/koppelen", data={"csrf": "x"}).status_code == 403
+    # `Origin: null` (andere oorsprong, sandbox of no-referrer) blijft geweigerd: nooit open bij twijfel.
+    assert _submit(c, hub.url, "ABCD-EFGH-JKMN", fp, origin="null").status_code == 403
+    # De pagina zelf zet same-origin, zodat een browser bij het eigen formulier de echte Origin meestuurt (N-01).
+    assert c.get("/").headers["referrer-policy"] == "same-origin"
     # Ongeldige invoer → 422 zonder Hub-aanroep; loopback zonder ontwikkelvlag is in productie verboden
     assert _submit(c, "http://192.0.2.5:30400/pad", "ABCD-EFGH-JKMN", fp).status_code == 422
     assert _submit(c, hub.url, "ABCD-EFGH", fp).status_code == 422
