@@ -1,9 +1,9 @@
-# ADR-0028 — Onafhankelijke review van contract 1.3: twaalf correcties en een gecorrigeerde conformiteitslijst
+# ADR-0028 — Onafhankelijke review van contract 1.3: dertien correcties en een gecorrigeerde conformiteitslijst
 
 Status: aangenomen · 2026-11-10 · ronde "contract 1.3", reviewstap · eigenaar contract: `ai-server-manager`
 Bouwt op: ADR-0027 (contract 1.3 vastgesteld), ADR-0016…0020 (B03), ADR-0011/0012 (contract 1.2).
 Resultaat: `docs/platform-v2/PLATFORM_CONTRACTEN.md` blijft `contracts 1.3` (nog nergens gekopieerd of gebouwd), met het
-blok "Correcties uit de onafhankelijke review" (RV1–RV12) in het wijzigingslog; `CONTRACT_1.3_CONFORMITEIT.md`
+blok "Correcties uit de onafhankelijke review" (RV1–RV13) in het wijzigingslog; `CONTRACT_1.3_CONFORMITEIT.md`
 gecorrigeerd en aangevuld (nu 121 punten).
 
 ## Context
@@ -73,10 +73,15 @@ Wat standhield (zelf nagelopen, niet overgenomen uit het rapport van de maker):
     niet aankomen. Vastgelegd wat alle vier diensten al doen: niet gekoppeld = niet pushen en geen pogingen tellen.
     (b) Het domein `media` had twee eigenaren (Jelly Leon en MediaGuard); de eigenaar is nu het paar
     (`source_app`, domein).
+13. **RV13 — MediaGuard-repo.** Het contract schreef de overstap naar een nieuwe publieke repo nog als toekomst. Gemeten
+    met de GitHub-API (alleen lezen, 2026-11-10): `lvos04/media-guard-ultimate` is publiek met één startcommit
+    ("publieke start (schone historie)", gelijk aan de lokale `3998bea`) en `media-guard-ultimate-archief` is privé;
+    alle 11 repos zijn dus publiek. Het GHCR-pakket `mediaguard-core` kon de review niet lezen (geen leesrecht op
+    pakketten): de koppeling aan de nieuwe repo en de zichtbaarheid blijven open (§1.2), en tot dan geen nieuwe release.
 
 **Conformiteitslijst:** C1.3-JLP-02 en C1.3-JLP-03 beschreven een stand die niet in de code staat (de teller per bron-IP
 en voor de dienst bestaat al; de code voor een onleesbaar bestand is `hub_link_onleesbaar`, niet `koppeling_onbekend`)
-en zijn gecorrigeerd. Aangevuld met de gevolgen van RV1–RV12 per repo, met regelnummers waar de code nu afwijkt (o.a.
+en zijn gecorrigeerd. Aangevuld met de gevolgen van RV1–RV13 per repo, met regelnummers waar de code nu afwijkt (o.a.
 `hub_adres[:500]`/`koppelcode[:64]` vóór de controle in home-control-hub, `http`/`https`-Origin in de executor),
 Δ-HUB-2 als repowerk van ai-server-manager (groep C12 ontbrak daar) en het nieuwe punt C1.3-MH-07 (de delta-matrix van
 my_house noemt nog "enrollment via `HUB_URL`").
@@ -105,7 +110,7 @@ stond (één met de niet-bestaande waarde "hardware/echte NAS"); die zijn rechtg
 
 - Geen enkele repo is gebroken: de correcties raken punten die nog niet gebouwd zijn (P3/P4) of leggen vast wat de
   referentie-implementatie (home-control-hub) al doet. Het werk staat per repo in de conformiteitslijst.
-- `test_contract_13.py` bewaakt het blok met de reviewcorrecties en de kernzinnen ervan.
+- `test_contract_13.py` bewaakt het blok met de reviewcorrecties (RV1–RV13) en de kernzinnen ervan.
 - ADR-0027 punt 12 ("tot dat gebouwd is, schrijft deze repo zulke regels nog niet") is hiermee ingehaald.
 - Niets hiervan is op een echte NAS, met echte accounts of op echte hardware gevalideerd; de codemetingen zijn gelezen
   (grep en bestandsinhoud), niet uitgevoerd in de andere repos.

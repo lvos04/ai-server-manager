@@ -158,11 +158,15 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 
 ## Contract 1.3 — onafhankelijke review (2026-11-10)
 
-- Blijft `contracts 1.3` (nog nergens gekopieerd); twaalf correcties RV1–RV12 in het wijzigingslog, motivering in
+- Blijft `contracts 1.3` (nog nergens gekopieerd); dertien correcties RV1–RV13 in het wijzigingslog, motivering in
   `docs/adr/ADR-0028-review-contract-1-3.md`. Belangrijkste: MediaGuard mag zijn bestaande Emby-koppeling houden
   (bibliotheek bijwerken na een vervanging) — de rest van het platform schrijft nooit in Emby; de HARDE EIS geldt ook
   voor upgrades met databasemigraties (10.11 → 12.x en later); geen kijkgedrag via de MediaGuard-adapter in de Hub;
   formulier-POST's van statuspagina's zijn met reden uitgezonderd van `Idempotency-Key`.
+- Gemeten met de GitHub-API (alleen lezen, 2026-11-10): de nieuwe `lvos04/media-guard-ultimate` is publiek met één
+  startcommit (schone historie) en `media-guard-ultimate-archief` is privé, dus alle 11 repos zijn publiek. Het
+  GHCR-pakket `mediaguard-core` kon niet gelezen worden (geen leesrecht op pakketten): koppeling en zichtbaarheid
+  blijven open (contract §1.2); tot dan geen nieuwe MediaGuard-release.
 - Conformiteitslijst gecorrigeerd en aangevuld (121 punten). Alles alleen gelezen en met tests gecontroleerd; niets op
   een echte NAS, met echte accounts of op echte hardware.
 

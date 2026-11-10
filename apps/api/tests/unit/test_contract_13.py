@@ -165,10 +165,10 @@ ADR_REVIEW = Path(__file__).resolve().parents[4] / "docs" / "adr" / "ADR-0028-re
 
 
 def test_reviewcorrecties_staan_in_het_wijzigingslog() -> None:
-    """De onafhankelijke review van 1.3 (ADR-0028) blijft `contracts 1.3`: RV1–RV12 staan in het 1.3-wijzigingslog."""
+    """De onafhankelijke review van 1.3 (ADR-0028) blijft `contracts 1.3`: RV1–RV13 staan in het 1.3-wijzigingslog."""
     log = _wijzigingslog()
     assert "### Correcties uit de onafhankelijke review (2026-11-10, blijft `contracts 1.3`; ADR-0028)" in log
-    for n in range(1, 13):
+    for n in range(1, 14):
         assert f"- RV{n}. " in log, f"RV{n} ontbreekt"
     assert ADR_REVIEW.is_file()
     assert "ADR-0028-review-contract-1-3.md" in _tekst(CONTRACT).split("## Wijzigingslog")[0]

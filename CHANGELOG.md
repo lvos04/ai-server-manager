@@ -5,15 +5,16 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
 ### Gerepareerd — onafhankelijke review van contract 1.3 (ADR-0028; blijft `contracts 1.3`)
-- Twaalf correcties RV1–RV12 in het wijzigingslog van het contract, telkens de veiligste lezing: de bestaande
+- Dertien correcties RV1–RV13 in het wijzigingslog van het contract, telkens de veiligste lezing: de bestaande
   Emby-koppeling van MediaGuard (bibliotheek bijwerken, afspeeltest) blijft, de rest van het platform schrijft nooit in
   Emby; de HARDE EIS geldt ook voor upgrades die de database van een mediaserver migreren (10.11 → 12.x); geen
   kijkgedrag via de MediaGuard-adapter in de Hub; een `service_id` voor de Jelly Leon-plugin (§4.3); `HUB_URL` bij
   my_house via de vertaling; onleesbaar koppelbestand vervangen vóór het verzoek; ook een POST op een al gekoppelde
   dienst telt als poging; geplakte sleutelsets tellen mee bij een sleutelrotatie; rol en `Idempotency-Key` na de
   authenticatie; formulier-POST's van statuspagina's met reden uitgezonderd van `Idempotency-Key`; types in de
-  log-sink; niet gekoppeld = niet pushen, en de eigenaar van een event is (`source_app`, domein).
-- Conformiteitslijst: C1.3-JLP-02/-03 gecorrigeerd (de gemeten stand klopte niet), de gevolgen van RV1–RV12 per repo
+  log-sink; niet gekoppeld = niet pushen, en de eigenaar van een event is (`source_app`, domein); de overstap van
+  MediaGuard naar de nieuwe publieke repo is gemeten uitgevoerd (GHCR-koppeling blijft open).
+- Conformiteitslijst: C1.3-JLP-02/-03 gecorrigeerd (de gemeten stand klopte niet), de gevolgen van RV1–RV13 per repo
   met regelnummers, Δ-HUB-2 als repowerk en het nieuwe punt C1.3-MH-07 (nu 121 punten).
 - `test_contract_13.py` bewaakt het reviewblok en de kernzin van elke correctie in de juiste paragraaf.
 - EVIDENCE volgens §11 van 1.3 (C1.3-ASM-15): `test_evidence_contract.py` kent `Intel-iGPU-getest (ontwikkelmachine)`

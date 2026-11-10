@@ -15,8 +15,8 @@ appstore-en-fork `fc682e5`, jelly-leon-platform `1d862f9`, zoeken-en-persoonlijk
 jelly-leon-clients `3da4548`. Wat daarna gecommit is, staat hier niet in.
 
 **Onafhankelijke review (2026-11-10, ADR-0028):** steekproef per repo opnieuw tegen de code gelegd. Gecorrigeerd:
-C1.3-JLP-02 en C1.3-JLP-03 (de gemeten stand klopte niet); aangevuld: de correcties RV1–RV12 van het contract (o.a.
-C1.3-ASM-04, -12, -18, -19, -21, C1.3-HCH-02, C1.3-ASF-03, C1.3-MGU-04, C1.3-MSO-04, C1.3-MH-02, C1.3-JL-05…07), het
+C1.3-JLP-02 en C1.3-JLP-03 (de gemeten stand klopte niet); aangevuld: de correcties RV1–RV13 van het contract (o.a.
+C1.3-ASM-04, -12, -18, -19, -21, C1.3-HCH-02, C1.3-ASF-03, C1.3-MGU-02, -04, C1.3-MSO-04, C1.3-MH-02, C1.3-JL-05…07), het
 ontbrekende repowerk Δ-HUB-2 bij ai-server-manager en het nieuwe punt C1.3-MH-07. jelly-leon is daarna verder gegaan
 (P4-0 op 12.4, `55fd3eeeb`); de punten van hoofdstuk 9 zijn daarop nagelopen en blijven gelden.
 
@@ -263,13 +263,13 @@ volgt, C1.3-ASM repowerk). De driftregel van de Peil-kopie (faalt nu bij elke ni
 ## 6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)
 
 **Conform (gemeten):** "Terug naar de Hub" uit de instelling `system.hub_url` (`apps/core/mediaguard/hub_url.py`, A36);
-GPL-3.0-`LICENSE`. Let op: de repo-overgang (nieuwe publieke repo) is een stap van de gebruiker en de orkestratie;
-punten hieronder gelden in de repo waar MediaGuard op dat moment wordt gebouwd.
+GPL-3.0-`LICENSE`; de repo-overgang zelf (nieuwe publieke repo met schone historie, archief privé; gemeten in de
+review, zie C1.3-MGU-02). De punten hieronder gelden in de nieuwe publieke repo.
 
 | ID | Wijziging | Contract | Bestanden | Moment |
 |---|---|---|---|---|
 | C1.3-MGU-01 | **Kopie 1.3** (nu nog 1.1) + nieuwe drifttest; EVIDENCE-test (ontbreekt) volgens §11 1.3. | kop, §11 (A35, A33) | `docs/platform-v2/PLATFORM_CONTRACTEN.md`, `docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md`, nieuwe test onder `apps/core/tests/` of `scripts/`, `docs/platform-v2/EVIDENCE.json` | NU |
-| C1.3-MGU-02 | **Repo-overgang:** huidige repo → `media-guard-ultimate-archief` (privé, ongewijzigd); nieuwe publieke `lvos04/media-guard-ultimate` met schone historie (GPL-3.0); GHCR-pakket `mediaguard-core` koppelen. Tot het pakket gekoppeld is: geen nieuwe release. | §1.1 besluit 3, §2.3 (A01) | repo, GHCR | na de Peil-ronde (stap van de gebruiker; open besluit GHCR) |
+| C1.3-MGU-02 | **Repo-overgang — repo gemeten uitgevoerd (review, GitHub-API 2026-11-10):** `lvos04/media-guard-ultimate` is een nieuwe publieke repo met één startcommit (schone historie, GPL-3.0) en `media-guard-ultimate-archief` is privé. Nog open: het GHCR-pakket `mediaguard-core` aan de nieuwe repo koppelen en de zichtbaarheid per pakket controleren (de review kon pakketten niet lezen). Tot het pakket gekoppeld is: geen nieuwe release | §1.1 besluit 3, §2.3 (A01) | repo, GHCR | na het GHCR-besluit (stap van de gebruiker; repo-deel gedaan) |
 | C1.3-MGU-03 | **HARDE EIS — upgradebewijs per release:** CI-gate die de vorige release start, een gevulde database maakt (fixture met voortgang), upgradet en controleert dat er niets verloren is; zonder groen bewijs geen release en geen update op de NAS. Geldt ook voor de eerste release uit de nieuwe repo. UI-rondes wijzigen geen datamodel. | §2.3 regel 7, §12 (A03) | `.github/workflows/` (release), nieuw upgradetestscript onder `scripts/`, migraties | NU (gate vóór de eerste release uit de nieuwe repo) |
 | C1.3-MGU-04 | **Meerdere mediaservers (Δ-MG-DUAL, Δ-MG-AUTH):** elke ingestelde server volgen; kijkpauze bij elke server; afspeeltest en NL-ondertitels per server; Emby `X-Emby-Token`, Jelly Leon 12.x `Authorization: MediaBrowser Token=…`; Emby-koppeling nooit onderbreken; de bestaande Emby-aanroepen (bibliotheek bijwerken `POST /Library/Media/Updated` en `/Library/Refresh`, afspeeltest, sessies; `mediaserver/clients.py`, `service.py`) blijven, zonder nieuwe schrijfroute naar Emby (§2.3 regel 3, RV1); `servers[]` **erbij** in `GET /api/v1/mediaserver/status`, bestaande velden blijven (eerste server). | §2.3 regel 2 (A03) | `apps/core/mediaguard/mediaserver/api.py`, `clients.py`, `service.py`, `subtitles.py`, instellingen, tests | P4-0 (exitcriterium) |
 | C1.3-MGU-05 | **Sleutelscopes (P3-02)** en gescopete routes voor de gereserveerde acties (eigenaar-connector met ondertekend `ExecutionRequest`); tot BG-05 geen van deze acties via de Hub of Jelly Leon. Rol `viewer` voor de sleutel van Jelly Leon (BG-04) bestaat al; `GET /api/v1/auth/me` geeft de rol. | §2.3 regels 2–3, §8 (A05, A28) | `apps/core/mediaguard/` (auth, sleutels), OpenAPI | P3 (scopes), na BG-05 (acties) |
