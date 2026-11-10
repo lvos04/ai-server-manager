@@ -2,16 +2,38 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
+import warnings
 from datetime import UTC, datetime
 from pathlib import Path
 
 from executor.statuspagina import executor_page, render, template
 
 BRON = Path(__file__).resolve().parents[3] / "design" / "ontwerptaal" / "statuspagina.html"
+# Pin (ONTWERPTAAL §14, Peil 1.1.1 E08): versie + sha256 van de kopie, gelijk aan de bron op commit 172ee87 (Peil 1.1.0).
+PIN_VERSIE = (1, 1, 0)
+PIN_SHA256 = "be766cc4bf6962772a8dfc77996da34040fa94698403a9625e33545fa9ee62c8"
 
 
-def test_sjabloon_is_exacte_kopie_van_de_ontwerptaal() -> None:
-    assert template() == BRON.read_text(encoding="utf-8"), "statuspagina.html wijkt af van design/ontwerptaal"
+def _versie(tekst: str) -> tuple[int, ...]:
+    m = re.search(r"Peil statuspagina-sjabloon (\d+)\.(\d+)\.(\d+)", tekst)
+    assert m, "sjabloon zonder Peil-versie in de kopcommentaar"
+    return tuple(int(x) for x in m.groups())
+
+
+def test_sjabloon_is_de_gepinde_kopie_van_de_ontwerptaal() -> None:
+    """Falen bij een met de hand gewijzigde kopie of bij dezelfde bronversie met andere inhoud; een nieuwere
+    bronversie in design/ontwerptaal is alleen een waarschuwing (overstappen = kopie + renderer + tests bijwerken)."""
+    kopie = template()
+    assert hashlib.sha256(kopie.encode("utf-8")).hexdigest() == PIN_SHA256, "statuspagina.html met de hand gewijzigd"
+    assert _versie(kopie) == PIN_VERSIE
+    bron = BRON.read_text(encoding="utf-8")
+    assert _versie(bron) >= PIN_VERSIE, "bron is ouder dan de gepinde kopie"
+    if _versie(bron) == PIN_VERSIE:
+        assert kopie == bron, "zelfde Peil-versie met andere inhoud in design/ontwerptaal"
+    else:
+        warnings.warn(f"Peil {_versie(bron)} staat in design/ontwerptaal; de executor pint {PIN_VERSIE}", stacklevel=1)
 
 
 def test_render_escapet_en_kent_als_niet_elk() -> None:
