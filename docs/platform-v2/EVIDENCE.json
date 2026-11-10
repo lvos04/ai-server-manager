@@ -428,5 +428,245 @@
     "opmerking": "EVIDENCE §11 van contract 1.3 in deze repo; rijen B01-001 en I23-23-08 consistent gemaakt. Het werkboek zelf is in deze stap niet opnieuw samengevoegd (dat gebeurt met de EVIDENCE van alle repos samen).",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ALG-01",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "apps/api/tests/unit/test_contract_pin.py (sha256 van PLATFORM_CONTRACTEN.md en CONTRACT_1.3_CONFORMITEIT.md gepind op bron-commit 02b119c); commit 200bc21, 113ff15; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "Bronrepo: geen kopie nodig; een nieuwe contracttekst vraagt een nieuwe pin en nieuwe kopieën via de orkestratie.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ALG-05",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "executor: gepinde sjabloonkopie Peil 1.1.1 (sha256 d352028f…, bron-commit 3e559e7) + renderer in één doorgang, apps/executor/tests/test_statuspagina.py (byte-gelijk met design/ontwerptaal/bouw/sjabloon.py); Hub: src/app/peil/ontwerptaal.css via scripts/peil-kopie.mjs, tests/unit/peil-tokens.test.ts; commits a8474af, commits 961e3ff, 7d84935, 0282f35; Playwright E2E (axe) en Peil-review: npx playwright test -c playwright.review.config.ts + node review/samenvat.mjs --streng: 57 schermen/toestanden, 676 metingen, harde bevindingen 0, axe-overtredingen 0; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "Echte schermlezer, telefoon en tv niet getest.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-01",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit 4541370; deploy/common/rechten.py, deploy/allinone/{supervisor,healthcheck}.py, deploy/executor/{entrypoint,healthcheck}.py; bash deploy/smoke.sh ai-server-manager:dev ai-server-manager-executor:dev (rooktest geslaagd: CapEff/CapPrm/CapAmb/CapBnd 0 en NoNewPrivs 1 voor elk proces, healthcheck --controle Uid 568 en CapBnd 0, executor als Custom User 568); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): gedrag van het standaard Custom App-formulier (ix-app clear_caps) alleen in Docker nagebootst.",
+    "opmerking": "Restrisico (§2.2): het korte venster vóór de wissel in het healthcheckproces.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-02",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit a1bd40e; apps/api/tests/integration/test_enrollment.py::test_enroll_antwoord_volgens_schema_1_3_en_eenmalig, ::test_base_url_nooit_reden_voor_weigering, ::test_herkoppelen_trekt_oude_tokens_pas_in_bij_eerste_gebruik_en_nieuw_vervalt_na_60_min, ::test_oude_installatie_roteert_zonder_het_wachtende_token_in_te_trekken, ::test_intrekken_en_herinschrijving; migratie 0011 (upgrade → base → upgrade, alembic check); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-03",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commits 8404343, a8474af; apps/api/tests/unit/test_keyset_fingerprint.py::test_testvector_1_3_twee_policy_sleutels_in_elke_volgorde; apps/executor/tests/test_hublink.py::test_testvectoren_contract_4_5 (HN69-2PHK-XV2D-X85W); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-04",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit a8474af, commits 961e3ff, 7d84935, 0282f35; apps/executor/tests (adresregels, DNS-resolutie, onleesbaar fail-closed, Host-beperking, JWT §4.7, jti per POST, execute na aanmelding); tests/e2e/test_executor_koppelen.py::test_herkomst_en_host_beperking_negatieve_gevallen, ::test_elke_post_telt_ook_bij_een_al_gekoppelde_executor, ::test_koppelen_bezig_onleesbaar_en_invoer_niet_afkappen; apps/web/e2e/90-afsluiting.spec.ts (echte formulier-POST in Chromium + Origin null, vreemde Origin, Sec-Fetch-Site same-site/cross-site, niet-toegestane Host, geen cookie); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): welk bron-IP en welke Host de executor achter de portpublicatie van TrueNAS ziet.",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-05",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit b02e263, commits 961e3ff, 7d84935, 0282f35; apps/api/tests/integration/test_breakglass.py::test_cgnat_standaard_niet_prive_en_alleen_beheerder_kan_het_toestaan; apps/api/tests/unit/test_contract_1_2.py::test_prive_bereiken, ::test_cgnat_alleen_als_een_beheerder_het_toestaat; apps/web/e2e/01-p1-opzet.spec.ts (noodaccount: CGNAT-instelling en zelftest); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): of de Hub achter de Docker-portpublicatie het echte client-IP ziet.",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-06",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit b02e263, commits 961e3ff, 7d84935, 0282f35; apps/api/tests/integration/test_breakglass.py (invalid_totp 422, sessie blijft geldig; fout eigen wachtwoord 422), apps/api/tests/integration/test_auth.py::test_wachtwoord_wijzigen_heeft_rate_limit_op_het_huidige_wachtwoord; apps/web/tests/unit/api.test.ts (422 meldt nooit af); apps/web/e2e/01-p1-opzet.spec.ts (foute code → veldfout); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-07",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 0899cd6, commits 961e3ff, 7d84935, 0282f35; apps/api/tests/integration/test_route_authz.py::test_vaste_scopes_per_dienst, ::test_rol_onder_minimum_krijgt_403_en_dienst_versus_gebruiker; apps/api/tests/integration/test_events_decisions.py::test_connectorcontract_van_de_hub; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "Route catalogusbeschikbaarheid (catalogus.lezen) volgt in P2.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-08",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 0899cd6; tests/e2e/test_catalogus.py::test_catalogus_ontdekt_bestaande_apps_zonder_mutatie (snapshot_id + totaal op elke pagina, 409 snapshot_changed na een nieuwe meting of ander filter, sorteren op status); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-09",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 8232e58, commits 961e3ff, 7d84935, 0282f35; apps/api/tests/unit/test_incident_regels.py (domeinen per eigenaar, vaste werkwoorden, service.*, vijf ernstwoorden); tests/e2e/test_incidenten.py::test_herstel_sluit_alleen_het_eigen_incident, ::test_ernst_bronwaarde_en_vaste_afbeelding; apps/web/tests/unit/status-nav.test.ts (bronwaarde in de UI); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "payload.severity en de oude service.*-namen gelden nog deze release als overgang.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-10",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (account)",
+    "bewijs": "commit 8232e58; tests/e2e/test_oidc_sso.py::test_sso_access_koppelt_op_issuer_en_sub, ::test_uitloggen_en_intrekken_werken_direct; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "NIET GEVALIDEERD (account): de OIDC-sub van een echte Authentik (sub_mode) is niet gemeten.",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-11",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 0899cd6; apps/api/tests/unit/test_bronnen.py::test_connector_health_beoordeling; tests/e2e/test_monitoring_bronnen.py::test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded; apps/api/tests/integration/test_events_decisions.py::test_connectorcontract_van_de_hub (database, worker, jobs, eigen_backup; totaal = slechtste); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "Oude jobs-checknamen (job, queue, wachtrij, taken) gelden nog deze release.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-12",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 0899cd6; apps/api/tests/unit/test_bronnen.py::test_max_age_van_de_bron_nooit_soepeler; tests/e2e/test_wizard_inventory.py::test_nas_offline_maakt_inventaris_verouderd_en_unknown (meting_verouderd); tests/e2e/test_monitoring_bronnen.py (meting_verouderd); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-13",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commit 8232e58; tests/e2e/test_logs_correlatie.py::test_grenzen_rate_limit_en_retentie (opslag 2000 tekens gemarkeerd, velden > 4 KiB ingekort, 8001 tekens → 422, trace_id geen UUID → 422); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-14",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commit a8474af; apps/api/tests/unit/test_idempotency_routes.py::test_elke_uitzondering_noemt_contract_1_3; apps/executor/tests/test_mutaties.py::test_elke_mutatie_vraagt_idempotency_key_na_de_authenticatie; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-16",
+    "status": "Bezig",
+    "validatie": "Sim-getest",
+    "bewijs": "commits 961e3ff, 7d84935, 0282f35; tests/e2e/test_executor_koppelen.py::test_hub_leest_de_koppelstatus_bij_de_dienst_ook_onleesbaar; apps/web/e2e/01-p1-opzet.spec.ts (scopes en koppelstatus per dienst); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "Catalogus 'adopted' als 'Geïmporteerd': de Hub-UI toont de appstore-status van een app nog niet; volgt met de adoptie-import (C1.3-ASM-21/ASF).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-17",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commit 4541370; deploy/manifest/*.manifest.yaml gevalideerd met de validator van appstore-en-fork op commit 4e4e305 (geldig; --strict alleen digest_pending_release); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "Wacht op C1.3-ASF-08: de gecommitte validator weigert healthcheck.monitor en accepted_findings als onbekend veld.",
+    "opmerking": "Kop 'platformcontract 1.3' en geen HUB_* zijn gedaan.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-23",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commit 200bc21, 113ff15; docs/platform-v2/OVERDRACHT/workflows/p0.js en p1.js (commonFor(repo): KWALITEIT_FORK voor jelly-leon-web en jelly-leon-clients; LEES EERST noemt contract 1.3 en de conformiteitslijst; syntax en tekst per repo met node nagerekend); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "blokkade": "",
+    "opmerking": "",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-18",
+    "status": "Niet gestart",
+    "validatie": "Niet getest",
+    "bewijs": "",
+    "blokkade": "",
+    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P2; niet in deze ronde.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-19",
+    "status": "Niet gestart",
+    "validatie": "Niet getest",
+    "bewijs": "",
+    "blokkade": "",
+    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P2; niet in deze ronde.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-20",
+    "status": "Niet gestart",
+    "validatie": "Niet getest",
+    "bewijs": "",
+    "blokkade": "",
+    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P2; niet in deze ronde.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-21",
+    "status": "Niet gestart",
+    "validatie": "Niet getest",
+    "bewijs": "",
+    "blokkade": "",
+    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P3/P4-0/P4; niet in deze ronde.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
+    "id": "C1.3-ASM-22",
+    "status": "Niet gestart",
+    "validatie": "Niet getest",
+    "bewijs": "",
+    "blokkade": "",
+    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P5 (na BG-06/BG-18); niet in deze ronde.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
   }
 ]
