@@ -10,18 +10,18 @@
     },
     {
       "id": "P1",
-      "status": "Niet gestart",
-      "validatie": "",
-      "bewijs": "",
-      "blokkade": "",
-      "bijgewerkt": "2026-11-09"
+      "status": "Bezig",
+      "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+      "bewijs": "P1 gebouwd en onafhankelijk gereviewd (2026-11-09/10): Hub catalogus/monitoring/incidenten/SSO + Hub-UI in Peil (ai-server-manager), B13-002…005 + contract 1.2 (home-control-hub), B08-002 + APP-01…20 (appstore-en-fork), manifests I07/I08/I09/I13/I23 + simulators (jelly-leon-platform); CI groen in alle repos; zie EVIDENCE.json per repo",
+      "blokkade": "P1-gate vraagt echte NAS, echte Authentik/Uptime Kuma/Beszel/Gotify en D17 (HTTPS); D01–D18 nog niet ingevuld",
+      "bijgewerkt": "2026-11-10"
     }
   ],
   "releases": [
     {
       "project": "MediaGuard Ultimate",
       "gecontroleerde_stand": "1.2.2 (tag v1.2.2 → 30f7415 = de710c7 + 2 CI-commits)",
-      "bewijsstatus": "GitHub-release; GHCR-digests gemeten (core-aio sha256:14e540ba…52dc6); versie op NAS onbekend",
+      "bewijsstatus": "GitHub-release; GHCR-digests gemeten (core-aio sha256:14e540ba…52dc6); versie op NAS onbekend; repo sinds 2026-11-10 publiek met schone historie (lvos04/media-guard-ultimate, commit 3998bea); oude historie privé in media-guard-ultimate-archief",
       "peildatum": "2026-11-09",
       "commit": "30f7415"
     },
