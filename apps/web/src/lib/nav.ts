@@ -135,9 +135,12 @@ export const PLANNED: Record<string, PlannedScreen> = {
   },
 };
 
-/** Alleen interne paden als terugsprong na inloggen (geen open redirect). */
+/**
+ * Alleen interne paden als terugsprong na inloggen (geen open redirect). Alleen zichtbare ASCII zonder spatie: een
+ * browser haalt tab/CR/LF uit een URL, waardoor "/<tab>/evil.lan" anders "//evil.lan" (een ander domein) zou worden.
+ */
 export function safeReturnPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/";
+  if (!raw || raw.length > 256 || !/^\/(?![/\\])[!-~]*$/.test(raw) || raw.includes("\\") || raw.includes("://")) return "/";
   if (raw.startsWith("/inloggen") || raw.startsWith("/eerste-start")) return "/";
   return raw;
 }

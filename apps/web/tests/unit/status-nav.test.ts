@@ -70,6 +70,14 @@ describe("navigatie exact volgens 08_UI", () => {
     expect(safeReturnPath("//kwaadaardig.example")).toBe("/");
     expect(safeReturnPath("/\\kwaadaardig")).toBe("/");
     expect(safeReturnPath("/inloggen?terug=/x")).toBe("/");
+    // Tab/CR/LF verdwijnen in de browser uit een URL: "/\t/evil" zou "//evil" (ander domein) worden.
+    expect(safeReturnPath("/\t/kwaadaardig.example")).toBe("/");
+    expect(safeReturnPath("/\n/kwaadaardig.example")).toBe("/");
+    expect(safeReturnPath("/\r/kwaadaardig.example")).toBe("/");
+    expect(safeReturnPath("/ /kwaadaardig.example")).toBe("/");
+    expect(safeReturnPath("/x/https://kwaadaardig.example")).toBe("/");
+    expect(safeReturnPath("/" + "a".repeat(300))).toBe("/");
+    expect(safeReturnPath("/apps/3?tab=logs")).toBe("/apps/3?tab=logs");
   });
 });
 

@@ -30,7 +30,23 @@ def test_groep_naar_rol() -> None:
 
 @pytest.mark.parametrize(
     ("raw", "want"),
-    [("/apps", "/apps"), ("//evil.lan/x", "/"), ("https://evil.lan", "/"), ("apps", "/"), ("/a\\b", "/"), (None, "/")],
+    [
+        ("/apps", "/apps"),
+        ("/apps/3?tab=logs#a", "/apps/3?tab=logs#a"),
+        ("//evil.lan/x", "/"),
+        ("https://evil.lan", "/"),
+        ("apps", "/"),
+        ("/a\\b", "/"),
+        (None, "/"),
+        # Browsers verwijderen tab/CR/LF uit een URL: "/<tab>/evil.lan" wordt "//evil.lan" (ander domein).
+        ("/\t/evil.lan", "/"),
+        ("/\n/evil.lan", "/"),
+        ("/\r/evil.lan", "/"),
+        ("/ /evil.lan", "/"),
+        ("/\x00", "/"),
+        ("/caf\u00e9", "/"),
+        ("/" + "a" * 300, "/"),
+    ],
 )
 def test_terugkeerpad_alleen_eigen_pad(raw: str | None, want: str) -> None:
     assert safe_return(raw) == want

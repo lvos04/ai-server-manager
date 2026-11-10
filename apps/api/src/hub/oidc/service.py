@@ -87,9 +87,15 @@ def map_role(groups: list[str], mappings: list[dict[str, Any]]) -> Role | None:
     return max(roles, key=lambda r: ROLE_RANK[r])
 
 
+# Alleen zichtbare ASCII zonder spatie en zonder backslash: een browser haalt tab/CR/LF uit een URL, waardoor
+# "/<tab>/evil.lan" in de meta-refresh na het aanmelden "//evil.lan" (een ander domein) zou worden.
+_SAFE_PATH = re.compile(r"/(?![/\\])[!-~]*")
+
+
 def safe_return(path: str | None) -> str:
+    """Terugkeerpad na SSO: alleen een pad binnen de Hub, anders ``/`` (geen open redirect)."""
     p = (path or "/").strip()
-    if not p.startswith("/") or p.startswith("//") or "\\" in p or "://" in p or len(p) > 256:
+    if len(p) > 256 or "\\" in p or "://" in p or not _SAFE_PATH.fullmatch(p):
         return "/"
     return p
 
