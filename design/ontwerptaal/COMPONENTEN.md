@@ -1,6 +1,6 @@
 # Peil — componentspecificaties (handoff)
 
-Versie 1.1.0 (na ontwerpreview, `../REVIEW.md`) · 9 november 2026 · hoort bij [ONTWERPTAAL.md](../../docs/platform-v2/ONTWERPTAAL.md). Gemaakt met `design:design-handoff` en
+Versie 1.1.1 (verbeterpunten uit de ontwerpreviews, §29; 1.1.0 na de ontwerpreview, `REVIEW.md`) · 10 november 2026 · hoort bij [ONTWERPTAAL.md](../../docs/platform-v2/ONTWERPTAAL.md). Gemaakt met `design:design-handoff` en
 `design:design-system`. Elk component noemt de **tokens** (geen losse waarden), **props**, **varianten**, **toestanden**,
 **responsief gedrag**, **randgevallen**, **beweging** en **toegankelijkheid**. De HTML-referentie staat in
 `prototypes/` (genoemd per component); de klasserecepten in `bouw/componenten.css` zijn de bron voor de cva-varianten.
@@ -66,7 +66,7 @@ alleen grijs, nooit `disabled` zonder reden — `disabled` haalt het element uit
 | Zijbalk (lg+) | `w-sidebar` (256), `bg-sidebar`, rand rechts `border`; logo 40 px; **exact 9 items** Home · Server · Media · Huis · Netwerk · Automatisering · Backups · Kosten · Instellingen; item `min-h-touch px-3 rounded-lg`, icoon 20 `text-muted-foreground`; actief: `bg-accent font-bold` + inset-balk 4 px `--primary` + `aria-current="page"`; ouder van een subpagina (Server boven Apps) `font-semibold` zonder `aria-current`; subnavigatie ingesprongen met 2 px lijn; voet: versie + validatiestatus |
 | Kopbalk | `sticky top-0 z-nav h-16 bg-card border-b`; ≥ 1280: Zoeken (knop, Ctrl K, `aria-keyshortcuts`) · Live-indicator · **Problemen** (inktteller) · **Goedkeuringen** (violette teller) · **AI** · gebruikersmenu (account, thema, uitloggen); 1024–1279: zoekknop als icoon, live-regel onder de kop; < 1024: logo · zoeken · gebruikersmenu + live-regel |
 | Live-indicator | neutraal `radio` + "Live · 11:56"; onderbroken/offline = stippelpil `unknown`; **één** `role="status"` per pagina (de zichtbare) |
-| Ondernavigatie (< lg) | `sticky bottom-0 z-nav h-16 + safe area`; 5 items Home · Apps · Problemen · AI · Meer; icoon 24 + label 14; actief = inset-balk 3 px boven + vet + `aria-current`; tellers `aria-hidden` met sr-only ", 3 open" (op Problemen) / ", 1 goedkeuring wacht" (op **Meer**, niet op AI; Meer-sheet begint met Goedkeuringen; op de goedkeuringspagina is Meer `aria-current`) — review 1.1.0 |
+| Ondernavigatie (< lg) | `sticky bottom-0 z-nav h-16 + safe area`; 5 items Home · Apps · Problemen · AI · Meer; icoon 24 + label 14; items op labelbreedte (`flex-auto min-w-touch`, geen vaste kolommen); actief = inset-balk 3 px boven + inkt + `aria-current`, **zonder extra gewicht** (1.1.1, E16; forced colors: onderstreping in `Highlight`); tellers `aria-hidden` met sr-only ", 3 open" (op Problemen) / ", 1 goedkeuring wacht" (op **Meer**, niet op AI; Meer-sheet begint met Goedkeuringen; op de goedkeuringspagina is Meer `aria-current`) — review 1.1.0 |
 | Meer-sheet | Sheet van onder (mobiel) met Server, Media, Huis, Netwerk, Automatisering, Backups, Kosten, Instellingen, Zoeken, Onboarding; focusval, Esc sluit, focus terug naar "Meer" |
 | Kindschil | eigen kop (logo "Thuis" + gebruikersmenu) en ondernavigatie **Home · Kijken · Zoeken · Ik**; geen zijbalk, geen tellers, geen beheer |
 | Inhoud | `main#inhoud tabindex=-1`, `max-w-content px-4 sm:px-6 lg:px-8 pt-6 pb-10`; bij routewissel focus naar de h1 en `document.title` = "<pagina> — Hub" |
@@ -109,8 +109,9 @@ StatusBadge {
 | unlinked | Niet gekoppeld | `link-2-off` | als unknown |
 | not_yet | Nog niet beschikbaar | `hourglass` | `bg-muted border-2 border-border-strong text-foreground` |
 
-Maat: `min-h-8 px-2.5 rounded-full text-sm font-semibold gap-1.5`, icoon 18 px; `w-fit max-w-full`; tekst mag omlopen
-(nooit `whitespace-nowrap`: overloop op 320 px). **Plaats:** vast — direct onder de kaarttitel of aan het rij-einde,
+Maat: `min-h-8 px-2.5 rounded-2xl text-sm font-semibold gap-1.5` (groot: `rounded-[1.25rem]`), icoon 18 px; `w-fit
+max-w-full`; tekst mag omlopen (nooit `whitespace-nowrap`: overloop op 320 px). Radius = halve hoogte van één regel
+(1.1.1): op één regel volledig rond, een omlopende pil wordt niet afgesneden (was `rounded-full`). **Plaats:** vast — direct onder de kaarttitel of aan het rij-einde,
 nooit midden in een zin. **Bij Onbekend staat de reden altijd zichtbaar ernaast** (ook op 360 px; nooit `hidden`,
 nooit afgekapt). `data-status="<status>"` (forced colors). **Niet doen:** groen voor "Actueel/Live/Klaar"; een badge
 zonder woord; een statuskleur voor iets dat geen gezondheid is.
@@ -210,7 +211,7 @@ zonder woord; R1 violet.
 |---|---|---|---|
 | **ErnstLabel** (T-20) | `ernst: "kritiek"\|"hoog"\|"middel"\|"laag"\|"info"` | rechthoek, linkerbalk 6 px, `text-sm font-semibold`: Kritiek `bg-destructive text-destructive-foreground` balk `down-ink`; Hoog `bg-down-bg text-down-ink` balk `down`; Middel `bg-muted` balk `foreground`; Laag `bg-unknown-bg` balk `unknown`; Info `bg-info-bg` balk `info` | sr-only "Ernst: " |
 | **IncidentStatus** (T-20a) | `"open"\|"erkend"\|"uitgesteld"\|"opgelost"` + `tot?` | tekst + icoon (`circle-dot`, `eye`, `timer`, `check`), `text-sm font-semibold`, geen kleur | sr-only "Status: " |
-| **ZekerheidLabel** (T-24) | `"zeker"\|"waarschijnlijk"\|"onzeker"\|"weet_niet"` | ovaal `border-2 border-border-strong`, drie stippen 10 px (gevuld = `bg-foreground`), woord | sr-only "Zekerheid: " |
+| **ZekerheidLabel** (T-24) | `"zeker"\|"waarschijnlijk"\|"onzeker"\|"weet_niet"`; uit een getal (1.1.1, E11): ≥ 0,85 zeker · ≥ 0,6 waarschijnlijk · lager onzeker · geen getal weet_niet; het getal alleen onder "Toon bewijs" | ovaal `border-2 border-border-strong`, drie stippen 10 px (gevuld = `bg-foreground`), woord | sr-only "Zekerheid: " |
 | **ActorLabel** (C-26) | `"systeem"\|"gebruiker"\|"ai"\|"flow"\|"spraak"` + naam | `rounded-sm border border-border-strong px-1.5 text-sm font-semibold` + icoon (`server`/`user`/`bot`/`workflow`/`mic`) | tekst |
 
 ---
@@ -478,10 +479,10 @@ Maximaal één tabrij per pagina. Periodekiezer is **geen** tab maar een ToggleG
 | Component | Specificatie |
 |---|---|
 | **KamerKaart** | StatKaart-variant: titel (kamer) + StatusBadge onder de titel; raster 2 kolommen met Temperatuur / Luchtvochtigheid (label `text-sm font-semibold muted`, waarde `text-3xl`, kwaliteit); doelblok (border, p-3): "Doel" + domeinchip (Verwarmen `domain-heat-bg/-ink` + `flame`, Koelen `domain-cool-*` + `snowflake`) + stappers − / + (`knop-icoon`, `aria-label="Doel 0,5 graad hoger"`) rond een `output[aria-live]` ("21,0 °C") + readback-regel; verlichting als raster van tegels; Versheid |
-| **ApparaatBediening (readback)** | na een opdracht: `role=status` "Verstuurd — wacht op bevestiging van my_house" (`loader-circle`, statisch bij reduced motion) → "Bevestigd: 21 °C" of "**Niet bevestigd** — het apparaat reageerde niet. Er is niets gewijzigd."; nooit "klaar" zonder readback |
-| **LichtTegel** | `button[aria-pressed]` 44+ px: aan = `border-2 border-domain-light-on bg-domain-light-on-bg text-domain-light-on-ink` + `lightbulb` (in de inkt, niet in `domain-light-on`: 2,8:1 op het vlak) + "Aan · 80%"; uit = `border-border-strong` + `lightbulb-off` + "Uit"; onbereikbaar = gestippelde `unknown`-rand, volle tekst, "Onbekend — niet bereikbaar" (nooit opacity) |
+| **ApparaatBediening (readback)** | na een opdracht: `role=status` "Verzonden — wacht op bevestiging van my_house" (`loader-circle`, statisch bij reduced motion) → "Bevestigd: 21 °C" of "**Niet bevestigd** — het apparaat reageerde niet. Er is niets gewijzigd."; nooit "klaar" zonder readback |
+| **LichtTegel** | `button[aria-pressed]` 44+ px: aan = `border-2 border-domain-light-on-ink bg-domain-light-on-bg text-domain-light-on-ink` (rand in de inkt sinds 1.1.1; de domeinkleur haalt 2,8:1 op het vlak) + `lightbulb` (in de inkt, niet in `domain-light-on`: 2,8:1 op het vlak) + "Aan · 80%"; uit = `border-border-strong` + `lightbulb-off` + "Uit"; onbereikbaar = gestippelde `unknown`-rand, volle tekst, "Onbekend — niet bereikbaar" (nooit opacity) |
 | **Verouderde kamer** | kaartrand gestippeld, Onbekend + Verouderd, waardevak "Laatst bekend · 06:40", reden, knop "Doel aanpassen" `aria-disabled` + "Bediening uit: zonder verse meting stuurt de Hub niets aan." |
-| **KlimaatZone** | per zone: naam + modus-chip; modusknoppen (actief = **domeinstijl** van de modus: `border-2 border-domain-heat bg-domain-heat-bg text-domain-heat-ink` + `check`, `aria-pressed="true"`; niet primair-blauw, want blauw is ook "koelen" — review 1.1.0); **conflict** verwarmen/koelen = knop `aria-disabled` + `melding-gate` (slot) "Koelen geblokkeerd. De gedeelde buitenunit verwarmt al…"; **handmatig** = label `hand` "Handmatig uit" + "Blijft uit tot je hervat; de AI en automatisering slaan deze zone over." + knop Hervatten; adapter niet ondersteund = CapabilityUnavailable "Bediening niet ondersteund" (nooit schijnbediening) |
+| **KlimaatZone** | per zone: naam + modus-chip; modusknoppen (actief = **domeinstijl** van de modus: `border-2 border-domain-heat-ink bg-domain-heat-bg text-domain-heat-ink` + `check` — rand in de inkt sinds 1.1.1, §4.1 regel 11, `aria-pressed="true"`; niet primair-blauw, want blauw is ook "koelen" — review 1.1.0); **conflict** verwarmen/koelen = knop `aria-disabled` + `melding-gate` (slot) "Koelen geblokkeerd. De gedeelde buitenunit verwarmt al…"; **handmatig** = label `hand` "Handmatig uit" + "Blijft uit tot je hervat; de AI en automatisering slaan deze zone over." + knop Hervatten; adapter niet ondersteund = CapabilityUnavailable "Bediening niet ondersteund" (nooit schijnbediening) |
 | **BoilerKaart** | titel met `shower-head` in `domain-boiler`; label `ban` "Alleen meten"; Vermogen nu / Vandaag (gemeten); kosten "≈ € 1,02 · geschat (vast tarief)"; `melding-beleid` "Schakelen is altijd uitgeschakeld (beleid)…"; **geen schakelaar in de DOM** |
 | **Energieverdeling** | totaal (P1) + dunne segmentbalk + tabel (Boiler `chart-3` gemeten, Airco `chart-1` gemeten 1-fasemeter, Overig `chart-other` + arcering afgeleid) + uitleg meterreset/zomertijd; geen verbruik per binnenunit |
 
@@ -497,18 +498,21 @@ geblokkeerde titels of thumbnails in resultaten (EX36).
 
 ---
 
-## 25. Statuspagina-sjabloon (C-55) — `statuspagina.html`
+## 25. Statuspagina-sjabloon (C-55) — `statuspagina*.html`
 
-Zie ONTWERPTAAL §13.2 (koppelen volgens contract 1.2: velden Hub-adres + koppelcode + **Hub-vingerafdruk**, formulier
-alleen zolang nooit gekoppeld, geen ontkoppelcode; executor: schrijfsleutel ná het koppelen en ontkoppelen alleen met de
-geverifieerde schrijfsleutel). Klassen (uit `statuspagina.css`): `.wrap` (max 760 px), `.kop`, `.blok`, `.pil-gezond/
--beperkt/-storing/-onbekend/-gate/-neutraal` (neutraal = "Gekoppeld", `link-2`), `.knoppen`, `.totaal`, `.checks` (`.naam`, `.tijd`, `.reden`), `.feiten`, `.melding-fout/-info`,
-`.selecteer` (trace-ID), `.stappen`, `.veld` (+ `.hulp`, `.veldfout`, `input[aria-invalid]`), `.knop`,
-`.knop-secundair`, `.voet`, `.spring` (skiplink), `.sr`. Plekken en vaste waarden staan in de kopcommentaar van het
-sjabloon. Paginatitel per toestand ("Executor — niet gekoppeld (koppelen mislukt)"); skiplink naar het foute veld; de
-melding bovenaan met `role=alert` en een link naar het veld; `autocomplete=off` voor codes; schrijfsleutel
-`type=password` met uitleg; ingevoerde waarden worden na een fout **niet** teruggezet; geen geheimen, accountnamen of
-privé-aantallen.
+Zie ONTWERPTAAL §13.2 (contract 1.3 §3.5/§3.7/§3.9: velden Hub-adres + koppelcode + **Hub-vingerafdruk**, formulier
+alleen zolang nooit gekoppeld en het koppelbestand leesbaar, geen ontkoppelcode; executor: schrijfsleutel ná het
+koppelen en ontkoppelen alleen met de geverifieerde schrijfsleutel). Klassen (uit `statuspagina.css`): `.wrap` (max
+760 px), `.kop`, `.blok`, `.pil-<toon>` (gezond, beperkt, storing, onbekend, verouderd, niet-beschikbaar, nog-niet,
+niet-gekoppeld, gate, beleid, feit) en `.pil-neutraal` ("Gekoppeld", `link-2`), `.knoppen`, `.totaal`, `.checks` (`.naam`,
+`.sub` met tijd en reden), `.feiten`, `.uitleg`, `.melding-fout/-info`, `.selecteer` (trace-ID), `.stappen`, `.veld` (+
+`.hulp`, `.verplicht`, `.veldfout`, `input[aria-invalid]`), `.knop`, `.knop-secundair` (ook als `a`), `.voet`,
+`.spring` (skiplink), `.sr`. Plekken en vaste waarden staan in de kopcommentaar van het sjabloon en in §29. Paginatitel
+per toestand ("Executor — niet gekoppeld (koppelen mislukt)"); skiplink naar het foute veld; de melding van dít verzoek
+met `role=alert` en een link naar het veld; `autocomplete=off` voor codes; schrijfsleutel `type=password` met uitleg;
+ingevoerde waarden worden na een fout **niet** teruggezet; geen geheimen, accountnamen of privé-aantallen.
+"Niet gekoppeld", "Ontkoppeld" en "Ingetrokken" hebben overal `link-2-off` (1.1.1, E04): in de controles met de toon
+`niet-gekoppeld`, in het koppelblok met dezelfde pil — nooit `circle-help` voor die betekenis.
 
 ---
 
@@ -578,3 +582,66 @@ geen nieuwe tokens en Peil blijft 1.1.0. Het gaat om hoe een paar specificaties 
 | C-01 | **Gebruikersmenu** | Radix DropdownMenu **niet-modaal** (`modal={false}`). Een modaal menu zet `aria-hidden` op de pagina terwijl daar focusbare elementen blijven (axe `aria-hidden-focus`). Esc, Tab en klikken buiten het menu sluiten het. |
 | C-01 | **Kindschil** | Op elke breedte een ondernavigatie, dus ook vanaf 1024 `scroll-padding-bottom` = ondernavigatie + safe area + 12 px. Tabtitel van de kind-403: "Niet voor jou — TrueNAS Home Platform". |
 | C-05 | **StatKaart, vers** | Geen badge: alleen de waarde met "· gemeten" en de tijd (K3). Een badge verschijnt alleen bij een afwijking (Onbekend, Verouderd, Beperkt, Storing). |
+
+---
+
+## 29. Aanvulling Peil 1.1.1 (10 november 2026)
+
+Verbeterpunten uit de ontwerpreviews (groepen E01–E16 in `docs/platform-v2/CONTRACT_1.3_KANDIDATEN.md`; wijzigingslog in
+ONTWERPTAAL §16). **Geen nieuwe tokens**; wel nieuwe sjabloonplekken, klassen en regels. Gemaakt met
+`design:design-system` (extend), `design:design-handoff`, `design:ux-copy` en `design:accessibility-review`.
+
+### 29.1 Statuspagina-sjabloon — plekken voor de Python-renderers
+
+| Plek | Type | Waarden | Wanneer | Sinds |
+|---|---|---|---|---|
+| `toon` (per rij in `checks` en `dienst_blok`) | tekst | `gezond, beperkt, storing, onbekend, verouderd, niet-beschikbaar, nog-niet, niet-gekoppeld, gate, beleid, feit` | altijd; bepaalt pilklasse én symbool `#i-<toon>` | 1.1.1 (5 nieuw + `niet-gekoppeld`) |
+| `reden_code` (per rij) | tekst | vaste code in snake_case | alleen samen met `reden`; verschijnt als " (code `x`)" | 1.1.1 |
+| `koppelstatus_onleesbaar` | vlag | — | koppelbestand onleesbaar (contract 1.3 §3.5); nooit samen met `koppelformulier` | 1.1.1 |
+| `koppelen_bezig` | vlag | — | `pending ≠ null`; verbergt formulier en stappen, toont de stabiele toestand + "Koppelen bezig" | 1.1.1 |
+| `koppelen_bezig_sinds`, `koppelen_bezig_iso` | tekst | "11:54" / ISO-tijd | optioneel bij `koppelen_bezig` | 1.1.1 |
+| `melding_rol` | tekst | `alert` · `status` · leeg | `alert` = fout van dít verzoek; `status` = info na dít verzoek; leeg = toestand die bij het laden al bestond | 1.1.1 (was vast `alert`) |
+| `melding_code` | tekst | vaste code | ook zonder `trace_id` (blijvende toestand) | 1.1.1 (was alleen met trace-ID) |
+| `melding_pad` | tekst | pad of bestandsnaam | in mono op een eigen regel na de meldingstekst (tekst eindigt dan op ":") | 1.1.1 |
+| `bron` | tekst | korte zin | optioneel; vervangt "`/readyz` en `/healthz` van deze dienst" | 1.1.1 |
+| `gereed_uitleg` | tekst | korte zin | optioneel; vervangt de vaste uitleg Gereed ↔ `/readyz` | 1.1.1 |
+
+**Waar/onwaar** (alle blokken): `false`, `None`/`null`, lege tekst, 0 en een lege lijst zijn onwaar. **Eén doorgang**:
+lees het sjabloon in een boom en schrijf die uit; vul nooit na de blokken nog eens over de uitvoer in
+(`bouw/sjabloon.py` is de referentie, ± 60 regels zonder afhankelijkheden).
+
+**Toestanden en wat de dienst invult:**
+
+| Toestand | Koppelblok | Formulier | Melding | Totaal (`totaal_toon` · label) |
+|---|---|---|---|---|
+| nooit gekoppeld | `koppelformulier` | ja | — | onbekend · Niet gereed |
+| nooit gekoppeld + fout van dit verzoek | `koppelformulier` + `fout_<veld>` | ja | `fout`, rol `alert`, code + trace-ID, link naar het veld | onbekend · Niet gereed |
+| nooit gekoppeld + poging loopt | `koppelformulier` + `koppelen_bezig` | **nee** | — | onbekend · Niet gereed ("er loopt een koppelpoging") |
+| gekoppeld | `gekoppeld` (+ `koppelen_bezig` bij een nieuwe poging) | nee | info met rol `status` alleen direct na koppelen | slechtste (§13.2) |
+| ontkoppeld / ingetrokken | `ontkoppeld` / `ingetrokken` | nee | — | onbekend · Niet gereed |
+| koppelstatus onleesbaar | `koppelstatus_onleesbaar` | **nee** | `fout`, **geen rol**, `melding_code` `koppelstatus_onleesbaar`, `melding_pad`, geen trace-ID | storing · Niet gereed |
+
+### 29.2 Componentregels
+
+| ID | Component | Specificatie 1.1.1 |
+|---|---|---|
+| C-01 | **Ondernavigatie** | items `flex-auto min-w-touch` (breedte van het label, rest gelijk verdeeld); actief: inset-balk 3 px `--primary` + `text-foreground`, **geen extra gewicht**; labels breken nooit midden in een woord; forced colors: onderstreping 3 px `Highlight` (basislaag). Gemeten: op 320 px past elk label (Noto Sans en DejaVu Sans). |
+| C-01 | **Kindschil** | `data-schil="kind"` op de schil; geen zijbalkraster (de kindschil heeft geen zijbalk — in 1.1.0 stond alle inhoud ≥ 1024 px in een kolom van 256 px); scroll-padding van de ondernavigatie op elke breedte (basislaag). |
+| C-01 | **Kopbalk ≥ 1280** | zoekknop `w-48` (2xl `w-72`): met DejaVu Sans liep de kopbalk op 1440 px 22 px over bij de live-pil "Onderbroken". |
+| C-03 | **StatusBadge** | `rounded-2xl` (groot `rounded-[1.25rem]`): halve regelhoogte, omlopende pil wordt niet afgesneden. Offline/verouderd: laatst bekende `healthy`/`paused` → `stale`; `degraded`/`down` blijven met "· stand van <tijd>" (ONTWERPTAAL §4.4). |
+| C-29 | **ZekerheidLabel** | uit een getal: ≥ 0,85 zeker · ≥ 0,6 waarschijnlijk · lager onzeker · geen getal weet_niet; getal alleen onder "Toon bewijs". |
+| C-32 | **Grafieken** | kleine gemeten waarden met twee significante cijfers (nooit "0" voor iets dat niet 0 is); één kleurcodering per figuur (kleur volgt de entiteit, teken in richting en label). |
+| C-43/45 | **Gekozen domeinknop / LichtTegel aan** | `border-2 border-domain-*-ink` + `bg-domain-*-bg` + `text-domain-*-ink`; tegels in een raster `repeat(auto-fit, minmax(max(8.5rem, 50% - 0.25rem), 1fr))` (hooguit twee kolommen, één als een tegel te smal wordt; met DejaVu Sans stak "Plafondlamp" op 320 px 6 px buiten de tegel). |
+| C-66 | **Datum- en tijdveld** | de ring op `:focus-within` staat nu in de basislaag van `ontwerptaal.css` en in de MediaGuard/MSO-aliaslaag. |
+
+### 29.3 Toegankelijkheid (gecontroleerd, Sim-getest in Chromium)
+
+- Meldingsrol: `role="alert"` alleen bij een fout van dít verzoek; een bestaande toestand heeft geen live-regio (en dan
+  ook geen `aria-labelledby` op een `div`, dat axe als verboden naam zou melden). WCAG 4.1.3.
+- Formulieren `novalidate` + `required` + "(verplicht)" + server-side veldfout met `aria-invalid`/`aria-describedby`.
+  WCAG 3.3.1/3.3.2.
+- Skiplink: verborgen met `transform`, bij focus volledig in beeld op 320 px (`controle/gedrag.json`).
+- Schermlezer: na de naam van een rij en na de totaalpil staat een verborgen ":" zodat pil en toelichting niet aan elkaar
+  worden gelezen; het scheidingsteken tussen tijd en reden is stil (`content: " · " / ""`). **Niet met een echte
+  schermlezer getest** (NIET GEVALIDEERD).
+
