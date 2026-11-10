@@ -61,6 +61,7 @@ from executor.statuspagina import executor_page, onleesbaar_melding
 
 CSRF_COOKIE = "executor_csrf"
 MAX_FORM_BYTES = 4096
+MAX_FORM_FIELDS = 8  # het formulier heeft er 4 (csrf, hub_adres, koppelcode, hub_vingerafdruk)
 MUTATIONS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Invoerlimieten van §3.7 (als geheel controleren, nooit eerst afkappen).
 MAX_HUB_ADRES, MAX_KOPPELCODE, MAX_VINGERAFDRUK = 512, 32, 64
@@ -500,7 +501,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         raw_body = await request.body()
         if len(raw_body) > MAX_FORM_BYTES:
             return _afgehandeld("formulier_te_groot", trace)
-        form = {k: v[0] for k, v in parse_qs(raw_body.decode(errors="replace"), max_num_fields=8).items() if v}
+        try:
+            fields = parse_qs(raw_body.decode(errors="replace"), max_num_fields=MAX_FORM_FIELDS)
+        except ValueError:  # meer velden dan het formulier heeft: vaste melding, nooit een kale 500
+            return _afgehandeld("formulier_te_groot", trace)
+        form = {k: v[0] for k, v in fields.items() if v}
         cookie = request.cookies.get(CSRF_COOKIE, "")
         if not cookie or not hmac.compare_digest(cookie.encode(), form.get("csrf", "").encode()):
             return _afgehandeld("formuliercode_onjuist", trace)

@@ -157,3 +157,36 @@ def test_gereed_alleen_gekoppeld_en_bevestigd(tmp_path: Path) -> None:
         link["confirmed_at"] = None
     assert c.get("/api/v1/status").json()["gereed"] is False
     assert c.get("/readyz").status_code == 200  # /readyz hangt niet van de koppeling af
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "&".join(f"veld{i}=1" for i in range(10)),  # meer velden dan het formulier heeft (parse_qs max_num_fields)
+        "opvulling=" + "x" * 5000,  # body > 4096 bytes
+    ],
+    ids=["te_veel_velden", "te_grote_body"],
+)
+def test_te_groot_formulier_geeft_vaste_melding_nooit_een_kale_500(tmp_path: Path, extra: str) -> None:
+    """§3.7: elk geweigerd formulier krijgt een vaste Nederlandse melding in het sjabloon (geen 500 zonder uitleg), gaat
+    niet naar de Hub en verandert niets aan het koppelbestand."""
+    import re
+
+    s = Settings(data_dir=tmp_path)
+    ensure_secrets(s.secrets_dir)
+    c = TestClient(create_app(s), base_url="http://executor.local", raise_server_exceptions=False)
+    csrf = re.search(r'name="csrf" value="([^"]+)"', c.get("/").text)
+    assert csrf is not None
+    body = (
+        f"csrf={csrf.group(1)}&hub_adres=http%3A%2F%2F192.0.2.5%3A30400&koppelcode=ABCD-EFGH-JKMN"
+        f"&hub_vingerafdruk=MEGG-8GFG-2E4Y-K2RQ&{extra}"
+    )
+    r = c.post(
+        "/koppelen",
+        content=body,
+        headers={"Origin": "http://executor.local", "Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert r.status_code == 413, r.text[:200]
+    assert r.headers["content-type"].startswith("text/html")
+    assert "formulier_te_groot" in r.text and "Het formulier is te groot." in r.text
+    assert not (s.secrets_dir / "hub-link.json").exists()  # niets geschreven, geen poging naar de Hub
