@@ -15,6 +15,9 @@ const paginas = {
   'kind': async () => (await import('./pagina-kind.mjs')).kind(),
   'statuspagina': async () => (await import('./pagina-statuspagina.mjs')).statuspagina(),
   'statuspagina-gekoppeld': async () => (await import('./pagina-statuspagina.mjs')).statuspaginaGekoppeld(),
+  // Peil 1.1.1: twee toestanden die het sjabloon in 1.1.0 niet kon tonen (E01, E02)
+  'statuspagina-onleesbaar': async () => (await import('./pagina-statuspagina.mjs')).statuspaginaOnleesbaar(),
+  'statuspagina-bezig': async () => (await import('./pagina-statuspagina.mjs')).statuspaginaBezig(),
   // Hub-ontwerpstap P1 + contract 1.2 (docs/ontwerp/HUB_PEIL_ONTWERP.md)
   'apps': async () => (await import('./pagina-apps.mjs')).apps(),
   'appdetail-p1': async () => (await import('./pagina-apps.mjs')).appdetailP1(),

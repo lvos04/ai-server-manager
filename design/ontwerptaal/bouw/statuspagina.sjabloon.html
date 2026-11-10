@@ -1,13 +1,21 @@
 <!doctype html>
 <!-- Peil statuspagina-sjabloon {{peil_versie}} · bron ai-server-manager/design/ontwerptaal · GET / van elke nieuwe dienst.
      Regels: geen JavaScript, alleen deze inline <style> en inline <svg>; geen afbeeldingen of fonts (CSP default-src 'none').
+     Serveer met Referrer-Policy: same-origin (contract 1.3 §3.7; met no-referrer stuurt elke browser Origin: null).
      Plekken: {{naam}} = tekst (altijd HTML-escapen), <!--ALS:x-->…<!--/ALS:x--> = blok tonen als x waar is,
      <!--NIET:x-->…<!--/NIET:x--> = tonen als x onwaar is, <!--ELK:lijst-->…<!--/ELK:lijst--> = herhalen per item.
-     Toon-waarden komen uit een vaste lijst: gezond | beperkt | storing | onbekend | gate. Meldingen komen uit een vaste
-     lijst per dienst (nooit weerspiegelde invoer). Zie ONTWERPTAAL.md §11.2 en §13.2.
-     Koppeltoestand (contract 1.2 §3.7/§3.9) — precies één van: koppelformulier (nog NOOIT gekoppeld: first_linked_at leeg) ·
-     gekoppeld · ontkoppeld · ingetrokken. Geen ontkoppelen en geen ontkoppelcode op de statuspagina; alleen de executor
-     heeft executor_beheer (ontkoppelen na het opnieuw invoeren van een live geverifieerde TrueNAS-schrijfsleutel) en
+     Blokken mogen genest zijn (ook NIET binnen ALS). Vul in ÉÉN doorgang in (bouw/sjabloon.mjs, bouw/sjabloon.py): een
+     ingevulde waarde wordt nooit opnieuw als sjabloon gelezen.
+     Tonen (vaste lijst, ook de naam van het symbool #i-<toon>): gezond | beperkt | storing | onbekend | verouderd |
+     niet-beschikbaar | nog-niet | niet-gekoppeld | gate | beleid | feit. Het totaal (totaal_toon) is alleen
+     gezond | beperkt | storing | onbekend. Meldingen komen uit een vaste lijst per dienst (nooit weerspiegelde invoer);
+     melding_toon fout | info, melding_icoon storing | info, melding_rol alert (fout van dít verzoek) | status (info na
+     dít verzoek) | leeg (toestand die bij het laden al bestond: geen live-regio). Zie ONTWERPTAAL.md §11.2 en §13.2.
+     Koppeltoestand (contract 1.3 §3.5/§3.7/§3.9) — precies één van: koppelformulier (nog NOOIT gekoppeld:
+     first_linked_at leeg en het koppelbestand leesbaar) · gekoppeld · ontkoppeld · ingetrokken · koppelstatus_onleesbaar
+     (fail-closed, geen formulier). Daarnaast koppelen_bezig (pending ≠ null): verbergt het formulier, de stabiele
+     toestand blijft staan. Geen ontkoppelen en geen ontkoppelcode op de statuspagina; alleen de executor heeft
+     executor_beheer (ontkoppelen na het opnieuw invoeren van een live geverifieerde TrueNAS-schrijfsleutel) en
      schrijfsleutel_formulier (na het koppelen). {{hub_adres}} komt alleen uit de opgeslagen koppeling (http/https). -->
 <html lang="nl">
 <head>
@@ -19,7 +27,7 @@
 <style>/*STATUSPAGINA_CSS*/</style>
 </head>
 <body>
-<svg aria-hidden="true" style="display:none"><symbol id="i-gezond" viewBox="0 0 24 24">{{icoon_gezond}}</symbol><symbol id="i-beperkt" viewBox="0 0 24 24">{{icoon_beperkt}}</symbol><symbol id="i-storing" viewBox="0 0 24 24">{{icoon_storing}}</symbol><symbol id="i-onbekend" viewBox="0 0 24 24">{{icoon_onbekend}}</symbol><symbol id="i-gate" viewBox="0 0 24 24">{{icoon_gate}}</symbol><symbol id="i-gekoppeld" viewBox="0 0 24 24">{{icoon_gekoppeld}}</symbol><symbol id="i-niet-gekoppeld" viewBox="0 0 24 24">{{icoon_niet_gekoppeld}}</symbol><symbol id="i-info" viewBox="0 0 24 24">{{icoon_info}}</symbol></svg>
+<svg aria-hidden="true" style="display:none"><symbol id="i-gezond" viewBox="0 0 24 24">{{icoon_gezond}}</symbol><symbol id="i-beperkt" viewBox="0 0 24 24">{{icoon_beperkt}}</symbol><symbol id="i-storing" viewBox="0 0 24 24">{{icoon_storing}}</symbol><symbol id="i-onbekend" viewBox="0 0 24 24">{{icoon_onbekend}}</symbol><symbol id="i-verouderd" viewBox="0 0 24 24">{{icoon_verouderd}}</symbol><symbol id="i-niet-beschikbaar" viewBox="0 0 24 24">{{icoon_niet_beschikbaar}}</symbol><symbol id="i-nog-niet" viewBox="0 0 24 24">{{icoon_nog_niet}}</symbol><symbol id="i-gate" viewBox="0 0 24 24">{{icoon_gate}}</symbol><symbol id="i-beleid" viewBox="0 0 24 24">{{icoon_beleid}}</symbol><symbol id="i-feit" viewBox="0 0 24 24">{{icoon_feit}}</symbol><symbol id="i-gekoppeld" viewBox="0 0 24 24">{{icoon_gekoppeld}}</symbol><symbol id="i-niet-gekoppeld" viewBox="0 0 24 24">{{icoon_niet_gekoppeld}}</symbol><symbol id="i-info" viewBox="0 0 24 24">{{icoon_info}}</symbol></svg>
 <a class="spring" href="#{{spring_doel}}">{{spring_tekst}}</a>
 <div class="wrap">
 <header class="kop">
@@ -29,28 +37,31 @@
 </header>
 <main id="inhoud">
 <!--ALS:melding-->
-<div class="melding melding-{{melding_toon}}" role="alert" aria-labelledby="melding-titel" style="margin-bottom:1rem">
+<div class="melding melding-{{melding_toon}}"<!--ALS:melding_rol--> role="{{melding_rol}}" aria-labelledby="melding-titel"<!--/ALS:melding_rol--> style="margin-bottom:1rem">
   <svg aria-hidden="true"><use href="#i-{{melding_icoon}}"/></svg>
   <div>
     <p id="melding-titel"><strong>{{melding_titel}}</strong></p>
     <p>{{melding_tekst}}<!--ALS:melding_link--> <a href="#{{melding_link_doel}}">{{melding_link_tekst}}</a><!--/ALS:melding_link--></p>
-    <!--ALS:trace_id--><p class="meta" style="color:inherit">Code <code>{{melding_code}}</code> · Trace-ID (selecteer en kopieer)</p><code class="selecteer">{{trace_id}}</code><!--/ALS:trace_id-->
+    <!--ALS:melding_pad--><p><code>{{melding_pad}}</code></p><!--/ALS:melding_pad-->
+    <!--ALS:melding_code--><p class="meta">Code <code>{{melding_code}}</code></p><!--/ALS:melding_code-->
+    <!--ALS:trace_id--><p class="meta">Trace-ID (selecteer en kopieer)</p><code class="selecteer">{{trace_id}}</code><!--/ALS:trace_id-->
   </div>
 </div>
 <!--/ALS:melding-->
 
 <section class="blok" aria-labelledby="h-status">
   <h2 id="h-status">Status</h2>
-  <p class="totaal"><span class="pil pil-{{totaal_toon}}"><svg aria-hidden="true"><use href="#i-{{totaal_toon}}"/></svg>{{totaal_label}}</span><span>{{totaal_toelichting}}</span></p>
+  <p class="totaal"><span class="pil pil-{{totaal_toon}}"><svg aria-hidden="true"><use href="#i-{{totaal_toon}}"/></svg>{{totaal_label}}</span><span class="sr">: </span><span>{{totaal_toelichting}}</span></p>
   <ul class="checks" aria-label="Controles">
-    <!--ELK:checks--><li><span class="naam">{{naam}}</span><span class="pil pil-{{toon}}"><svg aria-hidden="true"><use href="#i-{{toon}}"/></svg>{{label}}</span><span class="tijd"><time datetime="{{iso}}">{{tijd}}</time></span><!--ALS:reden--><span class="reden">{{reden}}</span><!--/ALS:reden--></li><!--/ELK:checks-->
+    <!--ELK:checks--><li><span class="naam">{{naam}}<span class="sr">:</span></span><span class="pil pil-{{toon}}"><svg aria-hidden="true"><use href="#i-{{toon}}"/></svg>{{label}}</span><span class="sub"><time datetime="{{iso}}">{{tijd}}</time><!--ALS:reden--><span>{{reden}}<!--ALS:reden_code--> (code <code>{{reden_code}}</code>)<!--/ALS:reden_code--></span><!--/ALS:reden--></span></li><!--/ELK:checks-->
   </ul>
   <dl class="feiten">
     <dt>Gereed</dt><dd>{{gereed}}</dd>
     <dt>Versie</dt><dd><code>{{versie}}</code></dd>
-    <dt>Bron</dt><dd><code>/readyz</code> en <code>/healthz</code> van deze dienst</dd>
+    <dt>Bron</dt><dd><!--ALS:bron-->{{bron}}<!--/ALS:bron--><!--NIET:bron--><code>/readyz</code> en <code>/healthz</code> van deze dienst<!--/NIET:bron--></dd>
     <dt>Bijgewerkt</dt><dd><time datetime="{{bijgewerkt_iso}}">{{bijgewerkt}}</time> (bij het laden van deze pagina). Laad de pagina opnieuw voor een nieuwe stand.</dd>
   </dl>
+  <p class="uitleg"><!--ALS:gereed_uitleg-->{{gereed_uitleg}}<!--/ALS:gereed_uitleg--><!--NIET:gereed_uitleg-->Gereed betekent: de eigen controles zijn in orde (<code>/readyz</code>) én de dienst is gekoppeld met de Hub. <code>/readyz</code> kijkt zelf niet naar de koppeling.<!--/NIET:gereed_uitleg--></p>
 </section>
 
 <section class="blok" aria-labelledby="h-koppeling">
@@ -58,45 +69,55 @@
   <!--ALS:gekoppeld-->
   <p><span class="pil pil-neutraal"><svg aria-hidden="true"><use href="#i-gekoppeld"/></svg>Gekoppeld</span></p>
   <dl class="feiten"><dt>Sinds</dt><dd>{{gekoppeld_sinds}}</dd><dt>Hub</dt><dd><code>{{hub_adres}}</code></dd><dt>Vingerafdruk</dt><dd><code>{{hub_vingerafdruk}}</code></dd></dl>
-  <p>Alle schermen van deze dienst staan in de Hub. Ontkoppelen of opnieuw koppelen gaat via de Hub. <a href="{{hub_adres}}">Hub openen</a></p>
+  <p>Alle schermen van deze dienst staan in de Hub. Ontkoppelen of opnieuw koppelen gaat via de Hub.</p>
+  <p class="knoppen"><a class="knop knop-secundair" href="{{hub_adres}}">Hub openen</a></p>
   <!--/ALS:gekoppeld-->
   <!--ALS:ontkoppeld-->
-  <p><span class="pil pil-onbekend"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Ontkoppeld</span></p>
+  <p><span class="pil pil-niet-gekoppeld"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Ontkoppeld</span></p>
   <p>De Hub heeft deze dienst ontkoppeld. De dienst voert niets uit. Opnieuw koppelen gaat via de Hub: <strong>Instellingen → Diensten</strong>.</p>
   <!--/ALS:ontkoppeld-->
   <!--ALS:ingetrokken-->
-  <p><span class="pil pil-onbekend"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Ingetrokken</span></p>
+  <p><span class="pil pil-niet-gekoppeld"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Ingetrokken</span></p>
   <p>De Hub heeft de koppeling ingetrokken. De dienst weigert elke opdracht en houdt zijn eigen gegevens. Opnieuw koppelen gaat via de Hub: <strong>Instellingen → Diensten</strong>.</p>
   <!--/ALS:ingetrokken-->
+  <!--ALS:koppelstatus_onleesbaar-->
+  <p><span class="pil pil-storing"><svg aria-hidden="true"><use href="#i-storing"/></svg>Onleesbaar</span></p>
+  <p>De koppelstatus van deze dienst is onleesbaar. Daarom vertrouwt de dienst niets van de Hub en voert hij niets uit. Hier staat bewust geen formulier.</p>
+  <p>Herstel gaat alleen met een nieuw koppeltoken: maak het in de Hub (<strong>Instellingen → Diensten</strong>). De Hub zet het in de instellingen van deze app, of je vult het zelf in bij de Custom App in TrueNAS.</p>
+  <!--/ALS:koppelstatus_onleesbaar-->
   <!--ALS:koppelformulier-->
-  <p><span class="pil pil-onbekend"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Niet gekoppeld</span></p>
+  <p><span class="pil pil-niet-gekoppeld"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Niet gekoppeld</span></p>
   <p>Deze dienst is nog niet met de Hub gekoppeld. Tot dan voert hij niets uit en staan zijn schermen niet in de Hub.</p>
-  <ol class="stappen">
+  <!--NIET:koppelen_bezig--><ol class="stappen">
     <li>Maak in de Hub een koppelcode: <strong>Instellingen → Diensten → Koppelcode maken</strong>. De Hub toont de koppelcode en de vingerafdruk samen.</li>
     <li>Vul hieronder het adres van de Hub, de koppelcode en de vingerafdruk in.</li>
-  </ol>
+  </ol><!--/NIET:koppelen_bezig-->
   <!--/ALS:koppelformulier-->
+  <!--ALS:koppelen_bezig-->
+  <p><span class="pil pil-nog-niet"><svg aria-hidden="true"><use href="#i-nog-niet"/></svg>Koppelen bezig</span></p>
+  <p>Er loopt een koppelpoging<!--ALS:koppelen_bezig_sinds--> (gestart om <time datetime="{{koppelen_bezig_iso}}">{{koppelen_bezig_sinds}}</time>)<!--/ALS:koppelen_bezig_sinds-->. Tot die klaar is, blijft de koppeltoestand hierboven gelden en kun je hier niets invullen. Laad de pagina over een minuut opnieuw.</p>
+  <!--/ALS:koppelen_bezig-->
 </section>
 
-<!--ALS:koppelformulier-->
+<!--ALS:koppelformulier--><!--NIET:koppelen_bezig-->
 <section class="blok" aria-labelledby="h-koppelen">
   <h2 id="h-koppelen">Koppelen</h2>
-  <form method="post" action="/koppelen" autocomplete="off">
+  <form method="post" action="/koppelen" autocomplete="off" novalidate>
     <input type="hidden" name="csrf" value="{{csrf_token}}">
     <div class="veld">
-      <label for="hub">Adres van de Hub</label>
+      <label for="hub">Adres van de Hub <span class="verplicht">(verplicht)</span></label>
       <p class="hulp" id="hub-hulp">Vorm: http(s)://&lt;NAS-adres&gt;:&lt;poort&gt;. Geen localhost.</p>
       <input id="hub" name="hub_adres" type="url" inputmode="url" required autocomplete="off" aria-describedby="hub-hulp<!--ALS:fout_hub_adres--> hub-fout<!--/ALS:fout_hub_adres-->"<!--ALS:fout_hub_adres--> aria-invalid="true"<!--/ALS:fout_hub_adres-->>
       <!--ALS:fout_hub_adres--><p class="veldfout" id="hub-fout"><svg aria-hidden="true"><use href="#i-storing"/></svg><span>{{fout_hub_adres}}</span></p><!--/ALS:fout_hub_adres-->
     </div>
     <div class="veld">
-      <label for="koppelcode">Koppelcode</label>
+      <label for="koppelcode">Koppelcode <span class="verplicht">(verplicht)</span></label>
       <p class="hulp" id="code-hulp">12 tekens in groepen van 4 (XXXX-XXXX-XXXX). Geldig {{koppelcode_geldig}}, één keer te gebruiken.</p>
       <input id="koppelcode" name="koppelcode" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="code-hulp<!--ALS:fout_koppelcode--> code-fout<!--/ALS:fout_koppelcode-->"<!--ALS:fout_koppelcode--> aria-invalid="true"<!--/ALS:fout_koppelcode-->>
       <!--ALS:fout_koppelcode--><p class="veldfout" id="code-fout"><svg aria-hidden="true"><use href="#i-storing"/></svg><span>{{fout_koppelcode}}</span></p><!--/ALS:fout_koppelcode-->
     </div>
     <div class="veld">
-      <label for="vingerafdruk">Vingerafdruk van de Hub</label>
+      <label for="vingerafdruk">Vingerafdruk van de Hub <span class="verplicht">(verplicht)</span></label>
       <p class="hulp" id="vinger-hulp">16 tekens in groepen van 4 (XXXX-XXXX-XXXX-XXXX). Staat in de Hub naast de koppelcode. Zo weet je zeker dat je met jouw Hub koppelt.</p>
       <input id="vingerafdruk" name="hub_vingerafdruk" required autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="vinger-hulp<!--ALS:fout_vingerafdruk--> vinger-fout<!--/ALS:fout_vingerafdruk-->"<!--ALS:fout_vingerafdruk--> aria-invalid="true"<!--/ALS:fout_vingerafdruk-->>
       <!--ALS:fout_vingerafdruk--><p class="veldfout" id="vinger-fout"><svg aria-hidden="true"><use href="#i-storing"/></svg><span>{{fout_vingerafdruk}}</span></p><!--/ALS:fout_vingerafdruk-->
@@ -104,16 +125,16 @@
     <button class="knop" type="submit">Koppelen met de Hub</button>
   </form>
 </section>
-<!--/ALS:koppelformulier-->
+<!--/NIET:koppelen_bezig--><!--/ALS:koppelformulier-->
 
 <!--ALS:schrijfsleutel_formulier-->
 <section class="blok" aria-labelledby="h-sleutel">
   <h2 id="h-sleutel">TrueNAS-schrijfsleutel</h2>
   <p>De executor is gekoppeld. Vul nu de TrueNAS-API-sleutel met schrijfrechten in. De executor test de sleutel direct bij TrueNAS.</p>
-  <form method="post" action="/schrijfsleutel" autocomplete="off">
+  <form method="post" action="/schrijfsleutel" autocomplete="off" novalidate>
     <input type="hidden" name="csrf" value="{{csrf_token}}">
     <div class="veld">
-      <label for="sleutel">TrueNAS-API-sleutel met schrijfrechten</label>
+      <label for="sleutel">TrueNAS-API-sleutel met schrijfrechten <span class="verplicht">(verplicht)</span></label>
       <p class="hulp" id="sleutel-hulp">Wordt versleuteld opgeslagen in deze dienst. Je ziet daarna alleen de laatste 4 tekens. De Hub ziet deze sleutel nooit.</p>
       <input id="sleutel" name="truenas_sleutel" type="password" required autocomplete="off" aria-describedby="sleutel-hulp<!--ALS:fout_sleutel--> sleutel-fout<!--/ALS:fout_sleutel-->"<!--ALS:fout_sleutel--> aria-invalid="true"<!--/ALS:fout_sleutel-->>
       <!--ALS:fout_sleutel--><p class="veldfout" id="sleutel-fout"><svg aria-hidden="true"><use href="#i-storing"/></svg><span>{{fout_sleutel}}</span></p><!--/ALS:fout_sleutel-->
@@ -127,9 +148,9 @@
 <section class="blok" aria-labelledby="h-beheer">
   <h2 id="h-beheer">Ontkoppelen of sleutel vervangen</h2>
   <p>Alleen nodig als je de Hub vervangt of de sleutel wilt wisselen. Als bewijs van TrueNAS-beheer vul je de TrueNAS-API-sleutel met schrijfrechten opnieuw in; de executor controleert hem live. Huidige sleutel eindigt op <code>{{sleutel_laatste4}}</code> ({{sleutel_datum}}).</p>
-  <form method="post" action="/beheer" autocomplete="off">
+  <form method="post" action="/beheer" autocomplete="off" novalidate>
     <input type="hidden" name="csrf" value="{{csrf_token}}">
-    <div class="veld"><label for="bewijs">Huidige TrueNAS-API-sleutel met schrijfrechten</label><input id="bewijs" name="truenas_sleutel" type="password" required autocomplete="off"></div>
+    <div class="veld"><label for="bewijs">Huidige TrueNAS-API-sleutel met schrijfrechten <span class="verplicht">(verplicht)</span></label><input id="bewijs" name="truenas_sleutel" type="password" required autocomplete="off"></div>
     <div class="veld"><label for="nieuw">Nieuwe sleutel (alleen bij vervangen)</label><p class="hulp" id="nieuw-hulp">Laat leeg als je alleen wilt ontkoppelen.</p><input id="nieuw" name="nieuwe_sleutel" type="password" autocomplete="off" aria-describedby="nieuw-hulp"></div>
     <p class="knoppen"><button class="knop knop-secundair" type="submit" name="actie" value="vervangen">Sleutel vervangen</button> <button class="knop knop-secundair" type="submit" name="actie" value="ontkoppelen">Ontkoppelen van de Hub</button></p>
   </form>
@@ -139,7 +160,7 @@
 <section class="blok" aria-labelledby="h-dienst">
   <h2 id="h-dienst">{{dienst_blok_titel}}</h2>
   <ul class="checks">
-    <!--ELK:dienst_blok--><li><span class="naam">{{naam}}</span><span class="pil pil-{{toon}}"><svg aria-hidden="true"><use href="#i-{{toon}}"/></svg>{{label}}</span><!--ALS:reden--><span class="reden">{{reden}}</span><!--/ALS:reden--></li><!--/ELK:dienst_blok-->
+    <!--ELK:dienst_blok--><li><span class="naam">{{naam}}<span class="sr">:</span></span><span class="pil pil-{{toon}}"><svg aria-hidden="true"><use href="#i-{{toon}}"/></svg>{{label}}</span><!--ALS:reden--><span class="sub"><span>{{reden}}<!--ALS:reden_code--> (code <code>{{reden_code}}</code>)<!--/ALS:reden_code--></span></span><!--/ALS:reden--></li><!--/ELK:dienst_blok-->
   </ul>
 </section>
 </main>
