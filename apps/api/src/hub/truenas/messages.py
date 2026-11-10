@@ -13,6 +13,7 @@ REASON_CODES: tuple[str, ...] = (
     "not_configured",
     "protocol_error",
     "stale",
+    "meting_verouderd",
 )
 
 MESSAGES: dict[str, tuple[str, str]] = {
@@ -61,6 +62,11 @@ MESSAGES: dict[str, tuple[str, str]] = {
     "stale": (
         "De laatste meting is verouderd.",
         "De gegevens zijn ouder dan de ingestelde geldigheid en gelden daarom als onbekend. Vernieuw de inventaris.",
+    ),
+    "meting_verouderd": (
+        "De laatste meting is verouderd.",
+        "De gegevens zijn ouder dan hun maximale leeftijd (max_age) en gelden daarom als onbekend. Vernieuw de "
+        "inventaris.",
     ),
 }
 

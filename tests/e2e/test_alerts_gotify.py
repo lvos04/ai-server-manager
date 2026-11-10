@@ -173,11 +173,23 @@ def test_prometheus_achtige_testload_geeft_geen_meldingenstorm(
 
 
 def test_keten_truenas_naar_gotify_app_down_en_dempen(
-    admin: Any, app: Any, settings: Any, fake_nas: FakeTrueNAS, worker_once: Any, periodic_run: Any, gotify: FakeGotify
+    admin: Any,
+    app: Any,
+    settings: Any,
+    fake_nas: FakeTrueNAS,
+    worker_once: Any,
+    periodic_run: Any,
+    gotify: FakeGotify,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Fake TrueNAS → inventaris → catalogus → gezondheid → reeks app.status → standaardregel 'App onbereikbaar' →
     Gotify. Pool-metingen komen als reeks binnen; dempen onderdrukt de volgende melding."""
-    settings.inventory_ttl_seconds = 7200  # de test springt ~20 min vooruit; de inventaris moet vers blijven
+    # De test springt ~20 min vooruit; de inventaris moet vers blijven. Contract 1.3 §6.2 begrenst de geldigheid op de
+    # standaard max_age (900 s), dus alleen in deze test die grens ruimer.
+    from hub import config as hub_config
+
+    monkeypatch.setattr(hub_config, "DEFAULT_MAX_AGE_SECONDS", 7200)
+    settings.inventory_ttl_seconds = 7200
     _channel(admin, gotify)
     connect(admin, fake_nas)
     refresh(admin, worker_once)

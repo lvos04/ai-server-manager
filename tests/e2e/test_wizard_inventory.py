@@ -260,7 +260,7 @@ def test_nas_offline_maakt_inventaris_verouderd_en_unknown(
     with psycopg.connect(clean_db, autocommit=True) as conn:
         conn.execute("UPDATE inventory_snapshot SET observed_at = observed_at - %s", (timedelta(hours=2),))
     pools = admin.get("/api/v1/inventory/pools").json()
-    assert pools["status"] == "unknown" and pools["reason_code"] == "stale" and pools["verouderd"] is True
+    assert pools["status"] == "unknown" and pools["reason_code"] == "meting_verouderd" and pools["verouderd"] is True
 
 
 def test_truenas_24_10_gebruikt_zfs_snapshot_en_extra_ca(settings: Any, setup_code: str, worker_once: Any) -> None:

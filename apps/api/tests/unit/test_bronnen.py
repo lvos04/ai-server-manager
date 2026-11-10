@@ -129,14 +129,53 @@ def test_heartbeat_beoordeling() -> None:
 
 
 def test_connector_health_beoordeling() -> None:
-    ok = {"status": "healthy", "observed_at": "2026-11-09T11:59:30Z", "reason_code": None, "checks": []}
+    """Contract 1.3 §6 en §6.2 (C1.3-ASM-11/12): totaal = slechtste check; zonder verse meting unknown."""
+    t = "2026-11-09T11:59:30Z"
+    ok = {"status": "healthy", "observed_at": t, "reason_code": None, "checks": []}
     assert judge_connector_health(ok, NOW)[:3] == ("healthy", None, datetime(2026, 11, 9, 11, 59, 30, tzinfo=UTC))
-    stalled = {**ok, "checks": [{"name": "Worker", "status": "down"}]}
-    assert judge_connector_health(stalled, NOW)[:2] == ("degraded", "jobs_staan_stil")
+    # Totaal = het slechtste van de gemelde status en de checks: een dienst die 'healthy' zegt met een worker die
+    # down is, is down (niet meer alleen degraded), met de reden jobs_staan_stil.
+    stalled = {**ok, "checks": [{"name": "worker", "status": "down", "observed_at": t, "detail": ""}]}
+    assert judge_connector_health(stalled, NOW)[:2] == ("down", "jobs_staan_stil")
+    jobs = {**ok, "checks": [{"name": "jobs", "status": "degraded", "observed_at": t, "detail": {"wachtrij": 3}}]}
+    assert judge_connector_health(jobs, NOW)[:2] == ("degraded", "jobs_staan_stil")
+    # Overgangsnaam (één release): 'queue' telt nog als jobs-check.
+    queue = {**ok, "checks": [{"name": "queue", "status": "degraded", "observed_at": t, "detail": ""}]}
+    assert judge_connector_health(queue, NOW)[:2] == ("degraded", "jobs_staan_stil")
+    db = {**ok, "checks": [{"name": "database", "status": "degraded", "observed_at": t, "detail": ""}]}
+    assert judge_connector_health(db, NOW)[:2] == ("degraded", "controle_faalt")
+    # Een check zonder verse meting (geen observed_at of te oud) telt als unknown — nooit groen.
+    geen_tijd = {**ok, "checks": [{"name": "database", "status": "healthy", "detail": ""}]}
+    status, reason, _, details = judge_connector_health(geen_tijd, NOW)
+    assert (status, reason) == ("unknown", "meting_verouderd") and details["checks"][0]["laatst_bekend"] == "healthy"
+    oud = {**ok, "checks": [{"name": "database", "status": "healthy", "observed_at": "2026-11-09T11:40:00Z"}]}
+    assert judge_connector_health(oud, NOW)[:2] == ("unknown", "meting_verouderd")
+    # Het geheel ouder dan max_age (900 s) of zonder tijd: unknown met meting_verouderd en de tijd van de meting.
     far = {**ok, "observed_at": "2020-01-01T00:00:00Z"}
-    assert judge_connector_health(far, NOW)[2] == NOW  # klok van de dienst niet vertrouwen bij grote afwijking
+    assert judge_connector_health(far, NOW)[:3] == ("unknown", "meting_verouderd", datetime(2020, 1, 1, tzinfo=UTC))
+    assert judge_connector_health({**ok, "observed_at": None}, NOW)[:2] == ("unknown", "meting_verouderd")
+    assert judge_connector_health({**ok, "observed_at": "2026-11-09T13:00:00Z"}, NOW)[:2] == (
+        "unknown",
+        "meting_verouderd",
+    )  # uit de toekomst: de klok van de dienst niet vertrouwen
     assert judge_connector_health({"status": "groen"}, NOW)[:2] == ("unknown", "antwoord_ongeldig")
     assert judge_connector_health(None, NOW)[:2] == ("unknown", "antwoord_ongeldig")
+
+
+def test_max_age_van_de_bron_nooit_soepeler() -> None:
+    """§6.2: de Hub neemt een strengere max_age uit discover over; een ruimere waarde maakt het niet soepeler."""
+    from hub.monitoring.sources import max_age_for
+
+    assert max_age_for(None, "health") == 900
+    assert max_age_for({"max_age_s": {"health": 60}}, "health") == 60
+    assert max_age_for({"max_age_s": {"health": 3600}}, "health") == 900
+    assert max_age_for({"max_age_s": {"database": 30, "health": 600}}, "database") == 30
+    assert max_age_for({"max_age_s": {"health": "60"}}, "health") == 900  # geen getal: genegeerd
+    body = {"status": "healthy", "observed_at": "2026-11-09T11:58:00Z", "checks": []}
+    assert judge_connector_health(body, NOW)[0] == "healthy"
+    assert judge_connector_health(body, NOW, {"max_age_s": {"health": 60}})[:2] == ("unknown", "meting_verouderd")
+    loose = {"status": "healthy", "observed_at": "2026-11-09T11:40:00Z", "checks": []}
+    assert judge_connector_health(loose, NOW, {"max_age_s": {"health": 3600}})[:2] == ("unknown", "meting_verouderd")
 
 
 def test_truenas_realtime_normalisatie_zonder_verzonnen_waarden() -> None:

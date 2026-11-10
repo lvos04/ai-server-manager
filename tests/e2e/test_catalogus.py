@@ -73,6 +73,28 @@ def test_catalogus_ontdekt_bestaande_apps_zonder_mutatie(admin: Any, fake_nas: F
     assert set(_apps(admin, soort="bestaand")) == {"mediaguard", "media-source-optimizer", "my-house"}
     assert admin.get("/api/v1/apps", params={"adaptertype": "verzonnen"}).status_code == 422
 
+    # Sorteren op status (C01): eerst wat aandacht vraagt (down), daarna beperkt, onbekend en gezond.
+    by_status = admin.get("/api/v1/apps", params={"sortering": "status"}).json()["items"]
+    rank = {"down": 0, "degraded": 1, "unknown": 2, "healthy": 3}
+    assert by_status[0]["runtime_id"] == "jellyfin"
+    ranks = [rank[a["gezondheid"]["status"]] for a in by_status]
+    assert ranks == sorted(ranks)
+
+    # Contract 1.3 §5 (C1.3-ASM-08): paginering over een momentopname met hetzelfde totaal op elke pagina.
+    p1 = admin.get("/api/v1/apps", params={"limit": 2}).json()
+    assert p1["totaal"] == 4 and p1["snapshot_id"] and p1["meting_observed_at"] and p1["next_cursor"]
+    p2 = admin.get("/api/v1/apps", params={"limit": 2, "cursor": p1["next_cursor"]}).json()
+    assert p2["snapshot_id"] == p1["snapshot_id"] and p2["totaal"] == 4 and p2["next_cursor"] is None
+    assert {a["id"] for a in p1["items"]} | {a["id"] for a in p2["items"]} == {a["id"] for a in apps.values()}
+    # Andere filters met de cursor van een andere momentopname → 409 snapshot_changed (opnieuw beginnen).
+    r = admin.get("/api/v1/apps", params={"limit": 2, "cursor": p1["next_cursor"], "soort": "bestaand"})
+    assert r.status_code == 409 and r.json()["code"] == "snapshot_changed"
+    assert admin.get("/api/v1/apps", params={"cursor": "geen-cursor"}).status_code == 400
+    # Een nieuwe meting is een nieuwe momentopname: de oude cursor geldt niet meer.
+    refresh(admin, worker_once)
+    r = admin.get("/api/v1/apps", params={"limit": 2, "cursor": p1["next_cursor"]})
+    assert r.status_code == 409 and r.json()["code"] == "snapshot_changed"
+
     # Alleen lezen: geen enkele schrijfmethode en nooit de app-configuratie (geheimen) opgehaald.
     assert fake_nas.mutations == []
     assert not [c for c in fake_nas.calls if c[0] == "app.query" and len(c[1]) > 1]

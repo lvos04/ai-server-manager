@@ -195,11 +195,11 @@ def discover(db: Session, settings: Settings, *, now: datetime | None = None) ->
     now = now or utcnow()
     target = current_target(db)
     url = target.url if target else None
-    st = kind_state(db, "apps", target=url, ttl_seconds=settings.inventory_ttl_seconds, now=now)
+    st = kind_state(db, "apps", target=url, ttl_seconds=settings.inventory_max_age_seconds, now=now)
     if st["status"] != "ok" or not isinstance(st.get("data"), list):
         return DiscoveryResult(status="unknown", reason_code=st.get("reason_code") or "stale")
-    images_st = kind_state(db, "images", target=url, ttl_seconds=settings.inventory_ttl_seconds, now=now)
-    ds_st = kind_state(db, "datasets", target=url, ttl_seconds=settings.inventory_ttl_seconds, now=now)
+    images_st = kind_state(db, "images", target=url, ttl_seconds=settings.inventory_max_age_seconds, now=now)
+    ds_st = kind_state(db, "datasets", target=url, ttl_seconds=settings.inventory_max_age_seconds, now=now)
     images = images_st["data"] if images_st["status"] == "ok" and isinstance(images_st.get("data"), list) else None
     # Datasets mogen de laatst bekende zijn (alleen voor de koppeling pad → dataset).
     datasets = ds_st.get("data") if isinstance(ds_st.get("data"), list) else None
@@ -305,7 +305,7 @@ def deep_link(row: CatalogApp, nas_address: str | None) -> dict[str, Any]:
 def is_inventory_fresh(db: Session, settings: Settings, now: datetime | None = None) -> dict[str, Any]:
     target = current_target(db)
     return kind_state(
-        db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds, now=now
+        db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds, now=now
     )
 
 

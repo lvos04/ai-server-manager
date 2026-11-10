@@ -184,7 +184,7 @@ def compute(db: Session, settings: Settings, *, now: datetime | None = None) -> 
             and any(s.bron == p for p in prefixes)
         ]
         newest = max((s.laatste_op for s in cands if s.laatste_op), default=None)
-        threshold = settings.inventory_ttl_seconds if otype == "pool" else ttl
+        threshold = settings.inventory_max_age_seconds if otype == "pool" else ttl
         return newest is not None and (now - newest).total_seconds() <= threshold, iso(newest)
 
     def row(e: Entry, oid: str | None, label: str | None = None) -> dict[str, Any]:
@@ -230,7 +230,7 @@ def compute(db: Session, settings: Settings, *, now: datetime | None = None) -> 
 
     rows: list[dict[str, Any]] = []
     pools_st = kind_state(
-        db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds
+        db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds
     )
     pool_names = [str(p.get("naam")) for p in pools_st.get("data") or [] if p.get("naam")]
     for e in NAS_ENTRIES:
@@ -239,7 +239,9 @@ def compute(db: Session, settings: Settings, *, now: datetime | None = None) -> 
                 rows.append(row(e, name, name))
         else:
             rows.append(row(e, "nas"))
-    gpus_st = kind_state(db, "gpus", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds)
+    gpus_st = kind_state(
+        db, "gpus", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds
+    )
     gpus = [g for g in gpus_st.get("data") or [] if g.get("pci_slot")]
     for g in gpus:
         label = f"{g.get('herkend_als') or 'gpu'} ({g['pci_slot']})"

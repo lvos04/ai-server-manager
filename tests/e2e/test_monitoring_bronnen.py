@@ -125,7 +125,7 @@ def test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_inget
     admin.post("/api/v1/monitoring/poll", headers=idem()).raise_for_status()
     _age_observations(clean_db, 10)
     p = admin.get(f"/api/v1/apps/{_apps(admin)['prowlarr']['id']}").json()["gezondheid"]
-    assert p["status"] == "unknown" and p["reason_code"] == "verouderd"
+    assert p["status"] == "unknown" and p["reason_code"] == "meting_verouderd"
     buiten = next(c for c in p["componenten"] if c["soort"] == "buitenkant")
     assert buiten["laatste_status"] == "healthy" and buiten["verouderd"] is True
     st = admin.get("/api/v1/monitoring/sources").json()["items"][0]["status"]
@@ -290,8 +290,13 @@ def test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded(
         assert dienst.rejected == []
         assert _apps(admin)["home-control-hub"]["gezondheid"]["status"] == "healthy"
 
-        # 200 maar de worker-controle faalt → degraded (B09-002).
+        # 200 maar de worker-controle faalt (B09-002). Contract 1.3 §6: het totaal is de slechtste check, dus een
+        # worker die down is maakt de dienst down; een beperkte jobs-check maakt hem beperkt.
         dienst.health = {"status": "healthy", "checks": [{"name": "worker", "status": "down"}]}
+        admin.post("/api/v1/monitoring/poll", headers=idem()).raise_for_status()
+        g = _apps(admin)["home-control-hub"]["gezondheid"]
+        assert g["status"] == "down" and g["reason_code"] == "jobs_staan_stil"
+        dienst.health = {"status": "healthy", "checks": [{"name": "jobs", "status": "degraded"}]}
         admin.post("/api/v1/monitoring/poll", headers=idem()).raise_for_status()
         g = _apps(admin)["home-control-hub"]["gezondheid"]
         assert g["status"] == "degraded" and g["reason_code"] == "jobs_staan_stil"
@@ -315,7 +320,7 @@ def test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded(
         # Heartbeat en connector-health blijven uit (10 min): binnenkant verouderd → unknown, nooit 'nog gezond'.
         _age_observations(clean_db, 10)
         g = _apps(admin)["home-control-hub"]["gezondheid"]
-        assert g["status"] == "unknown" and g["reason_code"] == "verouderd"
+        assert g["status"] == "unknown" and g["reason_code"] == "meting_verouderd"
 
         # Validatie en rechten.
         old = client.post(

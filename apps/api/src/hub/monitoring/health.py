@@ -46,6 +46,8 @@ MELDINGEN: dict[str, str] = {
     "connector-health) is gezond niet vast te stellen.",
     "binnenkant_niet_gebouwd": "De Hub-adapter voor de binnenkant van deze bestaande app (read-model met gescopete "
     "sleutel) volgt in fase P3; gezond is daarom nog niet vast te stellen.",
+    # Contract 1.3 §6.2: een meting ouder dan haar max_age is unknown met reason_code meting_verouderd.
+    "meting_verouderd": "De laatste meting is ouder dan toegestaan en geldt daarom als onbekend.",
     "verouderd": "De laatste meting is ouder dan toegestaan en geldt daarom als onbekend.",
     "status_onbekend": "TrueNAS meldt een onbekende staat voor deze app.",
     "worker_staat_stil": "De worker van de app meldt zich niet meer.",
@@ -93,7 +95,8 @@ class Component:
 
 
 def freshen(c: Component, ttl_seconds: float, now: datetime | None = None) -> Component:
-    """Een component ouder dan zijn TTL wordt ``unknown`` (``verouderd``); de laatste status blijft zichtbaar. Was hij
+    """Een component ouder dan zijn TTL wordt ``unknown`` (``meting_verouderd``, contract 1.3 §6.2); de laatste status
+    blijft zichtbaar als "laatst bekend". Was hij
     al ``unknown`` met een eigen reden (bv. een geweigerde key), dan blijft die reden staan."""
     now = now or utcnow()
     stale = c.observed_at is None or (now - c.observed_at).total_seconds() > ttl_seconds
@@ -104,7 +107,7 @@ def freshen(c: Component, ttl_seconds: float, now: datetime | None = None) -> Co
             c.soort,
             c.bron,
             "unknown",
-            c.reason_code or "verouderd",
+            c.reason_code or "meting_verouderd",
             c.observed_at,
             c.detail,
             {**c.extra, "verouderd": True},
@@ -113,7 +116,7 @@ def freshen(c: Component, ttl_seconds: float, now: datetime | None = None) -> Co
         c.soort,
         c.bron,
         "unknown",
-        "verouderd",
+        "meting_verouderd",
         c.observed_at,
         c.detail,
         {**c.extra, "laatste_status": c.status, "verouderd": True},
@@ -169,11 +172,11 @@ def evaluate(
             return result("unknown", "binnenkant_niet_gebouwd")
         if i is None:
             return result("unknown", "binnenkant_ontbreekt")
-        return result("unknown", i.reason_code or "verouderd", i)
+        return result("unknown", i.reason_code or "meting_verouderd", i)
     if not (healthy_b or healthy_i):
         stale = next((c for c in (b, i) if c is not None), None)
         if stale is not None:
-            return result("unknown", stale.reason_code or "verouderd", stale)
+            return result("unknown", stale.reason_code or "meting_verouderd", stale)
         if t is not None and t.status == "unknown":
             return result("unknown", t.reason_code or "inventaris_verouderd", t)
         return result("unknown", "geen_gezondheidsbron")

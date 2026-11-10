@@ -21,6 +21,7 @@ from hub.config import Settings
 from hub.errors import HubError
 from hub.keys import KeyRing
 from hub.models import IdempotencyRecord, Service, ServiceToken, User, WebSession
+from hub.scopes import has_scope
 from hub.security import ROLE_RANK, Role, constant_eq, sha256_hex
 from hub.timeutil import utcnow
 from hub.vault import Vault
@@ -199,6 +200,29 @@ def require_viewer_or_service(principal: Annotated[Principal | None, Depends(opt
     if principal.kind == "user" and (principal.role is None or ROLE_RANK[principal.role] < ROLE_RANK[Role.viewer]):
         raise HubError(403, "forbidden", "Hiervoor is minimaal de rol 'viewer' nodig.")
     return principal
+
+
+def require_viewer_or_scope(scope: str | None) -> Callable[..., Principal]:
+    """Gebruiker met rol ``viewer``+, of een dienst met precies deze vaste scope (contract 1.3 §4.4). Zonder scope →
+    403 ``scope_ontbreekt`` (nooit een intrekking); ``scope=None`` = alleen gebruikers."""
+
+    def dep(principal: Annotated[Principal | None, Depends(optional_principal)]) -> Principal:
+        if principal is None:
+            raise HubError(401, "unauthorized", "Niet aangemeld.")
+        if principal.kind == "service":
+            if scope is None or not has_scope(principal.service_app_id, scope):
+                raise HubError(
+                    403,
+                    "scope_ontbreekt",
+                    "Deze dienst heeft geen leesrecht op deze route (vaste scopes per dienst, contract §4.4).",
+                    {"vereiste_scope": scope},
+                )
+            return principal
+        if principal.role is None or ROLE_RANK[principal.role] < ROLE_RANK[Role.viewer]:
+            raise HubError(403, "forbidden", "Hiervoor is minimaal de rol 'viewer' nodig.")
+        return principal
+
+    return dep
 
 
 Admin = Annotated[Principal, Depends(require_user(Role.admin))]

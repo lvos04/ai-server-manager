@@ -66,7 +66,7 @@ def _nas_wide(db: Session, settings: Settings, inc: Incident, now: datetime) -> 
     if len(subjects) < 3:
         return None
     target = current_target(db)
-    st = kind_state(db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds)
+    st = kind_state(db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds)
     bewijs: list[dict[str, Any]] = [{"soort": "incident", "id": str(o.id), "titel": o.titel} for o in others[:10]]
     bewijs.append({"soort": "inventaris", "status": st.get("status"), "reden": st.get("reason_code")})
     if st.get("status") != "ok":
@@ -79,7 +79,9 @@ def _nas_wide(db: Session, settings: Settings, inc: Incident, now: datetime) -> 
             "meerdere_apps_en_inventaris",
             now,
         )
-    pools = kind_state(db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds)
+    pools = kind_state(
+        db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds
+    )
     bad = [p.get("naam") for p in pools.get("data") or [] if isinstance(p, dict) and p.get("gezond") is False]
     if pools.get("status") == "ok" and bad:
         bewijs.append({"soort": "pools", "ongezond": bad[:5]})

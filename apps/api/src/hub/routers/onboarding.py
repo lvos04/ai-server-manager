@@ -220,7 +220,7 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
     return gates_mod.GateInputs(
         decisions=decisions,
         pools_state=kind_state(
-            db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds
+            db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds
         ),
         eigen_backup={"finished_at": b.finished_at, "sha256": b.sha256, "id": str(b.id)}
         if b and b.finished_at

@@ -70,7 +70,7 @@ def coverage_inputs(db: Session, settings: Settings) -> cov.CoverageInputs:
     url = target.url if target else None
 
     def st(kind: str) -> dict[str, Any]:
-        return kind_state(db, kind, target=url, ttl_seconds=settings.inventory_ttl_seconds)
+        return kind_state(db, kind, target=url, ttl_seconds=settings.inventory_max_age_seconds)
 
     rpo: dict[str, dict[str, float]] = {}
     d16 = db.get(Decision, "D16")

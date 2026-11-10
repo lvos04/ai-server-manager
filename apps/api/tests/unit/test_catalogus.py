@@ -167,11 +167,12 @@ def test_down_wint_en_verdwenen_is_onbekend() -> None:
 
 def test_verouderde_component_is_onbekend_nooit_laatst_bekend() -> None:
     old = freshen(C("buitenkant", "healthy", age_s=600), ttl_seconds=300, now=NOW)
-    assert old.status == "unknown" and old.reason_code == "verouderd" and old.extra["laatste_status"] == "healthy"
+    # Contract 1.3 §6.2: verouderd = unknown met reason_code meting_verouderd; de oude waarde alleen "laatst bekend".
+    assert (old.status, old.reason_code, old.extra["laatste_status"]) == ("unknown", "meting_verouderd", "healthy")
     fresh = freshen(C("buitenkant", "healthy", age_s=10), ttl_seconds=300, now=NOW)
     assert fresh.status == "healthy"
     r = _ev([C("truenas", "healthy"), old])
-    assert r["status"] == "unknown" and r["reason_code"] == "verouderd"
+    assert r["status"] == "unknown" and r["reason_code"] == "meting_verouderd"
     # Een monitor die wél vers is, telt; een verouderde ernaast maakt de app niet onbekend.
     assert _ev([C("truenas", "healthy"), old, C("buitenkant", "healthy")])["status"] == "healthy"
 

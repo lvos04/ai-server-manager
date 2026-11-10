@@ -19,6 +19,10 @@ from hub.outbound import OutboundPolicy
 DEFAULT_SOCKET_DIR = "/tmp/asm-pg"  # noqa: S108 — map 0700 van uid 568, alleen unix-socket, geen netwerkpoort
 
 
+# Contract 1.3 §6.2: standaard max_age van een meting (een bron kan per capability strenger zijn).
+DEFAULT_MAX_AGE_SECONDS = 900
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HUB_", extra="ignore")
 
@@ -71,7 +75,8 @@ class Settings(BaseSettings):
     truenas_read_timeout: float = Field(default=15.0, gt=0, le=120)
     truenas_extra_ca_file: Path | None = None  # optioneel eigen CA; anders systeem-CA of vingerafdruk
 
-    # Inventaris
+    # Inventaris. De instelbare cache-TTL maakt een meting nooit verser dan haar bron (contract 1.3 §6.2): boven de
+    # standaard max_age (900 s) geldt 900 s, zie ``inventory_max_age_seconds``.
     inventory_ttl_seconds: int = Field(default=15 * 60, ge=30, le=24 * 3600)
     inventory_interval_seconds: int = Field(default=5 * 60, ge=30, le=24 * 3600)
 
@@ -144,6 +149,11 @@ class Settings(BaseSettings):
     @property
     def secrets_dir(self) -> Path:
         return self.data_dir / "secrets"
+
+    @property
+    def inventory_max_age_seconds(self) -> int:
+        """Effectieve geldigheid van een inventarismeting: nooit soepeler dan de standaard ``max_age`` van 900 s."""
+        return min(self.inventory_ttl_seconds, DEFAULT_MAX_AGE_SECONDS)
 
     @property
     def backups_dir(self) -> Path:

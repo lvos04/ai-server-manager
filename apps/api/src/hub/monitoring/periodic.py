@@ -59,7 +59,7 @@ def inventory_samples(db: Session, settings: Settings, now: datetime | None = No
     """Pool-gebruik, vrije ruimte en gezondheid uit een verse ``pool.query``-meting (geen meting → geen samples)."""
     target = current_target(db)
     st = kind_state(
-        db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds, now=now
+        db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds, now=now
     )
     observed = _parse(st.get("observed_at"))
     if st["status"] != "ok" or observed is None:

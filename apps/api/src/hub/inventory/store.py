@@ -99,7 +99,13 @@ def kind_state(
         )
         return base
     if now - attempt.observed_at > timedelta(seconds=ttl_seconds):
-        base.update(reason_code="stale", melding=message("stale"), advies=advice("stale"), verouderd=True)
+        # Contract 1.3 §6.2: verouderd = unknown met meting_verouderd (laatst bekende data blijft zichtbaar).
+        base.update(
+            reason_code="meting_verouderd",
+            melding=message("meting_verouderd"),
+            advies=advice("meting_verouderd"),
+            verouderd=True,
+        )
         return base
     base.update(status="ok", reason_code=None, melding="", advies="", verouderd=False)
     return base

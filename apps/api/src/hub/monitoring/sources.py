@@ -8,6 +8,7 @@ naar logs of antwoorden.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -16,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub.catalog.profiles import BINNENKANT_DIENST, profile_for
-from hub.config import Settings
+from hub.config import DEFAULT_MAX_AGE_SECONDS, Settings
 from hub.events.envelope import emit
 from hub.inventory.store import kind_state
 from hub.keys import KeyRing
@@ -31,7 +32,12 @@ from hub.truenas.connection import current_target
 from hub.vault import Vault
 
 log = logging.getLogger("hub.monitoring")
-JOB_CHECKS = ("worker", "jobs", "job", "queue", "wachtrij", "taken")
+# Contract 1.3 §6 regel 3: "geeft 200 maar voert geen jobs uit" herkent de Hub aan de vaste checknamen worker en jobs.
+# De oude namen gelden nog één overgangsrelease (deze, 0.1.x) en vervallen daarna (ADR-0029).
+JOB_CHECKS = ("worker", "jobs")
+JOB_CHECKS_OVERGANG = ("job", "queue", "wachtrij", "taken")
+HEALTH_RANK = {"healthy": 0, "unknown": 1, "degraded": 2, "down": 3}
+CHECK_NAME = re.compile(r"^[a-z0-9_.-]{1,64}$")
 
 
 def _obs(db: Session, bron_type: str, bron_id: str, sleutel: str = "") -> HealthObservation | None:
@@ -215,7 +221,7 @@ def poll_kuma(db: Session, settings: Settings, vault: Vault, src: MonitorSource,
 def _gpus(db: Session, settings: Settings) -> list[dict[str, Any]]:
     """GPU-identiteiten (PCI-slot) uit de inventaris; de laatst bekende volstaat (identiteit verandert niet)."""
     target = current_target(db)
-    st = kind_state(db, "gpus", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds)
+    st = kind_state(db, "gpus", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds)
     return [g for g in st.get("data") or [] if isinstance(g, dict)]
 
 
@@ -258,37 +264,84 @@ def poll_beszel(db: Session, settings: Settings, vault: Vault, src: MonitorSourc
 
 
 # ------------------------------------------------------------------ connector-health van eigen diensten (§6)
-def judge_connector_health(body: Any, now: datetime) -> tuple[str, str | None, datetime, dict[str, Any]]:
-    """Antwoord van ``GET /connector/v1/health`` → (status, reden, observed_at, details). Een dienst die zelf
-    'healthy' zegt maar een worker/jobs-controle heeft die faalt, is ``degraded`` (``jobs_staan_stil``)."""
-    if not isinstance(body, dict) or body.get("status") not in ("healthy", "degraded", "down", "unknown"):
+def worst(statuses: list[str]) -> str:
+    """Het slechtste in de volgorde healthy < unknown < degraded < down (§6 regel 1; onbekend is nooit groen)."""
+    return max(statuses, key=lambda st: HEALTH_RANK.get(st, 1), default="unknown")
+
+
+def _ts(raw: Any) -> datetime | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return ts if ts.tzinfo is not None else None
+
+
+def max_age_for(limits: Any, name: str) -> int:
+    """§6.2: standaard 900 s; een bron mag per capability of check strenger zijn via ``limits.max_age_s`` in
+    ``discover``. De Hub neemt dat over en is nooit soepeler dan de bron (en nooit soepeler dan 900 s)."""
+    values = [DEFAULT_MAX_AGE_SECONDS]
+    table = limits.get("max_age_s") if isinstance(limits, dict) else None
+    if isinstance(table, dict):
+        for key in ("health", name):
+            v = table.get(key)
+            if type(v) is int and v > 0:
+                values.append(v)
+    return min(values)
+
+
+def judge_connector_health(
+    body: Any, now: datetime, limits: Any = None
+) -> tuple[str, str | None, datetime, dict[str, Any]]:
+    """Antwoord van ``GET /connector/v1/health`` → (status, reden, observed_at, details), contract 1.3 §6 en §6.2.
+
+    - Het totaal is het **slechtste** van de gemelde status en alle checks (healthy < unknown < degraded < down).
+    - Een meting zonder verse ``observed_at`` (ouder dan ``max_age``, of ontbrekend) is ``unknown`` met
+      ``meting_verouderd``; dat geldt voor het geheel en per check. De oude waarde blijft alleen "laatst bekend".
+    - Een falende ``worker``/``jobs``-check geeft de reden ``jobs_staan_stil``."""
+    if not isinstance(body, dict) or body.get("status") not in HEALTH_RANK:
         return "unknown", "antwoord_ongeldig", now, {}
-    status = str(body["status"])
+    stated = str(body["status"])
     reason = str(body.get("reason_code"))[:64] if body.get("reason_code") else None
-    observed = now
-    raw = body.get("observed_at")
-    if isinstance(raw, str):
-        try:
-            ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            if ts.tzinfo is not None and abs((ts - now).total_seconds()) <= 300:
-                observed = ts
-        except ValueError:
-            pass
+    observed = _ts(body.get("observed_at"))
+    top_age = max_age_for(limits, "health")
+    if observed is None or (observed - now).total_seconds() > 300:
+        detail = {"laatst_bekend": stated, "observed_at_bron": body.get("observed_at")}
+        return "unknown", "meting_verouderd", now, detail
+    if (now - observed).total_seconds() > top_age:
+        return "unknown", "meting_verouderd", observed, {"laatst_bekend": stated, "max_age_s": top_age}
     checks = [c for c in body.get("checks") or [] if isinstance(c, dict)][:20]
-    clean: list[dict[str, Any]] = [
-        {
-            "name": str(c.get("name") or "")[:64],
-            "status": str(c.get("status") or "")[:16],
-            "observed_at": c.get("observed_at") if isinstance(c.get("observed_at"), str) else None,
-        }
-        for c in checks
-    ]
-    stalled = [
-        c for c in clean if any(k in c["name"].lower() for k in JOB_CHECKS) and c["status"] in ("down", "degraded")
-    ]
-    if status == "healthy" and stalled:
-        status, reason = "degraded", "jobs_staan_stil"
-    return status, reason, observed, {"checks": clean}
+    clean: list[dict[str, Any]] = []
+    for c in checks:
+        name = str(c.get("name") or "")[:64]
+        st = str(c.get("status") or "")
+        st = st if st in HEALTH_RANK else "unknown"
+        c_obs = _ts(c.get("observed_at"))
+        age = max_age_for(limits, name)
+        fresh = c_obs is not None and (now - c_obs).total_seconds() <= age and (c_obs - now).total_seconds() <= 300
+        clean.append(
+            {
+                "name": name if CHECK_NAME.match(name) else "ongeldig",
+                "status": st if fresh else "unknown",
+                "observed_at": c.get("observed_at") if isinstance(c.get("observed_at"), str) else None,
+                **({} if fresh else {"reason_code": "meting_verouderd", "laatst_bekend": st}),
+            }
+        )
+    total = worst([stated, *[c["status"] for c in clean]])
+    if total != stated or (total != "healthy" and reason is None):
+        job_names = (*JOB_CHECKS, *JOB_CHECKS_OVERGANG)
+        jobs = [c for c in clean if c["name"] in job_names and c["status"] in ("down", "degraded")]
+        stale = [c for c in clean if c.get("reason_code") == "meting_verouderd"]
+        bad = [c for c in clean if c["status"] == total]
+        if jobs and total in ("down", "degraded"):
+            reason = "jobs_staan_stil"
+        elif total == "unknown" and stale:
+            reason = "meting_verouderd"
+        elif bad:
+            reason = "controle_faalt"
+    return total, reason, observed, {"checks": clean, "gemeld": stated}
 
 
 def _fail(row: HealthObservation | None, threshold: int) -> tuple[str, str, int]:
@@ -332,6 +385,21 @@ def poll_connectors(db: Session, settings: Settings, keyring: KeyRing | None, no
         fails = 0
         status: str
         reason: str | None
+        limits: Any = None
+        try:
+            # §6.2: de bron mag in discover een strengere max_age per capability opgeven; zonder antwoord geldt 900 s.
+            disc = call(
+                base,
+                "GET",
+                "/connector/v1/discover",
+                bearer=keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))[0],
+                connect_timeout=settings.service_call_connect_timeout,
+                read_timeout=settings.service_call_read_timeout,
+            )
+            if disc.status == 200 and isinstance(disc.body, dict):
+                limits = disc.body.get("limits")
+        except ServiceCallError:
+            limits = None
         try:
             res = call(
                 base,
@@ -351,7 +419,7 @@ def poll_connectors(db: Session, settings: Settings, keyring: KeyRing | None, no
             elif res.status == 404:
                 status, reason, observed, details = "unknown", "capability_unavailable", now, {"http": 404}
             elif res.body is not None and res.status in (200, 503):
-                status, reason, observed, details = judge_connector_health(res.body, now)
+                status, reason, observed, details = judge_connector_health(res.body, now, limits)
             else:
                 status, reason, fails = _fail(row, settings.connector_fail_threshold)
                 observed, details = now, {"http": res.status}

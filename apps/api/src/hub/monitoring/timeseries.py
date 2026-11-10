@@ -301,6 +301,7 @@ def series_dict(s: MetricSeries, *, stale_seconds: int, now: datetime | None = N
         "laatst_bekend": {"waarde": s.laatste_waarde, "observed_at": iso(s.laatste_op)},
         "observed_at": iso(s.laatste_op),
         "status": "unknown" if stale else "ok",
+        "reason_code": "meting_verouderd" if stale else None,
         "verouderd": stale,
         "retentie": {"ruw_s": s.retentie_ruw_s, "vijf_minuten_s": s.retentie_5m_s, "uur_s": s.retentie_1u_s},
     }

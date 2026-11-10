@@ -37,6 +37,7 @@ def test_zonder_koppeling_alles_onbekend(admin: Any, periodic_run: Any) -> None:
         "observed_at": None,
         "status": "unknown",
         "reden": "geen_bron",
+        "reason_code": "geen_bron",
         "laatst_bekend": None,
     }
     assert v["gpus"] == [] and v["alleen_truenas"] is True

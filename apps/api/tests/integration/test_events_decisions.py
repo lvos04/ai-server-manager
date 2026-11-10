@@ -88,13 +88,23 @@ def test_connectorcontract_van_de_hub(admin: Any, app: Any) -> None:
     d = svc.get("/connector/v1/discover", headers=hdr).json()
     assert d["app_id"] == "ai-server-manager" and d["schema_version"] == "1.0" and d["capabilities"] == ["read"]
     h = svc.get("/connector/v1/health", headers=hdr).json()
+    # Contract 1.3 §6: vaste checknamen database, worker en jobs (+ eigen_backup); totaal = slechtste check.
     assert h["status"] in ("degraded", "unknown") and {c["name"] for c in h["checks"]} == {
         "database",
         "worker",
+        "jobs",
         "eigen_backup",
     }
-    items = svc.get("/connector/v1/items?type=decision&limit=5", headers=hdr).json()
-    assert len(items["items"]) == 5 and items["next_cursor"]
+    rank = {"healthy": 0, "unknown": 1, "degraded": 2, "down": 3}
+    assert rank[h["status"]] == max(rank[c["status"]] for c in h["checks"])
+    jobs = next(c for c in h["checks"] if c["name"] == "jobs")
+    assert set(jobs["detail"]) >= {"wachtrij", "bezig", "laatste_job_klaar"} and jobs["observed_at"]
+    assert d["limits"]["max_age_s"]["health"] == 900
+    # §4.4: besluiten alleen met de scope besluiten.lezen (aan geen dienst toegekend); gebruikers wel.
+    r = svc.get("/connector/v1/items?type=decision&limit=5", headers=hdr)
+    assert r.status_code == 403 and r.json()["code"] == "scope_ontbreekt"
+    items = admin.get("/connector/v1/items?type=decision&limit=5").json()
+    assert len(items["items"]) == 5 and items["next_cursor"] and items["observed_at"]
     for path in ("propose", "apply", "rollback"):
         r = svc.post(f"/connector/v1/{path}", headers=hdr)
         assert r.status_code == 501 and r.json()["code"] == "capability_unavailable"
@@ -103,12 +113,15 @@ def test_connectorcontract_van_de_hub(admin: Any, app: Any) -> None:
         json={"waarde": {"per_app": [{"app_id": "mediaguard", "rpo_uren": 24, "rto_uren": 4}]}},
         headers=idem(),
     )
-    ev = svc.get("/connector/v1/events", headers=hdr).json()
+    # De outbox en het bewijs van de Hub zijn alleen voor gebruikers (geen dienstscope, §4.4).
+    assert svc.get("/connector/v1/events", headers=hdr).status_code == 403
+    ev = admin.get("/connector/v1/events").json()
     assert (
         ev["items"][0]["event_type"] == "onboarding.decision.changed"
         and ev["items"][0]["source_app"] == "ai-server-manager"
     )
-    assert svc.get("/connector/v1/evidence/onzin", headers=hdr).status_code == 404
+    assert svc.get("/connector/v1/evidence/onzin", headers=hdr).status_code == 403
+    assert admin.get("/connector/v1/evidence/onzin").status_code == 404
 
 
 def test_besluit_statusovergangen(admin: Any) -> None:

@@ -84,6 +84,7 @@ class Picker:
             "observed_at": None,
             "status": "unknown",
             "reden": "verouderd" if last is not None else "geen_bron",
+            "reason_code": "meting_verouderd" if last is not None else "geen_bron",
             "laatst_bekend": None
             if last is None
             else {
@@ -102,7 +103,7 @@ def nas_view(db: Session, settings: Settings, *, now: datetime | None = None) ->
     pick = Picker(db, settings.nas_metrics_ttl_seconds, now)
     target = current_target(db)
     url = target.url if target else None
-    ttl = settings.inventory_ttl_seconds
+    ttl = settings.inventory_max_age_seconds
 
     def inv(kind: str) -> dict[str, Any]:
         return kind_state(db, kind, target=url, ttl_seconds=ttl, now=now)

@@ -49,7 +49,7 @@ def _target(db: Session) -> str | None:
 
 
 def _state(db: Session, settings: Settings, kind: str) -> dict[str, Any]:
-    return kind_state(db, kind, target=_target(db), ttl_seconds=settings.inventory_ttl_seconds)
+    return kind_state(db, kind, target=_target(db), ttl_seconds=settings.inventory_max_age_seconds)
 
 
 def app_status(app: dict[str, Any], stale: bool) -> str:
@@ -87,7 +87,7 @@ def inventory_summary(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any
             "aanleiding": run.trigger,
         },
         "soorten": kinds,
-        "ttl_seconden": settings.inventory_ttl_seconds,
+        "ttl_seconden": settings.inventory_max_age_seconds,
         "alleen_lezen": True,
     }
 

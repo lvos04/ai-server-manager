@@ -48,6 +48,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/break-glass/rotate"): "admin",
     ("POST", "/api/v1/auth/break-glass/confirm"): "admin",
     ("POST", "/api/v1/auth/break-glass/selftest"): "admin",
+    ("PUT", "/api/v1/auth/break-glass/cgnat"): "admin",
     ("POST", "/api/v1/services/enroll"): PUBLIC,
     ("POST", "/api/v1/auth/logout"): "kind",
     ("GET", "/api/v1/auth/me"): "kind",
@@ -137,6 +138,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/services/self/rotate"): SERVICE,
     ("GET", "/api/v1/services/self"): SERVICE,
     ("POST", "/api/v1/services/{service_id}/unlink"): "admin",
+    ("GET", "/api/v1/services/{service_id}/koppelstatus"): "operator",
     ("PUT", "/api/v1/services/{service_id}/truenas-app"): "admin",
     ("POST", "/api/v1/services/{service_id}/revoke"): "admin",
     ("POST", "/api/v1/services/{service_id}/rotate"): "admin",
@@ -148,8 +150,9 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/connector/v1/discover"): VIEWER_OR_SERVICE,
     ("GET", "/connector/v1/health"): VIEWER_OR_SERVICE,
     ("GET", "/connector/v1/items"): VIEWER_OR_SERVICE,
-    ("GET", "/connector/v1/events"): VIEWER_OR_SERVICE,
-    ("GET", "/connector/v1/evidence/{evidence_id}"): VIEWER_OR_SERVICE,
+    # Contract 1.3 §4.4: geen dienstscope voor de outbox en het bewijs van de Hub → alleen gebruikers.
+    ("GET", "/connector/v1/events"): "viewer",
+    ("GET", "/connector/v1/evidence/{evidence_id}"): "viewer",
     ("POST", "/connector/v1/propose"): VIEWER_OR_SERVICE,
     ("POST", "/connector/v1/apply"): VIEWER_OR_SERVICE,
     ("POST", "/connector/v1/rollback"): VIEWER_OR_SERVICE,
@@ -266,5 +269,39 @@ def test_rol_onder_minimum_krijgt_403_en_dienst_versus_gebruiker(admin: Any, app
         role = "viewer" if need == VIEWER_OR_SERVICE else need
         r = _call(clients[role], method, path)
         assert r.status_code not in (401, 403), f"{role} → {method} {path}: {r.status_code} {r.text[:200]}"
-    for path in ("/connector/v1/discover", "/connector/v1/health", "/connector/v1/items"):
+    for path in ("/connector/v1/discover", "/connector/v1/health"):
         assert _call(admin, "GET", path, svc_headers).status_code == 200
+    # §4.4: besluiten alleen met besluiten.lezen (aan geen enkele dienst toegekend) → 403 scope_ontbreekt.
+    r = _call(admin, "GET", "/connector/v1/items", svc_headers)
+    assert r.status_code == 403 and r.json()["code"] == "scope_ontbreekt"
+
+
+def test_vaste_scopes_per_dienst(admin: Any, app: Any) -> None:
+    """C1.3-ASM-07: inventaris.lezen voor appstore-en-fork en jelly-leon-platform; home-control-hub niet; besluiten en
+    backup.self voor geen enkele dienst. Een 403 scope_ontbreekt is geen intrekking: het token blijft geldig."""
+
+    def token(app_id: str) -> dict[str, str]:
+        r = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": app_id})
+        r = admin.post("/api/v1/services/enroll", json=enroll_body(app_id, token=r.json()["enrollment_token"]))
+        assert r.status_code == 200, r.text
+        return {"Authorization": f"Bearer {r.json()['service_token']}"}
+
+    asf, jlp, hch = token("appstore-en-fork"), token("jelly-leon-platform"), token("home-control-hub")
+    for hdr in (asf, jlp):
+        assert admin.get("/api/v1/apps", headers=hdr).status_code == 200
+        r = admin.get(f"/api/v1/apps/{uuid.uuid4()}", headers=hdr)
+        assert r.status_code == 404  # leesrecht, maar de app bestaat niet
+    r = admin.get("/api/v1/apps", headers=hch)
+    assert r.status_code == 403 and r.json()["code"] == "scope_ontbreekt"
+    assert r.json()["details"]["vereiste_scope"] == "inventaris.lezen"
+    for hdr in (asf, jlp, hch):
+        for kind in ("decision", "backup.self"):
+            r = admin.get(f"/connector/v1/items?type={kind}", headers=hdr)
+            assert r.status_code == 403 and r.json()["code"] == "scope_ontbreekt", kind
+        assert admin.get("/connector/v1/events", headers=hdr).json()["code"] == "scope_ontbreekt"
+        assert admin.get("/api/v1/services/self", headers=hdr).status_code == 200  # nooit een intrekking
+    # De beheerder ziet de scopes per dienst in de Hub-UI.
+    items = {i["app_id"]: i for i in admin.get("/api/v1/services").json()["items"]}
+    assert items["appstore-en-fork"]["scopes"] == ["inventaris.lezen"]
+    assert items["jelly-leon-platform"]["scopes"] == ["catalogus.lezen", "inventaris.lezen"]
+    assert items["home-control-hub"]["scopes"] == ["catalogus.lezen"]

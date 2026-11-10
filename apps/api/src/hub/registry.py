@@ -43,7 +43,7 @@ def nas_address(db: Session) -> str | None:
 
 def measured_apps(db: Session, settings: Settings) -> dict[str, Any]:
     target = current_target(db)
-    return kind_state(db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_ttl_seconds)
+    return kind_state(db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds)
 
 
 def _repositories(app: dict[str, Any]) -> set[str]:
