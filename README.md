@@ -4,15 +4,27 @@ De Hub van het platform: **B01** (centrale web-UI en beheer-API), **B02** (AI-be
 **B09** (monitoring/incidenten) en **B12** (back-up en herstel). Taal: Nederlands. Bron van waarheid voor de
 platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.3,
 vastgesteld 2026-11-10, ADR-0027; reviewcorrecties ADR-0028; wat elke repo moet veranderen:
-[`CONTRACT_1.3_CONFORMITEIT.md`](docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md)). De code hieronder volgt nog
-contract 1.2; de 1.3-punten voor deze repo staan in hoofdstuk 1 van die lijst.
+[`CONTRACT_1.3_CONFORMITEIT.md`](docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md)). De Hub en de executor volgen
+contract 1.3 voor alle punten die hoofdstuk 1 van die lijst als **NU** markeert (ADR-0029); de punten voor P2–P5
+(C1.3-ASM-18…22) en de manifestvelden die op de validator van appstore-en-fork wachten (C1.3-ASM-17) staan open in
+[`docs/platform-v2/EVIDENCE.json`](docs/platform-v2/EVIDENCE.json). De statuspagina van de executor en de Hub-UI
+volgen Peil 1.1.1.
 
-## Stand (versie 0.1.0, fase P0 + contract 1.2 — backend en web-UI)
+## Stand (versie 0.1.0, fase P0 + P1 + contract 1.3 — backend en web-UI)
+
+Contract 1.3 in deze repo (ADR-0029): enroll-antwoord `"1.3"` met `rotation_sequence` en een tolerante `base_url`;
+oude tokens pas ingetrokken bij het eerste gebruik van een nieuw token; vingerafdruk over alle policy-sleutels;
+`100.64.0.0/10` standaard niet privé (beheerinstelling); 401 alleen voor authenticatie; vaste leesscopes per dienst;
+paginering over een momentopname; inbox met domeinen per eigenaar, vaste werkwoorden en ernst in vijf woorden;
+`sso.access.*` op (`issuer`, `sub`); connector-health = slechtste check en versheid met `max_age`; log-sink met
+zichtbaar ingekorte opslag; healthchecks die als eerste naar 568 wisselen en een lege bounding set; de executor als
+dienst (adresregels, onleesbaar koppelbestand fail-closed, herkomst- en `Host`-regels, JWT-regels). Alles Sim-getest;
+niets op een echte NAS.
 
 | Onderdeel | Stand | Validatie |
 |---|---|---|
 | Hub-API (`apps/api`, pakket `hub`) | first-start-init, setupcode → eerste admin, login/rollen/CSRF, JWKS + gebruikers-JWT (`token_use: user`) en dienst-JWT (`token_use: hub_service`), enrollment volgens contract 1.2 (exact schema, vingerafdruk, toegestane herhaling, `services/self`, rotatie na eerste gebruik, rotatie aanvragen, ontkoppelen via de dienst), noodlogin met TOTP, onboarding-wizard D01–D18, gates, alleen-lezen TrueNAS-inventaris, dienstenregister met bevestigde TrueNAS-appnaam, back-updekking, eigen pg_dump, events-inbox, connectorcontract | Sim-getest (fake TrueNAS), echte PostgreSQL 16 |
-| Executor (`apps/executor`) | healthz/readyz, statuspagina met koppelen (koppelcode + Hub-vingerafdruk, pinning in `hub-link.json`), controle van inkomende Hub-JWT's, allowlist die **alles weigert**; TrueNAS-schrijfkey volgt in P2 | Unit-getest + Sim-getest tegen de echte Hub-API + image-rooktest |
+| Executor (`apps/executor`) | healthz/readyz, statuspagina (Peil 1.1.1) met koppelen (koppelcode + Hub-vingerafdruk, pinning in `hub-link.json`, herkomst- en `Host`-regels van contract 1.3 §3.7), onleesbaar koppelbestand fail-closed, controle van inkomende Hub-JWT's (§4.7, `jti` per POST), allowlist die **alles weigert**; TrueNAS-schrijfkey volgt in P2 | Unit-getest + Sim-getest tegen de echte Hub-API + browsertest + image-rooktest |
 | Web-UI (`apps/web`, Next.js-PWA, ontwerptaal Peil) | "TrueNAS Home Platform": eerste start, inloggen (+ SSO-knop, noodlogin), onboarding D01–D18, TrueNAS-koppeling, Home met P1-bronnen, Server (inventaris, metrieken, meetdekking, logs), appcatalogus + appdetail, Problemen-inbox + incidentdetail, Backups, Instellingen (account, toegang/SSO, noodaccount, diensten, monitoring en meldingen, audit, over), kindschil; latere fasen eerlijk "nog niet beschikbaar" (ADR-0024) | Unit-getest (vitest) + Sim-getest (Playwright 360/390/768/1440 × licht/donker + axe tegen simulators, ook tegen de image) |
 | Images | `deploy/allinone` (Hub + web-UI, alles-in-één, één poort 30400) en `deploy/executor` | gebouwd en gestart in Docker; **NIET GEVALIDEERD (echte NAS)** |
 | Policy/AI | volgt in P2; AI staat standaard uit, geen modellen, geen betaalde aanroepen | — |

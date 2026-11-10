@@ -40,6 +40,16 @@ meetwaarden (`reporting.realtime`): CPU, geheugen, ZFS ARC, schijf-I/O en netwer
 leesrecht of reageert de NAS niet, dan is alles **onbekend** met de reden erbij. Zie `GET /api/v1/observability/nas`
 en de meetdekking in `GET /api/v1/monitoring/coverage` (welke bron wat levert en waar de hiaten zitten).
 
+## Eigen diensten (connector-health en heartbeat, contract 1.3 §6 en §6.2)
+
+- De Hub leest per eigen dienst `GET /connector/v1/discover` (voor `limits.max_age_s`) en `GET /connector/v1/health`.
+  Het totaal is de **slechtste** van de gemelde status en alle checks (gezond < onbekend < beperkt < storing): een dienst
+  die "healthy" zegt met een worker die `down` is, staat op storing (`jobs_staan_stil`).
+- Een meting of check zonder verse `observed_at` (ouder dan `max_age`, standaard 900 s; een bron mag strenger zijn,
+  de Hub is nooit soepeler) is **onbekend** met `meting_verouderd`; de laatste waarde blijft alleen "laatst bekend".
+  Ook de instelbare inventaris-TTL geldt hooguit 900 s.
+- De Hub zelf meldt `database`, `worker`, `jobs` (wachtrij, bezig, laatste klaar) en `eigen_backup`.
+
 ## Gotify (meldingen op je telefoon)
 
 1. In Gotify: **Apps → Applicatie maken** (bv. "Hub") en kopieer het **applicatietoken**. Gebruik nooit een

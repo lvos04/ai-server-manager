@@ -4,6 +4,44 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — contract 1.3 toegepast in de Hub en de executor (ADR-0029; punten NU van C1.3-ASM)
+- **Enroll (C1.3-ASM-02):** antwoord `schema_version` `"1.3"` met `rotation_sequence` (0: geen sleutelrotatie
+  gebouwd); `base_url` alleen op type gecontroleerd, een ongeldige waarde wordt `null` met `base_url_genegeerd` en een
+  waarschuwing in de Hub-UI; bij herkoppelen vervallen de oude tokens pas bij het eerste gebruik van het nieuwe, en een
+  nieuw token dat 60 min ongebruikt blijft, vervalt. Migratie 0011 (`service.base_url_genegeerd`, `hub_setting`,
+  `incident.ernst_bron`).
+- **Sleutels (C1.3-ASM-03):** vingerafdruk over alle policy-sleutels (Hub en executor), testvector
+  `HN69-2PHK-XV2D-X85W`.
+- **Noodlogin (C1.3-ASM-05/06):** `100.64.0.0/10` standaard niet privé; `PUT /api/v1/auth/break-glass/cgnat`
+  (beheerder, audit, waarschuwing) en de zelftest toont het; `invalid_totp` en een fout eigen wachtwoord binnen een
+  sessie geven 422 (401 alleen voor authenticatie); UI onderscheidt op status.
+- **Scopes en momentopname (C1.3-ASM-07/08):** vaste leesscopes per dienst (`inventaris.lezen` voor appstore-en-fork
+  en jelly-leon-platform), 403 `scope_ontbreekt`; `backup.self`, outbox en bewijs van de Hub-connector alleen voor
+  gebruikers; `GET /api/v1/apps` met `snapshot_id`, `meting_observed_at` en 409 `snapshot_changed`; sorteren op status.
+- **Events en incidenten (C1.3-ASM-09/10):** domeinen per eigenaar, vaste werkwoorden, ernst in vijf Peil-woorden met
+  bronwaarde in de UI (hoog escaleert niet meer); `sso.access.revoked`/`changed` op (`issuer`, `sub`); filter op app.
+- **Connector, versheid en log-sink (C1.3-ASM-11/12/13):** totaal = slechtste check, vaste checknamen (ook `jobs`),
+  `limits.max_age_s` in `discover`, `max_age` van de bron overgenomen en nooit soepeler dan 900 s (ook de
+  inventaris-TTL), `meting_verouderd`; log-opslag zichtbaar ingekort.
+- **Koppelstatus in de Hub-UI (C1.3-ASM-16):** `GET /api/v1/services/{id}/koppelstatus` leest de witte lijst en de
+  NL-melding bij de dienst zelf; onleesbaar = storing; scopes en genegeerde `base_url` per dienst zichtbaar.
+- **Executor als dienst (C1.3-ASM-04/14):** adresregels (canonieke IP-vormen, controle na DNS-resolutie per
+  verbinding), onleesbaar koppelbestand fail-closed, `hub_incompatibel`, exacte `Origin` met het schema van het
+  verzoek, `Sec-Fetch-Site`, `Host`-beperking (`host_niet_toegestaan`), elke POST een poging (ook `al_gekoppeld`),
+  409 `koppelen_bezig`, invoer niet afkappen, één logregel per poging, Gereed = `/readyz` + gekoppeld + bevestigd;
+  JWT-regels van §4.7 (`aud` één string, geen `kid` → `unknown_key`, `jti` bij elke POST verbruikt, authenticatie vóór
+  rol, `Idempotency-Key` en body); `/api/v1/execute` vraagt eerst een dienst-JWT; statische Idempotency-Key-test;
+  browsertest met de negatieve gevallen.
+- **Images (C1.3-ASM-01):** bounding set leeg na de eigenaarschapsstap; healthchecks wisselen als eerste handeling naar
+  568 met no_new_privs; rooktest controleert CapPrm/CapAmb/CapBnd en de healthcheck apart, en de executor als Custom
+  User 568.
+- **Peil 1.1.1:** gepinde sjabloonkopie en renderer in één doorgang voor de executor; tokenkopie, ondernavigatie op
+  labelbreedte zonder vet actief item, statuspil-radius en "verzonden" in de Hub-UI.
+- **Overig:** uitgaande beheerdersadressen volgen de canonieke vormen van §3.2; contract-pin op bron-commit 02b119c
+  (C1.3-ALG-01); werkopdrachten noemen contract 1.3 en leggen de KWALITEIT van Python-diensten niet meer op aan
+  jelly-leon-web en jelly-leon-clients (C1.3-ASM-23); eigen manifesten met kop "platformcontract 1.3"
+  (`healthcheck.monitor` wacht op C1.3-ASF-08).
+
 ### Gerepareerd — onafhankelijke review van contract 1.3 (ADR-0028; blijft `contracts 1.3`)
 - Dertien correcties RV1–RV13 in het wijzigingslog van het contract, telkens de veiligste lezing: de bestaande
   Emby-koppeling van MediaGuard (bibliotheek bijwerken, afspeeltest) blijft, de rest van het platform schrijft nooit in

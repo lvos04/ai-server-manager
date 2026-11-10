@@ -170,6 +170,19 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - Conformiteitslijst gecorrigeerd en aangevuld (121 punten). Alles alleen gelezen en met tests gecontroleerd; niets op
   een echte NAS, met echte accounts of op echte hardware.
 
+## Contract 1.3 — toegepast in de Hub en de executor (2026-11-10)
+
+- Alle punten die hoofdstuk 1 van `CONTRACT_1.3_CONFORMITEIT.md` als **NU** markeert, zijn gebouwd en Sim-getest
+  (ADR-0029): C1.3-ASM-01…14, -16 en -23, plus de bronpin van het contract (C1.3-ALG-01) en Peil 1.1.1 (statuspagina
+  van de executor, tokens en componentregels van de Hub-UI). Details per punt in `EVIDENCE.json`.
+- **Open:** C1.3-ASM-17 (`healthcheck.monitor` en `accepted_findings` in de eigen manifesten) wacht op de validator van
+  appstore-en-fork (C1.3-ASF-08; de gecommitte validator kent de velden nog niet). C1.3-ASM-18…22 horen bij P2, P3,
+  P4-0, P4 en P5. De overgangen `payload.severity` en de oude jobs-checknamen vervallen in de release na 0.1.x.
+- Gevolg voor andere repos: `items`, `events` en `evidence` van de Hub-connector geven diensten nu 403
+  `scope_ontbreekt` (gemeten: geen dienst leest ze); events buiten het eigen domein of met andere werkwoorden dan §7
+  maken geen incident meer.
+- Niets op een echte NAS, met echte accounts of op echte hardware gevalideerd.
+
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 
 - Ubuntu-ontwikkelmachine (geheugen is de grens voor parallelle builds), Docker 29 (systeemdaemon), PostgreSQL 16.15 +

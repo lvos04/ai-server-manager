@@ -13,3 +13,8 @@ werkmap `<WERKMAP>`). Filter op één repo met `args.keys` (bv. `{"keys":["hch"]
 
 **Let op:** in deze repo staat `<WERKMAP>` in plaats van het echte pad van de ontwikkelmachine (publieke repo). Vervang
 `<WERKMAP>` vóór gebruik door de werkmap met de 11 repos (bv. `$HOME/truenas-v2`, als absoluut pad).
+
+**Contract 1.3 (C1.3-ASM-23):** de `COMMON`-tekst noemt nu contract 1.3 en `CONTRACT_1.3_CONFORMITEIT.md` als bindende
+leesstof. De KWALITEIT-eisen voor nieuwe Python-diensten (OpenAPI, alles-in-één image, `CUSTOM_APP.md`, manifest)
+gelden niet meer voor jelly-leon-web en jelly-leon-clients: die krijgen `KWALITEIT_FORK` (bouwen en testen met de
+upstream-toolchain, geen eigen image of Custom App; contract 1.3 §10, inventaris B03). `commonFor(repo)` kiest de tekst.

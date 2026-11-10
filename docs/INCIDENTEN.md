@@ -26,9 +26,17 @@ Gevoelige details (`classification: sensitive`, bv. het bron-IP van een noodlogi
 Alle wijzigingen vragen `Idempotency-Key`, accepteren `If-Match` (versie) en staan in het auditspoor.
 
 **Wat voedt de inbox?** De eigen outbox van de Hub (monitoringbronnen, meldingskanalen en dead-letters, eigen back-up,
-TrueNAS-inventaris, noodlogin, alert-overgangen, auditketting) en de events-inbox van diensten (`app.health.changed`,
-de SSO-events van home-control-hub, en elk `…failed/crashed/down…` met zijn `…succeeded/recovered/…`). Onbekende events
-maken geen incident maar blijven in `/api/v1/events`.
+TrueNAS-inventaris, noodlogin, alert-overgangen, auditketting) en de events-inbox van diensten (contract 1.3 §7,
+ADR-0029): `app.health.changed` over de **eigen** app, de SSO-events van home-control-hub, en binnen het **eigen domein**
+van de bron (bv. home-control-hub: `sso`, `energy`, `network`, `automation`, `flow`) de vaste werkwoorden — probleem
+`failed`, `crashed`, `down`, `degraded`, `stalled`, `blocked`, `rejected`, `saturated`, `conflict`; herstel `recovered`,
+`succeeded`, `resolved`, `restored`. Een event buiten het eigen domein, met een ander werkwoord of een onbekend type
+maakt geen incident maar blijft in `/api/v1/events`.
+
+**Ernst.** Een event mag `payload.ernst` meegeven met een van de vijf woorden `kritiek`, `hoog`, `middel`, `laag`,
+`info`; de Hub zet dat vast om (`kritiek` → kritiek; `hoog`/`middel` → waarschuwing; `laag`/`info` → info) en toont in
+de UI de bronwaarde (`ernst_bron`, `ernst_label`). Alleen kritiek escaleert. `payload.severity` geldt nog deze release
+als overgang. Filteren op app kan met `GET /api/v1/incidents?app=<app_id>` (bron of onderwerp).
 
 **Dedupe en correlatie.** Eén niet-opgelost incident per vingerafdruk (soort × bron × onderwerp): 100 identieke crashes
 geven één incident met 100 gebeurtenissen. Een herstel sluit alleen precies dat incident en nooit met een herstel dat

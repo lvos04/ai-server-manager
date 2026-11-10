@@ -8,11 +8,11 @@ export const meta = {
   ],
 }
 
-const COMMON = `Je werkt mee aan het programma "TrueNAS Home Platform V2". Taal voor alle documenten, UI-teksten, foutmeldingen en commitberichten: Nederlands (code-identifiers mogen Engels).
+const COMMON_TEMPLATE = (KWALITEIT) => `Je werkt mee aan het programma "TrueNAS Home Platform V2". Taal voor alle documenten, UI-teksten, foutmeldingen en commitberichten: Nederlands (code-identifiers mogen Engels).
 
 WERKMAP: <WERKMAP> bevat 11 git-repos naast elkaar (geen repo zelf): ai-server-manager, home-control-hub, appstore-en-fork, jelly-leon-platform, jelly-leon, jelly-leon-web, jelly-leon-clients, zoeken-en-persoonlijke-ai, media-guard-ultimate, media-source-optimizer, my_house. Er kunnen andere bouwers tegelijk werken, elk in een eigen repo. Wijzig en commit UITSLUITEND in jouw eigen repo (andere repos alleen lezen). ai-factory nooit aanraken.
 
-LEES EERST (bindend): <repo>/docs/platform-v2/PLATFORM_CONTRACTEN.md (versie 1.1!), <repo>/docs/platform-v2/README.md, je eigen B-/I-/A-/promptdocs in <repo>/docs/platform-v2/, en <repo>/docs/platform-v2/EXCEL_TAKEN.json (jouw Excel-taken met acceptatiecriteria). Gedeelde architectuur: docs/platform-v2/01_ARCHITECTUUR (vooral 02_DATA_EIGENAARSCHAP, 03_RISICO_AUTONOMIE, 07_API_EN_EVENTSCHEMA, 08_UI_EN_INTERACTIES) en 05_TESTS. Het volledige pakket staat in <WERKMAP>/ai-server-manager/docs/platform-v2/.
+LEES EERST (bindend): <repo>/docs/platform-v2/PLATFORM_CONTRACTEN.md (contracts 1.3, byte-gelijke kopie) en <repo>/docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md (wat jouw repo moet veranderen, met moment NU of een latere fase), <repo>/docs/platform-v2/README.md, je eigen B-/I-/A-/promptdocs in <repo>/docs/platform-v2/, en <repo>/docs/platform-v2/EXCEL_TAKEN.json (jouw Excel-taken met acceptatiecriteria). Gedeelde architectuur: docs/platform-v2/01_ARCHITECTUUR (vooral 02_DATA_EIGENAARSCHAP, 03_RISICO_AUTONOMIE, 07_API_EN_EVENTSCHEMA, 08_UI_EN_INTERACTIES) en 05_TESTS. Het volledige pakket staat in <WERKMAP>/ai-server-manager/docs/platform-v2/.
 
 VASTE KEUZES GEBRUIKER: Python 3.12 FastAPI + PostgreSQL + Next.js/React PWA (alle schermen centraal in de Hub-UI van ai-server-manager; andere nieuwe apps zijn API-diensten met alleen een kleine statuspagina). INSTALLATIE: uitsluitend als STANDAARD TrueNAS Custom App (formulier: image+tag, poort, opslag) — NOOIT YAML, 'Install via YAML', custom_compose_config of docker compose als installatiemethode (compose alleen voor ontwikkeling/CI/E2E). Eén alles-in-één image per repo (ingebouwde PostgreSQL via unix-socket, API, worker; zie het werkende voorbeeld <WERKMAP>/media-source-optimizer/deploy/allinone en docs/TRUENAS_CUSTOM_APP.md). Eerste installatie = twee handmatige Custom Apps (Hub + executor) via de TrueNAS-web-UI, daarna alles via de platform-UI/TrueNAS-API; derden-apps met meerdere containers via de officiële TrueNAS-catalogusapp. Geen terminal of install.sh voor de gebruiker. NAS-gegevens D01–D18 zijn onbekend: nooit voorbeeldwaarden (IP, poolnaam zoals "tank", versies) als echte waarden gebruiken; die komen uit de onboarding-wizard of uit gemeten TrueNAS-API-readback. Bestaande repos: alleen hiaten bouwen, nooit bestaande integriteit/rollback/monitoring dubbel bouwen of uitschakelen. Veiligheid volgens 03_RISICO_AUTONOMIE: geen shell/root voor AI, geen sh -c/sudo-endpoint, geen Docker-socket in containers, geen latest-tags (base images op @sha256-digest), boiler nooit schakelen, geen betaalde API-overage. Lokale AI-modellen optioneel en standaard uit. Jellyfin-fork: technische identiteit/API blijft 'Jellyfin', alleen de zichtbare naam wordt 'Jelly Leon'.
 
@@ -24,9 +24,17 @@ GIT: branch ccr-c133d7a0-kuz1cv (staat al uitgecheckt). Kleine logische commits 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Doe vóór ELKE push eerst git pull --rebase origin ccr-c133d7a0-kuz1cv en push daarna met git push -u origin ccr-c133d7a0-kuz1cv (bij netwerkfout tot 4× opnieuw na 2/4/8/16 s). Geen PR's, geen force-push, geen geheimen committen, nooit een modelnaam of model-ID in commits, code of docs.
 
-KWALITEIT: per onderdeel code + unit-, integratie- en E2E-tests (met simulators/fakes), OpenAPI-export, CI-workflow (.github/workflows), alles-in-één image + deploy/truenas/CUSTOM_APP.md (formuliervelden) + manifest met gepinde images en .env.example, ADR bij keuzes. Draai je tests echt en rapporteer exacte commando's en uitkomsten. Als het contract iets mist of tegenstrijdig is: kies de veiligste interpretatie, leg het vast in docs/adr en meld het onder contract_issues.
+${KWALITEIT}
 
 EINDRAPPORT: lever het gestructureerde eindrapport (repo, samenvatting NL, commits, tests_run, evidence_ids, blockers, contract_issues, followups).`
+
+// C1.3-ASM-23 (contract 1.3 §10, inventaris B03): de KWALITEIT-eisen voor nieuwe Python-diensten (image, Custom App,
+// OpenAPI, manifest) gelden niet voor de webclient en de apparaat-apps; die hebben geen eigen image of Custom App.
+const KWALITEIT_DIENST = "KWALITEIT: per onderdeel code + unit-, integratie- en E2E-tests (met simulators/fakes), OpenAPI-export, CI-workflow (.github/workflows), alles-in-één image + deploy/truenas/CUSTOM_APP.md (formuliervelden) + manifest met gepinde images en .env.example, ADR bij keuzes. Draai je tests echt en rapporteer exacte commando's en uitkomsten. Als het contract iets mist of tegenstrijdig is: kies de veiligste interpretatie, leg het vast in docs/adr en meld het onder contract_issues."
+const KWALITEIT_FORK = 'KWALITEIT (fork zonder eigen image of Custom App: jelly-leon-web en jelly-leon-clients): bouw en test met de upstream-toolchain van de fork (lint, unittests, build, artefact), CI-workflows en upstream-sync zonder auto-publicatie, technische identiteit Jellyfin ongewijzigd (alleen de zichtbare naam Jelly Leon), eigen app-ID\'s nooit gelijk aan een officiële app (contract 1.3 §1.1 besluit 1), ADR bij keuzes; geen OpenAPI, alles-in-één image, CUSTOM_APP.md of manifest voor deze repo. Wat niet te bouwen of te testen is (iOS/tvOS, echte apparaten, accounts): NIET GEVALIDEERD. Draai je tests echt en rapporteer exacte commando\'s en uitkomsten. Als het contract iets mist of tegenstrijdig is: kies de veiligste interpretatie, leg het vast in docs/adr en meld het onder contract_issues.'
+const FORKS = ['jelly-leon-web', 'jelly-leon-clients']
+const commonFor = (repo) => COMMON_TEMPLATE(FORKS.includes(repo) ? KWALITEIT_FORK : KWALITEIT_DIENST)
+
 
 const RESULT = {
   type: 'object',
@@ -172,16 +180,16 @@ log(`Groep(en): ${(args && args.groups) ? args.groups.join(', ') : 'alle'} — $
 
 const results = await pipeline(
   ITEMS,
-  (item) => agent(`${COMMON}\n\n${item.prompt}`, { label: `bouw:${item.key}`, phase: 'Bouwen', schema: RESULT }),
+  (item) => agent(`${commonFor(item.repo)}\n\n${item.prompt}`, { label: `bouw:${item.key}`, phase: 'Bouwen', schema: RESULT }),
   async (prev, item) => {
     if (!item.web || !prev) return prev
-    const w = await agent(`${COMMON}\n\n${item.webPrompt}\n\nMELDING BACKEND-AGENT:\n${JSON.stringify(prev)}`, { label: `web:${item.key}`, phase: 'Web', schema: RESULT })
+    const w = await agent(`${commonFor(item.repo)}\n\n${item.webPrompt}\n\nMELDING BACKEND-AGENT:\n${JSON.stringify(prev)}`, { label: `web:${item.key}`, phase: 'Web', schema: RESULT })
     return { backend: prev, web: w }
   },
   async (prev, item) => {
     if (!prev) return null
     const p = item.kind === 'delta' ? verifyTask(item.repo) : item.review
-    const r = await agent(`${COMMON}\n\n${p}\n\nMELDING VORIGE AGENT(S):\n${JSON.stringify(prev)}`, { label: `review:${item.key}`, phase: 'Review', schema: RESULT })
+    const r = await agent(`${commonFor(item.repo)}\n\n${p}\n\nMELDING VORIGE AGENT(S):\n${JSON.stringify(prev)}`, { label: `review:${item.key}`, phase: 'Review', schema: RESULT })
     return { item: item.key, build: prev, review: r }
   },
 )

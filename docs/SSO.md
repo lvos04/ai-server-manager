@@ -34,7 +34,9 @@ Inloggen gaat daarna via `GET /api/v1/auth/oidc/login`; fouten komen terug als `
   sessies van een gebruiker intrekken (`POST /api/v1/users/{id}/sessions/revoke`).
 - SSO uitzetten of issuer, client, redirect, groepsclaim of koppelingen wijzigen trekt alle SSO-sessies in (en vraagt een
   nieuwe testlogin).
-- Haalt Authentik iemands toegang weg, dan stuurt `home-control-hub` `sso.access.revoked`; de Hub trekt dan de
-  SSO-sessies van die gebruiker in. Een gebruiker zonder gekoppelde groep kan niet meer inloggen.
+- Haalt Authentik iemands toegang weg, dan stuurt `home-control-hub` `sso.access.revoked`; bij een wijziging
+  `sso.access.changed`. De Hub koppelt op (`issuer`, `sub`) en alleen zonder `sub` (overgang) op de gebruikersnaam, en
+  trekt de SSO-sessies van die gebruiker in; zo'n event geeft nooit rechten (contract 1.3 §7). Een gebruiker zonder
+  gekoppelde groep kan niet meer inloggen.
 - `GET /api/v1/sso/status` (admin) toont het advies van `home-control-hub`: de rechten van zijn Authentik-token
   (`deels_gecontroleerd` = waarschuwing, nooit groen) en of de rechtenkaart verouderd is.
