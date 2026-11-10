@@ -141,7 +141,7 @@ dienst-JWT van de Hub (`domains/sso/backup.py`, `authentik_router.py`, A28); dri
 |---|---|---|---|---|
 | C1.3-HCH-01 | **Herkomst statuspagina:** `Referrer-Policy: no-referrer` → `same-origin` (r. ~76); `Origin: null` niet meer accepteren, exacte `Origin`; `Sec-Fetch-Site` toevoegen; `Host`-beperking; browsertest met `Origin: null`, vreemde `Origin`, `same-site`, `cross-site`, niet-toegestane `Host`, geen cookie. | §3.7 (A13, A14) | `apps/api/src/integrations/status_page.py`, `tests/ui/statuspagina.spec.ts`, `apps/api/tests/integration/test_contract_1_2_link.py` | NU |
 | C1.3-HCH-02 | **Koppelformulier nalopen:** elke POST telt als poging (ook ongeldige invoer, lopende poging, onleesbaar bestand); 409 `koppelen_bezig`; meldingen alleen bij een echte poging; invoer niet afkappen; één logregel met trace-ID. | §3.7 (A14) | `apps/api/src/integrations/status_page.py`, tests | NU |
-| C1.3-HCH-03 | **Reasons** precies volgens de tabel van §4.7 (ontbrekende header, ander schema, lege waarde → `invalid_token`; JWS zonder `kid` → `unknown_key`); controlevolgorde met auth vóór bodyvalidatie. | §4.7 (A16) | `apps/api/src/integrations/security/auth.py`, tests | NU |
+| C1.3-HCH-03 | **Reasons:** de code volgt de tabel van §4.7 al (gemeten in `security/auth.py`: geen header, ander schema of lege waarde → `invalid_token`; geen gepinde `kid` → `unknown_key`; `strict_aud`); per geval een test toevoegen waar die ontbreekt (ook gepinde `kid` met foute handtekening en een onleesbare body zonder auth → 401). | §4.7 (A16) | `apps/api/tests/unit/` of `apps/api/tests/integration/test_contract_1_2_link.py` | NU (tests nalopen) |
 | C1.3-HCH-04 | **`rotation_sequence`** uit het enroll-antwoord in `pins.rotation_sequence`; `key-rotations?after=` vanaf die waarde; `schema_version` van het bestand `"1.3"`. | §3.3, §3.5, §4.5 (A17) | `apps/api/src/integrations/enrollment.py`, `hublink_store.py` (r. ~127), `worker.py`, `tests/e2e/sim_hub.py` | NU |
 | C1.3-HCH-05 | **`last_error`-codes:** de vaste aanvullingen van §3.5 gebruiken waar de dienst nu een eigen code heeft (o.a. `hub_incompatibel`, `token_ongeldig`, `vingerafdruk_ongeldig`, `hub_adres_ongeldig`, `overzetten_onvolledig`, `koppelstatus_onleesbaar`); bij `vingerafdruk_ongeldig`/`hub_adres_ongeldig` de Hub niet aanspreken en het token niet afhandelen. | §3.5 (A12) | `apps/api/src/integrations/enrollment.py`, `hublink_store.py`, tests | NU |
 | C1.3-HCH-06 | **`sso.access.revoked`/`changed`:** `payload` met `issuer`, `sub` (OIDC-`sub` van de Hub-client; `sub_mode` nagaan in de Authentik-broncode) en `preferred_username` (nu alleen de gebruikersnaam in `entity.id`). | §7 (A26) | `apps/api/src/integrations/domains/sso/authaudit.py`, tests | NU |
@@ -222,7 +222,8 @@ volgt, C1.3-ASM repowerk). De driftregel van de Peil-kopie (faalt nu bij elke ni
 
 **Conform (gemeten):** healthcheck wisselt naar 568 met no_new_privs (`deploy/allinone/healthcheck.py`, A08 deels);
 `Sec-Fetch-Site` gecontroleerd (`status_page.py` r. ~680); onleesbare body zonder auth geeft 401 (ADR-0012, A16 deels);
-`schema_version` major-controle (`enrollment.py` r. ~118); één embeddingproducent (A06); EVIDENCE-test
+`schema_version` major-controle (`enrollment.py` r. ~118); "Gereed" tegenover `/readyz` (A15); één embeddingproducent
+(A06); EVIDENCE-test
 (`apps/api/tests/unit/test_evidence_contract.py`).
 
 | ID | Wijziging | Contract | Bestanden | Moment |
