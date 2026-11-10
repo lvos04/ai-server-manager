@@ -23,7 +23,7 @@ const MG = {
   'viz-4': 'chart-4', 'viz-5': 'chart-5', 'viz-6': 'chart-other', 'viz-grid': 'chart-grid', 'lane-gpu': 'domain-lane-gpu', 'lane-cpu': 'domain-lane-cpu',
 };
 const mgVars = Object.entries(MG).map(([a, b]) => `  --mg-${a}: var(--${b});`).join('\n');
-const mg = kop('MediaGuard (apps/web/styles/mg.css) en MSO (apps/web/styles/mg.css + mso.css)', 'Volgorde in globals.css: @import "tailwindcss"; @import "./ontwerptaal.css"; @import "./mg.css"; @import "./peil-alias.css";') + `
+const mg = kop('MediaGuard (apps/web/styles/mg.css) en MSO (apps/web/styles/mg.css + mso.css)', 'Volgorde in globals.css: @layer theme, base, legacy, components, utilities; @import "tailwindcss"; @import "./ontwerptaal.css"; @import "./mg.css" layer(legacy); (MSO: ook mso.css) @import "./peil-alias.css" layer(legacy); — of ongelaagd, maar altijd NA mg.css.') + `
 :root, :root[data-theme="light"], :root[data-theme="dark"] {
 ${mgVars}
   --mg-overlay: rgb(0 0 0 / 0.5);
@@ -53,6 +53,21 @@ ${mgVars}
 :root .phase-bar--verify > span { background: var(--foreground); } /* controle-fase ≠ gezond */
 :root .phase-bar--paused > span { background: var(--paused); }
 :root .phase-bar--stale > span { opacity: 1; background-color: var(--stale); background-image: repeating-linear-gradient(135deg, var(--stale-hatch) 0 2px, transparent 2px 6px); } /* nooit opacity */
+/* 1.1.1 (E14, X-22: MediaGuard ADR-0016, MSO ADR-0006 punt 6) — Peils focusring en scroll-padding staan in @layer base en
+   verliezen van mg.css (ongelaagd of in de laag legacy, die na base komt). Deze laag staat na mg.css en zet ze terug.
+   mg.css haalde bij invoervelden de outline weg (box-shadow 3 px); daarom ook .input/.select/.textarea. */
+:focus-visible,
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible,
+:where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"]):focus-within {
+  outline: var(--focus-width) solid var(--ring);
+  outline-offset: var(--focus-offset);
+  box-shadow: 0 0 0 var(--focus-offset) var(--ring-halo);
+}
+html {
+  scroll-padding-top: calc(var(--header-h) + 0.75rem);
+  scroll-padding-bottom: calc(var(--bottomnav-h) + var(--actiebalk-h, 0px) + env(safe-area-inset-bottom, 0px) + 0.75rem);
+}
+@media (width >= 64rem) { html { scroll-padding-bottom: 0.75rem; } }
 `;
 fs.writeFileSync(D + 'aliaslagen/mediaguard-mso.css', mg);
 
@@ -89,6 +104,19 @@ const mh = kop('my_house (apps/web/src/styles.css)', 'Importeer NA styles.css (m
 .btn:disabled, .icon-btn:disabled { opacity: 1; color: var(--peil-disabled); border-style: dashed; border-color: var(--border-strong); }
 .btn.primary:hover:not(:disabled) { opacity: 1; background: var(--link-hover); }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--peil-ring-halo); }
+/* 1.1.1 (E14, X-32): de correcties uit my_house PEIL_MIGRATIE §8.1 in de generator in plaats van per app. Zelfde vorm als
+   de fase-2-recepten van my_house (laag components wint daar toch), zodat fase 1 en fase 2 er gelijk uitzien.
+   Niet overgenomen: lettermaten 12–13 → 14 px (vraagt een meting op 320/360 px in de app) en de vlag van
+   .en-col.is-incomplete (my_house koos al het info-drieluik; koelen-blauw zou een domeinbetekenis lenen). */
+.light-tile { border-color: var(--border-strong); }   /* uit: rand 2,0:1 → 5,9:1 */
+.nav-link.active { box-shadow: inset 4px 0 0 var(--primary); }   /* actief = balk, niet alleen een vlak van 1,1:1 */
+.bottom-link.active { box-shadow: inset 0 3px 0 var(--primary); }
+.tabs [role="tab"][aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--primary); }
+.segmented button[aria-pressed="true"], .segmented button[aria-selected="true"], .c-choices button[aria-pressed="true"] { border: 2px solid var(--text); }
+.note.ok { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }   /* "Klaar om te installeren" is geen gezondheid */
+.c-status.confirmed { color: var(--text); }
+.sp-btn:disabled, .c-choices button:disabled, .segmented button:disabled { opacity: 1; color: var(--peil-disabled); border-style: dashed; border-color: var(--border-strong); }
+.week-bar .carried, .lt-map.is-off { opacity: 1; background-image: repeating-linear-gradient(135deg, var(--peil-stale-hatch) 0 2px, transparent 2px 9px); }   /* dimmen = arcering, nooit opacity */
 `;
 fs.writeFileSync(D + 'aliaslagen/my_house.css', mh);
 
