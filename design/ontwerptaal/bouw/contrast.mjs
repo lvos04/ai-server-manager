@@ -76,6 +76,8 @@ p('chart-grid', 'card', 'info', 'raster (haarlijn, recessief)');
 p('chart-gap', 'card', 'info', 'arcering gat (draagt label "Geen meting")');
 for (const d of ['heat', 'cool', 'boiler', 'light-on']) {
   p(`domain-${d}-ink`, `domain-${d}-bg`, 'AAA', `domein ${d}: tekst op vlak`);
+  // 1.1.1 (E14, my_house PEIL_REVIEW §8 punt 3): my_house zet labels in de schemaband op -soft → tekstpaar, harde eis.
+  if (d === 'heat' || d === 'cool') p(`domain-${d}-ink`, `domain-${d}-soft`, 'AAA', `domein ${d}: tekst op band (-soft)`);
   p(`domain-${d}`, 'card', 'ui', `domein ${d}: icoon/lijn op kaart`);
   p(`domain-${d}`, `domain-${d}-bg`, 'info', `domein ${d}: icoon op eigen vlak (icoon heeft ook tekst ernaast)`);
 }

@@ -1,7 +1,7 @@
 {
   "naam": "Peil",
-  "versie": "1.1.0",
-  "gegenereerd": "2026-11-09T19:40:51.548Z",
+  "versie": "1.1.1",
+  "gegenereerd": "2026-11-10T06:25:54.259Z",
   "methode": "WCAG 2.x relatieve luminantie (npm wcag-contrast); ΔE = Euclidische afstand in OKLab ×100 (culori); paletcontrole: dataviz-skill validate_palette.js (Machado 2009 CVD).",
   "eisen": {
     "AAA": "7:1 (beide tekstniveaus en alle statustekst)",
@@ -1433,6 +1433,16 @@
         "gebruik": "domein heat: tekst op vlak"
       },
       {
+        "voorgrond": "domain-heat-ink",
+        "achtergrond": "domain-heat-soft",
+        "kleuren": "#6E2405 op #FFC3A4",
+        "ratio": 7.09,
+        "eis": "AAA",
+        "eisRatio": 7,
+        "oordeel": "voldoet",
+        "gebruik": "domein heat: tekst op band (-soft)"
+      },
+      {
         "voorgrond": "domain-heat",
         "achtergrond": "card",
         "kleuren": "#eb6834 op #FFFFFF",
@@ -1461,6 +1471,16 @@
         "eisRatio": 7,
         "oordeel": "voldoet",
         "gebruik": "domein cool: tekst op vlak"
+      },
+      {
+        "voorgrond": "domain-cool-ink",
+        "achtergrond": "domain-cool-soft",
+        "kleuren": "#0B3B73 op #AAD2FF",
+        "ratio": 7.08,
+        "eis": "AAA",
+        "eisRatio": 7,
+        "oordeel": "voldoet",
+        "gebruik": "domein cool: tekst op band (-soft)"
       },
       {
         "voorgrond": "domain-cool",
@@ -2975,6 +2995,16 @@
         "gebruik": "domein heat: tekst op vlak"
       },
       {
+        "voorgrond": "domain-heat-ink",
+        "achtergrond": "domain-heat-soft",
+        "kleuren": "#FFD3B5 op #802300",
+        "ratio": 7.06,
+        "eis": "AAA",
+        "eisRatio": 7,
+        "oordeel": "voldoet",
+        "gebruik": "domein heat: tekst op band (-soft)"
+      },
+      {
         "voorgrond": "domain-heat",
         "achtergrond": "card",
         "kleuren": "#d95926 op #141920",
@@ -3003,6 +3033,16 @@
         "eisRatio": 7,
         "oordeel": "voldoet",
         "gebruik": "domein cool: tekst op vlak"
+      },
+      {
+        "voorgrond": "domain-cool-ink",
+        "achtergrond": "domain-cool-soft",
+        "kleuren": "#C2DDFA op #064186",
+        "ratio": 7.12,
+        "eis": "AAA",
+        "eisRatio": 7,
+        "oordeel": "voldoet",
+        "gebruik": "domein cool: tekst op band (-soft)"
       },
       {
         "voorgrond": "domain-cool",
@@ -4825,17 +4865,17 @@
   },
   "samenvatting": {
     "licht": {
-      "paren": 154,
-      "aaa_tekstparen": "59 van 59",
-      "laagste_aaa_tekst": 7.31,
+      "paren": 156,
+      "aaa_tekstparen": "61 van 61",
+      "laagste_aaa_tekst": 7.08,
       "ui_en_icoon_paren": "68 van 68",
       "laagste_dE_grafiek_status": 16.1,
       "laagste_dE_status_onderling": 10.8
     },
     "donker": {
-      "paren": 154,
-      "aaa_tekstparen": "59 van 59",
-      "laagste_aaa_tekst": 7.28,
+      "paren": 156,
+      "aaa_tekstparen": "61 van 61",
+      "laagste_aaa_tekst": 7.06,
       "ui_en_icoon_paren": "68 van 68",
       "laagste_dE_grafiek_status": 16.1,
       "laagste_dE_status_onderling": 11.1
@@ -4944,13 +4984,13 @@
         },
         {
           "paar": "--heat-ink op --heat-soft",
-          "ratio": 5.49,
+          "ratio": 7.09,
           "eis": 4.5,
           "oordeel": "voldoet"
         },
         {
           "paar": "--cool-ink op --cool-soft",
-          "ratio": 6.22,
+          "ratio": 7.08,
           "eis": 4.5,
           "oordeel": "voldoet"
         },
@@ -5127,13 +5167,13 @@
         },
         {
           "paar": "--heat-ink op --heat-soft",
-          "ratio": 4.93,
+          "ratio": 7.06,
           "eis": 4.5,
           "oordeel": "voldoet"
         },
         {
           "paar": "--cool-ink op --cool-soft",
-          "ratio": 5.8,
+          "ratio": 7.12,
           "eis": 4.5,
           "oordeel": "voldoet"
         },
@@ -5237,18 +5277,18 @@
       "licht": [
         "stale-ink op stale-hatch 4.56",
         "stale-ink op muted 5.42",
-        "domain-heat-ink op domain-heat-soft 5.49",
         "stale-ink op background 5.88",
         "stale-ink op stale-bg 6",
-        "domain-cool-ink op domain-cool-soft 6.22"
+        "destructive op down-bg 6.28",
+        "stale-ink op card 6.67"
       ],
       "donker": [
-        "domain-heat-ink op domain-heat-soft 4.93",
         "stale-ink op stale-hatch 5.01",
-        "domain-cool-ink op domain-cool-soft 5.8",
         "stale-ink op muted 6.42",
         "primary op accent 6.55",
-        "stale-ink op stale-bg 6.81"
+        "stale-ink op stale-bg 6.81",
+        "stale-ink op popover 6.81",
+        "primary op secondary 6.99"
       ]
     },
     "scheiding": {
@@ -7738,8 +7778,8 @@
         {
           "voorgrond": "domain-heat-ink",
           "achtergrond": "domain-heat-soft",
-          "kleuren": "#6e2405 op #f4a57e",
-          "ratio": 5.49,
+          "kleuren": "#6e2405 op #ffc3a4",
+          "ratio": 7.09,
           "soort": "tekst",
           "eis": 4.5,
           "oordeel": "voldoet",
@@ -7748,8 +7788,8 @@
         {
           "voorgrond": "domain-cool-ink",
           "achtergrond": "domain-cool-soft",
-          "kleuren": "#0b3b73 op #9ec5f4",
-          "ratio": 6.22,
+          "kleuren": "#0b3b73 op #aad2ff",
+          "ratio": 7.08,
           "soort": "tekst",
           "eis": 4.5,
           "oordeel": "voldoet",
@@ -11410,8 +11450,8 @@
         {
           "voorgrond": "domain-heat-ink",
           "achtergrond": "domain-heat-soft",
-          "kleuren": "#ffd3b5 op #9c3d14",
-          "ratio": 4.93,
+          "kleuren": "#ffd3b5 op #802300",
+          "ratio": 7.06,
           "soort": "tekst",
           "eis": 4.5,
           "oordeel": "voldoet",
@@ -11420,8 +11460,8 @@
         {
           "voorgrond": "domain-cool-ink",
           "achtergrond": "domain-cool-soft",
-          "kleuren": "#c2ddfa op #184f95",
-          "ratio": 5.8,
+          "kleuren": "#c2ddfa op #064186",
+          "ratio": 7.12,
           "soort": "tekst",
           "eis": 4.5,
           "oordeel": "voldoet",

@@ -1,4 +1,4 @@
-// Peil — ontwerptaal TrueNAS Home Platform V2 · versie 1.1.0
+// Peil — ontwerptaal TrueNAS Home Platform V2 · versie 1.1.1
 // BRON VAN WAARHEID voor alle tokens. Alles in ../ (tokens.json, ontwerptaal.css, statuspagina.css, contrast.json)
 // wordt hieruit gegenereerd met `node bouw/genereer.mjs`. Wijzig waarden alleen hier.
 //
@@ -14,8 +14,8 @@
 
 export const META = {
   naam: 'Peil',
-  versie: '1.1.0',
-  datum: '2026-11-09',
+  versie: '1.1.1',
+  datum: '2026-11-10',
   omschrijving: 'Ontwerptaal van het TrueNAS Home Platform V2 (Hub, statuspagina\'s, uiterlijk van MediaGuard, MSO en my_house).',
 };
 
@@ -141,11 +141,11 @@ export const KLEUREN = [
   ['domain-heat', '#eb6834', '#d95926', 'domein', 'Verwarmen (my_house) — icoon flame; = chart-2.'],
   ['domain-heat-bg', '#FDEBDD', '#3A1F10', 'domein', 'Verwarmen: vlak (modusknop actief, chip).'],
   ['domain-heat-ink', '#6E2405', '#FFD3B5', 'domein', 'Verwarmen: tekst.'],
-  ['domain-heat-soft', '#F4A57E', '#9C3D14', 'domein', 'Verwarmen: decoratieve band/dial (draagt geen informatie).'],
+  ['domain-heat-soft', '#FFC3A4', '#802300', 'domein', 'Verwarmen: band/dial. Tekst erop alleen in domain-heat-ink (>= 7:1; 1.1.1: was #F4A57E/#9C3D14 met 5,5/4,9:1, my_house zet labels in de schemaband).'],
   ['domain-cool', '#2a78d6', '#3987e5', 'domein', 'Koelen (my_house) — icoon snowflake; = chart-1.'],
   ['domain-cool-bg', '#E0EEFB', '#0F2740', 'domein', 'Koelen: vlak.'],
   ['domain-cool-ink', '#0B3B73', '#C2DDFA', 'domein', 'Koelen: tekst.'],
-  ['domain-cool-soft', '#9ec5f4', '#184f95', 'domein', 'Koelen: decoratieve band/dial.'],
+  ['domain-cool-soft', '#AAD2FF', '#064186', 'domein', 'Koelen: band/dial. Tekst erop alleen in domain-cool-ink (>= 7:1; 1.1.1: was #9ec5f4/#184f95 met 6,2/5,8:1).'],
   ['domain-boiler', '#00a672', '#199e70', 'domein', 'Boiler (alleen meten) — icoon shower-head; = chart-3.'],
   ['domain-boiler-bg', '#E4E8EE', '#1E252E', 'domein', 'Boiler: vlak — bewust NEUTRAAL (review 1.1.0): een aqua/mint vlak was niet te onderscheiden van healthy-bg (ΔE 0,6). De boiler is alleen meten; identiteit = icoon shower-head + woord.'],
   ['domain-boiler-ink', '#0B0F14', '#F2F5F8', 'domein', 'Boiler: tekst — neutraal (groenige inkt was ΔE 2,5 van healthy-ink).'],

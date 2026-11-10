@@ -137,7 +137,11 @@ ${themeInline}
   }
   /* Pagina met een vaste actiebalk boven de ondernavigatie (wizard, preview op mobiel). */
   html:has([data-actiebalk]) { --actiebalk-h: 4.5rem; }
-  @media (width >= 64rem) { html { scroll-padding-bottom: 0.75rem; } }
+  @media (width >= 64rem) {
+    html { scroll-padding-bottom: 0.75rem; }
+    /* 1.1.1 (Hub-review R-03): de kindschil houdt op elke breedte een ondernavigatie; zet data-schil="kind" op de schil. */
+    html:has([data-schil="kind"]) { scroll-padding-bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 0.75rem); }
+  }
   body {
     background: var(--background);
     color: var(--foreground);
@@ -153,10 +157,18 @@ ${themeInline}
   code, kbd, samp, pre { font-family: var(--font-mono); font-size: max(0.9375em, 0.875rem); }
   /* Paden, digests, ID's: breken waar nodig, nooit horizontale overloop of afkappen (reflow 320 px). */
   :where(code, kbd, samp, .font-mono) { overflow-wrap: anywhere; }
+  /* 1.1.1 (Hub-review R-26, E12): een lang woord zonder breekpunt (variabelenaam, foutnaam) breekt in plaats van over te
+     lopen; nodig omdat het systeemfont per machine breder kan zijn (DejaVu Sans op de CI-runner). */
+  :where(main) { overflow-wrap: break-word; }
+  /* 1.1.1 (Hub-review R-16): een icoon in een lange regel krimpt nooit tot een stip. */
+  :where(svg.lucide) { flex-shrink: 0; }
   input, select, textarea { font-size: max(1rem, 16px); }
   ::placeholder { color: var(--muted-foreground); opacity: 1; }
   ::selection { background: var(--primary); color: var(--primary-foreground); }
-  :focus-visible {
+  :focus-visible,
+  /* 1.1.1 (Hub-review R-02, C-66): in een datum- of tijdveld kan de focus op de kalenderknop binnen het veld staan; dan
+     geldt :focus-visible niet op het veld. De ring staat daarom ook op :focus-within. */
+  :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"]):focus-within {
     outline: var(--focus-width) solid var(--ring);
     outline-offset: var(--focus-offset);
     box-shadow: 0 0 0 var(--focus-offset) var(--ring-halo);
@@ -175,6 +187,14 @@ ${themeInline}
   @media (forced-colors: active) {
     [data-status], [data-risico], [data-as] { border-color: CanvasText !important; }
     :focus-visible { outline-color: Highlight; }
+    /* 1.1.1 (MSO-review R-20): een vlak of een inset-balk (box-shadow) verdwijnt in forced colors. Het actieve
+       navigatie-item, de gekozen tab en een ingedrukte keuzeknop krijgen daarom een onderstreping in Highlight. */
+    [aria-current="page"], [aria-current="step"], [aria-selected="true"], [aria-pressed="true"] {
+      text-decoration-line: underline !important;
+      text-decoration-thickness: 3px !important;
+      text-underline-offset: 4px;
+      text-decoration-color: Highlight !important;
+    }
   }
 }
 
@@ -219,7 +239,10 @@ fs.writeFileSync(D + 'statuspagina.css', sp);
 
 // ─────────────────────────────────────────────── statuspagina.html (sjabloon) ─────────────────────────────────────
 const ICONEN = JSON.parse(fs.readFileSync(D + 'bouw/iconen.json', 'utf8'));
-const ICOON = { gezond: 'circle-check', beperkt: 'triangle-alert', storing: 'octagon-x', onbekend: 'circle-help', gate: 'lock', info: 'info', gekoppeld: 'link-2', niet_gekoppeld: 'link-2-off' };
+// 1.1.1 (E03/E04): elke toon heeft een eigen symbool met dezelfde naam (#i-<toon>), zodat een rij nooit het icoon van een
+// andere betekenis krijgt (ONTWERPTAAL §7). 'feit' = neutraal feit (info-icoon in inkt), geen gezondheid.
+const ICOON = { gezond: 'circle-check', beperkt: 'triangle-alert', storing: 'octagon-x', onbekend: 'circle-help', gate: 'lock', info: 'info', gekoppeld: 'link-2', niet_gekoppeld: 'link-2-off',
+  verouderd: 'clock-alert', niet_beschikbaar: 'circle-slash', nog_niet: 'hourglass', beleid: 'ban', feit: 'info' };
 let sj = fs.readFileSync(D + 'bouw/statuspagina.sjabloon.html', 'utf8').replace('/*STATUSPAGINA_CSS*/', sp.trim()).replace('{{peil_versie}}', META.versie);
 for (const [k, n] of Object.entries(ICOON)) sj = sj.replaceAll(`{{icoon_${k}}}`, ICONEN[n]);
 fs.writeFileSync(D + 'statuspagina.html', sj);
