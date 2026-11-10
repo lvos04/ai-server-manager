@@ -5,9 +5,9 @@ De Hub van het platform: **B01** (centrale web-UI en beheer-API), **B02** (AI-be
 platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.3,
 vastgesteld 2026-11-10, ADR-0027; reviewcorrecties ADR-0028; wat elke repo moet veranderen:
 [`CONTRACT_1.3_CONFORMITEIT.md`](docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md)). De Hub en de executor volgen
-contract 1.3 voor alle punten die hoofdstuk 1 van die lijst als **NU** markeert (ADR-0029); de punten voor P2–P5
-(C1.3-ASM-18…22) en de manifestvelden die op de validator van appstore-en-fork wachten (C1.3-ASM-17) staan open in
-[`docs/platform-v2/EVIDENCE.json`](docs/platform-v2/EVIDENCE.json). De statuspagina van de executor en de Hub-UI
+contract 1.3 voor alle punten die hoofdstuk 1 van die lijst als **NU** markeert (ADR-0029), ook de eigen manifesten
+(C1.3-ASM-17, `--strict` geldig met de validator van appstore-en-fork); de punten voor P2–P5 (C1.3-ASM-18…22) staan
+open in [`docs/platform-v2/EVIDENCE.json`](docs/platform-v2/EVIDENCE.json). De statuspagina van de executor en de Hub-UI
 volgen Peil 1.1.1.
 
 ## Stand (versie 0.1.0, fase P0 + P1 + contract 1.3 — backend en web-UI)

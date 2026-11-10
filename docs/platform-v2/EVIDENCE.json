@@ -420,6 +420,16 @@
     "bijgewerkt": "2026-11-10"
   },
   {
+    "id": "REVIEW-ai-server-manager-conformiteit-1.3",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "Onafhankelijke review van de conformiteitsronde (commits a8474af…5e21775): make lint en make type (ruff, mypy strict 99 + 11 bestanden) geslaagd; PATH=/usr/lib/postgresql/16/bin:$PATH pytest -q (unit, integratie, dienst-E2E, executor; echte PostgreSQL 16) 830 passed; migratie up → down base → up + alembic check zonder verschil; make openapi-check actueel; pip-audit --strict geen kwetsbaarheden; apps/web eslint, tsc, vitest 85 passed, npm audit 0; next build + Playwright-E2E 180 passed; Peil-review 25 passed, samenvat --streng: 57 schermen, 676 metingen, 0 harde bevindingen, 0 axe-overtredingen; tools/excel 11 passed; actionlint geldig; docker buildx build (beide images) + bash deploy/smoke.sh geslaagd (lege /appdata, healthy, CapEff/CapPrm/CapAmb/CapBnd 0, NoNewPrivs 1, healthcheck --controle Uid 568, Custom User 568, herstart en harde kill zonder dataverlies); contract-sha256 gelijk aan bron-commit 02b119c; Peil-kopieën (statuspagina.html, ontwerptaal.css) byte-gelijk aan design/ontwerptaal. Reparaties: b749f3e (C1.3-ASM-17 afgerond), 5dfd457 (executor: kale 500 bij te veel formuliervelden), 7529a5e (docs naar contract 1.3).",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): bron-IP en Host achter de portpublicatie van TrueNAS, ix-app clear_caps en de healthcheck onder TrueNAS; alles is met simulators en Docker op de ontwikkelmachine getest.",
+    "opmerking": "Alle NU-punten van hoofdstuk 1 nagelopen tegen code en tests (positief en negatief). C1.3-ASM-16 'adopted als Geïmporteerd' en Peil E15 in de Hub-UI staan nog open (zie die regels).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-10"
+  },
+  {
     "id": "C1.3-ASM-15",
     "status": "Bezig",
     "validatie": "Unit-getest",
@@ -445,7 +455,7 @@
     "validatie": "Sim-getest",
     "bewijs": "executor: gepinde sjabloonkopie Peil 1.1.1 (sha256 d352028f…, bron-commit 3e559e7) + renderer in één doorgang, apps/executor/tests/test_statuspagina.py (byte-gelijk met design/ontwerptaal/bouw/sjabloon.py); Hub: src/app/peil/ontwerptaal.css via scripts/peil-kopie.mjs, tests/unit/peil-tokens.test.ts; commits a8474af, commits 961e3ff, 7d84935, 0282f35; Playwright E2E (axe) en Peil-review: npx playwright test -c playwright.review.config.ts + node review/samenvat.mjs --streng: 57 schermen/toestanden, 676 metingen, harde bevindingen 0, axe-overtredingen 0; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
     "blokkade": "",
-    "opmerking": "Echte schermlezer, telefoon en tv niet getest.",
+    "opmerking": "Echte schermlezer, telefoon en tv niet getest. Nog niet overgenomen in de Hub-UI: E15 (een verouderde meting toont nu altijd 'Verouderd'; Peil 1.1.1 laat Beperkt en Storing staan met de tijd van de stand). Dat verbergt geen probleem als gezond, maar toont een bekend probleem minder precies; volgt in een functionele ronde.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-10"
   },
@@ -483,7 +493,7 @@
     "id": "C1.3-ASM-04",
     "status": "Bezig",
     "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
-    "bewijs": "commit a8474af, commits 961e3ff, 7d84935, 0282f35; apps/executor/tests (adresregels, DNS-resolutie, onleesbaar fail-closed, Host-beperking, JWT §4.7, jti per POST, execute na aanmelding); tests/e2e/test_executor_koppelen.py::test_herkomst_en_host_beperking_negatieve_gevallen, ::test_elke_post_telt_ook_bij_een_al_gekoppelde_executor, ::test_koppelen_bezig_onleesbaar_en_invoer_niet_afkappen; apps/web/e2e/90-afsluiting.spec.ts (echte formulier-POST in Chromium + Origin null, vreemde Origin, Sec-Fetch-Site same-site/cross-site, niet-toegestane Host, geen cookie); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
+    "bewijs": "commit a8474af, commits 961e3ff, 7d84935, 0282f35; apps/executor/tests (adresregels, DNS-resolutie, onleesbaar fail-closed, Host-beperking, JWT §4.7, jti per POST, execute na aanmelding); tests/e2e/test_executor_koppelen.py::test_herkomst_en_host_beperking_negatieve_gevallen, ::test_elke_post_telt_ook_bij_een_al_gekoppelde_executor, ::test_koppelen_bezig_onleesbaar_en_invoer_niet_afkappen; apps/web/e2e/90-afsluiting.spec.ts (echte formulier-POST in Chromium + Origin null, vreemde Origin, Sec-Fetch-Site same-site/cross-site, niet-toegestane Host, geen cookie); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen); reviewreparatie 5dfd457: een formulier-POST met meer velden dan het formulier heeft gaf een kale 500, nu 413 formulier_te_groot met vaste melding (apps/executor/tests/test_executor.py::test_te_groot_formulier_geeft_vaste_melding_nooit_een_kale_500)",
     "blokkade": "NIET GEVALIDEERD (echte NAS): welk bron-IP en welke Host de executor achter de portpublicatie van TrueNAS ziet.",
     "opmerking": "",
     "repo": "ai-server-manager",
@@ -603,9 +613,9 @@
     "id": "C1.3-ASM-17",
     "status": "Bezig",
     "validatie": "Unit-getest",
-    "bewijs": "commit 4541370; deploy/manifest/*.manifest.yaml gevalideerd met de validator van appstore-en-fork op commit 4e4e305 (geldig; --strict alleen digest_pending_release); GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
-    "blokkade": "Wacht op C1.3-ASF-08: de gecommitte validator weigert healthcheck.monitor en accepted_findings als onbekend veld.",
-    "opmerking": "Kop 'platformcontract 1.3' en geen HUB_* zijn gedaan.",
+    "bewijs": "commits 4541370 (kop 'platformcontract 1.3', geen HUB_*) en b749f3e (healthcheck.monitor op /readyz, accepted_findings digest_pending_release, provenance.license GPL-3.0); apps/api/tests/unit/test_eigen_manifesten.py (14 tests, met negatieve gevallen: HUB_URL in env, monitor weg of op /healthz, niet-toegestane accepted_finding, digest gevuld met digest_pending_release, latest, catalog_app, licentie null, compose); validator van appstore-en-fork op commit 7b3159d (git archive, alleen gelezen): validate --strict op beide manifesten geldig (0 fouten, alleen digest_pending_release geaccepteerd); CI-job manifest (zelfde validator, vaste commit, --strict)",
+    "blokkade": "",
+    "opmerking": "Afgerond in de onafhankelijke review nu C1.3-ASF-08 gecommit is (appstore-en-fork 1090fc9). accepted_findings digest_pending_release moet weg na de eerste release (anders faalt --strict). Het monitorplan zelf (B09) is C1.3-ASM-20 (P2); overnemen in Uptime Kuma is handmatig en NIET GEVALIDEERD.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-10"
   },

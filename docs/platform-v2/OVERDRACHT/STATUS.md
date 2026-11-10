@@ -175,13 +175,25 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - Alle punten die hoofdstuk 1 van `CONTRACT_1.3_CONFORMITEIT.md` als **NU** markeert, zijn gebouwd en Sim-getest
   (ADR-0029): C1.3-ASM-01…14, -16 en -23, plus de bronpin van het contract (C1.3-ALG-01) en Peil 1.1.1 (statuspagina
   van de executor, tokens en componentregels van de Hub-UI). Details per punt in `EVIDENCE.json`.
-- **Open:** C1.3-ASM-17 (`healthcheck.monitor` en `accepted_findings` in de eigen manifesten) wacht op de validator van
-  appstore-en-fork (C1.3-ASF-08; de gecommitte validator kent de velden nog niet). C1.3-ASM-18…22 horen bij P2, P3,
-  P4-0, P4 en P5. De overgangen `payload.severity` en de oude jobs-checknamen vervallen in de release na 0.1.x.
+- **C1.3-ASM-17** (onafhankelijke review, 2026-11-10): nu C1.3-ASF-08 gecommit is, staan `healthcheck.monitor` (op
+  `/readyz`) en `accepted_findings: digest_pending_release` in beide eigen manifesten; `--strict` geldig met de
+  validator van appstore-en-fork op 7b3159d, ook als CI-job `manifest`.
+- **Open:** C1.3-ASM-18…22 horen bij P2, P3, P4-0, P4 en P5. De overgangen `payload.severity` en de oude jobs-checknamen vervallen in de release na 0.1.x.
 - Gevolg voor andere repos: `items`, `events` en `evidence` van de Hub-connector geven diensten nu 403
   `scope_ontbreekt` (gemeten: geen dienst leest ze); events buiten het eigen domein of met andere werkwoorden dan §7
   maken geen incident meer.
 - Niets op een echte NAS, met echte accounts of op echte hardware gevalideerd.
+
+### Onafhankelijke review van de conformiteitsronde (2026-11-10)
+
+- Alles opnieuw gedraaid zoals de CI: lint en typecheck, pytest (830), migraties heen en terug, OpenAPI-drift,
+  pip-audit, web (eslint, tsc, vitest, Playwright-E2E 180, Peil-review 0 harde bevindingen), Excel-bijwerker, beide
+  images met de rooktest. Contract en Peil-kopieën byte-gelijk aan de bron.
+- Gerepareerd: C1.3-ASM-17 afgerond (monitorplan op `/readyz`, `accepted_findings`, GPL-3.0, test en CI-job met de
+  validator van appstore-en-fork); de executor gaf een kale 500 bij een formulier met te veel velden (nu 413 met vaste
+  melding); docs verwezen nog naar contract 1.2.
+- Nog open (bewust, met reden in `EVIDENCE.json`): "Geïmporteerd" voor `adopted` in de catalogus (C1.3-ASM-16) en
+  Peil E15 in de Hub-UI (C1.3-ALG-05).
 
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 
