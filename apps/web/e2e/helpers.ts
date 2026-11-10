@@ -28,6 +28,8 @@ export interface StackState {
   oidc_issuer?: string;
   oidc_client_id?: string;
   oidc_client_secret?: string;
+  /** Echte executor (statuspagina + koppelen); alleen in de eigen teststack, niet tegen de image. */
+  executor_url?: string;
 }
 
 /** Gedeelde gegevens tussen de opzet en de schermtests (ids van een app en een incident). */

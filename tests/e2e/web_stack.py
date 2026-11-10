@@ -10,7 +10,9 @@ Alleen voor ontwikkeling/CI (Sim-getest, geen echte NAS). Start:
   fake NAS toe te voegen en een simulator-dienst te laten koppelen (koppelcode) en events te laten sturen;
 - fakes voor Uptime Kuma, Beszel, Gotify en een OIDC-issuer (Authentik-vorm) op loopback, met hun adressen en
   testsleutels in ``state.json`` (alleen testgeheimen);
-- de periodieke worker-taken (meten, bronnen, gezondheid, alerts, incidenten, meldingen) met korte intervallen.
+- de periodieke worker-taken (meten, bronnen, gezondheid, alerts, incidenten, meldingen) met korte intervallen;
+- de echte executor (``executor.app``) op 127.0.0.1:``HUB_E2E_EXECUTOR_PORT`` met een eigen lege datamap, zodat de
+  web-E2E het koppelformulier van de statuspagina echt in een browser verstuurt (contract 1.2 §3.9; review N-01).
 Er worden geen successen gesimuleerd: alle antwoorden komen van de echte API; alleen NAS, bronnen, Gotify, de OIDC-
 issuer en de simulator-dienst zijn simulators.
 
@@ -38,6 +40,7 @@ sys.path.insert(0, str(HERE.parent))  # tests/ → fakes
 ADMIN_URL = os.environ.get("HUB_TEST_ADMIN_URL", "postgresql://postgres@127.0.0.1:5432/postgres")
 API_PORT = int(os.environ.get("HUB_E2E_API_PORT", "39401"))
 CONTROL_PORT = int(os.environ.get("HUB_E2E_CONTROL_PORT", "39402"))
+EXECUTOR_PORT = int(os.environ.get("HUB_E2E_EXECUTOR_PORT", "39403"))
 STATE_DIR = Path(os.environ.get("HUB_E2E_STATE_DIR", str(HERE / ".web-e2e-state")))
 READONLY_KEY = "readonly-test-key-0123456789"
 WRITE_KEY = "write-test-key-0123456789abc"
@@ -238,6 +241,35 @@ def _fake_state(f: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _start_executor(data_dir: Path) -> Any:
+    """De echte executor-app (statuspagina + koppelen) met een lege datamap; loopback-Hub alleen met de testvlag."""
+    import uvicorn
+    from executor.app import create_app as create_executor
+    from executor.config import Settings as ExecutorSettings
+    from executor.firststart import ensure_secrets as ensure_executor_secrets
+
+    ex_settings = ExecutorSettings(data_dir=data_dir, allow_loopback_hub=True)
+    ensure_executor_secrets(ex_settings.secrets_dir)
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_executor(ex_settings),
+            host="127.0.0.1",
+            port=EXECUTOR_PORT,
+            log_level="warning",
+            access_log=False,
+            server_header=False,
+        )
+    )
+    threading.Thread(target=server.run, daemon=True).start()
+    deadline = time.monotonic() + 15
+    while not server.started:
+        if time.monotonic() > deadline:
+            raise RuntimeError("executor start niet")
+        time.sleep(0.05)
+    log(f"executor op http://127.0.0.1:{EXECUTOR_PORT} (lege datamap, nog nooit gekoppeld)")
+    return server
+
+
 def _write_state(extra: dict[str, Any]) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     (STATE_DIR / "state.json").write_text(json.dumps(extra, indent=2))
@@ -301,6 +333,7 @@ def main() -> int:
     tmp = tempfile.TemporaryDirectory(prefix="asm-web-e2e-")
     nas: Any = None
     control: Any = None
+    executor: Any = None
     try:
         migrations.upgrade(db_url)
         settings = Settings(
@@ -326,6 +359,7 @@ def main() -> int:
 
         nas, control = _start_nas()
         fakes = _start_fakes()
+        executor = _start_executor(Path(tmp.name) / "executor")
         (STATE_DIR / "setupcode.txt").parent.mkdir(parents=True, exist_ok=True)
         (STATE_DIR / "setupcode.txt").write_text(res.setup_code)
         _write_state(
@@ -336,6 +370,7 @@ def main() -> int:
                 "readonly_key": READONLY_KEY,
                 "write_key": WRITE_KEY,
                 "database": db_name,
+                "executor_url": f"http://127.0.0.1:{EXECUTOR_PORT}",
                 **_fake_state(fakes),
             }
         )
@@ -376,6 +411,8 @@ def main() -> int:
         api_thread.join(10)
         app.state.engine.dispose()
     finally:
+        if executor is not None:
+            executor.should_exit = True
         if control is not None:
             control.shutdown()
         if nas is not None:

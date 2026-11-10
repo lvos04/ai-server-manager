@@ -4,7 +4,7 @@
  * geen enkele schrijfaanroep op de (fake) NAS.
  */
 import { expect, test } from "@playwright/test";
-import { ADMIN, KIND, VIEWER, expectAccessible, nasMutations, ready, setNas, shot } from "./helpers";
+import { ADMIN, KIND, VIEWER, expectAccessible, nasMutations, ready, setNas, shot, stackState } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -189,6 +189,63 @@ test("diensten: intrekken pas na het typen van de app-id; daarna ‘Ingetrokken�
   await page.getByLabel(/Ingetrokken diensten tonen/).check();
   await expect(page.getByTestId("dienst-home-control-hub")).toContainText("Ingetrokken");
   await expect(page.getByTestId("dienst-home-control-hub").locator('[data-status="healthy"]')).toHaveCount(0);
+});
+
+test("executor koppelen via de eigen statuspagina, echt verstuurd in de browser (§3.9; review N-01)", async ({ page, browser, baseURL }) => {
+  const st = stackState();
+  // Tegen de alles-in-één image (HUB_E2E_BASE_URL) start de teststack geen executor; de rooktest dekt die image.
+  test.skip(!st.executor_url && Boolean(process.env.HUB_E2E_BASE_URL), "geen executor in de stack tegen de image");
+  expect(st.executor_url, "de teststack hoort de executor te starten").toBeTruthy();
+  const executorUrl = st.executor_url!;
+  // Hub: koppelcode (30 min) + vingerafdruk via de onboarding, zoals de beheerder dat doet.
+  await page.goto("/onboarding/executor");
+  await ready(page);
+  await page.getByTestId("executor-koppelcode-maken").click();
+  const code = await page.getByTestId("koppelcode-waarde").locator("code").getAttribute("data-waarde");
+  const vinger = await page.getByTestId("koppelcode-vingerafdruk").locator("code").getAttribute("data-waarde");
+  expect(code).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+  expect(vinger).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+
+  // Executor-statuspagina in een eigen context (geen Hub-sessie), zoals in een nieuw tabblad.
+  const ctx = await browser.newContext({ locale: "nl-NL" });
+  try {
+    const ex = await ctx.newPage();
+    const origins: string[] = [];
+    ex.on("request", (r) => {
+      if (r.method() === "POST") void r.allHeaders().then((h) => origins.push(h["origin"] ?? "(geen)"));
+    });
+    const eerste = await ex.goto(`${executorUrl}/`);
+    expect(eerste?.headers()["referrer-policy"]).toBe("same-origin");
+    await expect(ex.getByRole("heading", { name: "Koppelen" })).toBeVisible();
+    // Eerst een verkeerde vingerafdruk: de executor koppelt niet en zegt waarom (veldfout), niets opgeslagen.
+    await ex.getByLabel("Adres van de Hub").fill(baseURL!);
+    await ex.getByLabel("Koppelcode").fill(code!);
+    await ex.getByLabel("Vingerafdruk van de Hub").fill("AAAA-BBBB-CCCC-DDDD");
+    await ex.getByRole("button", { name: "Koppelen met de Hub" }).click();
+    await expect(ex.locator("#vinger-fout")).toBeVisible();
+    await expect(ex.getByRole("heading", { name: "Koppelen" })).toBeVisible();
+    // Daarna de juiste vingerafdruk met dezelfde code: de code is pas na een geslaagde koppeling verbruikt.
+    await ex.getByLabel("Adres van de Hub").fill(baseURL!);
+    await ex.getByLabel("Koppelcode").fill(code!);
+    await ex.getByLabel("Vingerafdruk van de Hub").fill(vinger!);
+    await ex.getByRole("button", { name: "Koppelen met de Hub" }).click();
+    await expect(ex.locator("body")).toContainText("Gekoppeld met de Hub");
+    // Het formulier is weg na de eerste koppeling (§3.7); de vingerafdruk staat ter vergelijking op de pagina.
+    await ex.goto(`${executorUrl}/`);
+    await expect(ex.getByRole("heading", { name: "Koppelen" })).toHaveCount(0);
+    await expect(ex.locator("body")).toContainText(vinger!);
+    // De browser stuurde bij beide POST's de echte oorsprong mee, nooit `null` (N-01).
+    await expect.poll(() => origins.length).toBe(2);
+    expect(new Set(origins)).toEqual(new Set([executorUrl]));
+  } finally {
+    await ctx.close();
+  }
+  // De Hub ziet de executor als gekoppeld (neutraal, geen groen: koppelen zegt niets over gezondheid).
+  await expect(page.getByTestId("koppeling-gemeld")).toBeVisible({ timeout: 30_000 });
+  await page.reload();
+  await ready(page);
+  await expect(page.getByTestId("executor-koppelen")).toContainText("Gekoppeld");
+  await expect(page.getByTestId("executor-koppelen").locator('[data-status="healthy"]')).toHaveCount(0);
 });
 
 test("na alle scenario’s: geen enkele schrijfaanroep op de NAS; uitloggen sluit de sessie", async ({ page }) => {

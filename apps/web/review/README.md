@@ -53,9 +53,10 @@ PEIL_REVIEW_ZONDER_OPZET=1 PEIL_REVIEW_ALLEEN='^(home|apps)$' PEIL_REVIEW_BREEDT
 node review/samenvat.mjs
 ```
 
-Wil je de executor-statuspagina ook meten? Start dan de executor (`python -m executor api` met
-`EXECUTOR_DATA_DIR`, `EXECUTOR_PORT`, `EXECUTOR_HOST=127.0.0.1` en `EXECUTOR_ALLOW_LOOPBACK_HUB=true`) en zet
-`PEIL_REVIEW_EXECUTOR_URL=http://127.0.0.1:<poort>`.
+Wil je de executor-statuspagina ook meten? De teststack (`tests/e2e/web_stack.py`) start sinds ADR-0026 zelf een
+echte executor met een lege datamap op `http://127.0.0.1:39403` (`HUB_E2E_EXECUTOR_PORT`); zet dan
+`PEIL_REVIEW_EXECUTOR_URL=http://127.0.0.1:39403`. Let op: het koppelformulier telt hooguit 5 pogingen per 15 min per
+bron-IP (contract §3.7); bij meer breedtes toont de fouttoestand daarna de melding "Te veel pogingen".
 
 ## Bestanden
 
