@@ -52,6 +52,12 @@ def test_trigger_weigert_wijzigen_en_verwijderen(admin: Any, settings: Any) -> N
             conn.execute("UPDATE audit_event SET hash = repeat('0', 64) WHERE id = %s", (rid,))
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("DELETE FROM audit_event WHERE id = %s", (rid,))
+        # TRUNCATE vuurt geen rij-triggers af; een statement-trigger (migratie 0010) weigert het hele spoor leegmaken.
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("TRUNCATE audit_event")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("TRUNCATE audit_event RESTART IDENTITY CASCADE")
+        assert conn.execute("SELECT count(*) FROM audit_event").fetchone()[0] > 0
     assert admin.get("/api/v1/audit/verify").json()["status"] == "intact"
 
 

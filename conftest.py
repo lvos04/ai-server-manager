@@ -61,7 +61,11 @@ def clean_db(pg_url: str) -> str:
             )
         ]
         if tables:
+            # Alleen tests: het auditspoor weigert TRUNCATE (trigger, migratie 0010); als superuser tussen tests
+            # leegmaken met triggers uit voor deze ene opdracht.
+            conn.execute("SET session_replication_role = replica")
             conn.execute("TRUNCATE " + ", ".join(f'"{t}"' for t in tables) + " RESTART IDENTITY CASCADE")
+            conn.execute("RESET session_replication_role")
     return pg_url
 
 
