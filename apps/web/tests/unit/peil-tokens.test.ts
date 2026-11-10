@@ -15,7 +15,7 @@ const vergelijk = (a: number[], b: number[]) => a.map((x, i) => x - (b[i] ?? 0))
 
 describe("Peil-tokens (O-14: versie-gepinde kopie met herkomstkop + sha256)", () => {
   it("de kop pint versie en sha256; de inhoud is ongewijzigd en dezelfde bronversie is byte-gelijk", () => {
-    const [kop1, kop2, ...rest] = kopie.split("\n");
+    const [kop1 = "", kop2 = "", ...rest] = kopie.split("\n");
     const inhoud = rest.join("\n");
     const pinSha = /sha256:([0-9a-f]{64})/.exec(kop1)?.[1];
     expect(pinSha, "herkomstkop zonder sha256").toBeTruthy();

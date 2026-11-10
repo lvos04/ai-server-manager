@@ -11,7 +11,8 @@ from pathlib import Path
 from executor.statuspagina import executor_page, render, template
 
 BRON = Path(__file__).resolve().parents[3] / "design" / "ontwerptaal" / "statuspagina.html"
-# Pin (ONTWERPTAAL §14, Peil 1.1.1 E08): versie + sha256 van de kopie, gelijk aan de bron op commit 172ee87 (Peil 1.1.0).
+# Pin (ONTWERPTAAL §14, Peil 1.1.1 E08): versie + sha256 van de kopie,
+# gelijk aan de bron op commit 172ee87 (Peil 1.1.0).
 PIN_VERSIE = (1, 1, 0)
 PIN_SHA256 = "be766cc4bf6962772a8dfc77996da34040fa94698403a9625e33545fa9ee62c8"
 
