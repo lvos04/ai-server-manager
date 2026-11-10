@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text, update
+from sqlalchemy.exc import IntegrityError
 
 from hub import audit
 from hub.deps import (
@@ -469,7 +470,12 @@ def create_user(body: UserIn, db: DB, settings: SettingsDep, principal: Admin, i
         role=body.role.value,
     )
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        # Gelijktijdig dezelfde naam aangemaakt (unieke index): eerlijk 409 in plaats van een 500 (review N-06).
+        db.rollback()
+        raise HubError(409, "username_taken", "Deze gebruikersnaam bestaat al.") from exc
     audit.record(
         db,
         actor_type="user",

@@ -303,3 +303,43 @@ def test_413_valt_voor_routering_en_aanmelding_ook_chunked(client: Any) -> None:
         headers={**idem(), "content-type": "application/json"},
     )
     assert r.status_code == 401 and r.json()["code"] == "unauthorized"
+
+
+def test_gelijktijdig_dezelfde_gebruikersnaam_geeft_409_en_geen_500(admin: Any, pg_url: str) -> None:
+    """Review N-06: twee beheerders maken tegelijk dezelfde naam aan. De voorcontrole ziet nog niets; de unieke index
+    weigert bij het wegschrijven. Dat moet een eerlijke 409 ``username_taken`` zijn, geen 500, en zonder halve rij."""
+    import psycopg
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+
+    from hub.models import User
+
+    raced: list[bool] = []
+
+    def concurrent_insert(session: Any, _ctx: Any, _instances: Any) -> None:
+        # Precies tussen de voorcontrole en de flush van de nieuwe gebruiker: een andere transactie legt dezelfde naam
+        # vast (andere flushes in hetzelfde verzoek, zoals de sessie bijwerken, laten we met rust).
+        if raced or not any(isinstance(o, User) and o.username == "gelijktijdig" for o in session.new):
+            return
+        raced.append(True)
+        with psycopg.connect(pg_url, autocommit=True) as conn:
+            conn.execute(
+                "INSERT INTO app_user (id, username, display_name, password_hash, role, disabled, created_at, "
+                "updated_at, version) VALUES (gen_random_uuid(), 'gelijktijdig', '', 'x', 'viewer', false, now(), "
+                "now(), 1)"
+            )
+
+    event.listen(Session, "before_flush", concurrent_insert)
+    try:
+        r = admin.post(
+            "/api/v1/users",
+            json={"username": "gelijktijdig", "password": STRONG_PASSWORD, "role": "viewer"},
+            headers=idem(),
+        )
+    finally:
+        event.remove(Session, "before_flush", concurrent_insert)
+    assert raced == [True]
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "username_taken"
+    names = [u["username"] for u in admin.get("/api/v1/users").json()["items"]]
+    assert names.count("gelijktijdig") == 1
