@@ -10,6 +10,7 @@ Versie: `contracts 1.3` · Peildatum 2026-11-10 · Eigenaar: `lvos04/ai-server-m
   nooit als relatieve link: in een kopie zou zo'n link kapot zijn. `CONTRACT_1.3_CONFORMITEIT.md` staat in dezelfde map.
 - **Wat elke repo moet veranderen** om aan 1.3 te voldoen, met bestanden en moment (NU of een latere fase):
   `CONTRACT_1.3_CONFORMITEIT.md`. Keuzes en motivering: `ai-server-manager:docs/adr/ADR-0027-contract-1-3.md` (1.3),
+  `ai-server-manager:docs/adr/ADR-0028-review-contract-1-3.md` (correcties uit de review van 1.3),
   `ai-server-manager:docs/adr/ADR-0011-contract-1-2.md` en `ai-server-manager:docs/adr/ADR-0012-review-contract-1-2.md`
   (1.2). Invoer van 1.3: `ai-server-manager:docs/platform-v2/CONTRACT_1.3_KANDIDATEN.md` (groepen A01–A36).
 - Dit document maakt de pakketvoorstellen (`01_ARCHITECTUUR/02`, `03`, `07`, `08`) concreet zodat alle repos samenwerken.
@@ -119,6 +120,34 @@ Peil 1.1.1 (§13). Tussen haakjes de groep uit de inventaris.
 - K8. Foutcatalogus: naast de vaste codes staat alleen 423 `item_in_playback` (Jelly Leon, B03) als eigen statuscode;
   andere module-eigen situaties gebruiken `details.reason` of een eigen code onder 409.
 - K9. ID's voor contractpunten in EVIDENCE: `C1.3-<REPO>-<nn>` zoals in `CONTRACT_1.3_CONFORMITEIT.md`.
+
+### Correcties uit de onafhankelijke review (2026-11-10, blijft `contracts 1.3`; ADR-0028)
+
+Het contract was nog nergens gekopieerd of gebouwd; deze correcties horen daarom bij 1.3 zelf. Ze lossen
+tegenstrijdigheden met bestaande code, het B03-plan en het contract zelf op en kiezen steeds de veiligste lezing.
+- RV1. Emby (§2.3 regel 3): "nooit schrijven in Emby" geldt voor de Hub, de executor, de AI, Jelly Leon en de
+  overnametool; de **bestaande** Emby-koppeling van MediaGuard (bibliotheek bijwerken, afspeeltest, sessies) blijft
+  werken (bestaande integriteit, Δ-MG-DUAL); geen nieuwe schrijfroute naar Emby.
+- RV2. HARDE EIS (§2.3 regel 7): (a) geldt ook voor een upgrade die de database van een mediaserver migreert (10.11 →
+  12.x en latere Jelly Leon-updates met upstream-migraties, zoals B03 §10.9); terugzetten = vorige image én snapshot;
+  (b) zonder upgradebewijs ook geen MediaGuard-update via de Hub of de executor.
+- RV3. Privacy (§2.3 regel 2): de Hub-adapter van MediaGuard volgt de veldenwitte lijst van de viewerclient (nooit
+  `sessions`, `hold.reason`, `actions`, `tests`, `last`), zodat er via MediaGuard geen kijkgedrag in de Hub komt.
+- RV4. Jelly Leon-plugin (§2.3 regel 9): de gekopieerde sleutelset bevat een `service_id`, zodat de controle van §4.3
+  ook daar eenduidig is.
+- RV5. `HUB_URL` voor my_house (§3.2, §2.3 regel 5): de vertaling zet alleen `HUB_URL`, nooit een token of
+  vingerafdruk; geen manifestparameter.
+- RV6. Onleesbaar koppelbestand (§3.5): vervangen bij de eerste schrijfactie van een poging met een nieuw env-token,
+  vóór het verzoek aan de Hub; `/readyz` blijft 200; HTTP-uitkomst per vaste `last_error`-code.
+- RV7. Koppelformulier (§3.7): ook een POST op een al gekoppelde dienst telt als poging (409 `al_gekoppeld`).
+- RV8. Sleutelrotatie (§4.5): apps met een geplakte sleutelset tellen mee; de Hub ondertekent niet met een nieuwe
+  sleutel zolang zo'n app de oude set gepind heeft.
+- RV9. Controlevolgorde (§4.7): rol en `Idempotency-Key` pas ná de authenticatie.
+- RV10. `Idempotency-Key` (§5): formulier-POST's van statuspagina's zijn uitgezonderd (met reden); andere
+  uitzonderingen alleen met ADR.
+- RV11. Log-sink (§6.1): `op` is een tijd met tijdzone, `trace_id` een UUID.
+- RV12. Events (§7): niet gekoppeld = niet pushen en geen pogingen tellen (ook `unlinked`/`revoked`); de eigenaar van
+  een event is (`source_app`, domein), zodat `media` van Jelly Leon en van MediaGuard niet botsen.
 
 ## Eerdere wijzigingen
 
@@ -402,7 +431,10 @@ Regels:
      `GET /api/v1/mediaserver/status` krijgt **erbij** een lijst `servers: [{server_id, kind, label, connected,
      hold: {active}, …}]` met één element per server; de bestaande velden op het hoogste niveau (`kind`, `url`,
      `connected`, `sessions`, `hold`, …) blijven bestaan voor bestaande clients (regel 1) en beschrijven de eerste
-     ingestelde server.
+     ingestelde server. **Privacy:** de Hub-adapter volgt op deze route dezelfde veldenwitte lijst als de viewerclient
+     van Jelly Leon hieronder (nooit `sessions`, `hold.reason`, `actions`, `tests` of `last` opslaan, loggen of tonen;
+     alleen aantallen en `hold.active`): zo komt er ook via MediaGuard geen kijkgedrag (titels, gebruikers, apparaten)
+     van Emby of Jelly Leon in de Hub (regel 9).
    - **Jelly Leon als MediaGuard-client** (alleen na besluit BG-04, §1.2): naast de Hub mag Jelly Leon een eigen
      MediaGuard-sleutel met rol **viewer** hebben, ingevoerd in Jelly Leon zelf. De rol wordt gecontroleerd met
      `GET /api/v1/auth/me` bij elke start en elk uur; een andere rol → sleutel niet opslaan en niet gebruiken. Alleen een
@@ -433,9 +465,12 @@ Regels:
      `mediaguard.quarantine.restore` is R3 en wordt nooit door de AI voorgesteld. Tot dan antwoorden Hub en Jelly Leon met
      `handmatig_in_mediaguard` en een deeplink — nooit gesimuleerd succes. (In B03 heten de acties zonder voorvoegsel; het
      voorvoegsel voorkomt botsingen in de allowlist, Δ-HUB-1.)
-   - **Emby:** het platform schrijft nooit in Emby en stopt, updatet of verwijdert Emby nooit. Emby blijft de terugval
-     tot de gebruiker hem zelf verwijdert na de controlelijst "Emby verwijderen" (B03 §10.9.2); app stoppen en data
-     verwijderen blijven aparte stappen (APP-02/A4).
+   - **Emby:** de Hub, de executor, de AI, Jelly Leon en de overnametool (B03-015) schrijven nooit in Emby (alleen
+     `GET`, regel 2) en het platform stopt, updatet of verwijdert Emby nooit. De **bestaande** koppeling van MediaGuard
+     met Emby (bibliotheek laten bijwerken na een vervanging, afspeeltest, sessies lezen) is bestaande integriteit van
+     MediaGuard en blijft ongewijzigd werken (regel 1, Δ-MG-DUAL); er komt geen nieuwe schrijfroute naar Emby bij.
+     Emby blijft de terugval tot de gebruiker hem zelf verwijdert na de controlelijst "Emby verwijderen" (B03 §10.9.2);
+     app stoppen en data verwijderen blijven aparte stappen (APP-02/A4).
 4. **Installatie:** bestaande apps worden als standaard Custom App met één alles-in-één image geïnstalleerd
    (MediaGuard/MSO: bestaat; **my_house: alles-in-één Custom App-image in P3**, plus herstelprocedures zonder terminal:
    updaten/terugdraaien via het formulier, wachtwoord vergeten, sleutelwissel/oude hoofdsleutel uploaden via de UI).
@@ -445,7 +480,8 @@ Regels:
    routes, gebruikersreizen en clientcontracten blijven gelijk. Jelly Leon valt erbuiten.
    **"Terug naar de Hub"** (O-11) in een bestaande app haalt het Hub-adres uit een niet-geheime instelling van die app:
    het eigen instellingenregister (MediaGuard `system.hub_url`, MSO `systeem.hub_url`) of, als de app geen register
-   heeft, de optionele omgevingsvariabele `HUB_URL` (my_house). Validatie volgens §3.2; ongeldig of leeg ⇒ geen link.
+   heeft, de optionele omgevingsvariabele `HUB_URL` (my_house; bij installatie via de Hub zet de vertaling hem, §3.2).
+   Validatie volgens §3.2; ongeldig of leeg ⇒ geen link.
    Nooit afleiden uit `Referer`, de URL of andere invoer. In een bestaande app start `HUB_URL` **geen** enrollment
    (regel 2).
 6. **Clients van de fork** (`jelly-leon-clients`): eigen Android-`applicationId` (androidtv ook `app_id`,
@@ -457,11 +493,15 @@ Regels:
 7. **HARDE EIS (besluit 9 van de gebruiker): kijkgeschiedenis en MediaGuard-voortgang blijven altijd beschikbaar.** Dat
    is alle kijkgeschiedenis (gezien-status, hervatpunten, favorieten, beoordelingen, onthouden spoorkeuzes, gebruikers,
    rechten) en de voortgang van MediaGuard.
-   (a) Geen overstap van mediaserver zonder vóór/na-rapport per gebruiker en uitdrukkelijk akkoord van de gebruiker op
-   elk verschil, ook op verschillen door upstream-migraties; de bestaande installatie blijft ongewijzigd als terugval.
+   (a) Geen overstap van mediaserver en geen upgrade die de database van een mediaserver migreert (Emby → Jelly Leon,
+   een bestaande Jellyfin → Jelly Leon, 10.11 → 12.x, en elke latere Jelly Leon-update met upstream-migraties; B03
+   §10.9) zonder vóór/na-rapport per gebruiker en uitdrukkelijk akkoord van de gebruiker op elk verschil, ook op
+   verschillen door upstream-migraties; de bestaande installatie blijft ongewijzigd als terugval; terugzetten = vorige
+   image én snapshot samen, nooit alleen de image.
    (b) Elke MediaGuard-release, ook de eerste uit de nieuwe publieke repo, bewijst een upgrade op een **gevulde database
    van de vorige versie** zonder gegevensverlies; UI-rondes wijzigen geen datamodel. Zonder dat bewijs geen release en
-   geen update op de NAS.
+   geen update op de NAS, ook niet via de Hub of de executor (hoe de Hub het bewijs ziet, legt een ADR in P3 vast; tot
+   dan voert de Hub geen MediaGuard-update uit).
    (c) Geen platformactie, ook niet met goedkeuring, schrijft rechtstreeks in de database van Emby, Jelly Leon of
    MediaGuard.
 8. **Emby-exportarchief (B12):** het blijvende JSON-exportarchief van de Emby-kijkgegevens (met sha256) is een
@@ -474,7 +514,10 @@ Regels:
    eigen bovengrens.
    **Hub-koppeling van de plugin (JL4, ADR-0017):** geen enrollment. De beheerder plakt de publieke Hub-sleutelset in het
    Jellyfin-dashboard en vergelijkt de vingerafdruk (§4.5); daarna gelden §4.2–§4.7 (persistente `jti`-cache, `kind`
-   wint). Zonder pin 401 `not_linked`. De Hub pollt `GET /connector/v1/events` (geen push: Jelly Leon heeft geen
+   wint). De gekopieerde set (stap "Hub-sleutelset kopiëren", Δ-HUB-JL) bevat naast `jwks`, `policy_public_key` en de
+   vingerafdruk ook een `service_id`: de UUID die de Hub voor deze Jelly Leon-instantie (`app_id` `jelly-leon`) in zijn
+   register maakt. De plugin pint die mee; in dienst-JWT's (§4.3) is dat de eigen opgeslagen `service_id`. Zonder pin
+   401 `not_linked`. De Hub pollt `GET /connector/v1/events` (geen push: Jelly Leon heeft geen
    service-token). Naar de Hub gaan alleen aantallen en ondoorzichtige ID's: geen titels, bestandsnamen, paden,
    item-ID's, gebruikers- of apparaatnamen of IP-adressen. `propose`/`apply`/`rollback` geven in v1 501
    `capability_unavailable`.
@@ -539,7 +582,9 @@ env-enrollment *trust on first use*: de statuspagina en de Hub-UI tonen daarna b
 beheerder ze kan vergelijken.
 
 `HUB_URL`, `HUB_ENROLLMENT_TOKEN` en `HUB_KEY_FINGERPRINT` zijn **geen manifestparameters** en staan niet in
-`custom_app.env` (§9): de vertaling voegt ze bij `app.install`/`app.update` toe als de Hub koppelt (§8).
+`custom_app.env` (§9): de vertaling voegt ze bij `app.install`/`app.update` toe als de Hub koppelt (§8). Uitzondering
+zonder koppeling: my_house leest `HUB_URL` alleen voor "Terug naar de Hub" (§2.3 regel 5); daar voegt de vertaling
+alleen `HUB_URL` toe, nooit een token of vingerafdruk, en ook daar is het geen manifestparameter.
 
 ### 3.3 `POST /api/v1/services/enroll` — exact schema
 
@@ -643,12 +688,15 @@ daarna uit de database verwijderd (onvolledig → `last_error` `overzetten_onvol
   `first_linked_at` blijft na de eerste geslaagde koppeling **altijd** staan (bepaalt §3.7).
 - **Onleesbaar** (geen geldige JSON, een andere major van `schema_version`, ontbrekende verplichte velden, verkeerde
   eigenaar of rechten): **fail-closed**. De dienst vertrouwt geen Hub-JWT (401 `not_linked`), toont geen koppelformulier
-  (onbekend telt als "al eens gekoppeld") en meldt in `/readyz`-details en de witte lijst `last_error.code =
-  koppelstatus_onleesbaar`. Een gewone schrijfactie zet zo'n bestand **nooit** stil terug naar `nooit_gekoppeld`. Moet de
-  dienst het bestand vervangen (alleen bij een nieuw env-token, §3.8), dan bewaart hij het origineel eerst als
-  `hub-link.json.onleesbaar-<UTC-tijd>` (0600) en zet hij `unreadable_replaced_at`; zolang `first_linked_at` daarna leeg
-  is, blijft de toestand voor §3.7 "onleesbaar" (geen formulier). Herstel alleen met een nieuw env-token via de Hub
-  (§3.8).
+  (onbekend telt als "al eens gekoppeld") en meldt in `/readyz`-details en de witte lijst
+  `last_error.code = koppelstatus_onleesbaar` (`/readyz` blijft 200: de koppeling telt daar niet mee, §5). Een gewone
+  schrijfactie zet zo'n bestand **nooit** stil terug naar `nooit_gekoppeld`. Moet de dienst het bestand vervangen
+  (alleen bij een nieuw env-token, §3.8), dan bewaart hij het origineel eerst als `hub-link.json.onleesbaar-<UTC-tijd>`
+  (0600) en zet hij `unreadable_replaced_at`. Dat gebeurt bij de eerste schrijfactie van die poging (`pending`, §3.6
+  stap 2, of `last_error`), dus vóór het verzoek aan de Hub: zo staan `pending` en daarna de hash van het afgehandelde
+  token vast, en probeert de dienst een geweigerd token na een herstart niet opnieuw. Zolang `first_linked_at` daarna
+  leeg is, blijft de toestand voor §3.7 "onleesbaar" (geen formulier, geen vertrouwen). Herstel alleen met een nieuw
+  env-token via de Hub (§3.8).
 - `pending` (`null` of een lopende poging, **naast** de stabiele toestand): `{"kind":"token|koppelcode",
   "secret_sha256":"<hex>","hub_url":"…","started_at":"…Z","attempts":n}` — nooit het geheim zelf. Een lopende poging
   verandert `state`, token en pins niet: een bestaande koppeling blijft tot het slagen geldig.
@@ -657,9 +705,10 @@ daarna uit de database verwijderd (onvolledig → `last_error` `overzetten_onvol
 - `used_enrollment_token_sha256`: hashes van **afgehandelde** env-tokens (geslaagd of definitief mislukt), hooguit de
   20 laatste; een token in deze lijst wordt nooit opnieuw geprobeerd.
 - `last_error`: `null` of `{"code":"<vaste code>","at":"…Z"}` (geen trace-ID; weergave: Peil). De codelijst is **open**
-  (snake_case, elke code met een vaste NL-melding van de dienst). Vast: `hub_onbereikbaar`, `hub_weigerde`,
-  `hub_antwoord_ongeldig`, `hub_vingerafdruk_onjuist`, `enroll_endpoint_ontbreekt`, `rate_limited`,
-  `koppelen_onderbroken`, `token_verlopen_na_60_min`, `ingetrokken_door_hub`, en nieuw in 1.3: `hub_incompatibel`
+  (snake_case, elke code met een vaste NL-melding van de dienst). Vast: `hub_onbereikbaar` (netwerkfout of 5xx),
+  `hub_weigerde` (401), `hub_antwoord_ongeldig`, `hub_vingerafdruk_onjuist`, `enroll_endpoint_ontbreekt` (404),
+  `rate_limited` (429), `koppelen_onderbroken`, `token_verlopen_na_60_min`, `ingetrokken_door_hub`, en nieuw in 1.3:
+  `hub_incompatibel`
   (413/422 van de Hub), `token_ongeldig` (env-token past niet in het patroon), `vingerafdruk_ongeldig`
   (`HUB_KEY_FINGERPRINT` onleesbaar), `hub_adres_ongeldig` (`HUB_URL` breekt §3.2), `overzetten_onvolledig` (eenmalige
   overzetting uit de database onvolledig) en `koppelstatus_onleesbaar`. Bij `vingerafdruk_ongeldig` en
@@ -743,7 +792,8 @@ daarna uit de database verwijderd (onvolledig → `last_error` `overzetten_onvol
 - **Pogingen en rate-limit:** max. **5 pogingen per 15 min per bron-IP** (adres van de TCP-verbinding;
   `X-Forwarded-For` en andere headers nooit gebruiken) én max. 20 pogingen per 15 min voor de hele dienst. Elke
   formulier-POST die de herkomstcontrole doorstaat, telt mee voor beide limieten, ook bij ongeldige invoer, een lopende
-  poging of een onleesbaar koppelbestand. Teller in het geheugen mag als de dienst één API-proces heeft; anders gedeeld
+  poging, een onleesbaar koppelbestand of een dienst die al eens gekoppeld is (die laatste krijgt 409 `al_gekoppeld` en
+  gaat niet naar de Hub). Teller in het geheugen mag als de dienst één API-proces heeft; anders gedeeld
   (database). Overschrijding → vaste melding, geen verzoek naar de Hub.
 - **Koppelen bezig** (`pending ≠ null`): de dienst stuurt niets naar de Hub en antwoordt met de vaste melding
   `koppelen_bezig` (HTTP 409). De voorwaarde voor het formulier blijft "nog nooit gekoppeld"; hoe een lopende poging
@@ -945,9 +995,12 @@ het token zonder herinstallatie roteren of intrekken (§3.8).
   ingetrokken sleutels zijn ondertekend. Dienst pollt ≤ elke 15 min; een JWT met een onbekende `kid` krijgt direct 401
   `unknown_key` en zet op de achtergrond een extra poll in gang (max. 1× per 30 s; het verzoek wacht daar niet op).
   De Hub ondertekent pas met een nieuwe sleutel als elke actieve dienst via `GET /connector/v1/hub-link` een
-  `rotation_sequence` ≥ die van de rotatie meldt. Sleutels roteren is een beheerdershandeling (R2), nooit een
-  AI-actie. **De Hub heeft nog geen sleutelrotatie gebouwd:** tot dan geeft het endpoint `{"items":[]}`, roteert de
-  Hub zijn sleutels niet, en is rotatie = opnieuw koppelen.
+  `rotation_sequence` ≥ die van de rotatie meldt. Apps met een **geplakte** sleutelset (§2.3 regel 3, de Jelly
+  Leon-plugin van regel 9) hebben die route niet maar tellen wel mee: hoe de Hub weet dat zij de rotatie hebben (bv.
+  bevestiging door de beheerder per app), legt een ADR vast vóór de rotatie gebouwd wordt; tot dan ondertekent de Hub
+  niet met een nieuwe sleutel zolang zo'n app de oude set gepind heeft. Sleutels roteren is een beheerdershandeling
+  (R2), nooit een AI-actie. **De Hub heeft nog geen sleutelrotatie gebouwd:** tot dan geeft het endpoint `{"items":[]}`,
+  roteert de Hub zijn sleutels niet, en is rotatie = opnieuw koppelen.
 
 ### 4.6 `jti` en replaycache
 
@@ -978,7 +1031,9 @@ het token zonder herinstallatie roteren of intrekken (§3.8).
   | `token_replayed` | `jti` al gebruikt voor een andere mutatie (§4.6) |
 
   Controlevolgorde: 1 MiB-laag (§5) → `state` → tokensoort → handtekening/`kid` → claims → `token_use` → `jti` →
-  schemavalidatie van de body. Zonder geldige authenticatie dus altijd 401, ook bij een onleesbare of ongeldige body.
+  schemavalidatie van de body. Rol (403) en `Idempotency-Key` (400/409/422, §5) komen ook pas ná de authenticatie.
+  Zonder geldige authenticatie dus altijd 401, ook bij een onleesbare of ongeldige body of een ontbrekende
+  `Idempotency-Key`.
   Nooit "open access" bij verlopen/ingetrokken credentials (EX16): connector wordt `unknown` + incident.
 - Restrisico: verkeer op het LAN is (nog) HTTP; pins beschermen de echtheid van sleutels, niet de vertrouwelijkheid van
   tokens. HTTPS komt met B10/B13 (TLS-route) en verandert dit contract niet.
@@ -1030,7 +1085,11 @@ het token zonder herinstallatie roteren of intrekken (§3.8).
     `POST /api/v1/monitoring/heartbeat` (dedupe op `observed_at`, §6.1), `POST /api/v1/logs` (dubbele levering
     aanvaard, §6.1);
   - geen bijwerking behalve audit en tellers: `…/selftest`, `…/evaluate`, `…/verify`;
+  - formulier-POST's van een statuspagina (koppelen §3.7, de sleutelformulieren van de executor §3.9): een
+    browserformulier kan geen header meesturen; bescherming via het formuliertoken, de herkomstcontrole, de
+    pogingenlimiet, `koppelen_bezig` en de eenmaligheid van koppelcode en token;
   - `POST /connector/v1/propose`/`apply`/`rollback` **alleen zolang** ze 501 `capability_unavailable` geven.
+  Andere uitzonderingen alleen met een ADR in de repo en een contractmelding voor de volgende versie.
   Elke repo heeft een **statische test** die faalt op een muterende route zonder `Idempotency-Key` die niet met reden in
   een uitzonderingslijst staat (voorbeeld: `ai-server-manager:apps/api/tests/unit/test_idempotency_routes.py`). Let op
   §4.6: ook zonder `Idempotency-Key` verbruikt een POST de `jti`.
@@ -1089,8 +1148,9 @@ lezen of wijzigen niets bij de dienst en voeren nooit iets uit.
   Antwoord 202 `{status:"accepted", beoordeling}` of 200 `{status:"duplicate", …}` (dedupe op `(dienst, observed_at)`);
   hooguit één per 5 s (429 + `Retry-After: 5`). De Hub beoordeelt zelf (worker stil, jobs stil, falende checks →
   `degraded`). Uitblijven: na 3 × `verwacht_interval_s` is de meting verouderd en de binnenkant `unknown` (§6.2).
-- **`POST /api/v1/logs`** (log-sink) — body `{regels: [1–200 × {op, niveau: debug|info|warning|error|critical,
-  bericht (1–8000 tekens), logger ≤ 96, trace_id?, velden {}}]}`; onbekende velden of te lange invoer → 422. De Hub
+- **`POST /api/v1/logs`** (log-sink) — body `{regels: [1–200 × {op, niveau, bericht, logger, trace_id?, velden}]}`
+  met `op` (tijd met tijdzone), `niveau` ∈ `debug|info|warning|error|critical`, `bericht` (1–8000 tekens), `logger`
+  (≤ 96), `trace_id` (UUID, optioneel) en `velden` (object); onbekende velden of te lange invoer → 422. De Hub
   schoont vóór opslag (geheimen, adressen volgens zijn redactieregels), bewaart per regel hooguit 2000 tekens van het
   geschoonde bericht en hooguit 4 KiB `velden` (groter → alleen de sleutelnamen met `_ingekort: true`); dat inkorten is
   opslag, geen afkappen van invoer vóór de controle. Per dienst ≤ 1000 regels per minuut (instelbaar): regels boven de
@@ -1118,7 +1178,10 @@ de bron; een instelbare cache-TTL van de afnemer (bv. de Hub-inventaris) maakt e
 - Push: `POST {HUB_URL}/api/v1/events/inbox` (service-token). Dedupe op `event_id` én `(source_app, source_event_id)`.
   Antwoord 202 `accepted` of 200 `duplicate`.
 - Bron houdt een outbox (retry met backoff, dead-letter na 10 pogingen, zichtbaar in Hub). Zonder native events: Hub pollt
-  `/connector/v1/events` of bestaande routes met cursor/ETag/watermark. Geen exact-once-aanname.
+  `/connector/v1/events` of bestaande routes met cursor/ETag/watermark. Geen exact-once-aanname. Zolang een eigen dienst
+  niet gekoppeld is (§3.5: geen `state: gekoppeld`), pusht hij niet en telt hij geen pogingen; events blijven in de
+  outbox tot een nieuwe koppeling. Dat geldt ook voor `service.hub_link.unlinked` en `service.hub_link.revoked`: die
+  kan de dienst pas na een nieuwe koppeling afleveren (de Hub kent de toestand al, §3.8).
 - **Grenzen** (zoals de Hub-inbox ze afdwingt; een bron valideert vóór verzending tegen dezelfde regels, zodat een event
   niet pas als dead-letter opvalt): onbekende velden → 422; `schema_version` `"1.0"`; `event_type` ≤ 128 tekens en
   `^[a-z0-9_]+\.[a-z0-9_]+\.[a-z0-9_]+$` (precies drie segmenten); `source_app` = de `app_id` van het service-token (anders
@@ -1138,8 +1201,10 @@ de bron; een instelbare cache-TTL van de afnemer (bv. de Hub-inventaris) maakt e
   `notification`, `onboarding`, `action`; home-control-hub `sso`, `energy`, `network`, `automation`, `flow`;
   appstore-en-fork `catalog`; jelly-leon-platform `lifecycle`; zoeken-en-persoonlijke-ai `search`, `voice`; jelly-leon
   `media` (eventtypes van B03 §10.10); MediaGuard (via de Hub-adapter) `media`. Gedeeld: `app` (alleen
-  `app.health.changed` over de eigen app) en `service` (alleen de vaste lijst hieronder). Een event buiten het eigen
-  domein verwerkt de Hub alleen als algemene informatie, nooit met de regels van de eigenaar.
+  `app.health.changed` over de eigen app) en `service` (alleen de vaste lijst hieronder). De eigenaar van een event is
+  het paar (`source_app`, domein): `media` van `jelly-leon` en `media` van `mediaguard` zijn twee bronnen met elk hun
+  eigen regels. Een event buiten het eigen domein verwerkt de Hub alleen als algemene informatie, nooit met de regels
+  van de eigenaar.
 - **Vaste `service.*`-events** van elke eigen dienst (`entity: {type: "service", id: <app_id>}`):
   `service.hub_link.linked` (payload `{via: token|koppelcode}`), `service.hub_link.unlinked`,
   `service.hub_link.revoked`, `service.token.rotated`, `service.key_rotation.applied`, `service.key_rotation.rejected`.
