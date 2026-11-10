@@ -81,9 +81,21 @@ gekozen (veiligste) lezing.
     tegen `design/ontwerptaal/bouw/sjabloon.py`. Hub: tokenkopie 1.1.1 via `scripts/peil-kopie.mjs`; ondernavigatie op
     labelbreedte zonder vet actief item, statuspil met radius = halve regelhoogte, "verzonden" in plaats van
     "verstuurd". De Hub heeft geen domeinknoppen (huis): de regel "rand = -ink" is hier niet van toepassing.
-15. **Eigen manifesten (C1.3-ASM-17).** Kop "platformcontract 1.3" en geen `HUB_*`. `healthcheck.monitor` en
-    `accepted_findings` zijn nog niet toegevoegd: de gecommitte validator van appstore-en-fork (4e4e305) weigert beide
-    als onbekend veld. Wacht op C1.3-ASF-08.
+15. **Eigen manifesten (C1.3-ASM-17).** Kop "platformcontract 1.3" en geen `HUB_*`. Bij de conformiteitsronde wachtten
+    `healthcheck.monitor` en `accepted_findings` nog op de validator (appstore-en-fork 4e4e305 weigerde beide). Sinds
+    C1.3-ASF-08 gecommit is (appstore-en-fork 1090fc9; gecontroleerd op 7b3159d) staan ze erin (onafhankelijke review,
+    2026-11-10):
+    - **Monitorplan op `/readyz`**, niet `/healthz` (zoals eerst gepland): `/healthz` blijft groen als de database of
+      de geheimen weg zijn, `/readyz` niet; de koppeling telt daar niet mee (§5). 200, timeout 10 s, interval 60 s.
+      Gelijk aan het eigen manifest van appstore-en-fork. De beheerder neemt het plan over in Uptime Kuma ("handmatig
+      bevestigd", §9); het monitorplan zelf bouwen is C1.3-ASM-20 (P2).
+    - **`accepted_findings`: alleen `digest_pending_release`** (eigen image vóór de eerste release), zodat `--strict`
+      slaagt. De release-CI vult de digest; daarna moet deze regel weg (anders faalt `--strict`: geaccepteerde code die
+      niet meer optreedt).
+    - `provenance.license: GPL-3.0` (§1.1 besluit 8, gelijk aan `LICENSE`).
+    - Bewaakt door `apps/api/tests/unit/test_eigen_manifesten.py` (tekstregels, met negatieve gevallen) en de CI-job
+      `manifest`: de validator van appstore-en-fork op een vaste commit in `--strict`. Een nieuwe validatorversie is
+      een bewuste stap (commit in `ci.yml` bijwerken).
 
 ## Gevolgen
 
@@ -93,5 +105,5 @@ gekozen (veiligste) lezing.
   moeten de vaste namen van §7 volgen (conformiteitslijst, hoofdstukken 2–5).
 - `hoog` escaleert niet meer (was kritiek): alleen `kritiek` escaleert.
 - Open (later): P2-punten (C1.3-ASM-18/19/20), P3/P4-adapters (C1.3-ASM-21), P5 (C1.3-ASM-22), de catalogusroute voor
-  `catalogus.lezen` (P2), `healthcheck.monitor` in de manifesten (na C1.3-ASF-08), en het verwijderen van de
-  overgangen (`payload.severity`, oude jobs-checknamen) in de release na 0.1.x.
+  `catalogus.lezen` (P2), `accepted_findings: digest_pending_release` weghalen na de eerste release, en het
+  verwijderen van de overgangen (`payload.severity`, oude jobs-checknamen) in de release na 0.1.x.

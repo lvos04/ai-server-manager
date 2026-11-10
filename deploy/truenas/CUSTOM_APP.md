@@ -18,14 +18,14 @@ geen compose-bestand, geen terminal en geen `install.sh`.
 
 ## 0. Image en tag (publiek, met digest)
 
-De images staan op GHCR en worden **publiek** zodra de scan van besluit 3 klaar is (contract 1.2 §2.1); dan heb je
+De images staan op GHCR en worden **publiek** zodra de scan van besluit 3 klaar is (contract 1.3 §2.1); dan heb je
 **geen** registry-login nodig. De exacte tag én digest van een release staan in de release-bijlage
 `release/digests.json` (gemaakt door `release.yml`). Vul de tag in het formulier in als
 **`<versie>@sha256:<64 hex>`**, bijvoorbeeld `0.1.0@sha256:<digest uit digests.json>`. Dat is geldige Docker-syntax:
 TrueNAS maakt er `ghcr.io/lvos04/ai-server-manager:<versie>@sha256:…` van en haalt dan precies die image op.
 
 > **NIET GEVALIDEERD (echte NAS):** of het TrueNAS-formulier een tag met `@` accepteert en of TrueNAS met zo'n tag nog
-> updates detecteert, is niet op een echte NAS getest (contract 1.2 §2.2). Weigert het formulier de tag, vul dan
+> updates detecteert, is niet op een echte NAS getest (contract 1.3 §2.2). Weigert het formulier de tag, vul dan
 > alleen de exacte versie in (bv. `0.1.0`, nooit `latest`). De Hub leest na elke installatie of update via de
 > executor de digest terug en stopt bij een afwijking (vanaf fase P2).
 
@@ -126,7 +126,7 @@ die alleen binnen de container (127.0.0.1) luistert. Je hoeft dus geen tweede po
 
 **Install.** De statuspagina `http://<NAS-adres>:30410` toont **"nog niet gekoppeld"**. De executor voert **niets**
 uit (de allowlist is leeg tot fase P2). Er zijn geen omgevingsvariabelen nodig: de executor koppelt nooit met een
-`HUB_ENROLLMENT_TOKEN`, alleen met een koppelcode op zijn eigen statuspagina (contract 1.2 §3.9).
+`HUB_ENROLLMENT_TOKEN`, alleen met een koppelcode op zijn eigen statuspagina (contract 1.3 §3.9).
 
 **Koppelen met de Hub (eenmalig):**
 
@@ -172,7 +172,7 @@ volgt in fase P2.
   de start eerst een geverifieerde back-up (`/appdata/backups`, *pre-upgrade*) en voert daarna de migraties uit. Een
   mislukte migratie laat de oude database ongemoeid. Een ZFS-snapshot vooraf blijft verstandig.
 - **Terugdraaien:** een Custom App heeft geen catalogusversies: TrueNAS' *Roll Back* werkt hier niet voor een andere
-  image-tag (contract 1.2 §2.2, NIET GEVALIDEERD op een echte NAS). Terugdraaien = **Edit** → de vorige tag (met
+  image-tag (contract 1.3 §2.2, NIET GEVALIDEERD op een echte NAS). Terugdraaien = **Edit** → de vorige tag (met
   digest) weer invullen → **Update**, alleen naar een tag met hetzelfde databaseschema; anders eerst de
   back-up/snapshot van vóór de update terugzetten (tag-only rollback is niet veilig bij schemawijzigingen).
 

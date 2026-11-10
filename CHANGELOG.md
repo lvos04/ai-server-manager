@@ -39,8 +39,12 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   labelbreedte zonder vet actief item, statuspil-radius en "verzonden" in de Hub-UI.
 - **Overig:** uitgaande beheerdersadressen volgen de canonieke vormen van §3.2; contract-pin op bron-commit 02b119c
   (C1.3-ALG-01); werkopdrachten noemen contract 1.3 en leggen de KWALITEIT van Python-diensten niet meer op aan
-  jelly-leon-web en jelly-leon-clients (C1.3-ASM-23); eigen manifesten met kop "platformcontract 1.3"
-  (`healthcheck.monitor` wacht op C1.3-ASF-08).
+  jelly-leon-web en jelly-leon-clients (C1.3-ASM-23); eigen manifesten met kop "platformcontract 1.3".
+- **Eigen manifesten (C1.3-ASM-17, onafhankelijke review):** nu de validator van appstore-en-fork ze kent
+  (C1.3-ASF-08): `healthcheck.monitor` op `/readyz` (200, 10 s, 60 s), `accepted_findings: digest_pending_release`
+  tot de eerste release en `provenance.license: GPL-3.0`; `--strict` geldig. Nieuwe test `test_eigen_manifesten.py`
+  en CI-job `manifest` (validator op een vaste commit). Docs (CUSTOM_APP, README, rooktest) verwijzen naar contract
+  1.3.
 
 ### Gerepareerd — onafhankelijke review van contract 1.3 (ADR-0028; blijft `contracts 1.3`)
 - Dertien correcties RV1–RV13 in het wijzigingslog van het contract, telkens de veiligste lezing: de bestaande
