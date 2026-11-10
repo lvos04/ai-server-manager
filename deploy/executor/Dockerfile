@@ -33,13 +33,16 @@ LABEL org.opencontainers.image.title="ai-server-manager-executor" \
 COPY --from=build /install /usr/local
 COPY deploy/executor/entrypoint.py /usr/local/lib/executor/entrypoint.py
 COPY deploy/executor/healthcheck.py /usr/local/lib/executor/healthcheck.py
+COPY deploy/common/rechten.py /usr/local/lib/executor/rechten.py
 RUN set -eu; groupadd -g 568 apps; useradd -u 568 -g 568 -M -d /tmp -s /usr/sbin/nologin apps; \
     mkdir -p /appdata; chown 568:568 /appdata; chmod 0750 /appdata; \
     python -m pip check; python -c "import executor.app"
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 EXECUTOR_DATA_DIR=/appdata EXECUTOR_PORT=30410 TZ=Etc/UTC
 VOLUME ["/appdata"]
 EXPOSE 30410
+# Exec-vorm; de healthcheck wisselt als eerste handeling naar 568 (bounding set leeg, no_new_privs; contract 1.3 §2.2).
 HEALTHCHECK --interval=30s --timeout=8s --start-period=30s --retries=3 \
   CMD ["python", "/usr/local/lib/executor/healthcheck.py"]
-# entrypoint.py geeft /appdata aan 568, wisselt naar 568 en vervangt zichzelf door de API (PID 1, geen root meer).
+# entrypoint.py geeft /appdata aan 568, legt de bounding set, wisselt naar 568 en vervangt zichzelf door de API (PID 1,
+# geen root meer).
 CMD ["python", "/usr/local/lib/executor/entrypoint.py"]

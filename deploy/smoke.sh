@@ -4,7 +4,7 @@ set -euo pipefail
 HUB_IMAGE="${1:?hub-image}"
 EXEC_IMAGE="${2:?executor-image}"
 WORK="$(mktemp -d)"
-cleanup() { docker rm -f asm-smoke-hub asm-smoke-exec >/dev/null 2>&1 || true; rm -rf "$WORK" 2>/dev/null || sudo rm -rf "$WORK" 2>/dev/null || true; }
+cleanup() { docker rm -f asm-smoke-hub asm-smoke-exec asm-smoke-exec568 >/dev/null 2>&1 || true; rm -rf "$WORK" 2>/dev/null || sudo rm -rf "$WORK" 2>/dev/null || true; }
 trap cleanup EXIT
 mkdir -p "$WORK/hub" "$WORK/exec"
 
@@ -85,7 +85,7 @@ case " $uids" in *" 569 "*) ;; *) echo "FOUT: AI-runner draait niet als aparte g
 socks="$(docker exec -u 568 asm-smoke-hub sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk "NR>1 && \$4==\"0A\" {print \$2}"' | sort -u | tr '\n' ' ')"
 echo "luisterende sockets (hex ip:poort): $socks"
 test "$socks" = "00000000:76C0 0100007F:20D0 "
-# no-new-privileges en geen capabilities (contract 1.2 §2.2/§10; het standaardformulier zet geen no-new-privileges en
+# no-new-privileges en geen capabilities (contract 1.3 §2.2/§10; het standaardformulier zet geen no-new-privileges en
 # geen cap_drop, de images doen het zelf). Voor elk proces, ook PID 1. Processen van 'docker exec' zelf (deze shell en
 # zijn kinderen) tellen niet mee.
 privs() {  # privs <container> <veld>: unieke waarden van <veld> in /proc/<pid>/status over alle processen
@@ -93,12 +93,38 @@ privs() {  # privs <container> <veld>: unieke waarden van <veld> in /proc/<pid>/
     pp=$(awk "/^PPid:/{print \$2}" $p/status 2>/dev/null); [ "$pp" = "$me" ] && continue; [ "$pp" = 0 ] && [ "$pid" != 1 ] && continue;
     awk -v f="$0:" "\$1==f{print \$2}" $p/status 2>/dev/null; done' "$2" | sort -u | tr '\n' ' '
 }
+# Contract 1.3 §2.2 (C1.3-ASM-01): ook CapPrm en CapAmb 0 en — bij een start als root — een lege bounding set.
 for c in asm-smoke-hub asm-smoke-exec; do
   v="$(privs "$c" NoNewPrivs)"; echo "NoNewPrivs in $c: $v"
   test "$v" = "1 " || { echo "FOUT: niet alle processen in $c hebben no-new-privileges" >&2; exit 1; }
-  v="$(privs "$c" CapEff)"; echo "CapEff in $c: $v"
-  test "$v" = "0000000000000000 " || { echo "FOUT: een proces in $c heeft nog effectieve capabilities" >&2; exit 1; }
+  for f in CapEff CapPrm CapAmb CapBnd; do
+    v="$(privs "$c" "$f")"; echo "$f in $c: $v"
+    test "$v" = "0000000000000000 " || { echo "FOUT: een proces in $c heeft $f ≠ 0 ($v)" >&2; exit 1; }
+  done
 done
+# De healthcheck apart (§2.2): hetzelfde commando met de controlevlag, als root gestart zoals Docker dat doet; na de
+# wissel Uid 568, geen capabilities, lege bounding set en no_new_privs.
+for pair in "asm-smoke-hub /usr/local/lib/hub/healthcheck.py" "asm-smoke-exec /usr/local/lib/executor/healthcheck.py"; do
+  # shellcheck disable=SC2086
+  set -- $pair
+  out="$(docker exec "$1" python "$2" --controle)"
+  for want in $'Uid\t568' $'CapEff\t0000000000000000' $'CapPrm\t0000000000000000' $'CapAmb\t0000000000000000' \
+              $'CapBnd\t0000000000000000' $'NoNewPrivs\t1'; do
+    expect "healthcheck $1 na de wissel: ${want/$'\t'/ }" "$out" "$want"
+  done
+done
+# "Custom User 568" aangevinkt: geen eigenaarschapsstap en geen lege bounding set mogelijk; CapEff/CapPrm/CapAmb 0 en
+# NoNewPrivs 1 blijven verplicht (§2.2).
+mkdir -p "$WORK/exec568" && chmod 0777 "$WORK/exec568"
+docker run -d --name asm-smoke-exec568 -u 568:568 -p 127.0.0.1:30411:30410 -v "$WORK/exec568:/appdata" "$EXEC_IMAGE" >/dev/null
+wait_healthy asm-smoke-exec568
+v="$(privs asm-smoke-exec568 NoNewPrivs)"; test "$v" = "1 " || { echo "FOUT: Custom User 568 zonder no_new_privs" >&2; exit 1; }
+for f in CapEff CapPrm CapAmb; do
+  v="$(privs asm-smoke-exec568 "$f")"
+  test "$v" = "0000000000000000 " || { echo "FOUT: Custom User 568: $f ≠ 0 ($v)" >&2; exit 1; }
+done
+echo "ok: executor als Custom User 568: geen capabilities, no_new_privs"
+docker rm -f asm-smoke-exec568 >/dev/null
 
 # Herstart zonder dataverlies: eerste beheerder via de setupcode uit de log, dan herstart en harde kill.
 CODE="$(docker logs asm-smoke-hub 2>&1 | awk '/SETUPCODE \(eenmalig/ {c=$NF} END {print c}')"

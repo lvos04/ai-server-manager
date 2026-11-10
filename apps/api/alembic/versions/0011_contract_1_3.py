@@ -22,9 +22,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "service", sa.Column("base_url_genegeerd", sa.Boolean(), server_default="false", nullable=False)
-    )
+    op.add_column("service", sa.Column("base_url_genegeerd", sa.Boolean(), server_default="false", nullable=False))
     op.create_table(
         "hub_setting",
         sa.Column("sleutel", sa.String(length=64), nullable=False),

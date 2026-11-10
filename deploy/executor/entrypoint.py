@@ -1,4 +1,5 @@
-"""Entrypoint van de executor-image: als root alleen /appdata aan 568:568 geven, daarna alles als 568."""
+"""Entrypoint van de executor-image: als root alleen /appdata aan 568:568 geven, dan de bounding set legen en alles als
+568 met no_new_privs (contract 1.3 §2.2, C1.3-ASM-01)."""
 
 from __future__ import annotations
 
@@ -8,6 +9,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from rechten import drop_bounding_set  # noqa: E402
 
 UID, GID = 568, 568
 PR_SET_NO_NEW_PRIVS = 38
@@ -33,6 +37,9 @@ def main() -> None:
                 if p.name == "secrets":
                     for f in p.iterdir():
                         os.lchown(f, UID, GID)
+        # Contract 1.3 §2.2: na de eigenaarschapsstap de bounding set legen; mislukt dat, dan niet starten.
+        if not drop_bounding_set():
+            fail("de bounding set (capabilities) kon niet worden geleegd; de executor start niet als root door.")
         os.setgroups([])
         os.setgid(GID)
         os.setuid(UID)

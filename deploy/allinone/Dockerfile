@@ -77,6 +77,7 @@ COPY --from=web /usr/local/bin/node /usr/local/bin/node
 COPY --from=web /out /opt/hub-web
 COPY deploy/allinone/supervisor.py /usr/local/lib/hub/supervisor.py
 COPY deploy/allinone/healthcheck.py /usr/local/lib/hub/healthcheck.py
+COPY deploy/common/rechten.py /usr/local/lib/hub/rechten.py
 RUN set -eu; \
     for b in postgres initdb pg_ctl pg_isready psql pg_dump pg_restore; do \
       printf '#!/bin/sh\nLD_LIBRARY_PATH=/opt/pglibs exec /usr/lib/postgresql/16/bin/%s "$@"\n' "$b" > /usr/local/bin/$b; \
@@ -95,6 +96,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     HUB_DATA_DIR=/appdata HUB_PORT=30400 TZ=Etc/UTC
 VOLUME ["/appdata"]
 EXPOSE 30400
+# Exec-vorm; de healthcheck wisselt als eerste handeling naar 568 (bounding set leeg, no_new_privs; contract 1.3 §2.2).
 HEALTHCHECK --interval=30s --timeout=8s --start-period=90s --retries=3 \
   CMD ["python", "/usr/local/lib/hub/healthcheck.py"]
 # De bewaker is zelf PID 1 (signalen + zombie-opruiming) en draait na de init als 568: geen root-proces meer.

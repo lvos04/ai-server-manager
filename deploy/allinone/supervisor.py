@@ -32,6 +32,9 @@ import threading
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from rechten import drop_bounding_set  # noqa: E402
+
 UID = int(os.environ.get("HUB_UID", "568"))
 GID = int(os.environ.get("HUB_GID", "568"))
 AI_UID = int(os.environ.get("HUB_AI_UID", "569"))
@@ -253,6 +256,11 @@ def main() -> None:
     log(f"AI Server Manager — Hub (alles-in-één) · data {DATA} · poort {PORT}")
     started_as_root = os.getuid() == 0
     prepare_dirs()
+    # Contract 1.3 §2.2 (C1.3-ASM-01): na de eigenaarschapsstap de bounding set legen, vóór er een kindproces start
+    # (ook de AI-runner erft hem leeg). De effectieve set van dit proces blijft tot de wissel hieronder, zodat setuid
+    # in preexec_fn nog werkt; na execve krijgt geen proces meer capabilities. Mislukt het, dan niet doorstarten.
+    if started_as_root and not drop_bounding_set():
+        fail("de bounding set (capabilities) kon niet worden geleegd; de Hub start niet als root door.")
     py = sys.executable
     if run_once("first-start-init", [py, "-m", "hub", "init"]) != 0:
         fail("first-start-init mislukt (zie de melding hierboven); geheimen worden nooit overschreven")
