@@ -4,6 +4,24 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — contract 1.3 vastgesteld (`docs/platform-v2/PLATFORM_CONTRACTEN.md`, ADR-0027)
+- `PLATFORM_CONTRACTEN.md` is nu `contracts 1.3`: alle 36 contractgroepen uit de inventaris verwerkt, met een
+  wijzigingslog 1.2 → 1.3 bovenaan (één punt per groep) en de keuzes bij het vaststellen (K1–K9). Onder meer: Emby als
+  bestaande mediaserver en de HARDE EIS (kijkgeschiedenis en MediaGuard-voortgang), MediaGuard volgt twee servers
+  (`servers[]` naast de bestaande velden), gereserveerde MediaGuard-acties tot BG-05, Jelly Leon-conventies en JL4,
+  model-apps, healthcheck als 568 en bounding set, strengere herkomst- en `Host`-regels voor statuspagina's,
+  onleesbaar koppelbestand fail-closed, vingerafdruk over alle policy-sleutels (testvector `HN69-2PHK-XV2D-X85W`),
+  scopes dienst → Hub, heartbeat en log-sink, foutcatalogus, versheid (`max_age`), eventregels en ernst, SSO-regels,
+  eigenaar-connector en back-upbevestiging, manifest (`accepted_findings`, `checklist`, `post_install_checks`,
+  adoptie, monitorplan), EVIDENCE-waarden `Intel-iGPU-getest (ontwikkelmachine)` en `Niet getest`, GPL-3.0.
+- Nieuw `CONTRACT_1.3_CONFORMITEIT.md`: per repo (alle 11) de concrete wijzigingen met bestanden en moment (NU of
+  P2/P3/P4-0/P4/P5), ID's `C1.3-<REPO>-<nn>`, gemeten tegen de code van elke repo (alleen gelezen).
+- Nieuwe test `apps/api/tests/unit/test_contract_13.py`: kop, wijzigingslog en conformiteitslijst dekken elke groep,
+  geen relatieve links (kopieën), een hoofdstuk per repo, unieke ID's met geldig moment, testvectoren onafhankelijk
+  nagerekend, nieuwe validatiewaarden in §11.
+- De inventaris, README, `docs/platform-v2/README.md` en `OVERDRACHT/STATUS.md` (met de gebouwde client-ID's en hun
+  bron) wijzen naar 1.3. De code van de Hub volgt nog 1.2; wat hier nog moet, staat in hoofdstuk 1 van de lijst.
+
 ### Toegevoegd — inventaris voor contract 1.3 (`docs/platform-v2/CONTRACT_1.3_KANDIDATEN.md`)
 - Alle 151 contractmeldingen uit ronde 2, de contractpunten uit de ADR's en EVIDENCE van alle repos sinds 1.2, de
   B03-delta's (hoofdstuk 18, ADR-0016…0020), de besluiten van de gebruiker (Emby, MediaGuard volgt twee servers,

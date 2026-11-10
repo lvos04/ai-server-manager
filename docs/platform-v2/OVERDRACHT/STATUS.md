@@ -49,7 +49,11 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 
 1. **Android applicationId:** eigen ID, naast de officiële app installeerbaar (geregistreerde patch: android
    `applicationId`, androidtv daarnaast `app_id` en `app_search_suggest_authority`). iOS: eigen bundle-id (NIET GEVALIDEERD
-   (Mac/Xcode)).
+   (Mac/Xcode)). **Gebouwde ID's** (bron: alleen de bouwopdracht van ronde 2, "het voorbeeld uit ADR-0004 dat de
+   gebruiker in het keuzemenu koos"; bevestiging gevraagd, contract 1.3 §1.2): android `org.jellyfin.mobile.jellyleon`,
+   androidtv `org.jellyfin.androidtv.jellyleon`, Swiftfin (voorstel) `org.jellyfin.swiftfin.jellyleon`. Regel sinds
+   contract 1.3: nooit een ID, accounttype, authority, permissie, `app_search_suggest_*` of sharedpref-naam gelijk aan
+   die van een officiële app.
 2. **Swiftfin:** 1.6.1 blijft; de **server gaat naar de nieuwste stabiele Jellyfin 12.x (.NET 10) vóór P4**, zodat B03 direct
    op 12.x gebouwd wordt (jelly-leon + jelly-leon-web; Android-clients op 12.x-compatibiliteit controleren).
 3. **Zichtbaarheid:** alle repos en GHCR-images **publiek**, pas na een scan van de volledige historie op geheimen en
@@ -134,6 +138,22 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   2 afgewezen, 16 Peil-zaken (voor Peil 1.1.1). Contract 1.2 blijft bindend tot 1.3 is vastgesteld.
 - Open besluiten die de inventaris oplevert: §8 van dat document (o.a. BG-05, BG-06, 100.64.0.0/10, bevestiging van
   de Android-ID's en de Swiftfin-bundle-id, GHCR-pakket van de nieuwe MediaGuard-repo).
+
+## Contract 1.3 — vastgesteld (2026-11-10)
+
+- `docs/platform-v2/PLATFORM_CONTRACTEN.md` is nu **`contracts 1.3`** (wijzigingslog 1.2 → 1.3 bovenaan, 36 punten,
+  één per contractgroep A01–A36 uit de inventaris, plus de keuzes K1–K9). Keuzes en motivering:
+  `docs/adr/ADR-0027-contract-1-3.md`. Per repo (alle 11) de concrete wijzigingen met bestanden en moment (NU of
+  P2/P3/P4-0/P4/P5): `docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md` (120 punten met ID `C1.3-<REPO>-<nn>`).
+- Belangrijkste keuzes: `Host`-beperking tegen DNS-rebinding aangenomen; `servers[]` naast de bestaande velden van de
+  MediaGuard-status; MediaGuard-acties via de Hub gereserveerd tot BG-05 en P3-02; strengste herkomstregel
+  (`same-origin`, exacte `Origin`, `Sec-Fetch-Site`) voor alle statuspagina's; vingerafdruk over alle policy-sleutels
+  (nieuwe testvector `HN69-2PHK-XV2D-X85W`); bounding set verplicht leeg bij start als root; Emby alleen lezen en
+  HARDE EIS in §2.3; licentie GPL-3.0.
+- **Nog niet** naar de andere repos gekopieerd (volgende stap van de orkestratie, C1.3-ALG-01) en nog nergens in code
+  doorgevoerd; let op: media-guard-ultimate, media-source-optimizer en my_house hebben nog een kopie van **1.1**.
+- Open besluiten (contract §1.2): BG-05, BG-04, BG-06/BG-18, `100.64.0.0/10` voor de noodlogin, bevestiging van de
+  Android-ID's en de Swiftfin-bundle-id, GHCR-pakket van de nieuwe MediaGuard-repo, `JL_SYNC_PUSH_TOKEN`.
 
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 

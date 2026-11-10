@@ -1,9 +1,11 @@
 # Contract 1.3 — kandidaten (inventaris van alle meldingen sinds contract 1.2)
 
-Status: **inventaris, geen contract** · Peildatum 2026-11-10 · Eigenaar `lvos04/ai-server-manager` · Invoer voor de
-volgende stappen: contract 1.3 (alle groepen **(a)**), Peil 1.1.1 (alle groepen **(e)**) en het werk per repo (groepen
-**(c)**). Tot contract 1.3 is vastgesteld, blijft [`PLATFORM_CONTRACTEN.md`](PLATFORM_CONTRACTEN.md) `contracts 1.2`
-bindend. Dit document wijzigt geen contracttekst en geen code in andere repos.
+Status: **inventaris, geen contract — verwerkt in contract 1.3** (2026-11-10, `ai-server-manager:docs/adr/ADR-0027-contract-1-3.md`)
+· Peildatum 2026-11-10 · Eigenaar `lvos04/ai-server-manager` · Invoer voor de volgende stappen: contract 1.3 (alle
+groepen **(a)**, nu in [`PLATFORM_CONTRACTEN.md`](PLATFORM_CONTRACTEN.md) `contracts 1.3` en
+[`CONTRACT_1.3_CONFORMITEIT.md`](CONTRACT_1.3_CONFORMITEIT.md)), Peil 1.1.1 (alle groepen **(e)**) en het werk per repo
+(groepen **(c)**, ook per repo in de conformiteitslijst). Waar het contract een voorstel hieronder preciseert of
+strenger maakt, wint het contract (keuzes K1–K9 in het wijzigingslog). Dit document wijzigt geen code in andere repos.
 
 ## 0. Werkwijze
 
