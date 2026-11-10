@@ -265,3 +265,17 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   → Op de Ubuntu-machine opnieuw proberen en EVIDENCE bijwerken.
 - Excel-bijwerker: `ai-server-manager/tools/excel/update_excel.py` — sinds 2026-11-09 ook rijen toevoegen (Δ-ASM-EXCEL);
   getest op een test-werkboek en op de echte Excel (CI-job `excel`).
+
+## Besluiten van de gebruiker na contract 1.3 (2026-11-10)
+
+- **Noodlogin (A07):** alleen vanaf het thuisnetwerk (RFC 1918 / fc00::/7). `100.64.0.0/10` (Tailscale/CGNAT) telt niet
+  als privé; een beheerder kan het later in de Hub-UI expliciet toestaan (audit + waarschuwing).
+- **App-ID's (A02) bevestigd:** `org.jellyfin.mobile.jellyleon` (Android), `org.jellyfin.androidtv.jellyleon` (Android TV),
+  `org.jellyfin.swiftfin.jellyleon` (iOS/tvOS; NIET GEVALIDEERD (Mac/Xcode)).
+- **BG-04 — MediaGuard-sleutel van Jelly Leon: via de Hub.** De Hub beheert de (alleen-lezen, gescopete) MediaGuard-sleutel
+  in de eigen vault; Jelly Leon krijgt alleen wat nodig is — bij voorkeur zonder sleuteloverdracht (Jelly Leon vraagt de
+  MediaGuard-gegevens via de Hub met een dienst-JWT). Vraagt de Hub-koppeling van de Jelly Leon-plugin (JL4, golf 1); tot
+  dan `mediaguard: onbekend`.
+- **Extra's (C09):** de Android-app van MediaGuard krijgt ook en-US; my_house krijgt een tabelweergave + toetsenbordbediening
+  bij de grafiek "Laatste 24 uur".
+- Nog open: BG-05 (vóór golf 3), BG-06/BG-18 (vóór P5), GHCR-pakketrechten MediaGuard (gebruiker), `JL_SYNC_PUSH_TOKEN`.
