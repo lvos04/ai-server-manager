@@ -3,7 +3,7 @@
 De Hub van het platform: **B01** (centrale web-UI en beheer-API), **B02** (AI-beheer met risicobeleid en executor),
 **B09** (monitoring/incidenten) en **B12** (back-up en herstel). Taal: Nederlands. Bron van waarheid voor de
 platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.3,
-vastgesteld 2026-11-10, ADR-0027; wat elke repo moet veranderen:
+vastgesteld 2026-11-10, ADR-0027; reviewcorrecties ADR-0028; wat elke repo moet veranderen:
 [`CONTRACT_1.3_CONFORMITEIT.md`](docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md)). De code hieronder volgt nog
 contract 1.2; de 1.3-punten voor deze repo staan in hoofdstuk 1 van die lijst.
 

@@ -144,7 +144,8 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - `docs/platform-v2/PLATFORM_CONTRACTEN.md` is nu **`contracts 1.3`** (wijzigingslog 1.2 → 1.3 bovenaan, 36 punten,
   één per contractgroep A01–A36 uit de inventaris, plus de keuzes K1–K9). Keuzes en motivering:
   `docs/adr/ADR-0027-contract-1-3.md`. Per repo (alle 11) de concrete wijzigingen met bestanden en moment (NU of
-  P2/P3/P4-0/P4/P5): `docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md` (120 punten met ID `C1.3-<REPO>-<nn>`).
+  P2/P3/P4-0/P4/P5): `docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md` (121 punten met ID `C1.3-<REPO>-<nn>`, na de
+  review).
 - Belangrijkste keuzes: `Host`-beperking tegen DNS-rebinding aangenomen; `servers[]` naast de bestaande velden van de
   MediaGuard-status; MediaGuard-acties via de Hub gereserveerd tot BG-05 en P3-02; strengste herkomstregel
   (`same-origin`, exacte `Origin`, `Sec-Fetch-Site`) voor alle statuspagina's; vingerafdruk over alle policy-sleutels
@@ -154,6 +155,16 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   doorgevoerd; let op: media-guard-ultimate, media-source-optimizer en my_house hebben nog een kopie van **1.1**.
 - Open besluiten (contract §1.2): BG-05, BG-04, BG-06/BG-18, `100.64.0.0/10` voor de noodlogin, bevestiging van de
   Android-ID's en de Swiftfin-bundle-id, GHCR-pakket van de nieuwe MediaGuard-repo, `JL_SYNC_PUSH_TOKEN`.
+
+## Contract 1.3 — onafhankelijke review (2026-11-10)
+
+- Blijft `contracts 1.3` (nog nergens gekopieerd); twaalf correcties RV1–RV12 in het wijzigingslog, motivering in
+  `docs/adr/ADR-0028-review-contract-1-3.md`. Belangrijkste: MediaGuard mag zijn bestaande Emby-koppeling houden
+  (bibliotheek bijwerken na een vervanging) — de rest van het platform schrijft nooit in Emby; de HARDE EIS geldt ook
+  voor upgrades met databasemigraties (10.11 → 12.x en later); geen kijkgedrag via de MediaGuard-adapter in de Hub;
+  formulier-POST's van statuspagina's zijn met reden uitgezonderd van `Idempotency-Key`.
+- Conformiteitslijst gecorrigeerd en aangevuld (121 punten). Alles alleen gelezen en met tests gecontroleerd; niets op
+  een echte NAS, met echte accounts of op echte hardware.
 
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 
