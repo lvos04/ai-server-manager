@@ -104,6 +104,12 @@ werkend noodaccount) en H12 (Tailwind 4 + shadcn/ui + lucide, `globals.css` op t
 (Playwright tegen de echte API met simulators). "Opnieuw koppelen via executor `app.update`" (H5) volgt in P2.
 NIET GEVALIDEERD op een echte NAS of met een echte dienst.
 
+**Stand H7, eerste deel (QA-review P1, 2026-11-10, ADR-0026):** koppelen van de executor via zijn statuspagina
+(koppelcode 30 min + vingerafdruk, pinning) werkte in geen echte browser (`Referrer-Policy: no-referrer` → `Origin:
+null`). Gerepareerd met `same-origin` (exacte Origin-controle blijft) en **Sim-getest in Chromium** tegen de echte Hub-
+API en de echte executor (web-E2E `90-afsluiting.spec.ts`). De schrijfkey, live verifiëren en ontkoppelen/roteren op
+de executorpagina blijven P2.
+
 ---
 
 ## 2. home-control-hub

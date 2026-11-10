@@ -4,6 +4,16 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — onafhankelijke QA-review van P1 en de contract 1.2-schermen (ADR-0026)
+- **Executor koppelen in een echte browser (N-01):** de statuspagina stuurde `Referrer-Policy: no-referrer`, waardoor
+  elke browser `Origin: null` meestuurde en `POST /koppelen` altijd weigerde. Nu `same-origin`; de exacte
+  `Origin`-controle blijft (fail-closed). De web-E2E start de echte executor en verstuurt het formulier in Chromium.
+- **Open redirect na inloggen:** `?terug=/%09/ander.domein` werd in de browser `//ander.domein` (na SSO via de
+  meta-refresh, na lokaal inloggen via de router). Hub en web-UI accepteren nu alleen zichtbare ASCII zonder spatie.
+- **Auditspoor:** ook `TRUNCATE` wordt geweigerd (migratie 0010, statement-trigger).
+- **Gebruikers:** gelijktijdig dezelfde naam aanmaken geeft 409 `username_taken` in plaats van 500 (N-06).
+- **Eerlijkheid en Peil:** de executor logt bij de start de echte koppelstatus; overlays `bg-black/50` (ONTWERPTAAL §1).
+
 ### Gewijzigd — ontwerpreview van de gebouwde Hub-UI (ADR-0025, `docs/ontwerp/PEIL_REVIEW.md`)
 - **Meetgereedschap** `apps/web/review` + `make web-review`. Het meet alle schermen (beheerder, kijker, kind,
   publiek, executor-statuspagina, NAS offline en browser offline) op 320–1440 in licht en donker: axe, gerenderd
