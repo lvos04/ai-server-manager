@@ -255,6 +255,8 @@ staat nog open: NIET GEVALIDEERD.
   - run 42715050190 faalde op overloop met DejaVu Sans (R-26);
   - runs 42721759007 en 42724137831 faalden op een pagina die > 30 s bleef laden (N-07). De eerste keer maakte dat ook
     zichtbaar dat een grafiek bij een mislukte reekslijst eindeloos bleef laden; dat is gerepareerd;
-  - de uitkomst van de run na beide reparaties staat in EVIDENCE.json (I23-23-08).
+  - **run 42727322898 (`f609246`) is volledig groen** (python, web, excel, images). De reviewstap had 25 geslaagd en
+    geen herkansing nodig: 57 schermen en toestanden (zonder de executor, die in CI niet draait), 676 metingen, 0 harde
+    bevindingen, axe 0. Dit staat ook in EVIDENCE.json (I23-23-08, B01-004).
 - `docs/screenshots/p1` toont nog de stand vóór deze review (`333de88`). De actuele afdrukken maakt `make web-review`
   (`apps/web/review/uit/shots`, niet in Git); de voor/na-selectie staat in `docs/ontwerp/review/`.
