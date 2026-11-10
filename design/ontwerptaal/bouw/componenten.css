@@ -17,8 +17,10 @@
 
   /* ── Statusbadge (T-01, C-03) — pil, icoon + woord. Gezond zonder vlak; onbekend/verouderd gestippeld ─ */
   .status {
-    @apply inline-flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-full border-2 border-transparent px-2.5 py-0.5 text-sm leading-5 font-semibold;
+    @apply inline-flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-2xl border-2 border-transparent px-2.5 py-0.5 text-sm leading-5 font-semibold;
   }
+  /* 1.1.1 (MSO R-06): radius = halve hoogte van één regel (16 px bij 32 px, 20 px bij 40 px). Op één regel blijft de pil
+     volledig rond; een pil die omloopt, wordt niet meer door de ronde rand afgesneden (was rounded-full). */
   .status svg { @apply size-4.5 shrink-0; }
   .status-gezond { @apply text-healthy-ink; }
   .status-gezond svg { @apply text-healthy; }
@@ -33,7 +35,7 @@
   .status-gepauzeerd { @apply border-paused bg-paused-bg text-paused-ink; }
   .status-gepauzeerd svg { @apply text-paused; }
   .status-nogniet { @apply border-border-strong bg-muted text-foreground; }
-  .status-groot { @apply min-h-10 px-3.5 text-base; }
+  .status-groot { @apply min-h-10 rounded-[1.25rem] px-3.5 text-base; }
   .status-groot svg { @apply size-5; }
 
   /* ── Risicobadge (T-04, C-08) — hoekig: codeblok met treden-glyph + woord ─────────────────── */
@@ -114,9 +116,13 @@
   .zij-item[aria-current="page"] { @apply bg-accent font-bold shadow-[inset_4px_0_0_var(--primary)]; }
   .zij-item[aria-current="page"] svg { @apply text-foreground; }
   .zij-ouder { @apply font-semibold; }
-  .onder-item { @apply relative flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-sm font-medium text-muted-foreground no-underline; }
+  /* 1.1.1 (E16, MSO R-05): items op de breedte van hun label (flex-auto), de rest van de ruimte gelijk verdeeld; vijf vaste
+     kolommen van 64 px waren op 320 px te smal voor "Problemen" (4 px over). Nooit afbreken midden in een woord. */
+  .onder-item { @apply relative flex min-h-16 min-w-touch flex-auto flex-col items-center justify-center gap-0.5 px-1 text-sm font-medium text-muted-foreground no-underline; }
   .onder-item svg { @apply size-6; }
-  .onder-item[aria-current="page"] { @apply font-bold text-foreground shadow-[inset_0_3px_0_var(--primary)]; }
+  /* 1.1.1 (E16): actief = balk + inkt, ZONDER extra gewicht. Vet maakte het label breder dan zijn kolom (2 px op 320 px
+     met Noto Sans, meer met DejaVu Sans). In forced colors komt er een onderstreping bij (basislaag). */
+  .onder-item[aria-current="page"] { @apply text-foreground shadow-[inset_0_3px_0_var(--primary)]; }
   .teller { @apply inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-foreground px-1.5 text-sm leading-none font-bold text-background; }
   .teller-goedkeuring { @apply bg-risk-2-solid text-risk-2-on-solid; }
   .kop-item { @apply inline-flex min-h-touch items-center gap-2 rounded-lg px-3 font-semibold text-foreground no-underline hover:bg-accent; }

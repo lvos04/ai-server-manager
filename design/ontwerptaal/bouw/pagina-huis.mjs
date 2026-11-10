@@ -18,13 +18,13 @@ export function huis() {
       <output class="min-w-24 text-center text-2xl font-semibold cijfers" aria-live="polite">${nb('21,0 °C')}</output>
       <button type="button" class="knop knop-secundair knop-icoon" aria-label="Doel 0,5 graad hoger">${i('plus')}</button>
     </div>
-    <p class="flex items-center gap-2 text-sm font-semibold" role="status">${i('loader-circle', 'size-4')}Verstuurd — wacht op bevestiging van my_house</p>
+    <p class="flex items-center gap-2 text-sm font-semibold" role="status">${i('loader-circle', 'size-4')}Verzonden — wacht op bevestiging van my_house</p>
   </div>
   <div class="flex flex-col gap-2">
     <p class="font-semibold">Verlichting</p>
-    <div class="grid grid-cols-2 gap-2">
-      <button type="button" class="flex min-h-touch flex-col items-start gap-1 rounded-lg border-2 border-domain-light-on bg-domain-light-on-bg p-3 text-left text-domain-light-on-ink" aria-pressed="true">${i('lightbulb', 'size-5')}<span class="font-semibold">Plafondlamp</span><span class="text-sm">Aan · 80%</span></button>
-      <button type="button" class="flex min-h-touch flex-col items-start gap-1 rounded-lg border border-border-strong bg-card p-3 text-left" aria-pressed="false">${i('lightbulb-off', 'size-5 text-muted-foreground')}<span class="font-semibold">Leeslamp</span><span class="text-sm text-muted-foreground">Uit</span></button>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(max(8.5rem,calc(50%-0.25rem)),1fr))] gap-2">
+      <button type="button" class="flex min-h-touch min-w-0 flex-col items-start gap-1 rounded-lg border-2 border-domain-light-on-ink bg-domain-light-on-bg p-3 text-left text-domain-light-on-ink" aria-pressed="true">${i('lightbulb', 'size-5')}<span class="font-semibold">Plafondlamp</span><span class="text-sm">Aan · 80%</span></button>
+      <button type="button" class="flex min-h-touch min-w-0 flex-col items-start gap-1 rounded-lg border border-border-strong bg-card p-3 text-left" aria-pressed="false">${i('lightbulb-off', 'size-5 text-muted-foreground')}<span class="font-semibold">Leeslamp</span><span class="text-sm text-muted-foreground">Uit</span></button>
     </div>
   </div>
   ${meta({ bron: 'my_house (Zigbee-sensor woonkamer)', tijd: '11:55', rel: '1 min geleden' })}
@@ -46,7 +46,7 @@ export function huis() {
     <li class="flex flex-col gap-2 py-3">
       <div class="flex flex-wrap items-center gap-2"><span class="mr-auto font-semibold">Zone woonkamer</span>${chip('heat', 'flame', 'Verwarmen · 21&nbsp;°C')}</div>
       <p class="text-sm text-muted-foreground">Actieve sensor: woonkamer (vers, 11:55).</p>
-      <div class="flex flex-wrap gap-2"><button type="button" class="knop border-2 border-domain-heat bg-domain-heat-bg text-domain-heat-ink hover:bg-domain-heat-bg" aria-pressed="true">${i('flame')}<span>Verwarmen</span>${i('check', 'size-4')}</button><button type="button" class="knop knop-secundair" aria-disabled="true" aria-describedby="conflict">${i('snowflake')}<span>Koelen</span></button></div>
+      <div class="flex flex-wrap gap-2"><button type="button" class="knop border-2 border-domain-heat-ink bg-domain-heat-bg text-domain-heat-ink hover:bg-domain-heat-bg" aria-pressed="true">${i('flame')}<span>Verwarmen</span>${i('check', 'size-4')}</button><button type="button" class="knop knop-secundair" aria-disabled="true" aria-describedby="conflict">${i('snowflake')}<span>Koelen</span></button></div>
       ${melding('gate', 'lock', '<p id="conflict"><strong>Koelen geblokkeerd.</strong> De gedeelde buitenunit verwarmt al voor deze zones. Verwarmen en koelen tegelijk kan niet (conflict).</p>')}
     </li>
     <li class="flex flex-col gap-2 py-3">

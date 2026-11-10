@@ -48,7 +48,7 @@ const preview = `
         <ol class="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm font-semibold" aria-label="Stappen van de uitvoering">
           ${['Back-up', 'Bijwerken', 'Controle na uitvoering', 'Klaar of incident'].map((s, k, a) => `<li class="flex items-center gap-2"><span class="stap-bol" aria-hidden="true">${k + 1}</span>${s}${k < a.length - 1 ? i('arrow-right', 'size-4 text-muted-foreground') : ''}</li>`).join('')}
         </ol>
-        <p class="text-sm text-muted-foreground">Pas na de controle (readback) staat er <strong>Uitgevoerd en gecontroleerd</strong>. "Verstuurd" is nog niet klaar.</p>
+        <p class="text-sm text-muted-foreground">Pas na de controle (readback) staat er <strong>Uitgevoerd en gecontroleerd</strong>. "Verzonden" is nog niet klaar.</p>
       </section>
     </div>
     <aside aria-label="Veiligheid van dit voorstel" class="flex flex-col gap-3 rounded-lg bg-muted p-4 text-sm">

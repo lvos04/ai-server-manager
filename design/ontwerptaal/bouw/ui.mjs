@@ -135,7 +135,7 @@ export function shell({ pagina, titel, inhoud, live = 'aan', banner = '', kind =
 </head>
 <body>
 <a href="#inhoud" class="skiplink knop knop-primair">Naar inhoud</a>
-<div class="min-h-dvh lg:grid lg:grid-cols-[var(--spacing-sidebar)_minmax(0,1fr)]">
+<div class="${kind ? 'min-h-dvh' : 'min-h-dvh lg:grid lg:grid-cols-[var(--spacing-sidebar)_minmax(0,1fr)]'}"${kind ? ' data-schil="kind"' : ''}>
   ${kind ? '' : `<aside class="hidden border-r border-border bg-sidebar lg:block">
     <div class="sticky top-0 flex max-h-dvh flex-col gap-6 overflow-y-auto p-4">
       <a href="home.html" class="flex min-h-touch items-center gap-3 px-2 text-xl font-bold text-foreground no-underline">
@@ -150,7 +150,7 @@ export function shell({ pagina, titel, inhoud, live = 'aan', banner = '', kind =
     <header class="sticky top-0 z-30 border-b border-border bg-card">
       <div class="flex min-h-16 items-center gap-2 px-3 lg:px-6">
         <a href="${kind ? 'kind.html' : 'home.html'}" class="flex min-h-touch min-w-0 items-center gap-2 pr-1 font-bold text-foreground no-underline ${kind ? '' : 'lg:hidden'}"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">${i('server')}</span><span class="max-w-[8.5rem] text-base leading-5">TrueNAS Home Platform</span></a>
-        ${kind ? '' : `<button type="button" class="knop knop-secundair hidden w-56 justify-start font-normal whitespace-nowrap text-muted-foreground xl:inline-flex 2xl:w-72" aria-keyshortcuts="Control+K">${i('search')}<span>Zoeken</span><kbd class="ml-auto whitespace-nowrap text-foreground">Ctrl K</kbd></button>`}
+        ${kind ? '' : `<button type="button" class="knop knop-secundair hidden w-48 justify-start font-normal whitespace-nowrap text-muted-foreground xl:inline-flex 2xl:w-72" aria-keyshortcuts="Control+K">${i('search')}<span>Zoeken</span><kbd class="ml-auto whitespace-nowrap text-foreground">Ctrl K</kbd></button>`}
         <div class="ml-auto flex min-w-0 items-center gap-1">
           ${kind ? '' : `<span class="hidden xl:inline-flex">${liveEl.replace(' role="status"', '')}</span>
           <span class="hidden lg:contents">

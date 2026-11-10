@@ -11,7 +11,11 @@ const kaart = ({ id, titel, ic, badge = '', variant = '', inhoud, metaHtml, verd
 </article>`;
 
 export function home({ offline = false } = {}) {
-  const st = (s, l) => (offline ? status('verouderd', 'Verouderd · stand van 11:52') : status(s, l));
+  // 1.1.1 (E15): offline wordt een laatst bekende Gezond (en Gepauzeerd) "Verouderd"; Beperkt en Storing blijven staan met
+  // de tijd van de stand (een bekend probleem verdwijnt niet als de verbinding wegvalt); Onbekend en Nog niet blijven.
+  const BLIJFT = ['storing', 'beperkt'];
+  const offlineStatus = (s, l, verouderd) => (BLIJFT.includes(s) ? status(s, `${l} · stand van 11:52`) : s === 'onbekend' || s === 'nogniet' ? status(s, l) : status('verouderd', verouderd));
+  const st = (s, l) => (offline ? offlineStatus(s, l, 'Verouderd · stand van 11:52') : status(s, l));
   // Review 1.1.0 — offline-regel: LEZEN blijft werken met de laatst bekende stand; alleen wat iets wijzigt of een verse
   // server nodig heeft (testen, wizard, vernieuwen, goedkeuren) staat uit. Zelfde label = overal dezelfde toestand.
   const LEZEN = ['Incident bekijken', 'Voorstel beoordelen'];
@@ -22,7 +26,7 @@ export function home({ offline = false } = {}) {
     : knop(label, { soort: label === 'Incident bekijken' ? 'primair' : 'secundair', ic, href: label === 'Incident bekijken' ? 'problemen.html' : label === 'Voorstel beoordelen' ? 'appdetail.html' : label === 'Onboarding verder' ? 'wizardstap.html' : '#', extra: 'w-full sm:w-auto' }));
 
   const rij = (naam, s, label, reden, href = '#') => `<li><a href="${href}" class="flex min-h-touch flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-foreground no-underline hover:bg-accent sm:flex-nowrap sm:px-2">
-    <span class="mr-auto font-semibold sm:mr-0 sm:w-32 sm:shrink-0">${naam}</span>${offline && s !== 'nogniet' ? status('verouderd', 'Verouderd') : status(s, label)}<span class="reden min-w-0 flex-1 basis-full sm:basis-auto">${reden}</span>${i('chevron-right', 'hidden size-5 shrink-0 text-muted-foreground sm:block')}</a></li>`;
+    <span class="mr-auto font-semibold sm:mr-0 sm:w-32 sm:shrink-0">${naam}</span>${offline ? offlineStatus(s, label, 'Verouderd') : status(s, label)}<span class="reden min-w-0 flex-1 basis-full sm:basis-auto">${reden}</span>${i('chevron-right', 'hidden size-5 shrink-0 text-muted-foreground sm:block')}</a></li>`;
 
   const systeem = `
 <section aria-labelledby="sys-titel" class="kaart border-2 ${offline ? 'border-dashed border-unknown' : 'border-down'}" data-testid="systeemstatus">
