@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "executor"
 version = "0.1.0"
-description = "AI Server Manager — executor (enige component met TrueNAS-schrijfrechten; fase P0: nog niet gekoppeld)"
+description = "AI Server Manager — executor (enige component met TrueNAS-schrijfrechten; koppelen via de statuspagina, acties in fase P2)"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [

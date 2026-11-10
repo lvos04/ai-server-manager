@@ -29,7 +29,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[executor] FOUT: {exc}", flush=True)
             return 78
         print(f"[executor] geheimen: {'nieuw: ' + ', '.join(created) if created else 'aanwezig'}", flush=True)
-        print("[executor] nog niet gekoppeld; koppelen volgt in fase P2. De allowlist is leeg.", flush=True)
+        # De echte koppelstatus (witte lijst §3.5, zonder token of hashes), niet altijd "nog niet gekoppeld".
+        from executor.hublink import HubLinkStore
+
+        try:
+            state = str(HubLinkStore(s.secrets_dir).read().get("state") or "nooit_gekoppeld")
+        except (OSError, ValueError):
+            state = "onbekend (hub-link.json onleesbaar)"
+        print(f"[executor] koppelstatus: {state}. Allowlist leeg tot fase P2: er wordt niets uitgevoerd.", flush=True)
         return 0
     if args.cmd == "api":
         import uvicorn

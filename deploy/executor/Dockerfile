@@ -26,7 +26,7 @@ FROM ${PYTHON_IMAGE}
 ARG VERSION=0.1.0
 ARG REVISION=onbekend
 LABEL org.opencontainers.image.title="ai-server-manager-executor" \
-      org.opencontainers.image.description="AI Server Manager — executor (fase P0: nog niet gekoppeld)" \
+      org.opencontainers.image.description="AI Server Manager — executor (koppelen via de statuspagina; acties volgen in fase P2)" \
       org.opencontainers.image.source="https://github.com/lvos04/ai-server-manager" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
