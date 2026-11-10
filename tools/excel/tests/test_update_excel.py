@@ -609,6 +609,42 @@ def test_bewijs_jlt_naar_testmatrix_en_p4_0_naar_fasen(klein):
     assert waarde(blad(na, 1), "B28") == "Bezig"  # Dashboard toont de status van P4-0
 
 
+def test_contractpunten_en_reviews_in_eigen_overzicht(klein, capsys):
+    """Contract 1.3 §11: C1.x-…- en REVIEW-…-regels krijgen geen Excel-rij maar staan in het eigen overzicht (nooit
+    stil weggelaten); ook daar wordt 'Gereed' nooit doorgegeven."""
+    assert ue.main(args_voor(klein)) == 0
+    capsys.readouterr()
+    ev = klein["dir"] / "repo2" / "docs" / "platform-v2" / "EVIDENCE.json"
+    ev.parent.mkdir(parents=True)
+    ev.write_text(
+        json.dumps(
+            [
+                {"id": "C1.3-HCH-01", "status": "Bezig", "validatie": "Unit-getest", "bijgewerkt": "2026-11-10"},
+                {"id": "C1.2-H5", "status": "Gereed", "validatie": "Sim-getest", "bijgewerkt": "2026-11-10"},
+                {
+                    "id": "REVIEW-ai-server-manager-contract-1.3",
+                    "status": "Bezig",
+                    "validatie": "Unit-getest",
+                    "repo": "ai-server-manager",
+                    "bijgewerkt": "2026-11-10",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    uit = klein["dir"] / "uit2.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]) == 0
+    resultaat = json.loads(capsys.readouterr().out)
+    overzicht = {r["id"]: r for r in resultaat["contractpunten_en_reviews"]}
+    assert set(overzicht) == {"C1.3-HCH-01", "C1.2-H5", "REVIEW-ai-server-manager-contract-1.3"}
+    assert overzicht["C1.2-H5"]["status"] == "Bezig"  # 'Gereed' teruggezet
+    assert overzicht["C1.3-HCH-01"]["validatie"] == "Unit-getest"
+    assert not [w for w in resultaat["waarschuwingen"] if "geen rij gevonden" in w]
+    assert any("C1.2-H5" in w and "Gereed" in w for w in resultaat["waarschuwingen"])
+    assert ue.is_extern("C1.3-ASM-15") and ue.is_extern("REVIEW-zoeken-en-persoonlijke-ai-statuspagina")
+    assert not ue.is_extern("B01-001") and not ue.is_extern("JLT-12") and not ue.is_extern("C1.3")
+
+
 def test_herberekening_en_verwijzingen():
     assert ue.shift_ref("$A$2:$A$306", 307, 5, True) == "$A$2:$A$311"
     assert ue.shift_ref("$A$2:$A$306", 40, 1, False) == "$A$2:$A$307"

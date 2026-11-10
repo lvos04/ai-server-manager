@@ -17,7 +17,11 @@ Wat het hulpmiddel kan:
   ``per_test`` van ``EXCEL_TAKEN_PER_REPO.json``).
 - ``--fasen``: faserijen (bijv. P4-0 na P3) toevoegen aan het blad Fasen; het
   fasenblok op het Dashboard groeit mee.
-- ``--evidence``/``--program``: de bekende samenvoeging van bewijs.
+- ``--evidence``/``--program``: de bekende samenvoeging van bewijs. Regels voor
+  contractpunten (``C1.3-HCH-01``, ``C1.2-H5``) en reviews
+  (``REVIEW-<repo>-<onderwerp>``) hebben geen rij in de Excel (contract 1.3 §11):
+  ze komen in het eigen overzicht ``contractpunten_en_reviews`` van de uitvoer,
+  nooit stil weggelaten.
 
 Bij het invoegen groeien tabelbereiken, dropdowns (dataValidations),
 voorwaardelijke opmaak en formules op andere bladen (Dashboard, Appoverzicht)
@@ -69,6 +73,8 @@ ALLOWED = {
     "Besluiten": ["Open", "Ingevuld", "Getest", "Geblokkeerd", "N.v.t."],
 }
 FORBIDDEN = {"Gereed", "Geslaagd"}
+#: Contractpunten en reviews (contract 1.3 §11): geen Excel-rij, wel een eigen overzicht in de uitvoer.
+EXTERN_ID = re.compile(r"C1\.\d+-[A-Z0-9]+(?:-\d\d)?|REVIEW-[a-z0-9][A-Za-z0-9_.-]*")
 # Hogere waarde = voorzichtiger (wint bij samenvoegen).
 PRECEDENCE = {
     "N.v.t.": 0,
@@ -995,6 +1001,23 @@ def merge(entries: list[dict], sheet: str, warnings: list[str]) -> dict:
     }
 
 
+def is_extern(rid: str) -> bool:
+    """Contractpunt (``C1.x-…``) of review (``REVIEW-…``): geen rij in de Excel (contract 1.3 §11)."""
+    return EXTERN_ID.fullmatch(rid) is not None
+
+
+def overzichtregel(e: dict, warnings: list[str]) -> dict:
+    """Eén regel voor het overzicht van contractpunten en reviews; ook hier nooit 'Gereed' of 'Geslaagd'."""
+    status = (e.get("status") or "").strip()
+    if status in FORBIDDEN:
+        warnings.append(
+            f"{e.get('id')}: status '{status}' teruggezet naar 'Bezig' (alleen na echte acceptatie handmatig)"
+        )
+        status = "Bezig"
+    velden = ("id", "repo", "validatie", "bewijs", "blokkade", "bijgewerkt")
+    return {"status": status, **{k: str(e.get(k) or "").strip() for k in velden}}
+
+
 def route(rid: str) -> str:
     if rid.startswith("EX") or rid.startswith("JLT-"):
         return "Testmatrix"
@@ -1151,6 +1174,7 @@ def run(args: argparse.Namespace) -> dict:
 
     # 2. bewijs samenvoegen
     by_sheet: dict[str, dict[str, list[dict]]] = {s: {} for s in LAYOUT}
+    overzicht: list[dict] = []
     for p in args.evidence:
         try:
             items = json.loads(Path(p).read_text(encoding="utf-8"))
@@ -1164,6 +1188,9 @@ def run(args: argparse.Namespace) -> dict:
             if not rid:
                 continue
             e.setdefault("repo", Path(p).parts[-4] if len(Path(p).parts) >= 4 else "")
+            if is_extern(rid):
+                overzicht.append(overzichtregel(e, warnings))
+                continue
             by_sheet[route(rid)].setdefault(rid, []).append(e)
     program: dict = {}
     if args.program:
@@ -1192,7 +1219,12 @@ def run(args: argparse.Namespace) -> dict:
         if out == src and gewijzigd:
             shutil.copy2(src, src.with_suffix(".xlsx.bak"))
         wb.schrijf(out)
-    return {"bijgewerkt_per_blad": stats, "gewijzigde_onderdelen": gewijzigd, "waarschuwingen": warnings}
+    return {
+        "bijgewerkt_per_blad": stats,
+        "gewijzigde_onderdelen": gewijzigd,
+        "contractpunten_en_reviews": sorted(overzicht, key=lambda r: (r["id"], r["repo"])),
+        "waarschuwingen": warnings,
+    }
 
 
 def parser() -> argparse.ArgumentParser:
