@@ -4,6 +4,15 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — inventaris voor contract 1.3 (`docs/platform-v2/CONTRACT_1.3_KANDIDATEN.md`)
+- Alle 151 contractmeldingen uit ronde 2, de contractpunten uit de ADR's en EVIDENCE van alle repos sinds 1.2, de
+  B03-delta's (hoofdstuk 18, ADR-0016…0020), de besluiten van de gebruiker (Emby, MediaGuard volgt twee servers,
+  HARDE EIS, publiek + GPL-3.0), de P1-uitbreidingen van de Hub en de Peil-reviews: ontdubbeld in 74 groepen en
+  geclassificeerd (36 contractwijziging met tekstvoorstel, 8 al opgelost, 12 repowerk, 2 afgewezen, 16 voor Peil).
+- Bron byte-gelijk in `CONTRACT_1.3_MELDINGEN_RONDE2.json`; `tests/unit/test_contract_13_kandidaten.py` bewaakt dat
+  elke melding precies één keer in een bestaande groep staat en dat elke contractgroep een tekstvoorstel heeft.
+- Contract 1.2 blijft bindend tot 1.3 is vastgesteld; er is geen contracttekst gewijzigd.
+
 ### Gerepareerd — onafhankelijke QA-review van P1 en de contract 1.2-schermen (ADR-0026)
 - **Executor koppelen in een echte browser (N-01):** de statuspagina stuurde `Referrer-Policy: no-referrer`, waardoor
   elke browser `Origin: null` meestuurde en `POST /koppelen` altijd weigerde. Nu `same-origin`; de exacte

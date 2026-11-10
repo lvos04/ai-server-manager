@@ -13,6 +13,9 @@ Onbekende NAS-gegevens (D01–D18) worden nooit met voorbeeldwaarden ingevuld; z
 - `PLATFORM_CONTRACTEN.md` — bindend bouwcontract (`contracts 1.2`), bron van waarheid voor alle repos
 - `CONTRACT_1.2_CONFORMITEIT.md` — per repo wat er moet veranderen om aan contract 1.2 te voldoen (keuzes:
   `docs/adr/ADR-0011-contract-1-2.md`; correcties uit de onafhankelijke review: `docs/adr/ADR-0012-review-contract-1-2.md`)
+- `CONTRACT_1.3_KANDIDATEN.md` — inventaris voor contract 1.3: alle meldingen sinds 1.2 ontdubbeld en
+  geclassificeerd (contractwijziging met tekstvoorstel, al opgelost, repowerk, afgewezen, Peil); bron van de 151
+  meldingen uit ronde 2: `CONTRACT_1.3_MELDINGEN_RONDE2.json`
 - `00_START/BESLUITEN_EN_ONBEKENDEN.md`
 - `00_START/INHOUDSOPGAVE.md`
 - `00_START/INHOUD_CONTROLE.json`

@@ -126,6 +126,15 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   Geblokkeerd / 302 Niet gestart), Testmatrix 124 (9 Bezig / 8 Geblokkeerd / 107 Niet gestart), Besluiten 18 (17 Open /
   1 Ingevuld), Fasen 8 met P4-0 tussen P3 en P4 (P0 Bezig, rest Niet gestart). Nergens Gereed of Geslaagd.
 
+## Contract 1.3 — inventaris (2026-11-10)
+
+- `docs/platform-v2/CONTRACT_1.3_KANDIDATEN.md`: alle 151 meldingen uit ronde 2 plus de ADR's/EVIDENCE van alle repos
+  sinds 1.2, de B03-delta's, de besluiten van de gebruiker, de P1-uitbreidingen van de Hub en de Peil-reviews,
+  ontdubbeld in 74 groepen: 36 contractwijziging (met tekstvoorstel en geraakte repos), 8 al opgelost, 12 repowerk,
+  2 afgewezen, 16 Peil-zaken (voor Peil 1.1.1). Contract 1.2 blijft bindend tot 1.3 is vastgesteld.
+- Open besluiten die de inventaris oplevert: §8 van dat document (o.a. BG-05, BG-06, 100.64.0.0/10, bevestiging van
+  de Android-ID's en de Swiftfin-bundle-id, GHCR-pakket van de nieuwe MediaGuard-repo).
+
 ## Nieuwe machine (vanaf 2026-11-09 12:56)
 
 - Ubuntu-ontwikkelmachine (geheugen is de grens voor parallelle builds), Docker 29 (systeemdaemon), PostgreSQL 16.15 +
