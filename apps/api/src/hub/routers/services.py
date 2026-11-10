@@ -1,10 +1,15 @@
-"""Aanmelden van eigen diensten bij de Hub (enrollment, contract 1.2 §3.3–§3.9) en het register van service-tokens.
+"""Aanmelden van eigen diensten bij de Hub (enrollment, contract 1.3 §3.3–§3.9) en het register van service-tokens.
 
 - Eenmalige enrollment-tokens (60 min) voor apps die de Hub via de TrueNAS-API installeert (env ``HUB_URL`` +
   ``HUB_ENROLLMENT_TOKEN`` + ``HUB_KEY_FINGERPRINT``), en koppelcodes (60 min; executor 30 min) voor handmatig
   geïnstalleerde apps. Alleen hashes in de database; het service-token wordt precies één keer teruggegeven.
 - Toegestane herhaling na een herstart halverwege (§3.6): zelfde grant, ``app_id`` en sleutel-thumbprint, binnen de
   60 min, en het eerder uitgegeven token is nooit gebruikt.
+- Nieuwe enrollment van een bestaande registratie (1.3 §3.6): ``service_id`` blijft; de oude tokens worden pas
+  ingetrokken bij het **eerste gebruik** van het nieuwe token; blijft het nieuwe 60 min ongebruikt, dan vervalt het en
+  blijven de oude geldig (een mislukte herkoppeling breekt een bestaande koppeling niet).
+- ``base_url`` is alleen informatief: een waarde die niet aan §3.3 voldoet, wordt ``null`` met een waarschuwing in de
+  Hub-UI — nooit een reden om te weigeren (alleen een ander type dan string/null → 422).
 - Rotatie (§3.8): de dienst roteert zelf (``self/rotate``); een beheerder kan rotatie alleen **aanvragen** (202).
   Het oude token vervalt 10 min na het eerste gebruik van het nieuwe, hooguit 24 uur na de rotatie.
 - Koppelbeheer is nooit een ``action_id`` (§8): alleen beheerdersroutes met audit; de AI kan dit niet.
@@ -13,7 +18,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -26,8 +31,9 @@ from hub import APP_ID, audit
 from hub.config import Settings
 from hub.deps import DB, Admin, Idem, Operator, Principal, ServiceP, SettingsDep, get_keyring
 from hub.errors import HubError
-from hub.keys import KeyRing, jwk_thumbprint
+from hub.keys import ROTATION_SEQUENCE, KeyRing, jwk_thumbprint
 from hub.models import EnrollmentGrant, Service, ServiceToken
+from hub.outbound import OutboundError, validate_base_url
 from hub.registry import app_name_candidates, app_name_for, measured_apps, service_base_url
 from hub.security import (
     clear_failures,
@@ -46,14 +52,27 @@ from hub.vault import last4
 
 router = APIRouter(prefix="/api/v1/services", tags=["diensten en enrollment"])
 
-ENROLL_SCHEMA_VERSION = "1.2"
+ENROLL_SCHEMA_VERSION = "1.3"
 EXECUTOR_APP_ID = "ai-server-manager-executor"
-# TrueNAS-appnaampatroon (contract 1.2 §3.3), 1–40 tekens.
+# TrueNAS-appnaampatroon (contract 1.3 §3.3), 1–40 tekens.
 TRUENAS_APP_NAME = r"^[a-z]([-a-z0-9]*[a-z0-9])?$"
 ENROLLMENT_TOKEN = r"^enr_[A-Za-z0-9_-]{43}$"  # noqa: S105 — patroon, geen geheim
 SERVICE_VERSION = r"^[0-9A-Za-z][0-9A-Za-z.+_-]*$"
-BASE_URL = r"^https?://[A-Za-z0-9.\-\[\]:]+(/[^\s?#]*)?$"
 JWK_FIELDS = {"kty", "crv", "x", "kid"}
+REENROLL_UNUSED_SECONDS = 60 * 60  # §3.6: een nieuw token van een bestaande registratie vervalt na 60 min ongebruikt
+
+
+def informative_base_url(value: str | None) -> tuple[str | None, bool]:
+    """§3.3: ``http(s)://host[:poort][/pad]``, ≤ 512 tekens en de adresregels van §3.2 → ``(waarde, genegeerd)``.
+    Een string die daar niet aan voldoet wordt ``null`` met ``genegeerd=True`` (waarschuwing), nooit een weigering."""
+    if value is None:
+        return None, False
+    if len(value) > 512 or value != value.strip():
+        return None, True
+    try:
+        return validate_base_url(value), False
+    except OutboundError:
+        return None, True
 
 
 class Strict(BaseModel):
@@ -72,13 +91,13 @@ class GrantIn(Strict):
 
 
 class EnrollIn(Strict):
-    """Exact schema van contract 1.2 §3.3; onbekende velden → 422."""
+    """Exact schema van contract 1.3 §3.3; onbekende velden → 422. ``base_url`` alleen op type (string of null)."""
 
     app_id: str = Field(min_length=1, max_length=40, pattern=TRUENAS_APP_NAME)
     enrollment_token: str | None = Field(default=None, pattern=ENROLLMENT_TOKEN)
     pairing_code: str | None = Field(default=None, max_length=32)
     version: str = Field(min_length=1, max_length=64, pattern=SERVICE_VERSION)
-    base_url: str | None = Field(max_length=512, pattern=BASE_URL)
+    base_url: str | None
     public_key_jwk: dict[str, Any]
 
     @field_validator("pairing_code")
@@ -146,6 +165,8 @@ def _service_dict(db: Session, settings: Settings, svc: Service) -> dict[str, An
         "status": svc.status,
         "version": svc.version,
         "base_url": svc.base_url,
+        # Contract 1.3 §3.3: de dienst stuurde een base_url die niet aan de regels voldoet; bewaard als null.
+        "base_url_genegeerd": svc.base_url_genegeerd,
         "public_key_jwk": svc.public_key_jwk,
         "enrolled_via": svc.enrolled_via,
         "enrolled_at": iso(svc.enrolled_at),
@@ -159,7 +180,7 @@ def _service_dict(db: Session, settings: Settings, svc: Service) -> dict[str, An
         "rotatie": {
             "aangevraagd_op": iso(svc.rotation_requested_at),
             "aangevraagd_door": svc.rotation_requested_by,
-            # Alleen een melding (contract 1.2 §3.8): de Hub roteert nooit op eigen initiatief.
+            # Alleen een melding (contract 1.3 §3.8): de Hub roteert nooit op eigen initiatief.
             "aanbevolen": newest is not None and now - newest.created_at > advice_after,
             "token_leeftijd_dagen": None if newest is None else (now - newest.created_at).days,
         },
@@ -180,7 +201,14 @@ def _service_dict(db: Session, settings: Settings, svc: Service) -> dict[str, An
     }
 
 
-def _issue_token(db: Session, svc: Service, *, grant_id: uuid.UUID | None, rotated_from: uuid.UUID | None) -> str:
+def _issue_token(
+    db: Session,
+    svc: Service,
+    *,
+    grant_id: uuid.UUID | None,
+    rotated_from: uuid.UUID | None,
+    expires_at: datetime | None = None,
+) -> str:
     token = new_token("svc")
     db.add(
         ServiceToken(
@@ -189,9 +217,17 @@ def _issue_token(db: Session, svc: Service, *, grant_id: uuid.UUID | None, rotat
             last4=last4(token),
             rotated_from=rotated_from,
             grant_id=grant_id,
+            expires_at=expires_at,
         )
     )
     return token
+
+
+def _has_other_valid_tokens(db: Session, svc: Service, grant_id: uuid.UUID) -> bool:
+    """Geldige tokens van deze registratie die niet via deze grant zijn uitgegeven (herkoppelen van een bestaande)."""
+    if svc.id is None:
+        return False
+    return any(t.grant_id != grant_id for t in _valid_tokens(db, svc))
 
 
 def _grant(
@@ -313,7 +349,7 @@ def create_pairing_code(
 # ------------------------------------------------------------------ enrollment (geen authenticatie)
 @router.post(
     "/enroll",
-    summary="Dienst meldt zich aan met enrollment-token of koppelcode (contract 1.2 §3.3)",
+    summary="Dienst meldt zich aan met enrollment-token of koppelcode (contract 1.3 §3.3); antwoord schema_version 1.3",
     responses={
         401: {"description": "invalid_enrollment (onbekend, verlopen, al gebruikt of andere app_id)"},
         422: {"description": "validation_error"},
@@ -384,15 +420,21 @@ def enroll(
             svc = Service(app_id=body.app_id, enrolled_via=kind, enrolled_at=now)
             db.add(svc)
             db.flush()
-        else:  # herinstallatie/opnieuw koppelen: service_id blijft, alle oude tokens vervallen
+        else:
+            # Herinstallatie/opnieuw koppelen (§3.6): service_id blijft. De oude tokens blijven geldig tot het eerste
+            # gebruik van het nieuwe token (deps._service_principal); blijft dat 60 min ongebruikt, dan vervalt het.
             svc = found
-            _revoke_all(db, svc)
             svc.enrolled_via, svc.enrolled_at = kind, now
         grant.used_by_service = svc.id
-    svc.status, svc.version, svc.base_url, svc.updated_at = "active", body.version, body.base_url, now
+    base_url, ignored = informative_base_url(body.base_url)
+    svc.status, svc.version, svc.base_url, svc.updated_at = "active", body.version, base_url, now
+    svc.base_url_genegeerd = ignored
     svc.public_key_jwk = body.public_key_jwk
     svc.rotation_requested_at = svc.rotation_requested_by = None
-    token = _issue_token(db, svc, grant_id=grant.id, rotated_from=None)
+    # §3.6: bestaan er nog geldige tokens van deze registratie, dan blijven die geldig tot het eerste gebruik van het
+    # nieuwe token; het nieuwe vervalt als het 60 min ongebruikt blijft.
+    deadline = now + timedelta(seconds=REENROLL_UNUSED_SECONDS) if _has_other_valid_tokens(db, svc, grant.id) else None
+    token = _issue_token(db, svc, grant_id=grant.id, rotated_from=None, expires_at=deadline)
     clear_failures(db, rl_key)
     audit.record(
         db,
@@ -419,13 +461,15 @@ def enroll(
             "events_inbox_url": "/api/v1/events/inbox",
             "key_rotation_url": "/api/v1/auth/key-rotations",
             "enrollment_replayed": replay_svc is not None,
+            # Nieuw in 1.3 (§3.3): huidige reeks van de sleutelrotatie; de dienst vraagt alleen key-rotations?after=.
+            "rotation_sequence": ROTATION_SEQUENCE,
         },
         headers={"Cache-Control": "no-store"},
     )
 
 
 # ------------------------------------------------------------------ dienst zelf (Bearer service-token)
-@router.get("/self", summary="Dienst bevestigt zijn koppeling (Bearer service-token, contract 1.2 §3.6)")
+@router.get("/self", summary="Dienst bevestigt zijn koppeling (Bearer service-token, contract 1.3 §3.6)")
 def service_self(db: DB, principal: ServiceP, keyring: Annotated[KeyRing, Depends(get_keyring)]) -> dict[str, Any]:
     svc = db.get(Service, uuid.UUID(principal.id))
     if svc is None:
@@ -440,7 +484,7 @@ def service_self(db: DB, principal: ServiceP, keyring: Annotated[KeyRing, Depend
     }
 
 
-@router.post("/self/rotate", summary="Dienst roteert zijn eigen service-token (Bearer, contract 1.2 §3.8)")
+@router.post("/self/rotate", summary="Dienst roteert zijn eigen service-token (Bearer, contract 1.3 §3.8)")
 def rotate_self(db: DB, settings: SettingsDep, principal: ServiceP) -> JSONResponse:
     svc = db.get(Service, uuid.UUID(principal.id))
     if svc is None:
@@ -450,6 +494,8 @@ def rotate_self(db: DB, settings: SettingsDep, principal: ServiceP) -> JSONRespo
     current_id = principal.service_token_id
     current_expires = None
     for t in _valid_tokens(db, svc):
+        if t.id != current_id and t.first_used_at is None and t.grant_id is not None:
+            continue  # nog ongebruikt token van een herkoppeling (§3.6): dat beslist zelf bij zijn eerste gebruik
         if t.id != current_id and t.first_used_at is None:
             t.revoked_at = now  # eerder uitgegeven, nooit gebruikte nieuwe tokens (herhaalde rotatie)
             continue

@@ -5,6 +5,9 @@
   niet).
 - HTTPS met systeem-CA's (optioneel een extra CA-bestand); nooit stil zonder verificatie.
 - Tijdslimieten (standaard 5 s verbinden / 15 s lezen) en een harde grens op de antwoordgrootte.
+- Adresregels van contract 1.3 §3.2: een IPv4-adres alleen als ``a.b.c.d`` (een host van alleen cijfers, punten en
+  hex-delen die daar niet aan voldoet, zoals ``127.1`` of ``2130706433``, is ongeldig), IPv6 alleen tussen ``[]``,
+  één punt aan het eind van een naam telt niet mee.
 - Loopback, link-local (``169.254.0.0/16``, ``fe80::/10``) en ``0.0.0.0``/``::`` worden geweigerd, behalve met de
   expliciete ontwikkelvlag ``HUB_OUTBOUND_ALLOW_LOOPBACK`` (alleen voor tests): zo kan een ingesteld adres nooit de
   eigen interne API of een metadata-adres van de container raken.
@@ -17,6 +20,7 @@ import base64
 import http.client
 import ipaddress
 import json
+import re
 import socket
 import ssl
 from dataclasses import dataclass, field
@@ -25,6 +29,8 @@ from typing import Any
 from urllib.parse import quote, urlencode, urlsplit
 
 DEFAULT_MAX_BYTES = 2 * 1024 * 1024
+_CANON_V4 = re.compile(r"^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$")
+_NUMERIEK = re.compile(r"^(\d+|0[xX][0-9a-fA-F]*)(\.(\d+|0[xX][0-9a-fA-F]*))*\.?$")
 
 
 class OutboundError(Exception):
@@ -75,17 +81,27 @@ def validate_base_url(url: str, *, allow_loopback: bool = False) -> str:
         _ = parts.port
     except ValueError as exc:
         raise OutboundError("adres_ongeldig", "ongeldige poort") from exc
+    hostport = parts.netloc.rsplit("@", 1)[-1]
+    if (":" in parts.hostname) != hostport.startswith("["):
+        raise OutboundError("adres_ongeldig", "IPv6 alleen tussen [ ]")
     _check_host(parts.hostname, allow_loopback=allow_loopback)
     return url.rstrip("/")
 
 
 def _forbidden_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, allow_loopback: bool) -> bool:
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
     if ip.is_unspecified or ip.is_link_local or ip.is_multicast:
         return True
     return bool(ip.is_loopback and not allow_loopback)
 
 
 def _check_host(host: str, *, allow_loopback: bool) -> None:
+    if "%" in host:
+        raise OutboundError("adres_ongeldig", "geen zone-ID in een IPv6-adres")
+    if ":" not in host and _NUMERIEK.match(host) and not _CANON_V4.match(host.removesuffix(".")):
+        raise OutboundError("adres_ongeldig", "IPv4 alleen als a.b.c.d (vier delen 0–255, zonder voorloopnul)")
+    host = host.removesuffix(".")
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:

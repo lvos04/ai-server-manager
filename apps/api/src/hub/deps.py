@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -86,8 +86,25 @@ def _service_principal(request: Request, db: Session, settings: Settings, token:
     if svc is None or svc.status != "active":
         raise HubError(401, "unauthorized", "Deze dienst is ingetrokken.")
     changed = False
+    if row.first_used_at is None and row.grant_id is not None:
+        # Eerste gebruik van een token uit een (her)koppeling (contract 1.3 §3.6): nu pas vervallen de oude tokens van
+        # deze registratie (ook rotaties die de oude installatie intussen deed), en de termijn van 60 min voor dit token
+        # vervalt (het is in gebruik). Een nóg nieuwere, ongebruikte herkoppeling blijft wachten op haar eigen gebruik.
+        newer_enrollment = (ServiceToken.created_at > row.created_at) & ServiceToken.grant_id.is_not(None)
+        db.execute(
+            update(ServiceToken)
+            .where(
+                ServiceToken.service_id == row.service_id,
+                ServiceToken.id != row.id,
+                ServiceToken.revoked_at.is_(None),
+                ~newer_enrollment,
+            )
+            .values(revoked_at=now)
+        )
+        if row.superseded_at is None:
+            row.expires_at = None
     if row.first_used_at is None:
-        # Eerste gebruik van een (nieuw) token: vervangen oudere tokens vervallen 10 min later (contract 1.2 §3.8).
+        # Eerste gebruik van een (nieuw) token: vervangen oudere tokens vervallen 10 min later (contract 1.3 §3.8).
         row.first_used_at = now
         grace_until = now + timedelta(seconds=settings.service_token_rotation_grace_seconds)
         older = db.scalars(
@@ -114,7 +131,11 @@ def _service_principal(request: Request, db: Session, settings: Settings, token:
         .order_by(ServiceToken.created_at.desc())
         .limit(1)
     ).first()
-    stale_token = newest is not None and newest.id != row.id and newest.first_used_at is None
+    # Een nieuwer, nooit gebruikt token uit een rotatie (geen grant) = onderbroken rotatie; een ongebruikt token uit een
+    # herkoppeling (§3.6) is dat niet: de oude installatie mag dan gewoon doorwerken tot het nieuwe in gebruik is.
+    stale_token = (
+        newest is not None and newest.id != row.id and newest.first_used_at is None and newest.grant_id is None
+    )
     if svc.rotation_requested_at is not None or stale_token:
         # Aangevraagde rotatie of herstel na een onderbroken rotatie: de middleware zet Hub-Token-Rotation: required.
         request.state.hub_token_rotation = True

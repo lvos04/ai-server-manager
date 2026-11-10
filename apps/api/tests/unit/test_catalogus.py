@@ -192,6 +192,15 @@ def test_statuswaarde_voor_tijdreeks() -> None:
         ("http://169.254.169.254", "adres_niet_toegestaan"),
         ("http://[fe80::1]:80", "adres_niet_toegestaan"),
         ("http://0.0.0.0:80", "adres_niet_toegestaan"),
+        # Contract 1.3 §3.2: alleen canonieke IP-vormen; IPv6 alleen tussen [].
+        ("http://127.1:3001", "adres_ongeldig"),
+        ("http://2130706433", "adres_ongeldig"),
+        ("http://0x7f000001", "adres_ongeldig"),
+        ("http://010.0.0.1", "adres_ongeldig"),
+        ("http://0", "adres_ongeldig"),
+        ("http://localhost.:3001", "adres_niet_toegestaan"),
+        ("http://[::ffff:127.0.0.1]:80", "adres_niet_toegestaan"),
+        ("http://[fe80::1%25eth0]", "adres_ongeldig"),
     ],
 )
 def test_uitgaande_adressen_streng(url: str, reason: str) -> None:

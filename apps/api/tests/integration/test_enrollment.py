@@ -1,4 +1,5 @@
-"""Enrollment volgens contract 1.2 §3.3–§3.8: exact schema, herhaling na herstart, services/self, rotatie, intrekken.
+"""Enrollment volgens contract 1.3 §3.3–§3.8: exact schema (``schema_version`` 1.3, ``rotation_sequence``), tolerante
+``base_url``, herhaling na herstart, herkoppelen (intrekken bij het eerste gebruik), services/self, rotatie, intrekken.
 
 Positieve én negatieve scenario's: elk verboden veld of formaat → 422, elk ongeldig geheim → 401 (één code, geen
 orakel), rate-limit → 429 met Retry-After; alleen hashes in de database.
@@ -42,7 +43,7 @@ def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_enroll_antwoord_volgens_schema_1_2_en_eenmalig(admin: Any, app: Any, clean_db: str) -> None:
+def test_enroll_antwoord_volgens_schema_1_3_en_eenmalig(admin: Any, app: Any, clean_db: str) -> None:
     from hub.keys import jwk_thumbprint, keyset_fingerprint
 
     tok = _token(admin)
@@ -71,8 +72,11 @@ def test_enroll_antwoord_volgens_schema_1_2_en_eenmalig(admin: Any, app: Any, cl
         "events_inbox_url",
         "key_rotation_url",
         "enrollment_replayed",
+        "rotation_sequence",
     }
-    assert body["schema_version"] == "1.2" and body["app_id"] == "jelly-leon-platform"
+    assert body["schema_version"] == "1.3" and body["app_id"] == "jelly-leon-platform"
+    # Nieuw in 1.3: de reeks van de sleutelrotatie (de Hub roteert nog niet: 0, gelijk aan key-rotations = []).
+    assert body["rotation_sequence"] == 0 and type(body["rotation_sequence"]) is int
     assert re.fullmatch(r"svc_[A-Za-z0-9_-]{43}", body["service_token"])
     assert body["token_type"] == "Bearer" and body["hub_issuer"] == "hub" and body["enrollment_replayed"] is False
     assert body["key_rotation_url"] == "/api/v1/auth/key-rotations" and body["jwks_url"] == "/api/v1/auth/jwks"
@@ -161,8 +165,11 @@ def test_geen_herhaling_na_verlopen_of_intrekken(admin: Any, app: Any, clean_db:
         ({"app_id": "Home-Control-Hub"}, "app_id"),
         ({"app_id": "a" * 41}, "app_id"),
         ({"app_id": "eindigt-op-"}, "app_id"),
-        ({"base_url": "ftp://x"}, "base_url"),
-        ({"base_url": "http://x/?q=1"}, "base_url"),
+        # 1.3 §3.3: alleen een ander type dan string/null is een schemafout (nooit de waarde van een string).
+        ({"base_url": 5}, "base_url"),
+        ({"base_url": ["http://x"]}, "base_url"),
+        ({"base_url": {"url": "http://x"}}, "base_url"),
+        ({"base_url": True}, "base_url"),
         ({"enrollment_token": "enr_te-kort"}, "enrollment_token"),
         ({"enrollment_token": "svc_" + "A" * 43}, "enrollment_token"),
     ],
@@ -358,9 +365,95 @@ def test_intrekken_en_herinschrijving(admin: Any, app: Any) -> None:
         "/api/v1/services/enroll", json=enroll_body("jelly-leon", token=_token(admin, "jelly-leon"))
     ).json()
     assert second["service_id"] == first["service_id"]  # service_id blijft gelijk bij opnieuw koppelen
-    assert anon.get("/connector/v1/discover", headers=_bearer(first["service_token"])).status_code == 401
+    # 1.3 §3.6: het oude token blijft geldig tot het eerste gebruik van het nieuwe (geen Hub-Token-Rotation).
+    old = anon.get("/connector/v1/discover", headers=_bearer(first["service_token"]))
+    assert old.status_code == 200 and "Hub-Token-Rotation" not in old.headers
     assert anon.get("/connector/v1/discover", headers=_bearer(second["service_token"])).status_code == 200
+    assert anon.get("/connector/v1/discover", headers=_bearer(first["service_token"])).status_code == 401
     r = admin.post(f"/api/v1/services/{second['service_id']}/revoke", headers=idem())
     assert r.status_code == 200 and r.json()["status"] == "revoked"
     r = anon.get("/api/v1/services/self", headers=_bearer(second["service_token"]))
     assert r.status_code == 401 and r.json()["code"] == "unauthorized"
+
+
+@pytest.mark.parametrize(
+    ("base_url", "bewaard", "genegeerd"),
+    [
+        ("http://192.0.2.5:30401", "http://192.0.2.5:30401", False),
+        ("https://hch.lan/pad/", "https://hch.lan/pad", False),
+        (None, None, False),
+        ("ftp://x", None, True),
+        ("http://x/?q=1", None, True),
+        ("http://127.1:30401", None, True),
+        ("http://2130706433", None, True),
+        ("http://127.0.0.1:30401", None, True),
+        ("http://169.254.169.254", None, True),
+        ("http://user:pw@nas:1", None, True),
+        ("http://nas:1/" + "p" * 600, None, True),
+        ("geen url", None, True),
+        (" http://192.0.2.5:1", None, True),
+    ],
+)
+def test_base_url_nooit_reden_voor_weigering(
+    admin: Any, app: Any, base_url: str | None, bewaard: str | None, genegeerd: bool
+) -> None:
+    """C1.3-ASM-02: een base_url die niet aan §3.3 voldoet → null + waarschuwing in de Hub-UI, nooit 422."""
+    body = enroll_body("home-control-hub", token=_token(admin, "home-control-hub"), base_url=base_url)
+    r = _anon(app).post("/api/v1/services/enroll", json=body)
+    assert r.status_code == 200, r.text
+    item = next(i for i in admin.get("/api/v1/services").json()["items"] if i["app_id"] == "home-control-hub")
+    assert item["base_url"] == bewaard and item["base_url_genegeerd"] is genegeerd
+
+
+def test_herkoppelen_trekt_oude_tokens_pas_in_bij_eerste_gebruik_en_nieuw_vervalt_na_60_min(
+    admin: Any, app: Any, clean_db: str
+) -> None:
+    """§3.6 (1.3): een mislukte herkoppeling (de dienst weigert het antwoord, bv. verkeerde vingerafdruk) breekt een
+    bestaande koppeling niet: het nieuwe token vervalt na 60 min ongebruikt en de oude blijven geldig."""
+    anon = _anon(app)
+    first = anon.post(
+        "/api/v1/services/enroll", json=enroll_body("appstore-en-fork", token=_token(admin, "appstore-en-fork"))
+    ).json()
+    assert anon.get("/api/v1/services/self", headers=_bearer(first["service_token"])).status_code == 200
+    second = anon.post(
+        "/api/v1/services/enroll", json=enroll_body("appstore-en-fork", token=_token(admin, "appstore-en-fork"))
+    ).json()
+    item = next(i for i in admin.get("/api/v1/services").json()["items"] if i["app_id"] == "appstore-en-fork")
+    nieuw = next(t for t in item["tokens"] if t["laatste4"] == second["service_token"][-4:])
+    assert nieuw["verloopt"] is not None and nieuw["geldig"] is True  # termijn van 60 min tot het eerste gebruik
+    # Het nieuwe token blijft ongebruikt: na 60 min vervalt het; het oude werkt gewoon door.
+    with psycopg.connect(clean_db, autocommit=True) as conn:
+        conn.execute(
+            "UPDATE service_token SET expires_at = now() - interval '1 second' WHERE last4 = %s",
+            (second["service_token"][-4:],),
+        )
+    assert anon.get("/api/v1/services/self", headers=_bearer(second["service_token"])).status_code == 401
+    assert anon.get("/api/v1/services/self", headers=_bearer(first["service_token"])).status_code == 200
+    # Een geslaagde herkoppeling: bij het eerste gebruik van het nieuwe token vervallen de oude direct.
+    third = anon.post(
+        "/api/v1/services/enroll", json=enroll_body("appstore-en-fork", token=_token(admin, "appstore-en-fork"))
+    ).json()
+    assert anon.get("/api/v1/services/self", headers=_bearer(third["service_token"])).status_code == 200
+    assert anon.get("/api/v1/services/self", headers=_bearer(first["service_token"])).status_code == 401
+    item = next(i for i in admin.get("/api/v1/services").json()["items"] if i["app_id"] == "appstore-en-fork")
+    actief = [t for t in item["tokens"] if t["geldig"]]
+    assert [t["laatste4"] for t in actief] == [third["service_token"][-4:]] and actief[0]["verloopt"] is None
+    # Intrekken door de beheerder blijft direct (§3.8).
+    admin.post(f"/api/v1/services/{third['service_id']}/revoke", headers=idem())
+    assert anon.get("/api/v1/services/self", headers=_bearer(third["service_token"])).status_code == 401
+
+
+def test_oude_installatie_roteert_zonder_het_wachtende_token_in_te_trekken(admin: Any, app: Any) -> None:
+    anon = _anon(app)
+    first = anon.post(
+        "/api/v1/services/enroll", json=enroll_body("jelly-leon-platform", token=_token(admin, "jelly-leon-platform"))
+    ).json()
+    second = anon.post(
+        "/api/v1/services/enroll", json=enroll_body("jelly-leon-platform", token=_token(admin, "jelly-leon-platform"))
+    ).json()
+    rot = anon.post("/api/v1/services/self/rotate", headers=_bearer(first["service_token"]))
+    assert rot.status_code == 200
+    # Het nieuwe token uit de herkoppeling is niet ingetrokken door de rotatie van de oude installatie.
+    assert anon.get("/api/v1/services/self", headers=_bearer(second["service_token"])).status_code == 200
+    # En nu het in gebruik is, vervallen alle andere (ook het net geroteerde token van de oude installatie).
+    assert anon.get("/api/v1/services/self", headers=_bearer(rot.json()["service_token"])).status_code == 401

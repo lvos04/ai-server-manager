@@ -106,6 +106,19 @@ class Service(Base):
     truenas_app_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     truenas_app_name_confirmed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     truenas_app_name_confirmed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    # Contract 1.3 §3.3: een base_url die niet aan de regels voldoet, bewaart de Hub als null met een waarschuwing.
+    base_url_genegeerd: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+class HubSetting(Base):
+    """Beheerinstellingen van de Hub die alleen een beheerder in de Hub-UI wijzigt (audit; nooit een ``action_id``,
+    de AI kan ze niet voorstellen). Voorbeeld: ``noodlogin.cgnat_toestaan`` (contract 1.3 §4.1)."""
+
+    __tablename__ = "hub_setting"
+    sleutel: Mapped[str] = mapped_column(String(64), primary_key=True)
+    waarde: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    gewijzigd_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    gewijzigd_door: Mapped[str] = mapped_column(String(80))
 
 
 class EnrollmentGrant(Base):
@@ -642,6 +655,8 @@ class Incident(Base):
     soort: Mapped[str] = mapped_column(String(64), index=True)
     titel: Mapped[str] = mapped_column(String(200))
     ernst: Mapped[str] = mapped_column(String(16))  # info|waarschuwing|kritiek
+    # Contract 1.3 §7: de bronwaarde (kritiek|hoog|middel|laag|info) als het event die meegaf; de UI toont die.
+    ernst_bron: Mapped[str | None] = mapped_column(String(16), nullable=True)
     status: Mapped[str] = mapped_column(String(16))  # open|erkend|gesnoozed|opgelost
     bron: Mapped[str] = mapped_column(String(64))
     onderwerp_type: Mapped[str] = mapped_column(String(64), default="")
