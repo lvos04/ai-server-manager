@@ -86,7 +86,7 @@ Zet elke taak in de tabel "Lopend" van VOORTGANG.md (rol: "plan-eigenaar"; ze te
    alleen in de repos. Lees de tekst van S-P2-000 vóór je PA-1 start, want PA-1 kan STAPPEN_P2.md wijzigen.
 2. **Na elke melding:** lees het rapport in `afmaakrapporten/<naam>.md`. Controleer zelf: bestaat het bestand nog, is het
    niet korter geworden dan het was (`wc -l`; korter mag alleen als het rapport zegt wat er weg is en waarom), en geeft
-   `grep -n -i 'opus\|sonnet\|fable\|haiku' <bestand>` geen modelnaam (de treffer "OPUS-MT" is een vertaalmodel en
+   een grep op de modelnamen uit `<WERKMAP>/.lokaal/plan/MODELKEUZE.md` geen modelnaam (de treffer "OPUS-MT" is een vertaalmodel en
    mag). Valt een subagent uit: start dezelfde taak opnieuw; de aanvulling in de opdracht zegt al dat een eerdere poging
    kan zijn afgebroken.
 3. **Ronde 2, kruismeldingen:** elk rapport heeft een kop VOOR_ANDER_BESTAND. Verzamel de regels per doelbestand. Per
