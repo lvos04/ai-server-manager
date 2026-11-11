@@ -1,6 +1,6 @@
 {
   "info": {
-    "description": "Executor van TrueNAS Home Platform V2. Koppelen met de Hub via de statuspagina (koppelcode + vingerafdruk, contract 1.3 §3.9). De allowlist is leeg tot P2: elke actie wordt geweigerd. Geen shell, sudo of Docker.",
+    "description": "Executor van TrueNAS Home Platform V2. Koppelen met de Hub via de statuspagina (koppelcode + vingerafdruk, contract 1.3 §3.9). Voert alleen acties van de allowlist uit het ingebakken beleid uit, en alleen met een door de Hub ondertekend ExecutionRequest dat de executor zelf opnieuw controleert (§8). Geen shell, sudo of Docker.",
     "title": "AI Server Manager — executor",
     "version": "0.1.0"
   },
@@ -13,20 +13,73 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "description": "Vorm volgt later ``ExecutionRequest`` (contract §8); tot P2 wordt alleen ``action_id`` gelezen om te weigeren.",
+                "additionalProperties": false,
                 "properties": {
-                  "action_id": {
-                    "maxLength": 128,
-                    "minLength": 1,
-                    "title": "Action Id",
+                  "approval": {
+                    "description": "Gebonden goedkeuring (verplicht bij R2/R3): preview_hash, resource_etag, policy_hash, risk_class, expires_at (≤ 15 min), one_time_nonce, backup_checkpoint_id, action_scope.",
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "expires_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "issued_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "nonce": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "policy_decision": {
+                    "properties": {
+                      "policy_hash": {
+                        "type": "string"
+                      },
+                      "risk_class": {
+                        "enum": [
+                          "R0",
+                          "R1",
+                          "R2",
+                          "R3"
+                        ],
+                        "type": "string"
+                      },
+                      "rule_ids": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "risk_class",
+                      "rule_ids",
+                      "policy_hash"
+                    ],
+                    "type": "object"
+                  },
+                  "proposal": {
+                    "description": "ActionProposal (§8), ongewijzigd zoals beoordeeld door de Hub.",
+                    "type": "object"
+                  },
+                  "signature": {
+                    "description": "Ed25519 over de canonieke JSON zonder dit veld (base64url).",
                     "type": "string"
                   }
                 },
                 "required": [
-                  "action_id"
+                  "proposal",
+                  "approval",
+                  "policy_decision",
+                  "issued_at",
+                  "expires_at",
+                  "nonce",
+                  "signature"
                 ],
-                "title": "ExecuteIn",
                 "type": "object"
               }
             }
@@ -34,6 +87,14 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Uitgevoerd en teruggelezen: before/after-hash, nieuwe resource_etag en readback"
+          },
           "400": {
             "description": "Idempotency-Key ontbreekt of is geen UUID (pas na de authenticatie)"
           },
@@ -41,18 +102,67 @@
             "description": "unauthorized (§4.7): zonder geldige aanmelding altijd 401, ook bij een foute body"
           },
           "403": {
+            "description": "Geen dienst-JWT van de Hub, of het verzoek is geweigerd: handtekening_ongeldig, verzoek_verlopen, actie_geweigerd, actie_niet_toegestaan, risicoklasse_te_laag, goedkeuring_ontbreekt, goedkeuring_verlopen, goedkeuring_ongeldig"
+          },
+          "409": {
+            "description": "Niets uitgevoerd: policy_hash_verschilt, nonce_al_gebruikt, goedkeuring_al_gebruikt, goedkeuring_past_niet, doel_gewijzigd, doel_bestaat_niet, doel_bestaat_al, doel_past_niet, pool_niet_gezond, backup_checkpoint_ontbreekt, herstelpunt_onbekend, executor_bezet, executor_gestopt. Of ná de aanroep: afwijking (readback wijkt af; de executor is gestopt)"
+          },
+          "422": {
+            "description": "validation_error, execution_request_ongeldig of parameters_ongeldig"
+          },
+          "501": {
+            "description": "capability_unavailable (geen schrijfsleutel, of TrueNAS kent de methode niet)"
+          },
+          "502": {
+            "description": "uitvoering_mislukt of truenas_fout (de toestand is onveranderd teruggelezen)"
+          },
+          "503": {
+            "description": "replay_check_unavailable, journaal_niet_beschikbaar, policy_niet_beschikbaar, policy_niet_read_only, schrijfsleutel_onleesbaar of TrueNAS onbereikbaar (niets uitgevoerd)"
+          }
+        },
+        "summary": "Ondertekend ExecutionRequest uitvoeren (dienst-JWT van de Hub; de executor controleert alles opnieuw)",
+        "tags": [
+          "uitvoeren"
+        ]
+      }
+    },
+    "/api/v1/executions/{request_id}": {
+      "get": {
+        "operationId": "executions_api_v1_executions__request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {}
               }
             },
-            "description": "Actie geweigerd (allowlist leeg), of geen dienst-JWT van de Hub"
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "unauthorized (§4.7)"
+          },
+          "403": {
+            "description": "geen dienst-JWT van de Hub"
           },
           "422": {
-            "description": "validation_error (pas na de authenticatie)"
+            "description": "request_id is geen UUID"
+          },
+          "503": {
+            "description": "journaal_niet_beschikbaar"
           }
         },
-        "summary": "Weigert alles (allowlist leeg tot P2); eerst authenticatie met een dienst-JWT van de Hub",
+        "summary": "Journaal van één actieverzoek (dienst-JWT van de Hub): methode, uitkomst, before/after-hash",
         "tags": [
           "uitvoeren"
         ]
@@ -75,7 +185,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Koppelstatus (witte lijst), Gereed en (lege) allowlist",
+        "summary": "Koppelstatus (witte lijst), Gereed, beleid (policy_hash), allowlist en toestand van de schrijfsleutel",
         "tags": [
           "status"
         ]
@@ -125,7 +235,7 @@
             "description": "replay_check_unavailable"
           }
         },
-        "summary": "Ontkoppelen: nog niet beschikbaar voor de executor (vraagt een live geverifieerde schrijfkey, P2)",
+        "summary": "Ontkoppelen via de Hub kan niet: alleen op de executorpagina met een live geverifieerde schrijfkey",
         "tags": [
           "connector"
         ]

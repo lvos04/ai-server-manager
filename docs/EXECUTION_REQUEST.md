@@ -86,7 +86,35 @@ In deze volgorde; elke weigering heeft een stabiele code en er wordt niets uitge
 | risicoklasse ≥ eigen herberekening | `risicoklasse_te_laag` (403) |
 | goedkeuring aanwezig, geldig en gebonden | `goedkeuring_ontbreekt`, `goedkeuring_verlopen`, `goedkeuring_ongeldig` (403), `goedkeuring_past_niet` (409), `backup_checkpoint_ontbreekt` (409) |
 | nonce van de goedkeuring nog niet gebruikt | `goedkeuring_al_gebruikt` (409) |
-| precondities uit eigen readback (ETag van het doel, pools gezond) | `doel_gewijzigd` (409), `pool_niet_gezond` (409) |
+| precondities uit eigen readback (ETag van het doel, pools gezond) | `doel_gewijzigd`, `doel_bestaat_niet`, `doel_bestaat_al`, `pool_niet_gezond`, `herstelpunt_onbekend` (409) |
 
-Daarna voert de uitvoerder uit, leest terug en vergelijkt met de verwachte toestand. Een afwijking stopt de
-uitvoerder en wordt in de Hub een incident.
+Tussen deze stappen kan de executor ook weigeren om een reden die niet in het verzoek zit. Ook dan is er niets
+uitgevoerd:
+
+| Reden | Code (HTTP) |
+|---|---|
+| beleid niet geladen of niet alleen-lezen in de image | `policy_niet_beschikbaar`, `policy_niet_read_only` (503) |
+| er loopt al een uitvoering (de nonce is dan nog niet verbruikt) | `executor_bezet` (409) |
+| gestopt na een eerdere afwijking | `executor_gestopt` (409) |
+| journaal (eigen SQLite) niet beschikbaar | `journaal_niet_beschikbaar` (503) |
+| schrijfsleutel niet ingesteld, vault-verwijzing in de waarden, of TrueNAS kent geen van de methoden | `capability_unavailable` (501; `details.reden` = `schrijfsleutel_ontbreekt` of `vault_verwijzingen`, of `details.methoden` met de gezochte methoden) |
+| schrijfsleutel of sleutelopslag onleesbaar | `schrijfsleutel_onleesbaar` (503) |
+| TrueNAS onbereikbaar, te traag, ander certificaat, sleutel geweigerd of zonder rechten | `truenas_onbereikbaar`, `truenas_timeout`, `certificaat_gewijzigd`, `sleutel_geweigerd`, `truenas_geen_toegang` (503) |
+| TrueNAS geeft een fout bij het lezen | `truenas_fout` (502) |
+
+## Uitvoeren en teruglezen
+
+Daarna voert de uitvoerder uit, leest terug en vergelijkt met de verwachte toestand.
+
+| Uitkomst | Antwoord |
+|---|---|
+| toestand is zoals verwacht | `200` met `status: "uitgevoerd"`, `methode`, `before_hash`, `after_hash`, `resource_etag`, `readback`, `waarschuwingen`, `policy_hash` |
+| TrueNAS weigert de aanroep en het doel is onveranderd | `502 uitvoering_mislukt` (`details.reden`); de executor blijft werken |
+| toestand wijkt af, of de uitkomst is onbekend (time-out, verbroken verbinding, journaal weg na de aanroep) | `409 afwijking` (`details.reden`, `details.afwijkingen`, `details.gestopt`); de executor stopt |
+
+Na een afwijking weigert de executor alles met `executor_gestopt` tot een beheerder hem op de executorpagina
+vrijgeeft met de TrueNAS-schrijfsleutel. De Hub legt een incident vast; er is geen automatische herhaling.
+
+`GET /api/v1/executions/{request_id}` (dienst-JWT van de Hub) geeft `{request_id, uitvoeringen, gestopt}` uit het
+journaal. Elke uitvoering heeft `action_id`, `target`, `methode`, `status` (`gestart`, `uitgevoerd`, `mislukt` of
+`afwijking`), `before_hash` en `after_hash`. Een onbekend verzoek geeft een lege lijst.

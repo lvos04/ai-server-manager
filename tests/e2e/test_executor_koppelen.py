@@ -135,9 +135,11 @@ def test_executor_koppelt_met_koppelcode_en_vingerafdruk(
     # De Hub ziet de executor als actief en het token als gebruikt (bevestiging via services/self)
     item = next(s for s in admin.get("/api/v1/services").json()["items"] if s["app_id"] == "ai-server-manager-executor")
     assert item["status"] == "active" and item["tokens"][0]["eerst_gebruikt"]
-    # Na de eerste koppeling geen formulier meer (§3.7/§3.9); een POST wordt geweigerd
+    # Na de eerste koppeling geen koppelformulier meer (§3.7/§3.9); een POST wordt geweigerd. Wel vraagt de pagina nu
+    # de TrueNAS-schrijfsleutel (§3.9); beheer (ontkoppelen/vervangen) bestaat pas als er een sleutel ligt.
     page = c.get("/")
-    assert 'name="csrf"' not in page.text and "gaat via de Hub" in page.text
+    assert 'action="/koppelen"' not in page.text and "gaat via de Hub" in page.text
+    assert 'action="/schrijfsleutel"' in page.text and 'action="/beheer"' not in page.text
     again = c.post("/koppelen", data={"csrf": "x"}, headers={"Origin": BASE})
     assert again.status_code == 403  # zonder geldige formuliercode
     # Inkomende JWT's: dienst-JWT van de Hub → 200; service-token → 401 service_token_not_accepted
@@ -167,7 +169,8 @@ def test_executor_koppelt_met_koppelcode_en_vingerafdruk(
     wrong_aud, _ = keyring.issue_hub_service_jwt(audience="home-control-hub", service_id=sid)
     r = c.get("/connector/v1/hub-link", headers={"Authorization": f"Bearer {wrong_aud}"})
     assert r.status_code == 401 and r.json()["details"]["reason"] == "invalid_token"
-    # Ontkoppelen via de Hub: de executor weigert eerlijk (501, P2) → de Hub trekt niets in
+    # Ontkoppelen via de Hub: de executor weigert eerlijk (501: ontkoppelen kan alleen op de executorpagina met een
+    # live geverifieerde TrueNAS-schrijfsleutel, §3.9) → de Hub trekt niets in
     served_ex = Served(ex_app)
     try:
         from hub.routers import services as services_router
@@ -265,6 +268,10 @@ def test_koppelen_na_eerste_koppeling_geweigerd_ook_met_geldige_formuliercode(
             "hub_vingerafdruk": second["keyset_fingerprint"]}  # fmt: skip
     r = late.post("/koppelen", data=form, headers={"Origin": BASE})
     assert r.status_code == 409 and "al eens gekoppeld" in r.text
+    # De pagina van dit antwoord toont het sleutelformulier met een nieuwe formuliercode (de oude vervalt daarmee).
+    vers = re.search(r'name="csrf" value="([^"]+)"', r.text)
+    assert vers is not None and vers.group(1) != stale_csrf
+    form["csrf"] = vers.group(1)
     with psycopg.connect(clean_db) as conn:
         after = conn.execute("SELECT count(*) FROM audit_event WHERE action LIKE 'enrollment.%'").fetchone()
     assert after == before  # geen verzoek naar de Hub
@@ -281,8 +288,8 @@ def test_koppelen_na_eerste_koppeling_geweigerd_ook_met_geldige_formuliercode(
         )
     page = late.get("/")
     assert 'name="csrf"' not in page.text and "gaat via de Hub" in page.text
-    r = late.post("/koppelen", data=form, headers={"Origin": BASE})
-    assert r.status_code == 409
+    r = late.post("/koppelen", data=form, headers={"Origin": BASE})  # met de nog geldige formuliercode
+    assert r.status_code == 409 and "al eens gekoppeld" in r.text
     after_revoke = json.loads(link_file.read_text())
     assert after_revoke["first_linked_at"] == linked["first_linked_at"] and after_revoke["state"] == "ingetrokken"
     assert after_revoke["hub_url"] == linked["hub_url"] and after_revoke["pins"] == linked["pins"]
@@ -384,7 +391,14 @@ def test_elke_post_telt_ook_bij_een_al_gekoppelde_executor(
         "koppelcode": "ABCD-EFGH-JKMN",
         "hub_vingerafdruk": "x",
     }
-    codes = [late.post("/koppelen", data=form, headers={"Origin": BASE}).status_code for _ in range(5)]
+    codes = []
+    for _ in range(5):
+        r = late.post("/koppelen", data=form, headers={"Origin": BASE})
+        codes.append(r.status_code)
+        # Elke pagina met een formulier (hier: het sleutelformulier) geeft een nieuwe formuliercode uit.
+        vers = re.search(r'name="csrf" value="([^"]+)"', r.text)
+        assert vers is not None
+        form["csrf"] = vers.group(1)
     assert codes == [
         409,
         409,

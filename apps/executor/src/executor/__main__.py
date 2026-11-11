@@ -37,7 +37,11 @@ def main(argv: list[str] | None = None) -> int:
             state = "onleesbaar (fail-closed)" if link.get("_onleesbaar") else str(link.get("state"))
         except (OSError, ValueError):
             state = "onbekend (hub-link.json onleesbaar)"
-        print(f"[executor] koppelstatus: {state}. Allowlist leeg tot fase P2: er wordt niets uitgevoerd.", flush=True)
+        print(
+            f"[executor] koppelstatus: {state}. Uitvoeren kan pas na koppelen met de Hub en het instellen van de "
+            "TrueNAS-schrijfsleutel op de statuspagina.",
+            flush=True,
+        )
         return 0
     if args.cmd == "api":
         import uvicorn

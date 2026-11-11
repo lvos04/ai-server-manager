@@ -1,5 +1,5 @@
-"""Executor: gezondheid, statuspagina 'nog niet gekoppeld', allowlist weigert alles (na aanmelding), eigen geheimen,
-onleesbaar koppelbestand (contract 1.3 §3.5: fail-closed, /readyz blijft 200)."""
+"""Executor: gezondheid, statuspagina 'nog niet gekoppeld', alleen ondertekende acties van de allowlist (na
+aanmelding), eigen geheimen, onleesbaar koppelbestand (contract 1.3 §3.5: fail-closed, /readyz blijft 200)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import uuid
 from pathlib import Path
 
 import pytest
-from executorhelpers import Hub, auth
+from executorhelpers import POLICY, Hub, auth, execute, signed
 from executorhelpers import client as hub_client
 from fastapi.testclient import TestClient
+from policyhelpers import HOST, proposal
 
-from executor.allowlist import ALLOWLIST, check
 from executor.app import create_app
 from executor.config import Settings
 from executor.firststart import IDENTITY, VAULT_KEY, FirstStartError, ensure_secrets
@@ -30,8 +30,14 @@ def test_gezondheid_en_status(client: TestClient) -> None:
     r = client.get("/readyz")
     assert r.status_code == 200 and r.json()["gekoppeld"] is False
     st = client.get("/api/v1/status").json()
-    assert st["gekoppeld"] is False and st["allowlist"] == [] and st["identiteit"]["crv"] == "Ed25519"
+    assert st["gekoppeld"] is False and st["identiteit"]["crv"] == "Ed25519"
     assert "d" not in st["identiteit"]
+    # Allowlist v1 en policy_hash komen uit het ingebakken beleid (contract 1.3 §8); zonder koppeling en zonder
+    # schrijfsleutel voert de executor niets uit.
+    assert st["allowlist"] == POLICY.executor_allowlist() and st["policy"]["hash"] == POLICY.hash
+    assert st["uitvoeren"] == {"mogelijk": False, "reden": "niet_gekoppeld"}
+    assert st["schrijfsleutel"] == {"ingesteld": False, "onleesbaar": False, "laatste4": None, "ingesteld_op": None}
+    assert st["truenas"] == {"adres": None, "poort": None, "tls_vingerafdruk": None} and st["gestopt"] is None
     page = client.get("/")
     assert page.status_code == 200 and "Niet gekoppeld" in page.text and 'lang="nl"' in page.text
     # Peil-statuspaginasjabloon (C-55): platformnaam, geen groen voor 'niet gekoppeld', koppelformulier met de
@@ -46,31 +52,83 @@ def test_readyz_zonder_geheimen(tmp_path: Path) -> None:
     assert c.get("/readyz").status_code == 503
 
 
+def test_execute_eerst_aanmelden_dan_vorm(tmp_path: Path) -> None:
+    hub = Hub(tmp_path / "appdata", allow_writable_policy=True)
+    c = hub_client(hub)
+    # Zonder aanmelding: 401 (eerst authenticatie, contract 1.3 §4.7).
+    assert c.post("/api/v1/execute", json={"action_id": "app.restart"}).status_code == 401
+    # Een gebruikers-JWT is geen dienst-JWT van de Hub.
+    r = c.post("/api/v1/execute", json={}, headers=auth(hub.user_jwt(["admin"]), str(uuid.uuid4())))
+    assert r.status_code == 403 and r.json()["code"] == "forbidden"
+    # Een losse action_id is geen ExecutionRequest: zonder handtekening van de Hub gebeurt er niets.
+    for body in ({"action_id": "app.restart", "parameters": {}}, [], "tekst", {}):
+        r = execute(c, hub, body)
+        assert r.status_code == 422, r.text
+        assert r.json()["code"] in ("execution_request_ongeldig", "validation_error") and r.json()["trace_id"]
+
+
 @pytest.mark.parametrize(
-    "action",
+    ("action", "code"),
     [
-        "app.restart",
-        "app.install",
-        "zfs.snapshot.create",
-        "notification.send",
-        "shell.exec",
-        "sudo",
-        "docker.run",
-        "onbekend",
+        ("shell.exec", "actie_geweigerd"),
+        ("sudo", "actie_geweigerd"),
+        ("docker.run", "actie_geweigerd"),
+        ("app.delete", "actie_geweigerd"),
+        ("pool.dataset.delete", "actie_geweigerd"),
+        ("boiler.aan", "actie_geweigerd"),
+        ("onbekend", "actie_niet_toegestaan"),
+        ("notification.send", "actie_niet_toegestaan"),  # hoort bij de Hub (Gotify), niet bij de executor
+        ("sso.sessions.revoke", "actie_niet_toegestaan"),  # hoort bij de eigenaar-connector
     ],
 )
-def test_alles_geweigerd(tmp_path: Path, action: str) -> None:
+def test_buiten_de_allowlist_altijd_geweigerd(tmp_path: Path, action: str, code: str) -> None:
+    """Ook met een geldige handtekening van de Hub: wat niet op de allowlist staat wordt geweigerd (EX17, EX27)."""
+    hub = Hub(tmp_path / "appdata", allow_writable_policy=True)
+    c = hub_client(hub)
+    prop = proposal(action, {"host_id": HOST}, {"titel": "t", "tekst": "t"} if action == "notification.send" else {})
+    r = execute(c, hub, signed(hub, prop, risk_class="R3"))
+    assert r.status_code == 403, r.text
+    assert r.json()["code"] == code and r.json()["trace_id"]
+
+
+def test_zonder_schrijfsleutel_capability_unavailable_nooit_gesimuleerd_succes(tmp_path: Path) -> None:
+    hub = Hub(tmp_path / "appdata", allow_writable_policy=True)
+    c = hub_client(hub)
+    st = c.get("/api/v1/status").json()
+    assert st["uitvoeren"] == {"mogelijk": False, "reden": "schrijfsleutel_ontbreekt"}
+    prop = proposal("app.restart", {"host_id": HOST, "app_id": "demo-app"}, expected_version="sha256:" + "0" * 64)
+    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    assert r.status_code == 501, r.text
+    assert r.json()["code"] == "capability_unavailable" and r.json()["details"]["reden"] == "schrijfsleutel_ontbreekt"
+
+
+def test_beschrijfbaar_beleid_voert_niets_uit(tmp_path: Path) -> None:
+    """In het image is het beleid alleen-lezen (§8). Is het beschrijfbaar (zoals hier in de repo) en staat de
+    ontwikkelschakelaar uit, dan weigert de executor elk verzoek."""
     hub = Hub(tmp_path / "appdata")
     c = hub_client(hub)
-    # Zonder aanmelding: 401 (eerst authenticatie, contract 1.3 §4.7); daarna weigert de allowlist alles.
-    assert c.post("/api/v1/execute", json={"action_id": action}).status_code == 401
-    r = c.post(
-        "/api/v1/execute", json={"action_id": action, "parameters": {}}, headers=auth(hub.jwt(), str(uuid.uuid4()))
-    )
-    assert r.status_code == 403
-    assert r.json()["code"] in ("action_not_allowed", "action_forbidden") and r.json()["trace_id"]
-    assert not check(action).allowed
-    assert frozenset() == ALLOWLIST
+    st = c.get("/api/v1/status").json()
+    assert st["policy"]["read_only"] is False and st["uitvoeren"]["mogelijk"] is False
+    prop = proposal("app.restart", {"host_id": HOST, "app_id": "demo-app"}, expected_version="sha256:" + "0" * 64)
+    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    assert r.status_code == 503 and r.json()["code"] == "policy_niet_read_only", r.text
+    assert "Beschrijfbaar" in c.get("/").text and "policy_niet_read_only" in c.get("/").text
+
+
+def test_onleesbaar_beleid_voert_niets_uit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    leeg = tmp_path / "geen-beleid"
+    leeg.mkdir()
+    monkeypatch.setenv("ASM_POLICY_DIR", str(leeg))
+    hub = Hub(tmp_path / "appdata", allow_writable_policy=True)
+    c = hub_client(hub)
+    st = c.get("/api/v1/status").json()
+    assert st["policy"]["geladen"] is False and st["allowlist"] == []
+    assert st["uitvoeren"] == {"mogelijk": False, "reden": "policy_niet_beschikbaar"}
+    prop = proposal("app.restart", {"host_id": HOST, "app_id": "demo-app"}, expected_version="sha256:" + "0" * 64)
+    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    assert r.status_code == 503 and r.json()["code"] == "policy_niet_beschikbaar", r.text
+    page = c.get("/").text
+    assert "policy_niet_beschikbaar" in page and "Niet beschikbaar" in page
 
 
 def test_geen_shell_of_docker_routes(client: TestClient) -> None:
@@ -80,10 +138,13 @@ def test_geen_shell_of_docker_routes(client: TestClient) -> None:
         "/readyz",
         "/api/v1/status",
         "/api/v1/execute",
+        "/api/v1/executions/{request_id}",
         "/connector/v1/hub-link",
         "/connector/v1/hub-link/unlink",
     }
     assert client.post("/api/v1/shell", json={"cmd": "id"}).status_code == 404
+    # De formulierroutes van de statuspagina staan niet in de API-beschrijving.
+    assert not {"/koppelen", "/schrijfsleutel", "/beheer"} & paths
 
 
 def test_geheimen_nooit_overschreven(tmp_path: Path) -> None:

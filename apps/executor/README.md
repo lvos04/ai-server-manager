@@ -1,7 +1,12 @@
-# executor — AI Server Manager executor (fase P0/P1)
+# executor — AI Server Manager executor
 
-Eigen image en eigen standaard TrueNAS Custom App `ai-server-manager-executor` (poort 30410). Later is dit de **enige**
-component met een TrueNAS-API-key met schrijfrechten. Zonder die key doet hij bewust nog niets:
+Eigen image en eigen standaard TrueNAS Custom App `ai-server-manager-executor` (poort 30410). Dit is de **enige**
+component met een TrueNAS-API-sleutel met schrijfrechten. Hij voert uitsluitend door de Hub ondertekende acties van een
+vaste allowlist uit en controleert elk verzoek zelf opnieuw (contract 1.3 §8, ADR-0030). Zonder koppeling met de Hub of
+zonder schrijfsleutel voert hij niets uit.
+
+Status: **Sim-getest** tegen de in-repo nep-TrueNAS (`tests/fakes/fake_truenas.py`). Tegen een echte TrueNAS is niets
+gevalideerd (NIET GEVALIDEERD (hardware)).
 
 - `GET /healthz`, `GET /readyz`, `GET /api/v1/status` en `GET /`, de Nederlandse statuspagina (Peil-sjabloon 1.1.1,
   gepinde kopie met sha256 en drifttest). Daarop staat het koppelformulier (koppelcode van 30 minuten plus
@@ -20,23 +25,92 @@ component met een TrueNAS-API-key met schrijfrechten. Zonder die key doet hij be
   atomair, `schema_version` `"1.3"`; lezers accepteren elke `1.x`). Een onleesbaar bestand (geen JSON, andere major,
   ontbrekende velden, verkeerde eigenaar of rechten, symlink) is fail-closed: geen vertrouwen, geen formulier,
   `koppelstatus_onleesbaar`, en het bestand wordt nooit stil teruggezet. De executor kent geen env-token (§3.9): herstel
-  volgt in P2 met de TrueNAS-schrijfsleutel.
+  gaat met de TrueNAS-schrijfsleutel op de statuspagina (zie hieronder); is er nog geen sleutel ingesteld, dan zie
+  `deploy/truenas/CUSTOM_APP.md` (herstel).
 - `GET /connector/v1/hub-link` controleert inkomende Hub-JWT's in de volgorde en met de redenen van §4.7 (`aud` precies
   één string; geen header, ander schema of lege waarde → `invalid_token`; header zonder `kid` → `unknown_key`).
 - Elke POST/PUT/PATCH/DELETE met een Hub-JWT verbruikt de `jti` in een persistente replaycache
   (`/appdata/executor.sqlite3`), ook zonder `Idempotency-Key`; daarna pas rol (403), `Idempotency-Key` (400) en body
   (422). Een hergebruikte `jti` → `401 token_replayed`, ook na een herstart; is de cache onbruikbaar, dan `503`.
 - `POST /connector/v1/hub-link/unlink`: een gebruikers-JWT moet de rol `admin` hebben (de rol `kind` wint altijd); de
-  route antwoordt eerlijk `501 capability_unavailable`: ontkoppelen vraagt een live geverifieerde TrueNAS-schrijfkey
-  (P2).
-- `POST /api/v1/execute` vraagt eerst een dienst-JWT van de Hub en weigert daarna **alles** (`403
-  action_not_allowed`), want de allowlist is leeg. Zonder aanmelding: `401`.
+  route antwoordt eerlijk `501 capability_unavailable`: ontkoppelen vraagt een live geverifieerde TrueNAS-schrijfsleutel
+  en kan daarom alleen op de executorpagina (§3.9), niet via de Hub.
+- `POST /api/v1/execute` vraagt een dienst-JWT van de Hub en een `Idempotency-Key`, en daarna een ondertekend
+  `ExecutionRequest` (zie hieronder). Zonder aanmelding: `401`. `GET /api/v1/executions/{request_id}` geeft de Hub het
+  journaal van één verzoek.
 - Verzoeken groter dan 1 MiB krijgen `413`, ook chunked, vóór routering en aanmelding (§5).
 - Er is geen shell-, sudo- of Docker-endpoint en geen Docker-socket.
 - Bij de eerste start maakt de executor zijn eigen Ed25519-identiteit en `vault.key` in `/appdata/secrets` (0600; nooit
   overschreven).
 
-De TrueNAS-schrijfkey op de statuspagina volgt in fase P2 (contract §3.9 en §8), samen met:
-- de handtekeningcontrole van `ExecutionRequest`;
-- de nonce-opslag (in dezelfde SQLite-database);
-- de echte allowlist.
+## TrueNAS-schrijfsleutel (contract 1.3 §3.9)
+
+Zodra de executor gekoppeld is, vraagt de statuspagina de TrueNAS-API-sleutel met schrijfrechten. De Hub ziet deze
+sleutel nooit.
+
+1. **Stap 1 — vingerafdruk.** Na het versturen haalt de executor alleen het TLS-certificaat van TrueNAS op en toont de
+   SHA-256-vingerafdruk. De sleutel is dan nog niet verstuurd en niet bewaard.
+2. **Stap 2 — bevestigen.** Vul de sleutel nogmaals in (binnen 15 minuten). De executor verbindt met precies dat
+   certificaat, meldt aan met `auth.login_with_api_key`, controleert de rol (`FULL_ADMIN`, `APPS_WRITE` of
+   `SNAPSHOT_WRITE`) en slaat de sleutel versleuteld op (AES-256-GCM met `vault.key`) in
+   `/appdata/secrets/naslink.json` (0600). Daarna zie je alleen de laatste 4 tekens.
+
+Het **NAS-adres** is `EXECUTOR_TRUENAS_HOST` (optioneel) of, als dat leeg is, het IP-adres waarop je de executorpagina
+opent (de executor draait op de NAS zelf); poort `EXECUTOR_TRUENAS_PORT` (standaard 443). Open je de pagina via een naam
+of via loopback, dan is het adres onbekend (`nas_adres_onbekend`). Adres en certificaat liggen na stap 2 vast: een ander
+adres of certificaat wordt geweigerd en de sleutel wordt er dan niet naartoe gestuurd.
+
+**Beheer** (blok "Ontkoppelen of sleutel vervangen", zodra er een sleutel ligt) vraagt altijd de huidige sleutel als
+bewijs; de executor test hem live tegen het vastgelegde adres en certificaat voordat er iets verandert:
+
+- *Sleutel vervangen*: nieuwe sleutel invullen; ook die wordt eerst live getest.
+- *Vrijgeven na een afwijking*: huidige sleutel invullen, "Nieuwe sleutel" leeg laten en "Sleutel vervangen" kiezen.
+- *Ontkoppelen van de Hub*: de Hub wordt niet meer vertrouwd; NAS-adres, certificaat en sleutel blijven bewaard en het
+  koppelformulier komt terug. Dit is ook het herstel bij een onleesbaar koppelbestand.
+
+Voor alle drie de formulieren gelden de regels van §3.7 (herkomst, `Host`, formuliercode, pogingenlimiet).
+
+## Uitvoeren (contract 1.3 §8)
+
+De executor vertrouwt de Hub niet blind. Per verzoek, in deze volgorde:
+
+1. Vorm van het `ExecutionRequest`, handtekening (Ed25519 over canonieke JSON, alleen met de bij het koppelen gepinde
+   policy-sleutel van de Hub), geldigheid (hooguit 15 minuten) en `policy_hash` (gelijk aan het eigen, in het image
+   ingebakken beleid; anders `409 policy_hash_verschilt`).
+2. Eenmalige nonce van het verzoek (eigen SQLite, overleeft een herstart) en of de executor niet gestopt is.
+3. Eigen beslissing met hetzelfde beleid: allowlist, parameterschema, blokkades (o.a. Emby, het platform zelf, shell,
+   boiler), eigen risicoklasse (een lagere klasse in het verzoek → `403 risicoklasse_te_laag`) en bij R2/R3 de
+   goedkeuring: gebonden aan `preview_hash`-velden (`action_scope`), `resource_etag`, `policy_hash`, `risk_class`,
+   hooguit 15 minuten geldig, eenmalig (`goedkeuring_al_gebruikt`), en waar het beleid dat eist een
+   `backup_checkpoint_id`.
+4. Live lezen van TrueNAS: bestaat het doel, is de `resource_etag` nog gelijk (`doel_gewijzigd`), zijn alle pools
+   `ONLINE` en gezond voor opslagmutaties (`pool_niet_gezond`), en bestaan de benodigde methoden volgens
+   `core.get_methods` (anders `501 capability_unavailable`).
+5. Uitvoeren met alleen de methoden uit het beleid, teruglezen, before/after-hash in het journaal. Wijkt de teruggelezen
+   toestand af van wat was goedgekeurd, dan `409 afwijking`: de executor **stopt** en voert niets meer uit tot je hem op
+   de statuspagina vrijgeeft.
+
+Allowlist v1: `app.install`, `app.update`, `app.rollback`, `app.uninstall`, `app.start`, `app.stop`, `app.restart`,
+`zfs.snapshot.create`, `zfs.snapshot.clone_to_sandbox`.
+
+- Installeren gaat **alleen** als standaard Custom App (`app.create` met `custom_app: false`, `catalog_app: "ix-app"`
+  en waarden); `custom_compose_config` wordt nooit gestuurd en geweigerd als het in de parameters staat (EX47). Images
+  alleen met tag én `@sha256`-digest; geen `latest`, geen privileged, geen Docker-socket, geen hostpaden buiten `/mnt`.
+- Verwijderen is container-only: `remove_images: false`, `remove_ix_volumes: false`; datasets en snapshots blijven.
+- Bijwerken bewaart eerst de vorige waarden (versleuteld, in het journaal); terugzetten is `app.update` met die waarden.
+- Een kloon gaat alleen naar `<pool>/asm-sandbox/<naam>`; de ouderdataset moet al bestaan.
+- Er is geen shell-, sudo- of Docker-endpoint en geen Docker-socket; `NasClient` weigert elke methode buiten de vaste
+  lees- en schrijflijst.
+
+## Instellingen
+
+Alle optioneel (prefix `EXECUTOR_`); de Custom App heeft geen verplichte variabelen.
+
+| Variabele | Standaard | Betekenis |
+|---|---|---|
+| `EXECUTOR_TRUENAS_HOST` | leeg | NAS-adres als de TrueNAS-API op een ander adres luistert dan de executorpagina. |
+| `EXECUTOR_TRUENAS_PORT` | `443` | HTTPS-poort van de TrueNAS-API. |
+| `EXECUTOR_TRUENAS_TIMEOUT_SECONDS` | `15` | Time-out per TrueNAS-aanroep. |
+| `EXECUTOR_READBACK_WAIT_SECONDS` | `120` | Zo lang wachten op de verwachte eindtoestand; daarna is het een afwijking. |
+| `EXECUTOR_ALLOW_WRITABLE_POLICY` | `false` | Alleen ontwikkeling/CI. In het image is het beleid alleen-lezen. |
+| `EXECUTOR_ALLOW_LOOPBACK_HUB` | `false` | Alleen ontwikkeling/CI. |

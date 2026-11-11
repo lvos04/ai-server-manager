@@ -6,7 +6,14 @@ Alleen voor tests (simulator). Gedrag dat de echte TrueNAS-middleware nabootst:
 - versieprofielen: ``25.04`` (``pool.snapshot.query``) en ``24.10`` (``zfs.snapshot.query``);
 - notificaties (``collection_update``) tussen antwoorden door;
 - TLS met een eigen test-CA (zelfondertekend vanuit het perspectief van de Hub).
-Elke aanroep wordt gelogd; aanroepen van niet-leesmethoden komen in ``mutations`` (tests eisen dat die leeg blijft).
+Elke aanroep wordt gelogd; aanroepen van niet-leesmethoden komen in ``mutations`` (tests van de Hub eisen dat die leeg
+blijft).
+
+Schrijven (voor de executor, fase P2): alleen een sleutel met ``KeyProfile(write=True)`` mag schrijfmethoden aanroepen;
+elke andere sleutel krijgt ``EACCES``. App-methoden zijn jobs (een job-id als antwoord, uitkomst via
+``core.get_jobs``); de wijziging staat direct in de testdata. Testknoppen: ``fail`` (methode → foutmelding),
+``silent_noop`` (job "geslaagd" zonder wijziging), ``digest_override`` (repository → andere digest dan gevraagd),
+``hidden`` (methoden die deze "versie" niet aanbiedt) en ``job_polls`` (aantal keer RUNNING vóór de eindstaat).
 """
 
 from __future__ import annotations
@@ -56,8 +63,13 @@ READ_METHODS = {
     "interface.query",
     "core.subscribe",
     "core.unsubscribe",
+    "core.get_jobs",
 }
 WRITE_METHODS = {
+    "app.upgrade",
+    "app.rollback",
+    "pool.snapshot.clone",
+    "zfs.snapshot.clone",
     "app.create",
     "app.update",
     "app.delete",
@@ -69,6 +81,28 @@ WRITE_METHODS = {
     "pool.dataset.delete",
     "pool.snapshottask.create",
 }
+# Gevoelig lezen: de volledige app-configuratie (kan geheimen bevatten). Alleen met een schrijfprofiel; de Hub
+# (alleen-lezen) mag dit nooit aanroepen — een poging komt in ``mutations``.
+CONFIG_METHODS = {"app.config"}
+JOB_METHODS = {
+    "app.create",
+    "app.update",
+    "app.delete",
+    "app.redeploy",
+    "app.stop",
+    "app.start",
+    "app.upgrade",
+    "app.rollback",
+}
+
+
+class FakeCallError(Exception):
+    """Fout van een schrijfmethode in de fake (wordt een ``-32001`` met ``errname``)."""
+
+    def __init__(self, errname: str, reason: str) -> None:
+        super().__init__(reason)
+        self.errname = errname
+        self.reason = reason
 
 
 def _ms(days_ago: float = 0, hours_ago: float = 0) -> dict[str, int]:
@@ -443,6 +477,7 @@ def _app(
 class KeyProfile:
     roles: list[str] = field(default_factory=lambda: ["READONLY_ADMIN"])
     deny: set[str] = field(default_factory=set)
+    write: bool = False  # True: schrijfmethoden toegestaan (de schrijfsleutel van de executor)
 
 
 class FakeTrueNAS:
@@ -465,6 +500,17 @@ class FakeTrueNAS:
         self.calls: list[tuple[str, Any]] = []
         self.mutations: list[str] = []
         self.paths: list[str] = []
+        # Schrijven (executor): testknoppen en wat er is ontvangen.
+        self.fail: dict[str, str] = {}
+        self.silent_noop: set[str] = set()
+        self.digest_override: dict[str, str] = {}
+        self.hidden: set[str] = set()
+        self.job_polls = 1
+        self.jobs: dict[int, dict[str, Any]] = {}
+        self.created: list[dict[str, Any]] = []
+        self.updated: list[tuple[str, dict[str, Any]]] = []
+        self.deleted: list[tuple[str, dict[str, Any]]] = []
+        self.logins = 0
         self._tmp = tempfile.TemporaryDirectory(prefix="fake-truenas-")
         self.ca_file, self._cert, self._key = _make_tls(Path(self._tmp.name))
         self.port = 0
@@ -476,14 +522,11 @@ class FakeTrueNAS:
     @property
     def methods(self) -> set[str]:
         major_minor = tuple(int(x) for x in self.version.split(".")[:2])
-        m = set(READ_METHODS) | set(WRITE_METHODS)
-        if major_minor >= (25, 4):
-            m.discard("zfs.snapshot.query")
-            m.discard("zfs.snapshot.create")
-        else:
-            m.discard("pool.snapshot.query")
-            m.discard("pool.snapshot.create")
-        return m
+        m = set(READ_METHODS) | set(WRITE_METHODS) | set(CONFIG_METHODS)
+        old = "zfs" if major_minor >= (25, 4) else "pool"
+        for verb in ("query", "create", "clone"):
+            m.discard(f"{old}.snapshot.{verb}")
+        return m - self.hidden
 
     @property
     def url(self) -> str:
@@ -567,6 +610,7 @@ class FakeTrueNAS:
                 if method in WRITE_METHODS or (method not in READ_METHODS and method in self.methods):
                     self.mutations.append(method)
                 if method == "auth.login_with_api_key":
+                    self.logins += 1
                     profile = self.keys.get(str(params[0]) if params else "")
                     await self._reply(ws, mid, result=profile is not None)
                     continue
@@ -621,7 +665,9 @@ class FakeTrueNAS:
                     self.unsubscribed.append(str(params[0]) if params else "")
                     await self._reply(ws, mid, result=None)
                     continue
-                if method in profile.deny or method in WRITE_METHODS:
+                if method in CONFIG_METHODS and not profile.write:
+                    self.mutations.append("app.config(geheimen)")
+                if method in profile.deny or (method in WRITE_METHODS | CONFIG_METHODS and not profile.write):
                     await self._reply(
                         ws,
                         mid,
@@ -631,6 +677,20 @@ class FakeTrueNAS:
                             "data": {"error": 13, "errname": "EACCES", "reason": "Not authorized"},
                         },
                     )
+                    continue
+                if method in WRITE_METHODS | CONFIG_METHODS:
+                    try:
+                        await self._reply(ws, mid, result=self._write(method, params))
+                    except FakeCallError as exc:
+                        await self._reply(
+                            ws,
+                            mid,
+                            error={
+                                "code": -32001,
+                                "message": "Method call error",
+                                "data": {"error": 22, "errname": exc.errname, "reason": exc.reason},
+                            },
+                        )
                     continue
                 await self._reply(ws, mid, result=self._result(method, params, profile))
         except ConnectionClosed:
@@ -653,6 +713,8 @@ class FakeTrueNAS:
             return {m: {"description": None} for m in sorted(self.methods)}
         if method == "auth.me":
             return {"pw_name": "hub-lezer", "privilege": {"roles": {"$set": list(profile.roles)}, "web_shell": False}}
+        if method == "core.get_jobs":
+            return self._jobs(params)
         if (
             method == "app.query"
             and len(params) > 1
@@ -673,3 +735,185 @@ class FakeTrueNAS:
         if method == "app.query" and isinstance(value, list):
             return [{k: v for k, v in a.items() if k != "config"} for a in value]
         return value
+
+    # ---------------------------------------------------------------- schrijven (executor, fase P2)
+    def _jobs(self, params: list[Any]) -> list[dict[str, Any]]:
+        wanted = None
+        if params and isinstance(params[0], list) and params[0] and isinstance(params[0][0], list):
+            wanted = params[0][0][2]
+        out = []
+        for job in self.jobs.values():
+            if wanted is not None and job["id"] != wanted:
+                continue
+            if job["polls_left"] > 0:
+                job["polls_left"] -= 1
+                out.append({"id": job["id"], "method": job["method"], "state": "RUNNING", "error": None})
+            else:
+                out.append({k: v for k, v in job.items() if k != "polls_left"})
+        return out
+
+    def app(self, name: str) -> dict[str, Any] | None:
+        return next((a for a in self.data["app.query"] if a["name"] == name), None)
+
+    def datasets(self) -> dict[str, dict[str, Any]]:
+        out: dict[str, dict[str, Any]] = {}
+
+        def walk(nodes: list[dict[str, Any]]) -> None:
+            for n in nodes:
+                out[n["id"]] = n
+                walk(n.get("children") or [])
+
+        walk(self.data["pool.dataset.query"])
+        return out
+
+    def add_dataset(self, name: str) -> None:
+        parent = self.datasets()[name.rsplit("/", 1)[0]]
+        parent["children"].append(
+            {
+                "id": name,
+                "name": name,
+                "pool": name.split("/", 1)[0],
+                "type": "FILESYSTEM",
+                "mountpoint": f"/mnt/{name}",
+                "children": [],
+            }
+        )
+
+    def _set_image(self, app: dict[str, Any], image: dict[str, Any]) -> None:
+        """Image van een Custom App bijwerken. De tag mag ``<versie>@sha256:<digest>`` zijn; de digest in
+        ``app.image.query`` is die uit de tag, tenzij ``digest_override`` (registry levert iets anders)."""
+        repo, tag = str(image["repository"]), str(image["tag"])
+        ref = f"{repo}:{tag}"
+        version, _sep, pinned = tag.partition("@")
+        digest = self.digest_override.get(repo) or pinned or "sha256:" + hashlib.sha256(ref.encode()).hexdigest()
+        wl = app["active_workloads"]
+        wl["images"] = [ref]
+        for c in wl["container_details"]:
+            c["image"] = ref
+        app["human_version"] = version
+        app["metadata"]["app_version"] = version
+        entry = _image(f"{repo}:{version}")
+        entry["repo_digests"] = [f"{repo}@{digest}"]
+        self.data["app.image.query"] = [
+            i for i in self.data["app.image.query"] if f"{repo}:{version}" not in i["repo_tags"]
+        ] + [entry]
+
+    def _set_state(self, app: dict[str, Any], state: str) -> None:
+        app["state"] = state
+        app["active_workloads"]["containers"] = 1 if state == "RUNNING" else 0
+        for c in app["active_workloads"]["container_details"]:
+            c["state"] = state.lower()
+
+    def _write(self, method: str, params: list[Any]) -> Any:
+        if method == "app.config":
+            app = self.app(str(params[0]) if params else "")
+            if app is None:
+                raise FakeCallError("ENOENT", "App does not exist")
+            return json.loads(json.dumps(app.get("config") or {}))
+        if method in JOB_METHODS:
+            job_id = len(self.jobs) + 1
+            job: dict[str, Any] = {
+                "id": job_id,
+                "method": method,
+                "state": "SUCCESS",
+                "error": None,
+                "result": None,
+                "polls_left": self.job_polls,
+            }
+            if method in self.fail:
+                job.update(state="FAILED", error=self.fail[method])
+            elif method not in self.silent_noop:
+                try:
+                    self._apply(method, params)
+                except FakeCallError as exc:
+                    job.update(state="FAILED", error=f"[{exc.errname}] {exc.reason}")
+            self.jobs[job_id] = job
+            return job_id
+        if method in self.fail:
+            raise FakeCallError("EFAULT", self.fail[method])
+        if method in self.silent_noop:
+            return True
+        return self._apply(method, params)
+
+    def _apply(self, method: str, params: list[Any]) -> Any:
+        if method == "app.create":
+            data = params[0] if params and isinstance(params[0], dict) else {}
+            self.created.append(json.loads(json.dumps(data)))
+            name = str(data.get("app_name") or "")
+            if self.app(name) is not None:
+                raise FakeCallError("EEXIST", "Application with this name already exists")
+            if "custom_compose_config" in data or "custom_compose_config_string" in data or data.get("custom_app"):
+                self.mutations.append("app.create(custom_compose)")  # nooit: Install via YAML
+            values = data.get("values") or {}
+            ports = values.get("ports") or [{}]
+            storage = values.get("storage") or [{}]
+            app = _app(
+                name,
+                "RUNNING",
+                "onbekend/onbekend:0",
+                int(ports[0].get("port_number") or 0),
+                int(ports[0].get("container_port") or 0),
+                str((storage[0].get("host_path_config") or {}).get("path") or ""),
+                str(storage[0].get("mount_path") or ""),
+                catalog_app=str(data.get("catalog_app") or "ix-app"),
+            )
+            app["version"] = str(data.get("version") or app["version"])
+            app["metadata"]["train"] = str(data.get("train") or "stable")
+            app["config"] = json.loads(json.dumps(values))
+            if isinstance(values.get("image"), dict):
+                self._set_image(app, values["image"])
+            self.data["app.query"].append(app)
+            return None
+        if method in ("pool.snapshot.create", "zfs.snapshot.create"):
+            data = params[0] if params and isinstance(params[0], dict) else {}
+            ds, name = str(data.get("dataset") or ""), str(data.get("name") or "")
+            if ds not in self.datasets():
+                raise FakeCallError("ENOENT", "Dataset does not exist")
+            snaps = self.data["snapshots"].setdefault(ds, [])
+            full = f"{ds}@{name}"
+            if any(x["name"] == full for x in snaps):
+                raise FakeCallError("EEXIST", "Snapshot already exists")
+            snap = {
+                "name": full,
+                "dataset": ds,
+                "createtxg": str(1000 + len(snaps) + 1),
+                "properties": {"creation": {"parsed": _ms()}},
+            }
+            snaps.append(snap)
+            return snap
+        if method in ("pool.snapshot.clone", "zfs.snapshot.clone"):
+            data = params[0] if params and isinstance(params[0], dict) else {}
+            snap, dst = str(data.get("snapshot") or ""), str(data.get("dataset_dst") or "")
+            ds = snap.split("@", 1)[0]
+            if not any(x["name"] == snap for x in self.data["snapshots"].get(ds, [])):
+                raise FakeCallError("ENOENT", "Snapshot does not exist")
+            if dst.rsplit("/", 1)[0] not in self.datasets():
+                raise FakeCallError("ENOENT", "Parent dataset does not exist")
+            if dst in self.datasets():
+                raise FakeCallError("EEXIST", "Dataset already exists")
+            self.add_dataset(dst)
+            return True
+        if method in ("pool.dataset.delete", "pool.snapshottask.create"):
+            raise FakeCallError("EPERM", "Niet ondersteund in de fake")
+        app = self.app(str(params[0]) if params else "")
+        if app is None:
+            raise FakeCallError("ENOENT", "App does not exist")
+        options = params[1] if len(params) > 1 and isinstance(params[1], dict) else {}
+        if method == "app.update":
+            self.updated.append((app["name"], json.loads(json.dumps(options))))
+            if "custom_compose_config" in options or "custom_compose_config_string" in options:
+                self.mutations.append("app.update(custom_compose)")
+            values = options.get("values") or {}
+            app["config"] = {**(app.get("config") or {}), **json.loads(json.dumps(values))}
+            if isinstance(values.get("image"), dict):
+                self._set_image(app, values["image"])
+        elif method == "app.delete":
+            self.deleted.append((app["name"], dict(options)))
+            self.data["app.query"] = [a for a in self.data["app.query"] if a["name"] != app["name"]]
+        elif method in ("app.redeploy", "app.start"):
+            self._set_state(app, "RUNNING")
+        elif method == "app.stop":
+            self._set_state(app, "STOPPED")
+        elif method in ("app.upgrade", "app.rollback"):
+            app["version"] = str(options.get("app_version") or app["version"])
+        return None

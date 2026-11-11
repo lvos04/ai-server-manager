@@ -2,12 +2,12 @@
 
 - Koppelen alleen met een **koppelcode (30 min) + Hub-vingerafdruk** op de eigen statuspagina (§3.9); de Hub geeft voor
   de executor geen enrollment-token uit. Daarna geen koppelformulier meer: ontkoppelen/opnieuw koppelen vraagt een live
-  geverifieerde TrueNAS-schrijfkey tegen het vastgelegde NAS-adres + certificaat, en die bestaat pas in P2.
+  geverifieerde TrueNAS-schrijfkey tegen het vastgelegde NAS-adres + certificaat (``/beheer`` op de executorpagina).
 - Opslag in ``/appdata/secrets/hub-link.json`` (0600, atomair, onder ``hub-link.lock``), nooit in een database. Een
   onleesbaar bestand (geen geldige JSON, andere major, ontbrekende velden, verkeerde eigenaar of rechten) is
   **fail-closed** (§3.5): geen vertrouwen, geen formulier, ``koppelstatus_onleesbaar``; een gewone schrijfactie zet
-  het nooit stil terug. De executor heeft geen env-token (§3.9): herstel volgt met de live geverifieerde schrijfsleutel
-  (P2).
+  het nooit stil terug. De executor heeft geen env-token (§3.9): herstel gaat alleen met de live geverifieerde
+  schrijfsleutel (:meth:`HubLinkStore.reset`, aangeroepen door ``/beheer``).
 - Hub-sleutels worden gepind uit het enroll-antwoord; een via HTTP opgehaalde JWKS voegt nooit vertrouwen toe.
 - Aanroepen naar de Hub: ``http.client`` (geen redirects, geen proxy-omgeving), 5 s connect / 15 s read; de host
   wordt bij elke verbinding opgelost en gecontroleerd (§3.2) en de verbinding gaat naar precies dat adres.
@@ -60,7 +60,7 @@ ERRORS_NL = {
     "hub_incompatibel": "De Hub weigerde het verzoek als ongeldig (versies passen niet bij elkaar); er is niets "
     "opgeslagen.",
     "koppelstatus_onleesbaar": "De koppelstatus van de executor is onleesbaar. Hij vertrouwt de Hub niet en voert "
-    "niets uit. Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina; dat volgt in fase P2.",
+    "niets uit. Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub).",
     "hub_antwoord_ongeldig": "Het antwoord van de Hub voldeed niet aan het contract; er is niets opgeslagen.",
     "hub_vingerafdruk_onjuist": "De vingerafdruk klopt niet met de sleutels van deze Hub; er is niets opgeslagen.",
     "enroll_endpoint_ontbreekt": "Deze Hub-versie kent aanmelden niet.",
@@ -254,6 +254,23 @@ class HubLinkStore:
             yield data
             data["schema_version"] = SCHEMA_VERSION  # een dienst schrijft de versie van het contract dat hij volgt
             self._write(data)
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
+    def reset(self) -> None:
+        """Koppeling volledig wissen (terug naar ``nooit_gekoppeld``), ook als het bestand onleesbaar is. Alleen aan te
+        roepen na een live geverifieerde TrueNAS-schrijfkey op de executorpagina (contract 1.3 §3.9): dat is het bewijs
+        van TrueNAS-beheer. Pins, service-token en een lopende poging verdwijnen; daarna kan opnieuw worden gekoppeld
+        met een koppelcode."""
+        self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            with contextlib.suppress(FileNotFoundError):
+                # Een symlink of een bestand met verkeerde rechten nooit volgen of hergebruiken: eerst weg.
+                os.unlink(self.path)
+            self._write(empty_link())
         finally:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)

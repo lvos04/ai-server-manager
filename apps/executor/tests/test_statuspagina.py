@@ -107,19 +107,159 @@ def test_uitvoer_byte_gelijk_aan_de_referentie_renderer(link: dict[str, Any], mo
         assert c["toon"] in TONEN
 
 
-def test_gekoppeld_en_bevestigd_is_gereed_maar_nooit_groen() -> None:
-    html = executor_page(versie="0.1.0", link=LINKED, ready_checks=READY, csrf="", now=NOW)
-    assert "MEGG-8GFG-2E4Y-K2RQ" in html and 'name="csrf"' not in html and "gaat via de Hub" in html
-    assert "Ja — gekoppeld en bevestigd" in html
+ACTIES = ["app.restart", "app.stop", "zfs.snapshot.create"]
+BELEID = {"geladen": True, "hash": "sha256:" + "ab" * 32, "read_only": True, "toegestaan": True}
+NAS = {
+    "ingesteld": True,
+    "onleesbaar": False,
+    "nas_adres": "192.0.2.10",
+    "nas_poort": 443,
+    "tls_vingerafdruk": "0f" * 32,
+    "laatste4": "wxyz",
+    "ingesteld_op": "2026-11-10T09:00:00Z",
+    "rollen": ["FULL_ADMIN"],
+}
+
+
+def test_gekoppeld_en_bevestigd_is_gereed_maar_nooit_groen_zonder_schrijfsleutel() -> None:
+    html = executor_page(
+        versie="0.1.0", link=LINKED, ready_checks=READY, csrf="tok", now=NOW, allowlist=ACTIES, policy=BELEID
+    )
+    assert "MEGG-8GFG-2E4Y-K2RQ" in html and "gaat via de Hub" in html
+    assert "Ja — gekoppeld en bevestigd; voert niets uit zonder schrijfsleutel" in html
     # Totaal = slechtste controle (schrijfsleutel onbekend): nooit groen zolang de executor niets uitvoert.
     assert 'class="pil pil-onbekend"><svg aria-hidden="true"><use href="#i-onbekend"/></svg>Onbekend' in html
     assert 'class="knop knop-secundair" href="http://hub.invalid:30400">Hub openen' in html
-    # Toegestane acties: toon 'nog-niet' (zandloper), niet 'gate'.
-    assert 'pil-nog-niet"><svg aria-hidden="true"><use href="#i-nog-niet"/></svg>Nog niet beschikbaar' in html
+    # §3.9: zodra gekoppeld vraagt de pagina de schrijfsleutel; geen koppel- en geen beheerformulier.
+    assert 'action="/schrijfsleutel"' in html and 'name="csrf" value="tok"' in html
+    assert 'action="/koppelen"' not in html and 'action="/beheer"' not in html
+    assert 'pil-nog-niet"><svg aria-hidden="true"><use href="#i-nog-niet"/></svg>Niet ingesteld' in html
+    assert "zonder sleutel voert de executor niets uit" in html
+    # Toegestane acties: een feit uit het beleid in het image (toon 'beleid'), geen gezondheidsoordeel.
+    assert 'pil-beleid"><svg aria-hidden="true"><use href="#i-beleid"/></svg>3 acties' in html
+    assert "app.restart, app.stop, zfs.snapshot.create." in html and "Alleen-lezen" in html
+    assert "policy_hash sha256:" + "ab" * 32 in html
     niet_bevestigd = executor_page(
         versie="0.1.0", link={**LINKED, "confirmed_at": None}, ready_checks=READY, csrf="", now=NOW
     )
     assert "Nee — wacht op bevestiging door de Hub" in niet_bevestigd and "Niet bevestigd" in niet_bevestigd
+
+
+def test_met_schrijfsleutel_gezond_en_beheerformulier_zonder_de_sleutel() -> None:
+    html = executor_page(
+        versie="0.1.0", link=LINKED, ready_checks=READY, csrf="tok", now=NOW, nas=NAS, allowlist=ACTIES, policy=BELEID
+    )
+    assert 'class="pil pil-gezond"><svg aria-hidden="true"><use href="#i-gezond"/></svg>Gezond</span>' in html
+    assert "Ja — gekoppeld en bevestigd</dd>" in html
+    assert 'action="/beheer"' in html and 'action="/schrijfsleutel"' not in html and 'action="/koppelen"' not in html
+    # Alleen de laatste 4 tekens; eerlijk over wat getest is.
+    assert "Eindigt op wxyz. Live getest bij het instellen op 10-11-2026 09:00 UTC; daarna niet opnieuw getest." in html
+    assert "<code>wxyz</code>" in html
+    # Het vastgelegde NAS-adres en certificaat als feit.
+    assert 'pil-feit"><svg aria-hidden="true"><use href="#i-feit"/></svg>Vastgelegd' in html
+    assert "192.0.2.10, poort 443; TLS-vingerafdruk (SHA-256) 0F:0F:" in html
+    assert "Een ander adres of certificaat wordt geweigerd." in html
+
+
+def test_wacht_op_bevestiging_van_de_vingerafdruk() -> None:
+    html = executor_page(
+        versie="0.1.0",
+        link=LINKED,
+        ready_checks=READY,
+        csrf="tok",
+        now=NOW,
+        nas={"ingesteld": False, "onleesbaar": False, "wacht_op_bevestiging": True},
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    assert "Wacht op je bevestiging van de vingerafdruk van TrueNAS" in html and 'action="/schrijfsleutel"' in html
+
+
+def test_gestopt_na_een_afwijking_is_storing_met_herstelstap() -> None:
+    html = executor_page(
+        versie="0.1.0",
+        link=LINKED,
+        ready_checks=READY,
+        csrf="tok",
+        now=NOW,
+        nas=NAS,
+        gestopt={"code": "staat_verschilt", "at": "2026-11-10T11:00:00Z"},
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    assert 'class="pil pil-storing"><svg aria-hidden="true"><use href="#i-storing"/></svg>Storing' in html
+    assert "Gestopt" in html and "(code <code>executor_gestopt</code>)" in html
+    assert "Ja — gekoppeld en bevestigd; gestopt, voert niets uit" in html
+    assert "laat &#39;Nieuwe sleutel&#39; leeg en kies &#39;Sleutel vervangen&#39;" in html
+    journaal = executor_page(
+        versie="0.1.0",
+        link=LINKED,
+        ready_checks=READY,
+        csrf="tok",
+        now=NOW,
+        nas=NAS,
+        gestopt={"code": "journaal_niet_beschikbaar"},
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    assert (
+        "(code <code>journaal_niet_beschikbaar</code>)" in journaal and "Controleer de opslag van /appdata." in journaal
+    )
+
+
+def test_onleesbare_sleutelopslag_geen_formulieren() -> None:
+    html = executor_page(
+        versie="0.1.0",
+        link=LINKED,
+        ready_checks=READY,
+        csrf="tok",
+        now=NOW,
+        nas={"ingesteld": False, "onleesbaar": True},
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    assert (
+        "(code <code>sleutelopslag_onleesbaar</code>)" in html and "Storing — de opgeslagen TrueNAS-koppeling" in html
+    )
+    assert 'action="/schrijfsleutel"' not in html and 'action="/beheer"' not in html
+
+
+def test_beleid_onleesbaar_of_beschrijfbaar_is_nooit_groen() -> None:
+    kwargs: dict[str, Any] = {"versie": "0.1.0", "link": LINKED, "ready_checks": READY, "csrf": "tok", "now": NOW}
+    geen = executor_page(**kwargs, nas=NAS, allowlist=None, policy={"geladen": False})
+    assert "(code <code>policy_niet_beschikbaar</code>)" in geen and "Niet beschikbaar" in geen
+    assert (
+        'class="pil pil-gezond"><svg aria-hidden="true"><use href="#i-gezond"/></svg>Gezond</span><span class="sr">: '
+        not in geen
+    )
+    schrijfbaar = executor_page(
+        **kwargs, nas=NAS, allowlist=ACTIES, policy={**BELEID, "read_only": False, "toegestaan": False}
+    )
+    assert "(code <code>policy_niet_read_only</code>)" in schrijfbaar and "Beschrijfbaar" in schrijfbaar
+    assert "Gereed, maar het risicobeleid is niet bruikbaar" in schrijfbaar
+    ontwikkel = executor_page(
+        **kwargs, nas=NAS, allowlist=ACTIES, policy={**BELEID, "read_only": False, "toegestaan": True}
+    )
+    assert "Alleen voor ontwikkeling toegestaan (EXECUTOR_ALLOW_WRITABLE_POLICY)" in ontwikkel
+    assert "policy_niet_read_only" not in ontwikkel
+
+
+def test_onleesbaar_koppelbestand_met_sleutel_biedt_beheer_als_herstel() -> None:
+    html = executor_page(
+        versie="0.1.0",
+        link={"state": None, "_onleesbaar": True},
+        ready_checks=READY,
+        csrf="tok",
+        melding=onleesbaar_melding(sleutel_ingesteld=True),
+        now=NOW,
+        nas=NAS,
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    assert 'action="/beheer"' in html and 'action="/koppelen"' not in html and 'role="alert"' not in html
+    assert "daarna kun je opnieuw koppelen met een koppelcode" in html
+    zonder = onleesbaar_melding()
+    assert "nog geen TrueNAS-schrijfsleutel ingesteld" in zonder["tekst"] and "CUSTOM_APP.md" in zonder["tekst"]
 
 
 def test_niet_gekoppeld_heeft_eigen_toon_en_formulier_met_verplichte_velden() -> None:

@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from executorhelpers import AUD, UNLINK, Hub
+from executorhelpers import AUD, UNLINK, Hub, signed
 from executorhelpers import auth as _auth
 from executorhelpers import b64 as _b64
 from executorhelpers import client as _client
+from policyhelpers import HOST, proposal
 
 from executor.hublink import AuthFailed, HubLinkStore, verify_hub_jwt
 from executor.replay import ReplayCache, ReplayUnavailable
@@ -195,7 +196,8 @@ def test_authenticatie_voor_rol_idempotency_en_body(hub: Hub) -> None:
         assert r.status_code == 401, path
 
 
-def test_execute_eerst_aanmelden_dan_sleutel_dan_body_en_weigert_alles(hub: Hub) -> None:
+def test_execute_eerst_aanmelden_dan_sleutel_dan_body_en_weigert_alles(tmp_path: Path) -> None:
+    hub = Hub(tmp_path / "appdata", allow_writable_policy=True)
     c = _client(hub)
     # Gebruikers-JWT (ook admin) kan geen acties aanbieden: alleen de Hub met een dienst-JWT.
     admin = _auth(hub.user_jwt(["admin"]), str(uuid.uuid4()))
@@ -203,12 +205,21 @@ def test_execute_eerst_aanmelden_dan_sleutel_dan_body_en_weigert_alles(hub: Hub)
     assert r.status_code == 403 and r.json()["code"] == "forbidden"
     r = c.post("/api/v1/execute", json={"action_id": "app.restart"}, headers=_auth(hub.jwt()))
     assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required"
-    r = c.post("/api/v1/execute", json={"zonder": "action_id"}, headers=_auth(hub.jwt(), str(uuid.uuid4())))
-    assert r.status_code == 422 and r.json()["code"] == "validation_error"
+    # Geen JSON-object → validation_error; een object dat geen ondertekend ExecutionRequest is → geweigerd.
+    for inhoud in (b"{geen json", b"[1, 2]"):
+        kop = {**_auth(hub.jwt(), str(uuid.uuid4())), "content-type": "application/json"}
+        r = c.post("/api/v1/execute", content=inhoud, headers=kop)
+        assert r.status_code == 422 and r.json()["code"] == "validation_error", inhoud
+    for los in ({"zonder": "action_id"}, {"action_id": "app.restart"}, {"action_id": "shell.exec"}):
+        r = c.post("/api/v1/execute", json=los, headers=_auth(hub.jwt(), str(uuid.uuid4())))
+        assert r.status_code == 422 and r.json()["code"] == "execution_request_ongeldig", los
+    # Ook mét geldige handtekening van de Hub blijft een verboden actie geweigerd; de herhaling geeft hetzelfde
+    # antwoord (Idempotent-Replay) en voert niets opnieuw uit.
     token, key = hub.jwt(), str(uuid.uuid4())
-    first = c.post("/api/v1/execute", json={"action_id": "shell.exec"}, headers=_auth(token, key))
-    assert first.status_code == 403 and first.json()["code"] in ("action_not_allowed", "action_forbidden")
-    again = c.post("/api/v1/execute", json={"action_id": "shell.exec"}, headers=_auth(token, key))
+    verzoek = signed(hub, proposal("shell.exec", {"host_id": HOST}), risk_class="R3")
+    first = c.post("/api/v1/execute", json=verzoek, headers=_auth(token, key))
+    assert first.status_code == 403 and first.json()["code"] == "actie_geweigerd", first.text
+    again = c.post("/api/v1/execute", json=verzoek, headers=_auth(token, key))
     assert again.status_code == 403 and again.headers["Idempotent-Replay"] == "true"
     assert again.json() == first.json()
     # Geen tweede uitvoering met dezelfde jti voor een andere mutatie.
@@ -216,11 +227,24 @@ def test_execute_eerst_aanmelden_dan_sleutel_dan_body_en_weigert_alles(hub: Hub)
     assert r.status_code == 401 and r.json()["details"]["reason"] == "token_replayed"
 
 
+def test_execute_zonder_alleen_lezen_beleid_voert_niets_uit(hub: Hub) -> None:
+    """In de ontwikkelboom is ``policy/`` beschrijfbaar: zonder de expliciete ontwikkelinstelling weigert de executor
+    alles (fail-closed), ook een correct ondertekend verzoek."""
+    c = _client(hub)
+    verzoek = signed(hub, proposal("app.restart", {"host_id": HOST, "app_id": "my-house"}), risk_class="R1")
+    r = c.post("/api/v1/execute", json=verzoek, headers=_auth(hub.jwt(), str(uuid.uuid4())))
+    assert r.status_code == 503 and r.json()["code"] == "policy_niet_read_only", r.text
+
+
 # ------------------------------------------------------------------ statische Idempotency-Key-test (§5, C1.3-ASM-14)
 EXEMPT = {
     # Formulier-POST van een statuspagina: een browserformulier kan geen header meesturen; bescherming via het
     # formuliertoken, de herkomstcontrole, de pogingenlimiet, koppelen_bezig en de eenmaligheid van de koppelcode.
     "pair": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.9; RV10)",
+    # Idem voor de twee sleutelformulieren (§3.9): dezelfde regels als het koppelformulier, plus een live test van de
+    # TrueNAS-schrijfsleutel tegen het vastgelegde NAS-adres en certificaat vóór er iets verandert.
+    "write_key": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.9)",
+    "manage": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.9)",
 }
 
 
@@ -249,7 +273,7 @@ def test_elke_mutatie_vraagt_idempotency_key_na_de_authenticatie() -> None:
     import ast
 
     routes = _mutating_routes()
-    assert {"pair", "hub_link_unlink", "execute"} <= set(routes)
+    assert {"pair", "write_key", "manage", "hub_link_unlink", "execute"} <= set(routes)
     missing = []
     for name, fn in routes.items():
         if name in EXEMPT:
