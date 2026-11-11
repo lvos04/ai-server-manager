@@ -260,3 +260,87 @@ staat nog open: NIET GEVALIDEERD.
     bevindingen, axe 0. Dit staat ook in EVIDENCE.json (I23-23-08, B01-004).
 - `docs/screenshots/p1` toont nog de stand vóór deze review (`333de88`). De actuele afdrukken maakt `make web-review`
   (`apps/web/review/uit/shots`, niet in Git); de voor/na-selectie staat in `docs/ontwerp/review/`.
+
+---
+
+## Stap S-P2-005: teksten over de executor (11 november 2026)
+
+**Rol:** R-ONTWERP (ontwerpreview achteraf, alleen microcopy). **Bereik:** de twee tekstwijzigingen van stap S-P2-005
+in `apps/web/src/app/onboarding/executor/page.tsx` en `apps/web/src/app/instellingen/diensten/DienstenScreen.tsx`
+(`55bb5bb..31c19fc`, commit `8131e27`). Geen nieuw scherm, daarom geen ontwerpstap vooraf (stap S-P2-005, "Agents").
+**Toetsing aan:** Peil 1.1.1 (`docs/platform-v2/ONTWERPTAAL.md` §1, §4, §11, §12), `deploy/truenas/CUSTOM_APP.md`
+kop 5, `policy/acties.yaml` en de code van Hub en executor (zie "Feiten nagelopen").
+
+> **Eerlijkheid.** Gemeten in Chromium (Playwright) tegen de echte Hub-API, worker en database van de web-E2E-teststack
+> (`tests/e2e/web_stack.py`, `server/hub-server.mjs`, productie-build), met simulators voor TrueNAS en de bronnen:
+> **Sim-getest**. De toestand "koppelstatus onleesbaar" van de executor is in de teststack niet echt op te wekken
+> (de Hub vindt de executor niet in de nagebootste inventaris en meldt dan `dienst_adres_onbekend`). Daarvoor is in een
+> tijdelijke, niet gecommitte reviewtoestand alleen het antwoord van `GET /api/v1/services/{id}/koppelstatus`
+> onderschept, met precies de vorm die de Hub in die tak teruggeeft (`status: "onleesbaar"`). De executor zelf was echt
+> gekoppeld (browsertest `e2e/90-afsluiting.spec.ts`, "executor koppelen"). **NIET GEVALIDEERD:** echte NAS, echte
+> schermlezer, echte telefoon.
+
+### Feiten nagelopen (de tekst moet kloppen met wat de code doet)
+
+| Bewering in de tekst (stand `31c19fc`) | Wat de code zegt | Uitkomst |
+|---|---|---|
+| Vaste lijst "(apps starten, stoppen, herstarten, installeren, verwijderen zonder data, bijwerken en terugzetten, en snapshots maken)" | `policy/acties.yaml`, `uitvoerder: executor`: ook `zfs.snapshot.clone_to_sandbox`; `app.update` en `app.rollback` weigert de Hub zolang er geen herstelpunten per app zijn (`CUSTOM_APP.md` kop 5, `backup_checkpoint_ontbreekt`) | onvolledig, hersteld (T-01) |
+| "wijkt er iets af, dan stopt hij en volgt er een melding" | executor stopt (`executor_gestopt`) tot een beheerder hem op de statuspagina vrijgeeft; de Hub maakt een incident `actie.afwijking`, ernst kritiek (`hub/incidents/rules.py`) | vaag, hersteld (T-01) |
+| "Zolang de executor niet is gekoppeld, blijven de gates … dicht" | `hub/onboarding/gates.py`: beide gates vragen ook besluiten (D01–D03) of de gates `backup_gate` en `data_mutatie` | klopt, maar suggereert dat koppelen genoeg is; aangevuld (T-02) |
+| "Het beleid, de goedkeuringen en de uitvoering werken al via de Hub-API" | `CUSTOM_APP.md` kop 5 en ADR-0030 Open punten: zonder schermen is het voor een gebruiker niet te bedienen (`X-CSRF-Token`, `/api/docs`) | wekt een verkeerde verwachting, hersteld (T-03) |
+| Diensten, executor onleesbaar: "vul daar de TrueNAS-schrijfsleutel in, kies ‘Ontkoppelen van de Hub’" | `executor/statuspagina.py` `onleesbaar_melding`: dat kan alleen als er al een sleutel is ingesteld (blok "Ontkoppelen of sleutel vervangen"); zonder sleutel verwijst de statuspagina naar de installatie-instructies | klopte niet voor het geval zonder sleutel, hersteld (T-04) |
+| Kop "Status" boven een uitleg wat de executor doet | de sectie bevat geen status meer; de koppeltoestand staat in "2. Koppelen" | kop hernoemd naar "Wat de executor uitvoert" (zelfde woorden als de statuspagina: "Wat deze versie uitvoert") (T-05) |
+
+### Hersteld (alleen tekst; geen gedrag, gegevens of API)
+
+| # | Scherm | Was | Wordt |
+|---|---|---|---|
+| T-01 | Executor installeren en koppelen | lijst zonder klonen; "volgt er een melding" | volledige lijst incl. "een snapshot klonen naar een afgeschermde testdataset"; "Bijwerken en terugzetten weigert de Hub nog, tot er herstelpunten per app zijn."; bij een afwijking: incident onder Problemen en niets meer uitvoeren tot een beheerder hem op zijn statuspagina vrijgeeft |
+| T-02 | idem | alleen "blijven dicht" | plus "Koppelen alleen opent ze niet: ze hebben ook andere voorwaarden." |
+| T-03 | idem, melding "Schermen voor voorstellen en goedkeuren volgen later in fase P2" | "werken al via de Hub-API" | "zitten al in de Hub, maar … nog niet gebouwd. Tot die er zijn, kun je zelf nog geen actie voorstellen of goedkeuren." |
+| T-04 | Instellingen → Diensten, executor met onleesbare koppelstatus | één herstelweg | herstel met sleutel (blok ‘Ontkoppelen of sleutel vervangen’ → ‘Ontkoppelen van de Hub’ → nieuwe koppelcode) én het geval zonder sleutel |
+| T-05 | Executor installeren en koppelen | kop "Status" | kop "Wat de executor uitvoert" |
+
+### Metingen (na herstel)
+
+Gereedschap `apps/web/review/` (`peil-review.spec.ts`, `in-pagina.js`, `samenvat.mjs --streng`), breedtes 320, 360,
+390, 768, 1024 en 1440, licht en donker, met en zonder `PEIL_REVIEW_LETTER="DejaVu Sans"` (lettertype van de CI-runner).
+
+| Scherm / toestand | Metingen | axe (WCAG 2.2 A/AA) | Tekst min. | Overloop | Doelen < 44 px | Focus (390/1440) | Harde bevindingen |
+|---|---|---|---|---|---|---|---|
+| `executor-koppelen` (beheerder) | 12 + 12 | 0 | 9,32:1 | 0 | 0 (alleen de inline link "Wat mag nu?", uitgezonderd) | ring overal, niets bedekt, ring ≥ 8,34:1 | 0 |
+| `diensten` (beheerder; tweede run met gekoppelde executor) | 12 + 12 | 0 | 7,61:1 | 0 | 0 | ring overal, niets bedekt, ring ≥ 5,81:1 | 0 |
+| `kijker-diensten` | 12 + 12 | 0 | 8,34:1 | 0 | 0 | ring overal, niets bedekt, ring ≥ 8,34:1 | 0 |
+| `diensten-executor-onleesbaar` (tijdelijk, zie Eerlijkheid) | 12 + 12 | 0 | 7,61:1 | 0 | 0 | niet gemeten (de reviewtool slaat de Tab-doorloop over bij een toestand met interactie; de melding heeft geen bediening) | 0 |
+
+- **Peil-semantiek:** de melding "Koppelstatus onleesbaar" is `fout` (Storing: `octagon-x`, woord en vlak), zoals
+  Peil §13.2 voor onleesbaar voorschrijft; "Niet gekoppeld" blijft de stippelpil, "Gekoppeld" neutraal; geen groen.
+  De fase-melding gebruikt `hourglass` op `muted` (Nog niet beschikbaar).
+- **Microcopy (§11):** woordenlijstcontrole 0 treffers; geen "allowlist", "runbook" of Engelse statuswoorden;
+  rustige toon, eerst wat er is, dan waarom, dan wat je kunt doen.
+- **Afdrukken** (alle breedtes × thema's) met Read bekeken; niet in Git (`apps/web/review/uit/`).
+- **Volledige review (regressie, alle schermen):** zoals de CI (`PEIL_REVIEW_WORKERS=2 npx playwright test -c
+  playwright.review.config.ts` en `node review/samenvat.mjs --streng`): 57 schermen en toestanden, 676 metingen,
+  0 harde bevindingen, axe 0. Een extra lokale run met `PEIL_REVIEW_EXECUTOR_URL` (de executor-statuspagina, die de CI
+  niet meet) gaf 59 schermen, 700 metingen en 1 harde bevinding op `executor-statuspagina-fout`; zie O-S2-005-3.
+
+### Open (buiten het mandaat van deze review)
+
+- **O-S2-005-1 (belangrijk):** de statuspagina van de executor (`apps/executor/src/executor/statuspagina.py`,
+  `onleesbaar_melding` en de rij `sleutelopslag_onleesbaar`) en `apps/executor/README.md` verwijzen naar
+  "`deploy/truenas/CUSTOM_APP.md` (herstel)", maar dat document heeft geen herstelkop en noemt een onleesbaar
+  koppelbestand of een onleesbare sleutelopslag niet. Een beheerder zonder ingestelde schrijfsleutel heeft zo geen
+  beschreven herstelweg. Bestaat al sinds `b309042` (vóór deze stap). Voorstel: een kop "Herstel" in `CUSTOM_APP.md`
+  met de stappen voor beide toestanden, en de verwijzing daarop laten aansluiten.
+- **O-S2-005-2 (klein):** de intro van "Executor installeren en koppelen" (ongewijzigd in deze stap) zegt
+  "ondertekende, goedgekeurde acties uit uit een vaste lijst": "uit uit" leest stroef, en "goedgekeurd" is in Peil het
+  woord voor een menselijke goedkeuring (R2/R3), terwijl R1 automatisch binnen het beleid loopt. Voorstel bij de
+  volgende webstap: "Hij voert alleen acties uit een vaste lijst uit die de Hub heeft ondertekend — nooit shell, sudo
+  of Docker."
+- **O-S2-005-3 (klein):** de reviewcontrole "status alleen kleur" meldt op de executor-statuspagina na een mislukte
+  koppelpoging `input#koppelcode` en `input#vingerafdruk` (rand in `down`). Op de afdruk staat onder elk veld wel een
+  `octagon-x` met de fouttekst ("Koppelcode: 12 tekens in groepen van 4 …"), dus de status is niet alleen kleur; de
+  controle in `apps/web/review/in-pagina.js` (`semantiek`) ziet de fouttekst naast het veld niet. De statuspagina is in
+  deze stap niet gewijzigd (laatste wijziging `b309042`) en de CI meet haar niet. Voorstel: in `semantiek()` een veld
+  met `aria-invalid="true"` en een `aria-describedby` naar een zichtbare fouttekst niet als "alleen kleur" tellen, en
+  de executor-statuspagina ook in de CI-review meten.
