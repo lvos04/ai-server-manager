@@ -340,7 +340,8 @@ def test_inkomende_hub_jwt_redenen_en_volgorde() -> None:
         ("geen.jwt", {}, "invalid_token"),
         (_jws(key, "k1", _claims(sid, aud="home-control-hub")), {}, "invalid_token"),
         (_jws(key, "k1", _claims(sid, iss="nep")), {}, "invalid_token"),
-        (_jws(key, "k1", _claims(sid, exp=t + 121)), {}, "invalid_token"),  # exp − iat > 120 s
+        # exp − iat > 120 s. iat staat vast: anders verschuift hij mee als de seconde net omslaat (wisselvallige test).
+        (_jws(key, "k1", _claims(sid, iat=t, nbf=t, exp=t + 121)), {}, "invalid_token"),
         (_jws(key, "k1", _claims(sid, iat=t - 300, nbf=t - 300, exp=t - 240)), {}, "token_expired"),
         (_jws(key, "k1", _claims(sid, token_use=None)), {}, "token_use_invalid"),
         (_jws(key, "k1", _claims(sid, token_use="iets")), {}, "token_use_invalid"),
