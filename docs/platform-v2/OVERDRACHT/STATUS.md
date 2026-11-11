@@ -279,3 +279,12 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - **Extra's (C09):** de Android-app van MediaGuard krijgt ook en-US; my_house krijgt een tabelweergave + toetsenbordbediening
   bij de grafiek "Laatste 24 uur".
 - Nog open: BG-05 (vóór golf 3), BG-06/BG-18 (vóór P5), GHCR-pakketrechten MediaGuard (gebruiker), `JL_SYNC_PUSH_TOKEN`.
+
+## Uitvoeringsplan P2 tot en met P6 en de stand na ronde 3 (2026-11-11)
+
+- Bouwronde 3 is op 2026-11-11 afgebroken op verzoek van de gebruiker. De stand per repo (wat gepusht is, wat niet is
+  gereviewd, wat als half werk niet-gecommit in de werkmap staat) staat in `UITVOERINGSPLAN/STAND_RONDE3.md`.
+- Voor het vervolg is een uitvoeringsplan voor een regisseur met subagents geschreven: `UITVOERINGSPLAN/` (begin bij
+  `00_LEES_EERST.md`). **Het is een concept en NIET volledig gecontroleerd**: de onafhankelijke controle is afgebroken en
+  drie stapbestanden (P3 en beide P4-bestanden) zijn niet af. Eerste werk van de regisseur: `UITVOERINGSPLAN/PLAN_AFMAKEN.md`.
+- Het werkexemplaar met de bijgehouden voortgang staat op de bouwmachine in `/home/transcode/truenas-v2/.lokaal/plan/uit`.
