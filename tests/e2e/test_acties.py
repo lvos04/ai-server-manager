@@ -107,11 +107,13 @@ def test_r1_herstart_zonder_goedkeuring_met_readback(stack: Stack) -> None:
 
 
 def test_operator_voert_r1_uit_kijker_niet(stack: Stack) -> None:
+    """``jellyfin`` is hier een catalogusapp: stoppen blijft R1 (een Custom App stoppen is R2, zie
+    test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder)."""
     make_user(stack.admin, "oscar", "operator")
     make_user(stack.admin, "vera", "viewer")
     oscar, vera = login_as(stack.app, "oscar"), login_as(stack.app, "vera")
-    assert stel_voor(vera, "app.stop", app_target("my-house")).status_code == 403
-    r = stel_voor(oscar, "app.stop", app_target("my-house"))
+    assert stel_voor(vera, "app.stop", app_target("jellyfin")).status_code == 403
+    r = stel_voor(oscar, "app.stop", app_target("jellyfin"))
     assert r.status_code == 201, r.text
     v = r.json()
     assert v["actor"] == {"type": "user", "id": "oscar"} and v["risk_class"] == "R1"
@@ -119,12 +121,59 @@ def test_operator_voert_r1_uit_kijker_niet(stack: Stack) -> None:
     assert voer_uit(vera, v).status_code == 403
     r = voer_uit(oscar, v)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
-    assert stack.nas.app("my-house")["state"] == "STOPPED"
+    assert stack.nas.app("jellyfin")["state"] == "STOPPED"
     # Een voorstel namens iemand anders bestaat niet.
-    r = stel_voor(oscar, "app.start", app_target("my-house"), actor={"type": "user", "id": "beheerder"})
+    r = stel_voor(oscar, "app.start", app_target("jellyfin"), actor={"type": "user", "id": "beheerder"})
     assert r.status_code == 422 and r.json()["code"] == "actor_past_niet", r.text
-    r = stel_voor(oscar, "app.start", app_target("my-house"), actor={"type": "ai", "id": "oscar"})
+    r = stel_voor(oscar, "app.start", app_target("jellyfin"), actor={"type": "ai", "id": "oscar"})
     assert r.status_code == 422 and r.json()["code"] == "actor_past_niet", r.text
+
+
+TERUG_CUSTOM_APP = "alleen in de TrueNAS-web-UI"
+
+
+def test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Besluit van de gebruiker (2026-11-11; ADR-0030 besluit 21): een Custom App die het platform stopt, start het
+    daarna niet meer (``doel_niet_herkenbaar``). Daarom vraagt ``app.stop`` op een Custom App altijd een goedkeuring
+    van een beheerder (R2) en gebeurt hij nooit automatisch: een operator kan hem voorstellen maar niet goedkeuren of
+    uitvoeren, en ook een beheerder voert hem niet uit zonder goedkeuring. De preview zegt eerlijk dat weer starten
+    daarna alleen in de TrueNAS-web-UI kan. Een catalogusapp stoppen blijft R1, met "Starten met app.start."."""
+    admin, nas = stack.admin, stack.nas
+    make_user(admin, "oscar", "operator")
+    oscar = login_as(stack.app, "oscar")
+    naar_executor = _naar_executor(monkeypatch)
+    r = stel_voor(oscar, "app.stop", app_target("my-house"))
+    assert r.status_code == 201, r.text
+    v = r.json()
+    assert v["risk_class"] == "R2" and v["goedkeuring_nodig"] is True and v["status"] == "wacht_op_goedkeuring"
+    assert "STOP-EENRICHTING" in v["rule_ids"] and v["blokkades"] == []
+    assert v["preview"]["wijziging"] == {"soort": "stop", "app": "my-house", "verwacht": {"staat": "STOPPED"}}
+    assert TERUG_CUSTOM_APP in v["preview"]["terugdraaien"] and "doel_niet_herkenbaar" in v["preview"]["terugdraaien"]
+    assert "Starten met app.start" not in v["preview"]["terugdraaien"]
+    # Zonder goedkeuring voert niemand hem uit, en een operator keurt niet goed.
+    r = voer_uit(oscar, v)
+    assert r.status_code == 409 and r.json()["code"] == "goedkeuring_nodig", r.text
+    r = voer_uit(admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "goedkeuring_nodig", r.text
+    assert keur_goed(oscar, v).status_code == 403
+    assert naar_executor == [] and schrijfaanroepen(nas) == [] and nas.app("my-house")["state"] == "RUNNING"
+    # Met de goedkeuring van een beheerder: alleen een beheerder voert hem uit.
+    assert keur_goed(admin, v).status_code == 200
+    assert voer_uit(oscar, v).status_code == 403
+    r = voer_uit(admin, v)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert naar_executor == [v["request_id"]] and schrijfaanroepen(nas) == ["app.stop"]
+    assert nas.app("my-house")["state"] == "STOPPED"
+    # Een catalogusapp stoppen blijft R1: een operator voert het zonder goedkeuring uit, en starten kan weer.
+    r = stel_voor(oscar, "app.stop", app_target("jellyfin"))
+    assert r.status_code == 201, r.text
+    w = r.json()
+    assert w["risk_class"] == "R1" and w["goedkeuring_nodig"] is False and w["status"] == "klaar"
+    assert "STOP-EENRICHTING" not in w["rule_ids"] and w["preview"]["terugdraaien"] == "Starten met app.start."
+    assert voer_uit(oscar, w).status_code == 200 and nas.app("jellyfin")["state"] == "STOPPED"
+    assert schrijfaanroepen(nas) == ["app.stop", "app.stop"]
 
 
 def test_kritieke_app_is_r2_ook_als_de_aanvrager_r0_claimt(stack: Stack) -> None:
@@ -557,6 +606,7 @@ def test_gestopte_custom_app_kan_niet_via_het_platform_starten_een_catalogusapp_
     te herkennen aan zijn catalogusnaam (hier ``jellyfin``) en start gewoon (R1)."""
     admin, nas = stack.admin, stack.nas
     v = stel_voor(admin, "app.stop", app_target("my-house")).json()
+    assert v["risk_class"] == "R2" and keur_goed(admin, v).status_code == 200  # Custom App stoppen: R2
     assert voer_uit(admin, v).status_code == 200 and nas.app("my-house")["state"] == "STOPPED"
     r = stel_voor(admin, "app.start", app_target("my-house"))
     assert r.status_code == 403 and "doel_niet_herkenbaar" in _codes(r.json()["details"]), r.text
@@ -932,6 +982,7 @@ def test_afwijking_stopt_alles_en_wordt_een_incident(stack: Stack, periodic_run:
     admin, nas = stack.admin, stack.nas
     nas.silent_noop.add("app.stop")  # TrueNAS meldt succes, maar de app draait nog
     v = stel_voor(admin, "app.stop", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200  # Custom App stoppen: R2
     r = voer_uit(admin, v)
     assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
     nu = haal(admin, v)

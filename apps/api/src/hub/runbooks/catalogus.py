@@ -142,7 +142,15 @@ RUNBOOKS: tuple[Runbook, ...] = (
                 "/api/v1/backups/coverage",
             ),
         ),
-        mitigeren=(V("Stop de app om verdere schade te voorkomen.", "app.stop", "R1"),),
+        mitigeren=(
+            V(
+                "Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit een goedkeuring van een "
+                "beheerder (R2), en daarna weigert het platform app.rollback en app.start op die app "
+                "(doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI.",
+                "app.stop",
+                "R1",
+            ),
+        ),
         terugdraaien=(
             V(
                 "Een tag-terugzet alleen als de migratie niets schreef; anders is herstel van de database nodig "
@@ -176,9 +184,21 @@ RUNBOOKS: tuple[Runbook, ...] = (
         ),
         mitigeren=(
             H("Ruim op via de eigenaar van de data (MediaGuard/MSO); de Hub verwijdert nooit zelf media of datasets."),
-            V("Pauzeer een niet-kritieke, schrijvende app.", "app.stop", "R1"),
+            V(
+                "Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit een goedkeuring van een "
+                "beheerder (R2) en start de app daarna alleen weer in de TrueNAS-web-UI.",
+                "app.stop",
+                "R1",
+            ),
         ),
-        terugdraaien=(V("Start de gepauzeerde app weer als er genoeg ruimte is.", "app.start", "R1"),),
+        terugdraaien=(
+            V("Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is.", "app.start", "R1"),
+            H(
+                "Een gepauzeerde Custom App start je zelf in de TrueNAS-web-UI: het platform ziet bij een gestopte "
+                "Custom App niet wat erin draait en weigert app.start (doel_niet_herkenbaar).",
+                "TrueNAS-web-UI",
+            ),
+        ),
         bewijs=(L("Leg pool.gebruik vóór en na vast (grafiek of waarden).", "/api/v1/metrics/query"),),
         oorzaak=(H("Leg vast wat de ruimte opat en welke grens of retentie moet veranderen."),),
         test_na_herstel=(

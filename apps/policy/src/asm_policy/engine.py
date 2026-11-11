@@ -91,6 +91,10 @@ class Herkenning:
 
     apps: tuple[str, ...]
     volledig: bool
+    # Blijft de app na ``app.stop`` herkenbaar? Alleen een catalogusapp: zijn catalogusnaam zegt ook zonder image wat
+    # erin draait. Een Custom App (ix-app of compose) toont gestopt geen image meer; het platform kan hem dan niet
+    # meer starten (``DOEL_ONHERKENBAAR``). Daarom is ``app.stop`` daar R2 (``STOP_EENRICHTING``).
+    na_stop_herkenbaar: bool = True
 
 
 DOEL_ONHERKENBAAR = Blokkade(
@@ -100,6 +104,10 @@ DOEL_ONHERKENBAAR = Blokkade(
     "platform kan dan niet uitsluiten dat het Emby, MediaGuard of de mediaserver is en weigert elke actie op deze "
     "app, ook met goedkeuring.",
 )
+# Besluit van de gebruiker (2026-11-11; ADR-0030 besluit 21): een Custom App die het platform stopt, kan het daarna
+# niet meer starten. Stoppen is daar dus eenrichtingsverkeer: altijd R2 (goedkeuring van een beheerder), nooit
+# automatisch, ook niet op voorstel van de AI, een flow of een runbook. Een catalogusapp blijft R1.
+STOP_EENRICHTING = "STOP-EENRICHTING"
 
 
 def max_class(*classes: str) -> str:
@@ -150,12 +158,15 @@ def herken_app(
 
     Bestaat de app (``app``), dan tellen de naam, de catalogusapp en de images die TrueNAS toont. Volledig is de
     herkenning alleen als er een image te zien is of als de catalogusapp zegt wat er draait; anders niet (dicht bij
-    twijfel). Bestaat de app nog niet (installeren), dan tellen de naam en de image die geïnstalleerd gaat worden."""
+    twijfel). Na een stop blijft alleen een catalogusapp herkenbaar (``na_stop_herkenbaar``). Bestaat de app nog
+    niet (installeren), dan tellen de naam en de image die geïnstalleerd gaat worden."""
     if app is None:
         return Herkenning(recognize_all(policy, name, [i for i in verwachte_images if i]), True)
     images = app_images(app)
     catalogus = catalogus_app(app)
-    return Herkenning(recognize_all(policy, name, images, catalogus=catalogus or None), bool(images or catalogus))
+    return Herkenning(
+        recognize_all(policy, name, images, catalogus=catalogus or None), bool(images or catalogus), bool(catalogus)
+    )
 
 
 def recognize(policy: Policy, name: str | None, images: Iterable[str] = ()) -> str | None:
@@ -239,6 +250,9 @@ def classify(
     if kritiek and actie.klasse_kritiek:
         klasse = max_class(klasse, actie.klasse_kritiek)
         rules.append(f"KRITIEK:{kritieke[0]}")
+    if aid == "app.stop" and isinstance(herkend_als, Herkenning) and not herkend_als.na_stop_herkenbaar:
+        klasse = max_class(klasse, "R2")
+        rules.append(STOP_EENRICHTING)
     for b in policy.beschermd:
         if b.app in herkend and (b.acties is None or aid in b.acties):
             rules.append(b.id)

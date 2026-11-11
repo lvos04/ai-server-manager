@@ -338,6 +338,64 @@ def test_executor_en_hub_geven_een_onvolledige_herkenning_door_aan_de_weigering(
     assert [b["code"] for b in w.details["blokkades"]] == ["doel_niet_herkenbaar"]
 
 
+def test_stoppen_van_een_custom_app_vraagt_goedkeuring_een_catalogusapp_niet() -> None:
+    """Besluit van de gebruiker (2026-11-11; ADR-0030 besluit 21): een Custom App die het platform stopt, kan het
+    daarna niet meer starten (``doel_niet_herkenbaar``). Daarom is ``app.stop`` op een Custom App R2: altijd een
+    goedkeuring van een beheerder, ook op voorstel van de AI of een flow, nooit automatisch. Een catalogusapp blijft
+    gestopt herkenbaar aan zijn catalogusnaam en ``app.stop`` blijft daar R1. Hub en executor rekenen dit allebei
+    zelf uit (``check_decision``)."""
+    custom = herken_app(POLICY, "my-house", _readback("my-house", "RUNNING", ["ghcr.io/lvos04/my_house:0.1.0"]))
+    assert custom.volledig and not custom.na_stop_herkenbaar
+    for actor in ("user", "ai", "flow"):
+        c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type=actor, herkend_als=custom)
+        assert not c.geweigerd and c.risk_class == "R2" and c.requires_approval, actor
+        assert "STOP-EENRICHTING" in c.rule_ids, actor
+    # Alleen stoppen: starten en herstarten van dezelfde Custom App blijven R1.
+    for aid in ("app.start", "app.restart"):
+        c = classify(POLICY, action_id=aid, target=APP, parameters={}, actor_type="user", herkend_als=custom)
+        assert not c.geweigerd and c.risk_class == "R1" and not c.requires_approval, aid
+    # Een compose-app en een Custom App zonder bekende naam net zo.
+    for app in (
+        _readback("web", "RUNNING", ["ghcr.io/x/web:1"], catalogus="", custom=True),
+        _readback("iets-anders", "RUNNING", ["ghcr.io/x/y:1"]),
+    ):
+        h = herken_app(POLICY, str(app["name"]), app)
+        assert h.volledig and not h.na_stop_herkenbaar, app
+        c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=h)
+        assert c.risk_class == "R2" and c.requires_approval and "STOP-EENRICHTING" in c.rule_ids, app
+    # Een catalogusapp: draaiend én gestopt R1, zonder goedkeuring.
+    for staat, images in (("RUNNING", ["jellyfin/jellyfin:10.11.0"]), ("STOPPED", [])):
+        jf = herken_app(POLICY, "films", _readback("films", staat, images, catalogus="jellyfin"))
+        assert jf.volledig and jf.na_stop_herkenbaar
+        c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=jf)
+        assert not c.geweigerd and c.risk_class == "R1" and not c.requires_approval, staat
+        assert "STOP-EENRICHTING" not in c.rule_ids
+    # Beschermd blijft beschermd: Emby als Custom App met een Emby-image wordt geweigerd, ook met goedkeuring.
+    emby = herken_app(POLICY, "mediaserver", _readback("mediaserver", "RUNNING", ["docker.io/emby/embyserver:4.9"]))
+    c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=emby)
+    assert c.geweigerd and "emby_nooit_door_platform" in [b.code for b in c.blokkades]
+    # Zonder readback (stap 1 in Hub en executor) blijft app.stop R1: de readback maakt het alleen strenger.
+    kaal = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user")
+    assert kaal.risk_class == "R1" and not kaal.requires_approval
+    # Executor-kant: een R1-verzoek is te laag; R2 zonder goedkeuring ontbreekt die; met goedkeuring gaat het door.
+    prop = proposal("app.stop", {"host_id": HOST, "app_id": "my-house"}, {})
+    key = Ed25519PrivateKey.generate()
+    req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R1", now=NU)
+    _a, _c, w = check_decision(POLICY, req, now=NU, herkend_als=custom, uitvoerder="executor")
+    assert w is not None and w.code == "risicoklasse_te_laag"
+    req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R2", now=NU)
+    _a, _c, w = check_decision(POLICY, req, now=NU, herkend_als=custom, uitvoerder="executor")
+    assert w is not None and w.code == "goedkeuring_ontbreekt"
+    approval = approval_for(prop, policy_hash=POLICY.hash, risk_class="R2", now=NU)
+    req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R2", approval=approval, now=NU)
+    _a, eigen, w = check_decision(POLICY, req, now=NU, herkend_als=custom, uitvoerder="executor")
+    assert w is None and eigen is not None and eigen.risk_class == "R2"
+    # Dezelfde catalogusapp als R1 zonder goedkeuring: geen weigering.
+    req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R1", now=NU)
+    _a, eigen, w = check_decision(POLICY, req, now=NU, herkend_als=jf, uitvoerder="executor")
+    assert w is None and eigen is not None and eigen.risk_class == "R1"
+
+
 # ------------------------------------------------------------------ doel en parameters
 def test_doelschema() -> None:
     restart = POLICY.acties["app.restart"]

@@ -21,6 +21,7 @@ from executorhelpers import (
     READ_KEY,
     WRITE_KEY,
     Hub,
+    approved,
     execute,
     nas_hub,
     set_write_key,
@@ -444,7 +445,8 @@ def test_vrijgeven_na_een_afwijking(hub: Hub, nas: FakeTrueNAS) -> None:
         {"host_id": HOST, "app_id": "my-house"},
         expected_version=app_etag(nas.app("my-house"), nas.data["app.image.query"]),
     )
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    # my-house is een Custom App: stoppen is R2 en vraagt een goedkeuring (ADR-0030 besluit 21).
+    r = execute(c, hub, approved(hub, prop, risk_class="R2"))
     assert r.status_code == 409 and r.json()["code"] == "afwijking"
     nas.silent_noop.clear()
     pagina = c.get("/").text

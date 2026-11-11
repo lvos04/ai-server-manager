@@ -139,7 +139,16 @@ def _wijziging(actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[s
     return {"soort": aid}
 
 
-def _terugdraaien(aid: str) -> str:
+TERUG_STOP_CUSTOM_APP = (
+    "Niet via het platform. Een gestopte Custom App toont in TrueNAS geen image meer; het platform kan dan niet zien "
+    "wat erin draait en weigert app.start (doel_niet_herkenbaar). Weer starten kan daarna alleen in de TrueNAS-web-UI."
+)
+
+
+def _terugdraaien(aid: str, doel: Doel) -> str:
+    if aid == "app.stop" and not doel.herkend_als.na_stop_herkenbaar:
+        # ADR-0030 besluit 21: daarom is dit R2 en vraagt het altijd een goedkeuring van een beheerder.
+        return TERUG_STOP_CUSTOM_APP
     return {
         "app.install": "Verwijderen met app.uninstall (alleen de containers); de aangemaakte data blijft staan.",
         "app.uninstall": "Opnieuw installeren met app.install en dezelfde opslag; de data is niet verwijderd.",
@@ -182,6 +191,6 @@ def bouw(
         "huidig": doel.staat,
         "wijziging": _wijziging(actie, target, parameters, doel),
         "dataretentie": DATA_BLIJFT,
-        "terugdraaien": _terugdraaien(actie.action_id),
+        "terugdraaien": _terugdraaien(actie.action_id, doel),
     }
     return preview, canonical_sha256(preview)

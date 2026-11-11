@@ -127,11 +127,38 @@ def test_stoppen_en_starten_geven_een_nieuwe_etag(stack: Stack) -> None:
     assert r.json()["resource_etag"] == etag(nas, "films")
     r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "films"), risk_class="R1"))
     assert r.status_code == 200 and r.json()["resource_etag"] == voor, r.text
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
     assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
     r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "my-house"), risk_class="R1"))
     assert r.status_code == 403 and r.json()["details"]["blokkades"][0]["code"] == "doel_niet_herkenbaar", r.text
     assert writes(nas) == ["app.stop", "app.start", "app.stop"]
+
+
+def test_stoppen_van_een_custom_app_alleen_met_goedkeuring_van_een_beheerder(stack: Stack) -> None:
+    """Besluit van de gebruiker (2026-11-11; ADR-0030 besluit 21): een Custom App die het platform stopt, start het
+    daarna niet meer (``doel_niet_herkenbaar``). De executor dwingt daarom zelf af dat ``app.stop`` op een Custom App
+    R2 is: met R1 in het verzoek, met R2 zonder goedkeuring, of op voorstel van de AI zonder goedkeuring gebeurt er
+    niets. Met een goedkeuring van een beheerder stopt de app. Een catalogusapp stopt als R1, zoals het was."""
+    hub, c, nas = stack
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R1"))
+    assert r.status_code == 403 and r.json()["code"] == "risicoklasse_te_laag", r.text
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
+    assert r.status_code == 403 and r.json()["code"] == "goedkeuring_ontbreekt", r.text
+    ai = app_prop(nas, "app.stop", "my-house")
+    ai["actor"] = {"type": "ai", "id": "runner"}
+    r = execute(c, hub, signed(hub, ai, risk_class="R2"))
+    assert r.status_code == 403 and r.json()["code"] == "goedkeuring_ontbreekt", r.text
+    app = nas.app("my-house")
+    assert writes(nas) == [] and app is not None and app["state"] == "RUNNING"
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
+    assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
+    assert r.json()["methode"] == "app.stop" and writes(nas) == ["app.stop"]
+    nas.data["app.query"].append(
+        _app("films", "RUNNING", "jellyfin/jellyfin:10.11.0", 30013, 8096, "/mnt/t/f", "/c", catalog_app="jellyfin")
+    )
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "films"), risk_class="R1"))
+    assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
+    assert writes(nas) == ["app.stop", "app.stop"]
 
 
 def test_exacte_herhaling_met_hetzelfde_token_geeft_hetzelfde_antwoord(stack: Stack) -> None:
@@ -777,7 +804,7 @@ def test_mislukte_job_zonder_wijziging_is_geen_afwijking(stack: Stack) -> None:
 def test_job_die_slaagt_zonder_iets_te_doen_is_een_afwijking(stack: Stack) -> None:
     hub, c, nas = stack
     nas.silent_noop.add("app.stop")
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
     assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
     d = r.json()["details"]
     assert d["reden"] == "staat_verschilt" and d["gestopt"] is True
@@ -804,7 +831,7 @@ def test_mislukte_job_met_gewijzigde_toestand_is_een_afwijking(stack: Stack) -> 
         return job_id
 
     nas._write = half  # type: ignore[method-assign]
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
     assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
     assert r.json()["details"]["reden"] == "uitkomst_onbekend" and r.json()["details"]["gestopt"] is True
 
