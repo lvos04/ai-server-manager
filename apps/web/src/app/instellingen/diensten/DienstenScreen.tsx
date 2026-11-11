@@ -96,7 +96,7 @@ function KoppelstatusBijDienst({ d }: { d: Dienst }) {
           <p>
             De dienst kan zijn koppelbestand niet lezen en vertrouwt de Hub daarom niet.{" "}
             {d.app_id === EXECUTOR
-              ? "De executor koppelt niet met een token: herstel volgt in fase P2 met de TrueNAS-schrijfsleutel op de executorpagina."
+              ? "De executor koppelt niet met een token. Herstel op de statuspagina van de executor zelf: vul daar de TrueNAS-schrijfsleutel in, kies ‘Ontkoppelen van de Hub’ en koppel opnieuw met een nieuwe koppelcode."
               : "Herstel: maak een nieuw enrollment-token en zet het in de instellingen van de app."}
           </p>
         </Melding>

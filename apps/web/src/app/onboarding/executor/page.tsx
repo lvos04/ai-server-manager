@@ -17,11 +17,13 @@ export default function Page() {
         <section className="card stack" aria-labelledby="status" data-testid="executor-status">
           <h2 id="status">Status</h2>
           <p>
-            In deze fase voert de executor nog niets uit: zijn lijst met toegestane acties is leeg en weigert alles. Koppelen kan wel
-            al (hieronder); uitvoeren volgt in fase P2 met voorstel, beleid en goedkeuring.
+            De executor voert alleen door de Hub ondertekende acties uit een vaste lijst uit (apps starten, stoppen, herstarten,
+            installeren, verwijderen zonder data, bijwerken en terugzetten, en snapshots maken). Hij controleert elk verzoek zelf
+            opnieuw en leest na afloop terug of de wijziging klopt; wijkt er iets af, dan stopt hij en volgt er een melding.
           </p>
           <p>
-            Daardoor blijven de gates ‘Apps installeren’ en ‘R2/R3-acties’ dicht. Zie <Link href="/onboarding">Wat mag nu?</Link>
+            Zolang de executor niet is gekoppeld, blijven de gates ‘Apps installeren’ en ‘R2/R3-acties’ dicht. Zie{" "}
+            <Link href="/onboarding">Wat mag nu?</Link>
           </p>
         </section>
         <section className="card stack" aria-labelledby="installeren">
@@ -63,8 +65,11 @@ export default function Page() {
             </li>
           </ol>
           <ExecutorKoppelen />
-          <Melding soort="nogniet" titel="Acties uitvoeren volgt in fase P2">
-            <p>Ook gekoppeld voert de executor niets uit tot de policy-engine en goedkeuring er zijn.</p>
+          <Melding soort="nogniet" titel="Schermen voor voorstellen en goedkeuren volgen later in fase P2">
+            <p>
+              Het beleid, de goedkeuringen en de uitvoering werken al via de Hub-API. De schermen om een actie voor te stellen, de
+              preview te bekijken en goed te keuren zijn nog niet gebouwd.
+            </p>
           </Melding>
         </section>
       </div>
