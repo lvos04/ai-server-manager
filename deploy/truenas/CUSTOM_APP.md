@@ -195,6 +195,10 @@ uitvoeren, dan vervalt de goedkeuring en volgt een nieuwe preview.
   elke wijziging aan Emby. Emby wordt herkend aan de appnaam, de catalogusapp en de image. Van een gestopte Custom App
   toont TrueNAS geen image; dan is niet uit te sluiten dat het Emby, MediaGuard of de mediaserver is, en weigert het
   platform elke actie op die app (`doel_niet_herkenbaar`), ook met goedkeuring.
+- **Een Custom App stoppen vraagt altijd een goedkeuring (R2)** en gebeurt nooit automatisch, ook niet op voorstel
+  van de AI of via een runbook. Elke app die het platform installeert, is een Custom App, en na het stoppen kan het
+  platform zo'n app niet meer starten (zie hierboven). De preview zegt dat eerlijk: weer starten kan daarna alleen in
+  de TrueNAS-web-UI (Apps). Een catalogusapp stoppen en starten blijft R1.
 - **Geblokkeerd tot het is opgelost:** pool niet gezond of onbekend, back-up niet groen, executor niet gekoppeld,
   noodstop aan. Zo'n blokkade is niet weg te klikken, ook niet door een beheerder.
 - **Verwijderen van een app** haalt alleen de containers weg; datasets en data blijven staan.

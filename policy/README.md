@@ -16,6 +16,11 @@ Regels:
 - **`policy_hash`** = `sha256` over `asm-policy-hash-v1\n` en per `*.yaml` (op naam gesorteerd) naam, lengte en
   inhoud. Elke byte telt; dit README-bestand telt niet mee.
 - Een ongeldig of onleesbaar bestand → de dienst laadt geen beleid en voert niets uit (fail-closed).
+- Twee regels staan niet in de yaml maar vast in de engine (`asm_policy.engine`), omdat ze van de eigen readback van
+  het doel afhangen: `DOEL-ONHERKENBAAR` (van een bestaande app is niet te zien wat erin draait, zoals een gestopte
+  Custom App → elke actie geweigerd, ook met goedkeuring) en `STOP-EENRICHTING` (`app.stop` op een app die na het
+  stoppen niet meer herkenbaar is, dus elke Custom App → altijd R2: goedkeuring van een beheerder, nooit
+  automatisch; een catalogusapp blijft R1). Besluit van de gebruiker, 2026-11-11; ADR-0030 besluit 21.
 - `risk_claim` van AI of flow wordt nooit gelezen (EX18). Een onbekende `action_id` → `422`.
 - Er bestaat nooit een shell-, sudo-, exec-, Docker-, cron- of vrije-tekstactie, en geen actie die data, datasets,
   snapshots of media verwijdert.

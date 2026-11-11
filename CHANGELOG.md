@@ -10,6 +10,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   en genegeerd). Onbekende, destructieve en shell-achtige acties en elke boilerschakeling worden altijd geweigerd;
   Emby en andere beschermde apps worden herkend op naam, catalogusapp én image; is van een bestaande app niet te zien
   wat erin draait (een gestopte Custom App: TrueNAS toont dan geen image), dan wordt elke actie erop geweigerd.
+  Daarom vraagt `app.stop` op een Custom App altijd een goedkeuring van een beheerder (R2) en gebeurt hij nooit
+  automatisch; de preview en de runbooks zeggen dat weer starten daarna alleen in de TrueNAS-web-UI kan. Een
+  catalogusapp stoppen blijft R1.
 - **Executor (B02-006):** TrueNAS-sleutel met schrijfrechten op de executorpagina (adres en vingerafdruk tonen en
   bevestigen, daarna live testen en versleuteld opslaan); `POST /api/v1/execute` controleert zelf opnieuw handtekening,
   vervaltijd, nonce (eigen SQLite), allowlist, parameterschema, `policy_hash`, risicoklasse en precondities; TrueNAS

@@ -142,6 +142,17 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     MediaGuard of de mediaserver onder een andere naam zijn. Gevolg: een gestopte Custom App start, wijzigt of
     verwijdert het platform niet. Hub en executor gebruiken dezelfde functie (`herken_app`) op hun eigen readback; de
     nagebootste TrueNAS in de tests geeft bij een gestopte app dezelfde lege `active_workloads`.
+    **Stoppen van een Custom App is daarom eenrichtingsverkeer** (besluit van de gebruiker, 2026-11-11: "stoppen met
+    goedkeuring"). Elke app die het platform zelf installeert, is een Custom App; na `app.stop` kan het platform zo'n
+    app niet meer starten. Daarom is `app.stop` op een app die na het stoppen niet meer herkenbaar is (geen
+    catalogusapp: ix-app of compose) altijd R2 (`STOP-EENRICHTING`, in de engine; `policy/*.yaml` en de
+    `policy_hash` zijn ongewijzigd): een goedkeuring van een beheerder is verplicht en de stop gebeurt nooit
+    automatisch, ook niet op voorstel van de AI, een flow of een runbook. Hub en executor rekenen dit allebei zelf
+    uit; een verzoek met R1 weigert de executor (`risicoklasse_te_laag`). De preview zegt bij "terugdraaien" eerlijk
+    dat weer starten daarna alleen in de TrueNAS-web-UI kan, en de runbooks (`schijf_vol`, `db_migratie_mislukt`)
+    zeggen dat ook. `app.stop` op een catalogusapp blijft R1: die blijft gestopt herkenbaar en start gewoon weer.
+    Aan de beschermde regels (Emby nooit; MediaGuard en de mediaserver geen update, terugzet of verwijdering zonder
+    bewijs) verandert niets.
 22. **Fout mét of zonder vastlegging.** Een weigering die de toestand van het verzoek verandert (goedkeuring vervallen,
     voorstel verlopen, uitvoering mislukt, afwijking, uitkomst onbekend) wordt samen met die wijziging vastgelegd en
     is daarna het idempotente antwoord op dezelfde sleutel. Elke andere fout laat de database ongemoeid.
