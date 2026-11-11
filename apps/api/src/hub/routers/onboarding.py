@@ -18,10 +18,11 @@ from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.inventory.store import kind_state
-from hub.models import Decision
+from hub.models import Decision, Service
 from hub.onboarding import gates as gates_mod
 from hub.onboarding import service
 from hub.onboarding.catalog import BY_ID, DECISIONS
+from hub.registry import EXECUTOR_APP_ID
 from hub.timeutil import iso, utcnow
 from hub.truenas.client import display_fingerprint, fetch_server_fingerprint, normalize_fingerprint
 from hub.truenas.connection import API_KEY_REF, connection_row, current_target, record_test, run_collect
@@ -226,7 +227,11 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
         if b and b.finished_at
         else None,
         eigen_backup_max_age_seconds=settings.self_backup_interval_seconds + 2 * 3600,
-        executor_gekoppeld=False,  # koppelen van de executor volgt in fase P2
+        # Gekoppeld = een actieve registratie van de executor (koppeling afgerond op zijn eigen statuspagina, §3.9).
+        executor_gekoppeld=db.scalars(
+            select(Service.id).where(Service.app_id == EXECUTOR_APP_ID, Service.status == "active")
+        ).first()
+        is not None,
     )
 
 

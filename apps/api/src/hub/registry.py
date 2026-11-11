@@ -18,6 +18,8 @@ from hub.models import Decision, Service
 from hub.truenas.connection import current_target
 
 OWN_IMAGE_PREFIX = "ghcr.io/lvos04/"
+# App-id van de executor (contract §3.9): de enige dienst die ondertekende uitvoerverzoeken krijgt.
+EXECUTOR_APP_ID = "ai-server-manager-executor"
 # Containerpoorten uit contract §2 (de hostpoort is een voorstel en wordt altijd gemeten).
 CONTAINER_PORTS = {
     "ai-server-manager": 30400,

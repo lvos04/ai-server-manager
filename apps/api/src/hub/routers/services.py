@@ -35,7 +35,13 @@ from hub.errors import HubError
 from hub.keys import ROTATION_SEQUENCE, KeyRing, jwk_thumbprint
 from hub.models import EnrollmentGrant, Service, ServiceToken
 from hub.outbound import OutboundError, validate_base_url
-from hub.registry import app_name_candidates, app_name_for, measured_apps, service_base_url
+from hub.registry import (
+    EXECUTOR_APP_ID,
+    app_name_candidates,
+    app_name_for,
+    measured_apps,
+    service_base_url,
+)
 from hub.scopes import scopes_for
 from hub.security import (
     clear_failures,
@@ -55,7 +61,6 @@ from hub.vault import last4
 router = APIRouter(prefix="/api/v1/services", tags=["diensten en enrollment"])
 
 ENROLL_SCHEMA_VERSION = "1.3"
-EXECUTOR_APP_ID = "ai-server-manager-executor"
 # TrueNAS-appnaampatroon (contract 1.3 §3.3), 1–40 tekens.
 TRUENAS_APP_NAME = r"^[a-z]([-a-z0-9]*[a-z0-9])?$"
 ENROLLMENT_TOKEN = r"^enr_[A-Za-z0-9_-]{43}$"  # noqa: S105 — patroon, geen geheim

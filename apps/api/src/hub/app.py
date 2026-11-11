@@ -20,6 +20,7 @@ from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
 from hub.onboarding.service import seed
 from hub.routers import (
+    actions,
     alerts,
     auth,
     backups,
@@ -169,6 +170,11 @@ OPENAPI_TAGS = [
         "description": "Incidenten-inbox (B01-005): dedupe, correlatie, hypothese met bewijs, readback, snooze.",
     },
     {
+        "name": "acties en goedkeuringen",
+        "description": "Voorstel → policy (R0–R3) → preview → gebonden goedkeuring → ondertekend verzoek naar de "
+        "executor (B01-007, B02-005/006). De Hub wijzigt zelf niets op de NAS.",
+    },
+    {
         "name": "logs",
         "description": "Log-index (B09-004): alleen geschoonde, begrensde regels; zoeken en supportbundel.",
     },
@@ -276,6 +282,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         backups.router,
         incidents.router,
         runbooks.router,
+        actions.router,
         logs.router,
         events.router,
     ):

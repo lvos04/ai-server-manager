@@ -28,6 +28,29 @@
         "title": "Actor",
         "type": "object"
       },
+      "ActorIn": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "ActorIn",
+        "type": "object"
+      },
       "ApiKeyIn": {
         "additionalProperties": false,
         "properties": {
@@ -42,6 +65,35 @@
           "api_key"
         ],
         "title": "ApiKeyIn",
+        "type": "object"
+      },
+      "ApproveIn": {
+        "additionalProperties": false,
+        "description": "De drie hashes van de preview die de beheerder zag; wijkt er één af, dan is er niets goedgekeurd.",
+        "properties": {
+          "policy_hash": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Policy Hash",
+            "type": "string"
+          },
+          "preview_hash": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "resource_etag": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Resource Etag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_hash",
+          "resource_etag",
+          "policy_hash"
+        ],
+        "title": "ApproveIn",
         "type": "object"
       },
       "CgnatIn": {
@@ -705,6 +757,32 @@
         "title": "LogsIn",
         "type": "object"
       },
+      "NoodstopIn": {
+        "additionalProperties": false,
+        "properties": {
+          "actief": {
+            "title": "Actief",
+            "type": "boolean"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          }
+        },
+        "required": [
+          "actief"
+        ],
+        "title": "NoodstopIn",
+        "type": "object"
+      },
       "NotitieIn": {
         "additionalProperties": false,
         "properties": {
@@ -879,6 +957,107 @@
         "title": "PasswordIn",
         "type": "object"
       },
+      "ProposalIn": {
+        "additionalProperties": false,
+        "description": "``ActionProposal`` (contract §8). ``idempotency_key`` staat in de header; in de body mag hij ook, mits gelijk.",
+        "properties": {
+          "action_id": {
+            "description": "Getypte actie uit de allowlist, bv. app.restart.",
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Action Id",
+            "type": "string"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActorIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Moet passen bij de aangemelde gebruiker."
+          },
+          "evidence_ids": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ETag die de aanvrager zag.",
+            "title": "Expected Version"
+          },
+          "expires_in_seconds": {
+            "default": 3600,
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Expires In Seconds",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "risk_claim": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Wordt bewaard en genegeerd.",
+            "title": "Risk Claim"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          }
+        },
+        "required": [
+          "action_id",
+          "reason"
+        ],
+        "title": "ProposalIn",
+        "type": "object"
+      },
       "QuietHours": {
         "additionalProperties": false,
         "properties": {
@@ -963,6 +1142,22 @@
           "bericht"
         ],
         "title": "RegelIn",
+        "type": "object"
+      },
+      "RejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reden": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Reden",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reden"
+        ],
+        "title": "RejectIn",
         "type": "object"
       },
       "RestoreTestIn": {
@@ -2168,6 +2363,541 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/actions": {
+      "get": {
+        "operationId": "list_actions_api_v1_actions_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "alle",
+              "enum": [
+                "alle",
+                "open",
+                "wacht_op_goedkeuring",
+                "klaar",
+                "goedgekeurd",
+                "afgewezen",
+                "geweigerd",
+                "bezig",
+                "uitgevoerd",
+                "mislukt",
+                "afwijking",
+                "onbekend",
+                "verlopen"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 96,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Actions Api V1 Actions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Voorstellen en uitvoeringen (nieuwste eerst, cursor)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      },
+      "post": {
+        "operationId": "propose_api_v1_actions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Actie voorstellen: classificatie, preview en hashes (er wordt nog niets uitgevoerd)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/actions/noodstop": {
+      "get": {
+        "operationId": "get_noodstop_api_v1_actions_noodstop_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Noodstop Api V1 Actions Noodstop Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Staat de noodstop aan? (dan voert de Hub geen enkele actie uit)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      },
+      "put": {
+        "operationId": "put_noodstop_api_v1_actions_noodstop_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoodstopIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Noodstop in- of uitschakelen (alleen beheerder)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/actions/{request_id}": {
+      "get": {
+        "operationId": "get_action_api_v1_actions__request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Action Api V1 Actions  Request Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén voorstel met preview, hashes, blokkades, goedkeuring en uitkomst",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/actions/{request_id}/approve": {
+      "post": {
+        "operationId": "approve_api_v1_actions__request_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "R2/R3 goedkeuren voor precies deze preview (beheerder; 15 minuten, één keer bruikbaar)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/actions/{request_id}/execute": {
+      "post": {
+        "operationId": "execute_api_v1_actions__request_id__execute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Uitvoeren: alles opnieuw controleren, ondertekenen en naar de executor (R2/R3: alleen beheerder)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/actions/{request_id}/reconcile": {
+      "post": {
+        "operationId": "reconcile_api_v1_actions__request_id__reconcile_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Onbekende uitkomst ophelderen met het journaal van de executor (alleen lezen; er wordt niets herhaald)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/actions/{request_id}/reject": {
+      "post": {
+        "operationId": "reject_api_v1_actions__request_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Voorstel afwijzen (beheerder); er wordt niets uitgevoerd",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
     "/api/v1/alerts": {
       "get": {
         "operationId": "list_alerts_api_v1_alerts_get",
@@ -7288,6 +8018,29 @@
         ]
       }
     },
+    "/api/v1/policy": {
+      "get": {
+        "operationId": "get_policy_api_v1_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Policy Api V1 Policy Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Het risicobeleid: acties, klassen, blokkades en policy_hash (alleen-lezen)",
+        "tags": [
+          "acties en goedkeuringen"
+        ]
+      }
+    },
     "/api/v1/registry/services": {
       "get": {
         "operationId": "registry_api_v1_registry_services_get",
@@ -8787,6 +9540,10 @@
     {
       "description": "Incidenten-inbox (B01-005): dedupe, correlatie, hypothese met bewijs, readback, snooze.",
       "name": "incidenten"
+    },
+    {
+      "description": "Voorstel → policy (R0–R3) → preview → gebonden goedkeuring → ondertekend verzoek naar de executor (B01-007, B02-005/006). De Hub wijzigt zelf niets op de NAS.",
+      "name": "acties en goedkeuringen"
     },
     {
       "description": "Log-index (B09-004): alleen geschoonde, begrensde regels; zoeken en supportbundel.",

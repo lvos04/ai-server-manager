@@ -1,0 +1,405 @@
+"""Acties aan de Hub-kant zonder executor: weigeringen, blokkades, rollen, idempotentie en ``notification.send``
+(contract 1.3 §8; B01-007, B02-005; EX18, EX27). De keten mét executor staat in ``tests/e2e/test_acties.py``."""
+
+from __future__ import annotations
+
+import copy
+import uuid
+from collections.abc import Iterator
+from datetime import timedelta
+from pathlib import Path
+from typing import Any
+
+import pytest
+from actiehelpers import (
+    HOST,
+    Stack,
+    app_target,
+    audit_acties,
+    bouw_stack,
+    haal,
+    hashes,
+    keur_goed,
+    schrijfaanroepen,
+    stel_voor,
+    voer_uit,
+)
+from conftest import idem, login_as, make_user
+from executorhelpers import write_nas
+from fakes.fake_gotify import FakeGotify
+from fakes.fake_truenas import FakeTrueNAS
+from policyhelpers import install_params
+
+from hub.models import ActionRequest
+
+pytestmark = pytest.mark.integration
+TOKEN = "gotify-app-token-voor-test"
+
+
+@pytest.fixture
+def nas() -> Iterator[FakeTrueNAS]:
+    fake = write_nas().start()
+    yield fake
+    if fake._thread is not None and fake._thread.is_alive():  # een test kan de NAS zelf al hebben gestopt
+        fake.stop()
+
+
+@pytest.fixture
+def stack(
+    admin: Any, app: Any, nas: FakeTrueNAS, worker_once: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Stack:
+    """Hub + fake TrueNAS (alleen-lezen), **zonder** executor."""
+    return bouw_stack(
+        admin=admin,
+        app=app,
+        nas=nas,
+        worker_once=worker_once,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        met_executor=False,
+    )
+
+
+def _voorstel(c: Any, action_id: str, target: dict[str, Any], parameters: dict[str, Any] | None = None) -> Any:
+    """Voorstel met een eigen sleutel, zodat ook een geweigerd voorstel daarna is op te vragen."""
+    key = str(uuid.uuid4())
+    body = {"action_id": action_id, "target": target, "parameters": parameters or {}, "reason": "test"}
+    return key, c.post("/api/v1/actions", json=body, headers={"Idempotency-Key": key})
+
+
+def _kloon(nas: FakeTrueNAS, naam: str, image: str | None = None) -> None:
+    app = copy.deepcopy(nas.app("my-house"))
+    app["name"] = app["id"] = naam
+    if image is not None:
+        app["active_workloads"]["images"] = [image]
+        for c in app["active_workloads"]["container_details"]:
+            c["image"] = image
+    nas.data["app.query"].append(app)
+
+
+# ---------------------------------------------------------------------- beleid
+def test_beleid_is_leesbaar_en_ingebakken(stack: Stack) -> None:
+    make_user(stack.admin, "vera", "viewer")
+    r = login_as(stack.app, "vera").get("/api/v1/policy")
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["policy_hash"].startswith("sha256:") and len(b["policy_hash"]) == 71
+    acties = {a["action_id"]: a for a in b["acties"]}
+    assert acties["app.restart"]["risk_class"] == "R1" and acties["app.restart"]["risk_class_kritiek"] == "R2"
+    assert acties["app.install"]["risk_class"] == "R2" and acties["app.install"]["goedkeuring_nodig"] is True
+    assert acties["app.update"]["requires_backup"] is True and acties["notification.send"]["risk_class"] == "R0"
+    assert "boiler_verboden" in [v["code"] for v in b["verboden"]]
+    assert {"pool_niet_gezond", "backup_gate_rood", "noodstop_actief"} <= {d["code"] for d in b["dynamisch"]}
+    assert "adguard-home" in b["kritieke_apps"] and "emby" in [x["app"] for x in b["beschermd"]]
+    # Elk voorstel draagt dezelfde policy_hash.
+    v = stel_voor(stack.admin, "app.restart", app_target("my-house")).json()
+    assert v["policy_hash"] == b["policy_hash"]
+
+
+# ---------------------------------------------------------------------- weigeringen (statisch beleid)
+@pytest.mark.parametrize(
+    ("action_id", "target", "parameters"),
+    [
+        ("boiler.set", {"host_id": HOST}, {}),
+        ("app.restart", {"host_id": HOST, "app_id": "boiler-regelaar"}, {}),
+        ("app.restart", {"host_id": HOST, "app_id": "warm-water"}, {}),
+        (
+            "app.install",
+            {"host_id": HOST, "app_id": "demo-app"},
+            {"app_create": {"values": {"envs": [{"name": "KETEL"}]}}},
+        ),
+        ("zfs.snapshot.create", {"host_id": HOST, "dataset": "testpool/apps/water_heater"}, {"naam": "x"}),
+    ],
+)
+def test_boiler_wordt_altijd_geweigerd(
+    stack: Stack, action_id: str, target: dict[str, Any], parameters: dict[str, Any]
+) -> None:
+    """EX27: boiler in actie, doel of parameters → geweigerd, ook voor een beheerder en ook met goedkeuring."""
+    admin = stack.admin
+    key, r = _voorstel(admin, action_id, target, parameters)
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "boiler_verboden" in [b["code"] for b in r.json()["details"]["blokkades"]]
+    v = haal(admin, key)
+    assert v["status"] == "geweigerd" and v["risk_class"] == "R3" and v["preview"] is None
+    assert "boiler_verboden" in [b["code"] for b in v["blokkades"]]
+    # De parameterwaarden van een geweigerd voorstel worden niet bewaard (alleen hun hash).
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(key))
+        assert rij is not None and rij.parameters == {} and rij.gestart_op is None
+    # Een geweigerd voorstel is niet goed te keuren en niet uit te voeren.
+    hashes = {"preview_hash": "sha256:" + "0" * 64, "resource_etag": "x", "policy_hash": v["policy_hash"]}
+    r = admin.post(f"/api/v1/actions/{key}/approve", json=hashes, headers=idem())
+    assert r.status_code == 409 and r.json()["code"] == "status_past_niet", r.text
+    r = voer_uit(admin, key)
+    assert r.status_code == 409 and r.json()["code"] == "status_past_niet", r.text
+    assert "action.proposal.refused" in audit_acties(stack.app) and schrijfaanroepen(stack.nas) == []
+
+
+def test_een_melding_over_de_boiler_mag_maar_schakelt_niets(stack: Stack) -> None:
+    """Bewaking is geen bediening: vrije meldingstekst is geen doel."""
+    r = stel_voor(
+        stack.admin, "notification.send", {"host_id": HOST}, {"titel": "Boiler", "tekst": "De boiler is warm."}
+    )
+    assert r.status_code == 201 and r.json()["risk_class"] == "R0", r.text
+
+
+@pytest.mark.parametrize(
+    ("action_id", "status", "code", "klasse"),
+    [
+        ("shell.exec", 403, "actie_geweigerd", "R3"),
+        ("docker.exec", 403, "actie_geweigerd", "R3"),
+        ("pool.dataset.delete", 403, "actie_geweigerd", "R3"),
+        ("app.onbekend", 403, "actie_niet_toegestaan", "R3"),
+        ("mediaguard.repair.start", 501, "capability_unavailable", "R3"),
+        ("my_house.device.set", 501, "capability_unavailable", "R3"),
+        # Bekende actie van een andere eigenaar: de klasse uit het beleid blijft staan, uitvoeren kan hier niet.
+        ("sso.oidc.hub.register", 501, "capability_unavailable", "R2"),
+    ],
+)
+def test_verboden_onbekende_en_gereserveerde_acties(
+    stack: Stack, action_id: str, status: int, code: str, klasse: str
+) -> None:
+    key, r = _voorstel(stack.admin, action_id, {"host_id": HOST}, {})
+    assert r.status_code == status and r.json()["code"] == code, r.text
+    # Ook met risk_claim R0 (EX18) verandert er niets: de claim wordt alleen bewaard.
+    r2 = stel_voor(stack.admin, action_id, {"host_id": HOST}, {}, risk_claim="R0")
+    assert r2.status_code == status and r2.json()["code"] == code, r2.text
+    v = haal(stack.admin, key)
+    assert v["status"] == "geweigerd" and v["risk_class"] == klasse and v["risk_claim"] is None
+    assert voer_uit(stack.admin, key).json()["code"] == "status_past_niet"
+    assert schrijfaanroepen(stack.nas) == []
+
+
+@pytest.mark.parametrize(
+    ("naam", "image"),
+    [("emby", None), ("mijn-media", "docker.io/emby/embyserver:4.9.1.80"), ("emby", "docker.io/jellyfin/jellyfin:10")],
+)
+@pytest.mark.parametrize("action_id", ["app.stop", "app.restart", "app.uninstall"])
+def test_emby_wordt_nooit_door_het_platform_aangeraakt(
+    stack: Stack, naam: str, image: str | None, action_id: str
+) -> None:
+    """Besluit van de gebruiker: Emby blijft tot hij het zelf verwijdert. Herkend op naam én op image."""
+    _kloon(stack.nas, naam, image)
+    key, r = _voorstel(stack.admin, action_id, app_target(naam))
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]]
+    assert haal(stack.admin, key)["status"] == "geweigerd"
+
+
+@pytest.mark.parametrize(
+    ("naam", "action_id", "code"),
+    [
+        ("ai-server-manager", "app.stop", "platform_niet_stoppen"),
+        ("ai-server-manager", "app.uninstall", "platform_niet_stoppen"),
+        ("ai-server-manager-executor", "app.stop", "executor_niet_zelf"),
+        ("mediaguard", "app.uninstall", "mediaguard_upgradebewijs_ontbreekt"),
+        ("jellyfin", "app.uninstall", "mediaserver_migratie_vraagt_rapport"),
+    ],
+)
+def test_beschermde_apps(stack: Stack, naam: str, action_id: str, code: str) -> None:
+    if naam not in ("mediaguard", "jellyfin"):
+        _kloon(stack.nas, naam)
+    _key, r = _voorstel(stack.admin, action_id, app_target(naam))
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert code in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+
+
+def test_schema_en_doel_worden_gecontroleerd(stack: Stack) -> None:
+    admin = stack.admin
+    for target in ({"host_id": "andere-nas", "app_id": "my-house"}, {"host_id": HOST}, {"app_id": "../etc"}):
+        r = stel_voor(admin, "app.restart", target)
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    r = stel_voor(admin, "app.restart", app_target("my-house"), {"force": True})
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    r = stel_voor(admin, "app.restart", app_target("bestaat-niet"))
+    assert r.status_code == 409 and r.json()["code"] == "doel_bestaat_niet", r.text
+    r = stel_voor(admin, "app.install", app_target("my-house"), install_params("my-house"))
+    assert r.status_code == 409 and r.json()["code"] == "doel_bestaat_al", r.text
+    # Onbekende velden in het voorstel zelf bestaan niet (ook geen eigen backup_checkpoint_id of risicoklasse).
+    for extra in ({"backup_checkpoint_id": "x"}, {"risk_class": "R0"}, {"approval": {"approved_by": "ai"}}):
+        r = stel_voor(admin, "app.restart", app_target("my-house"), **extra)
+        assert r.status_code == 422, r.text
+    assert admin.get("/api/v1/actions").json()["items"] == [] and schrijfaanroepen(stack.nas) == []
+
+
+def test_nas_onbereikbaar_dan_geen_voorstel(stack: Stack) -> None:
+    """Zonder eigen readback geen preview en geen ETag: onbekend is geen grond voor een voorstel."""
+    stack.nas.stop()
+    r = stel_voor(stack.admin, "app.restart", app_target("my-house"))
+    assert r.status_code == 409 and r.json()["code"] == "doel_onbekend", r.text
+    assert stack.admin.get("/api/v1/actions").json()["items"] == []
+
+
+# ---------------------------------------------------------------------- rollen en idempotentie
+def test_rollen(stack: Stack) -> None:
+    admin = stack.admin
+    for naam, rol in (("vera", "viewer"), ("oscar", "operator"), ("kim", "kind")):
+        make_user(admin, naam, rol)
+    vera, oscar, kim = (login_as(stack.app, n) for n in ("vera", "oscar", "kim"))
+    v = stel_voor(oscar, "app.uninstall", app_target("my-house")).json()
+    assert v["status"] == "wacht_op_goedkeuring" and v["actor"] == {"type": "user", "id": "oscar"}
+    assert stel_voor(vera, "app.restart", app_target("my-house")).status_code == 403
+    assert stel_voor(kim, "app.restart", app_target("my-house")).status_code == 403
+    assert kim.get("/api/v1/actions").status_code == 403 and kim.get("/api/v1/policy").status_code == 403
+    assert vera.get("/api/v1/actions").status_code == 200
+    for c in (vera, oscar, kim):
+        assert keur_goed(c, v).status_code == 403
+        r = c.post(f"/api/v1/actions/{v['request_id']}/reject", json={"reden": "nee"}, headers=idem())
+        assert r.status_code == 403
+        assert c.put("/api/v1/actions/noodstop", json={"actief": False}, headers=idem()).status_code == 403
+    assert haal(admin, v)["status"] == "wacht_op_goedkeuring" and haal(admin, v)["goedkeuring"] is None
+
+
+def test_idempotentie_en_lijst(stack: Stack) -> None:
+    admin = stack.admin
+    key = str(uuid.uuid4())
+    body = {"action_id": "app.restart", "target": app_target("my-house"), "parameters": {}, "reason": "test"}
+    r1 = admin.post("/api/v1/actions", json=body, headers={"Idempotency-Key": key})
+    r2 = admin.post("/api/v1/actions", json=body, headers={"Idempotency-Key": key})
+    assert r1.status_code == 201 and r2.status_code == 201 and r1.json() == r2.json()
+    assert r1.json()["request_id"] == key  # request_id = Idempotency-Key (contract §8: idempotency_key)
+    # Dezelfde sleutel met een ander voorstel is geen nieuw voorstel.
+    r3 = admin.post("/api/v1/actions", json={**body, "action_id": "app.stop"}, headers={"Idempotency-Key": key})
+    assert r3.status_code in (409, 422), r3.text
+    r = admin.post("/api/v1/actions", json={**body, "idempotency_key": str(uuid.uuid4())}, headers=idem())
+    assert r.status_code == 422 and r.json()["code"] == "idempotency_key_past_niet", r.text
+    key2 = str(uuid.uuid4())
+    stop = {**body, "action_id": "app.stop", "idempotency_key": key2}
+    r = admin.post("/api/v1/actions", json=stop, headers={"Idempotency-Key": key2})
+    assert r.status_code == 201 and r.json()["request_id"] == key2, r.text
+    stel_voor(admin, "app.uninstall", app_target("mediaguard"))  # geweigerd (beschermd)
+    stel_voor(admin, "app.uninstall", app_target("my-house"))
+    lijst = admin.get("/api/v1/actions").json()
+    assert len(lijst["items"]) == 4 and lijst["noodstop"]["actief"] is False
+    assert [i["action_id"] for i in admin.get("/api/v1/actions", params={"status": "open"}).json()["items"]] == [
+        "app.uninstall",
+        "app.stop",
+        "app.restart",
+    ]
+    assert len(admin.get("/api/v1/actions", params={"status": "geweigerd"}).json()["items"]) == 1
+    assert len(admin.get("/api/v1/actions", params={"action_id": "app.restart"}).json()["items"]) == 1
+    pagina = admin.get("/api/v1/actions", params={"limit": 2}).json()
+    assert len(pagina["items"]) == 2 and pagina["next_cursor"]
+    rest = admin.get("/api/v1/actions", params={"limit": 2, "cursor": pagina["next_cursor"]}).json()
+    assert len(rest["items"]) == 2 and rest["next_cursor"] is None
+    assert {i["request_id"] for i in pagina["items"]}.isdisjoint(i["request_id"] for i in rest["items"])
+    assert admin.get(f"/api/v1/actions/{uuid.uuid4()}").status_code == 404
+
+
+def test_muterende_actieroutes_vragen_een_idempotency_key(stack: Stack) -> None:
+    """Zonder ``Idempotency-Key`` gebeurt er niets: geen voorstel, goedkeuring, afwijzing, uitvoering of noodstop."""
+    admin = stack.admin
+    v = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
+    rid = v["request_id"]
+    body = {"action_id": "app.restart", "target": app_target("my-house"), "parameters": {}, "reason": "test"}
+    for pad, inhoud in (
+        ("/api/v1/actions", body),
+        (f"/api/v1/actions/{rid}/approve", hashes(v)),
+        (f"/api/v1/actions/{rid}/reject", {"reden": "nee"}),
+        (f"/api/v1/actions/{rid}/execute", None),
+        (f"/api/v1/actions/{rid}/reconcile", None),
+    ):
+        r = admin.post(pad, json=inhoud)
+        assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required", (pad, r.text)
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "proef"})
+    assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required", r.text
+    assert [i["request_id"] for i in admin.get("/api/v1/actions").json()["items"]] == [rid]
+    assert haal(admin, v)["status"] == "wacht_op_goedkeuring" and haal(admin, v)["goedkeuring"] is None
+    assert admin.get("/api/v1/actions/noodstop").json()["actief"] is False and schrijfaanroepen(stack.nas) == []
+
+
+# ---------------------------------------------------------------------- zonder executor
+def test_zonder_gekoppelde_executor_wordt_er_niets_gewijzigd(stack: Stack) -> None:
+    admin = stack.admin
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert v["status"] == "klaar"
+    r = voer_uit(admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "executor_niet_gekoppeld", r.text
+    assert haal(admin, v)["status"] == "klaar"  # niets gestart, niets verbruikt
+    w = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
+    assert "executor_niet_gekoppeld" in [b["code"] for b in w["blokkades"]]
+    r = keur_goed(admin, w)
+    assert r.status_code == 409 and r.json()["code"] == "actie_geblokkeerd", r.text
+    assert schrijfaanroepen(stack.nas) == []
+
+
+# ---------------------------------------------------------------------- notification.send (R0, in de Hub)
+def test_melding_versturen_r0(stack: Stack, periodic_run: Any) -> None:
+    admin = stack.admin
+    params = {"titel": "Proefmelding", "tekst": "Dit is een test.", "prioriteit": 5}
+    v = stel_voor(admin, "notification.send", {"host_id": HOST}, params).json()
+    assert v["risk_class"] == "R0" and v["status"] == "klaar" and v["uitvoerder"] == "hub:gotify"
+    # Zonder kanaal: eerlijk mislukt, geen gesimuleerd succes.
+    r = voer_uit(admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "geen_kanaal", r.text
+    assert haal(admin, v)["status"] == "mislukt"
+    gotify = FakeGotify(tokens={TOKEN}).start()
+    try:
+        r = admin.post(
+            "/api/v1/notifications/channels",
+            json={"naam": "Telefoon", "basis_url": gotify.url, "token": TOKEN},
+            headers=idem(),
+        )
+        assert r.status_code == 201, r.text
+        make_user(admin, "oscar", "operator")
+        oscar = login_as(stack.app, "oscar")
+        v = stel_voor(oscar, "notification.send", {"host_id": HOST}, params).json()
+        r = voer_uit(oscar, v)
+        assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+        assert r.json()["resultaat"]["status"] == "wachtrij" and len(r.json()["resultaat"]["meldingen"]) == 1
+        periodic_run("meldingen_versturen")
+        assert [m["title"] for m in gotify.messages] == ["Proefmelding"]
+    finally:
+        gotify.stop()
+    for fout in (
+        {"titel": "x"},
+        {"titel": "x", "tekst": "y", "prioriteit": 11},
+        {"titel": "x", "tekst": "y", "url": "z"},
+    ):
+        r = stel_voor(admin, "notification.send", {"host_id": HOST}, fout)
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+
+
+# ---------------------------------------------------------------------- goedkeuring: bepaald, niet toevallig
+def test_open_goedkeuring_gaat_altijd_voor_ook_in_dezelfde_seconde(stack: Stack) -> None:
+    """Twee goedkeuringen met hetzelfde tijdstip (vervallen en meteen opnieuw goedgekeurd) mogen niet door toeval
+    worden verwisseld: anders zou een geldige goedkeuring soms als vervallen gelden."""
+    from hub.actions.service import huidige_goedkeuring
+    from hub.models import Approval
+    from hub.timeutil import utcnow
+
+    v = stel_voor(stack.admin, "app.uninstall", app_target("my-house")).json()
+    nu = utcnow().replace(microsecond=0)
+
+    def goedkeuring(**meer: Any) -> Approval:
+        return Approval(
+            id=uuid.uuid4(),
+            request_id=uuid.UUID(v["request_id"]),
+            preview_hash=v["preview_hash"],
+            resource_etag=v["resource_etag"],
+            policy_hash=v["policy_hash"],
+            risk_class="R2",
+            approved_by="beheerder",
+            approved_at=nu,
+            expires_at=nu + timedelta(minutes=15),
+            one_time_nonce=uuid.uuid4(),
+            action_scope={},
+            **meer,
+        )
+
+    with stack.app.state.sessionmaker() as db:
+        req = db.get(ActionRequest, uuid.UUID(v["request_id"]))
+        assert huidige_goedkeuring(db, req) is None
+        vervallen = [goedkeuring(vervallen_op=nu, vervallen_reden="gewijzigd:resource_etag") for _ in range(12)]
+        db.add_all(vervallen)
+        db.flush()
+        gebruikt = goedkeuring(used_at=nu)
+        db.add(gebruikt)
+        db.flush()
+        assert huidige_goedkeuring(db, req).id == gebruikt.id  # gebruikt gaat voor vervallen
+        open_ = goedkeuring()
+        db.add(open_)
+        db.flush()
+        for _ in range(3):
+            assert huidige_goedkeuring(db, req).id == open_.id
+        db.rollback()

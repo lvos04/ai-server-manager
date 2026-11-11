@@ -272,6 +272,75 @@ def _hub(ev: EventIn) -> Signaal | None:
             samenvatting=f"Export {eid} mislukt: {reden}.",
             details=_safe_details(ev, ("status", "reason_code")),
         )
+    if et in ("action.run.failed", "action.run.succeeded", "action.outcome.clarified"):
+        # Uitvoering van een actie via de executor (contract §8). Alleen een afwijking of een onbekende uitkomst is een
+        # incident; een nette weigering of een mislukte TrueNAS-aanroep (toestand onveranderd) staat in de audit.
+        doel = _s(p.get("doel"), 120) or eid
+        actie = _s(p.get("action_id"), 96) or "actie"
+        verzoek = _s(p.get("request_id"), 40)
+        uitkomst = str(p.get("uitkomst") or "")
+        if et == "action.outcome.clarified":
+            return Signaal(
+                "herstel",
+                "actie.uitkomst_onbekend",
+                f"{APP_ID}:actie_onbekend:{verzoek}",
+                f"Uitkomst van {actie} op {doel} is opgehelderd",
+                "info",
+                "hub:acties",
+                "action_request",
+                verzoek,
+                doel,
+                samenvatting=f"Het journaal van de executor gaf uitsluitsel: {uitkomst or 'bekend'}.",
+            )
+        if et.endswith("succeeded"):
+            return Signaal(
+                "herstel",
+                "actie.afwijking",
+                f"{APP_ID}:actie_afwijking:{doel}",
+                f"{actie} op {doel} uitgevoerd en gecontroleerd",
+                "info",
+                "hub:acties",
+                "action_target",
+                eid,
+                doel,
+                samenvatting="De toestand na de uitvoering klopt met de verwachting (readback door de executor).",
+            )
+        if uitkomst == "afwijking":
+            return Signaal(
+                "probleem",
+                "actie.afwijking",
+                f"{APP_ID}:actie_afwijking:{doel}",
+                f"Afwijking na {actie} op {doel}: executor gestopt",
+                "kritiek",
+                "hub:acties",
+                "action_target",
+                eid,
+                doel,
+                meldt_elke_keer=True,
+                samenvatting=(
+                    "De toestand na de uitvoering wijkt af van de verwachting of is onbekend. De executor voert niets "
+                    "meer uit tot een beheerder hem op de statuspagina van de executor vrijgeeft."
+                ),
+                details=_safe_details(ev, ("request_id", "action_id", "doel", "risk_class", "reden", "gestopt")),
+            )
+        if uitkomst == "onbekend":
+            return Signaal(
+                "probleem",
+                "actie.uitkomst_onbekend",
+                f"{APP_ID}:actie_onbekend:{verzoek}",
+                f"Uitkomst van {actie} op {doel} is onbekend",
+                "waarschuwing",
+                "hub:acties",
+                "action_request",
+                verzoek,
+                doel,
+                samenvatting=(
+                    "De executor gaf geen bruikbaar antwoord. De Hub herhaalt niets; vraag de uitkomst op via het "
+                    "journaal van de executor."
+                ),
+                details=_safe_details(ev, ("request_id", "action_id", "doel", "risk_class", "reden")),
+            )
+        return None
     if et == "inventory.run.completed":
         fp = f"{APP_ID}:truenas:inventaris"
         status = str(p.get("status") or "")

@@ -794,3 +794,66 @@ class OidcIdentity(Base):
     laatste_login_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     ingetrokken_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+# ------------------------------------------------------------------ acties en goedkeuringen (B01-007, contract §8)
+class ActionRequest(Base):
+    """Eén voorstel voor een getypte actie: wie, wat, waarop, de eigen risicoklasse van de Hub (``risk_claim`` staat
+    er alleen ter informatie bij en wordt nooit gebruikt), de preview met hash, de ETag van het doel en de uitkomst.
+    ``id`` is de ``Idempotency-Key`` van het voorstel en tegelijk het ``request_id`` bij de executor."""
+
+    __tablename__ = "action_request"
+    __table_args__ = (
+        Index("ix_action_request_status", "status", "aangemaakt_op"),
+        Index("ix_action_request_doel", "action_id", "doel_sleutel", "gestart_op"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    aangemaakt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    bijgewerkt_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    geldig_tot: Mapped[datetime] = mapped_column(TS)
+    actor_type: Mapped[str] = mapped_column(String(16))
+    actor_id: Mapped[str] = mapped_column(String(80))
+    action_id: Mapped[str] = mapped_column(String(96))
+    target: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    parameters: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    reden: Mapped[str] = mapped_column(Text, default="")
+    evidence_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    risk_claim: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    risk_class: Mapped[str] = mapped_column(String(4))
+    rule_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    policy_hash: Mapped[str] = mapped_column(String(80))
+    uitvoerder: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    doel_sleutel: Mapped[str] = mapped_column(String(300), default="")
+    resource_etag: Mapped[str] = mapped_column(String(300), default="")
+    preview: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    preview_hash: Mapped[str] = mapped_column(String(80), default="")
+    blokkades: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    # wacht_op_goedkeuring|klaar|goedgekeurd|afgewezen|geweigerd|bezig|uitgevoerd|mislukt|afwijking|onbekend|verlopen
+    status: Mapped[str] = mapped_column(String(24))
+    resultaat: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    gestart_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    uitgevoerd_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    execution_nonce: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    trace_id: Mapped[str] = mapped_column(String(64), default="")
+
+
+class Approval(Base):
+    """Gebonden goedkeuring (contract 1.3 §8): hoort bij precies deze preview, deze ETag en dit beleid, is hooguit
+    15 minuten geldig en kan één keer worden gebruikt (``used_at`` wordt atomair gezet vóór het versturen)."""
+
+    __tablename__ = "approval"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    request_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("action_request.id", ondelete="CASCADE"), index=True)
+    preview_hash: Mapped[str] = mapped_column(String(80))
+    resource_etag: Mapped[str] = mapped_column(String(300))
+    policy_hash: Mapped[str] = mapped_column(String(80))
+    risk_class: Mapped[str] = mapped_column(String(4))
+    approved_by: Mapped[str] = mapped_column(String(80))
+    approved_at: Mapped[datetime] = mapped_column(TS)
+    expires_at: Mapped[datetime] = mapped_column(TS)
+    one_time_nonce: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True)
+    backup_checkpoint_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    action_scope: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    vervallen_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    vervallen_reden: Mapped[str | None] = mapped_column(String(64), nullable=True)

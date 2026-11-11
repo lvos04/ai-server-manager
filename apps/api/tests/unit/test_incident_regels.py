@@ -210,3 +210,34 @@ def test_sso_events_van_home_control_hub() -> None:
     krit = classify(ev(hch, "sso.anomaly.detected", {"rule_id": "x", "ernst": "kritiek"}, ("sso_anomaly", "b")))
     assert krit and krit.ernst == "kritiek" and krit.ernst_bron == "kritiek"
     assert classify(ev(hch, "sso.access.revoked", {}, ("authentik_user", "leon"))) is None
+
+
+def test_acties_afwijking_en_onbekende_uitkomst() -> None:
+    """Contract §8: afwijking na uitvoering → stop + incident; een onbekende uitkomst is een eigen incident."""
+    doel, rid = "app:my-house", "0d6b7c0e-6f2f-4f65-9a52-0d2f0d3f8a11"
+    basis = {"request_id": rid, "action_id": "app.restart", "doel": doel, "risk_class": "R1"}
+
+    def actie(event_type: str, entity: tuple[str, str] = ("action_target", doel), **meer: Any) -> Any:
+        return classify(ev(APP_ID, event_type, {**basis, **meer}, entity, stroom="outbox"))
+
+    afw = actie("action.run.failed", uitkomst="afwijking", reden="readback_wijkt_af", gestopt=True)
+    assert afw and (afw.rol, afw.soort, afw.ernst) == ("probleem", "actie.afwijking", "kritiek")
+    assert afw.vingerafdruk == f"{APP_ID}:actie_afwijking:{doel}" and afw.meldt_elke_keer is True
+    assert afw.details["reden"] == "readback_wijkt_af" and afw.details["request_id"] == rid
+    ok = actie("action.run.succeeded", uitkomst="uitgevoerd")
+    assert ok and ok.rol == "herstel" and ok.vingerafdruk == afw.vingerafdruk  # sluit hetzelfde incident
+
+    onb = actie("action.run.failed", uitkomst="onbekend", reden="executor_onbereikbaar")
+    assert onb and (onb.rol, onb.soort, onb.ernst) == ("probleem", "actie.uitkomst_onbekend", "waarschuwing")
+    assert onb.vingerafdruk == f"{APP_ID}:actie_onbekend:{rid}" and onb.vingerafdruk != afw.vingerafdruk
+    klaar = actie("action.outcome.clarified", ("action_request", rid), uitkomst="mislukt")
+    assert klaar and klaar.rol == "herstel" and klaar.vingerafdruk == onb.vingerafdruk
+
+    # Een nette weigering of een mislukte aanroep (toestand onveranderd) is geen incident: dat staat in de audit.
+    for uitkomst in ("mislukt", "geweigerd", ""):
+        assert actie("action.run.failed", uitkomst=uitkomst) is None
+    # Alleen de Hub zelf mag dit melden: hetzelfde event van een andere app raakt deze regel niet.
+    vreemd = classify(
+        ev("mediaguard", "action.run.failed", {**basis, "uitkomst": "afwijking"}, ("action_target", doel))
+    )
+    assert vreemd is None or vreemd.soort != "actie.afwijking"

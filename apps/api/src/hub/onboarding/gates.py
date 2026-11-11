@@ -102,7 +102,7 @@ def _check(name: str, inp: GateInputs) -> dict[str, Any] | None:
             "soort": "executor",
             "id": "executor",
             "status": "geblokkeerd",
-            "tekst": "De executor is nog niet gekoppeld (koppelen volgt in fase P2).",
+            "tekst": "De executor is niet gekoppeld; koppel hem op zijn statuspagina met een koppelcode van de Hub.",
         }
     if name == "pools_gezond":
         st = inp.pools_state
