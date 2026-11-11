@@ -257,6 +257,61 @@ def test_kluisverwijzingen_bij_installeren_eerlijk_nog_niet_beschikbaar(stack: S
     assert r.json()["details"]["reden"] == "vault_verwijzingen" and schrijfaanroepen(stack.nas) == []
 
 
+def _tabellen_met(app: Any, waarde: str) -> list[str]:
+    """Alle tabellen van de Hub-database waarin ``waarde`` ergens in een rij staat."""
+    from sqlalchemy import text
+
+    with app.state.sessionmaker() as db:
+        tabellen = [str(r[0]) for r in db.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public'"))]
+        return sorted(
+            t
+            for t in tabellen
+            if db.execute(
+                text(f'SELECT count(*) FROM "{t}" x WHERE x::text LIKE :w'),  # noqa: S608 - namen uit pg_tables
+                {"w": f"%{waarde}%"},
+            ).scalar()
+        )
+
+
+def test_installatiewaarden_blijven_na_afloop_niet_in_de_hub(stack: Stack) -> None:
+    """ADR-0030 besluit 28: waarden van omgevingsvariabelen staan nooit in een preview, log of audit. Zolang een
+    voorstel open is, bewaart de Hub ze (nodig voor het uitvoeren); na afloop (uitgevoerd, afgewezen, verlopen) staan
+    ze nergens meer in de database van de Hub, en dus ook niet in zijn back-up. Alleen hun SHA-256 blijft."""
+    from hub.models import ActionRequest
+    from hub.timeutil import utcnow
+
+    admin, nas = stack.admin, stack.nas
+    geheim = {"uit": "waarde-uitgevoerd-5521", "af": "waarde-afgewezen-5522", "verl": "waarde-verlopen-5523"}
+
+    def voorstel(app_id: str, waarde: str) -> dict[str, Any]:
+        envs = [{"name": "APP_MODE", "value": "prod"}, {"name": "PROEF_WACHTWOORD", "value": waarde}]
+        r = stel_voor(admin, "app.install", app_target(app_id), install_params(app_id, envs=envs))
+        assert r.status_code == 201, r.text
+        return dict(r.json())
+
+    a = voorstel("demo-app", geheim["uit"])
+    assert _tabellen_met(stack.app, geheim["uit"]) == ["action_request"]
+    assert keur_goed(admin, a).status_code == 200
+    r = voer_uit(admin, a)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert nas.created[0]["values"]["envs"][1] == {"name": "PROEF_WACHTWOORD", "value": geheim["uit"]}
+    b = voorstel("demo-b", geheim["af"])
+    r = admin.post(f"/api/v1/actions/{b['request_id']}/reject", json={"reden": "niet nu"}, headers=idem())
+    assert r.status_code == 200 and r.json()["status"] == "afgewezen", r.text
+    c = voorstel("demo-c", geheim["verl"])
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(c["request_id"]))
+        rij.geldig_tot = utcnow() - timedelta(seconds=1)
+        db.commit()
+    assert haal(admin, c)["status"] == "verlopen"
+    for waarde in geheim.values():
+        assert _tabellen_met(stack.app, waarde) == [], waarde
+    # De hash van de parameters blijft gelijk (preview en audit verwijzen ernaar).
+    for v in (a, b, c):
+        assert haal(admin, v)["parameters_sha256"] == v["parameters_sha256"]
+    assert schrijfaanroepen(nas) == ["app.create"]
+
+
 # ---------------------------------------------------------------------- goedkeuring: gebonden, eenmalig, tijdelijk
 def test_goedkeuring_vervalt_als_het_doel_na_de_goedkeuring_wijzigt(stack: Stack) -> None:
     """EX19: verandert er iets aan een gebonden veld, dan is er niets goedgekeurd."""

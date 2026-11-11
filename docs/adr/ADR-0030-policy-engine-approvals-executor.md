@@ -172,9 +172,11 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     image-repository; nooit uit de `base_url` die een dienst zelf opgeeft. Niet gekoppeld of adres onbekend → er wordt
     niets ondertekend.
 28. **Geheimen in installatiewaarden.** Waarden van omgevingsvariabelen staan nooit in een preview, log of audit
-    (alleen de namen). Een verwijzing `vault://app/<app_id>/<parameter>` is het enige toegestane formaat; het invullen
-    ervan door de executor bestaat nog niet, dus een installatie met zo'n verwijzing geeft eerlijk
-    `501 capability_unavailable`.
+    (alleen de namen). Zolang een voorstel open is, bewaart de Hub ze in zijn database (nodig voor het uitvoeren); na
+    afloop (uitgevoerd, mislukt, afwijking, onbekend, afgewezen, geweigerd of verlopen) wist hij ze daar, zodat ze
+    niet voor altijd in klare tekst in de database en de back-up staan. De namen en `parameters_sha256` blijven. Een
+    verwijzing `vault://app/<app_id>/<parameter>` is het enige toegestane formaat; het invullen ervan door de executor
+    bestaat nog niet, dus een installatie met zo'n verwijzing geeft eerlijk `501 capability_unavailable`.
 29. **Testnaden.** Tests zetten alleen de *invoer* van de gates (`blokkades.gate_inputs`: besluiten, eigen back-up) en
     — voor `app.update`/`app.rollback` — een gesimuleerd herstelpunt (`blokkades.verified_checkpoint`); de
     beoordeling, de policy, de handtekening en de executor zijn de echte code.

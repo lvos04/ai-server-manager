@@ -22,7 +22,8 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   gelijktijdige aanroepen lopen na elkaar en precies één uitvoering bereikt de executor. Migratie 0012
   (`action_request`, `approval`).
 - **Apps via de executor (B01-003):** installeren als standaard Custom App (ix-app-waarden via `app.create`, nooit
-  `custom_compose_config`), verwijderen alleen de containers (data blijft), terugzetten met de vorige waarden.
+  `custom_compose_config`), verwijderen alleen de containers (data blijft), terugzetten met de vorige waarden. Waarden
+  van omgevingsvariabelen staan na afloop van een voorstel niet meer in de database van de Hub.
 - **Blokkades:** pool DEGRADED of onbekend en een rode back-upgate blokkeren opslagmutaties, ook met goedkeuring;
   anti-flap (afkoeltijd, maximum per uur; ook bij gelijktijdige uitvoering) en een noodstop voor alle uitvoering;
   bijwerken en terugzetten vragen een geverifieerd herstelpunt (app-herstelpunten bestaan nog niet →

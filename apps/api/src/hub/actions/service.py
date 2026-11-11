@@ -11,11 +11,14 @@ Vaste regels in dit bestand:
 - De eenmalige nonce van een goedkeuring wordt atomair verbruikt vóór verzending (EX20); er is geen tweede poging.
 - Een storing of onduidelijk antwoord is nooit een succes: de status wordt ``onbekend`` tot het journaal van de
   executor uitsluitsel geeft. De Hub herhaalt een uitvoering nooit vanzelf.
-- Parameterwaarden komen niet in de audit, de events of de API-antwoorden (alleen hun SHA-256 en de preview).
+- Parameterwaarden komen niet in de audit, de events of de API-antwoorden (alleen hun SHA-256 en de preview). Na
+  afloop van een voorstel wist de Hub ook de waarden van omgevingsvariabelen uit zijn eigen database
+  (:func:`_wis_waarden`).
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import uuid
@@ -165,6 +168,25 @@ def haal(db: Session, request_id: uuid.UUID, *, vergrendel: bool = False) -> Act
     return req
 
 
+def _wis_waarden(req: ActionRequest) -> None:
+    """Na afloop van een voorstel heeft de Hub de waarden van omgevingsvariabelen niet meer nodig: hij voert nooit iets
+    opnieuw uit. Ze verdwijnen dan uit ``parameters``, zodat de database van de Hub (en zijn back-up) ze niet voor
+    altijd in klare tekst bewaart; de namen blijven. ``parameters_sha256`` in de preview en de audit blijft gelijk
+    (ADR-0030 besluit 28)."""
+    params = req.parameters if isinstance(req.parameters, dict) else {}
+    ac = params.get("app_create")
+    values = ac.get("values") if isinstance(ac, dict) else None
+    envs = values.get("envs") if isinstance(values, dict) else None
+    if not isinstance(envs, list) or not any(isinstance(e, dict) and "value" in e for e in envs):
+        return
+    nieuw = copy.deepcopy(params)
+    for e in nieuw["app_create"]["values"]["envs"]:
+        if isinstance(e, dict) and "value" in e:
+            del e["value"]
+            e["waarde_gewist"] = True
+    req.parameters = nieuw
+
+
 # ------------------------------------------------------------------ tijdgebonden overgangen
 def veeg(db: Session, now: datetime | None = None) -> None:
     """Verlopen goedkeuringen en verlopen voorstellen bijwerken. De aanroeper commit.
@@ -212,6 +234,7 @@ def veeg(db: Session, now: datetime | None = None) -> None:
                 )
         if req.status in OPEN and req.geldig_tot <= now:
             req.status, req.bijgewerkt_op = "verlopen", now
+            _wis_waarden(req)
             for ap in goedkeuringen:
                 if ap.vervallen_op is None:
                     ap.vervallen_op, ap.vervallen_reden = now, "voorstel_verlopen"
@@ -519,6 +542,7 @@ def _herbereken(
     def stop(message: str, cls: Classification | None, details: dict[str, Any]) -> NoReturn:
         req.status, req.bijgewerkt_op = "geweigerd", now
         req.resultaat = {"code": "actie_geweigerd", "message": message}
+        _wis_waarden(req)
         if cls is not None:
             req.blokkades = [b.as_dict() for b in cls.blokkades]
         for ap in db.scalars(
@@ -712,6 +736,7 @@ def wijs_af(db: Session, principal: Principal, req: ActionRequest, *, reden: str
         ap.vervallen_op, ap.vervallen_reden = now, "afgewezen"
     req.status, req.bijgewerkt_op = "afgewezen", now
     req.resultaat = {"code": "afgewezen", "message": reden, "door": principal.name}
+    _wis_waarden(req)
     audit.record(
         db,
         actor_type="user",
@@ -756,6 +781,7 @@ def _sluit(
     now = utcnow()
     was_onbekend = req.status == "onbekend"
     req.status, req.resultaat, req.bijgewerkt_op = status, resultaat, now
+    _wis_waarden(req)  # het verzoek is al naar de executor of geweigerd; de Hub stuurt het nooit opnieuw
     if status == "uitgevoerd":
         req.uitgevoerd_op = now
     audit.record(
