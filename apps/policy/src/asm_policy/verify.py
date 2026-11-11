@@ -23,7 +23,7 @@ from typing import Any
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from asm_policy import execreq
-from asm_policy.engine import Classification, class_at_least, classify
+from asm_policy.engine import Classification, Herkenning, class_at_least, classify
 from asm_policy.loader import ActieDef, Policy
 from asm_policy.params import validate_parameters, validate_target
 
@@ -79,7 +79,7 @@ def check_decision(
     request: Mapping[str, Any],
     *,
     now: datetime,
-    herkend_als: str | Iterable[str] | None,
+    herkend_als: str | Iterable[str] | Herkenning | None,
     uitvoerder: str,
 ) -> tuple[ActieDef | None, Classification | None, Weigering | None]:
     prop = request["proposal"]

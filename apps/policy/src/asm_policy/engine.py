@@ -13,7 +13,8 @@ Regels (in deze volgorde, de strengste wint):
 5. Onbekende action_id (niet in de allowlist) → ``known=False``: de aanroeper geeft 422 en voert niets uit.
 6. Basisklasse uit ``acties.yaml``; kritieke apps (``apps.yaml``) → ``klasse_kritiek``. Nooit lager.
 7. Beschermde apps (Emby altijd; Hub/executor niet stoppen; MediaGuard en de mediaserver geen update zonder bewijs)
-   → geweigerd.
+   → geweigerd. Is van een bestaande app niet vast te stellen wat erin draait (geen image te zien, zoals bij een
+   gestopte app, en geen catalogusapp), dan kan het een beschermde app zijn → elke actie op die app geweigerd.
 8. Een actie met ``ai_mag_voorstellen: false`` van een AI- of flow-actor → geweigerd.
 9. R2/R3 vragen menselijke goedkeuring per gebonden diff; R0/R1 mogen automatisch (allowlist, cooldown, anti-flap
    controleert de Hub dynamisch).
@@ -25,6 +26,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from asm_policy.etag import app_images, catalogus_app
 from asm_policy.loader import RISK_RANK, Policy
 
 ACTOR_TYPES = ("user", "ai", "flow", "voice", "service", "system")
@@ -79,6 +81,27 @@ class Classification:
         }
 
 
+@dataclass(frozen=True)
+class Herkenning:
+    """Herkenning van de app die het doel is, uit de eigen readback (:func:`herken_app`).
+
+    ``volledig`` is onwaar als de app bestaat maar niet vast te stellen is wát erin draait: geen image te zien (TrueNAS
+    geeft bij een gestopte app lege ``active_workloads``) en geen catalogusapp die het zegt. Dan kan het Emby,
+    MediaGuard of de mediaserver zijn onder een andere naam, en weigert :func:`classify` elke actie op die app."""
+
+    apps: tuple[str, ...]
+    volledig: bool
+
+
+DOEL_ONHERKENBAAR = Blokkade(
+    "DOEL-ONHERKENBAAR",
+    "doel_niet_herkenbaar",
+    "Van deze app is nu niet te zien welke image erin draait (TrueNAS toont dat niet bij een gestopte app). Het "
+    "platform kan dan niet uitsluiten dat het Emby, MediaGuard of de mediaserver is en weigert elke actie op deze "
+    "app, ook met goedkeuring.",
+)
+
+
 def max_class(*classes: str) -> str:
     return max(classes, key=lambda c: RISK_RANK[c])
 
@@ -95,15 +118,18 @@ def _image_basenames(images: Iterable[str]) -> list[str]:
     return out
 
 
-def recognize_all(policy: Policy, name: str | None, images: Iterable[str] = ()) -> tuple[str, ...]:
-    """Alle herkenningen van een app: eerst op de appnaam, dan per image-basisnaam. Per naam telt de exacte treffer,
-    anders het langste voorvoegsel + ``-``/``_``.
+def recognize_all(
+    policy: Policy, name: str | None, images: Iterable[str] = (), *, catalogus: str | None = None
+) -> tuple[str, ...]:
+    """Alle herkenningen van een app: eerst op de appnaam, dan op de catalogusapp (``metadata.name``), dan per
+    image-basisnaam. Per naam telt de exacte treffer, anders het langste voorvoegsel + ``-``/``_``.
 
-    Naam en image kunnen naar verschillende apps wijzen (een app die ``emby`` heet met een andere image, of
-    andersom). Dan gelden de regels van **allebei**: een herkenning is er alleen om strenger te zijn en opent nooit
+    Naam, catalogusapp en image kunnen naar verschillende apps wijzen (een app die ``emby`` heet met een andere image,
+    of andersom). Dan gelden de regels van **allemaal**: een herkenning is er alleen om strenger te zijn en opent nooit
     iets."""
     gevonden: list[str] = []
-    for h in ([name.lower()] if name else []) + _image_basenames(images):
+    sleutels = [n.lower() for n in (name, catalogus) if n]
+    for h in sleutels + _image_basenames(images):
         treffer = next((app for app, needles in policy.herkenning.items() if h in needles), None)
         if treffer is None:
             best: tuple[int, str] | None = None
@@ -115,6 +141,21 @@ def recognize_all(policy: Policy, name: str | None, images: Iterable[str] = ()) 
         if treffer is not None and treffer not in gevonden:
             gevonden.append(treffer)
     return tuple(gevonden)
+
+
+def herken_app(
+    policy: Policy, name: str | None, app: Mapping[str, Any] | None, verwachte_images: Iterable[str] = ()
+) -> Herkenning:
+    """Herkenning van het doel uit de ruwe readback (``app.query``), voor Hub én executor.
+
+    Bestaat de app (``app``), dan tellen de naam, de catalogusapp en de images die TrueNAS toont. Volledig is de
+    herkenning alleen als er een image te zien is of als de catalogusapp zegt wat er draait; anders niet (dicht bij
+    twijfel). Bestaat de app nog niet (installeren), dan tellen de naam en de image die geïnstalleerd gaat worden."""
+    if app is None:
+        return Herkenning(recognize_all(policy, name, [i for i in verwachte_images if i]), True)
+    images = app_images(app)
+    catalogus = catalogus_app(app)
+    return Herkenning(recognize_all(policy, name, images, catalogus=catalogus or None), bool(images or catalogus))
 
 
 def recognize(policy: Policy, name: str | None, images: Iterable[str] = ()) -> str | None:
@@ -149,13 +190,18 @@ def classify(
     target: Mapping[str, Any] | None,
     parameters: Mapping[str, Any] | None,
     actor_type: str,
-    herkend_als: str | Iterable[str] | None = None,
+    herkend_als: str | Iterable[str] | Herkenning | None = None,
     requires_backup_claim: bool | None = None,
 ) -> Classification:
-    """Zie de moduletekst. ``herkend_als`` = :func:`recognize_all` op het doel (de aanroeper leest het doel zelf
-    uit); bij meer herkenningen gelden de regels van allemaal. ``requires_backup_claim`` uit het voorstel kan alleen
+    """Zie de moduletekst. ``herkend_als`` = :func:`herken_app` (of :func:`recognize_all`) op het doel (de aanroeper
+    leest het doel zelf uit); bij meer herkenningen gelden de regels van allemaal. Een onvolledige
+    :class:`Herkenning` weigert elke actie op die app. ``requires_backup_claim`` uit het voorstel kan alleen
     **verhogen** (``true``), nooit verlagen."""
-    herkend: tuple[str, ...] = (herkend_als,) if isinstance(herkend_als, str) else tuple(herkend_als or ())
+    onvolledig = isinstance(herkend_als, Herkenning) and not herkend_als.volledig
+    if isinstance(herkend_als, Herkenning):
+        herkend: tuple[str, ...] = herkend_als.apps
+    else:
+        herkend = (herkend_als,) if isinstance(herkend_als, str) else tuple(herkend_als or ())
     eerste = herkend[0] if herkend else None
     aid = action_id.strip().lower()
     target = target or {}
@@ -197,6 +243,9 @@ def classify(
         if b.app in herkend and (b.acties is None or aid in b.acties):
             rules.append(b.id)
             blocks.append(Blokkade(b.id, b.code, b.reden_nl))
+    if onvolledig and actie.doel == "app":
+        rules.append(DOEL_ONHERKENBAAR.id)
+        blocks.append(DOEL_ONHERKENBAAR)
     if actor_type in NIET_MENSELIJK and not actie.ai_mag_voorstellen:
         rules.append("ACTOR:alleen_mens")
         blocks.append(

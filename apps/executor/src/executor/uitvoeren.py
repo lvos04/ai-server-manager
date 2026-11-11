@@ -8,7 +8,8 @@ uitgevoerd):
 3. toestand "gestopt" (na een eerdere afwijking);
 4. allowlist, blokkades, doel- en parameterschema (zonder NAS);
 5. schrijfsleutel aanwezig → verbinding met de vastgelegde vingerafdruk → ``core.get_methods``;
-6. **eigen readback** van het doel → herkenning → risicoklasse en goedkeuring opnieuw;
+6. **eigen readback** van het doel → herkenning (naam, catalogusapp, images; niet vast te stellen wat er in een
+   bestaande app draait → geweigerd) → risicoklasse en goedkeuring opnieuw;
 7. nonce van de goedkeuring (EX20), ETag van het doel (EX19), pools gezond bij een opslagmutatie (EX11);
 8. methode kiezen die deze TrueNAS-versie kent (anders ``capability_unavailable``);
 9. uitvoeren → readback → vergelijken met de verwachting. **Afwijking → de executor stopt** en meldt ``afwijking``;
@@ -30,7 +31,7 @@ from typing import Any
 
 from asm_policy import etag as etags
 from asm_policy.canonical import canonical_sha256
-from asm_policy.engine import recognize_all
+from asm_policy.engine import herken_app, recognize_all
 from asm_policy.execreq import iso
 from asm_policy.loader import ActieDef, Policy
 from asm_policy.params import IX_APP, expected_image, vault_refs
@@ -473,9 +474,11 @@ class Uitvoerder:
                     )
                 return _nas_fout(exc)
             verwachte_image = expected_image(prop["parameters"])
-            refs = etags.app_images(doel.app) if doel.app else [str((verwachte_image or {}).get("repository") or "")]
-            naam = doel.naam if doel.soort.startswith("app") else None
-            herkend = recognize_all(policy, naam, [r for r in refs if r])
+            herkend = (
+                herken_app(policy, doel.naam, doel.app, [str((verwachte_image or {}).get("repository") or "")])
+                if doel.soort.startswith("app")
+                else None
+            )
             _a, eigen, w = check_decision(policy, request, now=now, herkend_als=herkend, uitvoerder="executor")
             if w is not None or eigen is None:
                 return _weiger(w) if w else fout(403, "actie_niet_toegestaan", "Deze actie staat niet op de allowlist.")

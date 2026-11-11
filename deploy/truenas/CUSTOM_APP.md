@@ -192,7 +192,9 @@ getoonde wijziging (15 minuten geldig, één keer bruikbaar), en dan de **execut
 uitvoeren, dan vervalt de goedkeuring en volgt een nieuwe preview.
 
 - **Altijd geweigerd:** shell- of root-opdrachten, verwijderen van datasets, pools of media, alles met de boiler, en
-  elke wijziging aan Emby.
+  elke wijziging aan Emby. Emby wordt herkend aan de appnaam, de catalogusapp en de image. Van een gestopte Custom App
+  toont TrueNAS geen image; dan is niet uit te sluiten dat het Emby, MediaGuard of de mediaserver is, en weigert het
+  platform elke actie op die app (`doel_niet_herkenbaar`), ook met goedkeuring.
 - **Geblokkeerd tot het is opgelost:** pool niet gezond of onbekend, back-up niet groen, executor niet gekoppeld,
   noodstop aan. Zo'n blokkade is niet weg te klikken, ook niet door een beheerder.
 - **Verwijderen van een app** haalt alleen de containers weg; datasets en data blijven staan.

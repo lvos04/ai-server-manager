@@ -78,7 +78,9 @@ def test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_inget
     assert KEY not in str(src) and src["geheim"]["laatste4"] == "cdef"
     r = admin.post(f"/api/v1/monitoring/sources/{src['id']}/test", headers=idem())
     assert r.status_code == 200, r.text
-    assert r.json()["resultaat"] == {"status": "ok", "monitors": 4, "gekoppeld": 3}
+    # Jellyfin is gestopt: TrueNAS toont dan geen poorten (lege active_workloads), dus die monitor koppelt niet
+    # automatisch op hostpoort. Gekoppeld: MediaGuard en Prowlarr.
+    assert r.json()["resultaat"] == {"status": "ok", "monitors": 4, "gekoppeld": 2}
     bron = r.json()["bron"]
     assert bron["status"]["status"] == "ok" and bron["status"]["versie"] == "2.5.9"
 

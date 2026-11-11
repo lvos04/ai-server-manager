@@ -401,6 +401,78 @@ def test_emby_wordt_ook_met_goedkeuring_nooit_aangeraakt(stack: Stack, monkeypat
     assert naar_executor == [] and schrijfaanroepen(nas) == []
 
 
+# ---------------------------------------------------------------------- gestopte apps: dicht bij twijfel
+EMBY_IMAGE = "docker.io/emby/embyserver:4.9.1.80"
+GESTOPT = [
+    pytest.param("mediaserver", EMBY_IMAGE, "emby", "emby_nooit_door_platform", id="catalogusapp-emby"),
+    pytest.param("mediaserver", EMBY_IMAGE, "ix-app", "doel_niet_herkenbaar", id="custom-app-met-emby-image"),
+    pytest.param(
+        "media-guard", "ghcr.io/lvos04/mediaguard-core:1.2.2", "ix-app", "doel_niet_herkenbaar", id="mediaguard"
+    ),
+    pytest.param("jellyleon", "ghcr.io/lvos04/jelly-leon:10.11.0", "ix-app", "doel_niet_herkenbaar", id="jelly-leon"),
+]
+APP_ACTIES = [
+    ("app.uninstall", {}),
+    ("app.update", {"catalog_version": "1.4.15"}),
+    ("app.rollback", {"catalog_version": "1.4.13"}),
+    ("app.start", {}),
+    ("app.restart", {}),
+    ("app.stop", {}),
+]
+
+
+def _gestopte_app(nas: FakeTrueNAS, naam: str, image: str, catalogus: str) -> None:
+    """Een gestopte app zoals TrueNAS hem toont: lege ``active_workloads``, dus geen image te zien."""
+    from fakes.fake_truenas import _app, _image
+
+    app = _app(naam, "STOPPED", image, 30500, 8096, f"/mnt/testpool/apps/{naam}", "/config", catalog_app=catalogus)
+    assert app["active_workloads"]["images"] == []
+    nas.data["app.query"].append(app)
+    nas.data["app.image.query"].append(_image(image))
+
+
+@pytest.mark.parametrize(("naam", "image", "catalogus", "code"), GESTOPT)
+def test_gestopte_beschermde_app_onder_een_andere_naam_wordt_nooit_aangeraakt(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, naam: str, image: str, catalogus: str, code: str
+) -> None:
+    """HARDE EIS: TrueNAS toont bij een gestopte app geen image. Een gestopte Emby, MediaGuard of Jelly Leon onder een
+    andere appnaam is dan alleen te herkennen aan de catalogusapp (``metadata.name``); lukt ook dat niet, dan kan het
+    platform niet uitsluiten dat het een beschermde app is en weigert het elke actie op die app (dicht bij twijfel).
+    Niets gaat naar de executor en TrueNAS krijgt geen enkele schrijfaanroep."""
+    admin, nas = stack.admin, stack.nas
+    naar_executor = _naar_executor(monkeypatch)
+    _gestopte_app(nas, naam, image, catalogus)
+    for action_id, params in APP_ACTIES:
+        key = str(uuid.uuid4())
+        body = {"action_id": action_id, "target": app_target(naam), "parameters": params, "reason": "test"}
+        r = admin.post("/api/v1/actions", json=body, headers={"Idempotency-Key": key})
+        assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", (action_id, r.text)
+        assert code in _codes(r.json()["details"]), (action_id, r.text)
+        assert haal(admin, key)["status"] == "geweigerd"
+        r = voer_uit(admin, key)
+        assert r.status_code == 409 and r.json()["code"] == "status_past_niet", (action_id, r.text)
+    assert naar_executor == [] and schrijfaanroepen(nas) == []
+    gestopt = nas.app(naam)
+    assert gestopt is not None and gestopt["state"] == "STOPPED"
+
+
+def test_gestopte_custom_app_kan_niet_via_het_platform_starten_een_catalogusapp_wel(stack: Stack) -> None:
+    """Tegenproef bij de vorige test. Een Custom App die het platform zelf stopte, toont daarna geen image meer: wat
+    erin draait is niet vast te stellen, dus starten via het platform wordt geweigerd. Een gestopte catalogusapp is
+    te herkennen aan zijn catalogusnaam (hier ``jellyfin``) en start gewoon (R1)."""
+    admin, nas = stack.admin, stack.nas
+    v = stel_voor(admin, "app.stop", app_target("my-house")).json()
+    assert voer_uit(admin, v).status_code == 200 and nas.app("my-house")["state"] == "STOPPED"
+    r = stel_voor(admin, "app.start", app_target("my-house"))
+    assert r.status_code == 403 and "doel_niet_herkenbaar" in _codes(r.json()["details"]), r.text
+    assert schrijfaanroepen(nas) == ["app.stop"]
+    r = stel_voor(admin, "app.start", app_target("jellyfin"))
+    assert r.status_code == 201 and r.json()["risk_class"] == "R1" and r.json()["blokkades"] == [], r.text
+    r = voer_uit(admin, r.json())
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert nas.app("jellyfin")["state"] == "RUNNING" and schrijfaanroepen(nas) == ["app.stop", "app.start"]
+
+
 def _gelijktijdig(eerste: Any, tweede: Any, moment: Any) -> tuple[Any, Any]:
     """Draai ``eerste()``. Precies vóór de flush waarop ``moment(session)`` waar is, start ``tweede()`` in een eigen
     draad (V-044). Is de tweede binnen 3 s klaar, dan was hij eerst; anders wacht hij op een vergrendeling van de

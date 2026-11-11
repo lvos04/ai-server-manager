@@ -114,15 +114,24 @@ def test_herstart_uitgevoerd_met_hashes_readback_en_journaal(stack: Stack) -> No
 
 
 def test_stoppen_en_starten_geven_een_nieuwe_etag(stack: Stack) -> None:
+    """Stoppen en weer starten geven elk een nieuwe ETag. Een catalogusapp blijft gestopt herkenbaar aan zijn
+    catalogusnaam en start gewoon; een gestopte Custom App toont geen image meer, dus starten wordt dan geweigerd."""
     hub, c, nas = stack
-    voor = etag(nas, "my-house")
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R1"))
+    nas.data["app.query"].append(
+        _app("films", "RUNNING", "jellyfin/jellyfin:10.11.0", 30013, 8096, "/mnt/t/f", "/c", catalog_app="jellyfin")
+    )
+    voor = etag(nas, "films")
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "films"), risk_class="R1"))
     assert r.status_code == 200, r.text
     assert r.json()["readback"]["staat"] == "STOPPED" and r.json()["resource_etag"] != voor
-    assert r.json()["resource_etag"] == etag(nas, "my-house")
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "my-house"), risk_class="R1"))
+    assert r.json()["resource_etag"] == etag(nas, "films")
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "films"), risk_class="R1"))
     assert r.status_code == 200 and r.json()["resource_etag"] == voor, r.text
-    assert writes(nas) == ["app.stop", "app.start"]
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R1"))
+    assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "my-house"), risk_class="R1"))
+    assert r.status_code == 403 and r.json()["details"]["blokkades"][0]["code"] == "doel_niet_herkenbaar", r.text
+    assert writes(nas) == ["app.stop", "app.start", "app.stop"]
 
 
 def test_exacte_herhaling_met_hetzelfde_token_geeft_hetzelfde_antwoord(stack: Stack) -> None:
@@ -272,12 +281,17 @@ def test_doel_gewijzigd_sinds_de_goedkeuring_wordt_niet_uitgevoerd(stack: Stack)
     prop = app_prop(nas, "app.uninstall", "my-house")
     app = nas.app("my-house")
     assert app is not None
-    nas._set_state(app, "STOPPED")  # wijziging buiten het platform om
+    nas._set_state(app, "CRASHED")  # wijziging buiten het platform om
     r = execute(c, hub, approved(hub, prop))
     assert r.status_code == 409 and r.json()["code"] == "doel_gewijzigd", r.text
     assert r.json()["details"] == {"verwacht": prop["expected_version"], "gevonden": etag(nas, "my-house")}
     assert writes(nas) == [] and nas.deleted == []
-    # Een andere image telt net zo.
+    # Buiten het platform om gestopt: dan is niet eens meer te zien wat erin draait, dus geweigerd.
+    nas._set_state(app, "STOPPED")
+    r = execute(c, hub, approved(hub, prop))
+    assert r.status_code == 403 and r.json()["details"]["blokkades"][0]["code"] == "doel_niet_herkenbaar", r.text
+    # Een andere image telt net zo (de app draait weer).
+    nas._set_state(app, "RUNNING")
     prop = app_prop(nas, "app.uninstall", "my-house")
     nas._set_image(app, {"repository": "ghcr.io/voorbeeld/anders", "tag": "9.9.9"})
     r = execute(c, hub, approved(hub, prop))
@@ -286,16 +300,17 @@ def test_doel_gewijzigd_sinds_de_goedkeuring_wordt_niet_uitgevoerd(stack: Stack)
 
 
 def test_goedkeuring_is_eenmalig(stack: Stack) -> None:
-    """EX20: dezelfde goedkeuring in een tweede (nieuw ondertekend) verzoek wordt geweigerd."""
+    """EX20: dezelfde goedkeuring in een tweede (nieuw ondertekend) verzoek wordt geweigerd. (Herstarten: de app
+    draait daarna weer en blijft dus herkenbaar; een gestopte Custom App wordt al eerder geweigerd.)"""
     hub, c, nas = stack
-    prop = app_prop(nas, "app.stop", "my-house")
+    prop = app_prop(nas, "app.restart", "my-house")
     approval = approval_for(prop, policy_hash=POLICY.hash, risk_class="R2")
     r = execute(c, hub, signed(hub, prop, risk_class="R2", approval=approval))
     assert r.status_code == 200, r.text
     assert r.json()["request_id"] == approval["request_id"]
     r = execute(c, hub, signed(hub, prop, risk_class="R2", approval=copy.deepcopy(approval)))
     assert r.status_code == 409 and r.json()["code"] == "goedkeuring_al_gebruikt", r.text
-    assert writes(nas) == ["app.stop"]
+    assert writes(nas) == ["app.redeploy"]
 
 
 def test_herstelpunt_verplicht_bij_update_en_terugzetten(stack: Stack) -> None:
@@ -329,6 +344,39 @@ def test_emby_onder_een_andere_naam_wordt_herkend_op_de_image(stack: Stack) -> N
         assert r.json()["details"]["blokkades"][0]["code"] == "emby_nooit_door_platform"
     app = nas.app("films")
     assert writes(nas) == [] and app is not None and app["state"] == "RUNNING"
+
+
+@pytest.mark.parametrize(
+    ("naam", "image", "catalogus", "code"),
+    [
+        pytest.param("mediaserver", "emby/embyserver:4.8.10.0", "emby", "emby_nooit_door_platform", id="cat-emby"),
+        pytest.param("mediaserver", "emby/embyserver:4.8.10.0", "ix-app", "doel_niet_herkenbaar", id="custom-emby"),
+        pytest.param("media-guard", "ghcr.io/lvos04/mediaguard-core:1.2.2", "ix-app", "doel_niet_herkenbaar", id="mg"),
+        pytest.param("jellyleon", "ghcr.io/lvos04/jelly-leon:10.11.0", "ix-app", "doel_niet_herkenbaar", id="jl"),
+    ],
+)
+def test_gestopte_app_zonder_zichtbare_image_weigert_de_executor_zelf(
+    stack: Stack, naam: str, image: str, catalogus: str, code: str
+) -> None:
+    """TrueNAS toont bij een gestopte app geen image. De executor herkent dan op de catalogusapp (``metadata.name``)
+    en weigert anders elke actie op die app: het kan Emby, MediaGuard of de mediaserver zijn. Ook een door de Hub
+    ondertekend en goedgekeurd verzoek (R3) haalt dat niet open."""
+    hub, c, nas = stack
+    nas.data["app.query"].append(_app(naam, "STOPPED", image, 8096, 8096, "/mnt/t/x", "/c", catalog_app=catalogus))
+    acties: list[tuple[str, dict[str, Any]]] = [
+        ("app.uninstall", {}),
+        ("app.update", {"catalog_version": "1.4.15"}),
+        ("app.rollback", {"catalog_version": "1.4.13"}),
+        ("app.start", {}),
+        ("app.restart", {}),
+        ("app.stop", {}),
+    ]
+    for action, params in acties:
+        r = execute(c, hub, approved(hub, app_prop(nas, action, naam, params), risk_class="R3"))
+        assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", (action, r.text)
+        assert code in [b["code"] for b in r.json()["details"]["blokkades"]], (action, r.text)
+    app = nas.app(naam)
+    assert writes(nas) == [] and app is not None and app["state"] == "STOPPED"
 
 
 def test_de_executor_wijzigt_zichzelf_niet(stack: Stack) -> None:

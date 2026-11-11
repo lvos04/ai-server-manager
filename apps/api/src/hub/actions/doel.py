@@ -2,7 +2,9 @@
 
 De Hub leest het doel met zijn alleen-lezen TrueNAS-sleutel en rekent de ``resource_etag`` met dezelfde functie als de
 executor (:mod:`asm_policy.etag`). Kan de Hub het doel niet lezen, dan is de toestand onbekend en komt er geen preview
-en geen goedkeuring (fail-closed) — onbekend telt nooit als "ongewijzigd".
+en geen goedkeuring (fail-closed) — onbekend telt nooit als "ongewijzigd". De herkenning van een app (naam,
+catalogusapp en images) komt uit :func:`asm_policy.engine.herken_app`, net als in de executor; is niet vast te stellen
+wat er in een bestaande app draait (gestopt, geen catalogusapp), dan weigert het beleid elke actie erop.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from typing import Any
 
 from asm_policy import Policy
 from asm_policy import etag as etags
-from asm_policy.engine import recognize_all
+from asm_policy.engine import Herkenning, herken_app
 from asm_policy.loader import ActieDef
 from asm_policy.params import expected_image
 from sqlalchemy.orm import Session
@@ -40,7 +42,8 @@ class Doel:
     etag: str
     bestaat: bool
     staat: dict[str, Any] = field(default_factory=dict)
-    herkend_als: tuple[str, ...] = ()  # alle herkenningen (naam én image); de regels van allemaal gelden
+    # Alle herkenningen (naam, catalogusapp en image; de regels van allemaal gelden) en of die volledig is.
+    herkend_als: Herkenning = field(default_factory=lambda: Herkenning((), True))
     extra_bestaat: bool = False  # snapshot of sandbox-dataset bestaat al
 
     @property
@@ -79,14 +82,13 @@ async def _lees(
         images = [i for i in (await client.call("app.image.query") or []) if isinstance(i, dict)]
         app = next((a for a in apps or [] if isinstance(a, dict) and a.get("name") == name), None)
         verwacht = expected_image(parameters)
-        refs = etags.app_images(app) if app else [str((verwacht or {}).get("repository") or "")]
         return Doel(
             actie.doel,
             name,
             etags.app_etag(app, images),
             app is not None,
             etags.app_state(app, images) if app is not None else {"naam": name, "afwezig": True},
-            recognize_all(policy, name, [r for r in refs if r]),
+            herken_app(policy, name, app, [str((verwacht or {}).get("repository") or "")]),
         )
     tree = await client.call("pool.dataset.query")
     if actie.doel == "dataset":

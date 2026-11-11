@@ -129,10 +129,19 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 20. **Twee keer classificeren.** Eerst zonder de NAS (verboden, boiler, gereserveerd, onbekend, schema), daarna met de
     eigen readback van het doel (kritieke of beschermde app). Kan de Hub het doel niet lezen, dan `409 doel_onbekend`:
     onbekend telt nooit als ongewijzigd, en zonder readback is er geen preview en geen `resource_etag`.
-21. **Herkenning op naam én image.** Wijzen de appnaam en de image naar verschillende bekende apps, dan gelden de
-    regels van beide (`recognize_all`); de strengste wint. Zo verliest een app met de naam `emby` de Emby-bescherming
-    niet door een andere image, en wordt een kritieke app niet R1 doordat zijn image op een gewone app lijkt. Hub en
-    executor gebruiken dezelfde functie.
+21. **Herkenning op naam, catalogusapp én image; dicht bij twijfel.** Wijzen de appnaam, de catalogusapp
+    (`metadata.name`, behalve `ix-app`) en de image naar verschillende bekende apps, dan gelden de regels van allemaal
+    (`recognize_all`); de strengste wint. Zo verliest een app met de naam `emby` de Emby-bescherming niet door een
+    andere image, en wordt een kritieke app niet R1 doordat zijn image op een gewone app lijkt. TrueNAS toont bij een
+    gestopte app geen image (lege `active_workloads`; middleware `plugins/apps/ix_apps/query.py`, `list_apps`, gelezen
+    in release/25.04.2 en release/25.10.0, NIET GEVALIDEERD op een echte NAS). Een catalogusapp blijft herkenbaar aan
+    zijn catalogusnaam: de catalogus legt zijn images vast en het formulier laat hooguit kiezen uit die images, nooit
+    een eigen repository (gelezen in `truenas/apps`, o.a. emby, plex en jellyfin). Is van een bestaande app niet vast
+    te stellen wat erin draait (geen image te zien en geen catalogusapp, zoals een gestopte Custom App), dan weigert
+    het beleid elke actie op die app (`DOEL-ONHERKENBAAR`, `doel_niet_herkenbaar`), ook met goedkeuring: het kan Emby,
+    MediaGuard of de mediaserver onder een andere naam zijn. Gevolg: een gestopte Custom App start, wijzigt of
+    verwijdert het platform niet. Hub en executor gebruiken dezelfde functie (`herken_app`) op hun eigen readback; de
+    nagebootste TrueNAS in de tests geeft bij een gestopte app dezelfde lege `active_workloads`.
 22. **Fout mét of zonder vastlegging.** Een weigering die de toestand van het verzoek verandert (goedkeuring vervallen,
     voorstel verlopen, uitvoering mislukt, afwijking, uitkomst onbekend) wordt samen met die wijziging vastgelegd en
     is daarna het idempotente antwoord op dezelfde sleutel. Elke andere fout laat de database ongemoeid.

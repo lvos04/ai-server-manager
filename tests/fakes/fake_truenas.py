@@ -14,6 +14,11 @@ elke andere sleutel krijgt ``EACCES``. App-methoden zijn jobs (een job-id als an
 ``core.get_jobs``); de wijziging staat direct in de testdata. Testknoppen: ``fail`` (methode → foutmelding),
 ``silent_noop`` (job "geslaagd" zonder wijziging), ``digest_override`` (repository → andere digest dan gevraagd),
 ``hidden`` (methoden die deze "versie" niet aanbiedt) en ``job_polls`` (aantal keer RUNNING vóór de eindstaat).
+
+Een gestopte app (``STOPPED``) heeft lege ``active_workloads``: geen images, containers, poorten of volumes, net als in
+de broncode van TrueNAS (middleware ``plugins/apps/ix_apps/query.py``, ``list_apps`` en
+``get_default_workload_values``; gelezen in release/25.04.2 en release/25.10.0, NIET GEVALIDEERD op een echte NAS).
+De werklast van daarvoor bewaart de fake apart (``_werklast``) en zet hij terug bij het starten.
 """
 
 from __future__ import annotations
@@ -443,8 +448,9 @@ def _app(
     custom_app: bool = False,
 ) -> dict[str, Any]:
     """Standaard Custom App = catalogus-app ``ix-app`` (``custom_app: false``); ``custom_app: true`` is een
-    compose-app (Install via YAML) — zo leest de Hub het in de broncode van TrueNAS (NIET GEVALIDEERD op een NAS)."""
-    return {
+    compose-app (Install via YAML) — zo leest de Hub het in de broncode van TrueNAS (NIET GEVALIDEERD op een NAS).
+    Gestopt: lege ``active_workloads`` (zie de kop van dit bestand)."""
+    app: dict[str, Any] = {
         "name": name,
         "id": name,
         "state": state,
@@ -457,20 +463,30 @@ def _app(
         "metadata": {"app_version": image.rsplit(":", 1)[-1], "name": catalog_app, "train": "stable"},
         "portals": {"Web UI": f"http://0.0.0.0:{host_port}/"},
         "config": {"env": {"SECRET_TOKEN": "mag-nooit-opgehaald-worden"}},
-        "active_workloads": {
-            "containers": 1 if state == "RUNNING" else 0,
-            "used_ports": [
-                {
-                    "container_port": container_port,
-                    "protocol": "tcp",
-                    "host_ports": [{"host_port": host_port, "host_ip": "0.0.0.0"}],
-                }
-            ],
-            "container_details": [{"service_name": name, "image": image, "state": state.lower()}],
-            "volumes": [{"source": src, "destination": dst, "mode": "rw", "type": "bind"}],
-            "images": [image],
-        },
     }
+    werklast = {
+        "containers": 1 if state == "RUNNING" else 0,
+        "used_ports": [
+            {
+                "container_port": container_port,
+                "protocol": "tcp",
+                "host_ports": [{"host_port": host_port, "host_ip": "0.0.0.0"}],
+            }
+        ],
+        "container_details": [{"service_name": name, "image": image, "state": state.lower()}],
+        "volumes": [{"source": src, "destination": dst, "mode": "rw", "type": "bind"}],
+        "images": [image],
+    }
+    if state == "STOPPED":
+        app["active_workloads"], app["_werklast"] = lege_werklast(), werklast
+    else:
+        app["active_workloads"] = werklast
+    return app
+
+
+def lege_werklast() -> dict[str, Any]:
+    """``active_workloads`` van een gestopte app zoals TrueNAS hem geeft (``get_default_workload_values``)."""
+    return {"containers": 0, "used_ports": [], "container_details": [], "volumes": [], "images": [], "networks": []}
 
 
 @dataclass
@@ -733,7 +749,7 @@ class FakeTrueNAS:
             return []
         value = self.data.get(method)
         if method == "app.query" and isinstance(value, list):
-            return [{k: v for k, v in a.items() if k != "config"} for a in value]
+            return [{k: v for k, v in a.items() if k != "config" and not k.startswith("_")} for a in value]
         return value
 
     # ---------------------------------------------------------------- schrijven (executor, fase P2)
@@ -786,7 +802,7 @@ class FakeTrueNAS:
         ref = f"{repo}:{tag}"
         version, _sep, pinned = tag.partition("@")
         digest = self.digest_override.get(repo) or pinned or "sha256:" + hashlib.sha256(ref.encode()).hexdigest()
-        wl = app["active_workloads"]
+        wl = app.get("_werklast") or app["active_workloads"]  # gestopt: de bewaarde werklast
         wl["images"] = [ref]
         for c in wl["container_details"]:
             c["image"] = ref
@@ -799,7 +815,16 @@ class FakeTrueNAS:
         ] + [entry]
 
     def _set_state(self, app: dict[str, Any], state: str) -> None:
+        """Staat wijzigen zoals TrueNAS: gestopt = lege ``active_workloads`` (de werklast blijft bewaard voor het
+        starten)."""
         app["state"] = state
+        if state == "STOPPED":
+            if "_werklast" not in app:
+                app["_werklast"] = app["active_workloads"]
+            app["active_workloads"] = lege_werklast()
+            return
+        if "_werklast" in app:
+            app["active_workloads"] = app.pop("_werklast")
         app["active_workloads"]["containers"] = 1 if state == "RUNNING" else 0
         for c in app["active_workloads"]["container_details"]:
             c["state"] = state.lower()

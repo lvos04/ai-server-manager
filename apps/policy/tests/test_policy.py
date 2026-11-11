@@ -14,7 +14,7 @@ from policyhelpers import DIGEST, DIGEST_B, HOST, POLICY_DIR, approval_for, exec
 
 from asm_policy import PolicyError, execreq, load_policy, policy_hash
 from asm_policy.canonical import CanonicalError, canonical_json, canonical_sha256
-from asm_policy.engine import classify, recognize, recognize_all
+from asm_policy.engine import classify, herken_app, recognize, recognize_all
 from asm_policy.etag import ABSENT, app_etag
 from asm_policy.loader import is_read_only
 from asm_policy.params import expected_image, validate_parameters, validate_target, vault_refs
@@ -261,6 +261,81 @@ def test_naam_en_image_wijzen_naar_verschillende_apps_dan_gelden_beide() -> None
     ).geweigerd
     assert recognize_all(POLICY, "iets-anders", ["ghcr.io/x/y:1"]) == ()
     assert recognize_all(POLICY, "authentik-server", ["docker.io/emby/embyserver:4"]) == ("authentik", "emby")
+
+
+def _readback(naam: str, staat: str, images: list[str], catalogus: str = "ix-app", custom: bool = False) -> Any:
+    """Een app zoals ``app.query`` hem geeft; gestopt = lege ``active_workloads`` (zoals TrueNAS)."""
+    details = [{"service_name": naam, "image": i, "state": staat.lower()} for i in images]
+    return {
+        "name": naam,
+        "state": staat,
+        "custom_app": custom,
+        "metadata": {"name": catalogus, "train": "stable"},
+        "active_workloads": {"images": images, "container_details": details},
+    }
+
+
+APP_ACTIES = ("app.uninstall", "app.update", "app.rollback", "app.start", "app.restart", "app.stop")
+
+
+def test_gestopte_app_herkenning_op_de_catalogusapp_en_anders_dicht() -> None:
+    """TrueNAS toont bij een gestopte app geen image. Een catalogusapp blijft herkenbaar aan ``metadata.name``; een
+    Custom App (``ix-app``) of compose-app zonder zichtbare image is niet herkenbaar en dan weigert het beleid elke
+    actie op die app: het kan Emby, MediaGuard of de mediaserver zijn (dicht bij twijfel)."""
+    emby = herken_app(POLICY, "mediaserver", _readback("mediaserver", "STOPPED", [], catalogus="emby"))
+    assert emby.apps == ("emby",) and emby.volledig
+    for aid in APP_ACTIES:
+        c = classify(POLICY, action_id=aid, target=APP, parameters={}, actor_type="user", herkend_als=emby)
+        assert c.geweigerd and "emby_nooit_door_platform" in [b.code for b in c.blokkades], aid
+    for gestopt in (
+        _readback("mediaserver", "STOPPED", []),
+        _readback("media-guard", "STOPPED", []),
+        _readback("my-house", "STOPPED", []),  # ook een bekende naam: wat erin draait is niet te zien
+        _readback("web", "STOPPED", [], catalogus="", custom=True),
+    ):
+        h = herken_app(POLICY, str(gestopt["name"]), gestopt)
+        assert not h.volledig, gestopt
+        for aid in APP_ACTIES:
+            c = classify(POLICY, action_id=aid, target=APP, parameters={}, actor_type="user", herkend_als=h)
+            assert c.geweigerd and "doel_niet_herkenbaar" in [b.code for b in c.blokkades], (aid, gestopt)
+            assert "DOEL-ONHERKENBAAR" in c.rule_ids
+    # Tegenproeven: een zichtbare image, een gestopte catalogusapp en een nieuwe app zijn wél vast te stellen.
+    draait = herken_app(POLICY, "my-house", _readback("my-house", "RUNNING", ["ghcr.io/lvos04/my_house:0.1.0"]))
+    assert draait.volledig and draait.apps == ("my_house",)
+    c = classify(POLICY, action_id="app.start", target=APP, parameters={}, actor_type="user", herkend_als=draait)
+    assert not c.geweigerd and c.risk_class == "R1"
+    jf = herken_app(POLICY, "films", _readback("films", "STOPPED", [], catalogus="jellyfin"))
+    assert jf.volledig and jf.apps == ("jellyfin",)
+    c = classify(POLICY, action_id="app.start", target=APP, parameters={}, actor_type="user", herkend_als=jf)
+    assert not c.geweigerd and c.risk_class == "R1"
+    c = classify(POLICY, action_id="app.uninstall", target=APP, parameters={}, actor_type="user", herkend_als=jf)
+    assert [b.code for b in c.blokkades] == ["mediaserver_migratie_vraagt_rapport"]
+    nieuw = herken_app(POLICY, "demo-app", None, ["ghcr.io/voorbeeld/demo-app"])
+    assert nieuw.volledig and nieuw.apps == ()
+    assert herken_app(POLICY, "nieuw", None, ["docker.io/emby/embyserver"]).apps == ("emby",)
+    # De catalogusnaam telt ook bij een draaiende app mee (alleen strenger): naam en image van iets anders.
+    mix = herken_app(POLICY, "films", _readback("films", "RUNNING", ["ghcr.io/x/y:1"], catalogus="emby"))
+    assert mix.apps == ("emby",) and mix.volledig
+    # Acties zonder app als doel kijken niet naar de herkenning van een app.
+    leeg = herken_app(POLICY, "x", _readback("x", "STOPPED", []))
+    melding = {"host_id": HOST}
+    c = classify(
+        POLICY, action_id="notification.send", target=melding, parameters={}, actor_type="user", herkend_als=leeg
+    )
+    assert "doel_niet_herkenbaar" not in [b.code for b in c.blokkades]
+
+
+def test_executor_en_hub_geven_een_onvolledige_herkenning_door_aan_de_weigering() -> None:
+    """``check_decision`` (Hub vlak vóór verzending én executor) weigert bij een onvolledige herkenning, ook met een
+    geldige goedkeuring en R3 in het verzoek."""
+    prop = proposal("app.uninstall", {"host_id": HOST, "app_id": "mediaserver"}, {})
+    approval = approval_for(prop, policy_hash=POLICY.hash, risk_class="R3", now=NU)
+    key = Ed25519PrivateKey.generate()
+    req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R3", approval=approval, now=NU)
+    gestopt = herken_app(POLICY, "mediaserver", _readback("mediaserver", "STOPPED", []))
+    _a, _c, w = check_decision(POLICY, req, now=NU, herkend_als=gestopt, uitvoerder="executor")
+    assert w is not None and w.status == 403 and w.code == "actie_geweigerd"
+    assert [b["code"] for b in w.details["blokkades"]] == ["doel_niet_herkenbaar"]
 
 
 # ------------------------------------------------------------------ doel en parameters
