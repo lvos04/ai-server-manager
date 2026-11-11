@@ -290,3 +290,73 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   C-11, C-12, Z-17, Z-19, Z-20) staan in `UITVOERINGSPLAN/BESLUITEN_EN_BLOKKADES.md` kop 1.5; de vastlegging in de
   besluitendocumenten volgt in stap S-P2-005.
 - Het werkexemplaar met de bijgehouden voortgang staat op de bouwmachine in `/home/transcode/truenas-v2/.lokaal/plan/uit`.
+
+## Besluiten van de gebruiker van 2026-11-11 (keuzemenu)
+
+Genomen via een keuzemenu van de regisseur op 2026-11-11; vastgelegd in stap S-P2-005. Geen van deze besluiten is een
+BG-besluit, dus ze staan niet in `02_BOUWPLANNEN/B03_BESLUITEN.md`. Menu's, opties en gevolgen per stap:
+`UITVOERINGSPLAN/BESLUITEN_EN_BLOKKADES.md`, kop "1.5 Besluiten uit het keuzemenu van 2026-11-11" en de kop per besluit.
+
+- **Z-04 — Afwijkende attributieregels in oude commits (10:44).** Vraag: "In de commits tot en met 10 november staat
+  een attributieregel met een modelnaam erin. Dat botst met de regel 'geen modelnaam in commits'. De historie aanpassen
+  kan alleen met een force-push, en die is verboden. Wat wil je?" Antwoord: "Laten staan; alleen nieuwe commits volgen
+  de regel." Gevolg: de historie wordt niet herschreven en er komt geen force-push; nieuwe commits eindigen met de vaste
+  attributieregel zonder modelnaam.
+- **Z-05 — Testwaarde met de vorm van een echt GitHub-token (10:44; omvang 11:47).** Vraag: "In een test van
+  jelly-leon-web staat een nepwaarde die de vorm van een GitHub-token heeft. Mag die worden vervangen door een neutrale
+  testwaarde?" Antwoord: "Ja, vervangen in een nieuwe commit" (de historie blijft ongewijzigd, zie Z-04); omvang
+  (11:47): "test + ADR-0010 samen in één commit". Uitgevoerd in jelly-leon-web, commit `b586db650`
+  (`tools/jelly-leon-web/tests/test_sync_workflow.py` en `docs/adr/ADR-0010-contract-1-2.md`); CI-run 43006625770
+  (Jelly Leon Web CI) op die commit: success.
+- **C-11 — Anonieme toegang tot de Node-RED-editor (10:52).** Onderwerp van de vraag (de letterlijke menutekst is niet
+  bewaard): jelly-leon-platform (`install/manifests/node-red.manifest.yaml`, ADR-0023 besluit 4) staat anoniem alleen
+  lezen toe, terwijl home-control-hub voor B11-001 eist dat een lezer zonder aanmelding 401 krijgt (controle
+  `anoniem_geweigerd`). Antwoord: "Geen anonieme toegang; de editor is alleen bruikbaar via een beheerder. Het
+  manifest/ADR-0023 in jelly-leon-platform wordt aangepast; home-control-hub houdt zijn controle." Gevolg: het manifest,
+  de rooktest, de repotest en ADR-0023 in jelly-leon-platform krijgen een negatieve test (anonieme aanvraag → 401);
+  home-control-hub houdt `anoniem_geweigerd` op 401. Zonder beheerder is de editor dicht tot C-12 is uitgevoerd.
+- **C-12 — Hoe krijgt Node-RED een beheerder en een dienstaccount? (11:25).** Vraag: "Node-RED heeft na jouw besluit
+  (geen anonieme toegang) een beheerder nodig, en home-control-hub een eigen dienstaccount om mee te lezen.
+  home-control-hub kan nu formulierargumenten maken met die twee accounts en een sleutel voor de versleuteling. Het
+  contract verbiedt geheimen in het Custom App-formulier. Hoe regelen we de accounts?" Antwoord (optie 1, "Voorziening
+  zonder geheim"): de manifeststandaard (appstore-en-fork) krijgt een voorziening voor een beheerder en een dienstaccount
+  zonder geheim in het Custom App-formulier; het profiel van home-control-hub (`build_profile` / `define_arguments` /
+  `credentialSecret`) vervalt of wordt daaraan gelijkgetrokken. Gevolg: geen uitzondering in contract kop "3.1
+  Uitgangspunten" (dat was optie 2). Eerst een ontwerp-ADR in appstore-en-fork, daarna de bouw in P3 (appstore-en-fork,
+  jelly-leon-platform en home-control-hub, elk een eigen stap). Stelt dat ontwerp-ADR een wijziging van contract kop 3.1
+  of kop 9 vast, dan komt die contractronde vóór de gate van P2.
+- **Z-17 — Zigbee2MQTT in of naast de image van my_house (11:25).** Vraag: "my_house wordt één standaard Custom App met
+  één image. Zigbee2MQTT, het programma dat de Zigbee-USB-stick bedient, kan op twee manieren mee. Of het
+  TrueNAS-formulier op jouw NAS een USB-apparaat aan een app kan doorgeven, is nog niet getest. Welke manier wil je?"
+  Antwoord (optie 1, variant a): "Zigbee2MQTT IN de image van my_house, optioneel (alleen aan als in het formulier een
+  USB-apparaat is opgegeven)". Gevolg: in P3 komt Zigbee2MQTT als optioneel proces in de image en de bewaker van
+  my_house; zonder doorgegeven USB-apparaat start het niet en is dat geen fout. MQTT blijft alleen binnen de container
+  luisteren. Hoe het manifest de optionele stick vastlegt, is nog open (Z-21); zonder dat besluit krijgt het manifest
+  geen apparaat. Werken met echte Zigbee-hardware blijft NIET GEVALIDEERD (hardware).
+- **Z-19 — "Module uit": 404 of 501 (11:25).** Vraag: "Als een module van Jelly Leon uit staat, wat krijgt een
+  aangemelde gebruiker dan terug op de routes van die module? De pluginlaag geeft nu 404 ('niet gevonden'). De
+  werkpakketten B03-033 en B03-035 vragen 501 `capability_unavailable` ('functie niet beschikbaar'). Wie niet is
+  aangemeld krijgt in beide gevallen 401." Antwoord (optie 1): "'module uit' geeft 404 zoals ADR-0030; afwijking van
+  WP-JSON in het bewijs vermelden". Gevolg: geen herstelstap in jelly-leon (ADR-0030 van jelly-leon, punt 2, blijft
+  gelden). In deze commit staat de acceptatie van B03-033 en B03-035 in `08_EXCEL/b03/werkpakketten.json` (en dezelfde
+  rijen in `08_EXCEL/tasks.json`) op 404. Het bouwplan `02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md`, kop "F2.5.1
+  Algemene regels", noemt bij "Module uit" nog 501; dit besluit gaat voor.
+- **Z-20 — Zes B03-werkpakketten zonder golf (11:25).** Vraag: "Volgens het fasedocument hoort bij P4 ook scene search,
+  live-tv/DVR en offline apps waar haalbaar. In de golfplanning van B03 2.0 hebben zes oudere werkpakketten geen plek:
+  universele bibliotheek, beschikbaarheid van clients, metadata en anime-mapping, semantische scènezoeker, offline
+  downloaden en live-tv/DVR. Wat doen we ermee? Je mag per werkpakket anders kiezen." Antwoord (optie 1, voor alle zes):
+  "B03-002, -003, -006, -008, -011, -012 IN P4 BOUWEN (per werkpakket eerst A-VERKEN, dan stappen in een golf)".
+  Gevolg: golf 3 krijgt B03-006 (stappen S-G3-28 en S-G3-29; BG-17 wordt vóór S-G3-28 voorgelegd), B03-002 (S-G3-30;
+  S-G3-31 alleen als de verkenning van S-G3-30 een webdeel noemt) en B03-003 (S-G3-32); golf 4 krijgt B03-008 (S-G4-49
+  en S-G4-50; in P4 alleen zoeken in de tekst van ondertitelcues, spraak en embeddings wachten op BG-06), B03-011
+  (S-G4-51 en S-G4-52) en B03-012 (S-G4-53 en S-G4-54). Stappen: `UITVOERINGSPLAN/STAPPEN_P4_GOLF3_4.md`. Vastgelegd
+  in `02_BOUWPLANNEN/B03_FASERING.md` kop "3. Golven en werkpakketten" en in `08_EXCEL/b03/werkpakketten.json` (en
+  dezelfde rijen in `08_EXCEL/tasks.json`). Delen die de echte NAS of echte apparaten vragen (bijvoorbeeld een
+  live-tv-tuner) blijven NIET GEVALIDEERD (echte NAS) tot P6.
+- **Vault-verwijzingen ook voor Custom Apps (12:00, bij stap S-P2-500 in appstore-en-fork).** Vraag (uit de verkenning
+  van die stap): krijgt ook een Custom App de vault-verwijzing (`custom_app.env[].value_from` naar een geheim dat de Hub
+  maakt), of alleen de `values` van een catalogusapp? Antwoord: "vault-verwijzingen ook voor Custom Apps (env), niet
+  alleen catalogusapps". Gevolg: dit botst met contract kop "3.1 Uitgangspunten" ("Nooit geheimen in het Custom
+  App-formulier"; punt (a) noemt alleen catalogusapps). Daarvoor is een uitzondering in het contract nodig, in een eigen
+  contractronde in deze repo met de kopieën in alle repos; het contract is bij dit vastleggen niet gewijzigd. De
+  executor vult zulke verwijzingen nog niet in (ADR-0030 besluit 28: eerlijk `501 capability_unavailable`).
