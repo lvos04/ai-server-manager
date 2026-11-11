@@ -11,7 +11,7 @@ export default function Page() {
     <>
       <PageHeader
         title="Executor installeren en koppelen"
-        intro="De executor is de enige app met een TrueNAS-key met schrijfrechten. Hij voert alleen door de Hub ondertekende, goedgekeurde acties uit uit een vaste lijst — nooit shell, sudo of Docker."
+        intro="De executor is de enige app met een TrueNAS-key met schrijfrechten. Hij voert alleen acties uit een vaste lijst uit die de Hub heeft ondertekend — nooit shell, sudo of Docker."
       />
       <div className="stack">
         <section className="card stack" aria-labelledby="status" data-testid="executor-status">
