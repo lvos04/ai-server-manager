@@ -597,6 +597,55 @@ def test_verlopen_goedkeuring_telt_niet(stack: Stack) -> None:
     assert schrijfaanroepen(nas) == [] and "action.approval.expired" in audit_acties(stack.app)
 
 
+def test_veeg_in_een_leesroute_schrijft_niet_over_een_uitvoering_heen(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0030 besluit 23: terwijl een uitvoering de rij van het verzoek vasthoudt, verloopt de goedkeuring en vraagt
+    iemand de lijst op. De veeg in die leesroute wacht niet op de uitvoering en schrijft er niets overheen: een
+    gebruikte goedkeuring is nooit ook "verlopen", en een verzoek verlaat "bezig" alleen via de uitvoerende
+    transactie. (De goedkeuring is inmiddels verlopen; de eigen controle van de Hub stuurt dan niets naar de
+    executor.)"""
+    from sqlalchemy import select, update
+
+    from hub.models import ActionRequest, Approval
+    from hub.timeutil import utcnow
+
+    admin, nas = stack.admin, stack.nas
+    lezer = login_as(stack.app, "beheerder")
+    v = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
+    naar_executor = _naar_executor(monkeypatch)
+    rid = uuid.UUID(v["request_id"])
+
+    def verlopen_en_lijst_lezen() -> Any:
+        with stack.app.state.sessionmaker() as db:
+            db.execute(
+                update(Approval).where(Approval.request_id == rid).values(expires_at=utcnow() - timedelta(seconds=5))
+            )
+            db.commit()
+        return lezer.get("/api/v1/actions")
+
+    r1, r2 = _gelijktijdig(
+        lambda: voer_uit(admin, v),
+        verlopen_en_lijst_lezen,
+        lambda s: any(isinstance(o, ActionRequest) and o.id == rid for o in s.dirty),
+    )
+    assert r2.status_code == 200, r2.text
+    assert r1.status_code == 409 and r1.json()["code"] == "uitvoering_geweigerd", r1.text
+    assert r1.json()["details"]["code"] == "goedkeuring_verlopen", r1.text
+    with stack.app.state.sessionmaker() as db:
+        rijen = list(db.scalars(select(Approval).where(Approval.request_id == rid)))
+    assert len(rijen) == 1 and rijen[0].used_at is not None, rijen
+    assert rijen[0].vervallen_op is None and rijen[0].vervallen_reden is None, (
+        rijen[0].vervallen_op,
+        rijen[0].vervallen_reden,
+    )
+    assert "action.approval.expired" not in audit_acties(stack.app)
+    nu = haal(admin, v)
+    assert nu["status"] == "mislukt" and nu["resultaat"]["code"] == "goedkeuring_verlopen", nu
+    assert naar_executor == [] and schrijfaanroepen(nas) == []
+
+
 def test_afwijzen_en_verlopen_voorstel(stack: Stack) -> None:
     from hub.models import ActionRequest
     from hub.timeutil import utcnow

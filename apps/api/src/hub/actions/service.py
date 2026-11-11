@@ -167,30 +167,54 @@ def haal(db: Session, request_id: uuid.UUID, *, vergrendel: bool = False) -> Act
 
 # ------------------------------------------------------------------ tijdgebonden overgangen
 def veeg(db: Session, now: datetime | None = None) -> None:
-    """Verlopen goedkeuringen en verlopen voorstellen bijwerken. De aanroeper commit."""
+    """Verlopen goedkeuringen en verlopen voorstellen bijwerken. De aanroeper commit.
+
+    Alleen verzoeken waarvan deze transactie de rij kan vergrendelen (``FOR UPDATE SKIP LOCKED``; de eigen rij van de
+    aanroeper telt mee). Een verzoek dat een andere transactie nu goedkeurt, afwijst, uitvoert of opheldert, slaat de
+    veeg over: die houdt de rij vast en ziet zelf wat er verlopen is. Op de vergrendelde rij gelden de voorwaarden
+    opnieuw, zodat een gebruikte goedkeuring nooit ook "verlopen" wordt en een verzoek dat al ``bezig`` is nooit
+    terug gaat (ADR-0030 besluit 23). De volgorde (eerst het verzoek, dan zijn goedkeuringen) is dezelfde als in
+    goedkeuren en uitvoeren."""
     now = now or utcnow()
-    open_ap = select(Approval).where(Approval.used_at.is_(None), Approval.vervallen_op.is_(None))
-    for ap in db.scalars(open_ap.where(Approval.expires_at <= now)).all():
-        ap.vervallen_op, ap.vervallen_reden = now, "verlopen"
-        req = db.get(ActionRequest, ap.request_id)
-        if req is not None and req.status == "goedgekeurd":
-            req.status, req.bijgewerkt_op = "wacht_op_goedkeuring", now
-            audit.record(
-                db,
-                actor_type="system",
-                actor_id="hub",
-                action="action.approval.expired",
-                target_type="action_request",
-                target_id=str(req.id),
-                details={"approval_id": str(ap.id), "action_id": req.action_id},
-            )
-    db.flush()
-    for req in db.scalars(
-        select(ActionRequest).where(ActionRequest.status.in_(OPEN), ActionRequest.geldig_tot <= now)
-    ).all():
-        req.status, req.bijgewerkt_op = "verlopen", now
-        for ap in db.scalars(open_ap.where(Approval.request_id == req.id)).all():
-            ap.vervallen_op, ap.vervallen_reden = now, "voorstel_verlopen"
+    db.flush()  # wijzigingen van de aanroeper eerst: de rijen hieronder worden opnieuw gelezen
+    open_ap = (Approval.used_at.is_(None), Approval.vervallen_op.is_(None))
+    kandidaten = set(db.scalars(select(Approval.request_id).where(*open_ap, Approval.expires_at <= now)))
+    kandidaten |= set(
+        db.scalars(select(ActionRequest.id).where(ActionRequest.status.in_(OPEN), ActionRequest.geldig_tot <= now))
+    )
+    if not kandidaten:
+        return
+    vast = db.scalars(
+        select(ActionRequest)
+        .where(ActionRequest.id.in_(kandidaten))
+        .order_by(ActionRequest.id)
+        .with_for_update(skip_locked=True)
+        .execution_options(populate_existing=True)
+    ).all()
+    for req in vast:
+        goedkeuringen = db.scalars(
+            select(Approval).where(Approval.request_id == req.id, *open_ap).execution_options(populate_existing=True)
+        ).all()
+        for ap in goedkeuringen:
+            if ap.expires_at > now:
+                continue
+            ap.vervallen_op, ap.vervallen_reden = now, "verlopen"
+            if req.status == "goedgekeurd":
+                req.status, req.bijgewerkt_op = "wacht_op_goedkeuring", now
+                audit.record(
+                    db,
+                    actor_type="system",
+                    actor_id="hub",
+                    action="action.approval.expired",
+                    target_type="action_request",
+                    target_id=str(req.id),
+                    details={"approval_id": str(ap.id), "action_id": req.action_id},
+                )
+        if req.status in OPEN and req.geldig_tot <= now:
+            req.status, req.bijgewerkt_op = "verlopen", now
+            for ap in goedkeuringen:
+                if ap.vervallen_op is None:
+                    ap.vervallen_op, ap.vervallen_reden = now, "voorstel_verlopen"
     db.flush()
 
 

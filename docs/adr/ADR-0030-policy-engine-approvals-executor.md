@@ -151,7 +151,10 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     vervallen gelden. Goedkeuren, afwijzen, uitvoeren en ophelderen vergrendelen de rij van het verzoek
     (`SELECT … FOR UPDATE`) tot het einde van hun transactie: twee gelijktijdige aanroepen op hetzelfde verzoek lopen
     na elkaar en de tweede krijgt `409 status_past_niet`. Bij uitvoeren blijven daarnaast de atomaire voorwaardelijke
-    updates staan (nonce van de goedkeuring en status), zodat precies één uitvoering de executor bereikt.
+    updates staan (nonce van de goedkeuring en status), zodat precies één uitvoering de executor bereikt. Het bijwerken
+    van verlopen goedkeuringen en voorstellen (ook vanuit de leesroutes) raakt alleen verzoeken waarvan het de rij zelf
+    kan vergrendelen (`FOR UPDATE SKIP LOCKED`) en controleert de voorwaarden daarna opnieuw: een gebruikte goedkeuring
+    wordt nooit ook "verlopen", en een verzoek dat `bezig` is gaat nooit terug.
 24. **Anti-flap voor iedereen.** Afkoeltijd en maximum per uur per (actie, doel) gelden ook voor een beheerder. Het
     contract zegt niet of ze alleen voor de AI gelden; dit is de veiligste lezing. Uitvoeren houdt per (actie, doel) een
     vergrendeling (`pg_advisory_xact_lock`) vast vanaf vlak vóór de controle van de blokkades tot het voorstel op
