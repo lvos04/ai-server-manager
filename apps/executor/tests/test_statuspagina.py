@@ -260,7 +260,28 @@ def test_onleesbaar_koppelbestand_met_sleutel_biedt_beheer_als_herstel() -> None
     assert 'action="/beheer"' in html and 'action="/koppelen"' not in html and 'role="alert"' not in html
     assert "daarna kun je opnieuw koppelen met een koppelcode" in html
     zonder = onleesbaar_melding()
-    assert "nog geen TrueNAS-schrijfsleutel ingesteld" in zonder["tekst"] and "CUSTOM_APP.md" in zonder["tekst"]
+    assert "geen bruikbare TrueNAS-schrijfsleutel" in zonder["tekst"] and "CUSTOM_APP.md" in zonder["tekst"]
+
+
+def test_onleesbaar_zonder_bruikbare_sleutel_zegt_niet_dat_er_geen_sleutel_is() -> None:
+    """Ontwerpreview S-P2-005 (herreview): de melding zonder bruikbare sleutel geldt ook als de sleutelopslag zelf
+    onleesbaar is (app.py geeft dan sleutel_ingesteld=False). Ze mag dan niet beweren dat er nog geen sleutel is
+    ingesteld, want de rij 'TrueNAS-schrijfsleutel' op dezelfde pagina zegt 'Onleesbaar'."""
+    beide = executor_page(
+        versie="0.1.0",
+        link={"state": None, "_onleesbaar": True},
+        ready_checks=READY,
+        csrf="",
+        melding=onleesbaar_melding(sleutel_ingesteld=False),
+        now=NOW,
+        nas={"ingesteld": False, "onleesbaar": True},
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    tekst = unescape(beide)
+    assert "sleutelopslag_onleesbaar" in tekst and "koppelstatus_onleesbaar" in tekst
+    assert "nog geen TrueNAS-schrijfsleutel ingesteld" not in tekst
+    assert "geen bruikbare TrueNAS-schrijfsleutel (niet ingesteld of onleesbaar)" in tekst
 
 
 REPO = Path(__file__).resolve().parents[3]
