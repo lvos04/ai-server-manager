@@ -35,6 +35,11 @@ RUN --mount=type=secret,id=ca_bundle,required=false \
     if [ -s /run/secrets/ca_bundle ]; then export PIP_CERT=/run/secrets/ca_bundle; fi; \
     pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore --prefix=/install \
         --no-deps -r requirements.lock
+COPY apps/policy /src/policy-pkg
+RUN --mount=type=secret,id=ca_bundle,required=false \
+    if [ -s /run/secrets/ca_bundle ]; then export PIP_CERT=/run/secrets/ca_bundle; fi; \
+    cd /src/policy-pkg && pip wheel --no-cache-dir --disable-pip-version-check --no-deps -w /wheels . \
+    && pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore --prefix=/install --no-deps /wheels/asm_policy-*.whl
 COPY apps/api/pyproject.toml apps/api/README.md ./
 COPY apps/api/src ./src
 COPY apps/api/alembic ./alembic
@@ -75,6 +80,9 @@ COPY --from=pg /out/lib /opt/pglibs
 COPY --from=build /install /usr/local
 COPY --from=web /usr/local/bin/node /usr/local/bin/node
 COPY --from=web /out /opt/hub-web
+# Risicobeleid: read-only ingebakken (eigenaar root, map 0555, bestanden 0444; het proces draait als 568). De Hub en de
+# executor rekenen er dezelfde policy_hash uit (contract 1.3 §8, ADR-0030).
+COPY --chown=0:0 --chmod=0444 policy/acties.yaml policy/apps.yaml policy/blokkades.yaml /usr/local/share/asm/policy/
 COPY deploy/allinone/supervisor.py /usr/local/lib/hub/supervisor.py
 COPY deploy/allinone/healthcheck.py /usr/local/lib/hub/healthcheck.py
 COPY deploy/common/rechten.py /usr/local/lib/hub/rechten.py
@@ -87,6 +95,8 @@ RUN set -eu; \
     groupadd -g 568 apps; useradd -u 568 -g 568 -M -d /tmp -s /usr/sbin/nologin apps; \
     groupadd -g 569 asm-ai; useradd -u 569 -g 569 -M -d /tmp -s /usr/sbin/nologin asm-ai; \
     mkdir -p /appdata; chown 568:568 /appdata; chmod 0750 /appdata; \
+    chown 0:0 /usr/local/share/asm /usr/local/share/asm/policy; chmod 0555 /usr/local/share/asm /usr/local/share/asm/policy; \
+    python -c "from asm_policy import load_policy; p = load_policy(); print('policy_hash:', p.hash)"; \
     python -m pip check; \
     python -c "import hub.app, hub.worker, psycopg, uvicorn, cryptography, websockets"; \
     python -c "from hub.migrations import script_location as s; print('migraties:', s())"; \

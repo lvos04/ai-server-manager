@@ -46,7 +46,7 @@ jobs:
       - name: Afhankelijkheden (exact vastgezet)
         run: |
           python -m pip install -r apps/api/requirements.lock -r apps/api/requirements-dev.lock
-          python -m pip install --no-deps -e apps/api -e apps/executor
+          python -m pip install --no-deps -e apps/policy -e apps/api -e apps/executor
           python -m pip check
           pg_dump --version
       - name: ruff (lint + format)
@@ -103,7 +103,7 @@ jobs:
         working-directory: .
         run: |
           python -m pip install -r apps/api/requirements.lock -r apps/executor/requirements.lock
-          python -m pip install --no-deps -e apps/api -e apps/executor
+          python -m pip install --no-deps -e apps/policy -e apps/api -e apps/executor
           python -m pip check
       - name: npm ci
         run: npm ci --no-audit --no-fund

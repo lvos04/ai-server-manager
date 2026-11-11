@@ -24,3 +24,4 @@ apps/web/vitest.config.mts
 apps/web/next-env.d.ts
 apps/web/tsconfig.tsbuildinfo
 docs/screenshots
+apps/policy/tests

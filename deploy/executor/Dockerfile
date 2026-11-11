@@ -15,6 +15,11 @@ RUN --mount=type=secret,id=ca_bundle,required=false \
     if [ -s /run/secrets/ca_bundle ]; then export PIP_CERT=/run/secrets/ca_bundle; fi; \
     pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore --prefix=/install \
         --no-deps -r requirements.lock
+COPY apps/policy /src/policy-pkg
+RUN --mount=type=secret,id=ca_bundle,required=false \
+    if [ -s /run/secrets/ca_bundle ]; then export PIP_CERT=/run/secrets/ca_bundle; fi; \
+    cd /src/policy-pkg && pip wheel --no-cache-dir --disable-pip-version-check --no-deps -w /wheels . \
+    && pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore --prefix=/install --no-deps /wheels/asm_policy-*.whl
 COPY apps/executor/pyproject.toml apps/executor/README.md ./
 COPY apps/executor/src ./src
 RUN --mount=type=secret,id=ca_bundle,required=false \
@@ -31,12 +36,17 @@ LABEL org.opencontainers.image.title="ai-server-manager-executor" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 COPY --from=build /install /usr/local
+# Risicobeleid: read-only ingebakken (eigenaar root, map 0555, bestanden 0444; het proces draait als 568). De Hub en de
+# executor rekenen er dezelfde policy_hash uit (contract 1.3 §8, ADR-0030).
+COPY --chown=0:0 --chmod=0444 policy/acties.yaml policy/apps.yaml policy/blokkades.yaml /usr/local/share/asm/policy/
 COPY deploy/executor/entrypoint.py /usr/local/lib/executor/entrypoint.py
 COPY deploy/executor/healthcheck.py /usr/local/lib/executor/healthcheck.py
 COPY deploy/common/rechten.py /usr/local/lib/executor/rechten.py
 RUN set -eu; groupadd -g 568 apps; useradd -u 568 -g 568 -M -d /tmp -s /usr/sbin/nologin apps; \
     mkdir -p /appdata; chown 568:568 /appdata; chmod 0750 /appdata; \
-    python -m pip check; python -c "import executor.app"
+    chown 0:0 /usr/local/share/asm /usr/local/share/asm/policy; chmod 0555 /usr/local/share/asm /usr/local/share/asm/policy; \
+    python -c "from asm_policy import load_policy; p = load_policy(); print('policy_hash:', p.hash)"; \
+    python -m pip check; python -c "import executor.app, websockets, yaml"
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 EXECUTOR_DATA_DIR=/appdata EXECUTOR_PORT=30410 TZ=Etc/UTC
 VOLUME ["/appdata"]
 EXPOSE 30410

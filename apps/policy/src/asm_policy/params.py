@@ -1,0 +1,562 @@
+"""Parameterschema's, doelschema's en harde grenzen per action_id (contract 1.3 §8 en §9 EX47, B01-003, ADR-0030).
+
+Elke functie geeft een lijst :class:`Fout` terug; leeg = geldig. De Hub controleert bij het voorstel, de executor
+opnieuw vóór uitvoering (zelfde code, eigen kopie van het beleid). Invoer wordt als geheel gecontroleerd en nooit
+afgekapt. Onbekende velden zijn een fout (strikt).
+
+``app.install`` (standaard Custom App = catalogusapp ``ix-app``) weigert vóór uitvoering (EX47): compose/YAML
+(``custom_app: true``, ``custom_compose_config(_string)``), ``privileged``, extra capabilities, apparaten, een
+Docker-socket, hostpaden buiten ``/mnt/<pool>/<dataset>`` (dus ook ``/``, ``/etc``, ``/var/run``, ``/root``), host
+network zonder reden, een gedeeld Docker-netwerk, ``latest`` of een tag zonder digest, ``HUB_*``-variabelen en root
+als "custom user".
+"""
+
+from __future__ import annotations
+
+import ipaddress
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any
+
+from asm_policy.canonical import CanonicalError, canonical_json
+from asm_policy.loader import ActieDef, Policy
+
+APP_NAME_RE = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
+DATASET_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*(/[A-Za-z0-9_.:-]+)*$")
+SNAP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+SANDBOX_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
+CATALOG_APP_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+TRAIN_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+VERSION_RE = re.compile(r"^\d{1,6}(\.\d{1,6}){1,3}$")
+DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+REPO_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*(:[0-9]{1,5})?(/[a-z0-9][a-z0-9._-]*){1,6}$")
+TAG_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
+ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+VAULT_REF_RE = re.compile(r"^vault://app/[a-z0-9][a-z0-9_-]{0,63}/[a-z0-9_.-]{1,128}$")
+CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+HOST_IDS = ("nas-primary",)
+IX_APP = "ix-app"
+RESTART_POLICIES = ("no", "unless-stopped", "on-failure", "always")
+MAX_VALUES_BYTES = 64 * 1024
+MAX_EIGENAAR_BYTES = 16 * 1024
+# Bekende velden van het formulier van de standaard Custom App (ix-app 1.4.8, questions.yaml; via appstore-en-fork).
+IX_VALUES_KEYS = frozenset(
+    {
+        "notes",
+        "image",
+        "hostname",
+        "entrypoint",
+        "command",
+        "TZ",
+        "envs",
+        "restart_policy",
+        "max_retry_count",
+        "disable_builtin_healthcheck",
+        "tty",
+        "stdin",
+        "devices",
+        "privileged",
+        "capabilities",
+        "run_as_custom_user",
+        "run_as",
+        "host_network",
+        "ports",
+        "networks",
+        "dns_config",
+        "portals",
+        "storage",
+        "labels",
+        "resources",
+    }
+)
+CONTAINER_FORBIDDEN_MOUNTS = ("/", "/proc", "/sys", "/dev", "/var/run/docker.sock", "/run/docker.sock")
+
+
+@dataclass(frozen=True)
+class Fout:
+    veld: str
+    code: str
+    fout: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {"veld": self.veld, "code": self.code, "fout": self.fout}
+
+
+def _f(veld: str, code: str, fout: str) -> Fout:
+    return Fout(veld, code, fout)
+
+
+def _only(obj: Any, where: str, allowed: set[str], required: set[str] = frozenset()) -> list[Fout]:  # type: ignore[assignment]
+    if not isinstance(obj, Mapping):
+        return [_f(where, "type", "verwacht een object")]
+    out = [_f(f"{where}.{k}" if where else k, "onbekend_veld", "onbekend veld") for k in obj if k not in allowed]
+    out += [
+        _f(f"{where}.{k}" if where else k, "verplicht", "verplicht veld ontbreekt") for k in required if k not in obj
+    ]
+    return out
+
+
+def _text(
+    v: Any, where: str, *, min_len: int = 1, max_len: int = 256, pattern: re.Pattern[str] | None = None
+) -> list[Fout]:
+    if not isinstance(v, str):
+        return [_f(where, "type", "verwacht tekst")]
+    if len(v) < min_len or len(v) > max_len:
+        return [_f(where, "lengte", f"lengte {min_len}–{max_len} tekens")]
+    if CONTROL_RE.search(v):
+        return [_f(where, "stuurteken", "stuurtekens zijn niet toegestaan")]
+    if pattern is not None and not pattern.fullmatch(v):
+        return [_f(where, "patroon", "ongeldige vorm")]
+    return []
+
+
+def _bool(v: Any, where: str) -> list[Fout]:
+    return [] if isinstance(v, bool) else [_f(where, "type", "verwacht true of false")]
+
+
+def _intr(v: Any, where: str, lo: int, hi: int) -> list[Fout]:
+    if type(v) is not int or not lo <= v <= hi:
+        return [_f(where, "bereik", f"geheel getal {lo}–{hi}")]
+    return []
+
+
+def _size(obj: Any, where: str, limit: int) -> list[Fout]:
+    try:
+        n = len(canonical_json(obj))
+    except CanonicalError as exc:
+        return [_f(where, "niet_canoniek", str(exc))]
+    return [_f(where, "te_groot", f"hooguit {limit} bytes")] if n > limit else []
+
+
+# ------------------------------------------------------------------ doel
+def validate_target(actie: ActieDef, target: Any) -> list[Fout]:
+    if not isinstance(target, Mapping):
+        return [_f("target", "type", "verwacht een object")]
+    out: list[Fout] = []
+    host = target.get("host_id")
+    if host is not None and host not in HOST_IDS:
+        out.append(_f("target.host_id", "buiten_scope", "alleen 'nas-primary' (één NAS in v1)"))
+    doel = actie.doel
+    if doel in ("app", "app_nieuw"):
+        out += _only(target, "target", {"host_id", "app_id"}, {"app_id"})
+        if "app_id" in target:
+            out += _text(target["app_id"], "target.app_id", max_len=40, pattern=APP_NAME_RE)
+    elif doel == "dataset":
+        out += _only(target, "target", {"host_id", "dataset"}, {"dataset"})
+        if "dataset" in target:
+            out += _dataset(target["dataset"], "target.dataset")
+    elif doel == "snapshot":
+        out += _only(target, "target", {"host_id", "snapshot"}, {"snapshot"})
+        snap = target.get("snapshot")
+        if isinstance(snap, str) and snap.count("@") == 1:
+            ds, name = snap.split("@")
+            out += _dataset(ds, "target.snapshot")
+            out += _text(name, "target.snapshot", max_len=64, pattern=SNAP_NAME_RE)
+        elif "snapshot" in target:
+            out.append(_f("target.snapshot", "patroon", "verwacht <dataset>@<naam>"))
+    elif doel == "geen":
+        out += _only(target, "target", {"host_id"})
+    else:  # eigenaar
+        out += _only(target, "target", {"host_id", "app_id", "resource"}, {"app_id"})
+        if target.get("app_id") != actie.eigenaar:
+            out.append(_f("target.app_id", "buiten_scope", f"deze actie hoort bij {actie.eigenaar}"))
+        if "resource" in target:
+            out += _text(target["resource"], "target.resource", max_len=200)
+    return out
+
+
+def _dataset(v: Any, where: str) -> list[Fout]:
+    errs = _text(v, where, max_len=200, pattern=DATASET_RE)
+    if not errs and ("/../" in f"/{v}/" or "/./" in f"/{v}/"):
+        errs.append(_f(where, "patroon", "ongeldige datasetnaam"))
+    return errs
+
+
+# ------------------------------------------------------------------ parameters
+def validate_parameters(policy: Policy, actie: ActieDef, target: Mapping[str, Any], params: Any) -> list[Fout]:
+    if not isinstance(params, Mapping):
+        return [_f("parameters", "type", "verwacht een object")]
+    out = _size(params, "parameters", MAX_VALUES_BYTES + 8 * 1024)
+    if out:
+        return out
+    schema = actie.parameters
+    if schema == "leeg":
+        return _only(params, "parameters", set())
+    if schema == "snapshot_create":
+        out = _only(params, "parameters", {"naam", "recursief"}, {"naam"})
+        if "naam" in params:
+            out += _text(params["naam"], "parameters.naam", max_len=64, pattern=SNAP_NAME_RE)
+        if "recursief" in params:
+            out += _bool(params["recursief"], "parameters.recursief")
+        return out
+    if schema == "snapshot_clone":
+        out = _only(params, "parameters", {"doel_dataset"}, {"doel_dataset"})
+        dest = params.get("doel_dataset")
+        snap = str(target.get("snapshot") or "")
+        pool = snap.split("/", 1)[0].split("@", 1)[0]
+        if isinstance(dest, str):
+            parts = dest.split("/")
+            ok = (
+                len(parts) == 3
+                and parts[0] == pool
+                and parts[1] == policy.sandbox_dataset
+                and bool(SANDBOX_NAME_RE.fullmatch(parts[2]))
+            )
+            if not ok:
+                out.append(
+                    _f(
+                        "parameters.doel_dataset",
+                        "buiten_sandbox",
+                        f"alleen <pool van de snapshot>/{policy.sandbox_dataset}/<naam>",
+                    )
+                )
+        elif "doel_dataset" in params:
+            out.append(_f("parameters.doel_dataset", "type", "verwacht tekst"))
+        return out
+    if schema == "notification_send":
+        out = _only(params, "parameters", {"titel", "tekst", "prioriteit"}, {"titel", "tekst"})
+        out += _text(params.get("titel"), "parameters.titel", max_len=120) if "titel" in params else []
+        out += _text(params.get("tekst"), "parameters.tekst", max_len=2000) if "tekst" in params else []
+        if "prioriteit" in params:
+            out += _intr(params["prioriteit"], "parameters.prioriteit", 0, 10)
+        return out
+    if schema == "eigenaar":
+        return _size(params, "parameters", MAX_EIGENAAR_BYTES)
+    if schema == "app_update":
+        return _app_update(params)
+    if schema == "app_rollback":
+        return _app_rollback(params)
+    if schema == "app_install":
+        return validate_install(params, target)
+    return [_f("parameters", "schema_onbekend", "onbekend parameterschema")]  # pragma: no cover
+
+
+def _image_ref(img: Any, where: str, digest: Any = None) -> list[Fout]:
+    out = _only(img, where, {"repository", "tag", "pull_policy"}, {"repository", "tag"})
+    if not isinstance(img, Mapping):
+        return out
+    out += _text(img.get("repository"), f"{where}.repository", max_len=255, pattern=REPO_RE)
+    tag = img.get("tag")
+    if not isinstance(tag, str) or not tag:
+        out.append(_f(f"{where}.tag", "verplicht", "exacte tag verplicht"))
+        return out
+    version, sep, dig = tag.partition("@")
+    if version.lower() == "latest" or not TAG_RE.fullmatch(version):
+        out.append(_f(f"{where}.tag", "latest_of_ongeldig", "geen latest: een exacte versie is verplicht"))
+    if sep and not DIGEST_RE.fullmatch(dig):
+        out.append(_f(f"{where}.tag", "digest_ongeldig", "digest moet sha256:<64 hex> zijn"))
+    if not sep and not (isinstance(digest, str) and DIGEST_RE.fullmatch(digest)):
+        out.append(_f(f"{where}.tag", "digest_ontbreekt", "tag <versie>@sha256:<digest> of een digest in het manifest"))
+    if "pull_policy" in img and img["pull_policy"] not in ("missing", "always", "never"):
+        out.append(_f(f"{where}.pull_policy", "waarde", "missing, always of never"))
+    return out
+
+
+def _app_update(params: Mapping[str, Any]) -> list[Fout]:
+    out = _only(params, "parameters", {"image", "catalog_version", "image_digest", "manifest_sha256"})
+    has_img, has_cat = "image" in params, "catalog_version" in params
+    if has_img == has_cat:
+        out.append(_f("parameters", "precies_een", "precies één van image (Custom App) of catalog_version"))
+    if has_img:
+        out += _image_ref(params["image"], "parameters.image", params.get("image_digest"))
+    if has_cat:
+        out += _text(params["catalog_version"], "parameters.catalog_version", max_len=32, pattern=VERSION_RE)
+    if "image_digest" in params:
+        out += _text(params["image_digest"], "parameters.image_digest", max_len=71, pattern=DIGEST_RE)
+    if "manifest_sha256" in params:
+        out += _text(params["manifest_sha256"], "parameters.manifest_sha256", max_len=71, pattern=SHA_RE)
+    return out
+
+
+def _app_rollback(params: Mapping[str, Any]) -> list[Fout]:
+    out = _only(params, "parameters", {"herstel_van", "catalog_version"})
+    has_exec, has_cat = "herstel_van" in params, "catalog_version" in params
+    if has_exec == has_cat:
+        out.append(_f("parameters", "precies_een", "precies één van herstel_van (Custom App) of catalog_version"))
+    if has_exec:
+        out += _text(params["herstel_van"], "parameters.herstel_van", max_len=36, pattern=UUID_RE)
+    if has_cat:
+        out += _text(params["catalog_version"], "parameters.catalog_version", max_len=32, pattern=VERSION_RE)
+    return out
+
+
+# ------------------------------------------------------------------ app.install (EX47, B01-003)
+def host_path_problem(path: Any) -> str | None:
+    """``None`` als het hostpad een dataset onder ``/mnt/<pool>/<dataset>`` is; anders de reden (NL)."""
+    if not isinstance(path, str) or not path.startswith("/"):
+        return "het hostpad moet absoluut zijn"
+    if CONTROL_RE.search(path) or "//" in path or path != path.rstrip("/") or len(path) > 512:
+        return "ongeldig hostpad"
+    parts = path.split("/")[1:]
+    if any(p in ("", ".", "..") for p in parts):
+        return "geen . of .. in een hostpad"
+    if "docker.sock" in path:
+        return "een Docker-socket mag nooit in een container"
+    if parts[0] != "mnt":
+        return "alleen datasets onder /mnt/<pool>/<dataset> (nooit /, /etc, /var/run, /root of andere systeempaden)"
+    if len(parts) < 3:
+        return "/mnt zonder dataset is niet toegestaan; kies een dataset onder /mnt/<pool>/<dataset>"
+    if parts[1].startswith(".") or parts[2].startswith("."):
+        return "verborgen of interne mappen (bv. /mnt/.ix-apps) zijn niet toegestaan"
+    return None
+
+
+def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, Any]]:
+    """(pad, sleutel, waarde) voor elke sleutel in geneste objecten en lijsten."""
+    out: list[tuple[str, Any, Any]] = []
+    if depth > 16:
+        return out
+    if isinstance(value, Mapping):
+        for k, v in value.items():
+            p = f"{path}.{k}" if path else str(k)
+            out.append((p, k, v))
+            out += _walk(v, p, depth + 1)
+    elif isinstance(value, list):
+        for i, v in enumerate(value):
+            out += _walk(v, f"{path}[{i}]", depth + 1)
+    return out
+
+
+def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any]) -> list[Fout]:
+    """Controles op elk niveau (ook voor catalogusapps met eigen waarden)."""
+    out: list[Fout] = []
+    reason = manifest.get("host_network_reason")
+    for p, k, v in _walk(values, where):
+        if k in ("custom_compose_config", "custom_compose_config_string", "compose"):
+            out.append(_f(p, "compose_verboden", "compose/YAML-installatie is nooit toegestaan"))
+        elif k == "privileged" and v is True:
+            out.append(_f(p, "privileged_verboden", "privileged is nooit toegestaan"))
+        elif k == "host_network" and v is True and not (isinstance(reason, str) and len(reason.strip()) >= 10):
+            out.append(_f(p, "host_network_zonder_reden", "host network alleen met een reden in het manifest"))
+        elif isinstance(v, str) and "docker.sock" in v:
+            out.append(_f(p, "docker_socket_verboden", "een Docker-socket mag nooit in een container"))
+        elif k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path")):
+            problem = host_path_problem(v)
+            if problem:
+                out.append(_f(p, "hostpad_verboden", problem))
+        elif isinstance(v, str) and v.startswith("vault://") and not VAULT_REF_RE.fullmatch(v):
+            out.append(_f(p, "vault_ref_ongeldig", "alleen vault://app/<app_id>/<parameter>"))
+    return out
+
+
+def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[Fout]:
+    w = "parameters.app_create.values"
+    out = _only(values, w, set(IX_VALUES_KEYS), {"image", "restart_policy", "TZ"})
+    out += _image_ref(values.get("image"), f"{w}.image", manifest.get("image_digest"))
+    if values.get("restart_policy") not in RESTART_POLICIES:
+        out.append(_f(f"{w}.restart_policy", "waarde", "expliciet: no, unless-stopped, on-failure of always"))
+    out += _text(values.get("TZ"), f"{w}.TZ", max_len=64) if "TZ" in values else []
+    if values.get("privileged") not in (None, False):
+        out.append(_f(f"{w}.privileged", "privileged_verboden", "privileged is nooit toegestaan"))
+    caps = values.get("capabilities") or {}
+    if not isinstance(caps, Mapping) or set(caps) - {"add"} or (caps.get("add") or []):
+        out.append(_f(f"{w}.capabilities", "capabilities_verboden", "geen extra capabilities"))
+    if values.get("devices"):
+        out.append(_f(f"{w}.devices", "devices_verboden", "geen apparaten in v1 (render-node volgt met D08/B03)"))
+    if values.get("networks"):
+        out.append(_f(f"{w}.networks", "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"))
+    if values.get("run_as_custom_user") is True:
+        run_as = values.get("run_as")
+        if not isinstance(run_as, Mapping) or any(
+            type(run_as.get(k)) is not int or run_as[k] < 1 for k in ("user", "group")
+        ):
+            out.append(_f(f"{w}.run_as", "root_verboden", "custom user moet een gewone uid/gid (≥ 1) zijn"))
+    envs = values.get("envs") or []
+    if not isinstance(envs, list) or len(envs) > 100:
+        out.append(_f(f"{w}.envs", "lijst", "hooguit 100 variabelen"))
+    else:
+        seen: set[str] = set()
+        for i, e in enumerate(envs):
+            ew = f"{w}.envs[{i}]"
+            out += _only(e, ew, {"name", "value"}, {"name", "value"})
+            if not isinstance(e, Mapping):
+                continue
+            name = e.get("name")
+            out += _text(name, f"{ew}.name", max_len=128, pattern=ENV_NAME_RE)
+            if isinstance(name, str):
+                if name.upper().startswith("HUB_"):
+                    out.append(_f(f"{ew}.name", "reserved_env", "HUB_* zet alleen de Hub zelf (contract §3.2)"))
+                if name in seen:
+                    out.append(_f(f"{ew}.name", "dubbel", "variabele staat er dubbel in"))
+                seen.add(name)
+            out += _text(e.get("value"), f"{ew}.value", min_len=0, max_len=4096)
+    storage = values.get("storage") or []
+    if not isinstance(storage, list) or len(storage) > 20:
+        out.append(_f(f"{w}.storage", "lijst", "hooguit 20 opslagregels"))
+    else:
+        for i, st in enumerate(storage):
+            sw = f"{w}.storage[{i}]"
+            if not isinstance(st, Mapping):
+                out.append(_f(sw, "type", "verwacht een object"))
+                continue
+            typ = st.get("type")
+            if typ not in ("host_path", "ix_volume", "tmpfs"):
+                out.append(_f(f"{sw}.type", "opslag_verboden", "alleen host_path, ix_volume of tmpfs"))
+            mount = st.get("mount_path")
+            if (
+                not isinstance(mount, str)
+                or not mount.startswith("/")
+                or mount.rstrip("/") in ("", *CONTAINER_FORBIDDEN_MOUNTS)
+                or ".." in mount
+            ):
+                out.append(
+                    _f(f"{sw}.mount_path", "mount_verboden", "absoluut pad in de container, niet / of een systeempad")
+                )
+            if typ == "host_path":
+                cfg = st.get("host_path_config") or {}
+                if not isinstance(cfg, Mapping) or cfg.get("acl_enable") not in (None, False):
+                    out.append(_f(f"{sw}.host_path_config", "acl_verboden", "ACL's zet het platform niet"))
+                problem = host_path_problem(cfg.get("path") if isinstance(cfg, Mapping) else None)
+                if problem:
+                    out.append(_f(f"{sw}.host_path_config.path", "hostpad_verboden", problem))
+    ports = values.get("ports") or []
+    if not isinstance(ports, list) or len(ports) > 20:
+        out.append(_f(f"{w}.ports", "lijst", "hooguit 20 poorten"))
+    else:
+        for i, pt in enumerate(ports):
+            pw = f"{w}.ports[{i}]"
+            out += _only(pt, pw, {"bind_mode", "port_number", "container_port", "protocol", "host_ips"},
+                         {"port_number", "container_port", "protocol"})  # fmt: skip
+            if not isinstance(pt, Mapping):
+                continue
+            out += _intr(pt.get("port_number"), f"{pw}.port_number", 1, 65535)
+            out += _intr(pt.get("container_port"), f"{pw}.container_port", 1, 65535)
+            if pt.get("protocol") not in ("tcp", "udp"):
+                out.append(_f(f"{pw}.protocol", "waarde", "tcp of udp"))
+            if pt.get("bind_mode", "published") not in ("published", "exposed"):
+                out.append(_f(f"{pw}.bind_mode", "waarde", "published of exposed"))
+            for j, ip in enumerate(pt.get("host_ips") or []):
+                try:
+                    ipaddress.ip_address(str(ip))
+                except ValueError:
+                    out.append(_f(f"{pw}.host_ips[{j}]", "ip", "geen IP-adres"))
+    resources = values.get("resources")
+    if not isinstance(resources, Mapping):
+        out.append(_f(f"{w}.resources", "verplicht", "resources (limieten) zijn verplicht"))
+    else:
+        gpus = resources.get("gpus") or {}
+        if isinstance(gpus, Mapping) and gpus.get("use_all_gpus") is True and manifest.get("gpu") != "intel_render":
+            out.append(_f(f"{w}.resources.gpus", "gpu_zonder_d08", "GPU alleen met manifest gpu=intel_render en D08"))
+        if isinstance(gpus, Mapping) and gpus.get("nvidia_gpu_selection"):
+            out.append(_f(f"{w}.resources.gpus", "gpu_verboden", "NVIDIA-selectie wordt niet aangeboden"))
+    for key in ("entrypoint", "command"):
+        seq = values.get(key) or []
+        if not isinstance(seq, list) or len(seq) > 32 or not all(isinstance(s, str) and len(s) <= 1024 for s in seq):
+            out.append(_f(f"{w}.{key}", "lijst", "lijst van hooguit 32 teksten (≤ 1024 tekens)"))
+    return out
+
+
+def validate_manifest_meta(manifest: Any) -> list[Fout]:
+    w = "parameters.manifest"
+    allowed = {
+        "app_id",
+        "manifest_sha256",
+        "version",
+        "image_digest",
+        "host_network_reason",
+        "install_reason",
+        "gpu",
+        "post_install_checks",
+        "rpo_uren",
+    }
+    out = _only(manifest, w, allowed, {"app_id"})
+    if not isinstance(manifest, Mapping):
+        return out
+    out += _text(manifest.get("app_id"), f"{w}.app_id", max_len=64, pattern=re.compile(r"^[a-z][a-z0-9_-]{0,63}$"))
+    if "manifest_sha256" in manifest:
+        out += _text(manifest["manifest_sha256"], f"{w}.manifest_sha256", max_len=71, pattern=SHA_RE)
+    if "image_digest" in manifest:
+        out += _text(manifest["image_digest"], f"{w}.image_digest", max_len=71, pattern=DIGEST_RE)
+    for k in ("host_network_reason", "install_reason"):
+        if manifest.get(k) is not None:
+            out += _text(manifest[k], f"{w}.{k}", max_len=500)
+    if "gpu" in manifest and manifest["gpu"] not in ("none", "intel_render"):
+        out.append(_f(f"{w}.gpu", "waarde", "none of intel_render"))
+    if "rpo_uren" in manifest:
+        out += _intr(manifest["rpo_uren"], f"{w}.rpo_uren", 1, 24 * 365)
+    checks = manifest.get("post_install_checks") or []
+    if not isinstance(checks, list) or len(checks) > 20:
+        out.append(_f(f"{w}.post_install_checks", "lijst", "hooguit 20 controles"))
+    else:
+        for i, c in enumerate(checks):
+            cw = f"{w}.post_install_checks[{i}]"
+            out += _only(c, cw, {"id", "soort", "beschrijving_nl"}, {"id", "soort", "beschrijving_nl"})
+            if isinstance(c, Mapping):
+                out += _text(c.get("id"), f"{cw}.id", max_len=64)
+                if c.get("soort") not in ("http", "handmatig"):
+                    out.append(_f(f"{cw}.soort", "waarde", "http of handmatig"))
+                out += _text(c.get("beschrijving_nl"), f"{cw}.beschrijving_nl", max_len=500)
+    return out
+
+
+def validate_install(params: Mapping[str, Any], target: Mapping[str, Any]) -> list[Fout]:
+    out = _only(params, "parameters", {"app_create", "manifest", "appstore_preview_hash"}, {"app_create", "manifest"})
+    manifest = params.get("manifest")
+    out += validate_manifest_meta(manifest)
+    manifest = manifest if isinstance(manifest, Mapping) else {}
+    if "appstore_preview_hash" in params:
+        out += _text(params["appstore_preview_hash"], "parameters.appstore_preview_hash", max_len=71, pattern=SHA_RE)
+    ac = params.get("app_create")
+    w = "parameters.app_create"
+    out += _only(ac, w, {"app_name", "custom_app", "catalog_app", "train", "version", "values"},
+                 {"app_name", "catalog_app", "train", "version", "values"})  # fmt: skip
+    if not isinstance(ac, Mapping):
+        return out
+    out += _deep_forbidden(ac, w, manifest)
+    if ac.get("custom_app") not in (None, False):
+        out.append(_f(f"{w}.custom_app", "compose_verboden", "custom_app=true is een compose-app (Install via YAML)"))
+    out += _text(ac.get("app_name"), f"{w}.app_name", max_len=40, pattern=APP_NAME_RE)
+    if ac.get("app_name") != target.get("app_id"):
+        out.append(_f(f"{w}.app_name", "doel_verschilt", "app_name moet gelijk zijn aan target.app_id"))
+    out += _text(ac.get("catalog_app"), f"{w}.catalog_app", max_len=64, pattern=CATALOG_APP_RE)
+    out += _text(ac.get("train"), f"{w}.train", max_len=32, pattern=TRAIN_RE)
+    version = ac.get("version")
+    if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
+        out.append(_f(f"{w}.version", "versie_exact", "een exacte versie (nooit latest)"))
+    values = ac.get("values")
+    if not isinstance(values, Mapping):
+        out.append(_f(f"{w}.values", "type", "verwacht een object"))
+        return out
+    out += _size(values, f"{w}.values", MAX_VALUES_BYTES)
+    if ac.get("catalog_app") == IX_APP:
+        if ac.get("train") != "stable":
+            out.append(_f(f"{w}.train", "waarde", "de standaard Custom App (ix-app) staat in de trein stable"))
+        out += _ix_values(values, manifest)
+    else:
+        reason = manifest.get("install_reason")
+        if not (isinstance(reason, str) and reason.strip()):
+            out.append(
+                _f("parameters.manifest.install_reason", "install_reason_ontbreekt", "catalogusapp vraagt een reden")
+            )
+    # Dubbele meldingen (zelfde veld en code) één keer tonen.
+    uniq: dict[tuple[str, str], Fout] = {}
+    for f in out:
+        uniq.setdefault((f.veld, f.code), f)
+    return list(uniq.values())
+
+
+def expected_image(params: Mapping[str, Any]) -> dict[str, str | None] | None:
+    """Verwachte image na ``app.install``/``app.update`` (voor de digest-readback); ``None`` bij een catalogusapp."""
+    img: Any = None
+    digest: Any = None
+    if "app_create" in params:
+        ac = params.get("app_create") or {}
+        if not isinstance(ac, Mapping) or ac.get("catalog_app") != IX_APP:
+            return None
+        img = (ac.get("values") or {}).get("image")
+        digest = (params.get("manifest") or {}).get("image_digest")
+    elif "image" in params:
+        img, digest = params.get("image"), params.get("image_digest")
+    if not isinstance(img, Mapping):
+        return None
+    tag = str(img.get("tag") or "")
+    version, _sep, in_tag = tag.partition("@")
+    return {"repository": str(img.get("repository") or ""), "tag": tag, "versie": version, "digest": in_tag or digest}
+
+
+def vault_refs(value: Any) -> list[str]:
+    """Alle ``vault://app/...``-verwijzingen (geheimen die de Hub pas bij verzenden invult, contract §3.1 a)."""
+    return sorted({v for _p, _k, v in _walk(value) if isinstance(v, str) and VAULT_REF_RE.fullmatch(v)})

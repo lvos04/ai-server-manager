@@ -5,6 +5,7 @@ BIN ?= $(abspath $(VENV)/bin)
 NICE := nice -n 10
 API := apps/api
 EXE := apps/executor
+POL := apps/policy
 comma := ,
 CA_SECRET := $(if $(wildcard /root/.ccr/ca-bundle.crt),--secret id=ca_bundle$(comma)src=/root/.ccr/ca-bundle.crt,)
 PROXY_ARGS := $(if $(HTTPS_PROXY),--network host --build-arg HTTPS_PROXY=$(HTTPS_PROXY),)
@@ -19,25 +20,28 @@ NPM := cd $(WEB) && NEXT_TELEMETRY_DISABLED=1
 venv:
 	$(PY) -m venv $(VENV)
 	$(BIN)/pip install -q -r $(API)/requirements.lock -r $(API)/requirements-dev.lock
-	$(BIN)/pip install -q --no-deps -e $(API) -e $(EXE)
+	$(BIN)/pip install -q --no-deps -e $(POL) -e $(API) -e $(EXE)
 
 lint:
 	cd $(API) && $(BIN)/ruff check src alembic tests ../../tests ../../conftest.py && $(BIN)/ruff format --check src alembic tests ../../tests ../../conftest.py
 	cd $(EXE) && $(BIN)/ruff check src tests && $(BIN)/ruff format --check src tests
+	cd $(POL) && $(BIN)/ruff check src tests && $(BIN)/ruff format --check src tests
 
 format:
 	cd $(API) && $(BIN)/ruff format src alembic tests ../../tests ../../conftest.py
 	cd $(EXE) && $(BIN)/ruff format src tests
+	cd $(POL) && $(BIN)/ruff format src tests
 
 type:
 	cd $(API) && $(NICE) $(BIN)/mypy
 	cd $(EXE) && $(NICE) $(BIN)/mypy
+	cd $(POL) && $(NICE) $(BIN)/mypy
 
 test:
 	$(NICE) $(BIN)/pytest
 
 test-unit:
-	$(BIN)/pytest $(API)/tests/unit $(EXE)/tests
+	$(BIN)/pytest $(POL)/tests $(API)/tests/unit $(EXE)/tests
 
 test-integration:
 	$(NICE) $(BIN)/pytest $(API)/tests/integration

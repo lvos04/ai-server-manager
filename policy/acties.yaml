@@ -1,0 +1,195 @@
+# Risicobeleid — allowlist van action_id's (platformcontract 1.3 §8, 03_RISICO_AUTONOMIE, ADR-0030).
+#
+# Dit bestand is read-only ingebakken in de Hub- én de executor-image (/usr/local/share/asm/policy). Beide rekenen
+# dezelfde policy_hash uit (asm_policy.loader.policy_hash) en de executor weigert een ExecutionRequest met een andere
+# hash. Wijzigen is een handmatige beheerdershandeling met review en een nieuwe image; nooit door de AI (geen route,
+# geen action_id).
+#
+# Velden per actie:
+#   uitvoerder       executor | hub:gotify | eigenaar:<app_id> (eigenaar-connector, POST /connector/v1/apply)
+#   truenas          TrueNAS-methoden in voorkeursvolgorde (per versie ontdekt met core.get_methods)
+#   doel             app | app_nieuw | dataset | snapshot | geen | eigenaar
+#   klasse           minimale risicoklasse R0–R3 (risk_claim van AI/flow telt nooit mee, EX18)
+#   klasse_kritiek   klasse als het doel een kritieke app is (netwerk, DNS, auth, het platform zelf; apps.yaml)
+#   parameters       naam van het parameterschema (asm_policy.params), met harde grenzen
+#   requires_backup  vóór goedkeuring een geverifieerd B12-herstelpunt binden (§8 back-upbevestiging)
+#   ai_mag_voorstellen  false = alleen een mens (beheerder) kan dit voorstellen
+#   opslagmutatie    true = geblokkeerd bij pool DEGRADED/onbekend of back-upgate rood (EX11/EX12)
+#   cooldown_seconden / max_per_uur   anti-flap per (action_id, doel)
+#   timeout_seconden maximale wachttijd op de TrueNAS-job
+#   verwacht         readback na uitvoering: staat | afwezig | aanwezig
+schema: asm-policy/1
+acties:
+  app.restart:
+    omschrijving: App opnieuw uitrollen (herstarten).
+    uitvoerder: executor
+    truenas: [app.redeploy]
+    doel: app
+    klasse: R1
+    klasse_kritiek: R2
+    parameters: leeg
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 600
+    max_per_uur: 3
+    timeout_seconden: 600
+    verwacht: {staat: RUNNING}
+  app.stop:
+    omschrijving: App stoppen (de data blijft staan).
+    uitvoerder: executor
+    truenas: [app.stop]
+    doel: app
+    klasse: R1
+    klasse_kritiek: R2
+    parameters: leeg
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 300
+    max_per_uur: 4
+    timeout_seconden: 300
+    verwacht: {staat: STOPPED}
+  app.start:
+    omschrijving: App starten.
+    uitvoerder: executor
+    truenas: [app.start]
+    doel: app
+    klasse: R1
+    klasse_kritiek: R2
+    parameters: leeg
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 300
+    max_per_uur: 4
+    timeout_seconden: 600
+    verwacht: {staat: RUNNING}
+  app.install:
+    omschrijving: App installeren als standaard Custom App (ix-app-waarden) of catalogusapp; nooit custom compose.
+    uitvoerder: executor
+    truenas: [app.create]
+    doel: app_nieuw
+    klasse: R2
+    parameters: app_install
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: true
+    cooldown_seconden: 0
+    max_per_uur: 6
+    timeout_seconden: 1800
+    verwacht: {aanwezig: true}
+  app.update:
+    omschrijving: Nieuwe gepinde image-tag (Custom App, app.update) of vaste catalogusversie (app.upgrade).
+    uitvoerder: executor
+    truenas: [app.update, app.upgrade]
+    doel: app
+    klasse: R2
+    parameters: app_update
+    requires_backup: true
+    ai_mag_voorstellen: true
+    opslagmutatie: true
+    cooldown_seconden: 0
+    max_per_uur: 6
+    timeout_seconden: 1800
+    verwacht: {aanwezig: true}
+  app.rollback:
+    omschrijving: Terugzetten — Custom App met de bewaarde vorige waarden (app.update), catalogusapp naar een eerder geïnstalleerde versie (app.rollback); data via eigenaar of snapshot.
+    uitvoerder: executor
+    truenas: [app.update, app.rollback]
+    doel: app
+    klasse: R2
+    parameters: app_rollback
+    requires_backup: true
+    ai_mag_voorstellen: true
+    opslagmutatie: true
+    cooldown_seconden: 0
+    max_per_uur: 6
+    timeout_seconden: 1800
+    verwacht: {aanwezig: true}
+  app.uninstall:
+    omschrijving: App verwijderen, alleen containers (remove_ix_volumes=false); datasets en data blijven.
+    uitvoerder: executor
+    truenas: [app.delete]
+    doel: app
+    klasse: R2
+    parameters: leeg
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 4
+    timeout_seconden: 900
+    verwacht: {afwezig: true}
+  zfs.snapshot.create:
+    omschrijving: ZFS-snapshot maken (pool.snapshot.create op 25.10, zfs.snapshot.create op 25.04).
+    uitvoerder: executor
+    truenas: [pool.snapshot.create, zfs.snapshot.create]
+    doel: dataset
+    klasse: R1
+    parameters: snapshot_create
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: true
+    cooldown_seconden: 300
+    max_per_uur: 6
+    timeout_seconden: 300
+    verwacht: {aanwezig: true}
+  zfs.snapshot.clone_to_sandbox:
+    omschrijving: Snapshot klonen naar een sandbox-dataset (alleen onder <pool>/asm-sandbox).
+    uitvoerder: executor
+    truenas: [pool.snapshot.clone, zfs.snapshot.clone]
+    doel: snapshot
+    klasse: R1
+    parameters: snapshot_clone
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: true
+    cooldown_seconden: 300
+    max_per_uur: 4
+    timeout_seconden: 300
+    verwacht: {aanwezig: true}
+  notification.send:
+    omschrijving: Melding versturen via de Gotify-adapter van de Hub (geen TrueNAS).
+    uitvoerder: hub:gotify
+    truenas: []
+    doel: geen
+    klasse: R0
+    parameters: notification_send
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 30
+    timeout_seconden: 30
+    verwacht: {}
+  # Acties via de eigenaar-connector (§8, tweede tabel). De eigenaar voert uit via POST /connector/v1/apply met een
+  # door de Hub ondertekend ExecutionRequest en controleert zelf opnieuw.
+  sso.oidc.hub.register:
+    omschrijving: OIDC-client van de Hub registreren in Authentik (via home-control-hub).
+    uitvoerder: eigenaar:home-control-hub
+    truenas: []
+    doel: eigenaar
+    klasse: R2
+    parameters: eigenaar
+    requires_backup: true
+    ai_mag_voorstellen: false
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 4
+    timeout_seconden: 120
+    verwacht: {}
+  sso.sessions.revoke:
+    omschrijving: SSO-sessies intrekken in Authentik (via home-control-hub).
+    uitvoerder: eigenaar:home-control-hub
+    truenas: []
+    doel: eigenaar
+    klasse: R2
+    parameters: eigenaar
+    requires_backup: false
+    ai_mag_voorstellen: false
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}

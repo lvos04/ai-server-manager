@@ -1,0 +1,80 @@
+# Risicobeleid — blokkades die altijd gelden, ook met goedkeuring (platformcontract 1.3 §8, 03_RISICO_AUTONOMIE,
+# ADR-0030). Read-only ingebakken in de Hub- én de executor-image; telt mee in de policy_hash.
+#
+# verboden_patronen: een action_id die hierop past, krijgt klasse R3 en wordt geweigerd, ook als de AI of een flow
+#   "R0" claimt (EX18). Zo'n action_id bestaat nooit in de allowlist. Patronen zijn reguliere expressies op het
+#   volledige action_id (kleine letters).
+# boiler: de boiler wordt nooit geschakeld, via welke route ook (EX27). Gezocht in action_id, alle tekstvelden van
+#   het doel en alle sleutels en tekstwaarden van de parameters.
+# gereserveerd: bekende action_id's die pas na een besluit van de gebruiker mogen (BG-05, P3-02); tot dan
+#   capability_unavailable met de reden, nooit gesimuleerd succes.
+# dynamisch: blokkades op de gemeten toestand; de Hub én de executor controleren ze (EX11/EX12).
+schema: asm-policy/1
+verboden_patronen:
+  - id: BLK-SHELL
+    code: actie_verboden_shell
+    patroon: '^(.*[._])?(shell|sudo|su|exec|ssh|docker|container|containers|compose|cron|cronjob|initshutdownscript|init_shutdown_script|run_command|command|script)([._].*)?$'
+    reden_nl: Er bestaat geen shell-, sudo-, exec- of Docker-actie (contract §1 en §8).
+  - id: BLK-DESTRUCTIEF
+    code: actie_verboden_destructief
+    patroon: '^.*(^|[._])(delete|destroy|purge|wipe|erase|format|remove_data|uninstall_data|dataset_delete|snapshot_delete)([._].*)?$|^(zfs|pool)\.snapshot\.rollback$|^(pool|zfs)\.dataset\.(delete|destroy|rollback)$'
+    reden_nl: Destructieve acties (data, datasets, snapshots, media, downloads, foto's) worden nooit automatisch uitgevoerd en in deze versie niet aangeboden.
+  - id: BLK-BEVEILIGING
+    code: actie_verboden_beveiligingsbeleid
+    patroon: '^(policy|policies|auth|user|users|role|roles|privilege|privileges|group|groups|service|services|enroll|enrollment|breakglass|break_glass|noodaccount|key|keys|apikey|api_key|vault|scope|scopes|hub)\..*$'
+    reden_nl: Beleid, rollen, privileges, koppelingen, sleutels en het noodaccount wijzig je alleen via de beheerdersroutes van de Hub; dat zijn nooit action_id's (contract §8).
+  - id: BLK-BETAALD
+    code: actie_verboden_betaald
+    patroon: '^.*(billing|purchase|payment|betaling|credits?|subscription|abonnement|top_?up|opwaarderen).*$'
+    reden_nl: Betaalde acties en opwaarderen zijn verboden (0 overage, contract §1).
+  - id: BLK-DB-DIRECT
+    code: actie_verboden_database
+    patroon: '^.*(^|[._])(db|database|sql|sqlite|postgres|query_write)([._].*)?$'
+    reden_nl: Geen platformactie schrijft rechtstreeks in de database van een andere app (contract §2.3 regel 7c).
+  - id: BLK-NETWERK
+    code: actie_verboden_netwerk
+    patroon: '^(network|interface|interfaces|firewall|route|staticroute|dns|vpn|tailscale|cloudflared|wireguard)\..*$'
+    reden_nl: Netwerk-, DNS-, VPN- en firewallwijzigingen lopen niet via de executor (lock-out-risico); zie B10.
+boiler:
+  id: BLK-BOILER
+  code: boiler_verboden
+  patronen:
+    - 'boiler'
+    - 'ketel'
+    - 'water[-_ .]?heater'
+    - 'warm[-_ .]?water'
+  reden_nl: De boiler wordt nooit geschakeld, via geen enkele route (EX27); alleen energie lezen.
+gereserveerd:
+  - id: RES-MEDIAGUARD
+    code: handmatig_in_mediaguard
+    patroon: '^mediaguard\..*$'
+    reden_nl: MediaGuard-acties zijn gereserveerd tot het besluit BG-05 van de gebruiker en sleutelscopes in MediaGuard (P3-02). Doe dit in MediaGuard zelf.
+  - id: RES-MY-HOUSE
+    code: capability_unavailable
+    patroon: '^(my_house|smart_home|mso)\..*$'
+    reden_nl: Acties voor my_house en MSO lopen via hun eigen goedkeuringsroute; die koppeling volgt in fase P3.
+dynamisch:
+  pool:
+    id: BLK-POOL
+    code: pool_niet_gezond
+    reden_nl: Een pool is niet gezond of de poolstatus is onbekend; geen opslag- of massamediamutaties (EX11).
+  backup:
+    id: BLK-BACKUP
+    code: backup_gate_rood
+    reden_nl: De back-upgate is niet groen; geen opslagmutaties en geen R2/R3-acties (EX12, B12-006).
+  noodstop:
+    id: BLK-NOODSTOP
+    code: noodstop_actief
+    reden_nl: De noodstop van de acties staat aan; er worden geen nieuwe acties uitgevoerd.
+  cooldown:
+    id: BLK-COOLDOWN
+    code: cooldown
+    reden_nl: Deze actie is kort geleden al voor dit doel uitgevoerd (anti-flap); wacht de afkoeltijd af.
+  frequentie:
+    id: BLK-FREQUENTIE
+    code: max_per_uur
+    reden_nl: Deze actie is het afgelopen uur te vaak voor dit doel uitgevoerd.
+  checkpoint:
+    id: BLK-CHECKPOINT
+    code: backup_checkpoint_ontbreekt
+    reden_nl: Er is geen geverifieerd herstelpunt (B12) van deze app binnen het RPO; zonder herstelpunt geen uitvoering (B12-006).
