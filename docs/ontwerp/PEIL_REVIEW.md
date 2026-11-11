@@ -326,21 +326,88 @@ Gereedschap `apps/web/review/` (`peil-review.spec.ts`, `in-pagina.js`, `samenvat
 
 ### Open (buiten het mandaat van deze review)
 
-- **O-S2-005-1 (belangrijk):** de statuspagina van de executor (`apps/executor/src/executor/statuspagina.py`,
+- **O-S2-005-1 (belangrijk) — HERSTELD in `4ef4ad4`, nagemeten bij de herreview (zie hieronder):** de statuspagina van de executor (`apps/executor/src/executor/statuspagina.py`,
   `onleesbaar_melding` en de rij `sleutelopslag_onleesbaar`) en `apps/executor/README.md` verwijzen naar
   "`deploy/truenas/CUSTOM_APP.md` (herstel)", maar dat document heeft geen herstelkop en noemt een onleesbaar
   koppelbestand of een onleesbare sleutelopslag niet. Een beheerder zonder ingestelde schrijfsleutel heeft zo geen
   beschreven herstelweg. Bestaat al sinds `b309042` (vóór deze stap). Voorstel: een kop "Herstel" in `CUSTOM_APP.md`
   met de stappen voor beide toestanden, en de verwijzing daarop laten aansluiten.
-- **O-S2-005-2 (klein):** de intro van "Executor installeren en koppelen" (ongewijzigd in deze stap) zegt
+- **O-S2-005-2 (klein) — HERSTELD in `636dbf4`, nagemeten bij de herreview (zie hieronder):** de intro van "Executor installeren en koppelen" (ongewijzigd in deze stap) zegt
   "ondertekende, goedgekeurde acties uit uit een vaste lijst": "uit uit" leest stroef, en "goedgekeurd" is in Peil het
   woord voor een menselijke goedkeuring (R2/R3), terwijl R1 automatisch binnen het beleid loopt. Voorstel bij de
   volgende webstap: "Hij voert alleen acties uit een vaste lijst uit die de Hub heeft ondertekend — nooit shell, sudo
   of Docker."
-- **O-S2-005-3 (klein):** de reviewcontrole "status alleen kleur" meldt op de executor-statuspagina na een mislukte
+- **O-S2-005-3 (klein) — open, belegd bij stap S-P2-010:** de reviewcontrole "status alleen kleur" meldt op de executor-statuspagina na een mislukte
   koppelpoging `input#koppelcode` en `input#vingerafdruk` (rand in `down`). Op de afdruk staat onder elk veld wel een
   `octagon-x` met de fouttekst ("Koppelcode: 12 tekens in groepen van 4 …"), dus de status is niet alleen kleur; de
   controle in `apps/web/review/in-pagina.js` (`semantiek`) ziet de fouttekst naast het veld niet. De statuspagina is in
   deze stap niet gewijzigd (laatste wijziging `b309042`) en de CI meet haar niet. Voorstel: in `semantiek()` een veld
   met `aria-invalid="true"` en een `aria-describedby` naar een zichtbare fouttekst niet als "alleen kleur" tellen, en
   de executor-statuspagina ook in de CI-review meten.
+
+### Herreview (11 november 2026, bereik `4023e9e..636dbf4`)
+
+**Rol:** R-ONTWERP (herreview na A-HERSTEL). **Bereik:** `4ef4ad4` (kop "Herstel" in `deploy/truenas/CUSTOM_APP.md`,
+de verwijzing daarnaar in `apps/executor/src/executor/statuspagina.py` en `apps/executor/README.md`, en een test) en
+`636dbf4` (intro van "Executor installeren en koppelen"), plus de open punten O-S2-005-1 en O-S2-005-2.
+
+> **Eerlijkheid.** Gemeten in Chromium tegen de echte Hub (web-E2E-teststack, productie-build, simulators voor TrueNAS
+> en de bronnen) en een **eigen echte executor** (`executor.app` met een eigen datamap). Die executor is eerst echt via
+> de browser met de Hub gekoppeld (koppelcode uit de Hub-pagina, formulier op de statuspagina); daarna zijn de
+> bestanden in zijn eigen datamap kapotgemaakt (`hub-link.json` en/of `naslink.json` met ongeldige inhoud, rechten
+> 0600), zodat de executor de toestanden zelf afleidt. Niets is onderschept. **Sim-getest**; echte NAS, echte
+> schermlezer en echte telefoon: **NIET GEVALIDEERD**.
+
+**Feiten nagelopen (kop "Herstel" tegen de code):** de twee codes en bestanden (`hublink.py` en `naslink.py`, `_load`:
+geen geldige JSON, andere hoofdversie, symlink, andere eigenaar, rechten buiten 0600); herstart zet alleen bij een
+andere eigenaar van de map `/appdata/secrets` map en bestanden terug op 568 (`deploy/executor/entrypoint.py`; de tekst
+zegt precies dat); met sleutel het blok "Ontkoppelen of sleutel vervangen" met "Nieuwe sleutel" en "Ontkoppelen van de
+Hub" (`statuspagina.html`); "Koppelcode voor de executor maken" en "Uitleg executor" bestaan in de Hub-UI
+(`ExecutorKoppelen.tsx`, `OnboardingScreen.tsx`); `certificaat_gewijzigd` bestaat (`truenas.py`, `app.py`). De kop beschrijft
+alleen de TrueNAS-web-UI, geen terminal (V-096). Uitkomst: klopt.
+
+**Gevonden en hersteld (alleen tekst):**
+
+| # | Scherm | Was | Wordt |
+|---|---|---|---|
+| T-06 | Executor-statuspagina, koppelstatus onleesbaar zonder bruikbare sleutel | "… en er is nog geen TrueNAS-schrijfsleutel ingesteld waarmee je dit hier kunt herstellen." | "… en er is geen bruikbare TrueNAS-schrijfsleutel (niet ingesteld of onleesbaar) waarmee je dit hier kunt herstellen." |
+
+Waarom: als ook de sleutelopslag onleesbaar is, geeft de executor deze melding (`app.py`, `_page`:
+`sleutel_ingesteld=bool(nas.get("ingesteld"))`, en `naslink.public()` zegt dan `ingesteld: False`). Op dezelfde pagina
+staat dan de rij "TrueNAS-schrijfsleutel · Onleesbaar". De melding zei dus iets wat de rij eronder tegenspreekt
+(gezien op de draaiende executor). Test: `apps/executor/tests/test_statuspagina.py`,
+`test_onleesbaar_zonder_bruikbare_sleutel_zegt_niet_dat_er_geen_sleutel_is` (rood met de oude tekst, mutatieproef).
+
+**Metingen** (`apps/web/review/`, 320/360/390/768/1024/1440 × licht/donker, `samenvat.mjs --streng`; tweede ronde met
+`PEIL_REVIEW_LETTER="DejaVu Sans"`):
+
+| Scherm / toestand | Metingen | axe | Tekst min. | Overloop | Doelen < 44 px | Focus (390/1440) | Harde bevindingen |
+|---|---|---|---|---|---|---|---|
+| `executor-koppelen` (nieuwe intro) | 12 + 12 | 0 | 9,32:1 | 0 | 0 | ring overal, niets bedekt, ≥ 8,34:1 | 0 |
+| executor-statuspagina, gekoppeld + `sleutelopslag_onleesbaar` | 12 + 12 | 0 | 8,34:1 | 0 | 0 | idem | 0 |
+| executor-statuspagina, `koppelstatus_onleesbaar` zonder sleutel | 12 (oud) + 12 + 12 (na T-06) | 0 | 8,34:1 | 0 | 0 | idem | 0 |
+| executor-statuspagina, beide onleesbaar | 12 (oud) + 12 + 12 (na T-06) | 0 | 8,34:1 | 0 | 0 | idem | 0 |
+
+- Eén zachte treffer van de woordenlijst op elke statuspagina: "de eigen controles zijn **in orde**" in de vaste
+  Gereed-zin. Dat is de letterlijke voorbeeldzin uit Peil §11.2 ("Statuspagina: Gereed"); geen statuswoord. Laten staan.
+- Het pad `deploy/truenas/CUSTOM_APP.md` breekt op 320 px netjes (ook met DejaVu Sans); afdrukken met Read bekeken.
+- De nieuwe intro: geen "goedgekeurd" meer, geen "uit uit"; past op 320 px zonder overloop.
+
+**Open na de herreview (buiten het mandaat; niet gewijzigd):**
+
+- **O-S2-005-4 (belangrijk, Peil-sjabloon):** het gepinde sjabloon (`apps/executor/src/executor/statuspagina.html`,
+  kopie van `design/ontwerptaal/statuspagina.html`, Peil 1.1.1) toont op de executor bij `koppelstatus_onleesbaar`
+  "Herstel gaat alleen met een nieuw koppeltoken: maak het in de Hub (Instellingen → Diensten). …". De executor kent
+  geen koppeltoken (contract §3.9); de melding bovenaan dezelfde pagina zegt dat ook. Op de draaiende executor staan
+  beide teksten tegelijk. Daarnaast toont het blok "gekoppeld" van hetzelfde sjabloon "Ontkoppelen of opnieuw koppelen
+  gaat via de Hub", terwijl ontkoppelen bij de executor op de statuspagina zelf gebeurt (§3.9) en bij een onleesbare
+  sleutelopslag alleen via een nieuwe datamap (`CUSTOM_APP.md`, kop "Herstel"). Oplossen vraagt een nieuwe Peil-versie
+  (uitzondering voor de executor in het sjabloon); dat is een besluit, geen ontwerpreview.
+- **O-S2-005-5 (klein):** `ERRORS_NL["koppelstatus_onleesbaar"]` in `apps/executor/src/executor/hublink.py` zegt
+  alleen "Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub)". Die tekst verschijnt bij
+  een formulierverzoek dat de executor met deze code weigert, en in `last_error` van de koppelstatus. Zonder bruikbare
+  sleutel klopt hij niet; voorstel: dezelfde tweedeling als `onleesbaar_melding`.
+- **O-S2-005-6 (klein):** `deploy/truenas/CUSTOM_APP.md`, stap 3, "Koppelen met de Hub", punt 1 zegt nog dat het scherm
+  "Diensten" er niet is en dat je de koppelcode via `/api/docs` maakt; kop 5 zegt dat `/api/docs` geen
+  `X-CSRF-Token` meestuurt, en de kop "Herstel" verwijst (terecht) naar de Hub-pagina "Executor installeren en
+  koppelen". Punt 1 is verouderd (V-104).
