@@ -644,10 +644,11 @@ def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(
     assert naar_executor == [] and schrijfaanroepen(nas) == []
 
 
-def _gelijktijdig(eerste: Any, tweede: Any, moment: Any) -> tuple[Any, Any]:
+def _gelijktijdig(eerste: Any, tweede: Any, moment: Any, *, tweede_eerst: bool | None = None) -> tuple[Any, Any]:
     """Draai ``eerste()``. Precies vóór de flush waarop ``moment(session)`` waar is, start ``tweede()`` in een eigen
     draad (V-044). Is de tweede binnen 3 s klaar, dan was hij eerst; anders wacht hij op een vergrendeling van de
-    eerste en loopt de eerste door. Zo is de volgorde bepaald, niet toevallig."""
+    eerste en loopt de eerste door. Zo is de volgorde bepaald, niet toevallig. Met ``tweede_eerst`` legt de test die
+    volgorde vast: ``True`` = de tweede was klaar terwijl de eerste zijn rij nog vasthield (hij wachtte dus niet)."""
     from sqlalchemy import event
     from sqlalchemy.orm import Session
 
@@ -661,6 +662,7 @@ def _gelijktijdig(eerste: Any, tweede: Any, moment: Any) -> tuple[Any, Any]:
         draden.append(t)
         t.start()
         t.join(timeout=3)
+        uitslag["tweede_was_eerst"] = not t.is_alive()
 
     event.listen(Session, "before_flush", bij_flush)
     try:
@@ -670,6 +672,12 @@ def _gelijktijdig(eerste: Any, tweede: Any, moment: Any) -> tuple[Any, Any]:
     assert draden, "het moment voor de tweede aanroep is nooit bereikt"
     draden[0].join(timeout=60)
     assert not draden[0].is_alive() and "tweede" in uitslag
+    if tweede_eerst is not None:
+        assert uitslag["tweede_was_eerst"] is tweede_eerst, (
+            "de tweede aanroep was klaar terwijl de eerste zijn rij vasthield"
+            if uitslag["tweede_was_eerst"]
+            else "de tweede aanroep wachtte op de rij die de eerste vasthield"
+        )
     return r1, uitslag["tweede"]
 
 
@@ -796,10 +804,13 @@ def test_veeg_in_een_leesroute_schrijft_niet_over_een_uitvoering_heen(
             db.commit()
         return lezer.get("/api/v1/actions")
 
+    # tweede_eerst=True: de leesroute was klaar terwijl de uitvoering de rij nog vasthield (FOR UPDATE SKIP LOCKED);
+    # met een wachtende FOR UPDATE zou de leesroute pas na de uitvoering klaar zijn en is deze test rood.
     r1, r2 = _gelijktijdig(
         lambda: voer_uit(admin, v),
         verlopen_en_lijst_lezen,
         lambda s: any(isinstance(o, ActionRequest) and o.id == rid for o in s.dirty),
+        tweede_eerst=True,
     )
     assert r2.status_code == 200, r2.text
     assert r1.status_code == 409 and r1.json()["code"] == "uitvoering_geweigerd", r1.text
