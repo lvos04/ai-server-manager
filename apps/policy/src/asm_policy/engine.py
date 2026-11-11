@@ -95,19 +95,32 @@ def _image_basenames(images: Iterable[str]) -> list[str]:
     return out
 
 
+def recognize_all(policy: Policy, name: str | None, images: Iterable[str] = ()) -> tuple[str, ...]:
+    """Alle herkenningen van een app: eerst op de appnaam, dan per image-basisnaam. Per naam telt de exacte treffer,
+    anders het langste voorvoegsel + ``-``/``_``.
+
+    Naam en image kunnen naar verschillende apps wijzen (een app die ``emby`` heet met een andere image, of
+    andersom). Dan gelden de regels van **allebei**: een herkenning is er alleen om strenger te zijn en opent nooit
+    iets."""
+    gevonden: list[str] = []
+    for h in ([name.lower()] if name else []) + _image_basenames(images):
+        treffer = next((app for app, needles in policy.herkenning.items() if h in needles), None)
+        if treffer is None:
+            best: tuple[int, str] | None = None
+            for app, needles in policy.herkenning.items():
+                for n in needles:
+                    if (h.startswith(n + "-") or h.startswith(n + "_")) and (best is None or len(n) > best[0]):
+                        best = (len(n), app)
+            treffer = best[1] if best else None
+        if treffer is not None and treffer not in gevonden:
+            gevonden.append(treffer)
+    return tuple(gevonden)
+
+
 def recognize(policy: Policy, name: str | None, images: Iterable[str] = ()) -> str | None:
-    """Herken een app op de exacte appnaam of image-basisnaam, anders het langste voorvoegsel + ``-``/``_``.
-    Alleen om strenger te zijn: een herkenning opent nooit iets."""
-    hay = ([name.lower()] if name else []) + _image_basenames(images)
-    for app, needles in policy.herkenning.items():
-        if any(h == n for n in needles for h in hay):
-            return app
-    best: tuple[int, str] | None = None
-    for app, needles in policy.herkenning.items():
-        for n in needles:
-            if any(h.startswith(n + "-") or h.startswith(n + "_") for h in hay) and (best is None or len(n) > best[0]):
-                best = (len(n), app)
-    return best[1] if best else None
+    """De eerste herkenning (de appnaam gaat voor de image). Voor weergave; regels gebruiken :func:`recognize_all`."""
+    alle = recognize_all(policy, name, images)
+    return alle[0] if alle else None
 
 
 def _strings(value: Any, depth: int = 0) -> Iterable[str]:
@@ -136,11 +149,14 @@ def classify(
     target: Mapping[str, Any] | None,
     parameters: Mapping[str, Any] | None,
     actor_type: str,
-    herkend_als: str | None = None,
+    herkend_als: str | Iterable[str] | None = None,
     requires_backup_claim: bool | None = None,
 ) -> Classification:
-    """Zie de moduletekst. ``herkend_als`` = :func:`recognize` op het doel (de aanroeper leest het doel zelf uit).
-    ``requires_backup_claim`` uit het voorstel kan alleen **verhogen** (``true``), nooit verlagen."""
+    """Zie de moduletekst. ``herkend_als`` = :func:`recognize_all` op het doel (de aanroeper leest het doel zelf
+    uit); bij meer herkenningen gelden de regels van allemaal. ``requires_backup_claim`` uit het voorstel kan alleen
+    **verhogen** (``true``), nooit verlagen."""
+    herkend: tuple[str, ...] = (herkend_als,) if isinstance(herkend_als, str) else tuple(herkend_als or ())
+    eerste = herkend[0] if herkend else None
     aid = action_id.strip().lower()
     target = target or {}
     parameters = parameters or {}
@@ -172,12 +188,13 @@ def classify(
 
     rules.append(f"ACT:{aid}")
     klasse = actie.klasse
-    kritiek = bool(herkend_als and herkend_als in policy.kritiek)
+    kritieke = [h for h in herkend if h in policy.kritiek]
+    kritiek = bool(kritieke)
     if kritiek and actie.klasse_kritiek:
         klasse = max_class(klasse, actie.klasse_kritiek)
-        rules.append(f"KRITIEK:{herkend_als}")
+        rules.append(f"KRITIEK:{kritieke[0]}")
     for b in policy.beschermd:
-        if herkend_als == b.app and (b.acties is None or aid in b.acties):
+        if b.app in herkend and (b.acties is None or aid in b.acties):
             rules.append(b.id)
             blocks.append(Blokkade(b.id, b.code, b.reden_nl))
     if actor_type in NIET_MENSELIJK and not actie.ai_mag_voorstellen:
@@ -204,6 +221,6 @@ def classify(
         requires_backup=requires_backup,
         opslagmutatie=actie.opslagmutatie,
         uitvoerder=actie.uitvoerder,
-        herkend_als=herkend_als,
+        herkend_als=kritieke[0] if kritieke else eerste,
         kritiek=kritiek,
     )

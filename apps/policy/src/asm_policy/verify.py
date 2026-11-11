@@ -75,7 +75,12 @@ def check_envelope(
 
 
 def check_decision(
-    policy: Policy, request: Mapping[str, Any], *, now: datetime, herkend_als: str | None, uitvoerder: str
+    policy: Policy,
+    request: Mapping[str, Any],
+    *,
+    now: datetime,
+    herkend_als: str | Iterable[str] | None,
+    uitvoerder: str,
 ) -> tuple[ActieDef | None, Classification | None, Weigering | None]:
     prop = request["proposal"]
     actie = policy.actie(str(prop["action_id"]))

@@ -14,7 +14,7 @@ from policyhelpers import DIGEST, DIGEST_B, HOST, POLICY_DIR, approval_for, exec
 
 from asm_policy import PolicyError, execreq, load_policy, policy_hash
 from asm_policy.canonical import CanonicalError, canonical_json, canonical_sha256
-from asm_policy.engine import classify, recognize
+from asm_policy.engine import classify, recognize, recognize_all
 from asm_policy.etag import ABSENT, app_etag
 from asm_policy.loader import is_read_only
 from asm_policy.params import expected_image, validate_parameters, validate_target, vault_refs
@@ -227,6 +227,40 @@ def test_herkenning_is_alleen_strenger() -> None:
     assert recognize(POLICY, "ai-server-manager-executor") == "ai-server-manager-executor"
     assert recognize(POLICY, "iets-anders", ["ghcr.io/x/y:1"]) is None
     assert recognize(POLICY, None) is None
+
+
+def test_naam_en_image_wijzen_naar_verschillende_apps_dan_gelden_beide() -> None:
+    """Een herkenning is er alleen om strenger te zijn: wijst de naam naar de ene app en de image naar de andere,
+    dan gelden de regels van allebei (anders zou een andere image de bescherming van de naam opheffen)."""
+    # Kritieke naam, image van een niet-kritieke bekende app → nog steeds kritiek (R2).
+    herkend = recognize_all(POLICY, "adguard-home", ["ghcr.io/voorbeeld/my-house:1.0"])
+    assert (
+        herkend == ("adguard-home", "my_house")
+        and recognize(POLICY, "adguard-home", ["x/my-house:1"]) == "adguard-home"
+    )
+    c = classify(
+        POLICY,
+        action_id="app.restart",
+        target={"app_id": "adguard-home"},
+        parameters={},
+        actor_type="user",
+        herkend_als=herkend,
+    )
+    assert c.risk_class == "R2" and c.kritiek and c.requires_approval and "KRITIEK:adguard-home" in c.rule_ids
+    # Naam emby met een andere bekende image, en andersom: de Emby-regel geldt in beide gevallen.
+    for naam, image in (("emby", "docker.io/jellyfin/jellyfin:10"), ("jellyfin", "docker.io/emby/embyserver:4.9")):
+        herkend = recognize_all(POLICY, naam, [image])
+        assert set(herkend) == {"emby", "jellyfin"}
+        c = classify(
+            POLICY, action_id="app.stop", target={"app_id": naam}, parameters={}, actor_type="user", herkend_als=herkend
+        )
+        assert c.geweigerd and "emby_nooit_door_platform" in [b.code for b in c.blokkades]
+    # Eén herkenning als tekst blijft werken; geen herkenning opent niets en verhoogt niets.
+    assert classify(
+        POLICY, action_id="app.stop", target={"app_id": "emby"}, parameters={}, actor_type="user", herkend_als="emby"
+    ).geweigerd
+    assert recognize_all(POLICY, "iets-anders", ["ghcr.io/x/y:1"]) == ()
+    assert recognize_all(POLICY, "authentik-server", ["docker.io/emby/embyserver:4"]) == ("authentik", "emby")
 
 
 # ------------------------------------------------------------------ doel en parameters
