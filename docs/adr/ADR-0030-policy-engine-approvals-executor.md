@@ -184,7 +184,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 ## Open punten
 
 - **Schermen in de Hub-UI.** De API is er; het goedkeuringsscherm (preview, hashes, goedkeuren/afwijzen, uitvoeren,
-  noodstop) is nog niet gebouwd. Tot dan loopt het via de API-documentatie (`/api/docs`).
+  noodstop) is nog niet gebouwd. Tot dan is het voor een gebruiker niet te bedienen: elke wijzigende aanroep vraagt
+  de header `X-CSRF-Token` bij de sessie, en de API-documentatie (`/api/docs`) stuurt die niet mee.
 - **Herstelpunten per app (B12).** Zolang die niet bestaan, zijn `app.update` en `app.rollback` via de Hub altijd
   geblokkeerd (`backup_checkpoint_ontbreekt`); de keten zelf is Sim-getest met een gesimuleerd herstelpunt.
 - **Gate `r2_r3_acties`** hangt af van `data_mutatie` (ADR-0007). Daardoor is élke R2-actie geblokkeerd bij een

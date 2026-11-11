@@ -202,8 +202,9 @@ uitvoeren, dan vervalt de goedkeuring en volgt een nieuwe preview.
   versie nog niet; tot dan weigert de Hub die twee acties eerlijk (`backup_checkpoint_ontbreekt`).
 - **Noodstop:** een beheerder legt alle uitvoering in één keer stil.
 
-De schermen hiervoor in de Hub-UI zijn nog niet gebouwd; tot dan loopt dit via de API-documentatie van de Hub
-(`/api/docs`, onderdeel "acties en goedkeuringen"), ingelogd als beheerder.
+De schermen hiervoor in de Hub-UI zijn nog niet gebouwd. Tot die er zijn, is dit voor een gebruiker nog niet te
+bedienen: de API bestaat al, maar elke wijzigende aanroep vraagt naast de aanmelding de header `X-CSRF-Token`, en die
+stuurt de API-documentatie van de Hub (`/api/docs`) niet mee.
 
 ## Updaten en terugdraaien
 
