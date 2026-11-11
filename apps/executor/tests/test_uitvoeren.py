@@ -346,6 +346,20 @@ def test_emby_onder_een_andere_naam_wordt_herkend_op_de_image(stack: Stack) -> N
     assert writes(nas) == [] and app is not None and app["state"] == "RUNNING"
 
 
+def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(stack: Stack) -> None:
+    """ADR-0030 besluit 21: de naam wijst naar Jellyfin, de image naar Emby. Op naam alleen zou stoppen en herstarten
+    R1 zijn; de executor leest zelf de image terug en weigert met de Emby-regel."""
+    hub, c, nas = stack
+    nas.data["app.query"] = [a for a in nas.data["app.query"] if a["name"] != "jellyfin"]
+    nas.data["app.query"].append(_app("jellyfin", "RUNNING", "emby/embyserver:4.8.10.0", 8096, 8096, "/mnt/t/e", "/c"))
+    for action in ("app.stop", "app.restart"):
+        r = execute(c, hub, signed(hub, app_prop(nas, action, "jellyfin"), risk_class="R1"))
+        assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+        assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    app = nas.app("jellyfin")
+    assert writes(nas) == [] and app is not None and app["state"] == "RUNNING"
+
+
 @pytest.mark.parametrize(
     ("naam", "image", "catalogus", "code"),
     [
@@ -825,6 +839,36 @@ def test_truenas_onbereikbaar_of_sleutel_ingetrokken(stack: Stack) -> None:
     r = execute(c, hub, signed(hub, prop, risk_class="R1"))
     assert r.status_code == 503 and r.json()["code"] == "truenas_onbereikbaar", r.text
     assert writes(nas) == []
+
+
+def test_trage_truenas_geeft_een_time_out_en_de_volgende_aanroep_klopt(nas: FakeTrueNAS) -> None:
+    """De TrueNAS-client draait op een eigen event loop in een eigen thread. Antwoordt TrueNAS te laat, dan volgt
+    binnen de tijdslimiet ``truenas_timeout``. Het late antwoord komt daarna nog binnen, maar hoort niet bij de
+    volgende aanroep: die krijgt zijn eigen antwoord. Na het sluiten loopt de thread niet meer."""
+    import threading
+    import time
+
+    from executor.truenas import NasClient, NasFout, fetch_fingerprint
+
+    nas.delays["pool.query"] = 1.5
+    client = NasClient(NAS_HOST, nas.port, fetch_fingerprint(NAS_HOST, nas.port), timeout=0.3)
+    client.open()
+    draad = client._thread
+    try:
+        assert isinstance(draad, threading.Thread) and draad.name == "nas-client" and draad.is_alive()
+        client.login(WRITE_KEY)
+        start = time.monotonic()
+        with pytest.raises(NasFout) as fout:
+            client.call("pool.query")
+        assert fout.value.code == "truenas_timeout" and time.monotonic() - start < 1.0
+        del nas.delays["pool.query"]
+        time.sleep(1.5)  # het late antwoord op pool.query is nu verstuurd
+        apps = client.call("app.query")
+        assert isinstance(apps, list) and {a["name"] for a in apps} >= {"my-house", "mediaguard"}
+        assert client.call("pool.query")[0]["name"] == "testpool"
+    finally:
+        client.close()
+    assert not draad.is_alive() and client._thread is None
 
 
 def test_onleesbare_sleutelopslag_voert_niets_uit(stack: Stack) -> None:

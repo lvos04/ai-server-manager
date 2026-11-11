@@ -349,6 +349,46 @@ def test_doel_wijzigt_tussen_voorstel_en_goedkeuring(stack: Stack) -> None:
     assert r.status_code == 409 and r.json()["code"] == "doel_gewijzigd", r.text
 
 
+@pytest.mark.parametrize("wijziging", ["versie", "digest"])
+def test_gewijzigde_appversie_of_digest_vraagt_opnieuw_goedkeuren(stack: Stack, wijziging: str) -> None:
+    """B01-007, acceptatie: bij een gewijzigde appversie tussen preview en goedkeuring opnieuw goedkeuren. Ook tussen
+    goedkeuring en uitvoering, en ook een andere digest onder dezelfde tag: de goedkeuring vervalt en TrueNAS krijgt
+    niets. Daarna is de nieuwe preview gewoon goed te keuren en uit te voeren."""
+    import hashlib
+
+    admin, nas = stack.admin, stack.nas
+    app = nas.app("my-house")
+    assert app is not None
+
+    def wijzig(n: int) -> None:
+        if wijziging == "versie":
+            nas._set_image(app, {"repository": "ghcr.io/lvos04/my_house", "tag": f"0.1.{n}"})
+            return
+        ref = app["active_workloads"]["images"][0]
+        rij = next(i for i in nas.data["app.image.query"] if ref in i["repo_tags"])
+        rij["repo_digests"] = [f"{ref.rsplit(':', 1)[0]}@sha256:" + hashlib.sha256(f"{ref}-{n}".encode()).hexdigest()]
+
+    v = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
+    wijzig(1)  # tussen preview en goedkeuring
+    r = keur_goed(admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "preview_gewijzigd", r.text
+    assert "resource_etag" in r.json()["details"]["gewijzigd"], r.text
+    nu = haal(admin, v)
+    assert nu["goedkeuring"] is None and nu["resource_etag"] != v["resource_etag"]
+    assert keur_goed(admin, nu).status_code == 200
+    wijzig(2)  # tussen goedkeuring en uitvoering
+    r = voer_uit(admin, nu)
+    assert r.status_code == 409 and r.json()["code"] == "goedkeuring_vervallen", r.text
+    assert "resource_etag" in r.json()["details"]["gewijzigd"], r.text
+    assert schrijfaanroepen(nas) == []
+    weer = haal(admin, v)
+    assert weer["status"] == "wacht_op_goedkeuring" and weer["goedkeuring"]["vervallen_reden"].startswith("gewijzigd:")
+    assert keur_goed(admin, weer).status_code == 200
+    r = voer_uit(admin, weer)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert schrijfaanroepen(nas) == ["app.delete"]
+
+
 def test_goedkeuring_is_eenmalig_ook_als_de_status_wordt_teruggezet(stack: Stack) -> None:
     """EX20: zelfs als de status van het verzoek (door een fout of ingreep) weer 'goedgekeurd' wordt, is de
     goedkeuring verbruikt."""
@@ -526,6 +566,32 @@ def test_gestopte_custom_app_kan_niet_via_het_platform_starten_een_catalogusapp_
     r = voer_uit(admin, r.json())
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
     assert nas.app("jellyfin")["state"] == "RUNNING" and schrijfaanroepen(nas) == ["app.stop", "app.start"]
+
+
+@pytest.mark.parametrize("action_id", ["app.stop", "app.restart"])
+def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, action_id: str
+) -> None:
+    """ADR-0030 besluit 21: wijst de naam naar een andere bekende app (hier ``jellyfin``) en de image naar Emby, dan
+    geldt ook de Emby-regel. Met alleen de eerste herkenning zou dit Jellyfin zijn: R1 en zonder goedkeuring uit te
+    voeren. Geweigerd bij het voorstel; er gaat niets naar de executor."""
+    from fakes.fake_truenas import _app, _image
+
+    admin, nas = stack.admin, stack.nas
+    naar_executor = _naar_executor(monkeypatch)
+    nas.data["app.query"] = [a for a in nas.data["app.query"] if a["name"] != "jellyfin"]
+    nas.data["app.query"].append(
+        _app("jellyfin", "RUNNING", EMBY_IMAGE, 30013, 8096, "/mnt/testpool/apps/jellyfin", "/config")
+    )
+    nas.data["app.image.query"].append(_image(EMBY_IMAGE))
+    key = str(uuid.uuid4())
+    body = {"action_id": action_id, "target": app_target("jellyfin"), "parameters": {}, "reason": "test"}
+    r = admin.post("/api/v1/actions", json=body, headers={"Idempotency-Key": key})
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in _codes(r.json()["details"]), r.text
+    assert haal(admin, key)["status"] == "geweigerd"
+    assert voer_uit(admin, key).status_code == 409
+    assert naar_executor == [] and schrijfaanroepen(nas) == []
 
 
 def _gelijktijdig(eerste: Any, tweede: Any, moment: Any) -> tuple[Any, Any]:
