@@ -4,6 +4,32 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — fase P2 deel 1: policy-engine, goedkeuringen en executor (ADR-0030; contract 1.3 §8)
+- **Risicoclassificatie (B02-005):** `policy/*.yaml` (acties, apps, blokkades) read-only ingebakken in de Hub- én de
+  executor-image, met `policy_hash`; gedeeld pakket `asm_policy` (deterministisch, R0–R3; `risk_claim` wordt bewaard
+  en genegeerd). Onbekende, destructieve en shell-achtige acties en elke boilerschakeling worden altijd geweigerd;
+  Emby en andere beschermde apps worden herkend op naam én image.
+- **Executor (B02-006):** TrueNAS-sleutel met schrijfrechten op de executorpagina (adres en vingerafdruk tonen en
+  bevestigen, daarna live testen en versleuteld opslaan); `POST /api/v1/execute` controleert zelf opnieuw handtekening,
+  vervaltijd, nonce (eigen SQLite), allowlist, parameterschema, `policy_hash`, risicoklasse en precondities; TrueNAS
+  JSON-RPC met `core.get_methods`, before/after-hash en readback; bij een afwijking stopt de executor en volgt een
+  incident. `GET /api/v1/executions/{request_id}` leest het journaal.
+- **Voorstellen en goedkeuringen in de Hub (B01-007):** `POST/GET /api/v1/actions`, `…/approve`, `…/reject`,
+  `…/execute`, `…/reconcile`, `GET /api/v1/policy` en `GET/PUT /api/v1/actions/noodstop`. Een goedkeuring is gebonden
+  aan `preview_hash`, `resource_etag` en `policy_hash`, hooguit 15 minuten geldig, één keer bruikbaar en vervalt bij
+  elke wijziging van een gebonden veld. Goedkeuren, afwijzen, uitvoeren en ophelderen vergrendelen het verzoek:
+  gelijktijdige aanroepen lopen na elkaar en precies één uitvoering bereikt de executor. Migratie 0012
+  (`action_request`, `approval`).
+- **Apps via de executor (B01-003):** installeren als standaard Custom App (ix-app-waarden via `app.create`, nooit
+  `custom_compose_config`), verwijderen alleen de containers (data blijft), terugzetten met de vorige waarden.
+- **Blokkades:** pool DEGRADED of onbekend en een rode back-upgate blokkeren opslagmutaties, ook met goedkeuring;
+  anti-flap (afkoeltijd, maximum per uur; ook bij gelijktijdige uitvoering) en een noodstop voor alle uitvoering;
+  bijwerken en terugzetten vragen een geverifieerd herstelpunt (app-herstelpunten bestaan nog niet →
+  `backup_checkpoint_ontbreekt`).
+- **Nog niet gebouwd:** de schermen in de Hub-UI voor voorstellen, preview en goedkeuren (nu via de API), een ingang
+  voor voorstellen door diensten, flows of AI, en app-herstelpunten (B12). Alles is Sim-getest tegen een fake TrueNAS;
+  NIET GEVALIDEERD (echte NAS).
+
 ### Gewijzigd — contract 1.3 toegepast in de Hub en de executor (ADR-0029; punten NU van C1.3-ASM)
 - **Enroll (C1.3-ASM-02):** antwoord `schema_version` `"1.3"` met `rotation_sequence` (0: geen sleutelrotatie
   gebouwd); `base_url` alleen op type gecontroleerd, een ongeldige waarde wordt `null` met `base_url_genegeerd` en een

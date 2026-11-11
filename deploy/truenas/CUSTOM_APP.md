@@ -27,7 +27,7 @@ TrueNAS maakt er `ghcr.io/lvos04/ai-server-manager:<versie>@sha256:…` van en h
 > **NIET GEVALIDEERD (echte NAS):** of het TrueNAS-formulier een tag met `@` accepteert en of TrueNAS met zo'n tag nog
 > updates detecteert, is niet op een echte NAS getest (contract 1.3 §2.2). Weigert het formulier de tag, vul dan
 > alleen de exacte versie in (bv. `0.1.0`, nooit `latest`). De Hub leest na elke installatie of update via de
-> executor de digest terug en stopt bij een afwijking (vanaf fase P2).
+> executor de digest terug en stopt bij een afwijking.
 
 **Terugval: registry-login (alleen als de image nog privé is).** Zolang het pakket nog niet publiek is, kan TrueNAS het
 alleen ophalen met een registry-login: TrueNAS → **Apps → Configuration → Docker Registries → Add** (menunamen verschillen per versie), registry
@@ -125,8 +125,9 @@ die alleen binnen de container (127.0.0.1) luistert. Je hoeft dus geen tweede po
 | | Host Path | `/mnt/<pool>/<apps-map>/ai-server-manager-executor` (eigen dataset, **niet** die van de Hub) |
 
 **Install.** De statuspagina `http://<NAS-adres>:30410` toont **"nog niet gekoppeld"**. De executor voert **niets**
-uit (de allowlist is leeg tot fase P2). Er zijn geen omgevingsvariabelen nodig: de executor koppelt nooit met een
-`HUB_ENROLLMENT_TOKEN`, alleen met een koppelcode op zijn eigen statuspagina (contract 1.3 §3.9).
+uit zolang hij niet gekoppeld is en geen TrueNAS-sleutel met schrijfrechten heeft. Er zijn geen omgevingsvariabelen
+nodig: de executor koppelt nooit met een `HUB_ENROLLMENT_TOKEN`, alleen met een koppelcode op zijn eigen statuspagina
+(contract 1.3 §3.9).
 
 **Koppelen met de Hub (eenmalig):**
 
@@ -138,12 +139,30 @@ uit (de allowlist is leeg tot fase P2). Er zijn geen omgevingsvariabelen nodig: 
 2. Open de statuspagina van de executor en vul **Hub-adres** (`http://<NAS-adres>:<hostpoort van de Hub>`),
    **koppelcode** en **Hub-vingerafdruk** in → **Koppelen**. De executor controleert de vingerafdruk zelf; klopt die
    niet, dan slaat hij niets op.
-3. Daarna toont de statuspagina "gekoppeld", het Hub-adres en dezelfde vingerafdruk. Het koppelformulier verdwijnt:
-   ontkoppelen of opnieuw koppelen gaat via de Hub (en op deze pagina pas met een live geverifieerde TrueNAS-schrijfkey,
-   fase P2).
+3. Daarna toont de statuspagina "gekoppeld", het Hub-adres en dezelfde vingerafdruk. Het koppelformulier verdwijnt.
 
-Voer hier nog **geen** TrueNAS-API-key in: dat formulier volgt in fase P2. Sim-getest tegen de echte Hub-API in de
-bouwomgeving; op een echte NAS **NIET GEVALIDEERD**.
+**TrueNAS-sleutel met schrijfrechten (eenmalig, op dezelfde pagina):**
+
+1. Maak in TrueNAS een **aparte gebruiker voor de executor** met een rol die apps en snapshots mag wijzigen, en
+   daarvoor een **API-key** (Credentials → API Keys; menunamen verschillen per versie). Gebruik **niet** de
+   alleen-lezen-key van de Hub: die weigert de executor (`schrijfrechten_ontbreken`).
+2. Open de statuspagina via het **IP-adres van de NAS** en plak de sleutel. De executor toont eerst alleen het
+   **NAS-adres** en de **SHA-256-vingerafdruk van het TrueNAS-certificaat**; de sleutel is dan nog niet verstuurd.
+   Vergelijk de vingerafdruk teken voor teken met wat je browser toont bij het slotje van de TrueNAS-web-UI.
+3. Klopt hij, plak dan dezelfde sleutel opnieuw en bevestig (binnen 15 minuten). De executor test de sleutel live,
+   bewaart hem versleuteld in `/appdata/secrets` en toont daarna alleen de laatste 4 tekens. De Hub ziet deze sleutel
+   nooit.
+4. Luistert de TrueNAS-API op een ander adres dan de executorpagina, zet dan bij **Environment Variables**
+   `EXECUTOR_TRUENAS_HOST` (en zo nodig `EXECUTOR_TRUENAS_PORT`). Alleen dan; standaard is er geen variabele nodig.
+
+Adres en certificaat liggen daarna vast. **Sleutel vervangen**, **Ontkoppelen van de Hub** en het **vrijgeven** van een
+gestopte executor (na een afwijking) doe je op dezelfde pagina onder "Ontkoppelen of sleutel vervangen", telkens met de
+huidige sleutel. Vrijgeven = de huidige sleutel invullen, "Nieuwe sleutel" leeg laten en "Sleutel vervangen" kiezen.
+
+Vanaf dat moment voert de executor alleen uit wat de Hub ondertekend aanlevert en wat op de vaste lijst in de image
+staat (apps starten/stoppen/herstarten, installeren, bijwerken, terugzetten, verwijderen zonder data, snapshots). Hij
+controleert alles zelf opnieuw en leest na elke wijziging terug of het klopt. Sim-getest tegen de echte Hub-API en een
+nagebouwde TrueNAS-API in de bouwomgeving; op een echte NAS **NIET GEVALIDEERD**.
 
 ## 4. Alleen-lezen-koppeling met TrueNAS (in de Hub-web-UI)
 
@@ -162,8 +181,27 @@ bouwomgeving; op een echte NAS **NIET GEVALIDEERD**.
 5. **Inventaris ophalen en meten:** daarna haal je de inventaris op (Server) en laat je D01, D03, D06 en D07 alleen-lezen
    meten. D02 kies je zelf uit de gemeten pools en datasets.
 
-De executor (formulier 2) koppel je met een koppelcode zoals in stap 3; de TrueNAS-schrijfkey op de executorpagina
-volgt in fase P2.
+De executor (formulier 2) koppel je met een koppelcode zoals in stap 3; daar vul je ook zijn eigen TrueNAS-sleutel
+met schrijfrechten in. De Hub houdt alleen de alleen-lezen-key.
+
+## 5. Wijzigingen laten uitvoeren (voorstel → goedkeuring → uitvoering)
+
+Elke wijziging op de NAS loopt via één weg: een **voorstel** in de Hub, een vaste **risicoklasse** uit het beleid in de
+image (R0–R3; niemand kan die klasse zelf kiezen), bij R2/R3 een **goedkeuring door een beheerder** voor precies de
+getoonde wijziging (15 minuten geldig, één keer bruikbaar), en dan de **executor**. Verandert de app tussen bekijken en
+uitvoeren, dan vervalt de goedkeuring en volgt een nieuwe preview.
+
+- **Altijd geweigerd:** shell- of root-opdrachten, verwijderen van datasets, pools of media, alles met de boiler, en
+  elke wijziging aan Emby.
+- **Geblokkeerd tot het is opgelost:** pool niet gezond of onbekend, back-up niet groen, executor niet gekoppeld,
+  noodstop aan. Zo'n blokkade is niet weg te klikken, ook niet door een beheerder.
+- **Verwijderen van een app** haalt alleen de containers weg; datasets en data blijven staan.
+- **Bijwerken en terugzetten** vragen een geverifieerd herstelpunt van de app. Die herstelpunten bestaan in deze
+  versie nog niet; tot dan weigert de Hub die twee acties eerlijk (`backup_checkpoint_ontbreekt`).
+- **Noodstop:** een beheerder legt alle uitvoering in één keer stil.
+
+De schermen hiervoor in de Hub-UI zijn nog niet gebouwd; tot dan loopt dit via de API-documentatie van de Hub
+(`/api/docs`, onderdeel "acties en goedkeuringen"), ingelogd als beheerder.
 
 ## Updaten en terugdraaien
 

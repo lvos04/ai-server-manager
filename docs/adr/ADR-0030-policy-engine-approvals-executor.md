@@ -103,6 +103,81 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 17. **Uitvoerders buiten de executor.** `notification.send` (R0) loopt via de Gotify-adapter van de Hub.
     `sso.*` hoort bij de eigenaar-connector van `home-control-hub`; zolang die geen `/connector/v1/apply` aanbiedt,
     geeft de Hub `capability_unavailable`.
+18. **Hub-routes voor voorstellen en goedkeuringen (B01-007).** Contract §8 legt de objecten vast, niet de routes.
+    Gekozen, alles onder `/api/v1` en alleen voor gebruikerssessies:
+
+    | Route | Rol | Doet |
+    |---|---|---|
+    | `GET /policy` | kijker | beleid, klassen, blokkades en `policy_hash` (alleen-lezen) |
+    | `POST /actions` | operator | voorstel → classificatie, preview en drie hashes; er wordt niets uitgevoerd |
+    | `GET /actions`, `GET /actions/{request_id}` | kijker | voorstellen met preview, blokkades, goedkeuring, uitkomst |
+    | `POST /actions/{request_id}/approve` | beheerder | R2/R3 goedkeuren voor precies de getoonde hashes |
+    | `POST /actions/{request_id}/reject` | beheerder | afwijzen met reden |
+    | `POST /actions/{request_id}/execute` | operator (R2/R3: beheerder) | opnieuw controleren, ondertekenen, uitvoeren |
+    | `POST /actions/{request_id}/reconcile` | operator | onbekende uitkomst ophelderen (alleen lezen) |
+    | `GET`/`PUT /actions/noodstop` | kijker / beheerder | noodstop lezen / zetten |
+
+    De rol kind heeft geen toegang. `request_id` = de `Idempotency-Key` van het voorstel (het `idempotency_key` van
+    contract §8); staat hij ook in de body, dan moet hij gelijk zijn. Voorstellen door diensten, flows of de AI
+    krijgen later een eigen ingang met een eigen dienstscope; tot dan bestaat die weg niet (dus ook geen AI-actor die
+    iets kan goedkeuren of uitvoeren).
+19. **Statussen.** `klaar` (R0/R1, direct uitvoerbaar), `wacht_op_goedkeuring`, `goedgekeurd`, `afgewezen`,
+    `geweigerd` (beleid), `bezig`, `uitgevoerd`, `mislukt` (toestand aantoonbaar onveranderd), `afwijking`, `onbekend`
+    en `verlopen`. Een geweigerd voorstel wordt wél vastgelegd (wie, wat, welke regel), maar zonder parameterwaarden:
+    alleen hun hash. Een voorstel dat het schema niet haalt (422) of waarvan het doel niet te lezen is, wordt niet
+    opgeslagen.
+20. **Twee keer classificeren.** Eerst zonder de NAS (verboden, boiler, gereserveerd, onbekend, schema), daarna met de
+    eigen readback van het doel (kritieke of beschermde app). Kan de Hub het doel niet lezen, dan `409 doel_onbekend`:
+    onbekend telt nooit als ongewijzigd, en zonder readback is er geen preview en geen `resource_etag`.
+21. **Herkenning op naam én image.** Wijzen de appnaam en de image naar verschillende bekende apps, dan gelden de
+    regels van beide (`recognize_all`); de strengste wint. Zo verliest een app met de naam `emby` de Emby-bescherming
+    niet door een andere image, en wordt een kritieke app niet R1 doordat zijn image op een gewone app lijkt. Hub en
+    executor gebruiken dezelfde functie.
+22. **Fout mét of zonder vastlegging.** Een weigering die de toestand van het verzoek verandert (goedkeuring vervallen,
+    voorstel verlopen, uitvoering mislukt, afwijking, uitkomst onbekend) wordt samen met die wijziging vastgelegd en
+    is daarna het idempotente antwoord op dezelfde sleutel. Elke andere fout laat de database ongemoeid.
+23. **Welke goedkeuring telt.** Per verzoek is er hooguit één open goedkeuring; opnieuw goedkeuren laat de vorige
+    vervallen (`vervangen`). De keuze van "de huidige" is volledig bepaald (open eerst, dan de laatst afgesloten),
+    ook als twee goedkeuringen in dezelfde seconde vallen — anders zou een geldige goedkeuring bij toeval als
+    vervallen gelden. Goedkeuren, afwijzen, uitvoeren en ophelderen vergrendelen de rij van het verzoek
+    (`SELECT … FOR UPDATE`) tot het einde van hun transactie: twee gelijktijdige aanroepen op hetzelfde verzoek lopen
+    na elkaar en de tweede krijgt `409 status_past_niet`. Bij uitvoeren blijven daarnaast de atomaire voorwaardelijke
+    updates staan (nonce van de goedkeuring en status), zodat precies één uitvoering de executor bereikt.
+24. **Anti-flap voor iedereen.** Afkoeltijd en maximum per uur per (actie, doel) gelden ook voor een beheerder. Het
+    contract zegt niet of ze alleen voor de AI gelden; dit is de veiligste lezing. Uitvoeren houdt per (actie, doel) een
+    vergrendeling (`pg_advisory_xact_lock`) vast vanaf vlak vóór de controle van de blokkades tot het voorstel op
+    `bezig` staat; zo zien twee voorstellen voor hetzelfde doel elkaars start ook als ze tegelijk worden uitgevoerd.
+25. **Synchroon uitvoeren, nooit herhalen.** `execute` wacht op het antwoord van de executor (time-out van de actie
+    plus marge). Komt er geen bruikbaar antwoord, dan is de status `onbekend`: de Hub herhaalt niets, want de nonce
+    is verbruikt. `reconcile` leest het journaal van de executor (`GET /api/v1/executions/{request_id}`) en zet de
+    status alleen op wat daar staat; zegt het journaal "nooit gezien" en is het `ExecutionRequest` verlopen, dan is
+    er aantoonbaar niets uitgevoerd (`mislukt`).
+26. **Incidenten.** Afwijking → kritiek incident per doel (`actie.afwijking`, vingerafdruk
+    `ai-server-manager:actie_afwijking:<doel>`, elke keer een melding); sluit bij een latere geslaagde en gecontroleerde
+    actie op hetzelfde doel. Onbekende uitkomst → waarschuwing per verzoek (`actie.uitkomst_onbekend`); sluit als de
+    uitkomst is opgehelderd. Een nette weigering of een mislukte aanroep staat alleen in het auditspoor.
+27. **Adres van de executor.** Uit de eigen inventaris (`app.query` + het NAS-adres van D03), met controle van de
+    image-repository; nooit uit de `base_url` die een dienst zelf opgeeft. Niet gekoppeld of adres onbekend → er wordt
+    niets ondertekend.
+28. **Geheimen in installatiewaarden.** Waarden van omgevingsvariabelen staan nooit in een preview, log of audit
+    (alleen de namen). Een verwijzing `vault://app/<app_id>/<parameter>` is het enige toegestane formaat; het invullen
+    ervan door de executor bestaat nog niet, dus een installatie met zo'n verwijzing geeft eerlijk
+    `501 capability_unavailable`.
+29. **Testnaden.** Tests zetten alleen de *invoer* van de gates (`blokkades.gate_inputs`: besluiten, eigen back-up) en
+    — voor `app.update`/`app.rollback` — een gesimuleerd herstelpunt (`blokkades.verified_checkpoint`); de
+    beoordeling, de policy, de handtekening en de executor zijn de echte code.
+
+## Open punten
+
+- **Schermen in de Hub-UI.** De API is er; het goedkeuringsscherm (preview, hashes, goedkeuren/afwijzen, uitvoeren,
+  noodstop) is nog niet gebouwd. Tot dan loopt het via de API-documentatie (`/api/docs`).
+- **Herstelpunten per app (B12).** Zolang die niet bestaan, zijn `app.update` en `app.rollback` via de Hub altijd
+  geblokkeerd (`backup_checkpoint_ontbreekt`); de keten zelf is Sim-getest met een gesimuleerd herstelpunt.
+- **Gate `r2_r3_acties`** hangt af van `data_mutatie` (ADR-0007). Daardoor is élke R2-actie geblokkeerd bij een
+  ongezonde pool of een rode back-upgate, ook een die geen opslag raakt (bv. een kritieke app herstarten). Veilig, maar
+  mogelijk strenger dan bedoeld; aanpassen is een besluit over de gates, niet over dit beleid.
+- **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
+  (contract §4.5) is een `kid` in het verzoek duidelijker. Contractvraag.
 
 ## Gevolgen
 
