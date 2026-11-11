@@ -24,7 +24,8 @@ Doe nu, in deze volgorde:
 
 Machtiging (geldt de hele sessie; je hoeft er niet opnieuw om te vragen):
 - Gebruik subagents voor zo veel mogelijk zaken. Je mag op elk moment tot 10 subagents tegelijk laten lopen.
-- Tot 8 bouwketens tegelijk open. Vangnet: toont "free -m" minder dan 3000 MB "available", dan geen extra zware keten.
+- Tot 8 bouwketens tegelijk open. Vangnet: toont "free -m" minder dan 3000 MB "available" (of swap meer dan 90 % vol
+  terwijl "available" onder 6000 MB ligt), dan geen extra zware keten.
 - Nooit twee schrijvers tegelijk in één repo. Subagents starten zelf geen subagents.
 - Bij ELKE Agent-aanroep vul je de velden model en effort in volgens deze niveautabel (nooit weglaten):
 <NIVEAUTABEL>
@@ -60,7 +61,8 @@ Doe nu, in deze volgorde:
 4. Ga verder met de eerstvolgende niet-afgevinkte stappen volgens VOORTGANG.md en het beslisschema van AGENTEN.md 3.1.
 
 Machtiging (geldt de hele sessie): tot 10 subagents tegelijk, voor zo veel mogelijk zaken; tot 8 bouwketens tegelijk
-open (vangnet: "free -m" onder 3000 MB "available" = geen extra zware keten); nooit twee schrijvers in één repo; bij
+open (vangnet: "free -m" onder 3000 MB "available", of swap boven 90 % bij minder dan 6000 MB "available" = geen extra
+zware keten); nooit twee schrijvers in één repo; bij
 ELKE Agent-aanroep model en effort volgens deze niveautabel:
 <NIVEAUTABEL>
 N5 alleen in de vijf gevallen van AGENTEN.md 7.3, elke inzet in "Topmodel-inzet". Passwordless sudo mag.

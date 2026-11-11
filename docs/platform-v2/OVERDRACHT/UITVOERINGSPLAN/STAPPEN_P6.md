@@ -37,9 +37,32 @@ Wat P6 **niet** is: geen enkele AI-stap schrijft naar de echte Emby, stopt Emby,
 
 ### 2.1 Gate ervoor (start van DEEL A)
 
-- De fasegate van P5 is gesloten: het A-GATE-rapport van P5 staat in VOORTGANG.md en de Excel is na P5 bijgewerkt.
+- De fasegate van P5 is gesloten. Dat is stap S-P5-910 ("Gate P5: onafhankelijke controle", `STAPPEN_P5.md` 7.1) met
+  het oordeel "GATE GEHAALD", gevolgd door 7.3 tot en met 7.5 van dat bestand (Excel nog één keer, STATUS.md en
+  VOORTGANG.md, melden). Controle: `grep -n '^ *oordeel:' <WERKMAP>/.lokaal/ketens/GATE-P5/RAPPORT-A-GATE.md` toont
+  "GATE GEHAALD", en de HEAD van elk van de acht repos van die gate (`git -C <WERKMAP>/<repo> rev-parse --short HEAD`)
+  is nog gelijk aan het veld `per_repo` van dat rapport (dezelfde regel als in "Al gedaan?" van S-P5-910). Is er sinds
+  het rapport in zo'n repo gecommit, dan geldt de gate voor die repo niet meer.
+- Daarvóór ligt de fase-afsluiting van P4: S-G4-90 (bewijs samenvoegen) en daarna de gate S-G4-95 ("Gate einde P4",
+  `STAPPEN_P4_GOLF3_4.md` hoofdstuk 10; rapport `<WERKMAP>/.lokaal/ketens/GATE-P4/RAPPORT-A-GATE.md`, uitkomst "gate
+  golf 4 gehaald"). P5 start pas na S-G4-95; S-P6-01 controleert alleen dat het rapport bestaat.
 - Per repo is de CI op de laatste commit van `ccr-c133d7a0-kuz1cv` groen (controle in S-P6-01).
-- Niet gehaald? Dan starten alleen S-P6-01 en de releasestappen van repos waar geen P5-werk meer ligt.
+- Niet gehaald? Dan starten alleen S-P6-01 en de releasestappen van repos waar geen P5-werk meer ligt. Alle vijf
+  release-repos hebben een eigen baan in P5. Een releasestap mag dus pas als in VOORTGANG.md elke P5-stap van die baan
+  is afgevinkt (of met reden geblokkeerd), en de repo niet in de nog open eisen van de gate valt:
+
+  | Releasestap | Repo | P5-stappen in die baan (bron: `STAPPEN_P5.md`, tabel "4. Volgorde en banen") |
+  |---|---|---|
+  | S-P6-02 | ai-server-manager | S-P5-02, S-P5-50 tot en met S-P5-64, S-P5-900 |
+  | S-P6-03 | home-control-hub | S-P5-30 tot en met S-P5-37 |
+  | S-P6-04 | appstore-en-fork | S-P5-70 tot en met S-P5-73 |
+  | S-P6-05 | jelly-leon-platform | S-P5-80 tot en met S-P5-86 |
+  | S-P6-06 | zoeken-en-persoonlijke-ai | S-P5-10 tot en met S-P5-24; de laatste stap van de baan is S-P5-23 (die wacht op S-P5-24) |
+
+  Daarnaast S-P5-103 (de image van `mt`) in de repo die S-P5-02 kiest. Welke repo dat is: ONBEKEND - eerst vaststellen
+  met `grep -n 'S-P5-103' <WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`. Is dat een van deze vijf, dan hoort S-P5-103 bij
+  die baan. De banen jelly-leon (S-P5-100 tot en met S-P5-115), jelly-leon-web (S-P5-120, S-P5-121) en
+  jelly-leon-clients (S-P5-130) hebben geen releasestap in P6. S-P6-30 en verder wachten op de hele gate.
 
 ### 2.2 Gates tijdens de fase (start van elk onderdeel van DEEL B)
 
@@ -197,19 +220,19 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
 ### S-P6-01 - Stand en voorwaarden van P6 vaststellen
 - **Repo:** geen (alleen lezen in alle 11 repos) | **Fase:** P6 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
 - **Werkpakketten en tests:** B03-013, B03-015, B03-019, JLT-74 (alleen voorwaarden vaststellen; geen EVIDENCE-wijziging)
-- **Vooraf:** fasegate P5 gesloten
+- **Vooraf:** fasegate P5 gesloten (S-P5-910 met oordeel "GATE GEHAALD"; controle in hoofdstuk 2.1). Is die gate nog niet gehaald, dan mag deze stap toch lopen (hij leest alleen); zijn dossier noemt dan per release-repo of de P5-baan klaar is (tabel in 2.1).
 - **Al gedaan?** `for r in ai-server-manager home-control-hub appstore-en-fork jelly-leon-platform jelly-leon jelly-leon-web jelly-leon-clients zoeken-en-persoonlijke-ai media-guard-ultimate media-source-optimizer my_house; do git -C <WERKMAP>/$r log -1 --format="$r %h %cI"; done` -> staat in VOORTGANG.md al een dossier "S-P6-01" met dezelfde commit-hashes, dan is de stap klaar. Wijkt één hash af: alleen die repo opnieuw nalopen.
 - **Lees eerst:** `<WERKMAP>/jelly-leon-platform/e2e/README.md#Wat er nu (P0) al is`; `<DOCS>/02_BOUWPLANNEN/B03_FASERING.md#Cutover-gate (P6) — "Jellyfin client/GPU testmatrix geslaagd"`; `<WERKMAP>/jelly-leon/docs/platform-v2/OVERNAME_EMBY.md#Wat nog moet gebeuren vóór de echte overname`; `<DOCS>/OVERDRACHT/STATUS.md#Besluiten van de gebruiker na contract 1.3 (2026-11-10)`
 - **Bouw:** (hier: vaststellen; er wordt niets geschreven in de repos)
-  1. CI per repo: `gh run list --repo lvos04/<repo> --branch ccr-c133d7a0-kuz1cv --limit 5`. Noteer per repo de laatste run en of die groen is, en of die run bij de commit van `git -C <WERKMAP>/<repo> log -1 --format=%H` hoort. Daarnaast per repo `git -C <WERKMAP>/<repo> status --short` en `git -C <WERKMAP>/<repo> log --oneline origin/ccr-c133d7a0-kuz1cv..HEAD`: elke niet-lege uitvoer is half of niet-gepusht werk (ronde 3 liet in zes repos half werk achter, zie `<WERKMAP>/.lokaal/plan/STAND_RONDE3.md`). Noteer het per repo; ruim niets op en commit niets.
+  1. CI per repo: `gh run list -R lvos04/<repo> -b ccr-c133d7a0-kuz1cv --limit 5`. Noteer per repo de laatste run en of die groen is, en of die run bij de commit van `git -C <WERKMAP>/<repo> log -1 --format=%H` hoort; de run op precies die commit geeft `gh run list -R lvos04/<repo> -b ccr-c133d7a0-kuz1cv -c "$(git -C <WERKMAP>/<repo> rev-parse HEAD)"` (`-c` alleen met de volle hash; een korte hash geeft een lege lijst). Daarnaast per repo `git -C <WERKMAP>/<repo> status --short` en `git -C <WERKMAP>/<repo> log --oneline origin/ccr-c133d7a0-kuz1cv..HEAD`: elke niet-lege uitvoer is half of niet-gepusht werk (ronde 3 liet in zes repos half werk achter, zie `<WERKMAP>/.lokaal/plan/STAND_RONDE3.md`). Noteer het per repo; ruim niets op en commit niets.
   2. Releases: `git -C <WERKMAP>/<repo> ls-remote --tags origin 'v0.1.0'` voor ai-server-manager, home-control-hub, appstore-en-fork, jelly-leon-platform en zoeken-en-persoonlijke-ai. Op de peildatum bestond de tag nergens.
   3. Integrale omgeving: `ls <WERKMAP>/jelly-leon-platform/e2e/integral 2>/dev/null` en `ls <WERKMAP>/jelly-leon-platform/e2e/simulators`. Op de peildatum bestond `integral/` niet en waren er simulators voor truenas, hub, beszel, uptime_kuma, gotify en authentik.
   4. Overname-assistent: `grep -n "tot die er is" <WERKMAP>/jelly-leon/docs/platform-v2/OVERNAME_EMBY.md`. Een treffer betekent: de assistent in het beheer van Jelly Leon ontbreekt nog; N-P6-11 kan dan niet starten (de gebruiker heeft geen terminal).
   5. Jelly Leon-release: `git -C <WERKMAP>/jelly-leon ls-remote --tags origin 'v*-jl.*'`. De eerste release (`12.4.0-jl.1` of later) is een stap van de gebruiker (BG-02; bron: `<WERKMAP>/jelly-leon/README.jelly-leon.md`). Zonder release geen staging op de NAS (N-P6-09).
   6. my_house als Custom App: `ls <WERKMAP>/my_house/deploy 2>/dev/null`. Op de peildatum bestond die map niet; de blokkade van B06-009 noemt dit ("Eerst P3-01"). Zonder alles-in-één image geen N-P6-06.
   7. Stand van het bewijs: per repo `python3 -c "import json,sys,collections; d=json.load(open(sys.argv[1])); print(collections.Counter(x.get('status') for x in d))" <WERKMAP>/<repo>/docs/platform-v2/EVIDENCE.json`. Een regel met status "Gereed" of "Geslaagd" is een bevinding (melden; de eigenaar-repo herstelt). Daarna de ID's zonder bewijsregel: `cd <WERKMAP> && python3 -c "import json,glob; have={r['id'] for p in glob.glob('*/docs/platform-v2/EVIDENCE.json') for r in json.load(open(p,encoding='utf-8'))}; print(*[i for i in open('.lokaal/plan/uit/ALLE_IDS.txt').read().split() if i not in have])"`. Een werkpakket (B..-...) of test (JLT-..) zonder regel hoort in de lijst "ontbreekt voor P6" van punt 9 (zie ook de noten onder de tabellen K.5 en K.6 in het hoofdstuk "Dekking"); een I-, D-, APP- of EX-rij zonder regel is geen bevinding: die krijgt zijn regel in S-P6-22 of in DEEL B.
-  8. Open besluiten en taken: lees in `<WERKMAP>/.lokaal/plan/uit/BESLUITEN_EN_BLOKKADES.md` de kop "2.0 Overzicht: wanneer wat", regel "Voor P6" (Z-07, Z-09, Z-11; D01...D07, D15...D17) en de kop "3.0 Overzicht: wanneer herinneren", regel "Start P6" (T-02, T-04, T-05, T-11, T-13, T-15, T-16, T-18). Noteer per ID of er een vastgelegd besluit of een afgeronde taak is (kop "0.3 Waar een nieuw besluit wordt vastgelegd" zegt waar je dat ziet). Wat open staat legt de regisseur met een keuzemenu voor; jij beslist niets.
-  9. Lever een dossier aan de regisseur: per punt 1-8 de uitkomst, plus de lijst "ontbreekt voor P6" met per ontbrekend deel het werkpakket-ID en de fase waar het thuishoort.
+  8. Open besluiten en taken: lees in `<WERKMAP>/.lokaal/plan/uit/BESLUITEN_EN_BLOKKADES.md` de kop "2.0 Overzicht: wanneer wat", regel "Voor P6" (Z-07, Z-09, Z-11; D01...D08, D11, D15...D17) en de kop "3.0 Overzicht: wanneer herinneren", regel "Start P6" (T-02, T-04, T-05, T-11, T-13, T-15, T-16, T-18). Noteer per ID of er een vastgelegd besluit of een afgeronde taak is (kop "0.3 Waar een nieuw besluit wordt vastgelegd" zegt waar je dat ziet). Wat open staat legt de regisseur met een keuzemenu voor; jij beslist niets.
+  9. Lever een dossier aan de regisseur: per punt 1-8 de uitkomst, de uitkomst van de gatecontroles uit hoofdstuk 2.1 (rapport GATE-P5 met oordeel en HEAD-vergelijking per repo; rapport GATE-P4 aanwezig ja/nee; per release-repo of de P5-baan uit de tabel in 2.1 is afgevinkt), plus de lijst "ontbreekt voor P6" met per ontbrekend deel het werkpakket-ID en de fase waar het thuishoort.
 - **Tests (verplicht):** geen bouw, dus geen nieuwe tests. Negatieve controle: voer punt 2 ook uit voor een tag die niet kan bestaan (`'v9.9.9'`); een lege uitvoer bewijst dat het commando onderscheid maakt.
 - **Poort:** geen (alleen lezen). Extra controle: het dossier bevat geen IP-adressen of geheimen.
 - **Valkuilen:** V-015 (half werk na een afgebroken ronde: niet weggooien en niet ongezien committen), V-034 ("groen" alleen voor de commit waar de run bij hoort), V-038 (CI was al rood vóór deze fase), V-030 (een storing bij GitHub is geen eigen fout). `git tag -l` toont alleen lokale tags; gebruik `ls-remote`. Een rode CI-run op een oudere commit is geen bevinding; alleen de laatste commit telt.
@@ -220,22 +243,22 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
 
 ### S-P6-02 - Release v0.1.0 van de Hub en de executor
 - **Repo:** ai-server-manager | **Fase:** P6 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee (de images bouwt de release-CI op GitHub, niet deze machine)
-- **Werkpakketten en tests:** I23-23-01, I23-23-07; EX19 (digest in het plan)
+- **Werkpakketten en tests:** I23-23-02, I23-23-03, I23-23-05, I23-23-06, I23-23-08 (de regels in deze repo); EX19 (digest in het plan)
 - **Vooraf:** S-P6-01; CI groen op de laatste commit; besluit 6 van de gebruiker (releases mogen zodra de CI groen is) is genomen
 - **Al gedaan?** `git -C <WERKMAP>/ai-server-manager ls-remote --tags origin 'v0.1.0'` en `grep -n "digest:" <WERKMAP>/ai-server-manager/deploy/manifest/*.manifest.yaml` -> klaar als de tag bestaat en beide manifesten een `sha256:`-digest hebben. Tag er wel, digest nog `null`: ga verder bij bouwpunt 4.
 - **Lees eerst:** `<WERKMAP>/ai-server-manager/.github/workflows/release.yml` (kopcommentaar en de stap "Tag moet gelijk zijn aan VERSION"); `<WERKMAP>/ai-server-manager/deploy/truenas/CUSTOM_APP.md#0. Image en tag (publiek, met digest)`; `<WERKMAP>/ai-server-manager/deploy/manifest/ai-server-manager.manifest.yaml` (kopcommentaar en `accepted_findings`)
 - **Bouw:**
   1. Controleer `cat <WERKMAP>/ai-server-manager/VERSION` = `0.1.0` en dat de werkboom schoon is (`git status --short` leeg) en gelijk aan origin (`git pull --rebase`).
   2. Maak een geannoteerde tag `v0.1.0` op de laatste commit waarvan de CI groen is en push alleen die tag (`git push origin v0.1.0`). Nooit een bestaande tag verplaatsen.
-  3. Volg de workflow `release` (`gh run list --repo lvos04/ai-server-manager --workflow release --limit 3`). De workflow publiceert `ghcr.io/lvos04/ai-server-manager:0.1.0` en de executor-image en levert `release/digests.json` als release-bijlage. Bron: kopcommentaar van `release.yml`.
+  3. Volg de workflow `release` (`gh run list -R lvos04/ai-server-manager --workflow release --limit 3`). De workflow publiceert `ghcr.io/lvos04/ai-server-manager:0.1.0` en de executor-image en levert `release/digests.json` als release-bijlage. Bron: kopcommentaar van `release.yml`.
   4. Haal de digests op (`gh release view v0.1.0 --repo lvos04/ai-server-manager` en de bijlage `digests.json`) en vul `image.digest` in `deploy/manifest/ai-server-manager.manifest.yaml` en `deploy/manifest/ai-server-manager-executor.manifest.yaml`. Verwijder in beide de geaccepteerde bevinding `digest_pending_release`.
   5. Werk `deploy/truenas/CUSTOM_APP.md#0. Image en tag (publiek, met digest)` bij met de tag in de vorm `0.1.0@sha256:<digest>`.
   6. Controleer of de pakketten publiek zijn (besluit 3 van de gebruiker): `docker manifest inspect ghcr.io/lvos04/ai-server-manager:0.1.0` zonder aanmelding. Lukt dat niet: meld het; de zichtbaarheid van een GHCR-pakket zet de gebruiker zelf.
   7. Werk `docs/platform-v2/EVIDENCE.json` bij (zie Bewijs), commit, `git pull --rebase`, push, wacht op groene CI.
 - **Tests (verplicht):** manifestcontrole zoals in de CI: `python -I -m appstore.manifest.cli validate --strict deploy/manifest/ai-server-manager.manifest.yaml` en hetzelfde voor het executor-manifest (omgeving volgens P-ai-server-manager). Negatieve test: zet in een tijdelijke kopie `digest: null` zonder de geaccepteerde bevinding en toon dat `validate --strict` faalt.
 - **Poort:** P-ai-server-manager uit POORTEN.md. Extra: de digest in het manifest is byte-gelijk aan die in de release-bijlage; nergens `latest`.
-- **Valkuilen:** V-090 (anoniem ophalen controleren voordat je het als installatiebewijs noemt; pakketrechten zet de gebruiker), V-022 (geen `git add -A`: in ai-server-manager kan half werk van andere ketens staan; voeg alleen de eigen paden toe), V-034. De release-workflow weigert als de tag niet gelijk is aan `v$(cat VERSION)`; een mislukte release nooit herstellen door de tag te verplaatsen maar door de oorzaak te herstellen en `v0.1.1` uit te brengen (VERSION ophogen). Het bestand `release/digests.json` nooit met de hand vullen.
-- **Bewijs:** I23-23-01 blijft "Bezig" (validatie "Sim-getest"; bewijs: release-run en digest). I23-23-07 blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): release-image met digest staat klaar; installatie, update en terugzetten op de NAS nog uitvoeren (N-P6-03)".
+- **Valkuilen:** V-026 (de release-workflow mag alleen bij een git-tag publiceren), V-100 (rijen die de NAS nodig hebben zonder de tekst "NIET GEVALIDEERD"), V-090 (anoniem ophalen controleren voordat je het als installatiebewijs noemt; pakketrechten zet de gebruiker), V-022 (geen `git add -A`: in ai-server-manager kan half werk van andere ketens staan; voeg alleen de eigen paden toe), V-034. De release-workflow weigert als de tag niet gelijk is aan `v$(cat VERSION)`; een mislukte release nooit herstellen door de tag te verplaatsen maar door de oorzaak te herstellen en `v0.1.1` uit te brengen (VERSION ophogen). Het bestand `release/digests.json` nooit met de hand vullen.
+- **Bewijs:** in `docs/platform-v2/EVIDENCE.json` van ai-server-manager hebben I23-23-02, -03, -05, -06 en -08 een regel (stand 2026-11-11: alle "Bezig"). Vul daar in `bewijs` de tag en de digest aan; de status blijft "Bezig". Bij I23-23-02, -03, -05 en -06 ontbrak op de peildatum de letterlijke tekst "NIET GEVALIDEERD" terwijl `blokkade` de echte NAS noemt (V-100): zet in `validatie` "Sim-getest; NIET GEVALIDEERD (echte NAS)" (bij -05 "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)") en laat `blokkade` beginnen met "NIET GEVALIDEERD (echte NAS): release-image met digest staat klaar; installatie op de NAS nog uitvoeren (N-P6-03)". I23-23-01 en I23-23-07 hebben hun regel in jelly-leon-platform (S-P6-05): maak ze hier niet aan.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST (VERPLICHT) (tegelijk) -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK
 - **Niveau:** A-BOUW N2 (kleine mechanische stap); overige standaard
 - **Stop en vraag als:** de CI niet groen is; de release-workflow faalt op rechten voor GHCR; het pakket niet publiek blijkt; de tag `v0.1.0` al bestaat op een andere commit dan de laatste groene.
@@ -249,14 +272,14 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
 - **Bouw:**
   1. Controleer `cat <WERKMAP>/home-control-hub/VERSION` = `0.1.0`, schone werkboom, `git pull --rebase`.
   2. Geannoteerde tag `v0.1.0` op de laatste groene commit; `git push origin v0.1.0`.
-  3. Volg de workflow `release` (`gh run list --repo lvos04/home-control-hub --workflow release --limit 3`); die pusht de alles-in-één image (`deploy/allinone/Dockerfile`) met exacte versie en schrijft `release/digests.json`.
+  3. Volg de workflow `release` (`gh run list -R lvos04/home-control-hub --workflow release --limit 3`); die pusht de alles-in-één image (`deploy/allinone/Dockerfile`) met exacte versie en schrijft `release/digests.json`.
   4. Vul `image.digest` in `deploy/manifest/home-control-hub.manifest.yaml` met de digest uit de release-bijlage; verwijder de geaccepteerde bevinding `digest_pending_release`.
   5. Controleer de publieke zichtbaarheid: `docker manifest inspect ghcr.io/lvos04/home-control-hub:0.1.0` zonder aanmelding.
   6. EVIDENCE bijwerken, commit, `git pull --rebase`, push, groene CI afwachten.
 - **Tests (verplicht):** `jl-manifest validate --strict deploy/manifest/home-control-hub.manifest.yaml` (de validator komt uit appstore-en-fork op een vastgezette commit; omgeving volgens P-home-control-hub). Negatieve test: tijdelijke kopie met `digest: null` zonder geaccepteerde bevinding moet falen.
 - **Poort:** P-home-control-hub uit POORTEN.md. Extra: digest in manifest = digest in release-bijlage; nergens `latest`.
-- **Valkuilen:** V-090, V-022, V-034. Tag en VERSION moeten gelijk zijn, anders stopt de workflow; een mislukte release herstellen met `v0.1.1`, nooit met een verplaatste tag.
-- **Bewijs:** nieuwe EVIDENCE-regel onder het bestaande ID B13-005 blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): release-image met digest staat klaar; back-up, upgrade en herstel met echte Authentik nog uitvoeren (N-P6-04)". Geen rij naar "Bezig" op grond van alleen de release.
+- **Valkuilen:** V-026 (publiceren alleen bij een git-tag), V-090, V-022, V-034. Tag en VERSION moeten gelijk zijn, anders stopt de workflow; een mislukte release herstellen met `v0.1.1`, nooit met een verplaatste tag.
+- **Bewijs:** werk de bestaande regel B13-005 in `docs/platform-v2/EVIDENCE.json` bij (alleen `bewijs` en `bijgewerkt`; geen tweede regel met hetzelfde ID); hij blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): release-image met digest staat klaar; back-up, upgrade en herstel met echte Authentik nog uitvoeren (N-P6-04)". Geen rij naar "Bezig" op grond van alleen de release.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST (VERPLICHT) (tegelijk) -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK
 - **Niveau:** A-BOUW N2; overige standaard
 - **Stop en vraag als:** CI niet groen; release-workflow faalt op GHCR-rechten; pakket niet publiek; tag bestaat al op een andere commit.
@@ -270,14 +293,14 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
 - **Bouw:**
   1. Controleer `cat <WERKMAP>/appstore-en-fork/VERSION` = `0.1.0`, schone werkboom, `git pull --rebase`.
   2. Geannoteerde tag `v0.1.0` op de laatste groene commit; `git push origin v0.1.0`.
-  3. Volg de workflow `release` (`gh run list --repo lvos04/appstore-en-fork --workflow release --limit 3`): image `ghcr.io/lvos04/appstore-en-fork:0.1.0` met SBOM en provenance; digest in `release/digests.json`; manifest met ingevulde digest als release-bijlage.
+  3. Volg de workflow `release` (`gh run list -R lvos04/appstore-en-fork --workflow release --limit 3`): image `ghcr.io/lvos04/appstore-en-fork:0.1.0` met SBOM en provenance; digest in `release/digests.json`; manifest met ingevulde digest als release-bijlage.
   4. Neem de digest uit de release-bijlage over in `deploy/manifest/appstore-en-fork.manifest.yaml`; verwijder de geaccepteerde bevinding `digest_pending_release`.
   5. Andere repos halen deze validator op een vastgezette commit op. Wijzig die vastgezette commits in deze stap niet; noteer in het rapport de commit van de release zodat latere stappen hem kunnen overnemen.
   6. Controleer de publieke zichtbaarheid: `docker manifest inspect ghcr.io/lvos04/appstore-en-fork:0.1.0` zonder aanmelding.
   7. EVIDENCE bijwerken, commit, `git pull --rebase`, push, groene CI afwachten.
 - **Tests (verplicht):** `jl-manifest validate --strict --format json deploy/manifest/appstore-en-fork.manifest.yaml` (zoals in `ci.yml`). Negatieve test: tijdelijke kopie met `digest: null` zonder geaccepteerde bevinding moet falen met `digest_not_pinned` (die code staat in het manifestcommentaar).
 - **Poort:** P-appstore-en-fork uit POORTEN.md. Extra: digest gelijk aan de release-bijlage; nergens `latest`.
-- **Valkuilen:** V-090, V-022, V-034. De tagvorm is hier strikter dan elders (alleen cijfers); `v0.1.0-rc1` start de release niet.
+- **Valkuilen:** V-026 (publiceren alleen bij een git-tag), V-090, V-022, V-034. De tagvorm is hier strikter dan elders (alleen cijfers); `v0.1.0-rc1` start de release niet.
 - **Bewijs:** B08-002 en APP-01...APP-20 blijven "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): inventaris als readback van de echte NAS via de op de NAS geïnstalleerde Hub nog uitvoeren (N-P6-05)". EX47 blijft "Bezig" (Sim-getest).
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST (VERPLICHT) (tegelijk) -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK
 - **Niveau:** A-BOUW N2; overige standaard
@@ -285,13 +308,13 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
 
 ### S-P6-05 - Release v0.1.0 van jelly-leon-platform en digests in de installatiemanifesten
 - **Repo:** jelly-leon-platform | **Fase:** P6 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee (de image bouwt de release-CI; de lokale rooktest in de tests is licht)
-- **Werkpakketten en tests:** I23-23-02, I23-23-03, I23-23-05, I23-23-07; EX47
+- **Werkpakketten en tests:** I23-23-01, I23-23-02, I23-23-03, I23-23-05, I23-23-07; EX47
 - **Vooraf:** S-P6-01; CI groen; voor bouwpunt 5: S-P6-02 klaar (digests van Hub en executor bekend)
 - **Al gedaan?** `git -C <WERKMAP>/jelly-leon-platform ls-remote --tags origin 'v0.1.0'`; `python3 -c "import json;print(json.load(open('<WERKMAP>/jelly-leon-platform/release/digests.json'))['version'])"` -> klaar als de tag bestaat, `version` = `0.1.0` en `grep -n "digest:" <WERKMAP>/jelly-leon-platform/install/manifests/ai-server-manager*.manifest.yaml` geen `null` meer toont.
 - **Lees eerst:** `<WERKMAP>/jelly-leon-platform/.github/workflows/release.yml` (kopcommentaar: tag = `v<VERSION>`, handmatig starten is een droogloop, een bestaande versie wordt nooit overschreven); `<WERKMAP>/jelly-leon-platform/install/truenas/INSTALLATIE.md#Stap 1 — Images ophalen (GHCR)`; `<WERKMAP>/jelly-leon-platform/install/manifests/README.md`; `<WERKMAP>/jelly-leon-platform/deploy/manifest/jelly-leon-platform.manifest.yaml`
 - **Bouw:**
   1. Vervolgpunt uit de bron (`<WERKMAP>/.lokaal/plan/bron/VERVOLGPUNTEN_RUW.md`, zoek op "Node 24"): breng vóór de eerste release de acties die alleen in `release.yml` voorkomen naar hun Node 24-versie, elk op commit-SHA gepind. Controleer eerst of dat al gebeurd is.
-  2. Droogloop: start `release.yml` handmatig op de branch (`gh workflow run release --repo lvos04/jelly-leon-platform --ref ccr-c133d7a0-kuz1cv`) en wacht tot hij groen is (bouwen + image-E2E, geen push).
+  2. Droogloop: start `release.yml` handmatig op de branch (`gh workflow run release -R lvos04/jelly-leon-platform --ref ccr-c133d7a0-kuz1cv`) en wacht tot hij groen is (bouwen + image-E2E, geen push).
   3. Controleer `cat VERSION` = `0.1.0`, schone werkboom, `git pull --rebase`. Geannoteerde tag `v0.1.0` op de laatste groene commit; `git push origin v0.1.0`.
   4. Na de release: neem `release/digests.json` uit de release-bijlage over in de repo en vul `image.digest` in `deploy/manifest/jelly-leon-platform.manifest.yaml`; verwijder de geaccepteerde bevinding `digest_pending_release`.
   5. Vul in `install/manifests/ai-server-manager.manifest.yaml` en `install/manifests/ai-server-manager-executor.manifest.yaml` de digests van de Hub-release (uit de release-bijlage van `lvos04/ai-server-manager`, tag `v0.1.0`). Deze twee bestanden zijn kopieën; de bron is `<WERKMAP>/ai-server-manager/deploy/manifest/`. Ze moeten daarna gelijk zijn aan de bron.
@@ -300,8 +323,8 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   8. EVIDENCE bijwerken, commit, `git pull --rebase`, push, groene CI afwachten.
 - **Tests (verplicht):** `make manifesten` (draait `python tools/manifesten.py`), `make test-repo`, `make rooktest`. Negatieve test: `python tools/manifesten.py` op een tijdelijke kopie van `install/manifests/` waarin één digest één teken afwijkt van de bron moet falen (drift tegen de bron); bestaat die controle niet, voeg dan een test toe in `tests/repo/`.
 - **Poort:** P-jelly-leon-platform uit POORTEN.md. Extra: R-MANIFEST vergelijkt elke digest met de release-bijlage van de eigenaar-repo.
-- **Valkuilen:** V-026 (de release-workflow mag alleen bij een git-tag publiceren; controleer na de droogloop van bouwpunt 2 met `gh run view` dat de stappen met `if: github.ref_type == 'tag'` zijn overgeslagen en dat er geen nieuwe versie in GHCR staat), V-090, V-022, V-035 (acties op commit-SHA). `release/digests.json` nooit met de hand vullen (staat in het bestand zelf). `gh workflow run` op de branch pusht niets; alleen de tag publiceert. INSTALLATIE.md blijft "NIET GEVALIDEERD (echte NAS)"; die zin niet weghalen.
-- **Bewijs:** I23-23-02...I23-23-08 blijven "Geblokkeerd" in deze repo: "NIET GEVALIDEERD (echte NAS): images met digest staan klaar; stappen 0-6 van INSTALLATIE.md op de NAS nog uitvoeren (N-P6-03)". EX47 blijft "Bezig" (Sim-getest).
+- **Valkuilen:** V-026 (de release-workflow mag alleen bij een git-tag publiceren; controleer na de droogloop van bouwpunt 2 met `gh run view <run-ID> -R lvos04/jelly-leon-platform` dat de stappen met `if: github.ref_type == 'tag'` zijn overgeslagen en dat er geen nieuwe versie in GHCR staat), V-090, V-022, V-035 (acties op commit-SHA), V-037 (de rooktest moet tegen de huidige contractversie draaien). `release/digests.json` nooit met de hand vullen (staat in het bestand zelf). `gh workflow run release -R lvos04/jelly-leon-platform --ref ccr-c133d7a0-kuz1cv` (bouwpunt 2) pusht niets; alleen de tag publiceert. INSTALLATIE.md blijft "NIET GEVALIDEERD (echte NAS)"; die zin niet weghalen.
+- **Bewijs:** I23-23-01 blijft "Bezig" (validatie "Sim-getest"); vul in `bewijs` de tag en de digest aan. I23-23-02...I23-23-08 blijven "Geblokkeerd" in deze repo: "NIET GEVALIDEERD (echte NAS): images met digest staan klaar; stappen 0-6 van INSTALLATIE.md op de NAS nog uitvoeren (N-P6-03)". EX47 blijft "Bezig" (Sim-getest).
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST (VERPLICHT) (tegelijk) -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK
 - **Niveau:** standaard
 - **Stop en vraag als:** de droogloop faalt op iets buiten deze repo; de Hub-release (S-P6-02) nog niet bestaat (doe dan bouwpunt 1-4 en meld dat 5-7 wachten); een pakket niet publiek is.
@@ -316,14 +339,14 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   1. Controleer `cat <WERKMAP>/zoeken-en-persoonlijke-ai/VERSION` = `0.1.0`, schone werkboom, `git pull --rebase`.
   2. De acties in `release.yml` staan hier op oudere versies dan in de andere repos (checkout v4, build-push v6). Breng ze naar dezelfde gepinde versies als in `<WERKMAP>/home-control-hub/.github/workflows/release.yml`; controleer met `actionlint` als de repo dat in zijn poort heeft.
   3. Geannoteerde tag `v0.1.0` op de laatste groene commit; `git push origin v0.1.0`.
-  4. Volg de workflow `release` (`gh run list --repo lvos04/zoeken-en-persoonlijke-ai --workflow release --limit 3`).
+  4. Volg de workflow `release` (`gh run list -R lvos04/zoeken-en-persoonlijke-ai --workflow release --limit 3`).
   5. Vul `image.digest` in het manifest met de digest uit de release-bijlage; verwijder de geaccepteerde bevinding `digest_pending_release`.
   6. Controleer de publieke zichtbaarheid: `docker manifest inspect ghcr.io/lvos04/zoeken-en-persoonlijke-ai:0.1.0` zonder aanmelding.
   7. EVIDENCE bijwerken, commit, `git pull --rebase`, push, groene CI afwachten.
 - **Tests (verplicht):** `jl-manifest validate --strict deploy/manifest/zoeken-en-persoonlijke-ai.manifest.yaml` (omgeving volgens P-zoeken-en-persoonlijke-ai). Negatieve test: tijdelijke kopie met `digest: null` zonder geaccepteerde bevinding moet falen met `digest_not_pinned`.
 - **Poort:** P-zoeken-en-persoonlijke-ai uit POORTEN.md. Extra: digest gelijk aan de release-bijlage; nergens `latest`.
-- **Valkuilen:** V-035 (acties op commit-SHA pinnen, nooit op een verschuivende tag), V-090, V-022, V-034. Het manifest zegt zelf dat niet gevalideerd is of het TrueNAS-formulier een `@` in de tag accepteert; die opmerking blijft staan tot N-P6-03 het antwoord geeft.
-- **Bewijs:** I14-14-02 en I25-25-02 blijven "Bezig" (Sim-getest; bewijs: release-run en digest). De NAS-installatie van deze app hoort bij N-P6-08 en blijft daar "Geblokkeerd".
+- **Valkuilen:** V-035 (acties op commit-SHA pinnen, nooit op een verschuivende tag), V-026 (publiceren alleen bij een git-tag), V-100 (I25-25-02 mist de tekst "NIET GEVALIDEERD"), V-090, V-022, V-034. Het manifest zegt zelf dat niet gevalideerd is of het TrueNAS-formulier een `@` in de tag accepteert; die opmerking blijft staan tot N-P6-03 het antwoord geeft.
+- **Bewijs:** I14-14-02 en I25-25-02 blijven "Bezig"; vul in `bewijs` de release-run en de digest aan. I14-14-02 houdt "NIET GEVALIDEERD (echte NAS)" in `validatie` en `blokkade`; haal uit de blokkade alleen de zin weg dat de release en de digest nog niet zijn uitgebracht. I25-25-02 had op de peildatum validatie "Unit-getest" en een blokkade zonder de tekst "NIET GEVALIDEERD" (V-100): zet `validatie` op "Unit-getest; NIET GEVALIDEERD (echte NAS)" en laat `blokkade` beginnen met "NIET GEVALIDEERD (echte NAS): ingest met echte bronnen op de NAS nog uitvoeren (N-P6-08)". De NAS-installatie van deze app hoort bij N-P6-08.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST (VERPLICHT) (tegelijk) -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK
 - **Niveau:** A-BOUW N2; overige standaard
 - **Stop en vraag als:** CI niet groen; release-workflow faalt; pakket niet publiek; tag bestaat al op een andere commit.
@@ -408,7 +431,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   8. `Makefile`: nieuw doel `test-integraal` dat `run.py` aanroept. CI: voeg een job toe die `tests/conformance` ook tegen de echte Hub draait (checkout van ai-server-manager op dezelfde branch, daarna `python e2e/conformance/echte_hub.py`); dit is het vervolgpunt "P6/CI". De volledige integrale run komt niet in de gewone CI (te zwaar); wel een handmatig te starten workflow met alleen de kern.
 - **Tests (verplicht):** unittests voor `run.py` (selectie, statusregels, redactie van sleutels) in `tests/repo/` of naast de runner; het rookscenario. Negatieve tests: de runner weigert een EVIDENCE-voorstel met status "Geslaagd"; een geheim dat in een antwoord voorkomt staat niet in de run-map; een onbekend scenario-ID geeft exitcode ongelijk aan 0. Draaien: `make lint`, `make typecheck`, `make test-repo`, daarna `flock <WERKMAP>/.lokaal/docker-build.lock nice -n 10 .venv/bin/python e2e/integral/run.py --bouw --profiel kern` en `flock <WERKMAP>/.lokaal/stack.lock nice -n 10 .venv/bin/python e2e/integral/run.py --groep rook`.
 - **Poort:** P-jelly-leon-platform uit POORTEN.md. Extra: `docker compose` staat alleen onder `e2e/integral/` en nergens in `install/` of `deploy/`; de README van `e2e/integral/` zegt letterlijk dat dit geen installatiemethode is.
-- **Valkuilen:** V-008 (poorten op 127.0.0.1 botsen met andere stacks), V-009 (`stack.lock` lang bezet), V-011 (nooit Docker opruimen terwijl een ander bouwt), V-012 (schijf), V-013 (`/tmp` is gedeeld werkgeheugen: run-mappen buiten `/tmp`), V-014 (een zware build wordt door de kernel gestopt), V-088 (testimages blijven staan), V-094 (sleutels in run-map of verzoeklog maskeren), V-003 (de weigering van een verboden status moet aantoonbaar kunnen falen). Elf images tegelijk bouwen of starten past niet in het geheugen: altijd één build tegelijk en alleen de nodige profielen. Nooit `docker system prune -a`, `docker builder prune -a` of `docker volume prune`; ruim alleen de eigen stack op (`docker compose -p <eigen projectnaam> down -v`). my_house heeft mogelijk nog geen `deploy/allinone/Dockerfile`: dan krijgt het profiel huis een duidelijke melding "nog niet beschikbaar" in plaats van een stille fout. De MediaGuard-image bouwen kan lang duren; gebruik de alles-in-één bouw die de repo zelf documenteert (`<WERKMAP>/media-guard-ultimate/deploy/aio/`) en wijzig daar niets.
+- **Valkuilen:** V-008 (poorten op 127.0.0.1 botsen met andere stacks), V-009 (`stack.lock` lang bezet), V-011 (nooit Docker opruimen terwijl een ander bouwt), V-012 (schijf), V-013 (`/tmp` is gedeeld werkgeheugen: run-mappen buiten `/tmp`), V-014 (een zware build wordt door de kernel gestopt), V-088 (testimages blijven staan), V-094 (sleutels in run-map of verzoeklog maskeren), V-003 (de weigering van een verboden status moet aantoonbaar kunnen falen), V-087 (een open poort is nog geen luisterende dienst: wacht in de runner op een inhoudelijk antwoord). Elf images tegelijk bouwen of starten past niet in het geheugen: altijd één build tegelijk en alleen de nodige profielen. Nooit `docker system prune -a`, `docker builder prune -a` of `docker volume prune`; ruim alleen de eigen stack op (`docker compose -p <eigen projectnaam> down -v`). my_house heeft mogelijk nog geen `deploy/allinone/Dockerfile`: dan krijgt het profiel huis een duidelijke melding "nog niet beschikbaar" in plaats van een stille fout. De MediaGuard-image bouwen kan lang duren; gebruik de alles-in-één bouw die de repo zelf documenteert (`<WERKMAP>/media-guard-ultimate/deploy/aio/`) en wijzig daar niets.
 - **Bewijs:** werk `e2e/README.md#Wat er nu (P0) al is` bij (de regel "Integrale compose + scenariorunner" is dan gebouwd). EX-rijen veranderen nog niet. Nieuwe opmerking bij I23-23-02 is niet nodig.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (VERPLICHT: de runner verwerkt sleutels en schrijft bewijs) (tegelijk) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** A-BOUW N4 (moeilijkheid hoog); overige standaard
@@ -509,7 +532,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   6. EX21 "AI-credits op": de credits-simulator meldt "op". Verwacht: aanroepen naar buiten stoppen, regelwerk gaat door, er worden geen extra kosten gemaakt (0 betaalde aanroepen in het simulatorlog).
 - **Tests (verplicht):** de zes scenario's. Negatieve proef: EX20 met twee verschillende, geldige goedkeuringen geeft wel twee uitvoeringen; EX19 zonder digestwijziging voert gewoon uit. Draaien: `flock <WERKMAP>/.lokaal/stack.lock nice -n 10 .venv/bin/python e2e/integral/run.py --scenario EX16,EX17,EX18,EX19,EX20,EX21`.
 - **Poort:** P-jelly-leon-platform uit POORTEN.md. Extra (veiligheid): geen scenario zet een beveiliging uit om te slagen; geen sleutel of token in de run-map.
-- **Valkuilen:** V-003 (de negatieve proef bewijst dat het scenario kan falen), V-098 (geen "Sim-geslaagd" voor een deel dat niet liep), V-009 (`stack.lock` lang bezet: meld de regisseur wanneer de run start), V-001, V-091 (replay en grenzen van de executor), V-094 (geen token in de run-map). Test de weigering op de plek waar ze hoort (server), niet alleen in de UI. Een scenario dat slaagt omdat de dienst toevallig onbereikbaar was, is geen bewijs: controleer altijd het verzoeklog van de simulator.
+- **Valkuilen:** V-003 (de negatieve proef bewijst dat het scenario kan falen), V-098 (geen "Sim-geslaagd" voor een deel dat niet liep), V-009 (`stack.lock` lang bezet: meld de regisseur wanneer de run start), V-001, V-091 (replay en grenzen van de executor), V-094 (geen token in de run-map), V-043 (intrekken in EX16 via elk pad testen dat een sleutel kan gebruiken). Test de weigering op de plek waar ze hoort (server), niet alleen in de UI. Een scenario dat slaagt omdat de dienst toevallig onbereikbaar was, is geen bewijs: controleer altijd het verzoeklog van de simulator.
 - **Bewijs:** EX16...EX21 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt". De gate "Risk policy + privileged executor tested" blijft open tot N-P6-03.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (VERPLICHT) (tegelijk) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** A-BOUW N4 (moeilijkheid hoog); R-VEILIG N4 (standaard voor deze rol); overige standaard
@@ -550,7 +573,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   7. EX50 "Migratie naar andere host" (simulatordeel): herstel Hub, my_house en aanmelding op een tweede simulatorinstantie met een ander adres. Verwacht: koppelingen blijven logisch kloppen na de adreswissel.
 - **Tests (verplicht):** de zeven scenario's. Negatieve proef: EX47 met een geldig manifest wordt wel aangenomen; EX15 met database-herstel erbij slaagt wel. Draaien: `flock <WERKMAP>/.lokaal/stack.lock nice -n 10 .venv/bin/python e2e/integral/run.py --scenario EX11,EX12,EX14,EX15,EX47,EX48,EX50`.
 - **Poort:** P-jelly-leon-platform uit POORTEN.md. Extra: geen scenario schrijft buiten de eigen testvolumes; R-VEILIG controleert dat de weigeringen van de server komen.
-- **Valkuilen:** V-003 (de negatieve proef bewijst dat het scenario kan falen), V-098 (geen "Sim-geslaagd" voor een deel dat niet liep), V-009 (`stack.lock` lang bezet: meld de regisseur wanneer de run start), V-070 (een oudere image start "gezond" op een nieuwere database: gezond is geen bewijs), V-099. EX15 heeft twee echt verschillende image-versies nodig; gebruik de release `0.1.0` en de lokale bouw, niet twee tags van dezelfde inhoud. EX50 is in de simulator alleen een logische proef: echte schijven, echte adressen en echte apparaten blijven NAS-werk.
+- **Valkuilen:** V-003 (de negatieve proef bewijst dat het scenario kan falen), V-098 (geen "Sim-geslaagd" voor een deel dat niet liep), V-009 (`stack.lock` lang bezet: meld de regisseur wanneer de run start), V-070 (een oudere image start "gezond" op een nieuwere database: gezond is geen bewijs), V-099, V-124 (de planroutes van de levenscyclusdienst gaven op de peildatum 501: controleer vóór EX14/EX15/EX50 dat ze gebouwd zijn, anders de stopregel). EX15 heeft twee echt verschillende image-versies nodig; gebruik de release `0.1.0` en de lokale bouw, niet twee tags van dezelfde inhoud. EX50 is in de simulator alleen een logische proef: echte schijven, echte adressen en echte apparaten blijven NAS-werk.
 - **Bewijs:** EX11, EX12, EX14, EX15, EX47, EX48 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt". EX50 -> "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): simulatordeel Sim-geslaagd; herstel op een echte tweede omgeving nog uitvoeren (N-P6-14)".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (VERPLICHT: uitvoerder en beleid) + R-HARDE-EIS (VERPLICHT: terugzetten en migreren van app-gegevens, EX14, EX15, EX50) (tegelijk) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** A-BOUW N4 (moeilijkheid hoog); overige standaard
@@ -572,7 +595,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   7. EX30 "Gree-firmware onverenigbaar" (simulatordeel): de bind mislukt. Verwacht: de adapter meldt "niet ondersteund" en doet nooit alsof er geschakeld is.
 - **Tests (verplicht):** de zeven scenario's. Negatieve proef: EX27 met een gewoon (niet-boiler) stopcontact mag volgens beleid wel een voorstel opleveren; EX25 met twee units in dezelfde modus wordt wel aangenomen. Draaien: `flock <WERKMAP>/.lokaal/stack.lock nice -n 10 .venv/bin/python e2e/integral/run.py --scenario EX24,EX25,EX26,EX27,EX28,EX29,EX30`.
 - **Poort:** P-jelly-leon-platform uit POORTEN.md. Extra: geen scenario stuurt iets naar een adres buiten het interne testnetwerk (er hangen echte apparaten aan het thuisnetwerk van de bouwmachine).
-- **Valkuilen:** V-003 (de negatieve proef bewijst dat het scenario kan falen), V-098 (geen "Sim-geslaagd" voor een deel dat niet liep), V-009 (`stack.lock` lang bezet: meld de regisseur wanneer de run start), V-056 (tijd en zomertijd: vaste klok in UTC). UDP-broadcast van het Gree-protocol mag het testnetwerk nooit verlaten; controleer dat het netwerk `internal: true` is voordat de fake unit start. Tijdtests (zomertijd) draaien met een vaste, in de test gezette klok; de testserver draait in UTC.
+- **Valkuilen:** V-003 (de negatieve proef bewijst dat het scenario kan falen), V-098 (geen "Sim-geslaagd" voor een deel dat niet liep), V-009 (`stack.lock` lang bezet: meld de regisseur wanneer de run start), V-056 (tijd en zomertijd: vaste klok in UTC), V-130 (de link "Terug naar de Hub" van my_house werkt pas met de alles-in-één image: geen scenariofout). UDP-broadcast van het Gree-protocol mag het testnetwerk nooit verlaten; controleer dat het netwerk `internal: true` is voordat de fake unit start. Tijdtests (zomertijd) draaien met een vaste, in de test gezette klok; de testserver draait in UTC.
 - **Bewijs:** EX24, EX25, EX27, EX28, EX29 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt". EX26 en EX30 -> "Geblokkeerd": "NIET GEVALIDEERD (hardware): simulatordeel Sim-geslaagd; echte Gree-unit nog uitvoeren (N-P6-06)". B06-009 blijft "Geblokkeerd".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (VERPLICHT: schakelverbod en actiebeleid) (tegelijk) -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK
 - **Niveau:** standaard
@@ -617,7 +640,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   8. Bewijs: zet een samenvatting van elk rapport in `docs/platform-v2/test-evidence/` (zonder absolute paden van deze machine) en werk `docs/platform-v2/EVIDENCE.json` bij (zie Bewijs). Commit, `git pull --rebase`, push, CI-controle.
 - **Tests (verplicht):** unittests voor de vergelijkings- en restantenfuncties van het nieuwe script in `tools/jelly-leon/tests/`: `$PY -m pytest -q tools/jelly-leon/tests`. De proef zelf: `flock <WERKMAP>/.lokaal/stack.lock nice -n 10 python3 tools/jelly-leon/e2e/terug_naar_stock.py --image jelly-leon:p6 --stock-image "$JL_RUNTIME_IMAGE" --expected-version "$VERSIE" --werkmap "$WERK" --report "$WERK/terug-naar-stock.json"`. Negatieve tests: (1) de `--negatieve-proef` uit bouwpunt 5 faalt aantoonbaar; (2) een optie in het nieuwe script (zoals `--negatief-verwacht` in `upgrade_proef.py`) wijzigt in de kopie één hervatpunt of plant één ongedocumenteerd restant en toont dat de proef dan exitcode 1 geeft; (3) een run met 0 gebruikers of 0 items is een fout, geen succes.
 - **Poort:** P-jelly-leon uit POORTEN.md (stap 1, 5, 6 en 9 en onderdeel "5. Contract-, EVIDENCE- en drifttests") en P-HARDE-EIS. Extra: in elk rapport is per gebruiker VÓÓR gelijk aan NA; de sha256 van de mediamap is gelijk; een overgeslagen deel staat als "niet uitgevoerd" in het rapport en telt niet als geslaagd.
-- **Valkuilen:** V-070 (een oude of stock-image start "gezond" op een datamap die hij niet aankan: gezond is geen bewijs, alleen aanmelden en afspelen tellen); V-111 (de afspeelproef verandert zelf de kijkgegevens: meet NA vóór het afspelen, of speel af met een aparte proefgebruiker); V-112 (elk onderdeel van de HARDE EIS echt meten: gezien, hervatpunten, favorieten, beoordelingen, spoorkeuzes, gebruikers); V-005 (meting over lege invoer); V-098 (geen "Sim-geslaagd" voor een deel dat niet liep); V-088 (ruim eigen testimages en containers op, maar `jelly-leon:p6` blijft staan); V-097 (geen paden of gegevens van deze machine in rapporten). Meldt het harnas een run als ONGELDIG door machinebelasting: later opnieuw draaien; de grens `B03_LASTGRENS` niet verhogen.
+- **Valkuilen:** V-070 (een oude of stock-image start "gezond" op een datamap die hij niet aankan: gezond is geen bewijs, alleen aanmelden en afspelen tellen); V-111 (de afspeelproef verandert zelf de kijkgegevens: meet NA vóór het afspelen, of speel af met een aparte proefgebruiker); V-112 (elk onderdeel van de HARDE EIS echt meten: gezien, hervatpunten, favorieten, beoordelingen, spoorkeuzes, gebruikers); V-005 (meting over lege invoer); V-077 (een ontbrekende meting is "mislukt", nooit "weggelaten"); V-115 (de acceptatie neemt elk deel van de HARDE EIS mee); V-098 (geen "Sim-geslaagd" voor een deel dat niet liep); V-088 (ruim eigen testimages en containers op, maar `jelly-leon:p6` blijft staan); V-097 (geen paden of gegevens van deze machine in rapporten). Meldt het harnas een run als ONGELDIG door machinebelasting: later opnieuw draaien; de grens `B03_LASTGRENS` niet verhogen.
 - **Bewijs:** B03-013 -> "Bezig", validatie "Sim-getest; NIET GEVALIDEERD (echte NAS)", blokkade "NIET GEVALIDEERD (echte NAS): terugzetproef met ZFS-snapshot op de NAS nog uitvoeren (N-P6-12)". JLT-60 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt". JLT-61 -> "Bezig" met de uitkomst per deel a, b en c in de opmerking; deel b blijft "Sim-mislukt" voor de overgang 10.11.11 -> 12.4 zolang er geen 12.y-image is (niet mooier voorstellen). JLT-65 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt" en de lijst van modules die aan stonden. Overal de tekst "NIET GEVALIDEERD (echte NAS): echte bibliotheek en echte datamap (N-P6-09, N-P6-12)".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (VERPLICHT) (tegelijk) -> A-HERSTEL -> R-EERLIJK (VERPLICHT: controleert de uitkomst per deel tegen de rapporten)
 - **Niveau:** A-BOUW N4 (moeilijkheid hoog); overige standaard
@@ -640,7 +663,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   8. JLT-67: `python3 tools/jelly-leon/upstream_sync.py kies` toont de nieuwste upstream-tag. Is dat nog `v12.4` (de stand op 2026-11-10), dan kan de proef niet: laat JLT-67 op "Niet gestart" met de reden en de datum van de controle. Is er een nieuwere 12.y-tag: maak een aparte werkkopie buiten de repo-map (`git worktree add <pad> HEAD`) en draai `python3 tools/jelly-leon/upstream_sync.py --repo <pad> merge --tag <tag>` (het hulpmiddel merget in de tak `sync/<tag>`), daarna dezelfde proef voor jelly-leon-web en `git subtree pull` voor jelly-leon-clients volgens de rij. Geen push naar de standaardbranch; een tak `sync/<tag>` pushen mag alleen als de regisseur dat na een vraag aan de gebruiker toestaat.
 - **Tests (verplicht):** de matrixruns uit 2 en 3, `compat_api.py`, en `PYTHONPATH=tools/b03-harnas $PY -m pytest -q tools/b03-harnas/tests`. Negatieve test: laat zien dat de vergelijking uit bouwpunt 4 een regressie vindt door in een kopie van het rapport één client op "speelt niet" te zetten; en `compat_api.py` faalt als een stock-route een ander antwoord geeft (gebruik de negatieve proef die het script zelf heeft; heeft het er geen: ONBEKEND - eerst vaststellen met: `grep -n "negatie" <WERKMAP>/jelly-leon/tools/jelly-leon/e2e/compat_api.py`, en voeg er anders één toe).
 - **Poort:** P-jelly-leon uit POORTEN.md (stap 1, 6, 7 en 9). Extra: de matrix noemt per client of het een echte app in een emulator, een echte browser of een nagebootste client is.
-- **Valkuilen:** V-073 (een nagebootste client bewijst geen echte client: label het zo); V-072 (bijwerken vanaf upstream botst: los conflicten niet op door fork-regels te schrappen; een botsing is de uitkomst van de proef); V-126 (de workflow `upstream-sync.yml` heeft nooit op GitHub gedraaid: beweer dat niet); V-004 (een overgeslagen emulator-onderdeel is niet groen); V-009 (het harnas houdt `stack.lock` lang vast: meld de regisseur wanneer de run start).
+- **Valkuilen:** V-073 (een nagebootste client bewijst geen echte client: label het zo); V-072 (bijwerken vanaf upstream botst: los conflicten niet op door fork-regels te schrappen; een botsing is de uitkomst van de proef); V-126 (de workflow `upstream-sync.yml` heeft nooit op GitHub gedraaid: beweer dat niet); V-004 (een overgeslagen emulator-onderdeel is niet groen); V-021 (de emulator start niet zonder toegang tot `/dev/kvm`: melden, niet omheen werken); V-076 (per client het aantal pogingen en de uitkomst zoals het bewijs ze geeft); V-077 (het harnas keurt af of goed om de verkeerde reden); V-009 (het harnas houdt `stack.lock` lang vast: meld de regisseur wanneer de run start).
 - **Bewijs:** B03-019, JLT-63, JLT-64 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt"; blokkade "NIET GEVALIDEERD (hardware): echte tv's, telefoons, tablets en streamingboxen (N-P6-09); NIET GEVALIDEERD (Mac/Xcode): Swiftfin en Safari". JLT-66 -> "Bezig" (Sim-uitkomst) met "NIET GEVALIDEERD (echte NAS, hardware): gecombineerde belasting met de echte A310 en UHD 770 (N-P6-10)". JLT-67 -> blijft "Niet gestart" (validatie "Niet getest") met reden, of "Bezig" met de uitkomst per patch als er een 12.y-tag was.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK (VERPLICHT)
 - **Niveau:** standaard
@@ -663,7 +686,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   8. Bewijs: voeg aan `docs/platform-v2/BOUWVERIFICATIE_B03-015.md` een kop "## P6-herhaling met de eindimage (<datum>)" toe met commit, image-ID, Emby-versie(s), tellingen per onderdeel, de telling van HTTP-methoden richting Emby uit de loggende proxy, en wat niet is gedaan. Werk `docs/platform-v2/EVIDENCE.json` bij. Commit, `git pull --rebase`, push, CI-controle.
 - **Tests (verplicht):** `tools/jelly-leon/.venv/bin/ruff check --config tools/emby-overname/ruff.toml tools/emby-overname`; `$PY -m pytest -q tools/emby-overname/tests`; de twee proefruns. Negatieve tests (noem per test de bestaande testnaam of voeg hem toe in `tools/emby-overname/tests`): (1) een doel dat geen Jellyfin is wordt geweigerd met exitcode 9; (2) `overzetten` zonder geldig akkoordbestand weigert; (3) een schrijfverzoek (POST of DELETE) richting Emby wordt door de proxy geweigerd en laat de proef falen; (4) `--emby-image` zonder digest stopt.
 - **Poort:** P-jelly-leon uit POORTEN.md (stap 8) en P-HARDE-EIS. Extra: 0 schrijfverzoeken naar Emby in het proxylog; per gebruiker is vóór gelijk aan na, of elk verschil staat met reden op de afhandellijst; de Emby-container is een wegwerpcontainer op vaste digest.
-- **Valkuilen:** V-109 en V-110 (de tool mag nooit in Emby schrijven; ook een leesverzoek kan Emby iets laten bijwerken: meet het in het proxylog); V-111 (de proef verandert zelf kijkgegevens); V-113 (spoorkeuzes alleen via de officiële route); V-114 (Emby gedraagt zich per versie anders); V-127 (proef tegen een andere versie dan de gebruiker heeft bewijst zijn situatie niet); V-097 (geen paden van deze machine in rapporten); V-008 (de proeven gebruiken vaste poorten op 127.0.0.1: altijd onder `stack.lock`). Deze stap raakt nooit de echte Emby van de gebruiker: er is geen adres en geen sleutel van de NAS op deze machine, en dat blijft zo.
+- **Valkuilen:** V-109 en V-110 (de tool mag nooit in Emby schrijven; ook een leesverzoek kan Emby iets laten bijwerken: meet het in het proxylog); V-119 ("nooit schrijven in Emby" precies nemen); V-111 (de proef verandert zelf kijkgegevens); V-113 (spoorkeuzes alleen via de officiële route); V-114 (Emby gedraagt zich per versie anders); V-127 (proef tegen een andere versie dan de gebruiker heeft bewijst zijn situatie niet); V-097 (geen paden van deze machine in rapporten); V-008 (de proeven gebruiken vaste poorten op 127.0.0.1: altijd onder `stack.lock`). Deze stap raakt nooit de echte Emby van de gebruiker: er is geen adres en geen sleutel van de NAS op deze machine, en dat blijft zo.
 - **Bewijs:** B03-015 -> "Bezig", validatie "Sim-getest; NIET GEVALIDEERD (echte NAS)", blokkade "NIET GEVALIDEERD (echte NAS): echte Emby van de gebruiker (D07) en echte overname met akkoord (N-P6-11)". JLT-70...JLT-73 -> "Bezig" met "Sim-geslaagd" of "Sim-mislukt" en de Emby-versie(s) waartegen is gedraaid. JLT-74 blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): generale repetitie Sim-geslaagd; echte overname, laatste delta en controlelijst nog uitvoeren (N-P6-11, N-P6-12, N-P6-13)". JLT-62 blijft "Niet gestart" (validatie "Niet getest") met de reden "geldt alleen als D07 een bestaande Jellyfin meet".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (VERPLICHT) + R-VEILIG (VERPLICHT: de tool leest sleutelbestanden van Emby en Jelly Leon) (tegelijk) -> A-HERSTEL -> R-EERLIJK (VERPLICHT)
 - **Niveau:** A-BOUW N4 (moeilijkheid hoog); R-HARDE-EIS N5. Winst: dit is de laatste controle van de echte overnamecode voordat de gebruiker haar op zijn eigen kijkgeschiedenis gebruikt; een gemiste schrijfactie naar Emby of een stil verschil per gebruiker is daarna niet meer te herstellen. Overige standaard.
@@ -705,7 +728,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   3. Draai kop "5. Contract-, EVIDENCE- en drifttests" van hetzelfde blok.
   4. Draai de proef die `POORTEN.md#P-HARDE-EIS` voor deze repo noemt en leg de aantallen vóór en na vast (gebruikers, gezien, hervatpunten, favorieten, of wat de proef telt). Voor jelly-leon-platform en jelly-leon-clients noemt P-HARDE-EIS geen proef: draai het commando dat daar achter "ONBEKEND" staat en meld de uitkomst.
   5. Loop de afvinklijst van `POORTEN.md#P-INSTALLATIE` af. Bekende afwijkingen leg je vast zonder ze als nieuwe fout te tellen: media-guard-ultimate, media-source-optimizer en my_house hebben geen installatiemanifest en geen `deploy/truenas/CUSTOM_APP.md` (controleer: `ls <WERKMAP>/<repo>/deploy/manifest <WERKMAP>/<repo>/deploy/truenas/CUSTOM_APP.md`); `<WERKMAP>/media-guard-ultimate/deploy/truenas` bevat een compose-bestand; `<DOCS>/03_INSTALLATIE/I05_MY_HOUSE.md` noemt in stap 2 en 3 YAML. Is een van deze afwijkingen inmiddels opgelost: meld dat ook.
-  6. Loop `POORTEN.md#P-EERLIJK` punt 1 tot en met 6 af over het HELE bestand `docs/platform-v2/EVIDENCE.json` van de repo. Lever een lijst van alle regels met status "Niet gestart", alle regels met validatie "Sim-mislukt" en alle regels "Geblokkeerd" waarin "NIET GEVALIDEERD" ontbreekt.
+  6. Loop `POORTEN.md#P-EERLIJK` punt 1 tot en met 6 af over het HELE bestand `docs/platform-v2/EVIDENCE.json` van de repo. Lever een lijst van alle regels met status "Niet gestart", alle regels met validatie "Sim-mislukt", alle regels "Geblokkeerd" waarin "NIET GEVALIDEERD" ontbreekt, en alle regels "Bezig" met een niet-lege `blokkade` waarin "NIET GEVALIDEERD" ontbreekt (op de peildatum twintig in zeven repos, onder meer I23-23-02, -03, -05, -06, B09-006, B12-002, EX36, EX43, EX44, JLT-64, JLT-73; zulke regels mist de verzamellijst van B.3 anders). Een regel uit de laatste twee soorten is een bevinding (V-100) voor een herstelketen in die repo als de blokkade de echte NAS, echte hardware of een echt account nodig heeft; noemt de blokkade alleen werk uit een eerdere fase, dan meld je dat als open werk.
   7. Alleen jelly-leon: herhaal JLT-68. Draai stap 4 van P-jelly-leon (de job `plugins`) en `$PY -m pytest -q tools/jelly-leon/tests/test_hub_sim.py`. Lees de testrij JLT-68 in `<DOCS>/08_EXCEL/e2e_cases.json` en noem per onderdeel van die rij de test die het dekt (kandidaten: `plugins/JellyLeon/tests/Jellyfin.Plugin.JellyLeon.Tests/Core/FoutcatalogusTests.cs` en `.../Core/HubTokenTests.cs`); een onderdeel zonder test heet "niet gedekt". Meld of JLT-68 een regel heeft in `docs/platform-v2/EVIDENCE.json` (op de peildatum niet).
   8. Lever het rapport in de vorm van `POORTEN.md#0.6` aan de regisseur: commit, CI, tabel per poortstap, de lijst uit bouwpunt 6, de afwijkingen uit bouwpunt 5 en een oordeel "groen" of "niet groen". De regisseur schrijft de uitkomst in VOORTGANG.md.
 - **Tests (verplicht):** de commando's van P-<repo> kop 4 en 5 (niet hier herhaald). Negatieve test: `cp docs/platform-v2/EVIDENCE.json /tmp/s-p6-40-<repo>.json`, zet in die kopie één status op "Gereed" en draai `grep -nE '"status": *"(Gereed|Geslaagd)"' /tmp/s-p6-40-<repo>.json`: de regel moet gevonden worden (de controle uit P-EERLIJK punt 2 werkt dus); verwijder de kopie. Daarnaast tellen de negatieve proeven die de poort zelf bevat mee (bijvoorbeeld de migratiecontrole die moet falen en de negatieve proef van het b03-harnas); noem ze in het rapport met hun uitkomst.
@@ -753,7 +776,7 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
   5. Werk de kolom "Stand" van de controlelijst "Emby verwijderen" bij per punt (1 tot en met 6): alleen "Sim-geslaagd in de proef" waar dat gemeten is; alles van de NAS blijft "nog niet (NAS)". Voeg bij punt 5 het schermpad van MediaGuard toe zoals S-P6-33 het heeft vastgesteld; onbekend = "ONBEKEND - eerst vaststellen op de NAS".
   6. Voeg een alinea "Terugval" toe: Emby blijft ongewijzigd draaien; terug naar Emby is één handeling zolang Emby niet verwijderd is; de ZFS-snapshot en het exportarchief blijven bewaard.
   7. Werk `docs/platform-v2/EVIDENCE.json` bij (B03-015, JLT-74: alleen het veld `bewijs` en `bijgewerkt`; status en blokkade blijven). Commit, `git pull --rebase`, push, CI-controle.
-- **Tests (verplicht):** het commando uit P-jelly-leon "3. Snel" voor de regel docs/EVIDENCE (niet hier herhaald) en `$PY -m pytest -q tools/jelly-leon/tests/test_evidence_contract.py`. Negatieve tests (moeten NIETS vinden): `grep -nE '([0-9]{1,3}\.){3}[0-9]{1,3}' <WERKMAP>/jelly-leon/docs/platform-v2/OVERNAME_EMBY.md`; `grep -niE 'emby (stoppen|verwijderen) door (de|een) (agent|ai)' ...`. Positief: elk subcommando dat het document noemt bestaat (`grep -n 'add_parser' <WERKMAP>/jelly-leon/tools/emby-overname/emby_overname/__main__.py`).
+- **Tests (verplicht):** het commando uit P-jelly-leon "3. Snel" voor de regel docs/EVIDENCE (niet hier herhaald) en `$PY -m pytest -q tools/jelly-leon/tests/test_evidence_contract.py`. Negatieve tests (moeten NIETS vinden): `grep -nE '([0-9]{1,3}\.){3}[0-9]{1,3}' <WERKMAP>/jelly-leon/docs/platform-v2/OVERNAME_EMBY.md`; `grep -niE 'emby (stoppen|verwijderen) door (de|een) (agent|ai)' ...`. Positief: elk subcommando dat het document noemt bestaat: `grep -nE '"(inventaris|export|proefrun|overzetten|akkoord-controle|vergelijk-export)"' <WERKMAP>/jelly-leon/tools/emby-overname/emby_overname/__main__.py` toont alle zes namen (`proefrun` en `overzetten` staan daar in een lus, niet direct achter `add_parser`; het verborgen subcommando `testhaak-schrijfpoging` hoort NIET in het document).
 - **Poort:** P-jelly-leon uit POORTEN.md (kop "3. Snel", regel docs/EVIDENCE), P-HARDE-EIS en P-EERLIJK. Extra: het document belooft nergens dat wachtwoorden of onthouden spoorkeuzes overgaan (de tabel "Wat er overgaat — en wat niet" blijft de waarheid).
 - **Valkuilen:** V-118 (het plan veronderstelt een terminal bij de overname); V-112 en V-113 (een onderdeel dat niet echt gemeten is; spoorkeuzes); V-114 en V-127 (Emby gedraagt zich per versie anders; een proef tegen een andere versie bewijst de situatie van de gebruiker niet); V-104.
 - **Bewijs:** B03-015 blijft "Bezig" ("Sim-getest; NIET GEVALIDEERD (echte NAS)"). JLT-74 blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS): draaiboek bijgewerkt; echte overname, laatste delta en controlelijst nog uitvoeren door de gebruiker (N-P6-11, N-P6-12, N-P6-13)".
@@ -788,9 +811,9 @@ de voorwaarden per onderdeel gehaald zijn; de AI-stappen van DEEL A wachten daar
 - **Werkpakketten en tests:** de rij P6 van blad Fasen (en P2...P5 als die nog geen regel hebben); alle rijen die S-P6-02...S-P6-52 in een EVIDENCE.json hebben bijgewerkt (onder meer EX01...EX50, B03-013, B03-015, B03-019, JLT-60...JLT-67, JLT-70...JLT-74). Deze stap wijzigt zelf geen bewijs van een andere repo.
 - **Vooraf:** S-P6-40 voor alle elf repos "groen" in VOORTGANG.md; S-P6-50, S-P6-51 en S-P6-52 klaar (S-P6-52 mag ook "besluit optie 2: niet gebouwd" zijn). Geen schrijvende keten in welke repo dan ook (de run leest alle EVIDENCE-bestanden).
 - **Al gedaan?** `python3 -c "import json;d=json.load(open('<WERKMAP>/ai-server-manager/docs/platform-v2/EVIDENCE_PROGRAMMA.json'));print([(f['id'],f['status'],f['bijgewerkt']) for f in d['fasen']]);print([(r['project'],r['commit']) for r in d['releases']])"` -> klaar als er een regel P6 staat met de datum van deze ronde, de vijf releases van S-P6-02...S-P6-06 erin staan, en `git log -1 --format=%cd -- docs/platform-v2/08_EXCEL/TrueNAS_V2_Uitvoering_en_Afvinken.xlsx` later is dan de laatste EVIDENCE-commit in de andere repos. Alleen het JSON-bestand bijgewerkt: ga verder bij bouwpunt 4.
-- **Lees eerst:** `<WERKMAP>/.lokaal/plan/uit/POORTEN.md#P-EXCEL` (de afvinklijst is de uitvoering van deze stap); `<WERKMAP>/ai-server-manager/tools/excel/README.md`; `<WERKMAP>/ai-server-manager/docs/platform-v2/EVIDENCE_PROGRAMMA.json` (drie sleutels: `fasen`, `releases`, `instructies`); `<DOCS>/01_ARCHITECTUUR/06_FASERING_EN_GATES.md#Fase P6 — Oplevering en beheer`; de A-GATE-rapporten van P2...P5 (de regisseur geeft de paden)
+- **Lees eerst:** `<WERKMAP>/.lokaal/plan/uit/POORTEN.md#P-EXCEL` (de afvinklijst is de uitvoering van deze stap); `<WERKMAP>/ai-server-manager/tools/excel/README.md`; `<WERKMAP>/ai-server-manager/docs/platform-v2/EVIDENCE_PROGRAMMA.json` (drie sleutels: `fasen`, `releases`, `instructies`); `<DOCS>/01_ARCHITECTUUR/06_FASERING_EN_GATES.md#Fase P6 — Oplevering en beheer`; de A-GATE-rapporten van P2...P5: `<WERKMAP>/.lokaal/ketens/GATE-P2/RAPPORT-A-GATE.md` (S-P2-910), `GATE-P3/RAPPORT-A-GATE.md` (S-P3-910), `GATE-P4/RAPPORT-A-GATE.md` (S-G4-95) en `GATE-P5/RAPPORT-A-GATE.md` (S-P5-910), alle in dezelfde map
 - **Bouw:**
-  1. `fasen`: voeg per fase P2, P3, P4, P5 een regel toe of werk hem bij volgens het A-GATE-rapport van die fase (velden `id`, `status`, `validatie`, `bewijs`, `blokkade`, `bijgewerkt`, zoals de bestaande regels P0 en P1). Geen rapport = geen wijziging; meld het.
+  1. `fasen`: de regels P2, P3, P4 en P5 zijn al geschreven door de stappen die het bewijs samenvoegen vóór de gate (S-P2-900, S-P3-900, S-G4-90 en S-P5-900). Hier alleen controleren of elke regel klopt met het A-GATE-rapport van die fase (velden `id`, `status`, `validatie`, `bewijs`, `blokkade`, `bijgewerkt`, zoals de bestaande regels P0 en P1). Waar dat niet zo is: bijwerken. Ontbreekt een regel: toevoegen. Nooit een tweede regel met hetzelfde `id`. Geen rapport = geen wijziging; meld het.
   2. `fasen`, regel P6: status "Geblokkeerd", validatie "Sim-getest; NIET GEVALIDEERD (echte NAS)", bewijs: het rapport van S-P6-22 en de uitkomsten van S-P6-40, blokkade: "NIET GEVALIDEERD (echte NAS): het NAS-acceptatiedraaiboek (onderdelen N-P6-01 tot en met N-P6-14) is nog niet door de gebruiker doorlopen".
   3. `releases`: voeg de releases uit S-P6-02...S-P6-06 toe met dezelfde velden als de bestaande regels (`project`, `gecontroleerde_stand`, `bewijsstatus`, `peildatum`, `commit`); de tag en digest staan in `gecontroleerde_stand`. `bewijsstatus` nooit "Gereed": gebruik de woorden van de bestaande regels. `instructies` alleen aanvullen als een A-GATE-rapport daarom vraagt.
   4. Voer `POORTEN.md#P-EXCEL` uit, punt 1 tot en met 9, in die volgorde (de commando's staan daar).
@@ -857,24 +880,37 @@ for p in sorted(glob.glob('*/docs/platform-v2/EVIDENCE.json')):
 " | sort
 ```
 
-Op de peildatum gaf dit 240 verschillende ID's. Elke regel hoort bij precies één onderdeel volgens de tabel hieronder. Noemt de blokkadetekst zelf een onderdeel ("(N-P6-05)"), dan gaat dat voor. Een regel die nergens past meldt de regisseur aan de gebruiker; hij wordt niet stil weggelaten.
+Op de peildatum gaf dit 240 verschillende ID's. Dit commando ziet geen regel die de echte NAS nodig heeft maar de tekst "NIET GEVALIDEERD" mist (V-100). Draai daarom ook:
+
+```
+cd <WERKMAP> && python3 -c "
+import json,glob
+for p in sorted(glob.glob('*/docs/platform-v2/EVIDENCE.json')):
+    for r in json.load(open(p,encoding='utf-8')):
+        b=(r.get('blokkade') or '').strip()
+        if b and r.get('status')!='Niet gestart' and 'NIET GEVALIDEERD' not in (r.get('validatie') or '')+b:
+            print(r['id'], p.split('/')[0], r.get('status'), b[:120], sep=' | ')
+" | sort
+```
+
+Op de peildatum gaf dit twintig regels (onder meer I23-23-02, -03, -05, -06, I25-25-02, B09-006, B12-002, EX16, EX36, EX43, EX44, EX48, JLT-64, JLT-73, C1.3-JLP-14). Een regel waarvan de blokkade de echte NAS, echte hardware of een echt account noemt, hoort net zo goed bij een onderdeel als de regels uit het eerste commando; de ontbrekende tekst wordt eerst hersteld (S-P6-40 bouwpunt 6, herstelketen in die repo). Elke regel hoort bij precies één onderdeel volgens de tabel hieronder. Noemt de blokkadetekst zelf een onderdeel ("(N-P6-05)"), dan gaat dat voor. Een regel die nergens past meldt de regisseur aan de gebruiker; hij wordt niet stil weggelaten.
 
 | ID-reeks of onderwerp | Onderdeel |
 |---|---|
 | I01; D01, D02, D03, D06, D07, D10 (noteren) | N-P6-01 |
-| I02; B12 (back-up en herstel); D04, D05, D16; EX11...EX14 | N-P6-02 |
-| I23; B01 (Hub) behalve B01-006, B01-008 en B01-011; B02 (AI Server Manager, executor); B08-003, B08-004, B08-006 (een app verwijderen, verplaatsen en terugzetten via de Hub); EX15...EX21, EX47; C1.3-ASM, C1.3-JLP en de C1.3-ALG-regels van ai-server-manager (C1.3-ALG-regels bestaan in zes repos; in een andere repo volgt zo'n regel het onderdeel van die repo); `REVIEW-ai-server-manager-...`, `REVIEW-jelly-leon-platform-...`; D01...D18 invullen of meten in de Hub | N-P6-03 |
-| I07, I08, I09, I10, I13; B09 (monitoring), B11 (Node-RED), B13 (Authentik), B01-006, B01-008; D17; EX22, EX23, EX45, EX46; C1.3-HCH; `REVIEW-home-control-hub-...` | N-P6-04 |
+| I02; B12 (back-up en herstel, ook B12-002 snapshotbeleid; behalve B12-007); D04, D05, D16; EX11...EX14 | N-P6-02 |
+| I23; B01 (Hub) behalve B01-006, B01-008, B01-009, B01-011 en B01-012; B02-005, B02-006, B02-009 (executor, beleid, voorspellend onderhoud); B08-003, B08-004, B08-006 (een app verwijderen, verplaatsen en terugzetten via de Hub); EX15...EX21, EX47; C1.3-ASM, C1.3-JLP en de C1.3-ALG-regels van ai-server-manager (C1.3-ALG-regels bestaan in zes repos; in een andere repo volgt zo'n regel het onderdeel van die repo); `REVIEW-ai-server-manager-...`, `REVIEW-jelly-leon-platform-...`; D01...D18 invullen of meten in de Hub | N-P6-03 |
+| I07, I08, I09, I10, I13; B09 (monitoring, ook B09-006 operator-runbooks), B11 (Node-RED), B13 (Authentik), B01-006, B01-008; D17; EX22, EX23, EX45, EX46; C1.3-HCH; `REVIEW-home-control-hub-...` | N-P6-04 |
 | APP-01...APP-20; I03, I04, I15...I20; I26-26-01, -03, -04, -05; B04 (MediaGuard), B05 (MSO), B08-001, B08-002; EX01...EX06, EX09, EX37, EX39...EX42; C1.3-MGU, C1.3-MSO, C1.3-ASF; `REVIEW-media-guard-ultimate-...`, `REVIEW-media-source-optimizer-...`, `REVIEW-appstore-en-fork-...` | N-P6-05 |
-| I05; B06 (my_house), B14 (energie), B01-011; D12, D13, D14; EX24...EX30; C1.3-MH; `REVIEW-my_house-...` | N-P6-06 |
+| I05; B06 (my_house, behalve B06-008), B14 (energie), B01-011; D12, D13, D14; EX24...EX30; C1.3-MH; `REVIEW-my_house-...` | N-P6-06 |
 | I11, I12, I21; B10 (netwerk); D03 (domeinen), D11; EX31...EX34 | N-P6-07 |
-| I14, I25, I22; B07 (zoeken), B15 (spraak); D09, D18; EX36, EX43, EX44, EX49; C1.3-ZPA, C1.2-ZA9; `REVIEW-zoeken-en-persoonlijke-ai-...` | N-P6-08 |
-| I06, I24; B03-001...B03-012 en B03-016...B03-019 (NAS- en apparaatdelen); D08, D15; JLT-01...JLT-58 voor zover niet bij N-P6-10 genoemd (onder meer JLT-49), JLT-63, JLT-64, JLT-69; EX07, EX08, EX10, EX35, EX38, EX48; B08-005 (forkbeheer; hoort bij EX48); C1.3-JL, C1.3-JLC, C1.3-JLW; `REVIEW-jelly-leon-web-...`, `REVIEW-jelly-leon-clients-...` | N-P6-09 |
-| De B03-modules en hun NAS-rijen: JLT-06, JLT-15, JLT-26, JLT-39, JLT-59, JLT-66; de NAS-delen van JLT-01...JLT-05, JLT-07...JLT-14, JLT-16...JLT-25, JLT-27...JLT-38 en JLT-50...JLT-58 (modulerijen F1, F2, F3, F5 en F6); B03-020 en hoger voor zover ze een module zijn | N-P6-10 |
-| B03-015; JLT-70...JLT-73 (NAS-herhaling), JLT-74 (deel overname) | N-P6-11 |
+| I14, I25, I22; B07 (zoeken), B15 (spraak); B02-001...B02-004, B02-007, B02-008, B02-010...B02-012 en B01-009 (AI met een echte aanbieder en tegoed; bron: STAPPEN_P2.md, hoofdstuk 7, rij 7); D09, D18; EX36, EX43, EX44, EX49; C1.3-ZPA, C1.2-ZA9; `REVIEW-zoeken-en-persoonlijke-ai-...` | N-P6-08 |
+| I06, I24; B03-001...B03-012 en B03-016...B03-019 (NAS- en apparaatdelen); D08, D15; JLT-01...JLT-58 voor zover niet bij N-P6-10 genoemd (onder meer JLT-49), JLT-63, JLT-64, JLT-69; EX07, EX08, EX10, EX35, EX38, EX48; B08-005 (forkbeheer; hoort bij EX48); C1.3-JL behalve C1.3-JL-05 (N-P6-11) en C1.3-JL-09 (N-P6-10); C1.3-JLC, C1.3-JLW; `REVIEW-jelly-leon-web-...`, `REVIEW-jelly-leon-clients-...` | N-P6-09 |
+| De B03-modules en hun NAS-rijen: JLT-06, JLT-15, JLT-26, JLT-39, JLT-59, JLT-66; de NAS-delen van JLT-01...JLT-05, JLT-07...JLT-14, JLT-16...JLT-25, JLT-27...JLT-38 en JLT-50...JLT-58 (modulerijen F1, F2, F3, F5 en F6); B03-020 en hoger voor zover ze een module zijn; C1.3-JL-09 (imagebewaking en adrescontrole met een echte model-app: alleen modules praten met een model-app) | N-P6-10 |
+| B03-015; JLT-70...JLT-73 (NAS-herhaling), JLT-74 (deel overname); C1.3-JL-05 | N-P6-11 |
 | B03-013, B03-014; JLT-60, JLT-61, JLT-62, JLT-65, JLT-67; JLT-74 (deel laatste delta en overstap); de Cutover-gate | N-P6-12 |
 | APP-02 (besluit), I26-26-02, I26-26-06; JLT-74 (deel controlelijst) | N-P6-13 |
-| EX50; de faserij P6; alles wat "72h soak", "metrics vergelijking" of "productieacceptatie" heet | N-P6-14 |
+| EX50; B01-012 (herstel van de Hub op een tweede host); B06-008, B12-007; de faserij P6; alles wat "72h soak", "metrics vergelijking" of "productieacceptatie" heet | N-P6-14 |
 
 ## B.4 Volgorde van de onderdelen
 
@@ -959,7 +995,7 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
 - **Stop als:** de versie buiten de ondersteunde reeks valt; de pool niet gezond is (eerst herstellen; niets installeren); een handeling alleen met een terminal kan.
 
 ### N-P6-02 - Back-up en herstelproef
-- **Rijen:** I02-02-01...I02-02-08; I01-01-02; I15-15-02; B12-001 en de NAS-delen van B12-003, B12-004, B12-006, B12-007; D04, D05, D16; EX13, EX14 (alleen echt); de NAS-kant van EX11 en EX12 als hun bewijs die noemt.
+- **Rijen:** I02-02-01...I02-02-08; I01-01-02; I15-15-02; B12-001 en de NAS-delen van B12-002 (snapshottaken en de snapshot vóór een uitrol, toegepast via de executor), B12-003, B12-004, B12-005, B12-006, B12-007; D04, D05, D16; EX13, EX14 (alleen echt); de NAS-kant van EX11 en EX12 als hun bewijs die noemt.
 - **Voorwaarden:** deel a: N-P6-01. Deel b: N-P6-03 (de Hub draait). De gebruiker heeft tijd voor een echte herstelproef (taak T-11). Gates die dit onderdeel opent: "OneDrive foto en DB restore getest" en "ZFS snapshots en pre-change database-export". Zonder dit onderdeel begint geen enkel onderdeel dat bestaande data raakt (N-P6-05, N-P6-09 en verder).
 - **Wat de gebruiker doet (deel a, zonder Hub):**
   1. I02 stap 1 (I02-02-01): stelt vast welke kopie naar OneDrive nu al loopt en wat erin zit (D04).
@@ -973,12 +1009,12 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
   8. EX13: doet de hersteltest uit OneDrive nog een keer via de Hub en vergelijkt de inhoud met het origineel.
 - **Wat de gebruiker terugmeldt:** per punt gedaan/niet gedaan; of de foto opende en de export leesbaar was; aantal snapshots en of die van Emby en MediaGuard erbij zijn (namen van snapshots niet nodig); de status van de back-up-gate; de status van D04, D05, D16 in de Hub; hoe lang het herstel duurde (voor D16).
 - **Wat de AI daarna controleert:** dat het proefherstel een ECHT bestand en een ECHTE database-export betrof en naar een aparte plek ging; dat de snapshots van Emby en MediaGuard er zijn vóórdat een later onderdeel start; dat de gate "toegestaan" pas meldde ná het vastgelegde bewijs (anders is de gate te ruim: melden als fout in de Hub).
-- **Wat daarna van "Geblokkeerd" af mag:** na deel a: I02-02-01...04, I01-01-02, EX14. Na deel b: I02-02-05...08, I15-15-02, B12-001, EX13; D04, D05, D16 volgens het Hub-scherm.
+- **Wat daarna van "Geblokkeerd" af mag:** na deel a: I02-02-01...04, I01-01-02, EX14. Na deel b: I02-02-05...08, I15-15-02, B12-001, EX13; D04, D05, D16 volgens het Hub-scherm; B12-002, B12-004, B12-005 en B12-006 voor het deel dat de gebruiker in punt 6 tot en met 8 echt heeft gedaan (B12-002 alleen als de Hub een snapshottaak via de executor heeft aangemaakt en de gebruiker die in TrueNAS ziet).
 - **Wat "Geblokkeerd" blijft:** B12-007 voor zover het een oefening op andere hardware vraagt (N-P6-14); alles wat niet is teruggemeld.
 - **Stop als:** de foto of de export niet terug te halen of niet leesbaar is (dan is er geen bruikbare back-up: geen enkel volgend onderdeel dat data raakt mag starten); een herstel alleen over bestaande data heen zou kunnen; de gate "toegestaan" toont zonder bewijs.
 
 ### N-P6-03 - De Hub en de executor installeren, bijwerken en terugzetten
-- **Rijen:** I23-23-01...I23-23-08; I01-01-03, I01-01-04; D01...D18 (invullen of meten); de NAS-delen van B01-001, B01-002, B01-003, B01-004, B01-005, B02-005, B02-006, B08-003, B08-004; EX15...EX21 en EX47 voor zover hun bewijs "NIET GEVALIDEERD" draagt; de open contractrijen C1.3-ASM-..., C1.3-JLP-... (onder meer C1.3-JLP-14) en C1.3-ALG-04, C1.3-ALG-05; `REVIEW-ai-server-manager-conformiteit-1.3`, `REVIEW-jelly-leon-platform-contract-1.3`.
+- **Rijen:** I23-23-01...I23-23-08; I01-01-03, I01-01-04; D01...D18 (invullen of meten); de NAS-delen van B01-001, B01-002, B01-003, B01-004, B01-005, B01-007, B01-010, B02-005, B02-006, B02-009, B08-003, B08-004, B08-006; EX15...EX21 en EX47 voor zover hun bewijs "NIET GEVALIDEERD" draagt; de open contractrijen C1.3-ASM-..., C1.3-JLP-... (onder meer C1.3-JLP-14) en C1.3-ALG-04, C1.3-ALG-05; `REVIEW-ai-server-manager-conformiteit-1.3`, `REVIEW-jelly-leon-platform-contract-1.3`.
 - **Voorwaarden:** N-P6-01 en N-P6-02 deel a. S-P6-02 en S-P6-05 klaar (tag en digest bekend). De GHCR-pakketten zijn bereikbaar (taak T-02); controle door de regisseur: `docker manifest inspect ghcr.io/<eigenaar>/<repo>:<versie>` slaagt zonder aanmelding. INSTALLATIE.md meldde op de peildatum dat de pakketten nog niet publiek waren; dan wacht dit onderdeel.
 - **Wat de gebruiker doet:** hij volgt `<WERKMAP>/jelly-leon-platform/install/truenas/INSTALLATIE.md` van "Stap 1 — Images ophalen (GHCR)" tot en met "Stap 5 — Custom App `ai-server-manager-executor` en koppelen".
   1. Stap 1: controleert dat het image zonder login op te halen is.
@@ -996,23 +1032,23 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
 - **Stop als:** het Tag-veld de digest weigert (niet op alleen de tag installeren zonder besluit van de gebruiker: de regisseur legt het voor); de Hub een sleutel met schrijfrechten accepteert (veiligheidsfout: stoppen, R-VEILIG inschakelen); een gate open staat zonder zijn besluiten; de setupcode ergens anders dan in de logs verschijnt.
 
 ### N-P6-04 - Bewaking, meldingen en aanmelden
-- **Rijen:** I07-07-01...06 (Beszel), I08-08-01...06 (Uptime Kuma), I09-09-01...06 (Authentik), I13-13-01...05 (Gotify), I10-10-01...06 (Node-RED); I01-01-08; I23-23-04; B13-002, B13-003, B13-004, B13-005; D17; EX22, EX23, EX45, EX46; B09-001...B09-005, B11-001, B11-004, B13-001; de NAS-delen van B01-006, B01-008 en C1.3-ASM-20; de open contractrijen C1.3-HCH-... van home-control-hub en `REVIEW-home-control-hub-contract-1.3`.
-- **Voorwaarden:** N-P6-03. S-P6-03 klaar. Voor Authentik: een domeinnaam met HTTPS en een herstelaccount (taak T-16). INSTALLATIE.md, "Stap 6 — Daarna installeert de Hub de rest", meldde op de peildatum dat installeren via de Hub op een NAS nog geblokkeerd is; de regisseur controleert dat eerst: `grep -n "Stand P2" <WERKMAP>/jelly-leon-platform/install/truenas/INSTALLATIE.md`.
+- **Rijen:** I07-07-01...06 (Beszel), I08-08-01...06 (Uptime Kuma), I09-09-01...06 (Authentik), I13-13-01...05 (Gotify), I10-10-01...06 (Node-RED); I01-01-08; I23-23-04; B13-002, B13-003, B13-004, B13-005; D17; EX22, EX23, EX45, EX46; B09-001...B09-006, B11-001...B11-005, B13-001; de NAS-delen van B01-006, B01-008 en C1.3-ASM-20; de open contractrijen C1.3-HCH-... van home-control-hub en `REVIEW-home-control-hub-contract-1.3`.
+- **Voorwaarden:** N-P6-03. S-P6-03 klaar. Voor Authentik: een domeinnaam met HTTPS en een herstelaccount (taak T-16). INSTALLATIE.md, "Stap 6 — Daarna installeert de Hub de rest", meldde op de peildatum dat installeren via de Hub op een NAS nog geblokkeerd is; de regisseur controleert dat eerst: `grep -n "Stand P2" <WERKMAP>/jelly-leon-platform/install/truenas/INSTALLATIE.md`. Voor Node-RED geldt besluit C-11 van de gebruiker (2026-11-11): geen anonieme toegang tot de editor, alleen bruikbaar via een beheerder; het manifest `install/manifests/node-red.manifest.yaml` en ADR-0023 in jelly-leon-platform worden daarop aangepast in P2. De regisseur controleert vóór dit onderdeel: `grep -n '"permissions":"read"' <WERKMAP>/jelly-leon-platform/install/manifests/node-red.manifest.yaml` geeft GEEN uitvoer. Een treffer betekent dat het manifest nog anoniem lezen toestaat: dan wacht het Node-RED-deel (punt 5) tot P2 dat heeft hersteld; de rest van dit onderdeel kan door. Voor de beheerder van Node-RED en het dienstaccount van home-control-hub geldt besluit C-12 van de gebruiker (2026-11-11, "voorziening zonder geheim"): ze komen via een voorziening van de manifeststandaard (eigenaar appstore-en-fork, `<WERKMAP>/appstore-en-fork/docs/MANIFESTSTANDAARD.md`) in het Custom App-formulier, zonder geheim in dat formulier. Het profiel van home-control-hub (`build_profile`, `define_arguments`, `credentialSecret`; route `POST /integrations/v1/automation/hardening-profile`) vervalt of wordt daaraan gelijkgetrokken en is GEEN installatieweg voor de gebruiker. De voorziening wordt ontworpen in S-P2-510 (ontwerp-ADR in appstore-en-fork) en gebouwd in S-P3-490 (manifeststandaard, appstore-en-fork), S-P3-445 (Node-RED-manifest, jelly-leon-platform) en S-P3-360 (profiel van home-control-hub); het Node-RED-deel (punt 5) start pas als die drie stappen in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` zijn afgevinkt. Hoe die voorziening eruitziet (welke velden het formulier krijgt en hoe de beheerder en het dienstaccount zonder geheim in het formulier tot stand komen): ONBEKEND tot die stappen er zijn (vragen C-5 en C-12); eerst vaststellen met: `grep -n -i "beheerder\|dienstaccount\|C-12" <WERKMAP>/appstore-en-fork/docs/MANIFESTSTANDAARD.md <WERKMAP>/jelly-leon-platform/install/manifests/node-red.manifest.yaml <WERKMAP>/jelly-leon-platform/docs/adr/ADR-0023-node-red-als-custom-app.md <WERKMAP>/ai-server-manager/docs/platform-v2/03_INSTALLATIE/I10_NODE_RED.md`. Is de voorziening niet gebouwd of gebruikt het manifest van Node-RED haar niet, dan wacht punt 5 (stopregel van S-P6-50: een ontbrekende functie, geen tekst voor de gebruiker); de regisseur laat de gebruiker dan GEEN terminal en GEEN argumenten van het profiel van home-control-hub gebruiken.
 - **Wat de gebruiker doet:**
   1. Installeert per app via de Hub: *Apps → Toevoegen*, leest het plan (image met digest, poorten, datasets, rechten, back-up-eisen, risico) en keurt het goed. Kan de Hub het nog niet, dan vult hij een standaard Custom App-formulier in met de waarden uit het manifest van die app in `<WERKMAP>/jelly-leon-platform/install/manifests/` (nooit YAML). Authentik gaat via de officiële catalogusapp van TrueNAS met vaste versie.
   2. Volgorde: eerst de eigen app home-control-hub (zie de tabel boven N-P6-01), dan Gotify (I13), Uptime Kuma (I08), Beszel (I07), dan Authentik (I09), als laatste Node-RED (I10). Per app de stappen van het I-document en de verplichte stappen na installatie uit `install/manifests/README.md`.
   3. I08 stap 3 (I08-08-03): bevestigt de voorgestelde monitors in Uptime Kuma (taak T-18). I08 stap 4 (I08-08-04) en EX22: stopt de Hub-app een paar minuten en kijkt of de melding buiten de Hub om op zijn telefoon komt; start de Hub weer.
   4. I09: stelt MFA en het herstelaccount in, koppelt de Hub via OIDC (B13-002), test aanmelden per app (B13-003) en test het intrekken van een sessie (I09-09-06). Besluit D17 invullen.
-  5. I10: importeert de flows en probeert één flow die iets verbodens vraagt (EX45) en één gebeurtenis die vijf keer binnenkomt (EX46), in de vorm die het I-document voorschrijft.
+  5. I10. Bij het installeren van Node-RED (punt 1) maakt hij de beheerder en het dienstaccount van home-control-hub aan via de velden die de voorziening van de manifeststandaard in het formulier zet (besluit C-12; welke velden: ONBEKEND, zie "Voorwaarden"). Hij gebruikt NIET de formulierargumenten van het profiel van home-control-hub (`--define=...`, wachtwoordhashes, `credentialSecret`) en zet geen wachtwoord, hash of sleutel in het formulier. Daarna eerst de proef op anonieme toegang (besluit C-11): opent de Node-RED-editor in een privévenster van de browser, zonder aan te melden. Verwacht: alleen het aanmeldscherm; geen flows, geen nodes en geen instellingen zichtbaar, ook niet alleen-lezen. Daarna leest hij de uitkomst van de isolatiecontrole van home-control-hub af. Die controle vraagt zonder aanmelding de paden `/flows`, `/nodes` en `/settings` op en eist voor elk 401 ("Een lezer zonder aanmelding krijgt geen flows, nodes of instellingen", controle `anoniem_geweigerd` in `<WERKMAP>/home-control-hub/apps/api/src/integrations/domains/automation/policy.py`). Waar de gebruiker die uitkomst ziet: ONBEKEND - S-P6-50 stelt de schermnaam vast uit de code (gezondheidscheck `automatisering` in `<WERKMAP>/home-control-hub/apps/api/src/integrations/health.py`). Pas daarna, aangemeld als beheerder: importeert de flows en probeert één flow die iets verbodens vraagt (EX45) en één gebeurtenis die vijf keer binnenkomt (EX46), in de vorm die het I-document voorschrijft.
   6. EX23 (hele NAS uit) doet hij NIET als proef, tenzij hij zelf een onderhoudsmoment plant: uitzetten onderbreekt Emby.
-- **Wat de gebruiker terugmeldt:** per app geïnstalleerd (ja/nee) en langs welke weg; of het plan in de Hub overeenkwam met wat er daarna draaide; of de melding bij een gestopte Hub aankwam en na hoeveel minuten; of aanmelden via Authentik per app werkte en welke app het niet deed; of het herstelaccount werkt; de uitkomst van de twee Node-RED-proeven; de status van D17.
-- **Wat de AI daarna controleert:** digests in de plannen tegen de manifesten; dat de melding bij een gestopte Hub echt buiten de Hub om liep (Uptime Kuma naar Gotify); dat de verboden flow is geweigerd door het beleid en niet door toeval; dat geen app zonder back-up-eis is geïnstalleerd.
-- **Wat daarna van "Geblokkeerd" af mag:** per app de I-rijen waarvan elke stap is gedaan; I01-01-08; I23-23-04 en B13-002...B13-005 na een geslaagde aanmelding, upgrade- en herstelproef van Authentik; EX22, EX45, EX46; D17 volgens het Hub-scherm.
-- **Wat "Geblokkeerd" blijft:** EX23 zonder gepland onderhoudsmoment; I10-rijen zolang ADR-0023 de installatie tegenhoudt; alles van Authentik zonder domeinnaam.
-- **Stop als:** een plan in de Hub afwijkt van wat er daarna draait; Authentik de enige weg naar binnen dreigt te worden zonder werkend herstelaccount; een flow een verboden actie toch uitvoert (veiligheidsfout).
+- **Wat de gebruiker terugmeldt:** per app geïnstalleerd (ja/nee) en langs welke weg; of het plan in de Hub overeenkwam met wat er daarna draaide; of de melding bij een gestopte Hub aankwam en na hoeveel minuten; of aanmelden via Authentik per app werkte en welke app het niet deed; of het herstelaccount werkt; of de beheerder en het dienstaccount via de voorziening van de manifeststandaard zijn aangemaakt (ja/nee, en of het formulier ergens om een geheim vroeg; geen namen of wachtwoorden); wat de Node-RED-editor zonder aanmelding liet zien (alleen het aanmeldscherm, of meer) en de uitkomst van de isolatiecontrole (`anoniem_geweigerd` ok of afwijking); de uitkomst van de twee Node-RED-proeven; de status van D17.
+- **Wat de AI daarna controleert:** digests in de plannen tegen de manifesten; dat de melding bij een gestopte Hub echt buiten de Hub om liep (Uptime Kuma naar Gotify); dat de verboden flow is geweigerd door het beleid en niet door toeval; dat geen app zonder back-up-eis is geïnstalleerd; dat een anonieme aanvraag aan Node-RED geen toegang kreeg: de gebruiker zag alleen het aanmeldscherm EN de isolatiecontrole meldt `anoniem_geweigerd` "ok" (401 op alle drie paden). Eén van beide ontbreekt of wijkt af = de I10-rijen en B11-001 blijven "Geblokkeerd". Daarnaast (C-12): het manifest van Node-RED bevat geen geheim en geen argumenten van het profiel van home-control-hub (`grep -n -i "credentialSecret\|--define" <WERKMAP>/jelly-leon-platform/install/manifests/node-red.manifest.yaml` geeft geen uitvoer), en de gebruiker meldt dat het formulier om geen geheim vroeg.
+- **Wat daarna van "Geblokkeerd" af mag:** per app de I-rijen waarvan elke stap is gedaan; I01-01-08; I23-23-04 en B13-002...B13-005 na een geslaagde aanmelding, upgrade- en herstelproef van Authentik; EX22, EX45, EX46; D17 volgens het Hub-scherm; B09-001...B09-006 en B11-001...B11-005 alleen voor het deel dat met de echte bewakingsapps en de echte Node-RED is teruggemeld (I10-rijen en B11-001 alleen na een geslaagde anonieme proef uit punt 5) (B09-006: alleen als een voorstel uit een runbook via een goedgekeurde actie van de executor is uitgevoerd).
+- **Wat "Geblokkeerd" blijft:** EX23 zonder gepland onderhoudsmoment; I10-rijen zolang ADR-0023 de installatie tegenhoudt, zolang het manifest nog anoniem lezen toestaat (besluit C-11) of zolang er geen beheerder in Node-RED is (de voorziening van besluit C-12 is niet gebouwd of niet gebruikt); alles van Authentik zonder domeinnaam.
+- **Stop als:** een plan in de Hub afwijkt van wat er daarna draait; Authentik de enige weg naar binnen dreigt te worden zonder werkend herstelaccount; een flow een verboden actie toch uitvoert (veiligheidsfout); de Node-RED-editor zonder aanmelding flows, nodes of instellingen toont, ook alleen-lezen (in strijd met besluit C-11; veiligheidsfout: Node-RED stoppen, R-VEILIG inschakelen, herstel in jelly-leon-platform); het formulier van Node-RED om een wachtwoord, hash, `credentialSecret` of ander geheim vraagt (in strijd met besluit C-12 en `<DOCS>/PLATFORM_CONTRACTEN.md`, kop "3.1 Uitgangspunten"): niets invullen, melden.
 
 ### N-P6-05 - Bestaande apps, MediaGuard en Media Source Optimizer
-- **Rijen:** APP-01...APP-20; B08-002; I26-26-01, -03, -04, -05; I03-03-01...08; I04-04-01...08; I15-15-01, -03...-06; I16-16-01...06; I17-17-01...06; I18-18-01...06; I19-19-01...06; I20-20-01...05; I23-23-06; B04-001...B04-010, B05-001...B05-010, B08-001; EX01...EX06, EX09, EX37, EX39...EX42 (in de simulator getest; hier de herhaling met de echte apps); de NAS-delen van C1.3-ASM-21; de open contractrijen C1.3-MGU-..., C1.3-MSO-..., C1.3-ASF-... (onder meer C1.3-ASF-14) en de `REVIEW-...-contract-1.3`-rijen van media-guard-ultimate, media-source-optimizer en appstore-en-fork.
+- **Rijen:** APP-01...APP-20; B08-002; I26-26-01, -03, -04, -05; I03-03-01...08; I04-04-01...08; I15-15-01, -03...-06; I16-16-01...06; I17-17-01...06; I18-18-01...06; I19-19-01...06; I20-20-01...05; I23-23-06; B04-001...B04-010, B05-001...B05-010, B08-001; EX01...EX06, EX09, EX37, EX39...EX42 (in de simulator getest; hier de herhaling met de echte apps); de NAS-delen van C1.3-ASM-21; de open contractrijen C1.3-MGU-..., C1.3-MSO-..., C1.3-ASF-... (onder meer C1.3-ASF-14, C1.3-MGU-02, -03, -04) en de `REVIEW-...-contract-1.3`-rijen van media-guard-ultimate, media-source-optimizer en appstore-en-fork; C1.3-ALG-05 zoals die in deze drie repos staat (echte telefoon, schermlezer, fel licht; voor MediaGuard ook de Android-app met Engelse systeemtaal).
 - **Voorwaarden:** N-P6-02 helemaal (herstelproef gedaan, snapshots van MediaGuard en Emby bestaan) en N-P6-03. S-P6-04 en S-P6-33 klaar (upgradebewijs van MediaGuard). Akkoord van de gebruiker op de proeven en zijn testbronnen (taak T-12). Gate: "MediaGuard/MSO API contract live verified".
 - **Wat de gebruiker doet:**
   1. Installeert de eigen app appstore-en-fork (zie de tabel boven N-P6-01). Inventaris (alleen lezen): laat de Hub de bestaande apps inlezen (B08-002, I26-26-01) en loopt per app het document `<DOCS>/04_BESTAANDE_APPS/A01_PLEX.md` tot en met `A20_MY_HOUSE.md` langs. Hij beslist per app: houden, bijwerken, later uitzetten. In dit onderdeel wordt NIETS uitgezet.
@@ -1023,10 +1059,11 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
   6. B04-010: schaduwfase, één echte download met een testbron waarvoor hij toestemming heeft, en een proefperiode van 24 tot 48 uur. Daarna geeft hij wel of geen akkoord.
   7. Media Source Optimizer (I04): versie vastleggen, koppelen met MediaGuard, Prowlarr en de clients, beleid instellen, back-up en migratie, koppelen met de Hub. B05-007: de proef met echte SABnzbd, qBittorrent en Prowlarr.
   8. De overige apps (I15...I20): per app de stappen van het I-document; bijwerken alleen via een plan in de Hub met back-up-eis.
+  9. Als hij dat wil (C1.3-ALG-05): opent de webschermen van MediaGuard, Media Source Optimizer en de appstore op zijn telefoon, in fel licht en met de schermlezer van de telefoon aan, en de Android-app van MediaGuard met Engelse systeemtaal; meldt wat onleesbaar of onbedienbaar is.
 - **Wat de gebruiker terugmeldt:** per app het besluit (houden, bijwerken, later uitzetten) en de draaiende versie; hoe MediaGuard en Media Source Optimizer nu geïnstalleerd zijn (Custom App-formulier of anders); de aantallen van MediaGuard vóór en na het bijwerken; of de back-up vooraf is gemaakt; de uitkomst van de schaduwfase en de proefperiode met zijn akkoord of weigering; de uitkomst van de proef met de echte downloadclients.
 - **Wat de AI daarna controleert:** de aantallen van MediaGuard vóór en na (elk verschil is een HARDE EIS-bevinding: R-HARDE-EIS beoordeelt het, terug naar de vorige versie is dan de eerste stap); de gemelde versies tegen de manifesten en tegen het upgradebewijs (het bewijs geldt alleen voor de versies waarvoor het gedraaid is); dat geen app met kijkgeschiedenis is uitgezet.
 - **Wat daarna van "Geblokkeerd" af mag:** APP-rijen waarvoor inventaris EN besluit zijn teruggemeld (behalve APP-02); B08-002; I26-26-01, -03, -04, -05; de I-rijen waarvan elke stap is gedaan; B04-010 en B05-007 alleen met het akkoord van de gebruiker erbij; I23-23-06.
-- **Wat "Geblokkeerd" blijft:** APP-02 (besluit over Emby: N-P6-13); alles van MediaGuard als het bijwerken niet is gedaan of is teruggedraaid.
+- **Wat "Geblokkeerd" blijft:** APP-02 (besluit over Emby: N-P6-13); alles van MediaGuard als het bijwerken niet is gedaan of is teruggedraaid; C1.3-MGU-02 tot de pakketten van MediaGuard onder de nieuwe repo publiek zijn (taak T-01); C1.3-ALG-05 in deze drie repos voor wat niet met een echte telefoon en schermlezer is gedaan.
 - **Stop als:** MediaGuard of Media Source Optimizer nu via YAML of compose is geïnstalleerd en bijwerken een andere installatieweg zou vragen (de repos hebben geen Custom App-manifest; `<WERKMAP>/media-guard-ultimate/deploy/truenas` bevat een compose-bestand; de regisseur legt dit voor via een keuzemenu, er wordt niets omgezet zonder besluit); er geen back-up van de MediaGuard-database is; een aantal na het bijwerken lager is dan ervoor.
 
 ### N-P6-06 - my_house en echte apparaten
@@ -1039,9 +1076,9 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
   4. I05 stap 5 (I05-05-05): koppelt de HomeWizard-meters en wijst de rollen toe. Energie wordt alleen gelezen.
   5. EX27: probeert de boiler te schakelen langs elke weg die hij heeft (het scherm van my_house, de Hub, een vraag aan de assistent). Verwacht: elke weg weigert; alleen het verbruik is te lezen.
   6. I05 stap 6 (I05-05-06): Gree. Eerst alleen uitlezen. Bedienen alleen bij een unit die als "getest" te boek staat en alleen terwijl hij in de kamer staat: één handeling, daarna controleren dat de unit doet wat het scherm zegt. EX26: zet een unit met de afstandsbediening uit terwijl een schema loopt; verwacht: de unit blijft uit tot hij zelf hervat. EX30: bij een unit die de koppeling weigert hoort het scherm "niet ondersteund" te tonen en nooit te doen alsof er is geschakeld.
-  7. I05 stap 7 (I05-05-07): Zigbee alleen als D13 dat zegt; de USB-stick wordt in het formulier doorgegeven (of dat in een standaard Custom App werkt is nooit gemeten: terugmelden).
+  7. I05 stap 7 (I05-05-07): Zigbee alleen als D13 dat zegt. Volgens besluit Z-17 van de gebruiker (2026-11-11) zit Zigbee2MQTT als optioneel proces in de image van my_house en gaat het alleen aan als in het Custom App-formulier een USB-apparaat (`/dev/serial/by-id/...`) is opgegeven (gebouwd in `STAPPEN_P3.md`, S-P3-720; de doorgifte beschreven in S-P3-755, `<WERKMAP>/my_house/deploy/truenas/CUSTOM_APP.md`). De gebruiker test dit met zijn echte Zigbee-USB-stick: hij geeft de stick in het formulier door zoals CUSTOM_APP.md beschrijft, kijkt of Zigbee2MQTT daarna draait en de stick ziet, en koppelt één Zigbee-apparaat terwijl hij erbij staat. Of een standaard Custom App een USB-apparaat kan doorgeven is nooit gemeten: terugmelden. Vooraf controleert de regisseur dat het proces in de image zit: `grep -rln -i zigbee2mqtt <WERKMAP>/my_house/deploy/allinone <WERKMAP>/my_house/deploy/truenas/CUSTOM_APP.md`; geen treffer = punt 7 wacht (stopregel van S-P6-50: een ontbrekende functie, geen tekst voor de gebruiker).
   8. I05 stap 8 (I05-05-08): zet de Android-app op zijn telefoon en doet een herstelproef van de my_house-gegevens naar een aparte plek. Bekijkt na een dag de grafiek van 24 uur op zijn telefoon.
-- **Wat de gebruiker terugmeldt:** langs welke weg my_house is geïnstalleerd; per soort apparaat gekoppeld (ja/nee) en aantal (geen namen van kamers of personen); of elke weg naar de boiler weigerde; de uitkomst van EX26 en EX30; of de Zigbee-stick zichtbaar werd; of de herstelproef lukte; of de grafiek en de meterstanden kloppen met wat de meter zelf toont; de status van D12, D13, D14.
+- **Wat de gebruiker terugmeldt:** langs welke weg my_house is geïnstalleerd; per soort apparaat gekoppeld (ja/nee) en aantal (geen namen van kamers of personen); of elke weg naar de boiler weigerde; de uitkomst van EX26 en EX30; of de Zigbee-stick in het formulier door te geven was, of Zigbee2MQTT daarna draaide en de stick zag, en of het gekoppelde Zigbee-apparaat reageerde; of de herstelproef lukte; of de grafiek en de meterstanden kloppen met wat de meter zelf toont; de status van D12, D13, D14.
 - **Wat de AI daarna controleert:** dat geen enkele weg de boiler heeft geschakeld (één geslaagde schakeling is een veiligheidsfout: stoppen, R-VEILIG); dat bedienen alleen bij "geteste" apparaten mogelijk was; de gemelde firmware of het type tegen wat de adapter ondersteunt; dat de gate voor Gree-aansturing in de Hub pas open ging na D12.
 - **Wat daarna van "Geblokkeerd" af mag:** I05-rijen waarvan de stap is gedaan; B06-009 (alleen als alle soorten apparaten EN een herstart van de NAS zijn teruggemeld); EX26, EX30; de B06- en B14-rijen waarvan de blokkadetekst alleen echte apparaten noemt; D12, D13, D14 volgens het Hub-scherm.
 - **Wat "Geblokkeerd" blijft:** B06-008 (verhuizing tussen twee omgevingen: N-P6-14); rijen met "echte schermlezer" in de blokkade tenzij de gebruiker die proef zelf deed; alles van Zigbee als D13 "nee" is (dan krijgt de rij de tekst "niet van toepassing volgens D13", nog steeds door de gebruiker zelf af te vinken).
@@ -1065,7 +1102,7 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
 - **Stop als:** het testapparaat zonder internet valt wanneer AdGuard Home stopt (dan de router NIET omzetten); de oude DNS-instelling niet is genoteerd; het beheer van de Hub of TrueNAS van buiten bereikbaar blijkt.
 
 ### N-P6-08 - Zoeken, persoonlijke AI en optioneel Navidrome
-- **Rijen:** I14-14-01...05, I25-25-01...06, I22-22-01...05; B07-001, B07-003, B07-005; B15-001, B15-003, B15-004, B15-007; D09, D18; EX36, EX43, EX44, EX49 (in de simulator getest; hier de herhaling met echte bronnen); C1.3-ZPA-... (open contractrijen), C1.2-ZA9; `REVIEW-zoeken-en-persoonlijke-ai-contract-1.3`, `REVIEW-zoeken-en-persoonlijke-ai-statuspagina`.
+- **Rijen:** I14-14-01...05, I25-25-01...06, I22-22-01...05; B07-001...B07-006; B15-001...B15-007; de account- en NAS-delen van B02-001...B02-004, B02-007, B02-008, B02-010...B02-012 en B01-009 (een echte AI-aanbieder, het echte tegoed en de bewaking op betaald verbruik); D09, D18; EX36, EX43, EX44, EX49 (in de simulator getest; hier de herhaling met echte bronnen); C1.3-ZPA-... (open contractrijen), C1.2-ZA9; `REVIEW-zoeken-en-persoonlijke-ai-contract-1.3`, `REVIEW-zoeken-en-persoonlijke-ai-statuspagina`.
 - **Voorwaarden:** N-P6-03; S-P6-06 klaar (tag en digest bekend). Voor foto's als bron: Immich uit N-P6-05. Gate: "0 paid API overage en monitor". Accounts en sleutels: taak T-22. Dit onderdeel is geen voorwaarde voor de overstap.
 - **Wat de gebruiker doet:**
   1. Installeert de app via de Hub (zie de tabel boven N-P6-01). De database met pgvector zit in het image; I14 stap 2 vraagt dus geen aparte database-app (I14-14-02 krijgt als bewijs de installatie van deze app).
@@ -1079,12 +1116,12 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
   9. Navidrome (I22) alleen als D18 "ja" is: I22 stap 1 tot en met 5.
 - **Wat de gebruiker terugmeldt:** welke soorten bronnen gekoppeld zijn (geen mapnamen); of zoeken werkte; of het beperkte account niets verbodens zag; of ingetrokken bronnen verdwenen; of herbouwen en herstel lukten; het verbruik tegen het budget (binnen/buiten, geen bedragen nodig); de status van D09 en D18; welke optionele onderdelen aan staan.
 - **Wat de AI daarna controleert:** dat geen enkele zoekvraag van het beperkte account iets teruggaf (één treffer is een privacyfout: stoppen, R-VEILIG); dat de gate voor betaalde AI in de Hub dicht bleef zolang D09 open stond; dat optionele onderdelen die uit staan ook als "uit" in het bewijs komen en niet als getest.
-- **Wat daarna van "Geblokkeerd" af mag:** I14- en I25-rijen waarvan de stap is gedaan; EX36, EX43, EX44 (de herhaling met echte bronnen; het simulatorbewijs blijft erbij staan); B07-001 en B07-003 als hun echte deel is teruggemeld; D09, D18 volgens het Hub-scherm; I22-rijen alleen als Navidrome is geïnstalleerd.
+- **Wat daarna van "Geblokkeerd" af mag:** I14- en I25-rijen waarvan de stap is gedaan; EX36, EX43, EX44 (de herhaling met echte bronnen; het simulatorbewijs blijft erbij staan); B07-rijen en gebouwde B15-rijen als hun echte deel is teruggemeld; de B02-rijen en B01-009 alleen als D09 is ingevuld, een echte aanbieder is gebruikt en het verbruik binnen het budget bleef; D09, D18 volgens het Hub-scherm; I22-rijen alleen als Navidrome is geïnstalleerd.
 - **Wat "Geblokkeerd" blijft:** alles van spraak en betekeniszoeken dat uit staat of niet gebouwd is (B15-rijen met "Niet gestart" blijven zo); C1.2-ZA9 en de statuspagina-rij zonder proef met een echte schermlezer, telefoon en tv; I22 als D18 "nee" is (tekst "niet van toepassing volgens D18").
 - **Stop als:** het beperkte account iets ziet wat het niet mag; een bron beschrijfbaar gekoppeld blijkt; er betaald verbruik is terwijl D09 open staat.
 
 ### N-P6-09 - Jelly Leon naast Emby: installatie, clients en GPU
-- **Rijen:** I24-24-01...I24-24-06; I06-06-01...I06-06-08; de NAS- en apparaatdelen van B03-001...B03-012 en B03-016...B03-019; D08, D15; JLT-49, JLT-63, JLT-64, JLT-69 en de rijen JLT-40...JLT-48 (apparaatprofielen en hardwareversnelling) waarvan de blokkade de echte NAS of echte apparaten noemt (de modulerijen, onder meer JLT-26 en JLT-39, horen bij N-P6-10); EX07, EX08, EX10, EX35, EX38, EX48; C1.3-JL-03, C1.3-JL-04, C1.3-JL-05, C1.3-JLC-02, C1.3-JLW-...; `REVIEW-jelly-leon-web-contract-1.3`, `REVIEW-jelly-leon-clients-contract-1.3`.
+- **Rijen:** I24-24-01...I24-24-06; I06-06-01...I06-06-08; de NAS- en apparaatdelen van B03-001...B03-012 en B03-016...B03-019; D08, D15; JLT-49, JLT-63, JLT-64, JLT-69 en de rijen JLT-40...JLT-48 (apparaatprofielen en hardwareversnelling) waarvan de blokkade de echte NAS of echte apparaten noemt (de modulerijen, onder meer JLT-26 en JLT-39, horen bij N-P6-10); EX07, EX08, EX10, EX35, EX38, EX48; C1.3-JL-03, C1.3-JL-04, C1.3-JLC-02, C1.3-JLW-... (C1.3-JL-05 hoort bij N-P6-11 en C1.3-JL-09 bij N-P6-10); `REVIEW-jelly-leon-web-contract-1.3`, `REVIEW-jelly-leon-clients-contract-1.3`.
 - **Voorwaarden:** N-P6-02 helemaal, N-P6-03 en N-P6-05. Er is een release van Jelly Leon op 12.x met een op te halen image (stap van de gebruiker, BG-02, taak T-13; `<WERKMAP>/jelly-leon/deploy/truenas/CUSTOM_APP.md` meldde op de peildatum dat er nog geen pakket bestond). Emby blijft de hele tijd draaien en blijft de mediaserver van het huishouden. Jelly Leon krijgt een eigen appnaam, een eigen poort en eigen datasets; de media worden alleen-lezen gekoppeld.
 - **Wat de gebruiker doet:**
   1. I24 stap 1 (I24-24-01): legt vast hoe het nu gaat met Emby (welke apparaten, wat speelt direct af) en vult D15 (de apparatenlijst) in de Hub in.
@@ -1101,11 +1138,11 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
 - **Wat de gebruiker terugmeldt:** of Emby de hele tijd bleef werken; of de mediamappen onveranderd bleven; per soort apparaat uit D15 de uitkomst (soort en app, geen namen); de status van D08 en D15; of de Hub twee kaarten ziet en ze na de herstart nog goed benoemt; de uitkomst van de voorrangsproef; of bijwerken en terugzetten lukten; welke apparaten hij niet heeft kunnen testen.
 - **Wat de AI daarna controleert:** de uitkomsten per apparaat tegen `<WERKMAP>/jelly-leon/docs/platform-v2/CLIENT_COMPAT_MATRIX.md` (de AI werkt die matrix bij, met "teruggemeld door de gebruiker" erbij); de meting tegen de resources in het manifest (`<WERKMAP>/jelly-leon/deploy/manifest/jelly-leon.manifest.yaml`); dat de gate voor GPU-transcodering in de Hub pas open ging na D08; elk signaal dat de mediamap is gewijzigd (dat is een no-go van de Cutover-gate: "media mutatie buiten MediaGuard").
 - **Wat daarna van "Geblokkeerd" af mag:** I24- en I06-rijen waarvan de stap is gedaan; D08, D15 volgens het Hub-scherm; per JLT- en B03-rij alleen het deel dat is teruggemeld (de rij blijft "Geblokkeerd" zolang de blokkade nog een niet-gedaan deel noemt); EX07, EX08, EX10, EX35; EX38 alleen met een echte ontvanger; C1.3-JL-03, C1.3-JL-04.
-- **Wat "Geblokkeerd" blijft:** alles van Swiftfin en Safari (vraagt een Mac met Xcode en een ontwikkelaarsaccount, taak T-14); de Android-apps zolang het besluit over ondertekening open is (taak T-19); C1.3-JL-05 (tot N-P6-11); JLT-69 (tot N-P6-12 klaar is: de rij omvat ook overname, upgrade en terugzetproef).
+- **Wat "Geblokkeerd" blijft:** alles van Swiftfin en Safari (vraagt een Mac met Xcode en een ontwikkelaarsaccount, taak T-14); de Android-apps zolang het besluit over ondertekening open is (taak T-19); C1.3-JL-05 (hoort bij N-P6-11); JLT-69 (tot N-P6-12 klaar is: de rij omvat ook overname, upgrade en terugzetproef).
 - **Stop als:** Emby hapert of stopt door iets uit dit onderdeel (Jelly Leon stoppen; Emby gaat voor); er iets in de mediamappen is veranderd; de poort van Jelly Leon botst met Emby; HDR of Dolby Vision op een apparaat slechter is dan met Emby (no-go van de Cutover-gate: eerst melden, niet doorgaan naar N-P6-11).
 
 ### N-P6-10 - De Jelly Leon-modules en de belastingtest op de NAS
-- **Rijen:** JLT-06, JLT-15, JLT-26, JLT-39, JLT-59, JLT-66; de NAS-delen van B03-020...B03-079 (de modules: Watch Together, aanbevelingen, ondertitels, kwaliteitscontrole, intro en aftiteling) en van de modulerijen JLT-01...JLT-38 en JLT-50...JLT-58 waarvan de blokkade de echte NAS of echte apparaten noemt.
+- **Rijen:** JLT-06, JLT-15, JLT-26, JLT-39, JLT-59, JLT-66; de NAS-delen van B03-020...B03-079 (de modules: Watch Together, aanbevelingen, ondertitels, kwaliteitscontrole, intro en aftiteling) en van de modulerijen JLT-01...JLT-38 en JLT-50...JLT-58 waarvan de blokkade de echte NAS of echte apparaten noemt; C1.3-JL-09 (imagebewaking en adrescontrole voor model-apps; gebouwd in S-P5-100, bewijs op de eindimage in S-P5-115).
 - **Voorwaarden:** N-P6-09. Gate: "Eén plugin met modules + belastingtest binnen de manifestresources". Vooraf door de gebruiker: een steekproef afleveringen labelen (taak T-08, BG-34) en de feiten voor Watch Together en de planner aanleveren (taak T-09). Welke modules bij de start van P6 bestaan: ONBEKEND - eerst vaststellen met: `cd <WERKMAP> && python3 -c "import json; print([r['id']+':'+r['status'] for r in json.load(open('jelly-leon/docs/platform-v2/EVIDENCE.json',encoding='utf-8')) if r['id'][:5]=='B03-0' and int(r['id'][4:7])>=20])"` (op de peildatum een lege lijst: de modules komen uit P4).
 - **Volgorde ten opzichte van de overstap:** de testrij JLT-06 zegt "na de cutover-gate", terwijl de Cutover-gate zelf vraagt dat de NAS-testrijen zijn uitgevoerd. Dit plan leest dat zo: de modules worden getest op de Jelly Leon-installatie NAAST Emby, vóór de overstap, met testgebruikers. De regisseur legt deze leeswijze één keer aan de gebruiker voor (keuzemenu: vóór de overstap testen / JLT-06 pas na de overstap en dan uitgezonderd van punt 4 van de Cutover-gate).
 - **Wat de gebruiker doet:**
@@ -1115,11 +1152,12 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
   4. JLT-15 (aanbevelingen): besluit BG-37 (in de testrij "O-7") staat de eenmalige evaluatie op de echte kijkhistorie toe, alleen geaggregeerd, met afmelden per gebruiker en zonder kinderen. Die historie staat pas in Jelly Leon na N-P6-11. Doe dit punt dus pas na N-P6-11, en dan eerst een ZFS-snapshot van de configuratie van Jelly Leon; vóór N-P6-11 alleen het deel met testgebruikers en de clients uit D15, en blijft JLT-15 "Geblokkeerd" met "wacht op N-P6-11".
   5. JLT-26 (ondertitels, module F3) en JLT-39 (kwaliteitscontrole, module F5): de proeven uit de testrij met de echte bibliotheek (alleen-lezen gekoppeld): ondertitels op echte paren met Engelse en menselijke Nederlandse ondertitels; de kwaliteitscontrole tegelijk met MediaGuard-AV1 en een live-transcode. Verwacht: 0 gewijzigde bestanden in de mediamappen, afspelen hapert niet, MediaGuard en Bazarr blijven de enige downloaders van ondertitels. Hoe de gebruiker deze proeven start: ONBEKEND - eerst vaststellen met: `grep -n "JLT-26\|JLT-39" <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json <WERKMAP>/.lokaal/plan/uit/STAPPEN_P4_GOLF3_4.md`.
   6. JLT-66 (belasting): alles tegelijk: twee streams, een analyse en MediaGuard aan het werk. Verwacht: afspelen houdt voorrang. Met welk scherm of hulpmiddel de gebruiker dit start: ONBEKEND - eerst vaststellen met: `grep -n "JLT-66" <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json <WERKMAP>/.lokaal/plan/uit/STAPPEN_P4_GOLF3_4.md` (op de peildatum heeft JLT-66 nog geen bewijsregel).
-- **Wat de gebruiker terugmeldt:** per module aan/uit en of afspelen daarna nog werkte; de uitkomst van de gezamenlijke sessie; of de knoppen klopten (aantal goed/fout in de steekproef); bij JLT-26 en JLT-39 of er iets in de mediamappen is veranderd en of afspelen haperde; of JLT-15 vóór of na N-P6-11 is gedaan; of afspelen onder belasting haperde; wat de Hub aan geheugen en processor toonde (binnen/buiten de grens van het manifest).
-- **Wat de AI daarna controleert:** het gemeten verbruik tegen de resources in het manifest; dat aanbevelingen alleen geaggregeerd zijn beoordeeld en geen kijkgedrag per persoon is teruggemeld; dat geen module de kijkgegevens van de testgebruiker heeft veranderd (JLT-65 hoort bij N-P6-12 maar een afwijking hier is al een stopreden).
-- **Wat daarna van "Geblokkeerd" af mag:** JLT-06, JLT-15 (alleen het deel met de echte kijkhistorie, dus na N-P6-11), JLT-26, JLT-39, JLT-59, JLT-66 en de B03-modulerijen, elk alleen voor het deel dat is teruggemeld.
-- **Wat "Geblokkeerd" blijft:** modules die niet gebouwd of niet aangezet zijn; meekijken van buiten zonder besluit; alles wat een Apple-apparaat met Swiftfin vraagt.
-- **Stop als:** een module gewoon afspelen breekt (module uit; "module uit = stock" is de eis van JLT-64); de kijkgegevens van een gebruiker veranderen door een module (na N-P6-11: snapshot van de configuratie van Jelly Leon terugzetten volgens `<WERKMAP>/jelly-leon/deploy/truenas/CUSTOM_APP.md#Updaten en terugdraaien`; Emby blijft de terugval); er iets in de mediamappen verandert; het verbruik buiten de grens van het manifest komt.
+  7. C1.3-JL-09 (model-apps). Dit punt geldt alleen als er via de Hub een model-app is geïnstalleerd (`mt`, een embedding-app of de stt-app; C1.3-ASM-22, besluiten BG-06 en BG-18). Zonder model-app slaat de gebruiker het over. Alleen een module praat met een model-app (`<DOCS>/02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md#10.16 Lokale verwerking en optionele modellen`): in N-P6-09 staan de modules uit, dus dit kan pas hier. Werkwijze: de gebruiker zet de module aan die de model-app gebruikt (vertaling bij punt 5, JLT-26; embeddings bij JLT-18) en kijkt of die module met de model-app op de NAS werkt. De model-app heeft een adres in het thuisnetwerk; dat is wat de adrescontrole toestaat. Hoe de "netwerkmeting op het thuisnetwerk" uit de blokkadetekst zonder terminal gaat (bijvoorbeeld een melding of teller van geweigerde adressen in het beheer van Jelly Leon of in de Hub): ONBEKEND - eerst vaststellen met: `grep -n "C1.3-JL-09" <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` en `ls <WERKMAP>/jelly-leon/docs/adr/` (de ADR van S-P5-100 over de gedeelde adrescontrole). Is er geen weg zonder terminal, dan blijft dat deel open (stopregel van S-P6-50: een ontbrekende functie, geen tekst voor de gebruiker).
+- **Wat de gebruiker terugmeldt:** per module aan/uit en of afspelen daarna nog werkte; de uitkomst van de gezamenlijke sessie; of de knoppen klopten (aantal goed/fout in de steekproef); bij JLT-26 en JLT-39 of er iets in de mediamappen is veranderd en of afspelen haperde; of JLT-15 vóór of na N-P6-11 is gedaan; of afspelen onder belasting haperde; wat de Hub aan geheugen en processor toonde (binnen/buiten de grens van het manifest); bij C1.3-JL-09: welke model-app er is (soort, geen adres), of de module die hem gebruikt werkte, en de uitkomst van de netwerkmeting als die er is.
+- **Wat de AI daarna controleert:** het gemeten verbruik tegen de resources in het manifest; dat aanbevelingen alleen geaggregeerd zijn beoordeeld en geen kijkgedrag per persoon is teruggemeld; dat geen module de kijkgegevens van de testgebruiker heeft veranderd (JLT-65 hoort bij N-P6-12 maar een afwijking hier is al een stopreden); bij C1.3-JL-09: dat de digest van de geïnstalleerde Jelly Leon-image dezelfde is als die van de release waarop de imagebewaking van S-P5-100 in de CI groen was (geen torch, transformers, ctranslate2 of sentencepiece in de image), en dat de gebruiker geen adres buiten het thuisnetwerk voor de model-app heeft ingevuld (het adres zelf komt niet in EVIDENCE).
+- **Wat daarna van "Geblokkeerd" af mag:** JLT-06, JLT-15 (alleen het deel met de echte kijkhistorie, dus na N-P6-11), JLT-26, JLT-39, JLT-59, JLT-66 en de B03-modulerijen, elk alleen voor het deel dat is teruggemeld; C1.3-JL-09 als de module met een echte model-app werkte EN de netwerkmeting is gedaan.
+- **Wat "Geblokkeerd" blijft:** modules die niet gebouwd of niet aangezet zijn; meekijken van buiten zonder besluit; alles wat een Apple-apparaat met Swiftfin vraagt; C1.3-JL-09 zonder geïnstalleerde model-app (BG-06, BG-18) of zonder netwerkmeting.
+- **Stop als:** een module gewoon afspelen breekt (module uit; "module uit = stock" is de eis van JLT-64); de kijkgegevens van een gebruiker veranderen door een module (na N-P6-11: snapshot van de configuratie van Jelly Leon terugzetten volgens `<WERKMAP>/jelly-leon/deploy/truenas/CUSTOM_APP.md#Updaten en terugdraaien`; Emby blijft de terugval); er iets in de mediamappen verandert; het verbruik buiten de grens van het manifest komt; een module een model-app alleen bereikt met een adres buiten het thuisnetwerk (veiligheidsfout: module uit, R-VEILIG inschakelen).
 
 ### N-P6-11 - De echte overname vanuit Emby
 - **Rijen:** B03-015; JLT-70, JLT-71, JLT-72, JLT-73 (de herhaling op de NAS), JLT-74 (het deel overname); C1.3-JL-05; D07 (gemeten).
@@ -1194,7 +1232,7 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
 - **Stop als:** één punt "nee" is; de inleesproef van het archief mislukt; er nog iemand op Emby kijkt; het archief niet in de back-up zit.
 
 ### N-P6-14 - Duurproef, herstel op een tweede omgeving en productieacceptatie
-- **Rijen:** EX50; EX23 (alleen op een gepland onderhoudsmoment); B06-008 en B12-007 (herstel op een andere omgeving); de regel P6 in `fasen`; elke rij die na de andere onderdelen nog op niveau 0 of 1 staat.
+- **Rijen:** EX50; EX23 (alleen op een gepland onderhoudsmoment); B01-012, B06-008 en B12-007 (herstel op een andere omgeving); de regel P6 in `fasen`; elke rij die na de andere onderdelen nog op niveau 0 of 1 staat.
 - **Voorwaarden:** alle onderdelen die de gebruiker wil meenemen zijn teruggemeld. Taak T-06. De faseringstekst (`<DOCS>/01_ARCHITECTUUR/06_FASERING_EN_GATES.md`) noemt "72h soak", "metrics vergelijking" en "productieacceptatie" maar legt geen meetpunten vast. De regisseur legt daarom vóór dit onderdeel één keuzemenu voor: welke meetpunten gelden (bijvoorbeeld: geen herstart van een app, geen kritieke melding, geheugen en processor binnen de grenzen van de manifesten, afspelen zonder hapering), en waarmee wordt vergeleken (de basismeting uit N-P6-04).
 - **Wat de gebruiker doet:**
   1. Laat het platform minstens 72 uur draaien bij gewoon gebruik en verandert in die tijd niets.
@@ -1203,7 +1241,7 @@ Elk onderdeel heeft dezelfde opbouw: Rijen; Voorwaarden; Wat de gebruiker doet (
   4. Loopt de Excel door (`<DOCS>/08_EXCEL/TrueNAS_V2_Uitvoering_en_Afvinken.xlsx`) en vinkt zelf af wat hij als klaar beschouwt. Voor rijen die alleen in de simulator zijn getest kiest hij per rij: afvinken op basis van het rapport van S-P6-22, of eerst zelf op de NAS herhalen.
 - **Wat de gebruiker terugmeldt:** per meetpunt de uitkomst (gehaald of niet); of het herstel op de tweede omgeving lukte; welke rijen hij zelf heeft afgevinkt (alleen de aantallen per blad zijn genoeg); wat hij bewust open laat.
 - **Wat de AI daarna controleert:** dat het gereedschap de vinkjes van de gebruiker laat staan (uitvoer `handmatig_afgevinkt` van S-P6-52); dat geen enkele `EVIDENCE.json` "Gereed" of "Geslaagd" bevat (dat blijft zo: het vinkje van de gebruiker staat alleen in de Excel, tenzij S-P6-52 anders heeft vastgelegd); dat elke rij die nog "Geblokkeerd" is een reden en een onderdeel noemt.
-- **Wat daarna van "Geblokkeerd" af mag:** EX50 (alleen met een echte tweede omgeving), EX23 (alleen na een echt, gepland uitval-moment), B06-008, B12-007; de regel P6 in `fasen` gaat naar "Bezig" met als bewijs de lijst van teruggemelde onderdelen.
+- **Wat daarna van "Geblokkeerd" af mag:** EX50 (alleen met een echte tweede omgeving), EX23 (alleen na een echt, gepland uitval-moment), B01-012, B06-008, B12-007; de regel P6 in `fasen` gaat naar "Bezig" met als bewijs de lijst van teruggemelde onderdelen.
 - **Wat "Geblokkeerd" blijft:** alles wat niet is teruggemeld; alles wat een Mac met Xcode vraagt.
 - **Productieacceptatie:** is geen handeling van de AI. Het platform is geaccepteerd wanneer de gebruiker dat zelf zegt en de rijen zelf heeft afgevinkt. De AI sluit dan `<DOCS>/OVERDRACHT/STATUS.md` af met de datum van zijn bericht en de lijst van wat bewust open blijft.
 - **Stop als:** een meetpunt niet is gehaald (eerst de oorzaak, geen acceptatie); het herstel op de tweede omgeving gegevens mist.
@@ -1259,7 +1297,7 @@ Volgorde voor moment 1: S-P6-40 (regressie, alle repos) -> S-P6-60 (EVIDENCE-pro
 | G-07 | De releasegate compatibiliteit is gedraaid | S-P6-31 (B03-019; JLT-63, JLT-64, JLT-66, JLT-67) | EVIDENCE.json van jelly-leon: de vijf regels bestaan, met uitkomst en datum; JLT-67 noemt dat hij op een volgende upstream-versie wacht | ALLEEN OP DE ECHTE NAS TE BEWIJZEN |
 | G-08 | De generale repetitie van de Emby-overname is gedraaid met de eindimage, tegen een Emby-image op vaste digest, en Emby is daarbij alleen gelezen | S-P6-32 (B03-015; JLT-70...JLT-73) | `<WERKMAP>/jelly-leon/docs/platform-v2/BOUWVERIFICATIE_B03-015.md`, kop "P6-herhaling met de eindimage": telling van HTTP-methoden richting Emby bevat alleen GET; tellingen per gebruiker vóór en na; de vier negatieve tests hebben een testnaam en zijn geslaagd. Zelf draaien: `$PY -m pytest -q tools/emby-overname/tests` volgens POORTEN.md, blok P-jelly-leon | ALLEEN OP DE ECHTE NAS TE BEWIJZEN |
 | G-09 | MediaGuard volgt Emby en Jelly Leon naast elkaar; uitval van de nieuwe server raakt de Emby-koppeling niet; het upgradebewijs meldt geen verlies | S-P6-33 (B03-014; JLT-73) | EVIDENCE.json van media-guard-ultimate, regel B03-014; zelf draaien: het pytest-commando uit de regel "Tests (verplicht)" van S-P6-33 | ALLEEN OP DE ECHTE NAS TE BEWIJZEN |
-| G-10 | De regressieronde is groen voor alle elf repos, op de commit waar ook de CI groen is | S-P6-40 | per repo het rapport in de ketenmap; per repo `gh run list --repo lvos04/<repo> --branch ccr-c133d7a0-kuz1cv --limit 3` en de commit vergelijken met `git -C <WERKMAP>/<repo> log -1 --format=%H`; van één repo naar keuze draait A-GATE zelf kop "5. Contract-, EVIDENCE- en drifttests" van het blok P-<repo> | VOLDAAN |
+| G-10 | De regressieronde is groen voor alle elf repos, op de commit waar ook de CI groen is | S-P6-40 | per repo het rapport in de ketenmap; per repo `gh run list -R lvos04/<repo> -b ccr-c133d7a0-kuz1cv -c "$(git -C <WERKMAP>/<repo> rev-parse HEAD)"` (volle hash; een korte hash geeft een lege lijst) en de commit vergelijken met `git -C <WERKMAP>/<repo> log -1 --format=%H`; van één repo naar keuze draait A-GATE zelf kop "5. Contract-, EVIDENCE- en drifttests" van het blok P-<repo> | VOLDAAN |
 
 ### F.1.2 Eerlijkheid van het bewijs
 
@@ -1422,3 +1460,519 @@ herstellen, de eis laten vervallen (alleen de gebruiker kan dat), of stoppen.
 - Wat bewust open blijft, meldt de regisseur bij de laatste melding als lijst: JLT-67 (wacht op een volgende
   upstream-versie), alles van Swiftfin en Safari (Mac en Xcode ontbreken), en elk onderdeel dat de gebruiker heeft
   overgeslagen.
+
+---
+
+# Dekking
+
+Elke rij is één ID, of een reeks ID's van hetzelfde soort met hetzelfde antwoord. "Stap in P6" is de stap van DEEL A
+die het ID bouwt, beproeft of bijwerkt; "Onderdeel van DEEL B" is het NAS-onderdeel dat het ID op de echte NAS oppakt.
+Een ID dat in een andere fase is gebouwd en hier alleen de NAS-validatie open heeft, staat er met die fase en met het
+onderdeel. Geen enkele rij gaat door P6 verder dan "Bezig" (B.2, niveau 1); "Gereed" en "Geslaagd" zet alleen de
+gebruiker, in de Excel.
+
+Herkomst en regels:
+
+- De ID's in K.1 tot en met K.6 staan in `<WERKMAP>/.lokaal/plan/uit/ALLE_IDS.txt` (513 ID's). Samen dekken K.1 tot en
+  met K.6 ALLE 513: P6 is de fase waarin elk ID zijn NAS-validatie krijgt of uitdrukkelijk open blijft.
+- De status "peildatum" komt uit `<WERKMAP>/.lokaal/plan/bron/STAND_PER_ID.tsv` (momentopname van vóór het einde van
+  ronde 3). Voor de stand van nu geldt altijd `git log` en de EVIDENCE.json van de repo (S-P6-01 bouwpunt 7).
+- De contractpunten (C1.3-...), de reviewregels (`REVIEW-...`) en de delta's (Δ-...) staan NIET in ALLE_IDS.txt; ze
+  staan in K.7. Geen enkel punt van `<DOCS>/CONTRACT_1.3_CONFORMITEIT.md` heeft het Moment "P6" (gecontroleerd op
+  2026-11-11: de kolom kent alleen NU, P2, P3, P4-0, P4 en P5); K.7 bevat daarom alleen de punten waarvan het
+  NAS-deel in DEEL B ligt.
+- De nummers G-nn (F.1), K.n (dit hoofdstuk), Z-, T- en BLOK- zijn nummers van dit plan en komen nooit in Excel,
+  EVIDENCE of commits.
+- De eerste kolom is wat de controle `<WERKMAP>/.lokaal/plan/uit/dekking.py` leest; houd de vorm `| ID | ...` aan bij een
+  wijziging.
+
+## K.1 De integrale E2E-matrix EX01...EX50
+
+Bron: `<DOCS>/05_TESTS/INTEGRALE_E2E_TESTMATRIX.md` en `<DOCS>/08_EXCEL/e2e_cases.json`; de kolom "Uitvoerbaar" is
+letterlijk de kolom uit `<WERKMAP>/jelly-leon-platform/e2e/README.md#Mapping EX01–EX50`. Elke rij hoort ook bij
+S-P6-13 (raamwerk en runner) en S-P6-22 (volledige run, rapport en het overnemen van de EVIDENCE-voorstellen in
+jelly-leon-platform). Op de peildatum hadden 39 van de 50 rijen nog geen enkele bewijsregel; de rijen die wel een regel
+hadden (EX15, EX16, EX18, EX19, EX22, EX23, EX36, EX43, EX44, EX47, EX48) houden die regel in hun eigen repo; het
+Excel-gereedschap voegt ze samen en de voorzichtigste status wint.
+
+| ID | Scenario (mapping in `e2e/README.md`) | Uitvoerbaar | Stap in P6 | Stand na DEEL A | Onderdeel van DEEL B |
+|---|---|---|---|---|---|
+| EX01 | MediaGuard offline | Sim | S-P6-14 | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX02 | MSO offline | Sim | S-P6-14 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX03 | Seerr-episode gerouteerd | Sim | S-P6-15 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX04 | Anime-verzoek | Sim | S-P6-15 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX05 | Verkeerd episodebestand | Sim | S-P6-15 | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX06 | MediaGuard-noodstop | Sim | S-P6-14 | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX07 | Stilstaande A310-lane | Sim+ (GPU echt) | S-P6-14 | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-09 |
+| EX08 | Playback tijdens AV1 | Echt (GPU) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-09 |
+| EX09 | VMAF-fout | Sim | S-P6-15 | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX10 | HDR/Dolby Vision | Echt (clients) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-09 |
+| EX11 | ZFS-pool gedegradeerd | Sim | S-P6-20 | "Bezig", Sim-geslaagd/-mislukt | N-P6-02 |
+| EX12 | Back-up verouderd | Sim | S-P6-20 (simulator: S-P6-12) | "Bezig", Sim-geslaagd/-mislukt | N-P6-02 |
+| EX13 | OneDrive-hersteltest | Echt (account) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-02 |
+| EX14 | Snapshot-restore naar sandbox | Sim | S-P6-20 | "Bezig", Sim-geslaagd/-mislukt | N-P6-02 |
+| EX15 | DB-schema terugzetten | Sim | S-P6-20 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 |
+| EX16 | Credential verlopen | Sim | S-P6-18 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 |
+| EX17 | Prompt-injectie in log | Sim | S-P6-18 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 (de echte AI-aanbieder: N-P6-08) |
+| EX18 | Policy-klasse vervalst | Sim | S-P6-18 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 |
+| EX19 | Approval-drift (digest) | Sim | S-P6-18 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 |
+| EX20 | Approval-replay | Sim | S-P6-18 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 |
+| EX21 | AI-credits op | Sim | S-P6-18 (simulator: S-P6-12) | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 (gate "0 paid API overage en monitor": N-P6-08) |
+| EX22 | Hub offline | Sim+ (telefoon echt) | S-P6-19 | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-04 |
+| EX23 | Volledige NAS offline | Echt (externe host) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-04 (alleen op een gepland onderhoudsmoment; anders N-P6-14) |
+| EX24 | Gree offline | Sim | S-P6-21 (simulator: S-P6-11) | "Bezig", Sim-geslaagd/-mislukt | N-P6-06 |
+| EX25 | Gree shared-outdoor-conflict | Sim | S-P6-21 (simulator: S-P6-11) | "Bezig", Sim-geslaagd/-mislukt | N-P6-06 |
+| EX26 | Afstandsbediening Gree OFF | Sim+ (apparaat echt) | S-P6-21 (simulator: S-P6-11) | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-06 |
+| EX27 | Boiler-schakelverbod | Sim | S-P6-21 (simulator: S-P6-11) | "Bezig", Sim-geslaagd/-mislukt | N-P6-06 |
+| EX28 | P1-meterreset + zomertijd | Sim | S-P6-21 (simulator: S-P6-11) | "Bezig", Sim-geslaagd/-mislukt | N-P6-06 |
+| EX29 | Zigbee-sensor stale | Sim | S-P6-21 (simulator: S-P6-11) | "Bezig", Sim-geslaagd/-mislukt | N-P6-06 |
+| EX30 | Gree-firmware incompatibel | Sim+ | S-P6-21 (simulator: S-P6-11) | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-06 |
+| EX31 | Router-DNS-pilot | Echt (router) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-07 |
+| EX32 | AdGuard DNS offline | Sim+ | S-P6-22 | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-07 |
+| EX33 | Nieuw IoT-apparaat | Sim+ | S-P6-22 | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-07 |
+| EX34 | Tailscale/tunnel ingetrokken | Echt (account) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-07 |
+| EX35 | Jellyfin offline-profiel | Echt (telefoon) | S-P6-22 | "Geblokkeerd" (alleen de reden vastgelegd) | N-P6-09 |
+| EX36 | Kind-ACL in zoekindex | Sim | S-P6-17 | "Bezig", Sim-geslaagd/-mislukt | N-P6-08 |
+| EX37 | Anime absolute numbering | Sim | S-P6-15 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX38 | LiveTV DVR-overlap | Sim+ | S-P6-17 | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-09 |
+| EX39 | MSO category `*` | Sim | S-P6-16 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX40 | MSO providerfout | Sim | S-P6-16 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX41 | Private torrent | Sim | S-P6-16 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX42 | Prowlarr-lus | Sim | S-P6-16 (simulator: S-P6-10) | "Bezig", Sim-geslaagd/-mislukt | N-P6-05 |
+| EX43 | Immich-privacy | Sim | S-P6-17 (simulator: S-P6-12) | "Bezig", Sim-geslaagd/-mislukt | N-P6-08 |
+| EX44 | Zoekbron intrekken | Sim | S-P6-17 (simulator: S-P6-12) | "Bezig", Sim-geslaagd/-mislukt | N-P6-08 |
+| EX45 | Node-RED-flow privilege | Sim | S-P6-19 | "Bezig", Sim-geslaagd/-mislukt | N-P6-04 |
+| EX46 | Node-RED-event 5× | Sim | S-P6-19 | "Bezig", Sim-geslaagd/-mislukt | N-P6-04 |
+| EX47 | Ongeldig manifest (privileged/hostmount) | Sim | S-P6-20 | "Bezig", Sim-geslaagd/-mislukt | N-P6-03 |
+| EX48 | Fork-upstream incompatibel | Sim | S-P6-20 (simulator: S-P6-12) | "Bezig", Sim-geslaagd/-mislukt | N-P6-09 |
+| EX49 | Onzekere STT "verwijder" | Sim | S-P6-17 (simulator: S-P6-12) | "Bezig", Sim-geslaagd/-mislukt | N-P6-08 |
+| EX50 | Migratie naar andere host | Sim+ | S-P6-20 | "Geblokkeerd"; simulatordeel Sim-geslaagd/-mislukt | N-P6-14 |
+
+## K.2 De testrijen van Jelly Leon die in P6 thuishoren (eindproeven, overname en NAS-rijen)
+
+Bron: `<DOCS>/08_EXCEL/b03/testen.json`. De zeven NAS-rijen van de functies (JLT-06, -15, -26, -39, -49, -59, -69)
+kunnen alleen op de echte NAS en met echte apparaten; DEEL A levert er geen bouwstap voor, alleen het draaiboek
+(S-P6-50).
+
+| ID | Titel (kort) | Stand peildatum | Stap in P6 | Onderdeel van DEEL B | Opmerking |
+|---|---|---|---|---|---|
+| JLT-06 | Echte NAS en echte apparaten (Watch Together) | geen regel | S-P6-50 (draaiboek) | N-P6-10 | leeswijze "na de cutover-gate" via keuzemenu (N-P6-10); meekijken van buiten alleen met BG-09 |
+| JLT-15 | Echte NAS, echte historie en echte apparaten (aanbevelingen) | geen regel | S-P6-50 (draaiboek) | N-P6-10, deel echte historie pas na N-P6-11 | BG-37: alleen geaggregeerd, zonder kinderen |
+| JLT-26 | Acceptatie op de echte NAS en echte apparaten (ondertitels, F3) | geen regel | S-P6-50 (draaiboek) | N-P6-10 | 0 gewijzigde bestanden in de mediamappen |
+| JLT-39 | Validatie op de echte NAS-bibliotheek en echte apparaten (kwaliteitscontrole, F5) | geen regel | S-P6-50 (draaiboek) | N-P6-10 | samen met MediaGuard-AV1 en een live-transcode |
+| JLT-49 | Echte NAS en echte apparaten (apparaatprofielen, F4) | geen regel | S-P6-50 (draaiboek) | N-P6-09 | meting per werkklasse per kaart (D08) |
+| JLT-59 | Echte NAS en echte apparaten (F6, segmenten) | geen regel | S-P6-50 (draaiboek) | N-P6-10 | steekproef gelabeld door de gebruiker (T-08, BG-34) |
+| JLT-60 | Upgrade 10.11.11 -> 12.x met behoud van gebruikersgegevens | Bezig (jelly-leon, -web, -clients) | S-P6-30; S-P6-40 (regressie) | N-P6-12 | "niet van toepassing" zonder bestaande Jellyfin-datamap (N-P6-12) |
+| JLT-61 | Terugzetten na de upgrade en terug naar de stock-image | Bezig (jelly-leon, -web) | S-P6-30 (delen a, b, c); S-P6-40 | N-P6-12 | deel b blijft Sim-mislukt zonder 12.y-image |
+| JLT-62 | Overname van een bestaande installatie | Niet gestart (jelly-leon) | S-P6-32 (alleen vaststellen of de rij geldt) | N-P6-12 | alleen als D07 een bestaande Jellyfin meet |
+| JLT-63 | Compatibiliteit van stock-clients met alle modules aan | Bezig (drie repos) | S-P6-31; MediaGuard-deel uit S-P6-33 | N-P6-09 | Swiftfin en Safari blijven NIET GEVALIDEERD (Mac/Xcode) |
+| JLT-64 | API- en gedragsregressie: alleen additief, module uit = stock | Bezig (jelly-leon) | S-P6-31 | N-P6-09 | blokkade zonder "NIET GEVALIDEERD" op de peildatum: herstellen (B.3, tweede commando) |
+| JLT-65 | Gegevensbescherming integraal met alle modules aan | geen regel | S-P6-30 | N-P6-12 | logscan op geheimen en 0 GUID's na verwijderen van een gebruiker |
+| JLT-66 | Gecombineerde belastingtest en live-prioriteit | geen regel | S-P6-31 (herhaling; het hulpmiddel komt uit P4: S-G1-40, met de golf-2-modules herhaald in S-G2-50) | N-P6-10 | meetinvoer voor BG-07 |
+| JLT-67 | Upstream-sync-proef 12.x -> 12.y | Niet gestart (jelly-leon) | S-P6-31 | geen (niet op de NAS) | blijft "Niet gestart" zolang er geen 12.y-tag is (F.5) |
+| JLT-68 | Pluginlaag en Hub-koppeling | geen regel | S-P6-40 (herhaling in jelly-leon) | geen | bijwerken door een herstelketen in jelly-leon (S-P6-40, Bewijs) |
+| JLT-69 | Echte NAS en echte apparaten (gemeenschappelijk) | Geblokkeerd (jelly-leon-clients) | S-P6-50 (draaiboek) | N-P6-09, af na N-P6-12 | omvat overname, belasting, apparatenproef en terugzetproef |
+| JLT-70 | Overname vanuit Emby: proefrun met een echte Emby-container | Bezig (jelly-leon) | S-P6-32 | N-P6-11 | met de Emby-versie van D07 op vaste digest |
+| JLT-71 | Overname: idempotentie, herhaling en laatste delta | Bezig (jelly-leon) | S-P6-32 | N-P6-11 (herhaling), N-P6-12 (laatste delta) | |
+| JLT-72 | Overname: niet-gekoppelde items en de afhandellijst | Bezig (jelly-leon) | S-P6-32 | N-P6-11 | |
+| JLT-73 | Overname: geen schrijfactie naar Emby; MediaGuard volgt beide | Bezig (jelly-leon, media-guard-ultimate) | S-P6-32; S-P6-33 (MediaGuard-deel) | N-P6-11 | blokkade zonder "NIET GEVALIDEERD" op de peildatum: herstellen |
+| JLT-74 | Overname vanuit Emby op de echte NAS en de controlelijst "Emby verwijderen" | Geblokkeerd (jelly-leon) | S-P6-51 (draaiboek); S-P6-32 (repetitie) | N-P6-11, N-P6-12, N-P6-13 | alleen de gebruiker voert uit; blijft "Geblokkeerd" tot N-P6-13 |
+
+## K.3 Installatierijen I01...I26
+
+Bron: `<DOCS>/03_INSTALLATIE/I01_TRUENAS_BASIS.md` tot en met `I26_BESTAANDE_APPS.md`, kop "2. Stappen in
+uitvoeringsvolgorde". Elke installatierij vraagt de echte NAS; DEEL A bouwt er niets aan behalve de releases (S-P6-02
+tot en met S-P6-06) en het draaiboek (S-P6-50). Een rij zonder bewijsregel krijgt die in S-P6-70 (bouwpunt 2), in de
+repo die daar staat. "Voorbereid in" noemt de fase die het simulatordeel of het manifest bouwde (bron: de regel
+"Werkpakketten en tests" van die stappen).
+
+| ID's | Document | Stand peildatum | Voorbereid in | Stap in P6 | Onderdeel van DEEL B |
+|---|---|---|---|---|---|
+| I01-01-01...I01-01-08 | I01 TrueNAS-basis | Geblokkeerd (jelly-leon-platform; ook regels in ai-server-manager) | P0/P1 | S-P6-50 | N-P6-01; I01-01-02 in N-P6-02; I01-01-03 en -04 in N-P6-03; I01-01-08 in N-P6-04 |
+| I02-02-01...I02-02-08 | I02 Back-up en herstel | Geblokkeerd (jelly-leon-platform) | P2 (B12) | S-P6-50 | N-P6-02 (deel a: 01...04; deel b: 05...08) |
+| I03-03-01...I03-03-08 | I03 MediaGuard | geen regel | P3 (S-P3-400, S-P3-410) | S-P6-50 | N-P6-05 |
+| I04-04-01...I04-04-08 | I04 Media Source Optimizer | geen regel | P3 (S-P3-400, S-P3-410) | S-P6-50 | N-P6-05 |
+| I05-05-01...I05-05-08 | I05 my_house | geen regel | P3 (S-P3-400, S-P3-440) | S-P6-50 | N-P6-06; stap 2 en 3 (YAML) worden NIET gevolgd |
+| I06-06-01...I06-06-08 | I06 Jellyfin | regels in jelly-leon en jelly-leon-web | P4-0 en golf 1 (onder meer S-P40-40, S-P40-50, S-G1-50) | S-P6-50 | N-P6-09 |
+| I07-07-01...I07-07-06 | I07 Beszel | Geblokkeerd (jelly-leon-platform) | P1 | S-P6-50 | N-P6-04 |
+| I08-08-01...I08-08-06 | I08 Uptime Kuma | Geblokkeerd (jelly-leon-platform) | P1 | S-P6-50; S-P6-19 (EX22, simulatordeel van I08-08-04) | N-P6-04 |
+| I09-09-01...I09-09-06 | I09 Authentik | Geblokkeerd (jelly-leon-platform) | P1 | S-P6-50 | N-P6-04 (D17, T-16) |
+| I10-10-01...I10-10-06 | I10 Node-RED | regels in jelly-leon-platform | P2 (S-P2-410); P3 (S-P3-445, besluit C-12) | S-P6-50 | N-P6-04 |
+| I11-11-01...I11-11-06 | I11 NetAlertX | geen regel | P5 (S-P5-82 e.a.) | S-P6-50 | N-P6-07 |
+| I12-12-01...I12-12-06 | I12 AdGuard Home | geen regel | P5 (S-P5-83 e.a.) | S-P6-50 | N-P6-07 |
+| I13-13-01...I13-13-05 | I13 Gotify | Geblokkeerd (jelly-leon-platform) | P1 | S-P6-50 | N-P6-04 |
+| I14-14-01...I14-14-05 | I14 pgvector (in de image van zoeken) | regels in zoeken-en-persoonlijke-ai | P5 (S-P5-85 e.a.) | S-P6-06 (I14-14-02); S-P6-50 | N-P6-08 |
+| I15-15-01...I15-15-06 | I15 Immich | geen regel | P3 (S-P3-420) | S-P6-50 | N-P6-05; I15-15-02 in N-P6-02 |
+| I16-16-01...I16-16-06 | I16 Prowlarr | geen regel | P3 (S-P3-420) | S-P6-50 | N-P6-05 |
+| I17-17-01...I17-17-06 | I17 SABnzbd | geen regel | P3 (S-P3-420) | S-P6-50 | N-P6-05 |
+| I18-18-01...I18-18-06 | I18 qBittorrent | geen regel | P3 (S-P3-430) | S-P6-50 | N-P6-05 |
+| I19-19-01...I19-19-06 | I19 Seerr | geen regel | P3 (S-P3-430) | S-P6-50 | N-P6-05 |
+| I20-20-01...I20-20-05 | I20 Bazarr | geen regel | P3 (S-P3-430) | S-P6-50 | N-P6-05 |
+| I21-21-01...I21-21-06 | I21 Tailscale en cloudflared | geen regel | P5 (S-P5-84 e.a.) | S-P6-50 | N-P6-07 |
+| I22-22-01...I22-22-05 | I22 Navidrome (optioneel) | geen regel | geen (optioneel, D18) | S-P6-50 | N-P6-08, alleen als D18 "ja" is; anders "niet van toepassing volgens D18" |
+| I23-23-01...I23-23-08 | I23 Home Control Hub | regels in jelly-leon-platform (01...08) en ai-server-manager (02, 03, 05, 06, 08) | P0...P2 | S-P6-02, S-P6-05; S-P6-50 | N-P6-03; I23-23-04 in N-P6-04; I23-23-06 in N-P6-05 |
+| I24-24-01...I24-24-06 | I24 Universele mediaserver | regels in jelly-leon, -web en -clients (I24-24-05 Geblokkeerd) | P4-0 en golf 1 (onder meer S-G1-70, S-P40-70) | S-P6-50 | N-P6-09 |
+| I25-25-01...I25-25-06 | I25 Zoeken | regels in zoeken-en-persoonlijke-ai | P5 (S-P5-85 e.a.) | S-P6-06 (I25-25-02); S-P6-50 | N-P6-08 |
+| I26-26-01, I26-26-03, I26-26-04, I26-26-05 | I26 Bestaande apps | geen regel | P5 (S-P5-84) | S-P6-50 | N-P6-05 |
+| I26-26-02, I26-26-06 | I26 Bestaande apps: Emby uitzetten en de proefstop van 72 uur | geen regel | P5 (S-P5-84) | S-P6-50, S-P6-51 | N-P6-13; alleen de gebruiker voert uit |
+
+## K.4 Bestaande apps (APP-01...APP-20) en de gegevens en besluiten van de echte omgeving (D01...D18)
+
+De APP-rijen staan op de peildatum allemaal "Geblokkeerd" in appstore-en-fork. De D-rijen staan in ai-server-manager
+met de status van het scherm "Onboarding" van de Hub ("Open", "Ingevuld", "Getest"); de WAARDE van een besluit komt
+nooit in een repo (B.2). Een besluit legt de gebruiker vast; geen agent vult het in.
+
+| ID's | Wat | Stand peildatum | Stap in P6 | Onderdeel van DEEL B |
+|---|---|---|---|---|
+| APP-01 | Plex | Geblokkeerd | S-P6-04 (bewijs), S-P6-50 | N-P6-05 (alleen inventaris; stoppen is een apart besluit van de gebruiker) |
+| APP-02 | Emby | Geblokkeerd | S-P6-04 (bewijs), S-P6-50, S-P6-51 | N-P6-05 (inventaris); besluit en uitzetten: N-P6-13, alleen door de gebruiker |
+| APP-03 | JellyPlex Watched | Geblokkeerd | S-P6-04 (bewijs), S-P6-50 | N-P6-05 (alleen inventaris; niet koppelen tijdens de overname, N-P6-11) |
+| APP-04...APP-16 | overige bestaande apps volgens `<DOCS>/04_BESTAANDE_APPS/APP_REGISTER.md` | Geblokkeerd | S-P6-04 (bewijs), S-P6-50; APP-09...APP-14 voorbereid in P3 (S-P3-180, S-P3-500) | N-P6-05 |
+| APP-17 | Jellyfin (bestaand) | Geblokkeerd | S-P6-04 (bewijs), S-P6-50; voorbereid in P3 | N-P6-05 (inventaris); N-P6-09 (blijft ongemoeid); N-P6-12 (JLT-60/62 alleen bij overname van zijn datamap) |
+| APP-18...APP-20 | MediaGuard, Media Source Optimizer, my_house | Geblokkeerd | S-P6-04 (bewijs), S-P6-50; voorbereid in P3 | N-P6-05 (APP-20 ook N-P6-06) |
+| D01, D02, D06, D10 | TrueNAS-versie; poolnaam en datasetpaden; poolgezondheid; doel van de bestaande mini-pc (vast besluit) | Open (D10 Ingevuld) | S-P6-01 (alleen vaststellen of ze open staan) | N-P6-01 (noteren), N-P6-03 (in de Hub invullen of meten) |
+| D03 | adres van de NAS en domeinen | Open | S-P6-01 | N-P6-01 (noteren), N-P6-03, N-P6-07 (domeinnamen) |
+| D04, D05, D16 | OneDrive-methode, bewijs van proefherstel, RPO/RTO | Open | S-P6-01 | N-P6-02 |
+| D07 | huidige appversies, waaronder Emby (gemeten) | Open | S-P6-01; S-P6-32 (repetitie met die versie zodra bekend) | N-P6-01 (versie), N-P6-03 (meten), N-P6-11 |
+| D08 | Intel-GPU-rendernodes (A310 en UHD 770) | Open | S-P6-01 | N-P6-03 (meten), N-P6-09 |
+| D09 | tegoed en harde stop voor betaalde AI | Open | S-P6-01 | N-P6-08 (tot dan staat betaalde AI uit) |
+| D11 | router-DNS en terugvalroute | Open | S-P6-01 | N-P6-07 |
+| D12, D13, D14 | Gree-type en firmware; Zigbee-hardware; HomeWizard-meters | Open | S-P6-01 | N-P6-06 |
+| D15 | mediaclients en apparaten | Open | S-P6-01 | N-P6-09 |
+| D17 | bereikbaarheid van OIDC (domeinnaam, HTTPS, herstelaccount) | Open | S-P6-01 | N-P6-04 |
+| D18 | optioneel Navidrome | Open | S-P6-01 | N-P6-08 |
+
+## K.5 Werkpakketten (B01...B15)
+
+Alle 185 werkpakketten uit ALLE_IDS.txt. "Gebouwd in" komt uit de regel "Werkpakketten en tests" van de stappen in
+STAPPEN_P2.md tot en met STAPPEN_P5.md (stand 2026-11-11; zie de noot onder de tabel). Elk
+werkpakket zit daarnaast in de regressieronde van zijn repo (S-P6-40); dat staat niet per rij herhaald. "Onderdeel"
+is het NAS-onderdeel dat het echte deel oppakt; noemt de blokkadetekst in EVIDENCE zelf een ander onderdeel, dan gaat
+die voor (B.3).
+
+| ID | Werkpakket (Excel) | Stand peildatum | Gebouwd in (stappen buiten P6) | Stap in P6 | Onderdeel van DEEL B |
+|---|---|---|---|---|---|
+| B01-001 | Onboarding en nas-inventaris | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-03 |
+| B01-002 | Centrale appcatalogus | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-03 |
+| B01-003 | Apps installeren en verwijderen | geen regel | S-P2-050, S-P2-160, S-P2-180 | — | N-P6-03 |
+| B01-004 | Observability in één scherm | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-03 |
+| B01-005 | Incidenten-inbox | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-03 |
+| B01-006 | Gebruikers en SSO | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B01-007 | Beheers-API en approvals | geen regel | S-P2-005, S-P2-040, S-P2-160 e.a. | — | N-P6-03 |
+| B01-008 | Automatiseringen zonder code | geen regel | S-P2-140, S-P2-160, S-P2-190 | — | N-P6-04 |
+| B01-009 | Globale AI-chat | geen regel | S-P2-130, S-P2-160, S-P2-200 | — | N-P6-08 |
+| B01-010 | App update en rollback-centrum | geen regel | S-P5-52, S-P5-53, S-P5-64 | — | N-P6-03 |
+| B01-011 | Energie en kosten | geen regel | S-P3-010, S-P3-150, S-P3-160 e.a. | — | N-P6-06 |
+| B01-012 | Portable export en recovery | geen regel | S-P5-54, S-P5-55, S-P5-64 | — | N-P6-14 |
+| B02-001 | Modelrechten en kosten | geen regel | S-P2-110, S-P2-200 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-002 | Read-only kennisinstrumenten | geen regel | S-P2-110 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-003 | Deterministische triage | geen regel | S-P2-110 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-004 | Plan-engine en analyse | geen regel | S-P2-110 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-005 | Risicoclassificatie | geen regel | S-P2-005, S-P2-010, S-P2-220 | — | N-P6-03 |
+| B02-006 | Privileged executor | geen regel | S-P2-005, S-P2-020, S-P2-030 e.a. | — | N-P6-03 |
+| B02-007 | Veilige zelfreparatie | geen regel | S-P2-120 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-008 | Updates en config verbeteringen | geen regel | S-P2-120 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-009 | Predictive maintenance | geen regel | S-P5-50, S-P5-51, S-P5-64 | — | N-P6-03 |
+| B02-010 | Automatiserings-AI | geen regel | S-P2-120 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-011 | Veiligheidsreview en modeltests | geen regel | S-P2-130, S-P2-210 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B02-012 | Zelflerend zonder auto-policy drift | geen regel | S-P2-120, S-P2-200 | — | N-P6-08 (echte AI-aanbieder en tegoed; installatie in N-P6-03) |
+| B03-001 | Forkstrategie en licentie | jelly-leon-clients:Bezig; jelly-leon-web:Bezig; jelly-leon:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-09 |
+| B03-002 | Universele bibliotheek | geen regel | S-G3-30, S-G3-31 (P4 golf 3; besluit Z-20, noot onder K.5) | — | N-P6-09 |
+| B03-003 | Beschikbaarheid van clients | jelly-leon-clients:Geblokkeerd | S-G3-32 (P4 golf 3; besluit Z-20, noot onder K.5) | — | N-P6-09 |
+| B03-004 | Intel transcoding planner | geen regel | S-G4-03, S-G4-04 | — | N-P6-09 |
+| B03-005 | Beste kwaliteit per apparaat | geen regel | S-G4-05, S-G4-08, S-G4-22 | — | N-P6-09 |
+| B03-006 | Metadata en anime mapping | geen regel | S-G3-28, S-G3-29 (P4 golf 3; besluit Z-20, noot onder K.5) | — | N-P6-09 |
+| B03-007 | Intro/recap/credits detectie | geen regel | S-G4-16, S-G4-23, S-G4-27 e.a. | — | N-P6-09 |
+| B03-008 | Semantische scènezoeker | geen regel | S-G4-49, S-G4-50 (P4 golf 4; besluit Z-20, noot onder K.5) | — | N-P6-09 |
+| B03-009 | MediaGuard-integratie | geen regel | S-G1-17, S-G1-50, S-G1-80 e.a. | — | N-P6-09 |
+| B03-010 | Accounts en parental control | geen regel | S-G1-15, S-G1-18, S-G1-90 e.a. | — | N-P6-09 |
+| B03-011 | Offline downloaden | geen regel | S-G4-51, S-G4-52 (P4 golf 4; besluit Z-20, noot onder K.5) | — | N-P6-09 |
+| B03-012 | Live-tv en DVR | geen regel | S-G4-53, S-G4-54 (P4 golf 4; besluit Z-20, noot onder K.5) | — | N-P6-09 |
+| B03-013 | Beheer en terugkeer upstream | jelly-leon-clients:Bezig; jelly-leon-web:Bezig; jelly-leon:Bezig | P0/P1 (status Bezig); bijdrage per module in S-G2-50 | S-P6-30 | N-P6-12 |
+| B03-014 | Upgrade server en web naar de nieuwste stabiele Jellyfin 12.x (P4-0) | jelly-leon-clients:Bezig; jelly-leon-web:Bezig; jelly-leon:Bezig | S-P2-600, S-P40-10, S-P40-20 e.a. | S-P6-33 (MediaGuard-deel) | N-P6-12 |
+| B03-015 | Overname vanuit de bestaande mediaserver (Emby; ook Jellyfin als D07 dat meet) | jelly-leon:Bezig | S-P2-600, S-P40-10, S-P40-20 e.a. | S-P6-32, S-P6-51 | N-P6-11 |
+| B03-016 | Echt mediacorpus, clientmatrix-testomgeving en baselinemeting standaard Jellyfin | jelly-leon-clients:Bezig; jelly-leon:Bezig | S-P40-10, S-P40-50, S-P40-70 e.a. | — | N-P6-09 |
+| B03-017 | Gemeenschappelijke pluginlaag: één plugin met modules, connector en Hub-koppeling, foutcatalogus en gegevensbescherming | geen regel | S-G1-17, S-G1-16, S-G1-10 e.a. | — | N-P6-09 |
+| B03-018 | Gemeenschappelijke analysewerker, audiopas en GPU-/batchplanner | geen regel | S-G1-15, S-G1-30, S-G1-32 e.a. | — | N-P6-09 |
+| B03-019 | Compatibiliteitsregressie met stock-clients en upstream-sync-proef | jelly-leon-clients:Bezig; jelly-leon-web:Bezig; jelly-leon:Bezig | S-P40-10, S-P40-40, S-P40-45 e.a. | S-P6-31 | N-P6-09 |
+| B03-020 | Watch Together-baseline (stock-standaard en stock-best), meetonzekerheid en SyncPlay-regressiesuite op Jellyfin 12.x | geen regel | S-P40-60, S-P40-62, S-P40-64 e.a. | — | N-P6-10 |
+| B03-021 | Watch Together-module: SyncPlay-decorator met reconciliatie, fail-closed status, diagnose en API-basis | geen regel | S-G2-10, S-G2-55, S-G2-90 | — | N-P6-10 |
+| B03-022 | Groepsprivacy, uitnodigingen en deelnemersbeheer | geen regel | S-G3-17, S-G4-44 | — | N-P6-10 |
+| B03-023 | Kinderprofiel en ouderlijk toezicht in Watch Together | geen regel | S-G3-18, S-G4-44 | — | N-P6-10 |
+| B03-024 | Synchronisatiekwaliteit: gezaaide driftcorrectie, telemetrie en web-UI | geen regel | S-G3-04, S-G3-24 | — | N-P6-10 |
+| B03-025 | Haperende deelnemer (zonder IgnoreWait), capaciteitsadvies en transcodes per deelnemer | geen regel | S-G3-19, S-G4-09, S-G4-43 | — | N-P6-10 |
+| B03-026 | Volgmodus voor clients zonder SyncPlay (Android TV, Swiftfin, derden) | geen regel | S-G3-20, S-G3-21, S-G3-26 | — | N-P6-10 |
+| B03-027 | Externe deelnemers via VPN zonder open poorten, met harde voorwaarde voor gasten | geen regel | S-G3-23 | — | N-P6-10 |
+| B03-028 | Chat en reacties (optioneel, standaard uit) | geen regel | S-G4-10, S-G4-24 | — | N-P6-10 |
+| B03-029 | Hub-kaart, connector, events en clientmatrix Watch Together | geen regel | S-G4-11, S-G4-44, S-G4-31 e.a. | — | N-P6-10 |
+| B03-030 | Baseline en evaluatieharnas aanbevelingen | geen regel | S-P40-60, S-P40-62, S-P40-64 e.a. | — | N-P6-10 |
+| B03-031 | Module Aanbevelingen en Similar-provider op 12.x | geen regel | S-G2-20, S-G2-55, S-G2-90 | — | N-P6-10 |
+| B03-032 | Klassieke aanbevelingsengine | geen regel | S-G2-22, S-G2-90 | — | N-P6-10 |
+| B03-033 | Eigen opslag, back-up, vergeten en terug naar stock (aanbevelingen) | geen regel | S-G2-24, S-G2-90 | — | N-P6-10 |
+| B03-034 | Profielen, kinderprofiel en huishouden-privacy (aanbevelingen) | geen regel | S-G2-26, S-G2-90 | — | N-P6-10 |
+| B03-035 | API /media/v1/recommendations en events | geen regel | S-G2-28, S-G2-90 | — | N-P6-10 |
+| B03-036 | Webrij, uitleg, feedback en instellingen (aanbevelingen) | geen regel | S-G4-20, S-G4-45 | — | N-P6-10 |
+| B03-037 | Clientmatrix aanbevelingen | geen regel | S-G4-29, S-G4-39 | — | N-P6-10 |
+| B03-038 | Optionele lokale embeddings voor aanbevelingen | geen regel | S-P5-17, S-P5-101 | — | N-P6-10 |
+| B03-039 | Hub-kaart, prestatie en release aanbevelingen | geen regel | S-G4-12, S-G4-31, S-G4-32 e.a. | — | N-P6-10 |
+| B03-040 | Ondertitelinventaris, stabiele spoorsleutels en NL-dekking (alleen lezen) | geen regel | S-G3-03, S-G3-05 | — | N-P6-10 |
+| B03-041 | Ondertiteltoolkit, Nederlandse leesregels en klassieke kwaliteitscontrole | geen regel | S-G3-05 | — | N-P6-10 |
+| B03-042 | Synchronisatie tegen audio met veiligheidstoetsen (de enige syncmeter van B03) | geen regel | S-G3-06 | — | N-P6-10 |
+| B03-043 | Beslisregels, bronkeuze en wisselwerking met MediaGuard/Bazarr | geen regel | S-G3-07 | — | N-P6-10 |
+| B03-044 | Lokale vertaalmotor als optionele app (standaard uit) en licentiebewaking | geen regel | S-P5-86, S-P5-102, S-P5-103 e.a. | — | N-P6-10 |
+| B03-045 | Vertaalpijplijn: zinssamenvoeging, opmaak, SDH, namen en regelafbreking | geen regel | S-P5-104 | — | N-P6-10 |
+| B03-046 | Kwaliteitsscore, publicatiedrempel en kalibratie | geen regel | S-P5-105 | — | N-P6-10 |
+| B03-047 | Eigen opslag, publicatie, onthouden spoorkeuzes en terug naar stock | geen regel | S-G3-08 | — | N-P6-10 |
+| B03-048 | Correctie-editor, beoordeling, vertaalgeheugen en woordenlijst | geen regel | S-P5-106, S-P5-120, S-P5-121 | — | N-P6-10 |
+| B03-049 | Clientweergave, Hub-kaart, events en connector-itemtypen | geen regel | S-G4-13, S-G4-30, S-P5-62 e.a. | — | N-P6-10 |
+| B03-050 | Kwaliteitsmodule: fundament, eigen opslag en alleen-lezen-garanties | geen regel | S-G3-01 | — | N-P6-10 |
+| B03-051 | Snelle kwaliteitscontrole (niveau 0/1), steekproef (niveau 1,5) en incrementeel scannen | geen regel | S-G3-11, S-G3-12 | — | N-P6-10 |
+| B03-052 | Volledige decodecontrole en audio-/beeldsignalen met tijdcodes (niveau 2) | geen regel | S-G3-12 | — | N-P6-10 |
+| B03-053 | F4-jobtypes en kostenmodel in de globale B03-batchplanner; pauze bij kijken, MediaGuard en noodstop; stroomonderbrekers | geen regel | S-G3-02 | — | N-P6-10 |
+| B03-054 | Taal- en ondertitelsynchronisatiecontrole (niveau 3) als afnemer van de ene ondertiteltoolkit | geen regel | S-G3-13 | — | N-P6-10 |
+| B03-055 | Bewijs, verificatierun, feedback en onderdrukking tegen valse positieven | geen regel | S-G3-14 | — | N-P6-10 |
+| B03-056 | MediaGuard-integratie van kwaliteitsbevindingen: alleen lezen, herstelverzoek als deeplink, readback | geen regel | S-G3-15 | — | N-P6-10 |
+| B03-057 | Beheer-UI 'Mediakwaliteit' en label in jelly-leon-web (upstream-stijl) | geen regel | S-G3-16, S-G3-25 | — | N-P6-10 |
+| B03-058 | Hub: connector, kaart 'Mediakwaliteit' en incidenten (alleen aantallen en ondoorzichtige ID's) | geen regel | S-G4-14, S-G4-30, S-G4-31 e.a. | — | N-P6-10 |
+| B03-059 | Optionele audiotaal- en dialoogcontrole met lokale STT (standaard uit) | geen regel | S-P5-86, S-P5-108 | — | N-P6-10 |
+| B03-060 | Baseline en meetharnas apparaatprofielen | geen regel | S-P40-60, S-P40-62, S-P40-64 e.a. | — | N-P6-10 |
+| B03-061 | Plugin apparaatkennis en afspeeluitkomsten | geen regel | S-G2-30, S-G2-55, S-G2-90 | — | N-P6-10 |
+| B03-062 | Hardwareversnelling-assistent (QSV/VA-API) | geen regel | S-G2-32, S-G2-90 | — | N-P6-10 |
+| B03-063 | Lanekeuze per sessie en terugval (afdwinging) | geen regel | S-G4-01, S-G4-02, S-G4-03 | — | N-P6-10 |
+| B03-064 | Gedeeld GPU-budget met MediaGuard | geen regel | S-G4-04 | — | N-P6-10 |
+| B03-065 | Actieve capability-probe in jelly-leon-web en stall-terugval | geen regel | S-G4-05, S-G4-21, S-G4-22 e.a. | — | N-P6-10 |
+| B03-066 | Geleerde profielen per apparaat met bevestiging | geen regel | S-G4-06, S-G4-42, S-G4-41 | — | N-P6-10 |
+| B03-067 | HDR/DV, audio en ondertitels per apparaat + kwaliteitslabel | geen regel | S-G4-08, S-G4-22 | — | N-P6-10 |
+| B03-068 | Bescherming stock-clients en MediaGuard-afspeeltest | geen regel | S-G4-07, S-G4-42, S-G4-30 e.a. | — | N-P6-10 |
+| B03-069 | Native clients en Hub-weergave apparaatprofielen | geen regel | S-G4-18, S-G4-25, S-G4-26 e.a. | — | N-P6-10 |
+| B03-070 | Segmentdetectie: bevroren testset, evaluatieharnas en baselines (stock 12.x standaard en stock + Intro Skipper) | geen regel | S-P40-60, S-P40-62, S-P40-64 e.a. | — | N-P6-10 |
+| B03-071 | Segmentprovider, eigen opslag en veilige publicatie via MediaSegments | geen regel | S-G2-40, S-G2-46, S-G2-55 e.a. | — | N-P6-10 |
+| B03-072 | Audiofingerprint-engine: intro's overal, varianten per seizoen/aflevering, anime-OP/ED, recaps en previews | geen regel | S-G2-42, S-G2-90 | — | N-P6-10 |
+| B03-073 | Aftiteling, post-credit-bescherming en grensverfijning met beeldkenmerken in vensters | geen regel | S-G2-44, S-G2-90 | — | N-P6-10 |
+| B03-074 | Ondertitel- en hoofdstuksignalen en terugkerende fragmenten (families) | geen regel | S-G3-22 | — | N-P6-10 |
+| B03-075 | Handmatige correctie, review, overslaan-voorkeur per profiel en leren van bevestigde correcties | geen regel | S-G4-15, S-G4-40, S-G4-46 | — | N-P6-10 |
+| B03-076 | Web: knoppen 'Sla intro over', 'Sla samenvatting over', 'Sla aftiteling over', correctiepaneel en beheerpagina | geen regel | S-G4-16, S-G4-23, S-G4-46 | — | N-P6-10 |
+| B03-077 | Clients: Android (telefoon/tablet), Android TV, desktop, Swiftfin en derden | geen regel | S-G4-27, S-G4-28, S-G4-30 | — | N-P6-10 |
+| B03-078 | MediaGuard-leesadapter, Hub-items en F6-taaktypen voor de gemeenschappelijke planner (alleen lezen) | geen regel | S-G4-17, S-G4-31, S-G4-32 e.a. | — | N-P6-10 |
+| B03-079 | Optionele lokale AI voor segmentdetectie (P5, standaard uit) | geen regel | S-P5-109 | — | N-P6-10 |
+| B04-001 | 1.2.2 feature baseline | media-guard-ultimate:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-05 |
+| B04-002 | Hub read-model adapter | media-guard-ultimate:Niet gestart | S-P3-010, S-P3-020, S-P3-030 e.a. | — | N-P6-05 |
+| B04-003 | Noodstop en risicocoördinatie | media-guard-ultimate:Niet gestart | S-P3-030, S-P3-080, S-P3-110 e.a. | — | N-P6-05 |
+| B04-004 | Diagnoseketen met MSO | media-guard-ultimate:Niet gestart | S-P3-075, S-P3-080, S-P3-630 | — | N-P6-05 |
+| B04-005 | Globale resource scheduler hooks | media-guard-ultimate:Niet gestart | S-P3-080, S-P3-670 | — | N-P6-05 |
+| B04-006 | Back-up en rollback integratie | media-guard-ultimate:Niet gestart | S-P3-100, S-P3-635 | — | N-P6-05 |
+| B04-007 | Jellyfin fork events | media-guard-ultimate:Niet gestart | S-P3-620, S-P3-675 | — | N-P6-05 |
+| B04-008 | Aanvullende randgevallen | media-guard-ultimate:Niet gestart | S-P3-075, S-P3-080, S-P3-615 e.a. | — | N-P6-05 |
+| B04-009 | MediaGuard upgrade gate | media-guard-ultimate:Bezig | S-P3-015, S-P3-600, S-P3-625 e.a. | — | N-P6-05 |
+| B04-010 | Proefmigratie en productiecontrole | media-guard-ultimate:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | S-P6-33 (simulatordeel) | N-P6-05 |
+| B05-001 | Releasegate v1.6.0 | media-source-optimizer:Bezig | S-P3-200, S-P3-205, S-P3-210 e.a. | — | N-P6-05 |
+| B05-002 | Actuele oorzaak per mislukking | media-source-optimizer:Bezig | S-P3-075, S-P3-280 | — | N-P6-05 |
+| B05-003 | Categorie * diagnose | media-source-optimizer:Bezig | S-P3-075, S-P3-280 | — | N-P6-05 |
+| B05-004 | Overzicht Voetafdruk | media-source-optimizer:Bezig | S-P3-270 | — | N-P6-05 |
+| B05-005 | Heldere Autopilot grenzen | media-source-optimizer:Bezig | S-P3-120, S-P3-240 | — | N-P6-05 |
+| B05-006 | Live MediaGuard compatibiliteit | media-source-optimizer:Bezig | S-P3-075, S-P3-265 | — | N-P6-05 |
+| B05-007 | SAB/qBit/Prowlarr live acceptatie | media-source-optimizer:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | — | N-P6-05 |
+| B05-008 | Kostenoptimalisatie | media-source-optimizer:Bezig | S-P3-150, S-P3-280 | — | N-P6-05 |
+| B05-009 | Integratie met Hub | media-source-optimizer:Niet gestart | S-P3-010, S-P3-020, S-P3-040 e.a. | — | N-P6-05 |
+| B05-010 | Back-up en migratie | media-source-optimizer:Bezig | S-P3-100, S-P3-205, S-P3-260 e.a. | — | N-P6-05 |
+| B06-001 | Productiecompatibiliteit | my_house:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-06 |
+| B06-002 | Apparaatconnecties | my_house:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-06 |
+| B06-003 | Harde boilerschakelblokkade | my_house:Bezig | S-P3-050, S-P3-090 | — | N-P6-06 |
+| B06-004 | Gree klimaat en gedeelde buitenunit | my_house:Bezig | S-P3-090 | — | N-P6-06 |
+| B06-005 | Energiedatakwaliteit | my_house:Bezig | S-P3-090 | — | N-P6-06 |
+| B06-006 | Hub-integratie | my_house:Bezig | S-P3-010, S-P3-020, S-P3-050 e.a. | — | N-P6-06 |
+| B06-007 | Spraak en AI | my_house:Niet gestart | S-P3-130 | — | N-P6-06 |
+| B06-008 | Verhuisbaarheid | my_house:Bezig | S-P3-100 | — | N-P6-14 |
+| B06-009 | Hardwarecontrole | my_house:Geblokkeerd | S-P3-440 | — | N-P6-06 |
+| B07-001 | Bronselectie en toestemming | zoeken-en-persoonlijke-ai:Bezig | S-P5-10, S-P5-58 | — | N-P6-08 |
+| B07-002 | Adapter-gedreven ingest | zoeken-en-persoonlijke-ai:Bezig | S-P5-10, S-P5-11, S-P5-12 e.a. | — | N-P6-08 |
+| B07-003 | Hybride zoekmachine | zoeken-en-persoonlijke-ai:Bezig | S-P5-13, S-P5-14, S-P5-24 e.a. | — | N-P6-08 |
+| B07-004 | Media scènes en ondertitels | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-16, S-P5-57 | — | N-P6-08 |
+| B07-005 | Vraag-en-antwoord met citaten | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-18, S-P5-24, S-P5-57 | — | N-P6-08 |
+| B07-006 | Opschonen en portabiliteit | zoeken-en-persoonlijke-ai:Bezig | S-P5-19, S-P5-58 | — | N-P6-08 |
+| B08-001 | Manifeststandaard | appstore-en-fork:Bezig | P0/P1 (status Bezig); in P3 de voorziening van besluit C-12: S-P3-490 | — | N-P6-05 (de C-12-voorziening: N-P6-04, punt 5) |
+| B08-002 | Import bestaande apps | appstore-en-fork:Geblokkeerd | S-P3-500 | S-P6-04 (bewijs) | N-P6-05 |
+| B08-003 | Install preview/dependency | jelly-leon-platform:Bezig | S-P2-395, S-P2-400, S-P2-420 | — | N-P6-03 |
+| B08-004 | Veilige updates | jelly-leon-platform:Bezig | S-P2-395, S-P2-400, S-P2-420 | — | N-P6-03 |
+| B08-005 | Forkbeheer | appstore-en-fork:Niet gestart | S-P5-60, S-P5-64, S-P5-70 e.a. | — | N-P6-09 |
+| B08-006 | Uninstall / move / recovery | jelly-leon-platform:Bezig | S-P5-61, S-P5-64, S-P5-80 e.a. | — | N-P6-03 |
+| B09-001 | Metrics coverage | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B09-002 | App healthchecks | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B09-003 | Time-series en alerts | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B09-004 | Logs en correlatie | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B09-005 | Out-of-band melding | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B09-006 | Operator runbooks | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | S-P6-40 (V-100-controle) | N-P6-04 |
+| B10-001 | Netwerktopologie ontdekken | home-control-hub:Bezig | S-P5-30, S-P5-31, S-P5-37 e.a. | — | N-P6-07 |
+| B10-002 | Nieuwe apparaten en signalen | home-control-hub:Niet gestart | S-P5-30, S-P5-31, S-P5-37 e.a. | — | N-P6-07 |
+| B10-003 | DNS-filtering met fail-safe | home-control-hub:Niet gestart | S-P5-30, S-P5-32, S-P5-37 e.a. | — | N-P6-07 |
+| B10-004 | Netwerktrafiekdiagnose | home-control-hub:Niet gestart | S-P5-30, S-P5-33, S-P5-37 e.a. | — | N-P6-07 |
+| B10-005 | VPN en tunnel monitoring | home-control-hub:Niet gestart | S-P5-30, S-P5-34, S-P5-37 e.a. | — | N-P6-07 |
+| B10-006 | AI-beveiligingsadvies | home-control-hub:Niet gestart | S-P5-30, S-P5-35, S-P5-37 e.a. | — | N-P6-07 |
+| B11-001 | Flow netwerkisolatie | home-control-hub:Bezig | S-P2-290, S-P2-295, S-P2-310 e.a. | — | N-P6-04 |
+| B11-002 | Eventtypen catalogus | home-control-hub:Niet gestart | S-P2-290, S-P2-295, S-P2-300 e.a. | — | N-P6-04 |
+| B11-003 | Veilige acties | home-control-hub:Niet gestart | S-P2-290, S-P2-295, S-P2-310 e.a. | — | N-P6-04 |
+| B11-004 | Simulatie en tests | home-control-hub:Niet gestart | S-P2-290, S-P2-295, S-P2-300 e.a. | — | N-P6-04 |
+| B11-005 | Herstel en versiebeheer | home-control-hub:Niet gestart | S-P2-290, S-P2-295, S-P2-320 e.a. | — | N-P6-04 |
+| B12-001 | Bestaande OneDrive controle | ai-server-manager:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | — | N-P6-02 |
+| B12-002 | Snapshotbeleid | ai-server-manager:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | S-P6-40 (V-100-controle) | N-P6-02 |
+| B12-003 | App-consistent exports | ai-server-manager:Bezig | S-P3-100 | — | N-P6-02 |
+| B12-004 | OneDrive-verificatie | geen regel | S-P2-090, S-P2-160, S-P2-190 | — | N-P6-02 |
+| B12-005 | Restore-test robot | geen regel | S-P2-100, S-P2-160, S-P2-190 | — | N-P6-02 |
+| B12-006 | Pre-update gate | geen regel | S-P2-090, S-P2-160, S-P2-190 | — | N-P6-02 |
+| B12-007 | Rampenscenario | geen regel | S-P2-100, S-P2-160, S-P2-190 | — | N-P6-14 |
+| B13-001 | Accountrecovery en admin toegang | home-control-hub:Bezig | P0/P1 (geen bouwstap in P2...P5; status Bezig) | — | N-P6-04 |
+| B13-002 | OIDC Hub | home-control-hub:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | — | N-P6-04 |
+| B13-003 | SSO mapping per app | home-control-hub:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | — | N-P6-04 |
+| B13-004 | Audit en rechten | home-control-hub:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | — | N-P6-04 |
+| B13-005 | Back-up en upgrade | home-control-hub:Geblokkeerd | P0/P1 (geen bouwstap in P2...P5; alleen de NAS-validatie open) | S-P6-03 (bewijs) | N-P6-04 |
+| B14-001 | Dekkingsmatrix | home-control-hub:Bezig | S-P3-150, S-P3-160, S-P3-300 e.a. | — | N-P6-06 |
+| B14-002 | Energietijdreeks | home-control-hub:Niet gestart | S-P3-150, S-P3-160, S-P3-310 | — | N-P6-06 |
+| B14-003 | Workload reservations | home-control-hub:Niet gestart | S-P3-320, S-P5-108 | — | N-P6-06 |
+| B14-004 | AI advies voor kosten | home-control-hub:Niet gestart | S-P3-150, S-P3-160, S-P3-330 | — | N-P6-06 |
+| B14-005 | Alert bij afwijkingen | home-control-hub:Niet gestart | S-P3-340, S-P3-350 | — | N-P6-06 |
+| B15-001 | Lokale spraakinput | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-20, S-P5-24, S-P5-59 | — | N-P6-08 |
+| B15-002 | STT privacy en tekstcontrole | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-20, S-P5-59, S-P5-86 | — | N-P6-08 |
+| B15-003 | Assistent-intentrouter | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-21, S-P5-59 | — | N-P6-08 |
+| B15-004 | TTS antwoord | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-22, S-P5-59, S-P5-86 | — | N-P6-08 |
+| B15-005 | Context en devices | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-21, S-P5-59 | — | N-P6-08 |
+| B15-006 | Privacy/datatools | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-20, S-P5-59 | — | N-P6-08 |
+| B15-007 | Spraak voor problemen | zoeken-en-persoonlijke-ai:Niet gestart | S-P5-21, S-P5-59 | — | N-P6-08 |
+
+Noot bij K.5 (voor S-P6-01 bouwpunt 7 en de regisseur):
+
+- De kolom "Gebouwd in" komt uit de regel "Werkpakketten en tests" van de stappen in STAPPEN_P2.md tot en met
+  STAPPEN_P5.md (stand 2026-11-11, bijgewerkt in ronde 2 van het afmaken). De andere planbestanden kunnen daarna nog
+  zijn aangevuld. Een actueler overzicht geeft de kolom "waar" van `<WERKMAP>/.lokaal/plan/uit/DEKKING.tsv` nadat de
+  regisseur `python3 <WERKMAP>/.lokaal/plan/uit/dekking.py` heeft gedraaid: daar staat "bouwstap: S-..." (het ID
+  staat in de regel "Werkpakketten en tests" van een stap die geen gatestap is) of "alleen genoemd: S-... (Dekking-tabel|gate)" (geen
+  bouwstap). Die laatste staan in de uitvoer van dekking.py ook apart, in het deel "Ter controle: ID's met categorie
+  'stap' zonder bouwstap".
+- Golf 2 van P4 (B03-021, B03-031 tot en met B03-035, B03-061, B03-062 en B03-071 tot en met B03-073) heeft sinds
+  ronde 2 van het afmaken uitgeschreven stappen: `STAPPEN_P4_GOLF1_2.md`, 8.3 "Golf 2", S-G2-10 tot en met S-G2-46,
+  met S-G2-55 (manifest en image) en de gate S-G2-90. P6 bouwt ze NIET: DEEL A heeft geen stap voor werk uit P3, P4
+  of P5. Hun NAS-deel blijft bij N-P6-10, want het zijn modules. Heeft zo'n werkpakket bij de start van P6 nog geen
+  bewijsregel, dan zet S-P6-01 het op de lijst "ontbreekt voor P6" met de fase waar het thuishoort.
+- **Bouwstap in P4 golf 3/4** (B03-002, B03-003, B03-006, B03-008, B03-011 en B03-012): besluit Z-20 van de gebruiker
+  (2026-11-11, `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker"; menu in
+  BESLUITEN_EN_BLOKKADES.md, kop "2.15 Nieuwe besluiten zonder bron-ID van 2026-11-11 (Z-16...Z-20)"): "in P4 bouwen
+  (per werkpakket eerst A-VERKEN, dan stappen in een golf)". Ze zitten in geen golf van
+  `<DOCS>/02_BOUWPLANNEN/B03_FASERING.md` (kop "3. Golven en werkpakketten") en krijgen hun stappen in
+  STAPPEN_P4_GOLF3_4.md: B03-006 S-G3-28 en S-G3-29, B03-002 S-G3-30 en S-G3-31, B03-003 S-G3-32 (golf 3); B03-008
+  S-G4-49 en S-G4-50, B03-011 S-G4-51 en S-G4-52, B03-012 S-G4-53 en S-G4-54 (golf 4). Voor B03-006 komt daar eerst besluit BG-17 bij (Z-20, optie 1). P6 bouwt ze NIET. Heeft zo'n werkpakket bij de
+  start van P6 nog geen bewijsregel, dan zet S-P6-01 het op de lijst "ontbreekt voor P6" met fase P4. N-P6-09 test van
+  deze zes alleen wat gebouwd is, en alleen het deel dat de echte NAS of echte hardware vraagt (live-tv en DVR met een
+  echte tv-ontvanger, EX38; offline downloaden op een echte telefoon, EX35; de apparaten uit D15). Noemt de
+  blokkadetekst in EVIDENCE na de bouw een ander onderdeel (bijvoorbeeld N-P6-10 omdat het als module is gebouwd), dan
+  gaat die voor (B.3). Het clientdeel van B03-003 staat al "Geblokkeerd" in jelly-leon-clients. Een NAS-onderdeel test
+  nooit iets wat niet gebouwd is.
+- B09-006 en B12-002 stonden op de peildatum "Bezig" met een blokkade die de echte NAS noemt maar zonder de tekst
+  "NIET GEVALIDEERD" (V-100). S-P6-40 bouwpunt 6 meldt ze; een herstelketen in ai-server-manager zet de tekst; daarna
+  vallen ze onder N-P6-04 en N-P6-02.
+- De werkpakketten met "P0/P1 (geen bouwstap in P2...P5 ...)" zijn vóór dit plan gebouwd; alleen hun NAS-deel is open.
+
+## K.6 De overige testrijen van Jelly Leon (functies F1...F6)
+
+Alle 53 testrijen uit `<DOCS>/08_EXCEL/b03/testen.json` die niet in K.2 staan. Ze worden in P4 en P5 gebouwd en in
+de simulator of met het b03-harnas beproefd; in P6 alleen nog het deel dat de echte NAS of echte apparaten vraagt.
+JLT-40...JLT-48 (apparaatprofielen en hardwareversnelling) horen bij N-P6-09; de andere modulerijen bij N-P6-10
+(daar staan de modules aan). Op de peildatum had geen van deze rijen een bewijsregel.
+
+| ID | Titel (kort) | Gebouwd of beproefd in (stappen buiten P6) | Onderdeel van DEEL B |
+|---|---|---|---|
+| JLT-01 | Watch Together drift-matrix tegen stock-standaard én stock-best op dezelfde 12.x | S-P40-60, S-G3-04, S-G3-24 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-02 | Pauze, hervatten, spoelen, volgende aflevering en groepsskip | S-P40-60, S-G3-04, S-G3-24 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-03 | Haperende deelnemer en racetest van het haperbeleid | S-G3-19, S-G3-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-04 | Gemengde apparaten, transcodes, capaciteitsadvies en lane bij groepspauze | S-G4-09, S-G4-43 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-05 | Privacy, uitnodigingen en kinderprofiel (chat als voorwaardelijk deel) | S-G3-17, S-G3-18, S-G3-27 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-07 | Volgmodus Android TV (stock-client) | S-G3-20, S-G3-21, S-G3-26 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-08 | Externe deelnemer via VPN (gesimuleerd) | S-G3-23 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-09 | Compatibiliteit, terugkeer naar stock en gegevensbescherming Watch Together | S-G3-17, S-G4-10, S-G4-11 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-10 | Offline-evaluatie warm: rangschikking, diversiteit en determinisme tegen ... | S-G2-22, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-11 | Koude start: kwaliteit en functioneel (nieuw profiel en kind) | S-G2-22, S-G2-26, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-12 | Feedback, uitsluiten en typemenging via de echte route | S-G2-28, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-13 | Kinderprofiel, toegang, uitlegprivacy en k-anonimiteit | S-G2-26, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-14 | Stock-clients en Jelly Leon-web-clients: geen regressie, Meer zoals dit ... | S-G4-20, S-G4-45, S-G4-29 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-16 | Gegevensbescherming aanbevelingen (differentiële controle-run) | S-G2-24, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-17 | Storing, terugval, uitzetten, verwijderen en terug naar stock | S-G2-24, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-18 | Optionele lokale embeddings uit, aan en onbereikbaar | S-P5-100, S-P5-101 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-19 | Prestatie en budget bij 10 000 items (exclusief meetslot) | S-G4-12 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-20 | NL-dekking: standaard Jellyfin (twee baselines) tegen Jelly Leon | S-G3-03, S-G3-05 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-21 | Vertaalpijplijn en kwaliteitsscore: kwaliteit, leesregels, opmaak en kalibratie | S-P5-104, S-P5-105 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-22 | Synchronisatie: verschoven, drift, M&E-val, te weinig cues, knip en andere ... | S-G3-06 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-23 | Voorrang menselijke NL en wisselwerking met MediaGuard | S-G3-07 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-24 | Gegevensbescherming, publicatietransactie, spoorkeuzes en terug naar stock | S-G3-03, S-G3-08, S-G3-27 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-25 | Clientmatrix: gemarkeerd spoor zichtbaar, juiste standaardkeuze, geen inbranden | S-G4-13, S-G4-30, S-G4-39 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-27 | Negatieve en veiligheidstests | S-P5-62, S-P5-100, S-P5-102 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-28 | Prestatie, budget en pauzeregels | S-P5-115 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-29 | Correctie, beoordeling, vertaalgeheugen en leren | S-P5-106, S-P5-120, S-P5-121 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-30 | Beschadigd en afgekapt beeld met tijdcode (ontwikkel- en testset) | S-G3-11, S-G3-12 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-31 | Audiofouten (ontwikkel- en testset) | S-G3-12 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-32 | Verkeerde talen en ontbrekend dialoogspoor | S-G3-11, S-G3-13, S-P5-108 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-33 | Ondertitelsynchronisatie via de ene syncmeter | S-G3-13 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-34 | Valse positieven en leren van feedback | S-G3-14 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-35 | Gegevensbescherming, alleen lezen en terug naar stock | S-G3-01, S-G3-27 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-36 | Budget en live-prioriteit binnen de globale planner | S-G3-02, S-G3-12 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-37 | MediaGuard-integratie zonder dubbel werk en zonder mutaties | S-G3-15 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-38 | Clientmatrix, Hub-kaart en stock-compatibiliteit | S-G3-16, S-G3-25, S-G4-14 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-40 | Winstmeting apparaatprofielen tegen standaard Jellyfin 12.x (twee baselines) | S-P40-64 (alleen het meetcommando), S-G4-47 | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-41 | Leren na een mislukte Direct Play (gecontroleerde fouten) | S-G4-06, S-G4-22 | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-42 | Actieve probe en bevestiging van een verruimende regel (voorwaardelijk) | S-G4-05, S-G4-06, S-G4-42 e.a. | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-43 | Hardwareversnelling-assistent als A/B tegen stock met handmatige QSV | S-G2-32, S-G2-90, S-G4-03 | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-44 | Lanekeuze, sessiesleutel, terugval en fail-safe van de lanewrapper | S-G2-34 (voorbereiding), S-G4-01, S-G4-02 e.a. | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-45 | Gedeeld GPU-budget met MediaGuard (alleen lezen, witte lijst) | S-G4-04 | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-46 | Stock-clients, officiële apps en MediaGuard-afspeeltest ongewijzigd | S-G4-07, S-G4-42, S-G4-30 | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-47 | HDR/DV, audio en ondertitels per apparaat | S-G4-08, S-G4-22 | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-48 | Negatief, veiligheid, prestatie, gegevensbescherming en terug naar stock | S-G4-02, S-G4-05, S-G4-07 e.a. | N-P6-09 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-50 | Segmentdetectie aantoonbaar beter dan stock Jellyfin 12.x (standaard én met ... | S-P40-66, S-G2-42, S-G2-44 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-51 | Post-credit-scènes, mid-credit-scènes en previews worden nooit overgeslagen | S-G2-44, S-G2-90, S-G4-16 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-52 | Intro's overal, varianten per seizoen/aflevering en anime-OP/ED | S-G2-42, S-G2-90 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-53 | Samenvatting ('Previously on') herkend | S-G2-42, S-G2-90, S-G3-22 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-54 | Handmatig corrigeren, overslaan-voorkeur en leren van bevestigde correcties | S-G4-15, S-G4-40, S-G4-46 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-55 | Skipknoppen in de clientmatrix en overslaan onder SyncPlay | S-G4-16, S-G4-23, S-G4-46 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-56 | Gegevensbescherming, persoonsgegevens en terug naar stock | S-G2-40, S-G2-90, S-G4-15 e.a. | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-57 | Negatieve en robuustheidsgevallen | S-G3-22 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+| JLT-58 | Rekenbudget, voorrang voor live kijken en koppeling met MediaGuard en Hub ... | S-G4-17, S-G4-38 | N-P6-10 (alleen het deel dat de echte NAS of echte apparaten vraagt) |
+
+Noot bij K.6: ook hier komt "Gebouwd of beproefd in" uit de regel "Werkpakketten en tests" (stand 2026-11-11, bijgewerkt
+in ronde 2 van het afmaken); voor een actueler overzicht en de beperking van DEKKING.tsv zie de noot bij K.5. De
+rijen die eerder ONTBREEKT heetten, hebben nu een stap: JLT-10, JLT-11, JLT-12, JLT-13, JLT-16, JLT-17 en JLT-52 in golf
+2 (`STAPPEN_P4_GOLF1_2.md` 8.3, S-G2-22 tot en met S-G2-42, gate S-G2-90); JLT-50 in golf 2 (S-G2-42 voor Intro, Recap
+en Preview, S-G2-44 voor Outro) en als winstmeting in S-G4-48; JLT-40 als winstmeting in S-G4-47 (het meetcommando
+werd vastgelegd in S-P40-64). Hun NAS-deel blijft bij N-P6-10 (JLT-40 bij N-P6-09): alleen wat echt de NAS of echte
+apparaten vraagt. Heeft zo'n rij bij de start van P6 nog geen bewijsregel, dan komt hij op de lijst "ontbreekt voor
+P6" van S-P6-01 bouwpunt 7. N-P6-09 en N-P6-10 voeren een rij pas uit als het simulatordeel in EVIDENCE staat; anders
+blijft de rij "Niet gestart" met de reden.
+
+## K.7 Contractpunten, reviewregels en delta's met een NAS-deel
+
+Deze ID's staan niet in ALLE_IDS.txt. Ze staan in de EVIDENCE.json van de genoemde repo; de lijst is de uitvoer van
+de twee verzamelcommando's uit B.3 op 2026-11-11, aangevuld met de contractpunten die STAPPEN_P2.md (hoofdstuk 7) en
+STAPPEN_P5.md (paragraaf 7.6) naar P6 verwijzen. Een punt dat op de peildatum "Niet gestart" was, wordt in DEEL B pas
+uitgevoerd als de eigen fase het simulatordeel in EVIDENCE heeft gezet. De regel
+"precies één onderdeel" van B.3 geldt per repo. C1.3-ALG-nn bestaat in meerdere repos; elke regel volgt de repo.
+
+| ID's | Repo | Stap in P6 | Onderdeel van DEEL B |
+|---|---|---|---|
+| C1.3-ASM-01, C1.3-ASM-04, C1.3-ASM-05; `REVIEW-ai-server-manager-conformiteit-1.3` | ai-server-manager | S-P6-02 (release), S-P6-40 | N-P6-03 |
+| C1.3-ASM-10 | ai-server-manager | S-P6-40 | N-P6-04 (OIDC-sub van een echte Authentik) |
+| C1.3-ASM-18, C1.3-ASM-20 (peildatum "Niet gestart"; gebouwd in P2) | ai-server-manager | S-P6-40 | N-P6-04 (echte Authentik; monitors bevestigen in Uptime Kuma, T-18) |
+| C1.3-ASM-21, C1.3-ASM-22 (peildatum "Niet gestart"; gebouwd in P3 en P5) | ai-server-manager | S-P6-40 | N-P6-05 (ASM-21); N-P6-03 en N-P6-10 (ASM-22, model-apps en D08) |
+| C1.3-ALG-05 (ai-server-manager) | ai-server-manager | S-P6-40 | N-P6-03 |
+| C1.3-ASF-01, C1.3-ASF-02, C1.3-ASF-03, C1.3-ASF-04, C1.3-ASF-09, C1.3-ASF-14 (peildatum "Niet gestart"; P2); C1.3-ALG-05 (appstore-en-fork); `REVIEW-appstore-en-fork-contract-1.3` | appstore-en-fork | S-P6-04 (release), S-P6-40 | N-P6-05 |
+| C1.3-HCH-01, C1.3-HCH-02, C1.3-HCH-04, C1.3-HCH-06, C1.3-HCH-10, C1.3-HCH-12, C1.3-HCH-13, C1.3-HCH-15 (peildatum "Niet gestart"; P2); `REVIEW-home-control-hub-contract-1.3` | home-control-hub | S-P6-03 (release), S-P6-40 | N-P6-04 |
+| C1.3-JLP-01, C1.3-JLP-06, C1.3-JLP-09, C1.3-JLP-10, C1.3-JLP-11, C1.3-JLP-14; `REVIEW-jelly-leon-platform-contract-1.3` | jelly-leon-platform | S-P6-05 (release), S-P6-40 | N-P6-03 |
+| C1.3-ALG-04, C1.3-JL-03, C1.3-JL-04 | jelly-leon | S-P6-40 | N-P6-09 |
+| C1.3-JL-09 (peildatum "Niet gestart"; gebouwd in P5: S-P5-100, bewijs op de eindimage in S-P5-115) | jelly-leon | S-P6-40 | N-P6-10 (alleen modules praten met een model-app; in N-P6-09 staan ze uit) |
+| C1.3-JL-05 | jelly-leon | S-P6-32 (repetitie), S-P6-40 | N-P6-11 |
+| C1.3-JLC-02; `REVIEW-jelly-leon-clients-contract-1.3` | jelly-leon-clients | S-P6-40 | N-P6-09 |
+| `REVIEW-jelly-leon-web-contract-1.3` | jelly-leon-web | S-P6-40 | N-P6-09 |
+| C1.3-MGU-02 | media-guard-ultimate | geen (wacht op T-01, BLOK-04) | N-P6-05 |
+| C1.3-MGU-03, C1.3-MGU-04; Δ-MG-AUTH, Δ-MG-DUAL (geen eigen regel; bewijs onder C1.3-MGU-04) | media-guard-ultimate | S-P6-33 | N-P6-05 (upgrade met de productiedatabase); N-P6-11 (MediaGuard volgt Emby en Jelly Leon) |
+| C1.3-ALG-05 (media-guard-ultimate); `REVIEW-media-guard-ultimate-contract-1.3` | media-guard-ultimate | S-P6-40 | N-P6-05 |
+| C1.3-MSO-02; C1.3-ALG-05 (media-source-optimizer); `REVIEW-media-source-optimizer-contract-1.3` | media-source-optimizer | S-P6-40 | N-P6-05 |
+| C1.3-MSO-03, C1.3-MSO-04, C1.3-MSO-05, C1.3-MSO-06 | media-source-optimizer | geen: op de peildatum "Niet gestart" met Moment P3 (werk van STAPPEN_P3.md) | N-P6-05, pas nadat P3 ze heeft gebouwd |
+| C1.3-MH-02; `REVIEW-my_house-contract-1.3`, `REVIEW-my_house-peil-1.1.1`, `REVIEW-my_house-grafiek-24-uur` | my_house | S-P6-40 | N-P6-06 |
+| C1.3-ZPA-01, C1.3-ZPA-02, C1.3-ZPA-04, C1.3-ZPA-05, C1.3-ZPA-09, C1.3-ZPA-13; C1.2-ZA9; `REVIEW-zoeken-en-persoonlijke-ai-contract-1.3`, `REVIEW-zoeken-en-persoonlijke-ai-statuspagina` | zoeken-en-persoonlijke-ai | S-P6-06 (release), S-P6-40 | N-P6-08 |
+| C1.3-ZPA-14 | zoeken-en-persoonlijke-ai | geen: op de peildatum "Niet gestart" (P5, na BG-06) | N-P6-08, pas nadat P5 het heeft gebouwd |
+| `REVIEW-ai-server-manager-nas-acceptatie`, `REVIEW-ai-server-manager-excel-afvinken` | ai-server-manager | S-P6-50, S-P6-52 | geen (documenten en gereedschap) |
+| faseregels P2...P6 in `<DOCS>/EVIDENCE_PROGRAMMA.json` | ai-server-manager | S-P6-60 | N-P6-14 (regel P6) |

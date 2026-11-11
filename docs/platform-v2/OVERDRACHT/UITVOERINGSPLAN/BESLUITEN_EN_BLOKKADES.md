@@ -69,8 +69,28 @@ grep -n -E '^## ' <WERKMAP>/ai-server-manager/docs/platform-v2/OVERDRACHT/STATUS
 grep -n -E '^## Besluiten van de gebruiker' <WERKMAP>/ai-server-manager/docs/platform-v2/02_BOUWPLANNEN/B03_BESLUITEN.md
 ```
 
-Verwacht op 2026-11-11: de laatste kop is "Besluiten van de gebruiker na contract 1.3 (2026-11-10)". Staat er een
-latere kop, lees die dan eerst en schrap wat daar genomen is uit de vragenlijst.
+Verwacht op 2026-11-11: de laatste BESLUITkop is "Besluiten van de gebruiker na contract 1.3 (2026-11-10)". In
+STATUS.md staat daarna nog de kop "Uitvoeringsplan P2 tot en met P6 en de stand na ronde 3 (2026-11-11)"; die bevat
+geen besluiten van de gebruiker (alleen de stand en de verwijzing naar dit plan). Staat er een nog latere kop, lees die
+dan eerst en schrap wat daar genomen is uit de vragenlijst.
+
+Let op: op 2026-11-11 nam de gebruiker via een keuzemenu de besluiten Z-04, Z-05, C-11, C-12, Z-17, Z-19 en Z-20
+(deel 1.5). Die staan op 2026-11-11 nog NIET in de twee bestanden hierboven (de commando's tonen ze dus niet); ze zijn
+wel genomen en worden niet opnieuw gevraagd. Het vastleggen in de repo volgt via A-BOUW van de eerstvolgende stap in ai-server-manager
+(`<WERKMAP>/.lokaal/plan/uit/AGENTEN.md`, kop "6.8 Besluit nodig, geblokkeerd, of niets kan meer starten", punt 5);
+tot die commit er is staat elk van de zeven in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` als "nog vast te leggen".
+
+**De eerstvolgende A-BOUW in ai-server-manager** is die van S-P2-005 (`STAPPEN_P2.md`; S-P2-000 leest alleen), of als
+S-P2-005 al voorbij is de eerste stap daarna in ai-server-manager die schrijft. De regisseur geeft die A-BOUW onder de
+kop "Ook vastleggen" mee (lijst: `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker", alle regels
+met "nog vast te leggen"):
+
+1. alle zeven genomen besluiten van 2026-11-11: Z-04, Z-05, C-11, C-12, Z-17, Z-19 en Z-20, elk met de letterlijke
+   vraag, het antwoord en de datum (deel 1.5), in STATUS.md (geen van de zeven is een BG-besluit, dus niet in [BG]);
+2. de documentatiestap voor Z-19 en Z-20: in WP-JSON (`docs/platform-v2/08_EXCEL/b03/werkpakketten.json`) de
+   acceptatie van B03-033 en B03-035 van 501 naar 404 (Z-19); in [B03-FASE] kop "3. Golven en werkpakketten" en in
+   WP-JSON de zes werkpakketten van Z-20 met hun stappen S-G3-28 t/m S-G3-32 en S-G4-49 t/m S-G4-54
+   (`STAPPEN_P4_GOLF3_4.md`). Geen ander stappenbestand heeft voor deze documentatiestap een eigen stap-ID.
 
 ### 0.4 Soorten ID's in dit bestand
 
@@ -84,6 +104,7 @@ latere kop, lees die dan eerst en schrap wat daar genomen is uit de vragenlijst.
 | K1...K9, RV1...RV13 | keuzes en reviewcorrecties van contract 1.3 | ai-server-manager `docs/adr/ADR-0027-contract-1-3.md` en `ADR-0028-review-contract-1-3.md` |
 | C1.3-<REPO>-nn | conformiteitspunt contract 1.3 | `CONTRACT_1.3_CONFORMITEIT.md` |
 | APP-01...APP-20, B..-..., I..-..-.., JLT-.., EX.. | werkpakketten en testrijen (Excel) | `<WERKMAP>/.lokaal/plan/uit/ALLE_IDS.txt` |
+| C-1...C-12 | contract- en beleidsvragen van fase P2 (C-11 en C-12 zijn op 2026-11-11 als besluit van de gebruiker genomen, deel 1.5; het menu van C-12 blijft in 2.16 staan ter verwijzing) | `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P2.md`, kop "8.2 Contract- en beleidsvragen (voor de eigenaar van het contract of van de manifeststandaard)" |
 | **Z-nn, T-nn, BLOK-nn** | **volgnummers van dit bestand** voor open besluiten zonder bron-ID (Z), taken van de gebruiker (T) en blokkades (BLOK) | dit bestand |
 
 Z-, T- en BLOK-nummers zijn geen bron-ID's. Gebruik ze in rapporten aan de regisseur en in VOORTGANG, nooit in Excel,
@@ -98,6 +119,10 @@ welk bestand het nummer komt:
   meetkwaliteit (T-03)").
 - **K1...K9** zijn in dit bestand de keuzes van contract 1.3. In `<WERKMAP>/.lokaal/plan/uit/AGENTEN.md` zijn K1...K7
   de controles van de regisseur (kop "2.1 De goedkope controles K1 tot en met K7").
+- **C-nn** is in dit bestand een contract- of beleidsvraag uit `STAPPEN_P2.md` kop 8.2 (bijvoorbeeld C-11 en C-12,
+  Node-RED). In de ontwerptaal Peil is C-nn een component (bijvoorbeeld
+  `<WERKMAP>/ai-server-manager/design/ontwerptaal/COMPONENTEN.md`, kop "11. GateBlokkade (C-11) en BeleidsSlot (C-13)"
+  en kop "12. NogNietBeschikbaar en CapabilityUnavailable (C-12)").
 
 Afkortingen voor bronnen (pad + kop, geen regelnummers):
 
@@ -204,42 +229,66 @@ Deze staan vast in het contract. De ADR's zelf vragen geen bevestiging; de agent
 | K1 | Host-beperking tegen DNS-rebinding: koppel- en sleutelformulieren van statuspagina's accepteren een POST alleen als de Host een IP-adres is, een naam zonder punt, of een naam onder `.local`, `.lan`, `.internal`, `.home.arpa` | bevestiging: Z-02 | ai-server-manager `docs/adr/ADR-0027-contract-1-3.md` |
 | RV2 | De HARDE EIS geldt voor elke upgrade die de database van een mediaserver migreert, dus ook latere Jelly Leon-updates met upstream-migraties | bevestigen of versoepelen: Z-03 | ai-server-manager `docs/adr/ADR-0028-review-contract-1-3.md` |
 
+### 1.5 Besluiten uit het keuzemenu van 2026-11-11
+
+Genomen door de gebruiker op 2026-11-11 via een keuzemenu van de regisseur: Z-04, Z-05 en C-11 om 10:44 en 10:52,
+C-12, Z-17, Z-19 en Z-20 om 11:25 (tijden uit `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker").
+**Nog vast te leggen in de repo via A-BOUW in ai-server-manager:** door A-BOUW van de eerstvolgende stap in
+ai-server-manager (S-P2-005 of de eerste schrijvende stap daarna), onder "Ook vastleggen", volgens 0.3 (STATUS.md;
+geen van deze zeven is een BG-besluit, dus niet in [BG]). Tot die commit er is staan ze in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop
+"Wacht op de gebruiker", als "nog vast te leggen". Niet opnieuw vragen.
+
+| ID | Gekozen optie (letterlijk) | Gevolg voor de bouw | Bron |
+|---|---|---|---|
+| Z-04 | "Laten staan; alleen nieuwe commits volgen de regel." (optie 1 van het menu bij Z-04) | Geen stap: de historie wordt niet herschreven en er komt geen force-push. Nieuwe commits eindigen met de vaste attributieregel zonder modelnaam. | keuzemenu 2026-11-11; `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker"; menu: kop "Z-04 — Afwijkende attributieregels in oude commits" |
+| Z-05 | "Ja, vervangen in een nieuwe commit" (optie 1 van het menu bij Z-05) | Kleine bouwstap S-P2-850 in jelly-leon-web (`STAPPEN_P2.md`, kop "S-P2-850 - jelly-leon-web: neutrale testwaarde in plaats van een nep-GitHub-token (Z-05)"); de historie blijft ongewijzigd (Z-04). | keuzemenu 2026-11-11; VOORTGANG.md, kop "Wacht op de gebruiker"; menu: kop "Z-05 — Testwaarde met de vorm van een echt GitHub-token" |
+| C-11 | "Geen anonieme toegang; de editor is alleen bruikbaar via een beheerder. Het manifest/ADR-0023 in jelly-leon-platform wordt aangepast; home-control-hub houdt zijn controle." Tekst in `STAPPEN_P2.md` kop 8.2, rij C-11: "Geen anonieme toegang tot de Node-RED-editor; alleen bruikbaar via een beheerder. Het manifest (`install/manifests/node-red.manifest.yaml`) en ADR-0023 in jelly-leon-platform worden aangepast; home-control-hub houdt zijn controle `anoniem_geweigerd` (401)." | De tegenstrijdigheid over de Node-RED-editor (deel 5, punt 5-12) is beslist ten gunste van home-control-hub: een lezer zonder aanmelding krijgt 401 (controle `anoniem_geweigerd` in `<WERKMAP>/home-control-hub/apps/api/src/integrations/domains/automation/policy.py`; acceptatie B11-001 "Viewer kan editor niet bereiken"). In jelly-leon-platform wijken `install/manifests/node-red.manifest.yaml` (nu `adminAuth` met `"default":{"permissions":"read"}` en het doel "anoniem alleen-lezen") en `docs/adr/ADR-0023-node-red-als-custom-app.md` besluit 4 ("Anoniem alleen-lezen is een bewuste keuze") af. Uitvoering volgens `STAPPEN_P2.md` kop 8.2, rij C-11: S-P2-410 past manifest, rooktest, repotest en ADR-0023 aan, met een negatieve test (anonieme aanvraag krijgt 401) en R-VEILIG; S-P2-395 behandelt het oude anonieme lezen niet als bevinding; S-P2-290 maakt `deploy/truenas/NODE_RED_CUSTOM_APP.md` in home-control-hub een verwijzing naar dat manifest; S-P2-310 houdt `anoniem_geweigerd` op 401. Gebruiker 568 tegenover 1000 is GEEN besluit: het manifest (568:568) is de installatieweg en volgt [CONTRACT] kop "2. Apps, images en poorten" (een container "als 568:568 waar de image dat toestaat"). Zonder beheerder is de editor helemaal dicht; hoe Node-RED een beheerder en een dienstaccount krijgt is open: C-12 (deel 2.16) en C-5. | keuzemenu 2026-11-11; VOORTGANG.md, kop "Wacht op de gebruiker"; beschrijving en uitvoering: `STAPPEN_P2.md`, kop "8.2 Contract- en beleidsvragen (voor de eigenaar van het contract of van de manifeststandaard)", rij C-11 |
+| C-12 | "Voorziening zonder geheim": de manifeststandaard (appstore-en-fork) krijgt een voorziening voor een beheerder en een dienstaccount zonder geheim in het Custom App-formulier; het profiel van home-control-hub (`build_profile` / `define_arguments` / `credentialSecret`) vervalt of wordt daaraan gelijkgetrokken. (Optie 1 van het menu bij C-12, deel 2.16.) De uitwerking moet nog ontworpen worden. | Eis: [CONTRACT] kop "3.1 Uitgangspunten" ("Nooit geheimen in het Custom App-formulier"; enige uitzondering het eenmalige enrollment-token); er komt GEEN contractuitzondering (dat was optie 2). Hoe de voorziening eruitziet staat in geen bron: eerst de ontwerpstap S-P2-510 in de baan appstore-en-fork (`STAPPEN_P2.md`; één ontwerp-ADR), daarna de bouw in `STAPPEN_P3.md`: S-P3-490 in appstore-en-fork (manifeststandaard), S-P3-445 in jelly-leon-platform (`install/manifests/node-red.manifest.yaml`) en S-P3-360 in home-control-hub (profiel uitfaseren of gelijktrekken), elk een eigen stap. Stelt het ADR van S-P2-510 een wijziging van [CONTRACT] kop 3.1 of kop 9 vast, dan komt die contractronde vóór de gate van P2 (2.16, "Na het besluit"). Tot die voorziening er is: geen keten breidt het profiel van home-control-hub uit of beschrijft het als installatieweg, en geen keten zet een geheim of gebruiker in het manifest; R-VEILIG legt de bevinding vast in S-P2-295. Daardoor blijft de editor na C-11 tot dan zonder beheerder dicht. Raakt S-P2-290, S-P2-295, S-P2-310, S-P2-410 (vraag C-5) en `STAPPEN_P6.md` onderdeel N-P6-04. | keuzemenu 2026-11-11 (11:25); VOORTGANG.md, kop "Wacht op de gebruiker"; menu: kop "C-12 — Hoe krijgt Node-RED een beheerder en een dienstaccount?" (2.16); deel 5 punt 5-15 |
+| Z-17 | Zigbee2MQTT IN de image van my_house, optioneel: alleen aan als in het formulier een USB-apparaat is opgegeven. (Optie 1 van het menu bij Z-17, "Variant a", deel 2.15.) | S-P3-720 neemt Zigbee2MQTT op als optioneel proces in de image en de bewaker; zonder doorgegeven USB-apparaat (`/dev/serial/by-id/...`) start het proces niet en is dat geen fout. S-P3-755 beschrijft de apparaat-doorgifte in `deploy/truenas/CUSTOM_APP.md`. Het gevolg "het manifest krijgt `devices` voor de dongle met `privilege_reason`" (my_house ADR-0004 besluit 10) is met de huidige manifeststandaard niet uit te voeren (gemeten in appstore-en-fork op `7b3159d`): hoe het manifest de optionele stick vastlegt is open besluit Z-21 (2.15); zonder dat besluit krijgt het manifest geen apparaat. MQTT blijft alleen binnen de container luisteren (ADR-0004 besluit 4). S-P3-720 legt de keuze ook vast in het nieuwe ADR van my_house (bouwpunt 6). Werken met echte Zigbee-hardware blijft NIET GEVALIDEERD (hardware) tot D13 en `STAPPEN_P6.md` onderdeel N-P6-06. De eigenaar van `STAPPEN_P3.md` werkt S-P3-720, S-P3-755, S-P3-900 en kop 7.4 bij. | keuzemenu 2026-11-11 (11:25); VOORTGANG.md, kop "Wacht op de gebruiker"; menu: kop "Z-17 — Zigbee2MQTT in of naast de image van my_house" (2.15); my_house `docs/adr/ADR-0004-alles-in-een-custom-app.md`, kop "Besluit (ontwerp)", punten 4, 6 en 10 |
+| Z-19 | "Module uit" geeft 404, zoals jelly-leon ADR-0030; de afwijking van WP-JSON (501 `capability_unavailable` bij B03-033 en B03-035) wordt in het bewijs vermeld. (Optie 1 van het menu bij Z-19, deel 2.15.) | Geen herstelstap in jelly-leon: de pijplijn en de bestaande modules blijven 404 geven (wie niet is aangemeld krijgt 401). Tests eisen 404 bij "module uit". De EVIDENCE-opmerking van B03-033 en B03-035 noemt de afwijking van WP-JSON letterlijk (`STAPPEN_P4_GOLF1_2.md`, kop "8.3 Golf 2", alinea "Module uit", en S-G2-28 bouwpunt 5). De gate G-F2-5 wacht niet meer op een besluit. Daarna volgt een documentatiestap in ai-server-manager: de acceptatie van B03-033 en B03-035 in WP-JSON (`docs/platform-v2/08_EXCEL/b03/werkpakketten.json`, veld Acceptatie; nu 501) gaat naar 404. Geen eigen stap-ID: dit gaat mee met "Ook vastleggen" in de eerstvolgende A-BOUW in ai-server-manager (0.3: S-P2-005 of de eerste schrijvende stap daarna). | keuzemenu 2026-11-11 (11:25); VOORTGANG.md, kop "Wacht op de gebruiker"; menu: kop "Z-19 — "Module uit": 404 of 501" (2.15); jelly-leon `docs/adr/ADR-0030-b03-017-foutcatalogus-pipeline-en-1-mib-per-route.md`, kop "Besluit", punt 2; deel 5 punt 5-13 |
+| Z-20 | B03-002, B03-003, B03-006, B03-008, B03-011 en B03-012 IN P4 BOUWEN: per werkpakket eerst A-VERKEN, dan stappen in een golf. (Optie 1 van het menu bij Z-20, voor alle zes, deel 2.15.) | Per werkpakket stelt A-VERKEN eerst de scope vast (wat "waar haalbaar" betekent); daarna bouwstappen in `STAPPEN_P4_GOLF3_4.md`: golf 3 S-G3-28 en S-G3-29 (B03-006), S-G3-30 en S-G3-31 (B03-002; S-G3-31 alleen als het dossier van S-G3-30 een webdeel noemt), S-G3-32 (B03-003); golf 4 S-G4-49 en S-G4-50 (B03-008), S-G4-51 en S-G4-52 (B03-011), S-G4-53 en S-G4-54 (B03-012). S-G4-95 noemt ze dan als gebouwd of niet gebouwd volgens die stappen, niet meer als "niet in P4 gebouwd volgens B03_FASERING". [B03-FASE] kop "3. Golven en werkpakketten" en WP-JSON krijgen ze via een documentatiestap in ai-server-manager (geen eigen stap-ID: "Ook vastleggen" in de eerstvolgende A-BOUW in ai-server-manager, 0.3). Voor B03-006 wordt BG-17 voorgelegd vóór S-G3-28 (2.9). De gedeelde cue-extractie bouwt S-G1-34 (B03-018); B03-008 krijgt in P4 alleen zoeken in de tekst van ondertitelcues (S-G4-49; spraak en embeddings wachten op BG-06, P5). De delen die de echte NAS of echte apparaten vragen (bv. een live-tv-tuner) blijven NIET GEVALIDEERD tot `STAPPEN_P6.md` onderdelen N-P6-09 en N-P6-10. | keuzemenu 2026-11-11 (11:25); VOORTGANG.md, kop "Wacht op de gebruiker"; menu: kop "Z-20 — Zes B03-werkpakketten zonder golf" (2.15); deel 5 punt 5-14 |
+
 ---
 
 ## 2. Open besluiten
 
 Stand 2026-11-11: 31 BG-besluiten open (BG-03, BG-05...BG-31, BG-33, BG-35, BG-36), 17 D-gegevens open (D01...D09,
-D11...D18) en 15 besluiten zonder bron-ID (Z-01...Z-15). De menu's staan in de volgorde waarin ze nodig zijn.
+D11...D18) en 16 besluiten zonder bron-ID open (Z-01...Z-03, Z-06...Z-16, Z-18, Z-21). Z-04 en Z-05 zijn op 2026-11-11
+genomen (deel 1.5); hun menu's blijven in 2.14 staan ter verwijzing. Z-16...Z-21 zijn op 2026-11-11 toegevoegd en
+staan in 2.15; daarvan zijn Z-17, Z-19 en Z-20 dezelfde dag genomen (deel 1.5); Z-21 kwam later die dag uit de
+uitwerking van Z-17. De contractvraag C-12 uit P2 (2.16) is
+op 2026-11-11 ook genomen (deel 1.5). Bij een genomen besluit blijft het menu staan ter verwijzing, met de regel
+"Status: GENOMEN". De menu's staan in de volgorde waarin ze nodig zijn.
 
 ### 2.0 Overzicht: wanneer wat
 
 De kolom "Stap in het plan" is overgenomen uit de stapbestanden in `<WERKMAP>/.lokaal/plan/uit/` zoals ze er op
-2026-11-11 stonden; die bestanden waren nog in bewerking, dus een stap-ID kan verschoven zijn. Controleer met:
-`grep -n -E 'BG-[0-9]+|Z-[0-9]+' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md`. `STAPPEN_P3.md` en `STAPPEN_P4_GOLF1_2.md`
-waren op dat moment nog in opbouw: de stap-ID's in de eerste vier rijen komen uit de besluitentabel van die bestanden
-(kop "3. Besluiten die eerst genomen moeten zijn" en stap S-P3-000), de stappen zelf waren nog niet allemaal
-uitgeschreven. Waar geen stap gevonden is staat "ONBEKEND".
+2026-11-11 stonden (na de derde afmaakronde; stap-ID's van C-12 en Z-20 ingevuld in ronde 4). Elke stap-ID in deze tabel bestond toen als kop in een stappenbestand
+(nagelopen met `grep -n -E '^#{2,4} (S-|N-P6-)' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md`). Een stap-ID kan later nog
+verschuiven; controleer met: `grep -n -E 'BG-[0-9]+|Z-[0-9]+|D18' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md`. Waar geen
+stap gevonden is staat "ONBEKEND".
 
 | Moment | Besluiten | Stap in het plan (gezien 2026-11-11) |
 |---|---|---|
-| NU (te laat of blokkeert lopend werk) | BG-03, BG-22; Z-04, Z-05, Z-06 (alleen melden, zie daar) | BG-03: S-G1-18 (later S-G2-26); BG-22: S-P40-80. Z-04...Z-06: geen stap gevonden, ONBEKEND - eerst vaststellen met: `grep -n -E 'Z-0[456]' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md` |
-| Voor P3 (contractronde en statuspagina's) | Z-02, Z-03, Z-08, Z-10 | S-P3-000 loopt ze na; Z-03: S-P3-015; Z-08: S-P3-720; Z-10: S-P3-200; Z-02: de stappen voor de statuspagina's (stap-ID ONBEKEND - eerst vaststellen met: `grep -n 'Z-02' <WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`) |
+| NU (te laat of blokkeert lopend werk) | BG-03, BG-22; Z-06 (alleen melden, zie daar) | BG-03: S-G1-18 (later S-G2-26); BG-22: S-P40-80. Z-06: `STAPPEN_P2.md` noemt het in de besluitentabel ("alle stappen": alles blijft op de werkbranch) en in kop "9.4 Melden aan de gebruiker" (gezien 2026-11-11). Z-04 en Z-05 zijn op 2026-11-11 genomen (deel 1.5): Z-04 zonder stap, Z-05 met S-P2-850 |
+| In P2, vóór S-P2-290, S-P2-295 en S-P2-310 | geen meer: C-12 is op 2026-11-11 genomen (deel 1.5; uitwerking nog te ontwerpen). C-5 (S-P2-410 bouwpunt 6) volgt de uitwerking van C-12 | S-P2-290, S-P2-295, S-P2-310, S-P2-410 lopen volgens het besluit in 1.5; de ontwerpstap van de voorziening in de baan appstore-en-fork is S-P2-510; de bouw volgt in P3: S-P3-490, S-P3-445, S-P3-360. Vraagt het ADR van S-P2-510 een contractwijziging (kop 3.1 of 9): contractronde vóór de gate van P2 |
+| Voor P3 (contractronde en statuspagina's) | Z-02, Z-03, Z-08, Z-10, Z-18; Z-21 | S-P3-000 loopt Z-02, Z-03, Z-08 en Z-10 na; Z-03: S-P3-015; Z-08: S-P3-720; Z-10: S-P3-200; Z-17 (Zigbee2MQTT) is op 2026-11-11 genomen (deel 1.5; uitvoering S-P3-720 en S-P3-755); Z-21 (Zigbee-stick in het manifest): vóór S-P3-755, zonder besluit geen apparaat in het manifest; Z-18 (I05-titels): vóór S-P3-440, zonder besluit optie 1; Z-02: de stappen voor de statuspagina's (stap-ID ONBEKEND - eerst vaststellen met: `grep -n 'Z-02' <WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`; op 2026-11-11 alleen in S-P3-000, S-P3-900 en kop "7.4 Melden aan de gebruiker") |
 | Na golf 1 (na de belastingtest B03-018, JLT-66) | BG-07 | na S-G1-40, voor S-G1-90 |
-| Start golf 2 | BG-16, BG-27, BG-33, BG-35, BG-36 | BG-16: S-G2-26; BG-27: S-G2-32; BG-33 en BG-36: S-G2-40; BG-35: S-G2-44. BG-33 komt ook terug in S-G4-15 |
-| Voor golf 3 | BG-05 | S-G3-07, S-G3-15 |
+| Start golf 2 | BG-16, BG-27, BG-33, BG-35, BG-36; D18 | BG-16: S-G2-26; BG-27: S-G2-32; BG-33 en BG-36: S-G2-40; BG-35: S-G2-44 (alle vier in `STAPPEN_P4_GOLF1_2.md`, kop "8.3 Golf 2"). BG-33 komt ook terug in S-G4-15. Z-19 ("module uit") is op 2026-11-11 genomen: 404 (deel 1.5; S-G2-28 en de documentatiestap in ai-server-manager). D18: S-G2-72 (start alleen bij "ja") |
+| Voor golf 3 | BG-05 | BG-05: S-G3-07, S-G3-15. Z-20 is op 2026-11-11 genomen: de zes werkpakketten worden in P4 gebouwd (deel 1.5), in `STAPPEN_P4_GOLF3_4.md` S-G3-28 t/m S-G3-32 (golf 3) en S-G4-49 t/m S-G4-54 (golf 4) |
 | Start golf 3 | BG-10, BG-11, BG-13, BG-14, BG-19, BG-21, BG-23, BG-24, BG-25 | S-G3-08, S-G3-11...S-G3-14, S-G3-16, S-G3-17, S-G3-19, S-G3-20, S-G3-24...S-G3-26 |
 | Voor B03-027 (golf 3) | BG-09 | S-G3-23; komt terug in S-P5-01 |
 | Voor golf 4 | BG-08 | S-G4-27, S-G4-28 |
 | Start golf 4 | BG-12, BG-15, BG-26, BG-28, BG-29, BG-30, BG-31 | S-G4-03, S-G4-04, S-G4-06...S-G4-10, S-G4-16, S-G4-20, S-G4-22...S-G4-24, S-G4-26...S-G4-29 |
-| Bij B03-006 | BG-17 | ONBEKEND - eerst vaststellen met: `grep -n 'B03-006' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md` |
-| Voor P5 | BG-06, BG-18; Z-01; D03, D08, D11 | S-P5-01 (besluitenronde), S-P5-02 |
+| Vóór S-G3-28 (B03-006, P4 golf 3) | BG-17 | Z-20 (genomen 2026-11-11, deel 1.5) geeft B03-006 de bouwstappen S-G3-28 en S-G3-29 in `STAPPEN_P4_GOLF3_4.md`. BG-17 voorleggen vóór S-G3-28 start (bij voorkeur samen met de besluiten van start golf 3) |
+| Voor P5 | BG-06, BG-18, Z-16; Z-01 | S-P5-01 (besluitenronde), S-P5-02. Z-16 alleen als BG-06 vraag a een app `mt` oplevert. D03, D08 en D11 worden in S-P5-01 NIET gevraagd (S-P5-01 bouwpunt 3: "die horen bij de NAS-uitvoering"); de P5-stappen lopen met die gegevens open (bv. S-P5-82 tot en met S-P5-84, regel "Vooraf": "bekend of open gelaten"). Zie de rij "Voor P6" |
 | In P5 | BG-20 | S-P5-01 |
-| Voor P6 | Z-07, Z-09, Z-11; D01...D07, D15...D17 | S-P6-01; releases in S-P6-02...S-P6-06 |
+| Voor P6 | Z-07, Z-09, Z-11; D01...D08, D11, D15...D17 | S-P6-01; releases in S-P6-02...S-P6-06. De gegevens D vult de gebruiker in bij de NAS-uitvoering (`STAPPEN_P6.md`, kop "K.4 Bestaande apps (APP-01...APP-20) en de gegevens en besluiten van de echte omgeving (D01...D18)"): onder meer D03 in N-P6-01 (noteren), N-P6-03 en N-P6-07; D08 in N-P6-03 (meten) en N-P6-09; D11 in N-P6-07 |
 | In P6, voor de echte overname | Z-13 (met T-21) | N-P6-11 "De echte overname vanuit Emby" in `STAPPEN_P6.md` (voorwaarde 6 van dat onderdeel) |
 | Na de Cutover-gate | Z-12, Z-14 | geen AI-stap: de gebruiker voert uit |
 | Voor de eerste AI-functie met een echte (cloud)aanbieder | D09 | niet vragen in P2 (`STAPPEN_P2.md`, tabel met D09); AI blijft standaard uit en B02-001 houdt "NIET GEVALIDEERD (account)"; voorleggen bij de NAS-uitvoering (N-P6-08) |
 | Bij de echte apparaten van my_house | D12, D13, D14 | geen bouwstap: de stappen in `STAPPEN_P3.md` bouwen in de simulator en zetten "NIET GEVALIDEERD (hardware)" met het D-nummer; voorleggen bij onderdeel N-P6-06 in `STAPPEN_P6.md` |
-| Wanneer het uitkomt | Z-15; D18 | geen |
+| Wanneer het uitkomt | Z-15 | geen |
 
 De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wanneer ze gevraagd worden".
 
@@ -263,7 +312,10 @@ De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wannee
   3. Alleen wie de beheerder als "kind" markeert. Gevolg volgens de bron: je vergeet makkelijk iemand.
 - **Na het besluit:** vastleggen (0.3). Bij optie 1 of 3: herstelstap door A-HERSTEL op `KidPolicy.cs` en de tests in
   `<WERKMAP>/jelly-leon/plugins/JellyLeon/tests/`, daarna R-HARDE-EIS en R-VEILIG. Bij optie 2: alleen de opmerking
-  "zolang BG-03 open staat" in de code bijwerken.
+  "zolang BG-03 open staat" in de code bijwerken. Let op: in jelly-leon staat B03-010 (deel IsKid) als HALF WERK
+  niet-gecommit in de werkmap (`<WERKMAP>/.lokaal/plan/STAND_RONDE3.md`). De stap na BG-03 start pas als de stap
+  "half werk afmaken" in jelly-leon gecommit en gepusht is (één schrijver per repo); controle: `git -C
+  <WERKMAP>/jelly-leon status --short` is leeg.
 - **Bron:** [BG] kop "BG-03 — Wat is een kinderprofiel?".
 
 #### BG-22 — Bazarr-vertaler en de ondertiteldownloaders van Jellyfin
@@ -394,6 +446,9 @@ De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wannee
 - **Na het besluit:** vastleggen (0.3).
 - **Bron:** [BG] kop "BG-36 — Module uit of "schaduw": eigen segmenten wissen of verbergen?".
 
+Ook bij de start van golf 2: D18 (Navidrome, vóór S-G2-72; menu in 2.12). Z-19 ("module uit") is op 2026-11-11
+genomen: 404 (deel 1.5).
+
 ### 2.4 Voor golf 3
 
 #### BG-05 — Mag de Hub MediaGuard laten herstellen of zoeken (na jouw goedkeuring)?
@@ -417,6 +472,8 @@ De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wannee
   R-HARDE-EIS; elke MediaGuard-release daarna vraagt het upgradebewijs (BLOK-04, BLOK-14).
 - **Bron:** [BG] kop "BG-05 — Mag de Hub MediaGuard laten herstellen of zoeken (na jouw goedkeuring)?"; [CONF] punt
   C1.3-ASM-19.
+
+Z-20 (zes B03-werkpakketten zonder golf) is op 2026-11-11 genomen: in P4 bouwen (deel 1.5).
 
 ### 2.5 Start golf 3
 
@@ -715,11 +772,14 @@ De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wannee
   overslaanbaar segment.
 - **Bron:** [BG] kop "BG-31 — Skipknoppen: tekst en standaardgedrag".
 
-### 2.9 Bij B03-006
+### 2.9 Bij B03-006 (vóór S-G3-28)
 
 #### BG-17 — Online metadata (TMDb/OMDb)
 
-- **Moment:** bij B03-006 (metadata).
+- **Moment:** vóór S-G3-28 (B03-006, serverdeel; P4 golf 3, `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P4_GOLF3_4.md`).
+  B03-006 staat in geen golf van [B03-FASE] kop "3. Golven en werkpakketten", maar besluit Z-20 (genomen 2026-11-11,
+  deel 1.5) laat het in P4 bouwen in S-G3-28 en S-G3-29. BG-17 is daarmee een gewoon open besluit: voorleggen voordat
+  S-G3-28 start (S-G3-28 "Vooraf" en "Stop en vraag als").
 - **Raakt:** B03-006, B03-032; repo jelly-leon.
 - **Zonder besluit geldt:** aan laten; dat is het standaardgedrag van Jellyfin en B03 verandert er niets aan (staat zo
   in het advies van de bron).
@@ -739,7 +799,9 @@ De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wannee
 - **Raakt:** B03-038, B03-044, B03-059, B03-079; B03-008, B07-004; repos ai-server-manager (contract), jelly-leon,
   zoeken-en-persoonlijke-ai, jelly-leon-platform.
 - **Zonder besluit geldt:** geen tweede producent en de app `mt` wordt niet gebouwd ([CONTRACT] kop "1.2 Open besluiten
-  (tot het besluit geldt de veiligste stand)"). Zie BLOK-09.
+  (tot het besluit geldt de veiligste stand)"). Zie BLOK-09. B03-008 krijgt in P4 (besluit Z-20) alleen zoeken in de
+  tekst van bestaande ondertitelcues (S-G4-49 en S-G4-50 in `STAPPEN_P4_GOLF3_4.md`); zoeken op omschrijving, een
+  vectorindex en spraak wachten op dit besluit.
 - **Vraag:** "Het contract noemt een lokaal embeddingmodel en spraakherkenning als optionele apps, maar legt niet vast
   welke app wat levert. a. Komt de vertaling in een aparte optionele app `mt`? b. Wie maakt embeddings? c. Wie levert
   spraakherkenning?"
@@ -780,6 +842,9 @@ De momenten van de BG-besluiten komen uit [BG] kop "2. Open besluiten — wannee
 - **Na het besluit:** vastleggen (0.3). Vast in de bron, geen keuze: modellen met een NC-licentie nooit; de motor in de
   jelly-leon-image is vervallen. De lijst met modelnamen staat in de bron en wordt hier niet herhaald.
 - **Bron:** [BG] kop "BG-18 — Vertaalmotor en licentie van het vertaalmodel".
+
+Ook voor P5, in dezelfde ronde: Z-16 (in welke bestaande repo komt de app `mt` en met welke `app_id`), alleen als
+BG-06 vraag a een app `mt` oplevert. Het menu staat in 2.15.
 
 ### 2.11 In P5
 
@@ -840,9 +905,14 @@ recente geverifieerde back-up van de Hub-database; `data_mutatie` vraagt ook gez
 
 Wanneer vragen:
 
-- **Voor P5:** D03, D08, D11 (zo gevraagd in `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P5.md`, kop "2.2 Besluiten en gegevens
-  die vooraf nodig zijn", gezien op 2026-11-11). D08 is ook nodig voor optie 1 van BG-35 (golf 2) en voor BG-27.
-- **Voor P6 (acceptatie op de echte NAS):** D01, D02, D04...D07, D15, D16, D17. D07 moet ook melden of er naast Emby een
+- **Niet in P5:** D03, D08 en D11 staan in `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P5.md`, kop "2.2 Besluiten en gegevens
+  die vooraf nodig zijn", maar daar met "geen bouwstap" en de NAS-uitvoering; S-P5-01 bouwpunt 3 zegt: "D03, D08 en D11
+  vraagt de regisseur NIET nu: die horen bij de NAS-uitvoering (STAPPEN_P6.md)". De P5-stappen lopen met die gegevens
+  open. D08 is ook nodig voor optie 1 van BG-35 (golf 2) en hangt samen met BG-27; wat zonder D08 geldt staat bij
+  die twee besluiten (2.3).
+- **Voor P6 (acceptatie op de echte NAS):** D01, D02, D03, D04...D08, D11, D15, D16, D17, elk bij het onderdeel van
+  `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P6.md` dat kop "K.4" noemt (D03: N-P6-01, N-P6-03, N-P6-07; D08: N-P6-03,
+  N-P6-09; D11: N-P6-07). D07 moet ook melden of er naast Emby een
   stock-Jellyfin draait ([BG] kop "9. Gegevens die nodig zijn (geen keuze)").
 - **Bij de bouw van het betreffende onderdeel van my_house op echte hardware:** D12, D13, D14.
 - **D09:** voor de eerste AI-functie met een cloudtool in productie. Vaste regel, geen keuze: alleen binnen het
@@ -868,9 +938,12 @@ Drie D-punten zijn wel een keuze. Leg ze voor met dit menu.
 
 #### D18 — Navidrome (optioneel)
 
-- **Moment:** wanneer het uitkomt; de bron vraagt eerst een gebruikerstest.
-- **Raakt:** `<WERKMAP>/ai-server-manager/docs/platform-v2/03_INSTALLATIE/I22_NAVIDROME_OPT.md`.
-- **Zonder besluit geldt:** Navidrome wordt niet geinstalleerd (gate `navidrome` dicht).
+- **Moment:** start golf 2, vóór S-G2-72 (`<WERKMAP>/.lokaal/plan/uit/STAPPEN_P4_GOLF1_2.md`, kop "S-G2-72 -
+  Controlelijst I22 Navidrome (alleen na besluit D18)"). De bron vraagt eerst een gebruikerstest; dat kan optie 2 zijn.
+- **Raakt:** `<WERKMAP>/ai-server-manager/docs/platform-v2/03_INSTALLATIE/I22_NAVIDROME_OPT.md`; I22-22-01...I22-22-05;
+  stap S-G2-72 (repo jelly-leon-platform).
+- **Zonder besluit geldt:** Navidrome wordt niet geinstalleerd (gate `navidrome` dicht); S-G2-72 start niet en de
+  I22-rijen blijven "Niet gestart" met de reden "D18 open".
 - **Vraag:** "Wil je Navidrome als aparte muziekserver naast Jelly Leon?"
 - **Opties:**
   1. Niet installeren. (Aanbevolen, aanbeveling van dit plan: het is optioneel en de meerwaarde is niet getest)
@@ -967,6 +1040,9 @@ waar de bron geen advies geeft staat "(Aanbevolen, aanbeveling van dit plan)" bi
 
 #### Z-04 — Afwijkende attributieregels in oude commits
 
+- **Status:** GENOMEN op 2026-11-11 (keuzemenu): optie 1, "Laten staan; alleen nieuwe commits volgen de regel." Zie
+  deel 1.5. Nog vast te leggen in de repo (0.3) via A-BOUW in ai-server-manager. Niet opnieuw vragen; het menu
+  hieronder blijft alleen ter verwijzing.
 - **Moment:** NU alleen melden; een besluit is pas nodig als de gebruiker de historie schoon wil hebben.
 - **Raakt:** alle repos; vaste regel 2 (commits eindigen met de vaste attributieregel; geen modelnaam in commits).
   Gemeten op 2026-11-11: de commits tot en met 2026-11-10 eindigen op een attributieregel waarin een modelnaam staat
@@ -988,6 +1064,9 @@ waar de bron geen advies geeft staat "(Aanbevolen, aanbeveling van dit plan)" bi
 
 #### Z-05 — Testwaarde met de vorm van een echt GitHub-token
 
+- **Status:** GENOMEN op 2026-11-11 (keuzemenu): optie 1, "Ja, vervangen in een nieuwe commit". Uitvoering: stap
+  S-P2-850 in `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P2.md`. Zie deel 1.5. Nog vast te leggen in de repo (0.3) via A-BOUW
+  in ai-server-manager. Niet opnieuw vragen; het menu hieronder blijft alleen ter verwijzing.
 - **Moment:** NU alleen melden; uitvoeren bij de eerstvolgende bouwstap in jelly-leon-web.
 - **Raakt:** `<WERKMAP>/jelly-leon-web/tools/jelly-leon-web/tests/test_sync_workflow.py`.
 - **Zonder besluit geldt:** de testwaarde blijft staan. Het is geen echt geheim, maar geheimscanners kunnen erop aanslaan.
@@ -1176,6 +1255,274 @@ waar de bron geen advies geeft staat "(Aanbevolen, aanbeveling van dit plan)" bi
   alles-in-een-test van media-source-optimizer.
 - **Bron:** [RUW] kop "my_house" (zoek op "mogen weg na akkoord").
 
+### 2.15 Nieuwe besluiten zonder bron-ID van 2026-11-11 (Z-16...Z-21)
+
+Toegevoegd op 2026-11-11 na de controle van de stappenbestanden. Zelfde velden als 0.5, met één afwijking: een optie
+krijgt hier alleen "(Aanbevolen)" als een bron die keuze onderbouwt. Bij deze zes doet geen bron dat, dus staat er
+geen aanbevolen optie. "Zonder besluit geldt" is de stand die het plan nu bouwt; dat is geen advies (0.2 regel 4).
+
+Stand 2026-11-11 (11:25): Z-17, Z-19 en Z-20 zijn genomen (deel 1.5; bij elk staat "Status: GENOMEN"). Hun menu's
+blijven hieronder staan ter verwijzing; niet opnieuw vragen. Z-16 en Z-18 staan nog open; voor Z-18 geldt de stand
+zonder besluit (optie 1). Z-21 (de Zigbee-stick in het manifest, een gevolg van Z-17) is later op 2026-11-11
+toegevoegd en staat open.
+
+#### Z-16 — Repo en `app_id` van de app `mt`
+
+- **Moment:** voor P5, in dezelfde ronde als BG-06 en BG-18 (2.10): `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P5.md`, stap
+  S-P5-01 bouwpunt 3. Alleen voorleggen als BG-06 vraag a "ja, een aparte optionele app `mt`" oplevert; bij "Niet
+  bouwen" vervalt Z-16.
+- **Raakt:** [CONTRACT] kop "1.2 Open besluiten (tot het besluit geldt de veiligste stand)", regel BG-06/BG-18 ("in welke
+  repo komt `mt`?"), en kop "2. Apps, images en poorten", rij "open (BG-06/BG-18)" voor `mt` (daar staat ook: de
+  Custom App-naam in die tabel is de vaste `app_id`); in de bron Δ-CONTRACT-MT; B03-044, B03-045, C1.3-ASM-22;
+  stappen S-P5-02 (rij van `mt`), S-P5-103, en het deel `mt` van S-P5-86 en S-P5-63.
+- **Zonder besluit geldt:** `mt` wordt niet gebouwd ([CONTRACT] kop "1.2 Open besluiten (tot het besluit geldt de
+  veiligste stand)"); S-P5-103 en het deel `mt` van S-P5-86 en S-P5-63 blijven "Geblokkeerd: besluit nodig"
+  (`STAPPEN_P5.md`, kop "2.2 Besluiten en gegevens die vooraf nodig zijn"). Zie BLOK-09.
+- **Vraag:** "Je hebt gekozen voor een aparte optionele app `mt` voor de vertaling. Het contract legt nog niet vast in
+  welke repo die app komt en onder welke vaste naam (`app_id`) de Hub en de catalogus hem kennen. a. In welke
+  bestaande repo komt `mt`? b. Welke `app_id` krijgt hij?"
+- **Opties vraag a** (geen aanbevolen optie: [B03-PLAN] tabelrij B-F3-1 stelt dezelfde vraag zonder advies voor de repo):
+  1. Een bestaande repo die jij aanwijst: ai-server-manager, home-control-hub, appstore-en-fork, jelly-leon-platform,
+     zoeken-en-persoonlijke-ai, media-guard-ultimate, media-source-optimizer, my_house, jelly-leon, jelly-leon-web of
+     jelly-leon-clients. Gevolg: S-P5-02 zet de repo in de contractrij van `mt`; S-P5-103 bouwt de image in die repo
+     (als die repo in P5 een eigen baan heeft, wordt het een stap van die baan: één schrijver per repo). Een twaalfde,
+     nieuwe repo is geen optie zonder apart besluit; `ai-factory` valt altijd af.
+  2. Nog niet beslissen. Gevolg: de stand zonder besluit blijft; de vertaling via `mt` wordt in P5 niet gebouwd.
+- **Opties vraag b** (geen aanbevolen optie):
+  1. `mt`, de naam die de apptabel van het contract nu gebruikt.
+  2. Een andere naam; de gebruiker noemt hem.
+- **Na het besluit:** vastleggen (0.3). S-P5-02 vult de rij van `mt` in het contract (eigenaar ai-server-manager) en
+  maakt de kopieen in de andere repos byte-gelijk. Een vaste naam uit het contract verandert daarna niet meer in één
+  repo los (`<WERKMAP>/.lokaal/plan/uit/VALKUILEN.md`, V-121).
+- **Bron:** [CONTRACT] koppen "1.2 Open besluiten (tot het besluit geldt de veiligste stand)" en "2. Apps, images en
+  poorten"; [B03-PLAN] tabelrij B-F3-1 en de deltarij Δ-CONTRACT-MT; `STAPPEN_P5.md`, kop "2.2 Besluiten en gegevens die
+  vooraf nodig zijn" (rij "Repo en `app_id` van `mt`") en stap S-P5-01 bouwpunt 3.
+
+#### Z-17 — Zigbee2MQTT in of naast de image van my_house
+
+- **Status: GENOMEN** op 2026-11-11: optie 1 (variant a), "Zigbee2MQTT IN de image van my_house, optioneel (alleen aan
+  als in het formulier een USB-apparaat is opgegeven)". Gevolg voor de bouw: deel 1.5, rij Z-17. Nog vast te leggen in
+  de repo via A-BOUW in ai-server-manager (0.3). Niet opnieuw vragen; het menu hieronder staat er ter verwijzing.
+  Het gevolg van optie 1 "het manifest krijgt `devices` voor de dongle met `privilege_reason`" kan de huidige
+  manifeststandaard niet uitdrukken; daarover gaat open besluit Z-21 (hieronder).
+
+- **Moment:** P3, vóór S-P3-720 (`<WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`, stap S-P3-720, "Stop en vraag als").
+- **Raakt:** my_house `docs/adr/ADR-0004-alles-in-een-custom-app.md` besluit 6 (en besluit 4: MQTT nu alleen binnen
+  de container; besluit 10: `devices` in het manifest alleen voor de optionele dongle); C1.3-MH-03, C1.3-MH-06; stappen
+  S-P3-720 (bouwpunt 6) en S-P3-755 (bouwpunt 2, apparaat-doorgifte in `deploy/truenas/CUSTOM_APP.md`); D13
+  (Zigbee-hardware); I05-05-07 (stap Zigbee van de controlelijst, S-P3-440 bouwpunt 4).
+- **Zonder besluit geldt:** Zigbee2MQTT zit niet in de image (S-P3-720 bouwpunt 6); `CUSTOM_APP.md` zegt dat Zigbee nog
+  open is (S-P3-755 bouwpunt 2). BLOK-13 wordt hierdoor niet tegengehouden.
+- **Vraag:** "my_house wordt één standaard Custom App met één image. Zigbee2MQTT, het programma dat de Zigbee-USB-stick
+  bedient, kan op twee manieren mee. Of het TrueNAS-formulier op jouw NAS een USB-apparaat aan een app kan doorgeven, is
+  nog niet getest. Welke manier wil je?"
+- **Opties** (geen aanbevolen optie: ADR-0004 besluit 6 noemt beide varianten als open punt, zonder advies):
+  1. Variant a: Zigbee2MQTT als optioneel proces in dezelfde image; het gaat alleen aan als in het formulier een
+     USB-apparaat (`/dev/serial/by-id/...`) is doorgegeven. Gevolg: S-P3-720 neemt het proces op in de image en de
+     bewaker; S-P3-755 beschrijft de apparaat-doorgifte; het manifest krijgt `devices` voor de dongle met
+     `privilege_reason`.
+  2. Variant b: een aparte standaard Custom App of catalogusapp die met de MQTT-broker in my_house praat. Gevolg volgens
+     ADR-0004: dat vraagt een MQTT-poort op de host met een eigen wachtwoord, terwijl MQTT nu alleen binnen de container
+     luistert (besluit 4). Waar die aparte app vandaan komt is in de bron niet uitgewerkt.
+  3. Nog niet beslissen. Gevolg: de stand zonder besluit; de image komt er zonder Zigbee2MQTT.
+- **Na het besluit:** vastleggen (0.3); S-P3-720 legt de keuze ook vast in het nieuwe ADR van my_house (bouwpunt 6).
+  Bij optie 2 eerst A-VERKEN laten uitzoeken waar de aparte app vandaan komt en wat besluit 4 dan wordt; daarna legt de
+  regisseur dat opnieuw voor. In alle gevallen blijft het werken met echte Zigbee-hardware NIET GEVALIDEERD (hardware)
+  tot D13 en `STAPPEN_P6.md` onderdeel N-P6-06.
+- **Bron:** my_house `docs/adr/ADR-0004-alles-in-een-custom-app.md`, kop "Besluit (ontwerp)", punten 4, 6 en 10;
+  `STAPPEN_P3.md`, stappen S-P3-720 en S-P3-755.
+
+#### Z-18 — Excel-titels van I05 die YAML noemen
+
+- **Moment:** P3, vóór S-P3-440 (`<WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`, stap S-P3-440, regel "Vooraf").
+- **Raakt:** I05-05-02 (Excel-titel "Eerste YAML zonder Zigbee/tunnel") en I05-05-03 ("TrueNAS Install via YAML");
+  jelly-leon-platform `install/checklists/I05_MY_HOUSE.checklist.yaml` (nieuw in S-P3-440); ai-server-manager
+  `docs/platform-v2/08_EXCEL/tasks.json` en `docs/platform-v2/03_INSTALLATIE/I05_MY_HOUSE.md`, met hun kopieen
+  (`docs/platform-v2/EXCEL_TAKEN.json` en `docs/platform-v2/03_INSTALLATIE/I05_MY_HOUSE.md` in jelly-leon-platform);
+  vaste regel 9 in `<WERKMAP>/.lokaal/plan/uit/00_LEES_EERST.md` (nooit YAML of compose als installatieweg).
+- **Zonder besluit geldt:** optie 1 (S-P3-440 bouwpunt 1: "Zonder antwoord geldt (1): dat verandert niets aan de bron").
+- **Vraag:** "Twee taken van my_house in de Excel heten 'Eerste YAML zonder Zigbee/tunnel' en 'TrueNAS Install via
+  YAML'. YAML is als installatieweg verboden; my_house wordt een standaard Custom App. De controlelijst moet de
+  Excel-titel letterlijk overnemen. Wat wil je?"
+- **Opties** (geen aanbevolen optie: de stap noemt optie 1 alleen als stand zonder antwoord):
+  1. Titels letterlijk laten staan. In de uitvoertekst van de controlelijst staat de weg via het formulier van de
+     standaard Custom App, met een regel die uitlegt dat het document YAML noemt en dat YAML niet wordt gebruikt.
+     Gevolg: geen wijziging in de Excel of in het I05-document.
+  2. De twee Excel-taken en het I05-document laten hernoemen in ai-server-manager. Gevolg: een programmawijziging
+     (Excel, `EXCEL_TAKEN.json` in alle kopieen en het document); S-P3-440 wacht tot de nieuwe `EXCEL_TAKEN.json` in
+     jelly-leon-platform is overgenomen.
+- **Na het besluit:** vastleggen (0.3); S-P3-440 vraagt het antwoord ook in VOORTGANG.md. Bij optie 2: werk in
+  ai-server-manager vóór S-P3-440; `STAPPEN_P3.md` had daar op 2026-11-11 geen eigen stap voor (vaststellen met
+  `grep -n 'I05-05-02' <WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`); de regisseur laat die stap eerst toevoegen.
+- **Bron:** `STAPPEN_P3.md`, stap S-P3-440 bouwpunt 1 en "Stop en vraag als"; ai-server-manager
+  `docs/platform-v2/08_EXCEL/tasks.json`, rijen I05-05-02 en I05-05-03 (veld "Taak").
+
+#### Z-19 — "Module uit": 404 of 501
+
+- **Status: GENOMEN** op 2026-11-11: optie 1, "'module uit' geeft 404 zoals ADR-0030; afwijking van WP-JSON in het
+  bewijs vermelden". Gevolg voor de bouw: deel 1.5, rij Z-19 (ook: documentatiestap in ai-server-manager voor de
+  acceptatie van B03-033 en B03-035 in WP-JSON). Nog vast te leggen in de repo via A-BOUW in ai-server-manager (0.3).
+  Niet opnieuw vragen; het menu hieronder staat er ter verwijzing.
+
+- **Moment:** start golf 2, vóór S-G2-28 (`<WERKMAP>/.lokaal/plan/uit/STAPPEN_P4_GOLF1_2.md`, stap S-G2-28, "Stop en
+  vraag als": de gate G-F2-5 wacht erop).
+- **Raakt:** de routes van elke module van de Jelly Leon-plugin (pijplijn van B03-017); B03-033, B03-035; stappen S-G2-24
+  (bewijs B03-033) en S-G2-28; repo jelly-leon (`Core/Http/JlPipeline.cs`, `Modules/Devices/DevicesController.cs`);
+  WP-JSON (`<WERKMAP>/ai-server-manager/docs/platform-v2/08_EXCEL/b03/werkpakketten.json`) in ai-server-manager.
+- **Zonder besluit geldt:** 404 volgens jelly-leon `docs/adr/ADR-0030-b03-017-foutcatalogus-pipeline-en-1-mib-per-route.md`
+  (zo is het gebouwd); de afwijking van WP-JSON staat letterlijk in de EVIDENCE-opmerking (`STAPPEN_P4_GOLF1_2.md`,
+  kop "8.3 Golf 2", alinea "Module uit", en S-G2-28 bouwpunt 5).
+- **Vraag:** "Als een module van Jelly Leon uit staat, wat krijgt een aangemelde gebruiker dan terug op de routes van
+  die module? De pluginlaag geeft nu 404 ('niet gevonden'). De werkpakketten B03-033 en B03-035 vragen 501
+  `capability_unavailable` ('functie niet beschikbaar'). Wie niet is aangemeld krijgt in beide gevallen 401."
+- **Opties** (geen aanbevolen optie: de bronnen spreken elkaar tegen en geen van beide geeft een afweging):
+  1. 404, zoals ADR-0030 en de bestaande modules. Gevolg: sluit aan bij [B03-PLAN] kop "10.1 Uitbreidingsladder en
+     pluginverpakking: één plugin met modules" ("module uit = haar routes, events, jobtypes en webdelen zijn weg"); de
+     acceptatie van B03-033 en B03-035 in WP-JSON moet in ai-server-manager worden aangepast (documentatiestap).
+  2. 501 `capability_unavailable`, zoals WP-JSON B03-033 en B03-035. Gevolg: sluit aan bij de betekenis die het contract
+     aan die code geeft ("functie bestaat niet of is (nog) niet beschikbaar", [CONTRACT] kop "5. Gemeenschappelijke
+     API-regels"); ADR-0030, de pijplijn en de bestaande modules in jelly-leon moeten worden aangepast, met tests.
+- **Na het besluit:** vastleggen (0.3). Optie 1: documentatiestap in ai-server-manager (WP-JSON). Optie 2: herstelstap
+  in jelly-leon (nieuw ADR dat ADR-0030 punt 2 vervangt, pijplijn en tests), vóór de gate G-F2-5.
+- **Bron:** jelly-leon `docs/adr/ADR-0030-b03-017-foutcatalogus-pipeline-en-1-mib-per-route.md`, kop "Besluit", punt 2;
+  WP-JSON rijen B03-033 en B03-035, veld Acceptatie; `STAPPEN_P4_GOLF1_2.md`, kop "8.3 Golf 2" (alinea "Module uit")
+  en stap S-G2-28.
+
+#### Z-20 — Zes B03-werkpakketten zonder golf
+
+- **Status: GENOMEN** op 2026-11-11: optie 1 voor alle zes, "B03-002, -003, -006, -008, -011, -012 IN P4 BOUWEN (per
+  werkpakket eerst A-VERKEN, dan stappen in een golf)". Gevolg voor de bouw: deel 1.5, rij Z-20 (stappen S-G3-28 t/m
+  S-G3-32 en S-G4-49 t/m S-G4-54); BG-17 wordt daarmee een open besluit vóór S-G3-28 (2.9). Nog vast te leggen in de repo via A-BOUW in ai-server-manager
+  (0.3). Niet opnieuw vragen; het menu hieronder staat er ter verwijzing.
+
+- **Moment:** ruim vóór golf 3. Moeten ze in P4 gebouwd worden, dan moeten er eerst stappen voor geschreven worden; de
+  gate van P4 (S-G4-95 in `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P4_GOLF3_4.md`) noemt ze.
+- **Raakt:** B03-002 (Universele bibliotheek), B03-003 (Beschikbaarheid van clients), B03-006 (Metadata en anime
+  mapping), B03-008 (Semantische scènezoeker), B03-011 (Offline downloaden), B03-012 (Live-tv en DVR); repos jelly-leon
+  en jelly-leon-clients (het clientdeel van B03-003 staat daar op "Geblokkeerd"); BG-17 (moment "bij B03-006"); BG-06
+  (noemt B03-008); `STAPPEN_P6.md` onderdeel N-P6-09 (alleen de NAS- en apparaatdelen). De gedeelde cue-extractie is
+  geen deel van B03-008: die bouwt S-G1-34 (B03-018, de bestandspas in `STAPPEN_P4_GOLF1_2.md`), en S-G3-22 in
+  `STAPPEN_P4_GOLF3_4.md` verwijst daarnaar (gezien 2026-11-11). B03-008 (semantische scènezoeker) krijgt na dit
+  besluit eigen bouwstappen in `STAPPEN_P4_GOLF3_4.md`: S-G4-49 en S-G4-50 (alleen zoeken op tekst; BG-06).
+- **Zonder besluit geldt:** geen bouwstap in P4; zo staat het in [B03-FASE] kop "3. Golven en werkpakketten" (geen golf)
+  en in WP-JSON (geen werkpakket). A-GATE noemt ze in S-G4-95 als "niet in P4 gebouwd volgens B03_FASERING; ligt bij
+  STAPPEN_P6.md", niet als gehaald.
+- **Vraag:** "Volgens het fasedocument hoort bij P4 ook scene search, live-tv/DVR en offline apps waar haalbaar. In de
+  golfplanning van B03 2.0 hebben zes oudere werkpakketten geen plek: universele bibliotheek, beschikbaarheid van
+  clients, metadata en anime-mapping, semantische scènezoeker, offline downloaden en live-tv/DVR. Wat doen we ermee?
+  Je mag per werkpakket anders kiezen."
+- **Opties** (geen aanbevolen optie: geen bron weegt dit af):
+  1. In P4 bouwen. Gevolg: per werkpakket eerst A-VERKEN, dan stappen in een golf toevoegen aan het plan; [B03-FASE]
+     en WP-JSON krijgen ze via een documentatiestap in ai-server-manager. Voor B03-006 volgt dan BG-17.
+  2. Uitstellen tot na P4. Gevolg: geen bouwstap in P4; S-G4-95 noemt ze als niet gebouwd; ze blijven open in de
+     Excel en worden later opnieuw voorgelegd (het moment noemt geen bron).
+  3. Laten vallen. Gevolg: [GATES] kop "Fase P4 — Universele mediaplatform" en de Excel moeten in ai-server-manager
+     worden aangepast (documentatiestap; de status in de Excel volgt [CONTRACT] kop "11. Bewijs en Excel
+     (EVIDENCE.json)"); BG-17 hoeft dan niet gevraagd te worden als B03-006 vervalt.
+- **Na het besluit:** vastleggen (0.3), per werkpakket-ID. De eigenaar van `STAPPEN_P4_GOLF1_2.md` en
+  `STAPPEN_P4_GOLF3_4.md` werkt de tabellen met werkpakketten zonder bouwstap bij.
+- **Bron:** [GATES] kop "Fase P4 — Universele mediaplatform", regel "Doel" (noemt letterlijk scene search, live-tv/DVR
+  en offline apps waar haalbaar; B03-002, B03-003 en B03-006 noemt die regel niet bij naam); [B03-FASE] kop "3. Golven
+  en werkpakketten"; WP-JSON (geen object voor deze zes); ai-server-manager `docs/platform-v2/08_EXCEL/tasks.json`
+  (titels); `STAPPEN_P4_GOLF3_4.md`, stap S-G4-95; `STAPPEN_P4_GOLF1_2.md`, de tabel met werkpakketten zonder bouwstap.
+
+#### Z-21 — Hoe legt het manifest van my_house de optionele Zigbee-stick vast?
+
+- **Moment:** P3, vóór S-P3-755 (`<WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`, stap S-P3-755, bouwpunt 1 en "Stop en
+  vraag als").
+- **Raakt:** besluit Z-17 (gevolg "het manifest krijgt `devices` voor de dongle met `privilege_reason`"); my_house
+  `deploy/manifest/my_house.manifest.yaml` en `deploy/truenas/CUSTOM_APP.md` (S-P3-755); my_house
+  `docs/adr/ADR-0004-alles-in-een-custom-app.md` besluit 10; de manifeststandaard in appstore-en-fork
+  (`schemas/manifest-v1.schema.json`, `apps/api/src/appstore/manifest/translate.py`, `docs/MANIFESTSTANDAARD.md`);
+  [CONTRACT] kop "9. Manifeststandaard (B08-001, eigenaar `appstore-en-fork`)"; C1.3-MH-06, I05-05-07; D01, D13.
+  Waarom dit open is: gemeten in appstore-en-fork op `7b3159d` (HEAD op 2026-11-11): `privileges.devices[]` eist
+  een vast `host_device` (patroon `^/dev/[A-Za-z0-9._/-]+$`); `CustomApp` heeft geen apparaatveld; `Parameter.type`
+  kent geen apparaattype (wel `gpu`, de enige optionele parameter voor hardware); `translate.py` zet
+  `privileges.devices` letterlijk in het formulier (`devices=[IxDevice(host_device=..., ...)]`). Een optionele stick
+  waarvan de gebruiker het pad kiest is dus niet uit te drukken, en een vast `/dev/serial/by-id/...`-pad verzinnen mag
+  niet (V-097). Het contract verandert niet tijdens P3 (`STAPPEN_P3.md`, kop "2.1 Gate ervoor (P2 naar P3)").
+- **Zonder besluit geldt:** (zo in `STAPPEN_P3.md`, S-P3-755) S-P3-755 maakt de rest van de stap af en pusht, met het
+  manifest ZONDER apparaat en zonder verzonnen pad; de stick werkt alleen via het handmatige formulierveld voor
+  apparaten dat `deploy/truenas/CUSTOM_APP.md` beschrijft (onderdeel "Zigbee-stick (alleen als je er een hebt)", met
+  `<NAAM-VAN-JE-STICK>` als plaatshouder, doorgegeven naar `/dev/zigbee`). Het bewijs van C1.3-MH-06 noemt dat het
+  manifest de stick niet kon vastleggen.
+- **Vraag:** "Zigbee2MQTT komt optioneel in de image van my_house (jouw besluit). Het manifest, waarmee de Hub de app
+  installeert, kan nu alleen een vast USB-apparaat vastleggen, geen optionele stick waarvan jij het pad kiest. Hoe
+  willen we de stick regelen?"
+- **Opties** (geen aanbevolen optie: ADR-0004 besluit 10 wil het apparaat in het manifest, maar geen bron weegt dat af
+  tegen een contractronde):
+  1. De manifeststandaard krijgt een optionele apparaatparameter, zoals de optionele GPU-parameter
+     (`docs/MANIFESTSTANDAARD.md`, alinea "GPU als optionele parameter"). Gevolg: wijziging van [CONTRACT] kop 9 en dus
+     een contractronde in ai-server-manager met kopieën byte-gelijk in alle repos, plus schema, regels en vertaling in
+     appstore-en-fork. Niet tijdens P3: óf vóór de gate van P2 (dan kan S-P3-755 het apparaat meteen vastleggen), óf
+     als eigen stap na P3 (dan eerst zoals "zonder besluit", later het manifest bijwerken). De regisseur laat die stap
+     eerst toevoegen.
+  2. Alleen het formulierveld in `CUSTOM_APP.md`, zonder manifestveld. Gevolg: gelijk aan de stand zonder besluit; geen
+     contractwijziging; de Hub installeert my_house zonder stick en de gebruiker voegt de stick zelf toe in het
+     formulier van TrueNAS. Afleiding van dit plan: ADR-0004 besluit 10 wordt dan niet uitgevoerd zoals geschreven; het
+     nieuwe ADR van my_house (S-P3-720) legt dat vast.
+- **Na het besluit:** vastleggen (0.3). Optie 1: contractronde (P-CONTRACT) en een stap in appstore-en-fork laten
+  toevoegen, op het gekozen moment. Optie 2: de eigenaar van `STAPPEN_P3.md` neemt het ADR-punt op in S-P3-720 of S-P3-755.
+  In beide gevallen blijft werken met een echte stick NIET GEVALIDEERD (hardware, echte NAS) tot D01, D13 en
+  `STAPPEN_P6.md` onderdeel N-P6-06.
+- **Bron:** `STAPPEN_P3.md`, stap S-P3-755 (bouwpunt 1 en "Stop en vraag als"); appstore-en-fork
+  `schemas/manifest-v1.schema.json` (`Privileges.devices`, `CustomApp`, `Parameter.type`),
+  `apps/api/src/appstore/manifest/translate.py` en `docs/MANIFESTSTANDAARD.md` (alinea's "GPU als optionele parameter"
+  en "Apparaten"); [CONTRACT] kop "9. Manifeststandaard (B08-001, eigenaar `appstore-en-fork`)"; my_house
+  `docs/adr/ADR-0004-alles-in-een-custom-app.md`, kop "Besluit (ontwerp)", punt 10; rapport van de eigenaar van P3
+  (`<WERKMAP>/.lokaal/plan/afmaakrapporten/ronde3_p3.md`, OPEN punt 2).
+
+### 2.16 Contract- en beleidsvragen van P2 die een keuzemenu kunnen worden (C-12)
+
+Stand 2026-11-11 (11:25): C-12 is door de gebruiker genomen via een keuzemenu van de regisseur (deel 1.5). De
+eerdere route "eerst naar de eigenaars van de bron" (`STAPPEN_P2.md` kop 8.2) vervalt daarmee; het menu blijft
+hieronder staan ter verwijzing. Niet opnieuw vragen.
+
+#### C-12 — Hoe krijgt Node-RED een beheerder en een dienstaccount?
+
+- **Status: GENOMEN** op 2026-11-11: optie 1, "Voorziening zonder geheim": de manifeststandaard (appstore-en-fork)
+  krijgt een voorziening voor een beheerder en een dienstaccount zonder geheim in het Custom App-formulier; het profiel
+  van home-control-hub (`build_profile` / `define_arguments` / `credentialSecret`) vervalt of wordt daaraan
+  gelijkgetrokken. De uitwerking moet nog ontworpen worden. Gevolg voor de bouw: deel 1.5, rij C-12. Nog vast te leggen
+  in de repo via A-BOUW in ai-server-manager (0.3). S-P2-290, S-P2-295, S-P2-310 en S-P2-410 hoeven niet meer op een
+  besluit te wachten.
+
+- **Moment:** in P2, vóór S-P2-290, S-P2-295 en S-P2-310 (`<WERKMAP>/.lokaal/plan/uit/STAPPEN_P2.md`); samen met
+  vraag C-5 (S-P2-410 bouwpunt 6).
+- **Raakt:** home-control-hub `apps/api/src/integrations/domains/automation/policy.py` (`build_profile`,
+  `define_arguments`: argumenten `--define=...` voor het Custom App-formulier met twee accounts, beheerder en
+  `hub-dienst`, als bcrypt-hash, en een `credentialSecret`) en de route
+  `POST /integrations/v1/automation/hardening-profile` in `router.py` (commit `4814b59`); jelly-leon-platform
+  `install/manifests/node-red.manifest.yaml` en `docs/adr/ADR-0023-node-red-als-custom-app.md` (besluiten 2 en 6:
+  instellingen via `FLOWS`, geen gebruikers, geen `credentialSecret`); [CONTRACT] kop "3.1 Uitgangspunten"; B11-001,
+  I10-10-01...I10-10-06; stappen S-P2-290, S-P2-295, S-P2-310, S-P2-410.
+- **Zonder besluit geldt:** (zo in `STAPPEN_P2.md` kop 8.2, rij C-12) geen keten wijzigt of verwijdert het profiel van
+  home-control-hub en geen keten zet een geheim of gebruiker in het manifest; `NODE_RED_CUSTOM_APP.md` beschrijft het
+  profiel niet als installatiestap; R-VEILIG legt de bevinding vast in S-P2-295. Gevolg: na C-11 is de editor zonder
+  beheerder helemaal dicht en kan home-control-hub zonder dienstaccount niets lezen (isolatiecontrole, momentopnamen).
+- **Vraag:** "Node-RED heeft na jouw besluit (geen anonieme toegang) een beheerder nodig, en home-control-hub een eigen
+  dienstaccount om mee te lezen. home-control-hub kan nu formulierargumenten maken met die twee accounts en een sleutel
+  voor de versleuteling. Het contract verbiedt geheimen in het Custom App-formulier. Hoe regelen we de accounts?"
+- **Opties:**
+  1. De manifeststandaard krijgt een voorziening voor een beheerder en een dienstaccount zonder geheim in het formulier
+     (vraag C-5); het profiel van home-control-hub vervalt of wordt daaraan gelijkgetrokken. (Aanbevolen; onderbouwd door
+     [CONTRACT] kop "3.1 Uitgangspunten": "Nooit geheimen in het Custom App-formulier", met als enige uitzondering het
+     eenmalige enrollment-token. Hoe die voorziening eruitziet staat in geen bron.) Gevolg: werk voor appstore-en-fork
+     (manifeststandaard), jelly-leon-platform (manifest) en home-control-hub (profiel), elk in een eigen stap.
+  2. Het profiel van home-control-hub blijft de bron voor de accounts, met een contractuitzondering in [CONTRACT] kop
+     "3.1 Uitgangspunten". Gevolg: contractronde in ai-server-manager en kopieen byte-gelijk in alle repos; het
+     formulier krijgt dan wachtwoordhashes en een `credentialSecret`.
+- **Na het besluit:** vastleggen (0.3; bij optie 2 ook het contract). Daarna past de eigenaar van `STAPPEN_P2.md` de
+  stappen S-P2-290, S-P2-295, S-P2-310 en S-P2-410 aan. Gekozen is optie 1: de ontwerpstap is S-P2-510 (baan
+  appstore-en-fork, `STAPPEN_P2.md`); de bouw volgt in `STAPPEN_P3.md`: S-P3-490 (appstore-en-fork), daarna S-P3-445
+  (jelly-leon-platform) en S-P3-360 (home-control-hub). Het ontwerp-ADR van S-P2-510 moet vaststellen of [CONTRACT]
+  kop "3.1 Uitgangspunten" of kop "9. Manifeststandaard" verandert (S-P2-510 bouwpunt 2e, `contract_meldingen`). Zo ja,
+  dan komt die contractronde (ai-server-manager, P-CONTRACT, kopieën byte-gelijk) vóór de gate van P2 (S-P2-910),
+  want het contract verandert niet tijdens P3; anders starten S-P3-490, S-P3-445 en S-P3-360 niet (S-P3-490 "Vooraf").
+- **Bron:** `STAPPEN_P2.md`, kop "8.2 Contract- en beleidsvragen (voor de eigenaar van het contract of van de
+  manifeststandaard)", rijen C-5 en C-12; [CONTRACT] kop "3.1 Uitgangspunten"; jelly-leon-platform
+  `docs/adr/ADR-0023-node-red-als-custom-app.md` besluiten 2 en 6.
+
 ---
 
 ## 3. Taken van de gebruiker
@@ -1195,11 +1542,11 @@ akkoord. Regels voor de regisseur:
 
 | Moment | Taken |
 |---|---|
-| NU | T-01, T-03 (na besluit Z-01) |
+| NU | T-01 |
 | Start golf 2 | T-08, T-17 |
 | Start golf 3 | T-09 |
 | Voor golf 4 | T-14, T-19, T-20 |
-| Voor P5 | T-22 |
+| Voor P5 | T-22; T-03 (na besluit Z-01, dat ook "voor P5" is; zie 2.0) |
 | Start P6 | T-02, T-04, T-05, T-11, T-13, T-15, T-16, T-18 |
 | In P6, op de NAS | T-06, T-07, T-12, T-21 |
 | Na de Cutover-gate | T-10 |
@@ -1241,7 +1588,8 @@ akkoord. Regels voor de regisseur:
 - **Waarom alleen de gebruiker:** een fine-grained token kan alleen via de GitHub-web-UI worden gemaakt.
 - **Blokkeert:** het automatisch pushen van `sync/<tag>` (BLOK-05); echt forkbeheer B08-005. Bouwen wordt er niet door
   tegengehouden.
-- **Herinneren:** NU (samen met Z-01) en opnieuw voor P5.
+- **Herinneren:** samen met Z-01, dus voor P5 (2.0). Eerder alleen als de gebruiker er zelf naar vraagt; het blokkeert
+  geen bouwstap.
 - **Controle:** de eerstvolgende run van de workflow "Upstream-sync" meldt niet meer dat het geheim ontbreekt:
   `gh run list --repo <eigenaar>/jelly-leon --workflow upstream-sync.yml`.
 - **Bron:** zie Z-01.
@@ -1250,10 +1598,13 @@ akkoord. Regels voor de regisseur:
 
 - **Wat precies:** de gegevens uit deel 2.12 invullen in de onboarding-wizard van de Hub, of ze laten meten via de
   TrueNAS-API. Daar hoort ook bij: of Jelly Leon beide GPU's ziet (de bron meldt dat de ingebouwde GPU naast een losse
-  kaart vaak uit staat in het BIOS; niet op deze NAS gecontroleerd).
+  kaart vaak uit staat in het BIOS; niet op deze NAS gecontroleerd), en het RAM van de NAS, de TrueNAS-versie en de
+  kernel (nodig voor BG-07; [BG] kop "9. Gegevens die nodig zijn (geen keuze)", rij "NAS-RAM, TrueNAS-versie en
+  kernel"). Het NAS-RAM is pas te vragen als de belastingtest JLT-66 een uitkomst heeft (moment van BG-07).
 - **Waarom alleen de gebruiker:** het zijn feiten over de eigen NAS, het netwerk, de apparaten en de accounts.
 - **Blokkeert:** de Hub-gates uit deel 2.12 (BLOK-20) en alle NAS-rijen.
-- **Herinneren:** D03, D08, D11 voor P5; de rest bij de start van P6; D12...D14 bij de hardwaretest van my_house.
+- **Herinneren:** bij de start van P6 (ook D03, D08 en D11: S-P5-01 vraagt die niet, zie 2.12); D12...D14 bij de
+  hardwaretest van my_house.
 - **Controle:** de gate in de Hub staat op "toegestaan".
 - **Bron:** [D]; [BG] kop "9. Gegevens die nodig zijn (geen keuze)".
 
@@ -1269,12 +1620,13 @@ akkoord. Regels voor de regisseur:
 #### T-06 — De tests op de echte NAS uitvoeren
 
 - **Wat precies:** het NAS-deel van P6 doorlopen en zelf afvinken. Het stappenplan noemt dat "DEEL B" met de
-  onderdelen N-P6-01 en verder; op 2026-11-11 stond daarvan alleen de gatetabel in het bestand.
+  veertien onderdelen N-P6-01 tot en met N-P6-14 (`STAPPEN_P6.md`, kop "DEEL B - NAS-acceptatiedraaiboek", gezien op
+  2026-11-11 later die dag; eerder stond daarvan alleen de gatetabel in het bestand).
 - **Waarom alleen de gebruiker:** er is geen echte NAS in de bouwomgeving (BLOK-01).
 - **Blokkeert:** elke rij met NIET GEVALIDEERD (echte NAS); de rij P6 in de Excel.
 - **Herinneren:** in P6, zodra het deel zonder NAS klaar is.
-- **Bron:** `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P6.md` kop "2.2 Gates tijdens de fase (start van elk onderdeel van
-  DEEL B)" (gezien op 2026-11-11); [GATES].
+- **Bron:** `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P6.md` koppen "2.2 Gates tijdens de fase (start van elk onderdeel van
+  DEEL B)" en "DEEL B - NAS-acceptatiedraaiboek" (gezien op 2026-11-11); [GATES].
 
 #### T-07 — Akkoord op elk verschil in het voor/na-rapport
 
@@ -1458,7 +1810,7 @@ Een blokkade is iets wat technisch vastzit: een stap kan het niet oplossen door 
 | BLOK-10 | meekijken van buiten huis (B03-027) | gebruiker, omgeving | BG-09 en een gevalideerde Tailscale op de NAS |
 | BLOK-11 | de echte overname vanuit Emby (JLT-74) | omgeving, volgorde | zie de lijst bij BLOK-11 |
 | BLOK-12 | delen van de upgradetests JLT-61, JLT-62, JLT-67 | volgorde, extern | zie BLOK-12 |
-| BLOK-13 | my_house installeren als standaard Custom App | volgorde | C1.3-MH-03 in P3 |
+| BLOK-13 | my_house installeren als standaard Custom App | volgorde | C1.3-MH-03 in P3: S-P3-720 en S-P3-725 |
 | BLOK-14 | MediaGuard-update via de Hub; sleutelrotatie | volgorde | twee ADR's in ai-server-manager |
 | BLOK-15 | inventaris van bestaande apps voor appstore-en-fork | volgorde, omgeving | Hub opent twee leesroutes voor diensten; daarna de echte NAS |
 | BLOK-16 | zekerheid over het gedrag van TrueNAS Custom Apps | omgeving | meting op de echte NAS (D01) |
@@ -1615,7 +1967,12 @@ Een blokkade is iets wat technisch vastzit: een stap kan het niet oplossen door 
   conformiteitspunt C1.3-MH-03 (moment P3; nieuw `deploy/allinone/*`). De map `<WERKMAP>/my_house/deploy` bestond op
   2026-11-11 nog niet.
 - **Wat wel kan:** al het andere werk aan my_house.
-- **Opgeheven door:** de bouwstap voor C1.3-MH-03 in P3.
+- **Opgeheven door:** de bouwstappen voor C1.3-MH-03 in P3: S-P3-720 (alles-in-een image deel 1: image, bewaker,
+  healthcheck, eerste start) en S-P3-725 (deel 2: CI, rooktest, digests) in `<WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`.
+  Het manifest en het installatiedocument van de Custom App volgen daarna in S-P3-755 (C1.3-MH-06). Zigbee2MQTT komt
+  volgens besluit Z-17 (genomen 2026-11-11, deel 1.5) als optioneel proces in de image (alleen aan met een doorgegeven
+  USB-apparaat); dat houdt deze blokkade niet tegen. Installatie op de NAS blijft daarna
+  NIET GEVALIDEERD (echte NAS) tot `STAPPEN_P6.md` onderdeel N-P6-06.
 - **Controle:** `ls <WERKMAP>/my_house/deploy/allinone`
 - **Bron:** [CONF] punt C1.3-MH-03; [EVIDENCE my_house] rij B06-009.
 
@@ -1741,12 +2098,16 @@ meldt het nummer. Het bijwerken van een bron is een bouwstap in de repo die eige
 | 5-3 | BG-04 is genomen als "via de Hub", maar teksten van voor het besluit gaan uit van een sleutel in Jelly Leon zelf: [CONF] punten C1.3-JL-08 en C1.3-MGU-05, en volgens `STAPPEN_P4_GOLF3_4.md` (alinea "Spanning BG-04") ook de werkpakketteksten B03-043, B03-056 en B03-064. | Het besluit. Geen stap voegt een sleutelveld voor MediaGuard toe aan een beheerpagina; blijkt het zonder sleuteloverdracht niet haalbaar, dan deel 2.13. | documentatiestap in ai-server-manager; code: eerst A-VERKEN op B03-009 |
 | 5-4 | BG-03 hoort "vóór golf 1" en BG-22 bij "P4-0 (overname)", maar beide staan open terwijl dat werk al gebouwd wordt. BG-03 is gebouwd volgens de regel "zonder besluit". | Nu voorleggen (deel 2.1). | regisseur |
 | 5-5 | [BG] zegt: tot een besluit geldt de veiligste stand, "nooit automatisch het advies". Een uitgeschreven stand zonder besluit staat er alleen bij BG-01, BG-02, BG-03, BG-09 en BG-21 (regel "Zonder besluit"), en in de regel "Advies" bij BG-05 ("Tot dan geldt (b)"), BG-07 ("tot dan (b)") en BG-26 ("Zonder keuze speelt een officiële app precies zoals standaard Jellyfin"). `STAPPEN_P4_GOLF3_4.md` (kop "3. Besluiten die eerst genomen moeten zijn") vult de kolom "Zonder besluit" bij andere besluiten met de tekst van het advies, bijvoorbeeld BG-11 ("huishouden") en BG-13 ("na 10 s doorgaan"); bij BG-33 staat er een ruimere stand ("beheerders en aangewezen volwassenen") dan in `STAPPEN_P4_GOLF1_2.md` ("alleen beheerders"). Dit bestand zegt daar "niet uitgeschreven in de bron" en laat de stap stoppen of de minst ingrijpende stand kiezen. | Regel 0.2-4 van dit bestand, tot het hoofdplan anders beslist. De eenvoudigste oplossing: de besluiten van een golf voorleggen voor de golf start, dan speelt het niet. | hoofdplan |
-| 5-6 | Vaste regel: geen modelnaam in commits en geen force-push. In de commits tot en met 2026-11-10 staat een attributieregel met een modelnaam; dat is alleen met een force-push te herstellen. [CONTRACT] kop "12. Commit- en pushregels" spreekt bovendien van "de attributieregel(s) die de lopende sessie voorschrijft". | Historie blijft staan; nieuwe commits volgen de vaste regel (Z-04). | gebruiker beslist |
+| 5-6 | Vaste regel: geen modelnaam in commits en geen force-push. In de commits tot en met 2026-11-10 staat een attributieregel met een modelnaam; dat is alleen met een force-push te herstellen. [CONTRACT] kop "12. Commit- en pushregels" spreekt bovendien van "de attributieregel(s) die de lopende sessie voorschrijft". | Historie blijft staan; nieuwe commits volgen de vaste regel. Besluit Z-04 genomen op 2026-11-11 (deel 1.5). | gebruiker heeft beslist; vastleggen in de repo (0.3) |
 | 5-7 | [CONTRACT] kop "12. Commit- en pushregels": al het werk op de werkbranch, geen PR's. In vijf repos is `main` de standaardbranch; die bevat het werk niet. De release van my_house start op een push naar `main`. | Werkbranch; niets samenvoegen zonder de gebruiker (Z-06, BLOK-19). | gebruiker beslist |
 | 5-8 | [RUW] noemt onder de koppen "media-guard-ultimate" en "media-source-optimizer" andere standaardbranches dan nu gemeten. Op 2026-11-11 is in beide repos de werkbranch de standaardbranch. | De meting. Opnieuw meten: `gh api repos/<eigenaar>/<repo> --jq .default_branch`. | geen (agentrapporten zijn momentopnamen) |
 | 5-9 | `<WERKMAP>/.lokaal/plan/bron/STAND_PER_ID.tsv` meldt B03-017 als "GEEN BEWIJS (Niet gestart)", terwijl in jelly-leon op 2026-11-11 een commit met dat ID staat (`8a293727d`). In [EVIDENCE jelly-leon] stond op dat moment nog geen rij B03-017. | De stand in de repo. `STAND_PER_ID.tsv` is een momentopname; A-VERKEN meet opnieuw voor elke stap. | de bouwer van B03-017 (bewijsregel toevoegen) |
 | 5-10 | Vaste regel "nooit Geslaagd" naast de waarde `Sim-geslaagd` in EVIDENCE (op 2026-11-11 24 keer in het veld `validatie`; geen enkele `status` "Gereed" of "Geslaagd"). | Geen echte tegenstrijdigheid: `Sim-geslaagd` is een toegestane waarde van het veld `validatie` voor testrijen; het veld `status` blijft "Bezig" of "Geblokkeerd". Een reviewer keurt `Sim-geslaagd` dus niet af, wel elke `status` "Gereed" of "Geslaagd". | geen |
 | 5-11 | De ADR's over contract 1.3 leggen K1 en RV2 vast zonder voorbehoud. Dat de gebruiker K1 nog moet bevestigen en RV2 kan versoepelen staat alleen in de agentrapporten ([RUW] kop "ai-server-manager"). | Zoals gebouwd, tot de gebruiker anders beslist (Z-02, Z-03). | regisseur legt voor |
+| 5-12 | Node-RED-editor: jelly-leon-platform (`install/manifests/node-red.manifest.yaml`, `docs/adr/ADR-0023-node-red-als-custom-app.md` besluit 4) staat anoniem alleen lezen toe; home-control-hub eist voor B11-001 dat een lezer zonder aanmelding 401 krijgt (`apps/api/src/integrations/domains/automation/policy.py`, controle `anoniem_geweigerd`). | Besluit C-11 van 2026-11-11 (deel 1.5): geen anonieme toegang; home-control-hub houdt zijn controle. | bouwstap in jelly-leon-platform (`STAPPEN_P2.md` kop 8.2, rij C-11) |
+| 5-13 | "Module uit": jelly-leon `docs/adr/ADR-0030-b03-017-foutcatalogus-pipeline-en-1-mib-per-route.md` (kop "Besluit", punt 2) geeft 404; WP-JSON B03-033 en B03-035 (veld Acceptatie) vragen 501 `capability_unavailable`. | 404, zoals gebouwd: besluit Z-19, genomen op 2026-11-11 (deel 1.5). De afwijking van WP-JSON staat letterlijk in de EVIDENCE-opmerking. | gebruiker heeft beslist (Z-19, optie 1); documentatiestap in ai-server-manager: acceptatie van B03-033 en B03-035 in WP-JSON naar 404 (geen eigen stap-ID: "Ook vastleggen" in de eerstvolgende A-BOUW in ai-server-manager, 0.3); vastleggen in de repo (0.3) |
+| 5-14 | [GATES] kop "Fase P4 — Universele mediaplatform" noemt scene search, live-tv/DVR en offline apps als doel van P4; B03-002, B03-003, B03-006, B03-008, B03-011 en B03-012 staan in geen golf van [B03-FASE] kop 3 en niet in WP-JSON. | In P4 bouwen: besluit Z-20, genomen op 2026-11-11 (deel 1.5). Per werkpakket eerst A-VERKEN, dan de stappen S-G3-28 t/m S-G3-32 (golf 3) en S-G4-49 t/m S-G4-54 (golf 4) van `STAPPEN_P4_GOLF3_4.md`. | gebruiker heeft beslist (Z-20, optie 1); documentatiestap in ai-server-manager ([B03-FASE] kop 3 en WP-JSON; geen eigen stap-ID: "Ook vastleggen" in de eerstvolgende A-BOUW in ai-server-manager, 0.3); vastleggen in de repo (0.3) |
+| 5-15 | home-control-hub maakt met zijn beveiligingsprofiel (`policy.py`, `build_profile` en `define_arguments`) formulierargumenten met accounts (bcrypt-hash) en een `credentialSecret`; [CONTRACT] kop "3.1 Uitgangspunten" zegt "Nooit geheimen in het Custom App-formulier", en het manifest van jelly-leon-platform heeft geen gebruikers en geen `credentialSecret`. | Besluit C-12, genomen op 2026-11-11 (deel 1.5): een voorziening zonder geheim in de manifeststandaard; het profiel van home-control-hub vervalt of wordt daaraan gelijkgetrokken. Tot die voorziening ontworpen en gebouwd is, breidt niemand het profiel uit, beschrijft niemand het als installatieweg en zet niemand een geheim of gebruiker in het manifest. | gebruiker heeft beslist (C-12, optie 1); ontwerp S-P2-510 en bouw S-P3-490 in appstore-en-fork, daarna S-P3-445 in jelly-leon-platform (manifest) en S-P3-360 in home-control-hub (profiel); vastleggen in de repo (0.3) |
 
 Bronnen bij 5-10: [CONTRACT] kop "11. Bewijs en Excel (EVIDENCE.json)".
 
@@ -1764,7 +2125,7 @@ Elk punt is ONBEKEND tot het met het genoemde commando is vastgesteld. Alle comm
 | 6-4 | Wat er functioneel breekt als `/_shc/config.json` van my_house wordt afgeschermd (Z-08). | `grep -rn '_shc/config' <WERKMAP>/my_house --include=*.ts --include=*.tsx --include=*.kt` (zelfde commando als bij Z-08; op 2026-11-11 gaf het alleen treffers in `apps/web/src/hub.ts` en twee testbestanden) |
 | 6-5 | Welke methoden voor OneDrive het bouwplan als opties noemt (D04). | `grep -n -i 'onedrive' <WERKMAP>/ai-server-manager/docs/platform-v2/02_BOUWPLANNEN/B12_*.md` |
 | 6-6 | De veiligste stand bij de 22 besluiten waar in deel 2 "niet uitgeschreven in de bron" staat. Wat daar staat is afgeleid door dit plan en door geen bron bevestigd. | de gebruiker beslist (het besluit zelf voorleggen) |
-| 6-7 | Of de stap-ID's uit de andere planbestanden nog kloppen. Die bestanden werden op 2026-11-11 nog geschreven: `STAPPEN_P3.md` en `STAPPEN_P4_GOLF1_2.md` waren in opbouw (in het tweede stonden nog geen stappen, alleen de besluitentabel), en van DEEL B van `STAPPEN_P6.md` stond alleen de gatetabel. | `ls <WERKMAP>/.lokaal/plan/uit/` en `grep -n -E '^#{2,3} S-' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md` |
+| 6-7 | Of de stap-ID's uit de andere planbestanden nog kloppen. Die bestanden werden op 2026-11-11 nog geschreven en gecontroleerd (`PLAN_AFMAKEN.md`, taken PA-1 tot en met PA-9): toen dit bestand werd geschreven waren `STAPPEN_P3.md` en `STAPPEN_P4_GOLF1_2.md` in opbouw en stond van DEEL B van `STAPPEN_P6.md` alleen de gatetabel; later die dag had DEEL B de onderdelen N-P6-01 tot en met N-P6-14. | `ls <WERKMAP>/.lokaal/plan/uit/` en `grep -n -E '^#{2,3} (S-|N-P6-)' <WERKMAP>/.lokaal/plan/uit/STAPPEN_*.md` |
 | 6-8 | Of ronde 3 intussen punten uit dit bestand heeft opgelost (bijvoorbeeld het alles-in-een image van my_house, de ADR's van BLOK-14, de leesroutes van BLOK-15). | per punt het commando bij "Controle"; anders `git -C <WERKMAP>/<repo> log --oneline -20` |
 | 6-9 | Of de twee gates "Voor P4 (B03-functies)" gehaald zijn. | zie het slot van deel 4.2 |
 | 6-10 | Of een besluit na 2026-11-10 is genomen buiten de twee statusbronnen om. | de twee commando's in deel 0.3; bij twijfel vraagt de regisseur het de gebruiker |

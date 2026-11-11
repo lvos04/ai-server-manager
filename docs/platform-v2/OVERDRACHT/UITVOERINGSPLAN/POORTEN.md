@@ -40,6 +40,12 @@ stap niet klaar en heet hij in het rapport "Bezig" of "Geblokkeerd", nooit "klaa
 ### 0.2 Vaste begrippen
 
 - **Snelle variant**: alleen de controles voor het geraakte deel. Bedoeld om tijdens het werk vaak te draaien.
+  Elk commando draait LOS, met een eigen exitcode in het rapport (zoals regel O1 in de prompts van `AGENTEN.md`). In de
+  tabellen "Snel" staan ze daarom als "`a`; los daarna `b`". Staat er toch ergens (ook in "Volledig" of in een
+  algemene poort) een keten als `make lint && make test`, draai dan elk deel los: anders slaat een rode lint de tests
+  over en ziet de reviewer niet alle uitkomsten. Uitzonderingen die WEL aan elkaar vast blijven: `cd <map> && ...`
+  (het tweede deel hoort in die map) en "eerst maken, dan vergelijken" (bv. `make openapi && git diff --exit-code
+  docs/openapi/`).
 - **Volledige variant**: dezelfde controles als de CI van de repo, in dezelfde volgorde. Verplicht vóór de commit
   die een stap afsluit.
 - **Zwaar: ja**: het commando bouwt een image, draait Gradle, start containers of draait een testsuite die
@@ -51,6 +57,11 @@ stap niet klaar en heet hij in het rapport "Bezig" of "Geblokkeerd", nooit "klaa
   - `<WERKMAP>/.lokaal/gradle.lock` voor elk Gradle-commando;
   - `<WERKMAP>/.lokaal/stack.lock` voor proeven die containers met een echte mediaserver of een hele stack starten.
   Gebruik: `flock <lockbestand> <commando>`. Het commando wacht dan tot een ander klaar is.
+- **Databaselock**: twee extra lockbestanden, los van de drie hierboven (ze tellen niet mee bij het geheugen-wachten
+  van 0.3 regel 2): `<WERKMAP>/.lokaal/hch-db.lock` (home-control-hub) en `<WERKMAP>/.lokaal/zoek-db.lock`
+  (zoeken-en-persoonlijke-ai). De tests van die twee repos gebruiken vaste databasenamen en gooien die vooraf weg met
+  `DROP DATABASE IF EXISTS ... WITH (FORCE)`; twee runs tegelijk breken elkaar dan af. Zie 0.3 regel 5. `flock` maakt
+  het bestand zelf aan als het nog niet bestaat.
 - **Richtgetal**: een aantal tests of een duur uit een eerdere meting. Het aantal tests mag stijgen. Daalt het,
   dan hoort daar een uitleg bij in het rapport (welke test is verdwenen en waarom).
 
@@ -59,8 +70,15 @@ stap niet klaar en heet hij in het rapport "Bezig" of "Geblokkeerd", nooit "klaa
 De machine heeft 22 CPU's en 14,5 GiB werkgeheugen. Daarom gelden deze regels voor elk commando in dit bestand:
 
 1. Zet `nice -n 10` voor elk zwaar commando.
-2. Vóór een zwaar commando: `free -m`. Is "available" lager dan 3000 MB, start het commando dan niet en meld dit
-   aan de regisseur.
+2. Vóór een zwaar commando: `free -m` en `df -h /` (regel 3). Geheugen te laag = kolom "available" onder 3000 (MB),
+   of "available" onder 6000 met swap meer dan 90 % gebruikt (regel "Swap": "used" meer dan 90 % van "total"). Met
+   "available" 6000 of meer telt de swap niet (besluit van de gebruiker, 2026-11-11). Geheugen te laag: niet starten. Doe
+   eerst ander werk van je stap en meet opnieuw. Is er niets anders te doen: wacht tot het zware commando van een
+   ander klaar is (`flock <WERKMAP>/.lokaal/<lock> true` wacht vanzelf tot die lock vrij is; doe dat voor elk van de
+   drie locks `docker-build.lock`, `gradle.lock` en `stack.lock`) en meet opnieuw. Blijft het geheugen te laag
+   terwijl alle drie de locks vrij zijn: stop en meld onder blokkades ("geheugen te laag", met de uitvoer van
+   `free -m`). Bron: `AGENTEN.md`, regel O3 in de prompts van deel 5 en kop "3.3 Weinig geheugen of
+   schijf".
 3. Vóór een image-build of een stackproef: `df -h /`. Is er minder dan 15 GB vrij, stop en meld. Ruim alleen eigen,
    bij naam genoemde images en containers op.
 4. VERBODEN terwijl er iets bouwt: `docker system prune -a`, `docker builder prune -a`, `docker volume prune`.
@@ -70,6 +88,18 @@ De machine heeft 22 CPU's en 14,5 GiB werkgeheugen. Daarom gelden deze regels vo
 5. PostgreSQL 16 draait gedeeld op `127.0.0.1:5432` (gebruiker `postgres`, geen wachtwoord). Tests maken eigen
    databases aan en ruimen die zelf op. Maak nooit met de hand een database aan zonder repo-voorvoegsel in de
    naam, en verwijder nooit een database die je niet zelf hebt aangemaakt.
+   Reviewers van één keten draaien tegelijk in dezelfde repo (bv. R-TECH met de volledige variant en R-HARDE-EIS met
+   "migraties heen en terug"). Daarom:
+   - **Een database die je met de hand aanmaakt** (de migratieproef van P-ai-server-manager, P-home-control-hub,
+     P-appstore-en-fork en P-zoeken-en-persoonlijke-ai) krijgt een eigen achtervoegsel: `<ACHTERVOEGSEL>` = je rol
+     plus het stap-ID, in kleine letters met `_` (bv. `r_harde_eis_s_p2_005`, `r_tech_s_p2_005`, `a_bouw_s_p2_005`,
+     `a_gate_p2`). Zo heeft elke subagent een eigen naam (regel RV6 van de reviewprompts in `AGENTEN.md`). Draai zo'n
+     blok als één bash-aanroep: een `export` geldt alleen binnen dezelfde shell.
+   - **Vaste namen in de testcode** van home-control-hub en zoeken-en-persoonlijke-ai (de namen staan in het P-blok,
+     Omgeving): draai elk commando van die repo dat PostgreSQL gebruikt achter de databaselock van de repo (0.2). Het
+     P-blok geeft de commando's zo. Dat geldt ook voor de commando's van die twee repos in P-PEIL en voor een losse
+     test die niet in het P-blok staat. In de andere repos maakt de testcode zelf unieke namen (willekeurig of met het
+     proces-ID; gezien op 2026-11-11 in de `conftest.py`-bestanden); daar is geen lock nodig.
 6. Zet vóór Python-tests die een database back-uppen of herstellen altijd
    `PATH=/usr/lib/postgresql/16/bin:$PATH`. Zonder deze regel pakt de test een nieuwere `pg_dump` naast een
    oudere `pg_restore` en faalt hij op de omgeving, niet op de code.
@@ -101,15 +131,26 @@ Zoek de regel die past bij wat de stap heeft veranderd. Past er meer dan één r
 
 ### 0.5 CI-controle na elke push (geldt voor alle repos)
 
-`gh` staat in `~/.local/bin`. Alle commando's draaien vanuit de werkmap van de repo.
+`gh` staat in `~/.local/bin`. Alle commando's draaien vanuit de werkmap van de repo, en elk `gh run`- en
+`gh workflow`-commando krijgt `-R lvos04/<repo>` (zoals in `AGENTEN.md`, controle K5). Zonder `-R` kiest `gh` zelf een
+remote, en in de forks met een remote `upstream` is dat de upstream-repo: `gh repo view --json nameWithOwner` gaf op
+2026-11-11 in `<WERKMAP>/jelly-leon` `jellyfin/jellyfin` (in `<WERKMAP>/my_house`, zonder `upstream`, wel
+`lvos04/my_house`). Zonder `-R` lees of start je dan runs van een andere repo.
 
 ```bash
 SHA=$(git rev-parse HEAD)
-gh run list --branch ccr-c133d7a0-kuz1cv --commit "$SHA" --limit 10 \
+gh run list -R lvos04/<repo> --branch ccr-c133d7a0-kuz1cv --commit "$SHA" --limit 10 \
   --json databaseId,workflowName,status,conclusion,headSha
-gh run watch <run-id> --exit-status        # wacht tot de run klaar is; exitcode 0 = groen
-gh run view <run-id> --log-failed          # alleen bij rood: de falende stappen
+gh run watch <run-id> -R lvos04/<repo> --exit-status   # wacht tot de run klaar is; exitcode 0 = groen
+gh run view <run-id> -R lvos04/<repo> --log-failed     # alleen bij rood: de falende stappen
 ```
+
+`--commit` (kort `-c`) werkt alleen met de VOLLEDIGE commit-hash van 40 tekens. Met een korte hash geeft
+`gh run list` een lege lijst `[]`, ook als er een run is: op 2026-11-11 gaf
+`gh run list -R lvos04/home-control-hub -b ccr-c133d7a0-kuz1cv -c 076f964` `[]` en met de volle hash van dezelfde
+commit run 42990957447 "success". Noemt een stap, rapport of VOORTGANG.md een korte hash, maak hem dan eerst vol:
+`SHA=$(git rev-parse <korte-hash>)`. Gebruik nooit een korte hash bij `--commit`/`-c`; een lege lijst met een korte
+hash bewijst niet dat er "geen run" is.
 
 Afvinklijst:
 
@@ -118,10 +159,17 @@ Afvinklijst:
       het P-<repo>-blok hoe je hem met de hand start.
 - [ ] Elke run heeft `status: completed` en `conclusion: success`.
 - [ ] Het rapport noemt per run: het run-ID, de workflownaam en de uitkomst.
-- [ ] Bij rood: eerst `gh run view <run-id> --log-failed` lezen, dan hoofdstuk 3 volgen. Een rode run wordt nooit
+- [ ] Bij rood: eerst `gh run view <run-id> -R lvos04/<repo> --log-failed` lezen, dan hoofdstuk 3 volgen. Een rode run wordt nooit
       "bekend probleem" genoemd zonder dat de oorzaak in het rapport staat.
 
 Lokaal groen en CI rood betekent: de stap is NIET klaar.
+
+Afgebroken runs (`conclusion: cancelled`): bijna elke workflow in deze repos heeft `concurrency` met
+`cancel-in-progress: true` per branch (vaststellen: `grep -n -A2 'concurrency' .github/workflows/*.y*ml`). Een nieuwe
+push of een met de hand gestarte run (`gh workflow run -R lvos04/<repo> ...`) van DEZELFDE workflow op dezelfde branch breekt de lopende run
+af. Gevolgen: (1) een afgebroken run is geen groene run; controleer altijd de run op de commit die je meldt; (2) start
+een workflow pas met de hand (`gh workflow run -R lvos04/<repo> ...`) nadat de run van de push voor die workflow
+`completed` is (`gh run watch <run-id> -R lvos04/<repo> --exit-status`), anders breek je die run zelf af.
 
 ### 0.6 Rapportvorm van een poortresultaat
 
@@ -183,11 +231,11 @@ Elk blok in hoofdstuk 1 heeft dezelfde koppen, in deze volgorde:
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| `apps/policy`, `apps/executor`, `apps/api` (zonder database) | `make lint && make test-unit` | nee |
+| `apps/policy`, `apps/executor`, `apps/api` (zonder database) | `make lint`; los daarna `make test-unit` | nee |
 | `apps/api` met database | `PATH=/usr/lib/postgresql/16/bin:$PATH HUB_TEST_ADMIN_URL=postgresql://postgres@127.0.0.1:5432/postgres make test-integration` | ja (geen lock; niet naast een andere volledige testsuite) |
 | Eén testbestand | `.venv/bin/python -m pytest -q <pad naar testbestand>` | nee |
 | API-vorm (routes, schema's) | `make openapi-check` | nee |
-| `apps/web` (code) | `make web-lint && make web-test` | nee |
+| `apps/web` (code) | `make web-lint`; los daarna `make web-test` | nee |
 | `tools/excel` | `.venv/bin/python -m pytest -q tools/excel/tests` (vraagt eerst `.venv/bin/python -m pip install -r tools/excel/requirements-test.txt`), of dezelfde test met `<WERKMAP>/.lokaal/excel-venv/bin/python` | nee |
 | `deploy/manifest/*.manifest.yaml` | zie Volledig, stap 9 | nee |
 | `.github/workflows/*.yml` | `actionlint .github/workflows/*.yml` | nee |
@@ -198,19 +246,25 @@ Elk blok in hoofdstuk 1 heeft dezelfde koppen, in deze volgorde:
 2. `make type` - Zwaar: nee (mypy op api, executor en policy).
 3. `PATH=/usr/lib/postgresql/16/bin:$PATH HUB_TEST_ADMIN_URL=postgresql://postgres@127.0.0.1:5432/postgres nice -n 10 .venv/bin/python -m pytest -q`
    - Zwaar: ja (geen lock). Richtgetal: ruim 800 tests, ongeveer 9 minuten.
-4. Migraties heen en terug, op een eigen database:
+4. Migraties heen en terug, op een eigen database (vul `<ACHTERVOEGSEL>` in volgens 0.3 regel 5; draai het blok
+   als één bash-aanroep):
    ```bash
-   psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE asm_ci_migrate"
-   export HUB_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/asm_ci_migrate
+   DB=asm_ci_migrate_<ACHTERVOEGSEL>     # bv. asm_ci_migrate_r_harde_eis_s_p2_005
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE IF EXISTS $DB"   # alleen je eigen naam: resten van een afgebroken eigen run
+   psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE $DB"
+   export HUB_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/$DB
    .venv/bin/python -m hub migrate
    .venv/bin/python -m hub migrate --check
    .venv/bin/python -m hub migrate --down base
    .venv/bin/python -m hub migrate --check    # MOET nu falen (exitcode ongelijk aan 0)
    .venv/bin/python -m hub migrate
    (cd apps/api && ../../.venv/bin/alembic -c alembic.ini check)
-   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE asm_ci_migrate"
+   unset HUB_DATABASE_URL
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE $DB"
    ```
-   Zwaar: nee. De database `asm_ci_migrate` is van deze poort; ruim hem na afloop op.
+   Zwaar: nee. De database `asm_ci_migrate_<ACHTERVOEGSEL>` is van jou; ruim hem na afloop op. Een vaste naam zonder
+   achtervoegsel botst als R-TECH (volledige variant) en R-HARDE-EIS (P-HARDE-EIS) tegelijk lopen: de een gooit de
+   database weg terwijl de ander migreert.
 5. `make openapi-check` - Zwaar: nee.
 6. `make audit` - Zwaar: nee (`pip-audit --strict` op de twee lockbestanden; vraagt netwerk).
 7. Web: `make web-lint && make web-test && make web-audit` - Zwaar: nee.
@@ -280,6 +334,14 @@ rooktest; die job is de onafhankelijke herhaling van stap 11.
   `python3.12 -m venv .venv`, `.venv/bin/pip install -r apps/api/requirements.lock`,
   `.venv/bin/pip install -e 'apps/api[dev]'`. Al klaar? `ls .venv/bin/pytest`.
 - Database: `HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres`.
+- Databaselock `<WERKMAP>/.lokaal/hch-db.lock` (0.2 en 0.3 regel 5): de testcode gebruikt vaste databasenamen en gooit die vooraf weg
+  met `DROP DATABASE IF EXISTS ... WITH (FORCE)`: `hch_test_api` (`apps/api/tests/conftest.py`, tenzij
+  `HCH_TEST_DB_NAME` gezet is), `hch_test_migrations`, `hch_test_backup`, `hch_test_newer_db` (tests onder
+  `apps/api/tests/integration/`), `hch_test_e2e` (`tests/e2e/conftest.py`), `hch_ui_toestanden`
+  (`tests/ui/genereer_toestanden.py`, via `make toestanden`, `make test-ui` en `make schermafdrukken`),
+  `hch_review_<n>` (`tests/ui/ontwerpreview.py`) en `hch_interop_hub`, `hch_interop_dienst`
+  (`tests/interop/test_real_hub.py`). Gezien op 2026-11-11. Elk commando hieronder dat PostgreSQL gebruikt staat
+  daarom achter deze lock; doe dat ook bij een commando dat hier niet staat.
 - Manifestvalidator: de test `apps/api/tests/unit/test_deploy_artifacts.py` zoekt `jl-manifest` in de variabele
   `HCH_JL_MANIFEST` en anders in `<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest`. Met
   `HCH_MANIFEST_VALIDATOR_VERPLICHT=1` faalt de test als de validator ontbreekt (zo draait de CI).
@@ -290,10 +352,10 @@ rooktest; die job is de onafhankelijke herhaling van stap 11.
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
 | `apps/api` (code) | `make lint` | nee |
-| `apps/api` (één testbestand) | `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>` | nee |
+| `apps/api` (één testbestand) | `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres flock <WERKMAP>/.lokaal/hch-db.lock ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>` | nee |
 | API-vorm | `make openapi && git diff --exit-code docs/openapi/` | nee |
 | Contractkopie | `python3 tools/contract_kopie.py controleer` | nee |
-| Peil-kopie of statuspagina | `python3 tools/peil_kopie.py controleer && make test-ui` | nee |
+| Peil-kopie of statuspagina | `python3 tools/peil_kopie.py controleer`; los daarna `flock <WERKMAP>/.lokaal/hch-db.lock make test-ui` | nee |
 | `deploy/manifest/home-control-hub.manifest.yaml` | `<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest validate --strict deploy/manifest/home-control-hub.manifest.yaml` | nee |
 
 ### 4. Volledig (CI-volgorde)
@@ -303,25 +365,28 @@ rooktest; die job is de onafhankelijke herhaling van stap 11.
    - Zwaar: nee (dit deel zit niet in `make lint`, wel in de CI).
 3. `make contract-drift` en `make peil-drift` - Zwaar: nee (vraagt netwerk: `vergelijk --online` haalt de bron op).
    Zonder netwerk: `python3 tools/contract_kopie.py vergelijk --bron ../ai-server-manager`.
-4. `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres HCH_MANIFEST_VALIDATOR_VERPLICHT=1 nice -n 10 ../../.venv/bin/python -m pytest -q -p no:cacheprovider`
-   - Zwaar: ja (geen lock).
-5. Migraties heen en terug, op een eigen database (zoals de CI-stap "Migraties op en neer"):
+4. `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres HCH_MANIFEST_VALIDATOR_VERPLICHT=1 flock <WERKMAP>/.lokaal/hch-db.lock nice -n 10 ../../.venv/bin/python -m pytest -q -p no:cacheprovider`
+   - Zwaar: ja (alleen de databaselock; geen machinelock).
+5. Migraties heen en terug, op een eigen database (zoals de CI-stap "Migraties op en neer"; vul `<ACHTERVOEGSEL>`
+   in volgens 0.3 regel 5; draai het blok als één bash-aanroep):
    ```bash
-   psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE hch_ci_mig'
-   export HCH_DATA_DIR=$(mktemp -d) HCH_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/hch_ci_mig
+   DB=hch_ci_mig_<ACHTERVOEGSEL>     # bv. hch_ci_mig_r_harde_eis_s_p2_290
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE IF EXISTS $DB"   # alleen je eigen naam
+   psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE $DB"
+   export HCH_DATA_DIR=$(mktemp -d) HCH_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/$DB
    .venv/bin/python -m integrations migrate && .venv/bin/python -m integrations migrate --down base && .venv/bin/python -m integrations migrate
    unset HCH_DATA_DIR HCH_DATABASE_URL
-   psql -h 127.0.0.1 -U postgres -c 'DROP DATABASE hch_ci_mig'
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE $DB"
    ```
-   Zwaar: nee.
+   Zwaar: nee. Geen databaselock nodig: de naam is van jou alleen.
 6. `make openapi && git diff --exit-code docs/openapi/` - Zwaar: nee.
-7. `PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres make e2e`
-   - Zwaar: ja (geen lock).
+7. `PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres flock <WERKMAP>/.lokaal/hch-db.lock make e2e`
+   - Zwaar: ja (alleen de databaselock; geen machinelock).
 8. `.venv/bin/pip-audit -r apps/api/requirements.lock --progress-spinner off` - Zwaar: nee.
 9. Manifest: `<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest validate --strict deploy/manifest/home-control-hub.manifest.yaml`
    - Zwaar: nee.
-10. Statuspagina (job `statuspagina-ui`): `make schermafdrukken` en daarna
-    `.venv/bin/python tests/ui/ontwerpreview.py --uit tests/ui/review-uit` - Zwaar: nee.
+10. Statuspagina (job `statuspagina-ui`): `flock <WERKMAP>/.lokaal/hch-db.lock make schermafdrukken` en daarna
+    `flock <WERKMAP>/.lokaal/hch-db.lock .venv/bin/python tests/ui/ontwerpreview.py --uit tests/ui/review-uit` - Zwaar: nee.
 11. Image en rooktest:
     ```bash
     flock <WERKMAP>/.lokaal/docker-build.lock make image
@@ -329,8 +394,8 @@ rooktest; die job is de onafhankelijke herhaling van stap 11.
     ```
     Zwaar: ja, lock `docker-build.lock`. `make smoke` draait `deploy/allinone/smoke-test.sh home-control-hub:dev`.
 
-Alleen als de koppeling met de Hub is geraakt: `make interop HUB_PY=<WERKMAP>/ai-server-manager/.venv/bin/python`
-(draait `tests/interop` tegen de echte Hub-code). Zwaar: ja (geen lock).
+Alleen als de koppeling met de Hub is geraakt: `flock <WERKMAP>/.lokaal/hch-db.lock make interop HUB_PY=<WERKMAP>/ai-server-manager/.venv/bin/python`
+(draait `tests/interop` tegen de echte Hub-code). Zwaar: ja (alleen de databaselock).
 
 ### 5. Contract-, EVIDENCE- en drifttests
 
@@ -381,7 +446,7 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| `apps/api` (code) | `make lint && make typecheck` | nee |
+| `apps/api` (code) | `make lint`; los daarna `make typecheck` | nee |
 | Manifestschema of -regels | `cd apps/api && ../../.venv/bin/python -m pytest -q tests/unit/test_manifest_schema.py tests/unit/test_manifest_rules.py tests/unit/test_manifest_contract_13.py` | nee |
 | Unit-tests | `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH nice -n 10 ../../.venv/bin/python -m pytest -q -n 4 tests/unit` | nee |
 | Eigen manifest | `make manifest` | nee |
@@ -396,16 +461,21 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 3. `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH APPSTORE_REQUIRE_DB=1 nice -n 10 ../../.venv/bin/python -m pytest -q tests/integration`
    - Zwaar: ja (geen lock).
 4. `.venv/bin/python -m pytest -q tests/e2e/test_service_e2e.py` - Zwaar: ja (geen lock).
-5. Migraties heen en terug, op een eigen database:
+5. Migraties heen en terug, op een eigen database (vul `<ACHTERVOEGSEL>` in volgens 0.3 regel 5; draai het blok
+   als één bash-aanroep):
    ```bash
-   psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE appstore_ci_mig"
-   export APPSTORE_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/appstore_ci_mig
+   DB=appstore_ci_mig_<ACHTERVOEGSEL>     # bv. appstore_ci_mig_r_tech_s_p2_500
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE IF EXISTS $DB"   # alleen je eigen naam
+   psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE $DB"
+   export APPSTORE_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/$DB
    .venv/bin/appstore migrate && .venv/bin/appstore migrate --down base && .venv/bin/appstore migrate
    .venv/bin/appstore db-pending; echo "exitcode db-pending: $?"    # MOET 1 zijn (1 = schema actueel)
    unset APPSTORE_DATABASE_URL
-   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE appstore_ci_mig"
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE $DB"
    ```
-   Zwaar: nee. `appstore db-pending` geeft exitcode 0 als er nog migraties wachten en 1 als het schema actueel is
+   Zwaar: nee. De testcode van deze repo maakt zelf unieke namen (`appstore_test_<pid>`, `appstore_e2e_<pid>`,
+   `appstore_ui_<pid>`, `appstore_review_a_<pid>`; gezien op 2026-11-11), dus de andere commando's hebben geen
+   databaselock nodig. `appstore db-pending` geeft exitcode 0 als er nog migraties wachten en 1 als het schema actueel is
    (`apps/api/src/appstore/__main__.py`); exitcode 0 na de laatste `migrate` is dus een fout. De CI gebruikt voor
    deze stap de database van de CI-container met een eigen wachtwoord; neem dat wachtwoord nergens over.
 6. OpenAPI: zie de regel "API-vorm" bij Snel. Zwaar: nee.
@@ -447,6 +517,12 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
   `VALIDATOR_COMMIT` in home-control-hub en zoeken-en-persoonlijke-ai, `APPSTORE_COMMIT` in jelly-leon). Een
   wijziging aan het manifestschema of aan de regels hier is pas overal van kracht als die pins zijn verzet. Meld
   elke wijziging aan `apps/api/src` onder de manifestcode aan de regisseur, met de nieuwe commit.
+- jelly-leon-platform pint NIET: de CI daar kloont de validator van appstore-en-fork op de werkbranch
+  `ccr-c133d7a0-kuz1cv` (vaststellen: `grep -n 'appstore-en-fork.git' <WERKMAP>/jelly-leon-platform/.github/workflows/ci.yml`).
+  Elke push hier verandert dus direct de validator voor de volgende CI-run van jelly-leon-platform. Een
+  manifestwijziging hier is pas klaar als ook de CI van jelly-leon-platform op zijn laatste commit groen is
+  (met de hand starten: `gh workflow run ci.yml -R lvos04/jelly-leon-platform --ref ccr-c133d7a0-kuz1cv` in `<WERKMAP>/jelly-leon-platform`); rood
+  daar is tak H (hoofdstuk 3).
 - Een nieuwe regel die bestaande manifesten van andere repos afkeurt is een contractwijziging: stop en meld
   (P-CONTRACT).
 
@@ -462,7 +538,8 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 - Lokale ingang: `Makefile` (doelen `venv`, `lint`, `typecheck`, `test`, `test-sim`, `test-repo`, `test-conformance`,
   `test-conformance-hub`, `test-e2e`, `openapi`, `image`, `sim-image`, `audit`, `peil-kopie`, `test-ui`,
   `test-ui-live`, `statuspagina-shots`, `ontwerpreview`, `validator-venv`, `manifesten`, `rooktest`,
-  `upstream-rooktest`).
+  `upstream-rooktest`, `nodered`, `nodered-rooktest`). Let op: `make test` draait alleen `apps/api`; de CI-job
+  `test` draait daarnaast de simulatortests (`make test-sim`) en `tests/conformance` (`make test-conformance`).
 
 ### 2. Omgeving
 
@@ -477,7 +554,7 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| Code onder `apps/api` | `make lint && cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH LIFECYCLE_TEST_PG=postgresql+psycopg://postgres@127.0.0.1:5432/postgres ../../.venv/bin/python -m pytest -q <pad onder tests/>` | nee |
+| Code onder `apps/api` | `make lint`; los daarna `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH LIFECYCLE_TEST_PG=postgresql+psycopg://postgres@127.0.0.1:5432/postgres ../../.venv/bin/python -m pytest -q <pad onder tests/>` | nee |
 | Simulatoren | `make test-sim` | nee |
 | Koppeling met de Hub (contract 1.3) | `make test-conformance` | nee |
 | Manifesten onder `install/manifests/` of `deploy/manifest/` | `make manifesten` | nee |
@@ -495,7 +572,10 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 5. `make test-sim` - Zwaar: nee.
 6. `make test-conformance` - Zwaar: nee (conformiteit contract 1.3 tegen de Hub-simulator).
 7. `make validator-venv && make manifesten` - Zwaar: nee.
-8. `PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo` - Zwaar: nee.
+8. `JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`
+   - Zwaar: nee. `JL_MANIFEST` is verplicht: `tests/repo/test_checklists.py` zoekt de validator ALLEEN via die
+   variabele en faalt met `MANIFEST_VALIDATOR_VERPLICHT=1` als hij ontbreekt (de map `.venv-validator` komt uit
+   stap 7).
 9. OpenAPI: zie de regel "API-vorm" bij Snel. Zwaar: nee.
 10. `make audit` - Zwaar: nee (netwerk).
 11. Statuspagina (job `statuspagina`): `make test-ui` en `make test-ui-live` - Zwaar: nee.
@@ -560,6 +640,14 @@ in `ci.yml` als `ASM_COMMIT` staat.
 - Python: `make venv` maakt `.venv` (uit `apps/api/requirements.lock`, daarna `apps/api[dev]`).
   Al klaar? `ls .venv/bin/pytest`.
 - Database: `SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres`.
+- Databaselock `<WERKMAP>/.lokaal/zoek-db.lock` (0.2 en 0.3 regel 5): de testcode gebruikt vaste databasenamen en gooit die vooraf weg
+  met `DROP DATABASE IF EXISTS ... WITH (FORCE)`: `zoek_test_api` (`apps/api/tests/conftest.py`, tenzij
+  `SEARCH_AI_TEST_DB_NAME` gezet is), `zoek_test_backup`, `zoek_test_mig0002` (tests onder
+  `apps/api/tests/integration/`), `zoek_test_e2e` (`tests/e2e/conftest.py`), `zoek_ui_echt_a`, `_b`, `_d`, `_f` en
+  `zoek_ui_echt_ontbreekt` (`tests/ui/echte_dienst.py`, ook via `make ui-echt`) en `zoek_interop_hub`,
+  `zoek_interop_dienst` (`tests/interop/test_real_hub.py`). Gezien op 2026-11-11. Elk commando hieronder dat
+  PostgreSQL gebruikt staat daarom achter deze lock; doe dat ook bij een commando dat hier niet staat. `make ui`
+  gebruikt geen database (`Makefile`: toestanden uit de renderer) en hoeft de lock niet.
 - Validator: `JL_MANIFEST=<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest`.
 - UI-tests: `make ui` installeert zelf `tests/ui/node_modules`.
 
@@ -568,7 +656,7 @@ in `ci.yml` als `ASM_COMMIT` staat.
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
 | Code | `make lint` | nee |
-| Eén testbestand | `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>` | nee |
+| Eén testbestand | `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres flock <WERKMAP>/.lokaal/zoek-db.lock ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>` | nee |
 | Contract- of Peil-kopie | `cd apps/api && ../../.venv/bin/python -m pytest -q tests/unit/test_contract_kopie.py tests/unit/test_peil_kopie.py -p no:cacheprovider` | nee |
 | Manifest | `<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest validate --strict deploy/manifest/zoeken-en-persoonlijke-ai.manifest.yaml` | nee |
 | API-vorm | `make openapi && git diff --exit-code docs/openapi/` | nee |
@@ -579,24 +667,27 @@ in `ci.yml` als `ASM_COMMIT` staat.
 1. `make lint` - Zwaar: nee (ruff, ruff format, mypy).
 2. Drift van de Peil-kopie en de contractkopie: zie de regel "Contract- of Peil-kopie" bij Snel. Zwaar: nee.
 3. Manifest: zie de regel "Manifest" bij Snel. Zwaar: nee.
-4. `PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres JL_MANIFEST=<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 nice -n 10 make test`
-   - Zwaar: ja (geen lock).
-5. Migraties heen en terug, op een eigen database (zoals de CI-stap "Migraties op en neer"):
+4. `PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres JL_MANIFEST=<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 flock <WERKMAP>/.lokaal/zoek-db.lock nice -n 10 make test`
+   - Zwaar: ja (alleen de databaselock; geen machinelock).
+5. Migraties heen en terug, op een eigen database (zoals de CI-stap "Migraties op en neer"; vul `<ACHTERVOEGSEL>`
+   in volgens 0.3 regel 5; draai het blok als één bash-aanroep):
    ```bash
-   psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE zoek_ci_mig'
-   export SEARCH_AI_DATA_DIR=$(mktemp -d) SEARCH_AI_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/zoek_ci_mig
+   DB=zoek_ci_mig_<ACHTERVOEGSEL>     # bv. zoek_ci_mig_r_tech_s_p5_10
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE IF EXISTS $DB"   # alleen je eigen naam
+   psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE $DB"
+   export SEARCH_AI_DATA_DIR=$(mktemp -d) SEARCH_AI_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5432/$DB
    .venv/bin/python -m search_ai migrate && .venv/bin/python -m search_ai migrate --down base && .venv/bin/python -m search_ai migrate
    unset SEARCH_AI_DATA_DIR SEARCH_AI_DATABASE_URL
-   psql -h 127.0.0.1 -U postgres -c 'DROP DATABASE zoek_ci_mig'
+   psql -h 127.0.0.1 -U postgres -c "DROP DATABASE $DB"
    ```
-   Zwaar: nee. De CI-database is een pgvector-image; lokaal staat de extensie `vector` bij PostgreSQL 16.
+   Zwaar: nee. Geen databaselock nodig: de naam is van jou alleen. De CI-database is een pgvector-image; lokaal staat de extensie `vector` bij PostgreSQL 16.
 6. `make openapi && git diff --exit-code docs/openapi/` - Zwaar: nee.
-7. `PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres make e2e`
-   - Zwaar: ja (geen lock).
+7. `PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres flock <WERKMAP>/.lokaal/zoek-db.lock make e2e`
+   - Zwaar: ja (alleen de databaselock; geen machinelock).
 8. `.venv/bin/pip-audit -r apps/api/requirements.lock --progress-spinner off` - Zwaar: nee.
 9. Statuspagina (job `statuspagina-ui`): `make ui` en daarna de ontwerpreview tegen de echte dienst zoals de CI hem
    draait, met uitvoer BUITEN de repo:
-   `PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres .venv/bin/python tests/ui/echte_dienst.py --out /tmp/zoek-echte-dienst --rapport /tmp/zoek-echte-dienst/CONTROLE.json`
+   `PATH=/usr/lib/postgresql/16/bin:$PATH SEARCH_AI_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres flock <WERKMAP>/.lokaal/zoek-db.lock .venv/bin/python tests/ui/echte_dienst.py --out /tmp/zoek-echte-dienst --rapport /tmp/zoek-echte-dienst/CONTROLE.json`
    - Zwaar: nee. Gebruik hiervoor niet `make ui-echt` (dat overschrijft de afdrukken in de repo, zie Valkuilen).
 10. Image en rooktest:
     ```bash
@@ -606,7 +697,7 @@ in `ci.yml` als `ASM_COMMIT` staat.
     Zwaar: ja, lock `docker-build.lock`. `make smoke` draait
     `deploy/allinone/smoke-test.sh zoeken-en-persoonlijke-ai:dev`.
 
-Alleen als de koppeling met de Hub is geraakt: `make interop HUB_PY=<WERKMAP>/ai-server-manager/.venv/bin/python`.
+Alleen als de koppeling met de Hub is geraakt: `flock <WERKMAP>/.lokaal/zoek-db.lock make interop HUB_PY=<WERKMAP>/ai-server-manager/.venv/bin/python`.
 Zwaar: ja (geen lock).
 
 ### 5. Contract-, EVIDENCE- en drifttests
@@ -641,7 +732,8 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
     3.14), de kopieën, het upgradebewijs, de encoder-unittests (`services/encoder`, Python 3.14), de web-UI
     (`apps/web`). Zware jobs (encoder-image, forks, upstream-sync) draaien alleen 's nachts of met de hand.
   - `.github/workflows/android.yml`: start ALLEEN als de push een bestand raakt onder `apps/android/`, of
-    `design/ontwerptaal/tokens.json`, of `deploy/release-manifest.json`.
+    `design/ontwerptaal/tokens.json`, of `deploy/release-manifest.json`, of `.github/workflows/android.yml` zelf.
+    Met de hand: `gh workflow run android.yml -R lvos04/media-guard-ultimate --ref ccr-c133d7a0-kuz1cv`.
   - `.github/workflows/release.yml`: alleen bij een release (tests, images, `scripts/aio-smoke.py`, upgradebewijs,
     publiceren). Wordt in P2 t/m P6 niet door A-BOUW gestart.
 - Lokale ingang: geen Makefile. Verzamelscript `scripts/test-all.sh` (opties `--only a,b`, `--skip a,b`, `--fast`;
@@ -660,11 +752,11 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| `apps/core` (één testbestand) | `cd apps/core && ../../.venv/bin/ruff check . && ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>` | nee |
+| `apps/core` (één testbestand) | `cd apps/core && ../../.venv/bin/ruff check .`; los daarna `cd apps/core && ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>` | nee |
 | Upgradepad, release, AIO, instellingen | `cd apps/core && ../../.venv/bin/python -m pytest -q tests/test_upgradebewijs.py tests/test_hub_url_setting.py tests/test_evidence_contract.py tests/test_kopie_herkomst.py tests/test_stack_regressions.py tests/test_zero_config.py tests/test_aio.py tests/test_release_pipeline.py tests/test_openapi_export.py` | nee |
 | Contract- of Peil-kopie | `python3 scripts/kopie-herkomst.py controleer` | nee |
-| `services/encoder` | `cd services/encoder && .venv/bin/ruff check app tests && .venv/bin/mypy app` | nee |
-| `apps/web` (code) | `cd apps/web && npm run check:peil && npm run lint && npm run typecheck && npm run test:unit` | nee |
+| `services/encoder` | `cd services/encoder && .venv/bin/ruff check app tests`; los daarna `cd services/encoder && .venv/bin/mypy app` | nee |
+| `apps/web` (code) | `cd apps/web && npm run check:peil`; los daarna `cd apps/web && npm run lint`; los daarna `cd apps/web && npm run typecheck`; los daarna `cd apps/web && npm run test:unit` | nee |
 | `apps/android` | `cd apps/android && python3 tools/peil_tokens.py --check` | nee |
 | `.github/workflows/*.yml` | `actionlint .github/workflows/*.yml` | nee |
 
@@ -710,15 +802,16 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
    release met een Emby-koppeling en daarna de kandidaat op dezelfde datamap). VERPLICHT als de stap de
    mediaserverkoppeling raakt (Δ-MG-AUTH, Δ-MG-DUAL, `app.integraties`, aanmelden/sessies bij Emby of Jelly Leon):
    ```bash
-   free -m        # "available" minstens 3000, anders niet starten (0.3)
+   free -m        # geheugen te laag (0.3 regel 2): niet starten
    MGMS_BEWIJS=<lege map buiten de repo> MG_CORE_PYTHON=<WERKMAP>/media-guard-ultimate/.venv/bin/python \
      flock <WERKMAP>/.lokaal/stack.lock nice -n 10 tests/contract/mediaserver/run.sh
    ```
    Zwaar: ja, lock `stack.lock` (start containers met een echte mediaserver; zonder `MGMS_KANDIDAAT` bouwt het
    script ook een kandidaat-image). Dit zijn testcontainers op eigen poorten, NIET de Emby van de gebruiker.
    Deze job draait in `ci.yml` NIET op een push (alleen 's nachts of met de hand); het CI-bewijs start je zelf:
-   `gh workflow run ci.yml --ref ccr-c133d7a0-kuz1cv -f heavy=true` en volg dan 0.5 voor de job
-   `contracttest mediaservers`.
+   `gh workflow run ci.yml -R lvos04/media-guard-ultimate --ref ccr-c133d7a0-kuz1cv -f heavy=true` en volg dan 0.5 voor de job
+   `contracttest mediaservers`. Start dit pas als de run van de push `completed` is: `ci.yml` heeft
+   `cancel-in-progress: true` per branch, dus de handmatige run breekt anders de push-run af (0.5).
 
 ### 5. Contract-, EVIDENCE- en drifttests
 
@@ -741,8 +834,8 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
   de omgeving. Controleer eerst `df -h /tmp`; zet zo nodig `TMPDIR` op een map op schijf.
 - `:app:recordPaparazziDebug` OVERSCHRIJFT de referentiebeelden. Dat commando hoort alleen bij een ontwerpstap
   (P-PEIL), nooit om een falende `verifyPaparazziDebug` groen te krijgen.
-- Deze repo heeft nog geen manifest en geen `CUSTOM_APP.md` (zie P-INSTALLATIE, open punt). De map
-  `deploy/truenas` bevat een compose-bestand; dat is geen installatieweg.
+- Deze repo heeft nog geen manifest en geen `deploy/truenas/CUSTOM_APP.md` (zie P-INSTALLATIE, open punt). Er is
+  wel `docs/INSTALL_TRUENAS.md`. De map `deploy/truenas` bevat een compose-bestand; dat is geen installatieweg.
 
 ---
 
@@ -755,7 +848,7 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
   **Start NIET vanzelf op de werkbranch**: alleen bij een push naar `main`, bij tags `v*`, bij een pull request en
   met de hand. Na elke push dus zelf starten:
   ```bash
-  gh workflow run ci.yaml --ref ccr-c133d7a0-kuz1cv
+  gh workflow run ci.yaml -R lvos04/media-source-optimizer --ref ccr-c133d7a0-kuz1cv
   ```
   Geef NOOIT de invoer `release_version` mee: leeg betekent alleen bouwen en testen, gevuld betekent publiceren.
 - `.github/workflows/release.yaml`: alleen bij een release. Wordt niet door A-BOUW gestart.
@@ -776,7 +869,7 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 | `apps/core`, `apps/mocks`, `scripts` (code) | `make lint` | nee |
 | `apps/core` (één testbestand) | `cd apps/core && PATH=/usr/lib/postgresql/16/bin:$PATH MSO_PG_BIN=/usr/lib/postgresql/16/bin MSO_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres ../../.venv/bin/python -m pytest -q -p no:warnings -rs <pad onder tests/>` | nee |
 | Contract- of Peil-kopie | `python3 scripts/bronkopie.py controleer` | nee |
-| `apps/web` (code) | `cd apps/web && npm run check:peil && npm run typecheck && npm run lint && npm run test:unit` | nee |
+| `apps/web` (code) | `cd apps/web && npm run check:peil`; los daarna `cd apps/web && npm run typecheck`; los daarna `cd apps/web && npm run lint`; los daarna `cd apps/web && npm run test:unit` | nee |
 | `.github/workflows/*.yaml` | `actionlint .github/workflows/ci.yaml .github/workflows/release.yaml` | nee |
 
 ### 4. Volledig (CI-volgorde)
@@ -825,8 +918,8 @@ Eén workflow (`ci.yml`) hoort op elke push te starten. Volg 0.5.
 
 ### 6. CI-controle
 
-1. Na de push: `gh workflow run ci.yaml --ref ccr-c133d7a0-kuz1cv` (zonder invoer).
-2. Wacht enkele seconden en zoek de run: `gh run list --workflow ci.yaml --branch ccr-c133d7a0-kuz1cv --limit 3`.
+1. Na de push: `gh workflow run ci.yaml -R lvos04/media-source-optimizer --ref ccr-c133d7a0-kuz1cv` (zonder invoer).
+2. Wacht enkele seconden en zoek de run: `gh run list -R lvos04/media-source-optimizer --workflow ci.yaml --branch ccr-c133d7a0-kuz1cv --limit 3`.
 3. Controleer dat `headSha` van die run gelijk is aan `git rev-parse HEAD`, en volg verder 0.5.
 
 Zonder deze handmatige start is er GEEN CI-bewijs voor de stap.
@@ -841,8 +934,9 @@ Zonder deze handmatige start is er GEEN CI-bewijs voor de stap.
 - `make e2e` kan schermafdrukken in de repo opnieuw renderen. Controleer daarna `git status --short` en zet
   onbedoeld gewijzigde afdrukken terug met `git checkout -- <pad>`.
 - `E2E_MIN_TESTS` verlagen is verboden (hoofdstuk 3).
-- Deze repo heeft nog geen manifest en geen `CUSTOM_APP.md` (zie P-INSTALLATIE, open punt). De map
-  `deploy/truenas` bevat compose-bestanden; dat is geen installatieweg.
+- Deze repo heeft nog geen manifest en geen `deploy/truenas/CUSTOM_APP.md` (zie P-INSTALLATIE, open punt). Het
+  bestaande installatiedocument voor de Custom App staat op `docs/TRUENAS_CUSTOM_APP.md`. De map `deploy/truenas`
+  bevat compose-bestanden; dat is geen installatieweg.
 
 ---
 
@@ -856,7 +950,7 @@ Zonder deze handmatige start is er GEEN CI-bewijs voor de stap.
     branch behalve `main`.
   - `.github/workflows/android.yml`: start ALLEEN als de push een bestand raakt onder `apps/android/`, of
     `design/ontwerptaal/tokens.json`, of `.github/workflows/android.yml`. Kan ook met de hand:
-    `gh workflow run android.yml --ref ccr-c133d7a0-kuz1cv`.
+    `gh workflow run android.yml -R lvos04/my_house --ref ccr-c133d7a0-kuz1cv`.
   - `.github/workflows/audit.yml`: alleen gepland of met de hand. `.github/workflows/edge.yml`: alleen op `main`.
 - Lokale ingang: geen Makefile; de commando's staan in `ci.yml`.
 
@@ -881,9 +975,9 @@ Zonder deze handmatige start is er GEEN CI-bewijs voor de stap.
 |---|---|---|
 | `apps/api` (code) | `.venv/bin/ruff check apps/api/src apps/api/tests` | nee |
 | Platformkoppeling (contract, EVIDENCE, Peil-kopie, Hub-adres) | `cd apps/api && ../../.venv/bin/python -m pytest -q tests/platform_v2` | nee |
-| `integrations` | `pipx run ruff==0.17.4 check integrations && nice -n 10 .venv/bin/python -m pytest -q integrations/tests` | nee |
-| `apps/web` (code) | `cd apps/web && npx tsc --noEmit && npm test` | nee |
-| `infra/scripts`, `infra/compose` | `shellcheck infra/scripts/*.sh apps/web/docker/*.sh apps/web/e2e/*.sh && python3 -m unittest discover -s infra/tests -v && bash infra/scripts/validate_compose.sh` | nee |
+| `integrations` | `pipx run ruff==0.17.4 check integrations`; los daarna `nice -n 10 .venv/bin/python -m pytest -q integrations/tests` | nee |
+| `apps/web` (code) | `cd apps/web && npx tsc --noEmit`; los daarna `cd apps/web && npm test` | nee |
+| `infra/scripts`, `infra/compose` | `shellcheck infra/scripts/*.sh apps/web/docker/*.sh apps/web/e2e/*.sh`; los daarna `python3 -m unittest discover -s infra/tests -v`; los daarna `bash infra/scripts/validate_compose.sh` | nee |
 | `apps/android` | `python3 apps/android/tools/peil_tokens.py --check` | nee |
 | `.github/workflows/*.yml` | `actionlint .github/workflows/*.yml` | nee |
 
@@ -1008,14 +1102,14 @@ Zonder deze handmatige start is er GEEN CI-bewijs voor de stap.
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| `tools/jelly-leon`, `docs/platform-v2/PATCHES.md`, `docs/platform-v2/EVIDENCE.json` | `$PY tools/jelly-leon/check_fork_consistency.py && $PY tools/jelly-leon/patch_register_check.py && $PY -m pytest -q tools/jelly-leon/tests && tools/jelly-leon/.venv/bin/ruff check --config tools/jelly-leon/ruff.toml tools/jelly-leon` | nee |
+| `tools/jelly-leon`, `docs/platform-v2/PATCHES.md`, `docs/platform-v2/EVIDENCE.json` | `$PY tools/jelly-leon/check_fork_consistency.py`; los daarna `$PY tools/jelly-leon/patch_register_check.py`; los daarna `$PY -m pytest -q tools/jelly-leon/tests`; los daarna `tools/jelly-leon/.venv/bin/ruff check --config tools/jelly-leon/ruff.toml tools/jelly-leon` | nee |
 | Kopie van contract of conformiteitslijst | `$PY tools/jelly-leon/contract_drift.py --bron-map ../ai-server-manager` | nee |
 | `deploy/allinone/entrypoint.sh`, `deploy/allinone/healthcheck.sh` | `shellcheck -s sh deploy/allinone/entrypoint.sh deploy/allinone/healthcheck.sh` | nee |
 | `deploy/manifest/jelly-leon.manifest.yaml` | Volledig, stap 2 | nee |
 | `plugins/` | Volledig, stap 4 | ja, `docker-build.lock` |
 | C#-code buiten `plugins/` (core-patch) | Volledig, stap 1 (patchregister) en stap 3. Er is geen snelle variant: de hele solution moet bouwen en testen. | ja, `docker-build.lock` |
-| `tools/emby-overname` | `tools/jelly-leon/.venv/bin/ruff check --config tools/emby-overname/ruff.toml tools/emby-overname && $PY -m pytest -q tools/emby-overname/tests` | nee |
-| `tools/b03-harnas` | `tools/jelly-leon/.venv/bin/ruff check --config tools/b03-harnas/ruff.toml tools/b03-harnas && PYTHONPATH=tools/b03-harnas $PY -m pytest -q tools/b03-harnas/tests && PYTHONPATH=tools/b03-harnas $PY -m b03h guard --git .` | nee |
+| `tools/emby-overname` | `tools/jelly-leon/.venv/bin/ruff check --config tools/emby-overname/ruff.toml tools/emby-overname`; los daarna `$PY -m pytest -q tools/emby-overname/tests` | nee |
+| `tools/b03-harnas` | `tools/jelly-leon/.venv/bin/ruff check --config tools/b03-harnas/ruff.toml tools/b03-harnas`; los daarna `PYTHONPATH=tools/b03-harnas $PY -m pytest -q tools/b03-harnas/tests`; los daarna `PYTHONPATH=tools/b03-harnas $PY -m b03h guard --git .` | nee |
 | `.github/workflows/*.yml` | `actionlint .github/workflows/jelly-leon-ci.yml .github/workflows/upstream-sync.yml` | nee |
 
 ### 4. Volledig (CI-volgorde)
@@ -1240,12 +1334,12 @@ stappen 5 tot en met 8.
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| `tools/jelly-leon-web`, `docs/platform-v2/PATCHES.md`, `docs/platform-v2/EVIDENCE.json` | `$PY tools/jelly-leon-web/check_fork_consistency.py && $PY tools/jelly-leon-web/patch_register_check.py && $PY -m pytest -q -c tools/jelly-leon-web/pytest.ini tools/jelly-leon-web/tests` | nee |
+| `tools/jelly-leon-web`, `docs/platform-v2/PATCHES.md`, `docs/platform-v2/EVIDENCE.json` | `$PY tools/jelly-leon-web/check_fork_consistency.py`; los daarna `$PY tools/jelly-leon-web/patch_register_check.py`; los daarna `$PY -m pytest -q -c tools/jelly-leon-web/pytest.ini tools/jelly-leon-web/tests` | nee |
 | Kopie van contract of conformiteitslijst | `$PY tools/jelly-leon-web/contract_drift.py --online --github` | nee |
-| Broncode onder `src/` (TypeScript, JavaScript) | `nice -n 10 npm run lint && npm run build:check` | nee |
+| Broncode onder `src/` (TypeScript, JavaScript) | `nice -n 10 npm run lint`; los daarna `npm run build:check` | nee |
 | Stijlbestanden onder `src/` | `npm run stylelint` | nee |
 | Eén testbestand | `npm test -- <pad naar testbestand>` | nee |
-| `.github/workflows/*.yml` | `$PY tools/jelly-leon-web/workflow_check.py --overzicht && PATH=<WERKMAP>/.lokaal/jlw-venv/bin:$PATH actionlint .github/workflows/jelly-leon-web-ci.yml .github/workflows/upstream-sync.yml` | nee |
+| `.github/workflows/*.yml` | `$PY tools/jelly-leon-web/workflow_check.py --overzicht`; los daarna `PATH=<WERKMAP>/.lokaal/jlw-venv/bin:$PATH actionlint .github/workflows/jelly-leon-web-ci.yml .github/workflows/upstream-sync.yml` | nee |
 
 Elke wijziging aan een bestand dat van upstream komt, moet in het patchregister staan; daarom hoort
 `patch_register_check.py` bij elke snelle ronde.
@@ -1367,7 +1461,7 @@ Eén workflow (`jelly-leon-web-ci.yml`) hoort op elke push te starten. Volg 0.5.
 
 | Geraakt | Commando (vanuit de werkmap) | Zwaar |
 |---|---|---|
-| `tools/clients`, `docs/platform-v2/PATCHES.md`, `docs/platform-v2/EVIDENCE.json` | `make lint && make test && make check` | nee |
+| `tools/clients`, `docs/platform-v2/PATCHES.md`, `docs/platform-v2/EVIDENCE.json` | `make lint`; los daarna `make test`; los daarna `make check` | nee |
 | Elke wijziging in `android`, `androidtv`, `desktop` of `swiftfin` (patchregister en app-identiteit) | `make check` | nee |
 | `android/` | `ANDROID_HOME=$HOME/android-sdk make android-bouw GRADLE_LOCK=<WERKMAP>/.lokaal/gradle.lock` | ja, `gradle.lock` |
 | `androidtv/` | `ANDROID_HOME=$HOME/android-sdk make androidtv-bouw GRADLE_LOCK=<WERKMAP>/.lokaal/gradle.lock` | ja, `gradle.lock` |
@@ -1452,11 +1546,11 @@ Eén workflow (`jelly-leon-web-ci.yml`) hoort op elke push te starten. Volg 0.5.
 - De andere vijf starten alleen bij hun padfilter. Raakt de stap een client en is er geen run voor de commit, start
   dan de workflow met de hand en volg hem daarna volgens 0.5:
   ```bash
-  gh workflow run clients-android.yml --ref ccr-c133d7a0-kuz1cv
-  gh workflow run clients-androidtv.yml --ref ccr-c133d7a0-kuz1cv
-  gh workflow run clients-desktop.yml --ref ccr-c133d7a0-kuz1cv
-  gh workflow run clients-swiftfin.yml --ref ccr-c133d7a0-kuz1cv
-  gh workflow run clients-compat.yml --ref ccr-c133d7a0-kuz1cv
+  gh workflow run -R lvos04/jelly-leon-clients clients-android.yml --ref ccr-c133d7a0-kuz1cv
+  gh workflow run -R lvos04/jelly-leon-clients clients-androidtv.yml --ref ccr-c133d7a0-kuz1cv
+  gh workflow run -R lvos04/jelly-leon-clients clients-desktop.yml --ref ccr-c133d7a0-kuz1cv
+  gh workflow run -R lvos04/jelly-leon-clients clients-swiftfin.yml --ref ccr-c133d7a0-kuz1cv
+  gh workflow run -R lvos04/jelly-leon-clients clients-compat.yml --ref ccr-c133d7a0-kuz1cv
   ```
   Start alleen de workflow van de client die de stap raakt. Een met de hand gestarte run draait op de laatste
   commit van de branch: controleer in `gh run list` dat `headSha` gelijk is aan de commit van de stap.
@@ -1786,7 +1880,7 @@ git status --short
 git log origin/ccr-c133d7a0-kuz1cv..HEAD --oneline
 git log -1 --format='%H %s'
 git show --stat HEAD
-gh run list --branch ccr-c133d7a0-kuz1cv --commit "$(git rev-parse HEAD)" --limit 10 \
+gh run list -R lvos04/<repo> --branch ccr-c133d7a0-kuz1cv --commit "$(git rev-parse HEAD)" --limit 10 \
   --json databaseId,workflowName,status,conclusion,headSha
 grep -nE '"status": *"(Gereed|Geslaagd)"' docs/platform-v2/EVIDENCE.json
 ```
@@ -1846,6 +1940,10 @@ Volgorde (contract, kop "13. Ontwerptaal", "Werkwijze"):
 | media-guard-ultimate | web en Android | P-media-guard-ultimate, Volledig stap 5, 6 en 7 (`npm run check:peil`, de e2e-suite met `apps/web/e2e/peil.spec.ts`, `tools/peil_tokens.py --check`, `:app:verifyPaparazziDebug`) | dezelfde stappen, plus de commando's onder de genoemde kop | "9. Uitgevoerde controles (exacte commando's)" |
 | media-source-optimizer | web | P-media-source-optimizer, Volledig stap 4 en 8 (`npm run check:peil`, `make e2e` met `apps/web/e2e/peil.spec.ts`) | dezelfde stappen, plus de commando's onder de genoemde kop | "10. Opnieuw draaien" |
 | my_house | web en Android | P-my_house, Volledig stap 7 en 10 (`apps/web/e2e/run-stack.sh` met `apps/web/e2e/peil-metingen.ts`, `apps/android/tools/peil_tokens.py --check`, `:app:verifyPaparazziDebug`) | dezelfde stappen, plus de commando's onder de genoemde kop | "9. Bestanden en opnieuw meten" |
+
+home-control-hub en zoeken-en-persoonlijke-ai: draai elk commando uit deze tabel dat PostgreSQL gebruikt (home-control-hub:
+`make test-ui`, `make schermafdrukken`, `tests/ui/ontwerpreview.py`; zoeken-en-persoonlijke-ai: `make ui-echt`) achter de
+databaselock van de repo, bv. `flock <WERKMAP>/.lokaal/hch-db.lock make schermafdrukken` (0.3 regel 5).
 
 Driftcontrole van de Peil-kopie (elke Peil-repo behalve de bron): zie punt 5 van het P-<repo>-blok. Kort:
 `make peil-drift` (home-control-hub, appstore-en-fork), `make test-repo` (jelly-leon-platform),
@@ -2034,7 +2132,10 @@ Open punt - media-guard-ultimate, media-source-optimizer en my_house hebben nog 
 `deploy/truenas/CUSTOM_APP.md`. Dat is werk voor de fase van de bestaande apps (zie
 `CONTRACT_1.3_CONFORMITEIT.md`, koppen "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)",
 "7. media-source-optimizer (MSO, bestaande app; P3)" en "8. my_house (bestaande app; P3)"; voor my_house onder
-andere C1.3-MH-03 en C1.3-MH-06). my_house installeert nu nog met een compose-YAML; de stand en de richting
+andere C1.3-MH-03 en C1.3-MH-06). Er bestaan wel oudere installatiedocumenten op een andere plek:
+`media-source-optimizer/docs/TRUENAS_CUSTOM_APP.md` en `media-guard-ultimate/docs/INSTALL_TRUENAS.md`; een stap die
+`deploy/truenas/CUSTOM_APP.md` maakt, neemt die inhoud mee en laat geen twee tegenstrijdige documenten achter.
+my_house installeert nu nog met een compose-YAML; de stand en de richting
 staan in `<WERKMAP>/my_house/docs/adr/ADR-0004-alles-in-een-custom-app.md`, kop "Context". Tot die
 stappen gebouwd zijn geldt voor deze drie repos: punten 2 tot en met 9 kunnen niet groen zijn; EVIDENCE.json zegt
 dat eerlijk (`Niet gestart` of `Bezig`), en een stap die een installatiedocument voor deze repos schrijft noemt
@@ -2089,9 +2190,11 @@ Afvinklijst:
         --out <bestand buiten de repo>.xlsx
       ```
       Lees de JSON-uitvoer: `bijgewerkt_per_blad`, `gewijzigde_onderdelen`, `contractpunten_en_reviews` en
-      `waarschuwingen`. Exitcode 2 met "FOUT: ... er is niets geschreven" betekent dat een rij `Gereed` of
-      `Geslaagd` zou krijgen: zoek de EVIDENCE-regel op en herstel hem in de repo van herkomst (P-EERLIJK), niet in
-      het script.
+      `waarschuwingen`. Exitcode 2 met "FOUT: ... er is niets geschreven" betekent dat het script weigert. Lees de
+      foutregel; mogelijke oorzaken (bron: `raise ExcelFout` in `tools/excel/update_excel.py`): een status `Gereed`
+      of `Geslaagd`, een onbekende status, een onleesbaar EVIDENCE-bestand, een ontbrekend blad. Herstel een
+      EVIDENCE-regel in de repo van herkomst (P-EERLIJK), nooit in het script; een ontbrekend blad of een andere
+      oorzaak: stop en meld.
 - [ ] 4. Elke waarschuwing is gelezen en verklaard. Een waarschuwing dat bewijs met `Gereed` of `Geslaagd` is
       teruggezet naar `Bezig` betekent: de EVIDENCE.json van die repo is fout en wordt daar hersteld.
 - [ ] 5. De echte run (het exacte commando; schrijft het Excel-bestand in de repo en maakt een `.xlsx.bak`):
@@ -2154,7 +2257,7 @@ Doe dit direct na de fout, vóór elke andere handeling:
       ze netjes. Ruim alleen op wat je zelf hebt gestart; wat je niet kunt opruimen noem je in de melding onder
       "Achtergelaten" (3.6).
 - [ ] 2. Bewaar de uitvoer: het letterlijke commando, de werkmap, de exitcode en de eerste foutregel. Bij een rode
-      CI-run: `gh run view <run-id> --log-failed`.
+      CI-run: `gh run view <run-id> -R lvos04/<repo> --log-failed`.
 - [ ] 3. Leg de stand van de repo vast: `git status --short` en `git log origin/ccr-c133d7a0-kuz1cv..HEAD --oneline`.
 - [ ] 4. Gooi niets weg: geen `git reset --hard`, geen `git checkout -- .`, geen `git clean`, geen `git stash drop`.
       (Het terugzetten van opnieuw gerenderde beelden die niet bij de stap horen, zoals P-PEIL beschrijft, blijft
@@ -2206,7 +2309,7 @@ is dat geen fout van de poort: de status wordt `Geblokkeerd` met `NIET GEVALIDEE
 
 | Verschijnsel | Eerst controleren | Dan |
 |---|---|---|
-| Exitcode 137, of een proces dat zonder foutmelding stopt | `free -m` | Wachten tot "available" boven 3000 MB is; draaien onder de lock en met de begrenzing uit het P-<repo>-blok (bijvoorbeeld `taskset -c 0-3` bij jelly-leon-web). Niet de begrenzing uit het script halen |
+| Exitcode 137, of een proces dat zonder foutmelding stopt | `free -m` | Volg 0.3 regel 2 (eerst ander werk, dan wachten op de drie locks met `flock <lock> true`, opnieuw meten; blijft het geheugen te laag (0.3 regel 2: "available" onder 3000 MB, of onder 6000 MB met swap meer dan 90 % gebruikt): melden onder blokkades); draaien onder de lock en met de begrenzing uit het P-<repo>-blok (bijvoorbeeld `taskset -c 0-3` bij jelly-leon-web). Niet de begrenzing uit het script halen |
 | "No space left on device" | `df -h /` en `df -h /tmp` | Alleen eigen, bij naam genoemde images, containers en uitvoermappen verwijderen. Geen van de drie verboden prune-commando's uit 0.3 regel 4. Lukt het niet: melden |
 | Poort bezet | `ss -ltnp` | Draaien onder de lock (`stack.lock`) en wachten; geen proces van een ander stoppen. Voor media-source-optimizer: zie "Stackpoorten" in de Valkuilen van P-media-source-optimizer |
 | Het commando wacht lang op `flock` | `ls -l <WERKMAP>/.lokaal/*.lock` | Wachten. Een lock nooit weghalen of omzeilen. Wacht je langer dan het P-<repo>-blok aannemelijk maakt: melden |
@@ -2223,7 +2326,7 @@ niet in de Valkuilen van het P-<repo>-blok: melden, niet zelf iets installeren o
 **Tak D - Was al rood.** Vaststellen (alleen lezen):
 
 ```bash
-gh run list --branch ccr-c133d7a0-kuz1cv --limit 10 --json databaseId,workflowName,conclusion,headSha
+gh run list -R lvos04/<repo> --branch ccr-c133d7a0-kuz1cv --limit 10 --json databaseId,workflowName,conclusion,headSha
 git log --oneline -5 -- <pad van het falende bestand of de falende test>
 ```
 
@@ -2232,7 +2335,7 @@ niet van deze stap is, dan herstelt A-BOUW dit NIET stil in zijn eigen stap. Mel
 van herkomst. De regisseur beslist wie het herstelt (het kan werk van een andere keten zijn). Jouw stap is intussen
 niet klaar: zonder groene CI op jouw commit geldt 0.1.
 
-**Tak E - Alleen in de CI rood.** Lees eerst `gh run view <run-id> --log-failed`. Vaste oorzaken:
+**Tak E - Alleen in de CI rood.** Lees eerst `gh run view <run-id> -R lvos04/<repo> --log-failed`. Vaste oorzaken:
 
 - De CI gebruikt een gepinde commit van een andere repo en lokaal draai je tegen de map ernaast (Valkuilen van
   P-ai-server-manager, P-home-control-hub, P-jelly-leon-platform, P-zoeken-en-persoonlijke-ai, P-jelly-leon). De pin
@@ -2243,7 +2346,7 @@ niet klaar: zonder groene CI op jouw commit geldt 0.1.
 - Een verschil in hulpprogramma of lettertype tussen deze machine en de CI (Valkuilen van P-my_house). Herstel de
   oorzaak in de code of het script; een schermtest wordt niet verruimd.
 - De runner zelf faalde (afgebroken, geen schijfruimte, netwerk), zonder een foutregel uit de eigen code of tests.
-  Dan één keer: `gh run rerun <run-id> --failed`, daarna `gh run watch <run-id> --exit-status`. Een tweede keer
+  Dan één keer: `gh run rerun <run-id> -R lvos04/<repo> --failed`, daarna `gh run watch <run-id> -R lvos04/<repo> --exit-status`. Een tweede keer
   opnieuw starten zonder wijziging is niet toegestaan: melden.
 
 Elke wijziging om de CI groen te krijgen is een herstelpoging en telt mee (3.5). Een workflowbestand wijzig je

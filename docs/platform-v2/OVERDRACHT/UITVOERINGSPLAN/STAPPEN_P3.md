@@ -2,8 +2,8 @@
 
 Dit bestand is het uitvoeringsplan voor fase P3. De regisseur kiest hieruit stappen en geeft elke subagent het
 stap-ID mee; de subagent leest zijn stap zelf. Elke stap is door een bouwer in een keer af te ronden.
-Stand van dit plan: geschreven op 2026-11-11, terwijl ronde 3 nog in de repos bouwde. Daarom heeft elke stap een
-regel "Al gedaan?".
+Stand van dit plan: geschreven op 2026-11-11, terwijl ronde 3 nog in de repos bouwde; ronde 3 is daarna (09:52)
+AFGEBROKEN (`<WERKMAP>/.lokaal/plan/STAND_RONDE3.md`). Daarom heeft elke stap een regel "Al gedaan?".
 
 ## 0. Afkortingen en vaste verwijzingen
 
@@ -81,7 +81,8 @@ Bron: [GATES], kop "Gate matrix" en kop "Fase P2 — Veilig automatiseren"; STAP
       van A-BOUW.
 
 Stappen die niet op Gate P2 wachten (geen schrijven via de Hub, geen executor): alle stappen in
-`media-source-optimizer`, `media-guard-ultimate`, `my_house`, `home-control-hub` en `jelly-leon-platform`, en in
+`media-source-optimizer`, `media-guard-ultimate`, `my_house`, `home-control-hub`, `jelly-leon-platform` en
+`appstore-en-fork` (S-P3-490 wacht wel op de ontwerpstap van C-12 in P2, zie die stap), en in
 `ai-server-manager` alle stappen behalve S-P3-110, S-P3-120 en S-P3-130. De regisseur mag deze banen dus al laten lopen terwijl
 P2 in `ai-server-manager` nog bezig is, MITS in die repo nooit twee schrijvers tegelijk werken: de baan
 `ai-server-manager` van P3 start pas als de baan `ai-server-manager` van P2 stilligt.
@@ -149,7 +150,10 @@ De afvinklijst van de gate staat in hoofdstuk 7 (stap S-P3-910).
 11. **Stap klaar** betekent alle vier: lokale poorten groen (POORTEN: P-<repo> plus de algemene poorten die de stap
     noemt), commit gepusht, de CI-run op precies die commit groen (POORTEN, kop "0.5 CI-controle na elke push (geldt
     voor alle repos)"), en EVIDENCE klopt met wat echt gemeten is (P-EERLIJK). Een overgeslagen test telt niet als
-    groen (V-004).
+    groen (V-004). Elk `gh run`- en `gh workflow`-commando krijgt `-R lvos04/<repo>` (in een fork kiest `gh` anders de
+    upstream-repo), en `gh run list -c` / `--commit` krijgt altijd de VOLLE hash (`git rev-parse HEAD`): met een korte
+    hash geeft `gh` een lege lijst (gemeten 2026-11-11: `-c 076f964` in home-control-hub gaf `[]`, de volle hash gaf
+    run 42990957447).
 12. **Namen die nog niet bestaan.** Een bestand, route of kolom met "(nieuw)" is een voorstel. Bestaat er in de repo
     al iets met dezelfde functie, dan gebruikt de bouwer dat en meldt hij de afwijking. Een migratienummer wordt altijd
     eerst vastgesteld met het commando in de stap.
@@ -167,6 +171,13 @@ De afvinklijst van de gate staat in hoofdstuk 7 (stap S-P3-910).
 | appstore-en-fork | register van bestaande apps en adoptiemanifest (B08-002, APP-01...APP-20: "Geblokkeerd", Sim-getest) | alleen meebewegen met gewijzigde A-documenten |
 
 Deze stand veroudert. De regel "Al gedaan?" in elke stap is leidend, niet deze tabel.
+
+Ronde 3 is op 2026-11-11 afgebroken. Het halve werk dat toen in de werkmappen bleef staan (ai-server-manager:
+policy-engine, goedkeuringen en executor; home-control-hub: afronding B11; jelly-leon-platform: review P2;
+media-guard-ultimate: ontwerpherstel van het mediaserver-tabblad; my_house: een testbestand) hoort bij P2 en wordt
+daar afgemaakt (STAPPEN_P2.md, S-P2-000 en de stap van die repo). Een baan van P3 in zo'n repo start pas als de baan
+van P2 in dezelfde repo stilligt en `git -C <WERKMAP>/<repo> status --short` leeg is. Vindt een stap van P3 toch
+ongecommit werk: stoppen en melden (hoofdstuk 3, regel 4), nooit weggooien of meecommitten.
 
 ---
 
@@ -219,14 +230,17 @@ lock uit regel 8 van hoofdstuk 3 vraagt; de stap zelf mag gewoon starten, alleen
 | S-P3-330 Advies over kosten | home-control-hub | S-P3-310, S-P3-320 | nee | alle andere banen |
 | S-P3-340 Meldingen bij afwijkingen | home-control-hub | S-P3-310 | nee | alle andere banen |
 | S-P3-350 Statuspagina energie | home-control-hub | S-P3-340 | nee | alle andere banen |
+| S-P3-360 Node-RED-profiel op de voorziening van C-12 | home-control-hub | S-P3-350; S-P3-490 en S-P3-445 gepusht | nee | alle andere banen |
 | S-P3-400 ADR en gereedschap voor I03...I20 | jelly-leon-platform | S-P3-000 | nee | alle andere banen |
 | S-P3-410 Controlelijsten I03 en I04 | jelly-leon-platform | S-P3-400 | nee | alle andere banen |
 | S-P3-420 Controlelijsten I15, I16, I17 | jelly-leon-platform | S-P3-400 | nee | alle andere banen |
 | S-P3-430 Controlelijsten I18, I19, I20 | jelly-leon-platform | S-P3-400 | nee | alle andere banen |
-| S-P3-440 I05: controlelijst en installatietekst | jelly-leon-platform | S-P3-400; keuze van de gebruiker over de I05-titels | nee | alle andere banen |
+| S-P3-440 I05: controlelijst en installatietekst | jelly-leon-platform | S-P3-400; Z-18 genomen of zonder besluit optie 1 | nee | alle andere banen |
+| S-P3-445 Node-RED-manifest op de voorziening van C-12 | jelly-leon-platform | S-P3-440; S-P3-490 gepusht; S-P2-410 klaar (los van S-P3-450; zie de stap) | ja (rooktest, `stack.lock`) | geen andere stackproef |
 | S-P3-450 Manifestkopieen van de drie apps | jelly-leon-platform | S-P3-290, S-P3-660, S-P3-755 gepusht | nee | alle andere banen |
-| S-P3-500 Register bestaande apps laten meebewegen | appstore-en-fork | S-P3-180 gepusht | nee | alle andere banen |
-| S-P3-600 Scopes op API-sleutels | media-guard-ultimate | S-P3-000; S-P2-610 klaar | ja (image-build upgradebewijs) | geen andere image-build |
+| S-P3-490 Voorziening beheerder en dienstaccount zonder geheim (C-12) | appstore-en-fork | S-P3-000; S-P2-510 (ontwerpstap C-12, STAPPEN_P2.md) afgevinkt; contractronde eerst als zijn ADR die vraagt (zie de stap) | nee | alle andere banen |
+| S-P3-500 Register bestaande apps laten meebewegen | appstore-en-fork | S-P3-180 gepusht (los van S-P3-490; zie de kop van de baan) | nee | alle andere banen |
+| S-P3-600 Scopes op API-sleutels | media-guard-ultimate | S-P3-000; S-P2-610 en S-P2-620 klaar | ja (image-build upgradebewijs) | geen andere image-build |
 | S-P3-610 Connector deel 1: discover, health, healthz, readyz | media-guard-ultimate | S-P3-600 | ja (upgradebewijs) | geen andere image-build |
 | S-P3-615 Connector deel 2: items, evidence, vijf datasets | media-guard-ultimate | S-P3-610 | ja (upgradebewijs) | geen andere image-build |
 | S-P3-620 Events met cursor | media-guard-ultimate | S-P3-610 | ja (upgradebewijs) | geen andere image-build |
@@ -248,7 +262,7 @@ lock uit regel 8 van hoofdstuk 3 vraagt; de stap zelf mag gewoon starten, alleen
 | S-P3-705 Boiler: regressietests | my_house | S-P3-700 | nee | alle andere banen |
 | S-P3-710 Inbedrijfstellingsgate | my_house | S-P3-705 | nee | alle andere banen |
 | S-P3-715 Tests sensor, TTL en herstart | my_house | S-P3-700 | nee | alle andere banen |
-| S-P3-720 Alles-in-een image deel 1 | my_house | S-P3-700; besluit Z-08 | ja (image-build) | geen andere image-build |
+| S-P3-720 Alles-in-een image deel 1 | my_house | S-P3-700; besluit Z-08; Z-17 (genomen 2026-11-11) | ja (image-build) | geen andere image-build |
 | S-P3-725 Alles-in-een image deel 2: CI en rooktest | my_house | S-P3-720 | ja (image-build) | geen andere image-build |
 | S-P3-730 Herstel en overstap zonder terminal | my_house | S-P3-725 | nee | alle andere banen |
 | S-P3-735 Proef back-up A naar herstel B | my_house | S-P3-730 | ja (image-build, twee containers) | geen andere image-build of stackproef |
@@ -288,9 +302,12 @@ wachten.
 
 **Daarna vrijkomend:**
 
-- `jelly-leon-platform` is na S-P3-440 klaar tot S-P3-450 kan (die wacht op de drie manifesten). De plek komt vrij.
-- `home-control-hub` is na S-P3-350 klaar. De plek komt vrij.
-- `appstore-en-fork` heeft alleen S-P3-500, helemaal aan het einde.
+- `jelly-leon-platform` is na S-P3-440 klaar tot S-P3-445 (wacht op S-P3-490) of S-P3-450 (wacht op de drie
+  manifesten) kan. De plek komt vrij.
+- `home-control-hub` is na S-P3-350 klaar tot S-P3-360 kan (wacht op S-P3-490 en S-P3-445). De plek komt vrij.
+- `appstore-en-fork` heeft S-P3-490 (C-12; zodra de ontwerpstap van C-12 in STAPPEN_P2.md is afgevinkt) en S-P3-500
+  (helemaal aan het einde). Volgorde C-12: S-P3-490 (appstore-en-fork) -> S-P3-445 (jelly-leon-platform) -> S-P3-360
+  (home-control-hub), telkens na de push van de vorige (V-017).
 - De eerste zware golf is in `media-guard-ultimate` (elke stap). De tweede zware golf begint als
   `media-source-optimizer` bij S-P3-250 komt en `my_house` bij S-P3-720. Dan staan drie banen voor
   `docker-build.lock`. De regisseur laat ze lopen (de lock regelt de volgorde) maar start er geen vierde zware keten
@@ -299,7 +316,7 @@ wachten.
   bezig.
 
 **Repos zonder werk in P3:** `jelly-leon`, `jelly-leon-web`, `jelly-leon-clients` en `zoeken-en-persoonlijke-ai`.
-`appstore-en-fork` heeft tot S-P3-500 geen werk. In deze repos mag de regisseur een keten uit een andere fase of golf
+`appstore-en-fork` heeft buiten S-P3-490 en S-P3-500 geen werk. In deze repos mag de regisseur een keten uit een andere fase of golf
 laten lopen als de gate-matrix ([GATES], kop "Gate matrix") dat toestaat: werk van P4-0 of P4 in de drie
 Jelly Leon-repos alleen na "Gate P4-0" ([B03-FASE], kop "4. Gates"); werk van P5 in `zoeken-en-persoonlijke-ai` alleen
 volgens het stappenbestand van P5. Zo'n keten telt mee voor de grens van 8 ketens en voor de locks.
@@ -309,9 +326,9 @@ volgens het stappenbestand van P5. Zo'n keten telt mee voor de grens van 8 keten
 ## 6. Stappen
 
 **Niveaus.** "standaard" staat in regel 10 van hoofdstuk 3. Het topmodel (N5) wordt in P3 vijf keer ingezet:
-S-P3-220 (R-VEILIG, kern van de authenticatie van MSO), S-P3-600 en S-P3-625 (R-HARDE-EIS, migratiecode van de
-MediaGuard-database), S-P3-740 (R-VEILIG, kern van de verificatie van ondertekende verzoeken) en S-P3-910 (A-GATE aan
-het einde van de fase). Dat is 5 op 81 stappen.
+S-P3-220 (R-VEILIG, kern van de authenticatie van MSO), S-P3-600 (R-VEILIG, kern van de authenticatie van
+MediaGuard: sleutelscopes), S-P3-625 (R-HARDE-EIS, migratiecode over de MediaGuard-database), S-P3-740 (R-VEILIG, kern van de verificatie van ondertekende verzoeken) en S-P3-910 (A-GATE aan
+het einde van de fase). Dat is 5 op 84 stappen.
 
 **Keten.** De standaardketen is A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL (alleen bij bevindingen) -> R-EERLIJK. Wat een
 stap daarbovenop noemt met het woord VERPLICHT mag niet worden overgeslagen.
@@ -321,12 +338,12 @@ stap daarbovenop noemt met het woord VERPLICHT mag niet worden overgeslagen.
 - **Werkpakketten en tests:** geen eigen ID (controlestap); leest de stand van alle ID's uit hoofdstuk 8
 - **Vooraf:** geen
 - **Al gedaan?** `grep -n 'S-P3-000' <WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` -> staat er een regel van vandaag, sla over. Is de regel ouder, doe de stap opnieuw.
-- **Lees eerst:** dit bestand, hoofdstuk 3.1 en hoofdstuk 8; BESLUITEN, koppen "Z-02", "Z-03", "Z-08", "Z-10" en "BG-05"; STAPPEN_P2.md, hoofdstuk 4
+- **Lees eerst:** dit bestand, hoofdstuk 3.1 en hoofdstuk 8; BESLUITEN, koppen "Z-02", "Z-03", "Z-08", "Z-10", "Z-17", "Z-18", "C-12" en "BG-05"; STAPPEN_P2.md, hoofdstuk 4; `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker"
 - **Bouw:** (er wordt niets gebouwd en niets gecommit)
   1. Per repo (`ai-server-manager`, `media-guard-ultimate`, `media-source-optimizer`, `my_house`, `home-control-hub`, `jelly-leon-platform`, `appstore-en-fork`): `git -C <WERKMAP>/<repo> rev-parse --abbrev-ref HEAD`, `git -C <WERKMAP>/<repo> status --short` en `git -C <WERKMAP>/<repo> log --oneline -5`. Noteer ongecommit werk en bij welke stap het hoort.
   2. Draai STAND voor alle ID's uit hoofdstuk 8 en leg de uitkomst naast de tabel in hoofdstuk 3.1. Elk verschil betekent dat een stap (deels) al gedaan is: noteer het stap-ID.
   3. Draai de regel "Al gedaan?" van de eerste twee stappen van elke baan.
-  4. Lees per open besluit de regel "Zonder besluit geldt": `grep -n -E '^#### (Z-02|Z-03|Z-08|Z-10|BG-05)' <WERKMAP>/.lokaal/plan/uit/BESLUITEN_EN_BLOKKADES.md`. Meld welke vragen nu in een keuzemenu moeten: Z-10 voor S-P3-200, Z-08 voor S-P3-720, Z-03 voor S-P3-015, Z-02 voor de statuspagina's, en de keuze over de I05-titels voor S-P3-440.
+  4. Lees per open besluit de regel "Zonder besluit geldt": `grep -n -E '^#### (Z-02|Z-03|Z-08|Z-10|Z-18|BG-05)' <WERKMAP>/.lokaal/plan/uit/BESLUITEN_EN_BLOKKADES.md`. Meld welke vragen nu in een keuzemenu moeten: Z-10 voor S-P3-200, Z-08 voor S-P3-720, Z-03 voor S-P3-015, Z-02 voor de statuspagina's, en Z-18 (I05-titels) voor S-P3-440 (zonder besluit geldt optie 1; S-P3-440 wacht er niet op). Niet opnieuw vragen, wel nagaan dat ze in VOORTGANG.md, kop "Wacht op de gebruiker", als genomen staan: Z-17 (2026-11-11: Zigbee2MQTT in de image van my_house, optioneel; S-P3-720, S-P3-755) en C-12 (2026-11-11: voorziening zonder geheim via de manifeststandaard; S-P3-490, S-P3-445, S-P3-360). Meld of de ontwerpstap van C-12 in STAPPEN_P2.md al is afgevinkt en of zijn ADR een contractwijziging vraagt (S-P3-490, regel "Vooraf").
   5. Meet `df -h <WERKMAP>` en `free -m` en vergelijk met POORTEN, kop "0.3 Vaste omgeving en machineregels".
   6. Lever een rapport per repo: commit, half werk, stappen die al klaar zijn, open vragen. De regisseur zet het in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` onder "P3 - nulmeting" met de datum.
 - **Tests (verplicht):** geen bouwtests. Negatieve controle: neem een ID dat volgens hoofdstuk 3.1 "Niet gestart" is en bevestig met STAND dat het niet zonder bewijsverwijzing op "Bezig" staat.
@@ -343,11 +360,17 @@ Werkmap `<WERKMAP>/ai-server-manager`. Poort: P-ai-server-manager. Een testbesta
 `.venv/bin/python -m pytest -q <pad naar testbestand>`. Tests met database:
 `PATH=/usr/lib/postgresql/16/bin:$PATH HUB_TEST_ADMIN_URL=postgresql://postgres@127.0.0.1:5432/postgres make test-integration`
 (niet naast een andere volledige testsuite). Nieuwe migratie: het volgende vrije nummer in `apps/api/alembic/versions/`
-(vaststellen met `ls apps/api/alembic/versions | tail -3`; op 2026-11-11 was `0012_acties_goedkeuringen.py` de laatste
+(vaststellen met `ls apps/api/alembic/versions/0*.py | tail -3`; op 2026-11-11 was `0012_acties_goedkeuringen.py` de laatste
 en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; op 2026-11-11 was ADR-0030 de laatste).
 `make web-e2e` en `make web-review` hebben geen lock maar zijn volgens POORTEN (P-ai-server-manager, kop "4. Volledig
 (CI-volgorde)", punt 8) wel zwaar: draai ze niet naast een andere volledige testsuite en alleen als `free -m`
 "available" 3000 MB of meer is. De kolom "Zwaar" van de UI-stappen staat op "nee" omdat er geen lock nodig is.
+
+Let op: de map `apps/api/src/hub/actions/` (met `service.py`: `stel_voor`, `keur_goed`, `voer_uit`, `_journaal`; en
+`blokkades.py`: `dynamisch`) stond op 2026-11-11 alleen als ongecommit half werk van ronde 3 (P2) in de werkmap
+(`<WERKMAP>/.lokaal/plan/STAND_RONDE3.md`). S-P3-110, S-P3-120 en S-P3-130 gebruiken die code pas na Gate P2. Is de
+map dan niet gecommit (`git -C <WERKMAP>/ai-server-manager ls-files apps/api/src/hub/actions | head -3` geeft niets), of
+heten de functies anders: stoppen en melden, niet zelf nabouwen.
 
 ### S-P3-010 - ADR: adapters voor de bestaande apps
 - **Repo:** ai-server-manager | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
@@ -405,10 +428,10 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
   6. Ontkoppelen verwijdert de vault-waarde en de opgeslagen metingen. De Hub schrijft daarbij niets in de app.
   7. `make openapi`, daarna `make openapi-check`.
 - **Tests (verplicht):** nieuwe unit- en integratietests. Negatief: (a) een basisadres naar loopback of een metadata-adres wordt geweigerd; (b) de exacte testsleutel komt niet voor in het antwoord, in de logregels van de test of in de audit; (c) een gewone gebruiker krijgt 403 op maken en verwijderen; (d) een meting van 901 s oud geeft `unknown`. Commando's: `make lint && make test-unit`, daarna `PATH=/usr/lib/postgresql/16/bin:$PATH HUB_TEST_ADMIN_URL=postgresql://postgres@127.0.0.1:5432/postgres make test-integration`, daarna `make openapi-check`.
-- **Poort:** P-ai-server-manager (snel en volledig) + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
+- **Poort:** P-ai-server-manager (snel en volledig) + P-VEILIG + P-CONTRACT + P-HARDE-EIS (migratie) + P-GIT + P-EERLIJK
 - **Valkuilen:** V-003, V-043, V-048, V-051, V-066, V-094
 - **Bewijs:** C1.3-ASM-21 blijft "Bezig", validatie "Unit-getest"
-- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG VERPLICHT; R-HARDE-EIS VERPLICHT omdat de stap een migratie toevoegt: bestaande tabellen en gegevens van de Hub blijven ongewijzigd, downgrade getest) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog); verder standaard
 - **Stop en vraag als:** het ongecommitte P2-werk in `apps/api/src/hub/models.py` nog niet gepusht is (dan eerst de P2-baan afmaken); het ADR een keuze openlaat; de migratie een bestaande tabel van P2 moet wijzigen.
 
@@ -441,14 +464,14 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
 - **Lees eerst:** [CONTRACT], kop "2.3 ..." regel 2 (MSO: machine-sleutel met scope `read`) en regel 3; [DM-MSO], kop "6. Hub-adapter: welke bestaande routes de Hub kan gebruiken (connectorcontract §6, enrollment §3)" en kop "12. Contract 1.3 (conformiteitsronde 2026-11-10)"; `<WERKMAP>/media-source-optimizer/docs/openapi/media-source-optimizer.openapi.json`; het ADR van S-P3-010
 - **Bouw:**
   1. Module `mso` in de adaptermap. Aanmelden met een machine-sleutel met scope `read`. Die sleutel bestaat pas na S-P3-220 in MSO; hoe de sleutel wordt meegestuurd (naam van de kop) is ONBEKEND - eerst vaststellen met: `grep -n -i 'machine\|x-api-key\|authorization' <WERKMAP>/media-source-optimizer/apps/core/mso/auth.py | head -30`. Tot S-P3-220 gepusht is test de adapter alleen tegen de nagebootste MSO.
-  2. Zonder sleutel leesbaar: `GET /healthz`, `GET /api/v1/setup/status`. Met sleutel: `GET /api/v1/system/info`, `/api/v1/system/health`, `/api/v1/overview`, `/api/v1/usenet/failure-reasons`, `/api/v1/usenet/categories/diagnosis`, `/api/v1/mediaguard/compat`, `/api/v1/costs/summary`, `/api/v1/system/maintenance`, `/api/v1/changes?status=preview`. Controleer elk pad in het OpenAPI-bestand.
+  2. Zonder sleutel leesbaar: `GET /healthz` (staat bewust niet in het OpenAPI-bestand: `include_in_schema=False` in `<WERKMAP>/media-source-optimizer/apps/core/mso/app.py`), `GET /api/v1/setup/status`. Met sleutel: `GET /api/v1/system/info`, `/api/v1/system/health`, `/api/v1/overview`, `/api/v1/usenet/failure-reasons`, `/api/v1/usenet/categories/diagnosis`, `/api/v1/mediaguard/compat`, `/api/v1/costs/summary`, `/api/v1/system/maintenance`, `/api/v1/changes?status=preview`. Controleer elk pad in het OpenAPI-bestand.
   3. Vertaling naar de health van het contract: `offline` wordt `down`, `auth_failed` wordt `degraded` met een `reason_code`, geen gegevens wordt `unknown`. De slechtste check bepaalt de toestand van de app.
   4. Foutformaat van MSO is `{detail, code, correlation_id}`: neem `correlation_id` over in het incident van de Hub.
   5. De Hub gebruikt nooit een gebruikerswachtwoord of een sessie met CSRF van MSO. Een poging om zo te koppelen wordt in de koppelroute geweigerd.
   6. Open wijzigingen (`/api/v1/changes?status=preview`) worden alleen getoond met een link naar MSO. Goedkeuren komt in S-P3-120.
 - **Tests (verplicht):** unit- en integratietests tegen een nagebootste MSO. Negatief: (a) sleutel zonder scope `read` (403) geeft een incident en `unknown`; (b) `auth_failed` van een koppeling in MSO wordt `degraded`, niet `healthy`; (c) een koppeling met gebruikersnaam en wachtwoord wordt geweigerd. Commando: `.venv/bin/python -m pytest -q <pad naar het nieuwe testbestand>`, daarna `make lint && make test-unit`.
 - **Poort:** P-ai-server-manager + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
-- **Valkuilen:** V-001, V-017, V-051, V-094
+- **Valkuilen:** V-129, V-001, V-017, V-051, V-094
 - **Bewijs:** C1.3-ASM-21 "Bezig", "Sim-getest". B05-009 is een regel van `media-source-optimizer` (S-P3-230). Echte MSO op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard
@@ -489,7 +512,7 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
   5. Incidentregel: adapter drie metingen achter elkaar `unknown` of `down` geeft een incident (regels in `apps/api/src/hub/incidents/rules.py`).
 - **Tests (verplicht):** `apps/api/tests/unit/test_catalogus.py` en `apps/api/tests/unit/test_incident_regels.py` uitbreiden. Negatief: geen koppeling geeft `unknown`; een meting ouder dan `max_age` geeft `unknown` met `meting_verouderd`. Commando: `make lint && make test-unit && make web-lint && make web-test`.
 - **Poort:** P-ai-server-manager + P-CONTRACT + P-PEIL (alleen tekst gewijzigd) + P-GIT + P-EERLIJK
-- **Valkuilen:** V-051, V-052
+- **Valkuilen:** V-120, V-051, V-052
 - **Bewijs:** C1.3-ASM-21 "Bezig", "Sim-getest"
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK. Geen A-ONTWERP: er komt geen nieuw scherm of onderdeel bij; R-TECH controleert dat.
 - **Niveau:** standaard
@@ -510,7 +533,7 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
   6. Toetsenbord en schermlezer: alle knoppen bereikbaar, foutmelding gekoppeld aan het veld.
 - **Tests (verplicht):** componenttests en een browsertest in `apps/web/e2e/` (nieuw bestand, genummerd tussen `10-schermen.spec.ts` en `90-afsluiting.spec.ts`). Negatief: (a) na opslaan staat de sleutel nergens in de pagina (zoek de testwaarde in de DOM); (b) een gewone gebruiker ziet de invoer niet; (c) fouttoestand toont de reden, geen lege kaart. Commando's: `make web-lint && make web-test`, `make web-e2e`, `make web-review`.
 - **Poort:** P-ai-server-manager + P-PEIL + P-VEILIG + P-GIT + P-EERLIJK
-- **Valkuilen:** V-058, V-061, V-063, V-094
+- **Valkuilen:** V-120, V-058, V-061, V-063, V-094
 - **Bewijs:** C1.3-ASM-21 "Bezig", "Sim-getest". I03-03-08 en I04-04-08 zijn regels van `jelly-leon-platform` (S-P3-410).
 - **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
 - **Niveau:** standaard
@@ -530,10 +553,10 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
   5. Route om de keten te lezen (ingelogde gebruiker), in het bestaande incidentenrouterbestand `apps/api/src/hub/routers/incidents.py`. OpenAPI bijwerken.
   6. De keten biedt geen actie aan: geen herzoek, geen verwijderen, geen opruimen. Alleen links.
 - **Tests (verplicht):** unit- en integratietests met de nagebootste apps uit S-P3-030 en S-P3-040. Negatief: (a) MSO onbereikbaar: de keten toont de MediaGuard-schakels en "onbekend" voor MSO, geen fout 500; (b) een keten bevat geen veld uit de verboden lijst van S-P3-030; (c) twee verzoeken van dezelfde keten dragen dezelfde correlatiewaarde. Commando: `make lint && make test-unit`, daarna de integratietests (commando in de kop van deze baan), daarna `make openapi-check`.
-- **Poort:** P-ai-server-manager + P-CONTRACT + P-GIT + P-EERLIJK
+- **Poort:** P-ai-server-manager + P-CONTRACT + P-HARDE-EIS (alleen lezen in MediaGuard) + P-GIT + P-EERLIJK
 - **Valkuilen:** V-046, V-051, V-066
 - **Bewijs:** C1.3-ASM-21 "Bezig", "Sim-getest". De integrale scenario's (EX39...EX42) horen bij STAPPEN_P6.md, stap S-P6-16.
-- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT: de keten leest MediaGuard; R-HARDE-EIS controleert dat alleen GET-routes en de gecachte diagnose worden gebruikt) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard
 - **Stop en vraag als:** voor een schakel een schrijvende of interactieve route nodig lijkt.
 
@@ -552,7 +575,7 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
   6. Geen actieknoppen voor MediaGuard of MSO op dit scherm in deze stap. `media` uit `PLANNED` in `apps/web/src/lib/nav.ts` halen; het deel voor Jelly Leon blijft gepland (P4) en staat zo op het scherm.
 - **Tests (verplicht):** componenttests en browsertest. Negatief: (a) adapter `unknown`: het scherm toont "onbekend", niet nul problemen; (b) noodstop aan: de balk staat er en er is geen knop om hem uit te zetten; (c) geen koppeling: het scherm verwijst naar het koppelscherm. Commando's: `make web-lint && make web-test`, `make web-e2e`, `make web-review`.
 - **Poort:** P-ai-server-manager + P-PEIL + P-GIT + P-EERLIJK
-- **Valkuilen:** V-051, V-058, V-061, V-063
+- **Valkuilen:** V-120, V-051, V-058, V-061, V-063
 - **Bewijs:** C1.3-ASM-21 "Bezig", "Sim-getest"
 - **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
 - **Niveau:** standaard
@@ -573,7 +596,7 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
   6. `huis` uit `PLANNED` in `apps/web/src/lib/nav.ts` halen.
 - **Tests (verplicht):** componenttests en browsertest. Negatief: (a) de pagina bevat geen knop of formulier dat een POST naar de adapter doet; (b) verlopen token: het scherm toont "koppeling verlopen" met een verwijzing naar het koppelscherm; (c) een verouderde sensor wordt niet als actueel getoond. Commando's: `make web-lint && make web-test`, `make web-e2e`, `make web-review`.
 - **Poort:** P-ai-server-manager + P-PEIL + P-GIT + P-EERLIJK
-- **Valkuilen:** V-051, V-058, V-061, V-063, V-064
+- **Valkuilen:** V-120, V-051, V-058, V-061, V-063, V-064
 - **Bewijs:** C1.3-ASM-21 "Bezig", "Sim-getest". Echte apparaten: "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md onderdeel N-P6-06.
 - **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
 - **Niveau:** standaard
@@ -754,7 +777,7 @@ en nog niet gecommit). Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; 
 
 Werkmap `<WERKMAP>/media-source-optimizer`. Poort: P-media-source-optimizer. De tests van de kern vragen PostgreSQL 16
 en lopen een testbestand tegelijk. Nieuwe migratie: het volgende vrije nummer in `apps/core/mso/migrations/`
-(vaststellen met `ls apps/core/mso/migrations | tail -3`; op 2026-11-11 was `0607_footprint.sql` de laatste; de
+(vaststellen met `ls apps/core/mso/migrations/*.sql | tail -3`; op 2026-11-11 was `0607_footprint.sql` de laatste; de
 MSO-bouwlijst noemt `0608` en `0609` als voorstel, het echte nummer hangt af van de volgorde van uitvoering). Nieuw
 ADR: volgend vrij nummer (`ls docs/adr | tail -3`; op 2026-11-11 was ADR-0009 de laatste). Na een bewuste wijziging
 van de API wordt `docs/openapi/media-source-optimizer.openapi.json` bijgewerkt met het commando dat in de stap staat
@@ -769,11 +792,11 @@ en meegecommit. Het getal `E2E_MIN_TESTS` in `Makefile` wordt nooit verlaagd. De
 - **Lees eerst:** BESLUITEN, kop "Z-10 — media-source-optimizer: CI op de werkbranch"; [DM-MSO], kop "9. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regels P3-04 en P3-14; `.github/workflows/ci.yaml` (blok `on:`); `docs/adr/ADR-0005-eerlijke-ci-e2e-en-logcontrole.md`, kop "Besluiten"; POORTEN, kop "P-media-source-optimizer", onderdeel "6. CI-controle"
 - **Bouw:**
   1. Z-10 optie 1 (CI ook bij een push op de werkbranch): voeg in `.github/workflows/ci.yaml` onder `on: push: branches:` het patroon voor de werkbranch toe (de MSO-bouwlijst noemt `ccr-*`). Verander niets aan `tags`, aan `workflow_dispatch` of aan de invoer `release_version`.
-  2. Z-10 zonder besluit of optie 3: wijzig de workflow niet. Elke stap in deze baan start de CI dan met de hand: `gh workflow run ci.yaml --ref ccr-c133d7a0-kuz1cv` en leest de uitkomst met `gh run list --workflow ci.yaml --branch ccr-c133d7a0-kuz1cv --limit 3`. Geef nooit de invoer `release_version` mee.
+  2. Z-10 zonder besluit of optie 3: wijzig de workflow niet. Elke stap in deze baan start de CI dan met de hand: `gh workflow run ci.yaml -R lvos04/media-source-optimizer --ref ccr-c133d7a0-kuz1cv` en leest de uitkomst met `gh run list -R lvos04/media-source-optimizer --workflow ci.yaml --branch ccr-c133d7a0-kuz1cv --commit "$(git rev-parse HEAD)" --limit 3` (volle hash; hoofdstuk 3, regel 11). Geef nooit de invoer `release_version` mee.
   3. Haal de gevolgde map `apps/core/mso_core.egg-info` uit git (`git rm -r --cached apps/core/mso_core.egg-info`) en zet `*.egg-info/` in `.gitignore`.
   4. Controleer of `apps/core/pyproject.toml` nog naar een niet-bestaand `THIRD_PARTY.md` verwijst: `grep -n 'THIRD_PARTY' apps/core/pyproject.toml`. Geen treffer betekent dat dit deel al is hersteld (zie `CHANGELOG.md`); wel een treffer: laat de verwijzing wijzen naar een bestaand bestand of haal hem weg.
   5. Leg in `README.md` (ontwikkeldeel) vast hoe de CI op de werkbranch start, in een regel.
-- **Tests (verplicht):** `make lint` en `actionlint .github/workflows/ci.yaml .github/workflows/release.yaml`. Negatief: (a) `git ls-files | grep -c 'egg-info'` geeft 0; (b) `grep -n -A3 '^on:' .github/workflows/release.yaml` laat zien dat `release.yaml` alleen start bij een wijziging van `release/VERSION` of met de hand, dus niet door deze push; (c) na de push staat er precies een nieuwe run van `ci.yaml` op deze commit en geen run van `release.yaml`.
+- **Tests (verplicht):** `make lint` en `actionlint .github/workflows/ci.yaml .github/workflows/release.yaml`. Negatief: (a) `git ls-files | grep -c 'egg-info'` geeft 0; (b) `grep -n -A3 '^on:' .github/workflows/release.yaml` laat zien dat `release.yaml` alleen start bij een wijziging van `release/VERSION` of met de hand, dus niet door deze push; (c) na de push staat er precies een nieuwe run van `ci.yaml` op deze commit en geen run van `release.yaml` (`gh run list -R lvos04/media-source-optimizer --commit "$(git rev-parse HEAD)" --json workflowName,status,conclusion`).
 - **Poort:** P-media-source-optimizer (snel) + P-GIT + P-EERLIJK
 - **Valkuilen:** V-004, V-022; een run starten met `release_version` publiceert images en is verboden
 - **Bewijs:** B05-001 blijft "Bezig"; voeg de CI-run op de werkbranch toe aan het bewijs
@@ -880,7 +903,7 @@ en meegecommit. Het getal `E2E_MIN_TESTS` in `Makefile` wordt nooit verlaagd. De
   8. Werk de OpenAPI-export bij.
 - **Tests (verplicht):** nieuw testbestand `apps/core/tests/test_connector_api.py` (nieuw). Negatief: (a) zonder sleutel 401, sleutel zonder `read` 403; (b) een check ouder dan `max_age` maakt `health` `unknown`, nooit gezond; (c) een verlopen cursor geeft de contractfout; (d) dezelfde gebeurtenis komt bij herhaald ophalen met hetzelfde ID terug; (e) `propose`, `apply` en `rollback` geven 501; (f) de waarde van een opgeslagen wachtwoord of sleutel komt in geen enkel antwoord voor. Commando: `cd apps/core && PATH=/usr/lib/postgresql/16/bin:$PATH MSO_PG_BIN=/usr/lib/postgresql/16/bin MSO_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres MSO_OPENAPI_BIJWERKEN=1 ../../.venv/bin/python -m pytest -q -p no:warnings -rs tests/test_connector_api.py tests/test_openapi_export.py`, daarna `make lint`.
 - **Poort:** P-media-source-optimizer (snel en volledig) + P-CONTRACT + P-VEILIG + P-GIT + P-EERLIJK
-- **Valkuilen:** V-001, V-046, V-051, V-052, V-066
+- **Valkuilen:** V-129, V-001, V-046, V-051, V-052, V-066
 - **Bewijs:** B05-009 blijft "Bezig", nu "Sim-getest" voor het leesdeel; C1.3-MSO-04 naar "Bezig", "Unit-getest". I04-04-08 is een regel van `jelly-leon-platform` (S-P3-410). Echte Hub tegen echte MSO: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard
@@ -1053,7 +1076,7 @@ en meegecommit. Het getal `E2E_MIN_TESTS` in `Makefile` wordt nooit verlaagd. De
 - **Niveau:** standaard
 - **Stop en vraag als:** de validator een veld eist dat alleen op de NAS te meten is (laat het dan open volgens het contract en meld het); de "terugdraaiknop" uit de bouwlijst als bouwwerk wordt gevraagd (dat staat open en is een keuze van de gebruiker, zie hoofdstuk 8).
 
-## Baan home-control-hub (energie en werklast, B14)
+## Baan home-control-hub (energie en werklast, B14; Node-RED-profiel C-12)
 
 Werkmap `<WERKMAP>/home-control-hub`. Poort: P-home-control-hub. Het energiedomein staat in
 `apps/api/src/integrations/domains/energy/` (`catalog.py`, `models.py`, `router.py`). De tabellen bestaan al sinds
@@ -1062,12 +1085,13 @@ migratie `apps/api/alembic/versions/0001_basisschema.py` (onder andere `energy_m
 `energy_estimate_provenance`), met vaste regels in de database: een meter is altijd alleen-lezen, een schatting heeft
 altijd een herkomst, "onbekend" heeft nooit een waarde. Op 2026-11-11 gaven de routes `/meters`, `/usage`,
 `/workloads` en `/advice` nog `501 capability_unavailable` en bestond alleen `/coverage`. Een nieuwe migratie krijgt
-het volgende vrije nummer (`ls apps/api/alembic/versions | tail -3`; op 2026-11-11 was `0005_b11_automatisering.py` de
+het volgende vrije nummer (`ls apps/api/alembic/versions/0*.py | tail -3`; op 2026-11-11 was `0005_b11_automatisering.py` de
 laatste; de baan van P2 in deze repo kan er een hebben toegevoegd). Een testbestand draaien:
 `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH HCH_TEST_ADMIN_URL=postgresql+psycopg://postgres@127.0.0.1:5432/postgres ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>`.
 Na elke wijziging van een route: `make openapi && git diff --exit-code docs/openapi/` (de tweede helft faalt als de
 export niet is meegecommit). Deze baan bouwt geen enkele route die iets schakelt: de boiler wordt in alle gevallen
-alleen gemeten.
+alleen gemeten. Na de energie volgt S-P3-360: het beveiligingsprofiel van Node-RED op de voorziening van besluit C-12
+(na S-P3-490 in appstore-en-fork en S-P3-445 in jelly-leon-platform).
 
 ### S-P3-300 - Energie: bron my_house en de dekkingsmatrix
 - **Repo:** home-control-hub | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
@@ -1085,7 +1109,7 @@ alleen gemeten.
   7. OpenAPI bijwerken.
 - **Tests (verplicht):** nieuw `apps/api/tests/integration/test_b14_001_dekkingsmatrix.py` (nieuw) met een nagebootste bron onder `apps/api/tests/fakes/`. Negatief: (a) bron onbereikbaar: alle rollen "onbekend", geen oude waarde als actueel; (b) de client kan geen ander werkwoord dan GET versturen (test op de client zelf); (c) een meter zonder rol wordt niet aan een rol gekoppeld; (d) een lezer zonder rechten krijgt 401 of 403 voordat er iets wordt gelezen; (e) het geheim van de bron staat in geen antwoord. Commando: het testcommando uit de kop van deze baan met `tests/integration/test_b14_001_dekkingsmatrix.py`, daarna `make lint` en `make openapi && git diff --exit-code docs/openapi/`.
 - **Poort:** P-home-control-hub (snel en volledig) + P-CONTRACT + P-VEILIG + P-GIT + P-EERLIJK
-- **Valkuilen:** V-001, V-048, V-051, V-094, V-066
+- **Valkuilen:** V-121, V-001, V-048, V-051, V-094, V-066
 - **Bewijs:** B14-001 blijft "Bezig", nu "Sim-getest". Echte meters: "NIET GEVALIDEERD (hardware)"; nodig: besluit D14 en de meters in huis; STAPPEN_P6.md onderdeel N-P6-06.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: uitgaand verkeer en een geheim) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard
@@ -1196,12 +1220,33 @@ alleen gemeten.
 - **Niveau:** standaard
 - **Stop en vraag als:** het blok een onderdeel vraagt dat Peil niet heeft; de statuspagina door het blok trager wordt dan de bestaande test toelaat.
 
-## Baan jelly-leon-platform (controlelijsten I03, I04, I05, I15...I20 en manifestkopieen)
+### S-P3-360 - home-control-hub: Node-RED-beveiligingsprofiel uitfaseren of gelijktrekken met de voorziening van C-12
+- **Repo:** home-control-hub | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee
+- **Werkpakketten en tests:** B11-001 (deel: beheerder en dienstaccount van Node-RED volgens besluit C-12; de EVIDENCE-regel is gebouwd in P2)
+- **Vooraf:** S-P3-350 klaar (een schrijver per repo); S-P3-490 gepusht (de voorziening in de manifeststandaard) en S-P3-445 gepusht (het Node-RED-manifest gebruikt haar; dat manifest is de installatieweg); de baan home-control-hub van P2 ligt stil (S-P2-290, S-P2-295, S-P2-310 dicht); vraagt het ontwerp-ADR van S-P2-510 een contractwijziging, dan eerst die contractronde (zoals in "Vooraf" van S-P3-490)
+- **Al gedaan?** `grep -n 'def build_profile\|def define_arguments\|credentialSecret\|SERVICE_USER' <WERKMAP>/home-control-hub/apps/api/src/integrations/domains/automation/policy.py; grep -n 'hardening-profile' <WERKMAP>/home-control-hub/apps/api/src/integrations/domains/automation/router.py` -> klaar als het profiel is zoals het ADR van de ontwerpstap van C-12 zegt (weg, of zonder geheim in formulierargumenten) en een test dat bewijst. Op 2026-11-11 (`076f964`): `define_arguments` (regel 401) maakte `--define`-argumenten met twee bcrypt-hashes (beheerder en `hub-dienst`) en een `credentialSecret`, via de route `POST /integrations/v1/automation/hardening-profile`.
+- **Lees eerst:** BESLUITEN, kop "C-12 — Hoe krijgt Node-RED een beheerder en een dienstaccount?" (besluit van de gebruiker op 2026-11-11: optie 1, "voorziening zonder geheim in het formulier via de manifeststandaard (appstore-en-fork); profiel van home-control-hub vervalt of wordt daaraan gelijkgetrokken"; `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker"); het ontwerp-ADR van de ontwerpstap van C-12 in `<WERKMAP>/appstore-en-fork/docs/adr/` en wat S-P3-490 bouwde; [CONTRACT] kop "3.1 Uitgangspunten" ("Nooit geheimen in het Custom App-formulier"); `apps/api/src/integrations/domains/automation/policy.py` (`build_profile`, `define_arguments`, `SERVICE_USER`, de controle `anoniem_geweigerd`), `router.py` (route `hardening-profile`); `apps/api/tests/integration/test_b11_001_isolatie.py`; `deploy/truenas/NODE_RED_CUSTOM_APP.md`; `docs/adr/ADR-0016-b11-node-red-automatisering.md`; in jelly-leon-platform (alleen lezen) `install/manifests/node-red.manifest.yaml` na S-P3-445
+- **Bouw:**
+  1. Volg het ADR van de ontwerpstap: of het profiel VERVALT (de argumentenbouwer en de route weg, met de OpenAPI-export), of het wordt GELIJKGETROKKEN (het levert alleen nog wat de voorziening vraagt, zonder wachtwoord, hash of `credentialSecret` in een formulierargument). Zegt het ADR het niet, of anders dan deze twee: stoppen.
+  2. Het dienstaccount waarmee home-control-hub Node-RED leest (nu `SERVICE_USER = "hub-dienst"`) komt via de voorziening; een geheim dat home-control-hub daarvoor zelf bewaart blijft in de eigen vault en komt in geen log, antwoord of formulierargument (V-094). Bestaande vault-items worden niet weggegooid tenzij het ADR dat zegt; een `credentialSecret` die Node-RED al gebruikt wordt nooit vervangen (anders zijn de bestaande credentials onleesbaar; docstring van `build_profile`).
+  3. Besluit C-11 blijft: de controle `anoniem_geweigerd` (401 zonder aanmelding) en de isolatiecontrole blijven werken en blijven getest.
+  4. `deploy/truenas/NODE_RED_CUSTOM_APP.md` verwijst naar het manifest van jelly-leon-platform en beschrijft het profiel niet als installatiestap; ADR-0016 krijgt een alinea met besluit C-12 en wat er met het profiel is gebeurd.
+  5. Na een routewijziging: `make openapi && git diff --exit-code docs/openapi/` (export meecommitten).
+- **Tests (verplicht):** het testcommando uit de kop van deze baan met `tests/integration/test_b11_001_isolatie.py` en de andere tests die `policy.py` of de route raken (`grep -rln 'hardening\|define_arguments\|build_profile' apps/api/tests`); daarna `make openapi && git diff --exit-code docs/openapi/`. Negatief: (a) geen antwoord van home-control-hub bevat nog een bcrypt-hash, wachtwoord of `credentialSecret` als formulierargument (zoek de testwaarden in de antwoorden); bij uitfaseren geeft de oude route 404; (b) een anonieme aanvraag op `/flows`, `/nodes` en `/settings` blijft als `anoniem_geweigerd` gemeld (C-11); (c) een dienstaccount met meer rechten dan het ADR toestaat wordt door de isolatiecontrole gemeld; (d) de bestaande vault-items en de `credentialSecret` zijn na de wijziging ongewijzigd (byte-gelijk) tenzij het ADR anders zegt.
+- **Poort:** P-home-control-hub (snel en volledig) + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
+- **Valkuilen:** V-094, V-003, V-017, V-018
+- **Bewijs:** B11-001 houdt zijn status uit P2; vul de opmerking aan met "beheerder en dienstaccount via de voorziening van de manifeststandaard (C-12, S-P3-490/S-P3-445); profiel <vervallen|gelijkgetrokken>". De echte Node-RED op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: accounts, geheimen en de toegang tot de Node-RED-editor) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard (moeilijkheid hoog: A-BOUW en A-HERSTEL N4)
+- **Stop en vraag als:** het ADR van de ontwerpstap niet zegt of het profiel vervalt of wordt gelijkgetrokken; uitfaseren bestaande credentials van Node-RED onleesbaar zou maken; het dienstaccount alleen te leveren is met een geheim in het formulier; een andere repo (jelly-leon-platform, appstore-en-fork) gewijzigd moet worden.
+
+## Baan jelly-leon-platform (controlelijsten I03, I04, I05, I15...I20, manifestkopieen en Node-RED C-12)
 
 Werkmap `<WERKMAP>/jelly-leon-platform`. Poort: P-jelly-leon-platform. Deze baan bouwt geen dienst en geen route: zij
 legt de installatiedocumenten I03, I04, I05 en I15 tot en met I20 vast als controlelijst (`kind: checklist`,
 `install.method: none`) in het formaat dat I01 en I02 al hebben, en neemt de manifesten van de drie eigen apps over
-als kopie. Vaste gegevens (gemeten op 2026-11-11):
+als kopie. Daarnaast past S-P3-445 het Node-RED-manifest (I10, gebouwd in P2) aan op de voorziening van besluit C-12
+(na S-P3-490). Vaste gegevens (gemeten op 2026-11-11):
 
 - Bestaande controlelijsten: `install/checklists/I01_TRUENAS_BASIS.checklist.yaml` en
   `install/checklists/I02_BACKUP_EN_RESTORE.checklist.yaml`. Schema: `schemas/checklist-v1.schema.json`. Controle:
@@ -1216,9 +1261,14 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
   de controlelijst.
 - Waar de tekst van het document niet kan (terminal, YAML als installatieweg), wijkt `uitvoeren_nl` af en zegt het
   veld `afwijking_van_document_nl` waarom. De titel blijft de Excel-titel.
-- Commando's: `make lint`; `make test-repo` (alle tests onder `tests/repo`); een testbestand:
-  `.venv/bin/python -m pytest -q tests/repo/<bestand>`; `make manifesten` (draait `tools/manifesten.py`,
+- Commando's: `make lint`; `JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo` (alle tests onder `tests/repo`); een testbestand:
+  `JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/<bestand>`; `make manifesten` (draait `tools/manifesten.py`,
   `tools/manifest_kopie.py controleer`, `tools/validator_kopie.py controleer` en `tools/checklists.py`).
+- Validator: draai eerst `make validator-venv` (maakt `.venv-validator` uit `../appstore-en-fork`). Zonder `JL_MANIFEST`
+  slaat `tests/repo/test_checklists.py` de validatortest STIL over; daarom staat in elk testcommando van deze baan
+  `JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1` ervoor en `-rs` erbij. Het rapport
+  noemt het aantal overgeslagen tests; een overgeslagen validatortest telt niet als groen (V-004; POORTEN,
+  P-jelly-leon-platform, kop "4. Volledig (CI-volgorde)", punt 8).
 - Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; op 2026-11-11 was ADR-0023 de laatste).
 - EVIDENCE: op 2026-11-11 had `docs/platform-v2/EVIDENCE.json` geen regels voor I03, I04, I05 en I15 tot en met I20.
   Nieuwe regels krijgen de vorm van de bestaande I01- en I02-regels (bekijk er een met STAND `jelly-leon-platform`
@@ -1238,7 +1288,7 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
   3. Loop `tools/checklists.py` na op alles wat alleen voor I01 en I02 geldt (vaste namen, vaste aantallen): `grep -n 'I01\|I02\|== 8' tools/checklists.py`. Maak het algemeen zonder een regel te verzwakken.
   4. Stel vast of het schema iets tegenhoudt: `id` heeft het patroon `^I[0-9]{2}$` (I03 tot en met I20 passen). Wijzig het schema alleen als een verplicht veld voor een bestaande app geen zinnige waarde kan hebben; leg dat dan vast in het ADR.
   5. Werk `install/manifests/README.md` of het document dat de controlelijsten noemt bij met een regel per nieuwe lijst (naam en document), zonder NAS-gegevens. Welk document dat is: ONBEKEND - eerst vaststellen met: `grep -rln 'checklists' <WERKMAP>/jelly-leon-platform/docs <WERKMAP>/jelly-leon-platform/install --include=*.md`.
-- **Tests (verplicht):** `make lint && .venv/bin/python -m pytest -q tests/repo/test_checklists.py && .venv/bin/python tools/checklists.py`. Negatief: (a) een proefkopie van een lijst met een stap minder dan de Excel-taken faalt; (b) een tweede lijst voor hetzelfde document faalt; (c) een lijst met een terminalopdracht in `uitvoeren_nl` faalt nog steeds (bestaande negatieve test blijft groen). Doe (a) en (b) als test in het testbestand, niet met de hand.
+- **Tests (verplicht):** `make lint && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/test_checklists.py && .venv/bin/python tools/checklists.py`. Negatief: (a) een proefkopie van een lijst met een stap minder dan de Excel-taken faalt; (b) een tweede lijst voor hetzelfde document faalt; (c) een lijst met een terminalopdracht in `uitvoeren_nl` faalt nog steeds (bestaande negatieve test blijft groen). Doe (a) en (b) als test in het testbestand, niet met de hand.
 - **Poort:** P-jelly-leon-platform (snel) + P-INSTALLATIE (leescontrole: geen terminalweg) + P-GIT + P-EERLIJK
 - **Valkuilen:** V-003, V-096, V-022
 - **Bewijs:** geen statuswijziging. Geen nieuwe EVIDENCE-regels in deze stap.
@@ -1260,7 +1310,7 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
   5. Geen stap krijgt een TrueNAS-methode die niet in de lijst `LEZEND` van `tools/checklists.py` staat. Een stap zonder methode krijgt `wijze: handmatig_bewijs` of `handmatig_in_truenas_ui` met een `handmatig_ui_pad_nl` in woorden (menu's, geen opdrachten).
   6. Waar het document een terminalopdracht noemt: `uitvoeren_nl` beschrijft de weg via de webinterface en `afwijking_van_document_nl` zegt waarom.
   7. EVIDENCE: voeg zestien regels toe in de vorm van de bestaande I-regels, status "Geblokkeerd", met per regel de juiste soort (NAS, hardware voor I03-03-06 en I03-03-07, account waar een account nodig is).
-- **Tests (verplicht):** `make lint && .venv/bin/python -m pytest -q tests/repo/test_checklists.py && make manifesten`, daarna de EVIDENCE-test van deze repo (`make test-repo`). Negatief: (a) verander in een proefkopie buiten de repo een `acceptatie_nl` met een teken: `tools/checklists.py` moet falen; (b) `grep -n -i 'ssh\|sudo\|docker \|midclt\|zfs \|/mnt/' install/checklists/I03_MEDIAGUARD.checklist.yaml install/checklists/I04_MEDIA_SOURCE_OPTIMIZER.checklist.yaml` geeft niets.
+- **Tests (verplicht):** `make lint && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/test_checklists.py && make manifesten`, daarna de EVIDENCE-test van deze repo (`JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`). Negatief: (a) verander in een proefkopie buiten de repo een `acceptatie_nl` met een teken: `tools/checklists.py` moet falen; (b) `grep -n -i 'ssh\|sudo\|docker \|midclt\|zfs \|/mnt/' install/checklists/I03_MEDIAGUARD.checklist.yaml install/checklists/I04_MEDIA_SOURCE_OPTIMIZER.checklist.yaml` geeft niets.
 - **Poort:** P-jelly-leon-platform (snel) + P-INSTALLATIE + P-HARDE-EIS (leescontrole op I03 stap 3 en 4) + P-GIT + P-EERLIJK
 - **Valkuilen:** V-096, V-097, V-089, V-070
 - **Bewijs:** I03-03-01...I03-03-08 en I04-04-01...I04-04-08 nieuw als "Geblokkeerd" met "NIET GEVALIDEERD (echte NAS): controlelijst geschreven en gecontroleerd tegen de Excel-taken; uitvoeren op de NAS door de gebruiker (STAPPEN_P6.md onderdeel N-P6-05)". I03-03-06: "NIET GEVALIDEERD (hardware)" erbij (echte GPU). I03-03-07: "NIET GEVALIDEERD (hardware)" (echte telefoon).
@@ -1281,7 +1331,7 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
   4. I16: eigenaarschap volgens [DM-MG] (MediaGuard wijzigt alleen de eigen tags; geen tweede reconciler). Stap 4 (MSO integration, lusdetectie) verwijst naar MSO; de lijst belooft niets wat MSO niet doet.
   5. I17: stap 5 (Backup config) en stap 6 (Health en update) beschrijven de weg via de webinterface van SABnzbd en de TrueNAS-webinterface; geen bestandspaden met een echte poolnaam.
   6. EVIDENCE: achttien regels, status "Geblokkeerd", met de juiste soort per regel.
-- **Tests (verplicht):** `make lint && .venv/bin/python -m pytest -q tests/repo/test_checklists.py && make manifesten && make test-repo`. Negatief: (a) een proefkopie met een schrijvende TrueNAS-methode (een naam die past op de regel `SCHRIJVEND` in `tools/checklists.py`) faalt; (b) een proefkopie van I15 waarin stap 2 geen `NIET GEVALIDEERD (account)` noemt faalt.
+- **Tests (verplicht):** `make lint && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/test_checklists.py && make manifesten && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`. Negatief: (a) een proefkopie met een schrijvende TrueNAS-methode (een naam die past op de regel `SCHRIJVEND` in `tools/checklists.py`) faalt; (b) een proefkopie van I15 waarin stap 2 geen `NIET GEVALIDEERD (account)` noemt faalt.
 - **Poort:** P-jelly-leon-platform (snel) + P-INSTALLATIE + P-GIT + P-EERLIJK
 - **Valkuilen:** V-096, V-097, V-089, V-003
 - **Bewijs:** I15-15-01...I15-15-06, I16-16-01...I16-16-06 en I17-17-01...I17-17-06 nieuw als "Geblokkeerd" met "NIET GEVALIDEERD (echte NAS): controlelijst geschreven; uitvoeren door de gebruiker (STAPPEN_P6.md onderdeel N-P6-05)". I15-15-02: "NIET GEVALIDEERD (account)" en onderdeel N-P6-02.
@@ -1301,7 +1351,7 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
   3. I19: Seerr blijft via MediaGuard lopen ([DM-MG], regels I19-19-01 tot en met I19-19-06). Stap 5 (Hub/Jellyfin links): geen tweede aanvraagmotor; de lijst zegt dat de Hub aanvragen alleen toont.
   4. I20: stap 5 (Decommission gate) is een besluit van de gebruiker. `uitvoeren_nl` zegt dat Bazarr blijft tot pariteit is aangetoond ([A-09]) en dat het platform Bazarr nooit zelf verwijdert. Stap 3 (Retentietest) vraagt echte media en spelers: `NIET GEVALIDEERD (hardware)`.
   5. EVIDENCE: zeventien regels, status "Geblokkeerd", met de juiste soort per regel.
-- **Tests (verplicht):** `make lint && .venv/bin/python -m pytest -q tests/repo/test_checklists.py && make manifesten && make test-repo`. Negatief: (a) een proefkopie van I20 met zes stappen faalt (het document heeft er vijf); (b) `grep -n -i 'verwijder' install/checklists/I20_BAZARR.checklist.yaml` toont geen stap waarin het platform zelf iets verwijdert.
+- **Tests (verplicht):** `make lint && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/test_checklists.py && make manifesten && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`. Negatief: (a) een proefkopie van I20 met zes stappen faalt (het document heeft er vijf); (b) `grep -n -i 'verwijder' install/checklists/I20_BAZARR.checklist.yaml` toont geen stap waarin het platform zelf iets verwijdert.
 - **Poort:** P-jelly-leon-platform (snel) + P-INSTALLATIE + P-GIT + P-EERLIJK
 - **Valkuilen:** V-096, V-097, V-089
 - **Bewijs:** I18-18-01...I18-18-06, I19-19-01...I19-19-06 en I20-20-01...I20-20-05 nieuw als "Geblokkeerd" met "NIET GEVALIDEERD (echte NAS): controlelijst geschreven; uitvoeren door de gebruiker (STAPPEN_P6.md onderdeel N-P6-05)". I20-20-03: "NIET GEVALIDEERD (hardware)" erbij.
@@ -1312,23 +1362,43 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
 ### S-P3-440 - Platform: controlelijst I05 (my_house) met de standaard Custom App als weg
 - **Repo:** jelly-leon-platform | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
 - **Werkpakketten en tests:** I05-05-01, I05-05-02, I05-05-03, I05-05-04, I05-05-05, I05-05-06, I05-05-07, I05-05-08; raakt B06-009, D12, D13, D14
-- **Vooraf:** S-P3-400 klaar; keuze van de gebruiker over de I05-titels (zie bouwpunt 1; geen besluit-ID, de regisseur legt het keuzemenu voor en noteert het antwoord in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`)
+- **Vooraf:** S-P3-400 klaar; besluit Z-18 (BESLUITEN, deel 2.15, kop "Z-18 — Excel-titels van I05 die YAML noemen") genomen, of zonder besluit optie 1. Stand 2026-11-11: Z-18 is open en voor Z-18 geldt de stand zonder besluit (optie 1); de stap wacht er dus niet op. Een later antwoord noteert de regisseur in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker"
 - **Al gedaan?** `ls <WERKMAP>/jelly-leon-platform/install/checklists | grep '^I05_'` en STAND `jelly-leon-platform` `I05-05-01` `I05-05-03` -> de lijst en acht EVIDENCE-regels betekent klaar.
 - **Lees eerst:** [I-05] (koppen "2. Stappen in uitvoeringsvolgorde" met "Stap 2. Eerste YAML zonder Zigbee/tunnel" en "Stap 3. TrueNAS Install via YAML", en "5. Let op"); `<WERKMAP>/my_house/docs/adr/ADR-0004-alles-in-een-custom-app.md`; [DM-MH], kop "3. Installatie- en bestaande-app-stappen (my_house-kant)"; BESLUITEN, kop "BLOK-13"; STAPPEN_P6.md, kop "N-P6-06 - my_house en echte apparaten"
 - **Bouw:**
-  1. De keuze. De Excel-taken I05-05-02 ("Eerste YAML zonder Zigbee/tunnel") en I05-05-03 ("TrueNAS Install via YAML") noemen YAML, en de vaste regel verbiedt YAML als installatieweg. Het gereedschap eist de Excel-titel letterlijk. Keuzemenu van de regisseur: (1) titels letterlijk laten staan en in `uitvoeren_nl` de weg via het formulier van de standaard Custom App beschrijven, met `afwijking_van_document_nl` (geen wijziging in het Excel-bestand); (2) de twee Excel-taken en het I05-document laten hernoemen in `ai-server-manager` (een programmawijziging: Excel, `EXCEL_TAKEN.json` in alle kopieen en het document). Zonder antwoord geldt (1): dat verandert niets aan de bron en sluit aan bij wat STAPPEN_P6.md voor N-P6-06 al zegt.
+  1. De keuze (besluit Z-18; BESLUITEN, deel 2.15). De Excel-taken I05-05-02 ("Eerste YAML zonder Zigbee/tunnel") en I05-05-03 ("TrueNAS Install via YAML") noemen YAML, en de vaste regel verbiedt YAML als installatieweg. Het gereedschap eist de Excel-titel letterlijk. Keuzemenu van de regisseur: (1) titels letterlijk laten staan en in `uitvoeren_nl` de weg via het formulier van de standaard Custom App beschrijven, met `afwijking_van_document_nl` (geen wijziging in het Excel-bestand); (2) de twee Excel-taken en het I05-document laten hernoemen in `ai-server-manager` (een programmawijziging: Excel, `EXCEL_TAKEN.json` in alle kopieen en het document). Zonder antwoord geldt (1) ("Zonder besluit geldt" van Z-18): dat verandert niets aan de bron en sluit aan bij wat STAPPEN_P6.md voor N-P6-06 al zegt. Noteer in `toelichting_nl` van de controlelijst welke optie gold ("Z-18: optie 1, zonder besluit" of de gekozen optie).
   2. Nieuw `install/checklists/I05_MY_HOUSE.checklist.yaml` (nieuw) met acht stappen, `aanpak: inrichten_en_testen` (my_house draait nog niet als standaard Custom App) of `behouden_en_valideren` als de gebruiker dat bij de keuze zo wil; leg de keuze vast in `toelichting_nl`.
   3. Stap 2 en 3: `uitvoeren_nl` beschrijft het invullen van het formulier van de standaard Custom App volgens het document van my_house (`deploy/truenas/CUSTOM_APP.md` in die repo, gemaakt in S-P3-755) en het wachten op "gezond". `afwijking_van_document_nl`: "Het document noemt YAML. De vaste installatieweg is de standaard Custom App met een alles-in-een image; YAML wordt niet gebruikt." Bestaat het document van S-P3-755 nog niet, dan verwijst de tekst naar de naam van het bestand zonder de inhoud te herhalen.
-  4. Stap 5 (HomeWizard rollen): de boiler wordt alleen gemeten; `acceptatie_nl` (letterlijk uit Excel) zegt dat al, `uitvoeren_nl` herhaalt dat er geen schakelhandeling is. Stap 6 (Gree): eerst alleen uitlezen; bedienen alleen bij een unit die in my_house als getest te boek staat (D12). Stap 7 (Zigbee): alleen als D13 dat zegt.
+  4. Stap 5 (HomeWizard rollen): de boiler wordt alleen gemeten; `acceptatie_nl` (letterlijk uit Excel) zegt dat al, `uitvoeren_nl` herhaalt dat er geen schakelhandeling is. Stap 6 (Gree): eerst alleen uitlezen; bedienen alleen bij een unit die in my_house als getest te boek staat (D12). Stap 7 (Zigbee): alleen als D13 dat zegt; de weg is de apparaat-doorgifte in het formulier van de standaard Custom App zoals `deploy/truenas/CUSTOM_APP.md` van my_house (S-P3-755) die beschrijft (besluit Z-17: Zigbee2MQTT zit optioneel in de image en gaat alleen aan als in het formulier een USB-apparaat is opgegeven); geen shell-commando (`ls -l /dev/serial/by-id/`) en geen compose-profiel (`afwijking_van_document_nl`).
   5. Stap 8 (Android en restore): herstelproef naar een aparte plek, via de webinterface van my_house (S-P3-730); geen opdracht in een terminal.
   6. EVIDENCE: acht regels, status "Geblokkeerd"; I05-05-04 tot en met I05-05-08 met "NIET GEVALIDEERD (hardware)".
-- **Tests (verplicht):** `make lint && .venv/bin/python -m pytest -q tests/repo/test_checklists.py && make manifesten && make test-repo`. Negatief: (a) `grep -n -i 'compose\|yaml' install/checklists/I05_MY_HOUSE.checklist.yaml` toont alleen de twee letterlijke Excel-titels en de regels `afwijking_van_document_nl`, geen aanwijzing om YAML te gebruiken; (b) een proefkopie waarin `titel_nl` van stap 2 is "verbeterd" faalt in `tools/checklists.py` (bij keuze 1).
+- **Tests (verplicht):** `make lint && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/test_checklists.py && make manifesten && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`. Negatief: (a) `grep -n -i 'compose\|yaml' install/checklists/I05_MY_HOUSE.checklist.yaml` toont alleen de twee letterlijke Excel-titels en de regels `afwijking_van_document_nl`, geen aanwijzing om YAML te gebruiken; (b) een proefkopie waarin `titel_nl` van stap 2 is "verbeterd" faalt in `tools/checklists.py` (bij keuze 1).
 - **Poort:** P-jelly-leon-platform (snel) + P-INSTALLATIE + P-GIT + P-EERLIJK
 - **Valkuilen:** V-096, V-097, V-089
 - **Bewijs:** I05-05-01...I05-05-08 nieuw als "Geblokkeerd": I05-05-01, -02, -03 met "NIET GEVALIDEERD (echte NAS): controlelijst geschreven; installeren via het formulier door de gebruiker (STAPPEN_P6.md onderdeel N-P6-06)"; I05-05-04...-08 met "NIET GEVALIDEERD (hardware): echte Hue, HomeWizard, Gree, Zigbee en telefoon (N-P6-06)".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST (tegelijk; R-MANIFEST VERPLICHT) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard
-- **Stop en vraag als:** de gebruiker keuze (2) maakt (dan is het werk in `ai-server-manager` en wacht deze stap tot de nieuwe `EXCEL_TAKEN.json` is overgenomen); het gereedschap de woorden "YAML" in een letterlijke titel als verboden waarde ziet.
+- **Stop en vraag als:** de gebruiker bij Z-18 keuze (2) maakt (dan is het werk in `ai-server-manager` en wacht deze stap tot de nieuwe `EXCEL_TAKEN.json` is overgenomen); het gereedschap de woorden "YAML" in een letterlijke titel als verboden waarde ziet.
+
+### S-P3-445 - Platform: Node-RED-manifest op de voorziening voor beheerder en dienstaccount (C-12)
+- **Repo:** jelly-leon-platform | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** ja (de rooktest start containers; lock `stack.lock`)
+- **Werkpakketten en tests:** I10-10-01 (deel: beheerder en dienstaccount volgens besluit C-12; de EVIDENCE-regel is gebouwd in P2)
+- **Vooraf:** S-P3-440 klaar (een schrijver per repo; deze stap hangt niet af van S-P3-450 en mag vóór S-P3-450 lopen); S-P3-490 gepusht; S-P2-410 klaar (besluit C-11 is in het manifest uitgevoerd); vraagt het ontwerp-ADR van S-P2-510 een contractwijziging, dan eerst die contractronde (zoals in "Vooraf" van S-P3-490)
+- **Al gedaan?** `grep -n -i 'C-12' <WERKMAP>/jelly-leon-platform/docs/adr/ADR-0023-node-red-als-custom-app.md <WERKMAP>/jelly-leon-platform/install/manifests/node-red.manifest.yaml` -> het manifest gebruikt de voorziening van S-P3-490, ADR-0023 noemt C-12 en de rooktest bewijst het: klaar. Op 2026-11-11 (`35fc44d`): het manifest had in `FLOWS` `adminAuth` met `"users":[]` en zei in de commentaarkop dat het geen beheerder kan aanmaken.
+- **Lees eerst:** BESLUITEN, kop "C-12 — ..." (besluit van de gebruiker op 2026-11-11, optie 1); het ontwerp-ADR van de ontwerpstap van C-12 in `<WERKMAP>/appstore-en-fork/docs/adr/` en wat S-P3-490 bouwde; [CONTRACT] koppen "3.1 Uitgangspunten" en "9. Manifeststandaard (B08-001, eigenaar `appstore-en-fork`)"; `install/manifests/node-red.manifest.yaml` (commentaarkop, `FLOWS`, `post_install_checks`); `install/node-red/settings-overrides.json`; `tools/nodered_flows.py`, `tools/nodered_rooktest.py`; `tests/repo/test_nodered.py`; `docs/adr/ADR-0023-node-red-als-custom-app.md` (besluiten 2, 4 en 6, kop "Wat het manifest niet kan (geblokkeerd)"); STAPPEN_P2.md, stap S-P2-410 (hoe C-11 is uitgevoerd); in home-control-hub (alleen lezen) `SERVICE_USER` en de controle `anoniem_geweigerd` in `apps/api/src/integrations/domains/automation/policy.py`
+- **Bouw:**
+  1. De validatorkopie volgt de commit van S-P3-490: `make validator-venv`, daarna `python tools/validator_kopie.py controleer` (het bijwerkcommando: `python tools/validator_kopie.py --help`; nooit met de hand kopieren).
+  2. `install/manifests/node-red.manifest.yaml` gebruikt de voorziening van S-P3-490 voor een beheerder en het dienstaccount (de naam volgens het ADR; home-control-hub gebruikt nu `hub-dienst`), precies zoals het ADR het beschrijft, zonder wachtwoord, hash, `credentialSecret` of token in het manifest of in `FLOWS`. `install/node-red/settings-overrides.json`, `tools/nodered_flows.py render` en `render --check` blijven gelijk met het manifest.
+  3. Besluit C-11 blijft: anoniem geen toegang (401 op `/flows`, `/nodes`, `/settings`); de monitor en `post_install_checks` blijven een beveiligde van een onbeveiligde Node-RED onderscheiden.
+  4. Rooktest (`tools/nodered_rooktest.py`): de beheerder kan zich aanmelden; het dienstaccount heeft precies de rechten die het ADR noemt (verwacht: alleen lezen) en kan geen flows schrijven; anoniem blijft 401. Het bewaarde rapport `docs/platform-v2/bewijs/nodered-rooktest-p2.json` wordt alleen vervangen door een nieuw rapport zonder adressen (V-097) als de rooktest is veranderd.
+  5. ADR-0023: besluit 2 en 6 en de kop "Wat het manifest niet kan (geblokkeerd)" volgen C-12 (beheerder en dienstaccount nu via de voorziening); de commentaarkop van het manifest en `install/node-red/README.md` ook.
+- **Tests (verplicht):** `make validator-venv && make manifesten`; `JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`; `make nodered`; de rooktest `flock <WERKMAP>/.lokaal/stack.lock nice -n 10 .venv/bin/python tools/nodered_rooktest.py --rapport <bestand buiten de repo>.json`. Negatief: (a) anoniem GET `/flows`, `/nodes`, `/settings` en POST `/flows` geven 401 (C-11); (b) het dienstaccount kan geen flows schrijven (de gemeten status in het rapport); (c) `grep -n -i 'bcrypt\|\$2[aby]\$\|credentialSecret\|password' install/manifests/node-red.manifest.yaml install/node-red/settings-overrides.json` geeft geen geheime waarde (alleen regels die het ADR noemt, zonder waarde); (d) een proefkopie van het manifest buiten de repo met een wachtwoordhash in `FLOWS` of in een omgevingsvariabele wordt door de validator geweigerd (de foutcode uit S-P3-490).
+- **Poort:** P-jelly-leon-platform (volledig) + P-INSTALLATIE + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
+- **Valkuilen:** V-094, V-097, V-002, V-087, V-017
+- **Bewijs:** I10-10-01 blijft "Geblokkeerd" met "NIET GEVALIDEERD (echte NAS)"; vul de opmerking aan met "beheerder en dienstaccount via de voorziening van de manifeststandaard (C-12, S-P3-490), gemeten in de rooktest; anoniem 401 (C-11)".
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST + R-VEILIG (tegelijk; R-MANIFEST VERPLICHT: installatiemanifest; R-VEILIG VERPLICHT: accounts, geheimen en de toegang tot de editor) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard (moeilijkheid hoog: A-BOUW en A-HERSTEL N4)
+- **Stop en vraag als:** de voorziening van S-P3-490 de beheerder of het dienstaccount alleen met een geheim in het manifest of het formulier kan leveren; Node-RED de accounts alleen met een instelling kan krijgen die het formulier van een standaard Custom App niet zet; de rooktest het dienstaccount meer rechten geeft dan het ADR noemt; home-control-hub gewijzigd moet worden (dat is S-P3-360).
 
 ### S-P3-450 - Platform: manifestkopieen van MediaGuard, MSO en my_house
 - **Repo:** jelly-leon-platform | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
@@ -1344,7 +1414,7 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
   5. Stel vast of `tests/repo/test_installeerbare_manifesten.py` een vaste lijst manifesten kent: `grep -n 'manifest.yaml' tests/repo/test_installeerbare_manifesten.py`. Breid de lijst uit als dat zo is.
   6. Laat de controlelijsten I03, I04 en I05 naar de kopie verwijzen waar een stap "installeren of bijwerken via het formulier" beschrijft (veld `verwijzing`), zonder de inhoud van het manifest te herhalen.
   7. Werk `install/manifests/README.md` bij: drie regels, elk met bron en doel.
-- **Tests (verplicht):** `make lint && .venv/bin/python -m pytest -q tests/repo/test_manifest_kopie.py tests/repo/test_installeerbare_manifesten.py && make manifesten && make test-repo`. Negatief: (a) wijzig in een proefkopie een teken in een overgenomen manifest: `python tools/manifest_kopie.py controleer` faalt op de sha256; (b) een kopie zonder herkomstkop faalt; (c) een vermelding in `overgang-1.3.yaml` die de validator niet meer geeft laat `tools/manifesten.py` falen.
+- **Tests (verplicht):** `make lint && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest MANIFEST_VALIDATOR_VERPLICHT=1 .venv/bin/python -m pytest -q -rs tests/repo/test_manifest_kopie.py tests/repo/test_installeerbare_manifesten.py && make manifesten && JL_MANIFEST=$PWD/.venv-validator/bin/jl-manifest PEIL_BRON_VERPLICHT=1 MANIFEST_VALIDATOR_VERPLICHT=1 VALIDATOR_BRON_VERPLICHT=1 make test-repo`. Negatief: (a) wijzig in een proefkopie een teken in een overgenomen manifest: `python tools/manifest_kopie.py controleer` faalt op de sha256; (b) een kopie zonder herkomstkop faalt; (c) een vermelding in `overgang-1.3.yaml` die de validator niet meer geeft laat `tools/manifesten.py` falen.
 - **Poort:** P-jelly-leon-platform (snel) + P-INSTALLATIE + P-CONTRACT + P-GIT + P-EERLIJK
 - **Valkuilen:** V-017, V-018, V-016, V-097
 - **Bewijs:** geen statuswijziging van de I-regels (blijven "Geblokkeerd"); voeg aan de opmerking van I03-03-04, I04-04-01 en I05-05-03 toe "manifestkopie aanwezig en gevalideerd met de validator (Sim-getest); NIET GEVALIDEERD (echte NAS)".
@@ -1352,12 +1422,37 @@ als kopie. Vaste gegevens (gemeten op 2026-11-11):
 - **Niveau:** standaard
 - **Stop en vraag als:** een van de drie manifesten in de eigen repo niet strikt valideert (dan is het werk van die repo, niet van deze stap); de validatorkopie in deze repo ouder is dan de standaard die de manifesten gebruiken (`python tools/validator_kopie.py controleer` faalt).
 
-## Baan appstore-en-fork (register van de bestaande apps)
+## Baan appstore-en-fork (register van de bestaande apps; voorziening C-12)
 
-Werkmap `<WERKMAP>/appstore-en-fork`. Poort: P-appstore-en-fork. Deze baan heeft in P3 een stap. Het register
+Werkmap `<WERKMAP>/appstore-en-fork`. Poort: P-appstore-en-fork. Deze baan heeft in P3 twee stappen. Het register
 `apps/api/src/appstore/bestaande_apps/register.yaml` haalt elke tekst letterlijk uit de kopie van de A-documenten in
 `docs/platform-v2/04_BESTAANDE_APPS/` van deze repo; de test `apps/api/tests/unit/test_bestaande_apps_register.py`
 bewaakt dat. Het register zegt niets over de NAS (geen versies, poorten of paden).
+
+Daarnaast bouwt deze baan in S-P3-490 de voorziening voor een beheerder en een dienstaccount zonder geheim in het
+formulier (besluit C-12 van de gebruiker, 2026-11-11), na de ontwerpstap van C-12 in STAPPEN_P2.md. S-P3-490 en
+S-P3-500 hangen niet van elkaar af: de stap waarvan de regel "Vooraf" het eerst gehaald is, loopt eerst (een schrijver
+tegelijk). Afnemers: S-P3-445 (jelly-leon-platform, Node-RED-manifest) en S-P3-360 (home-control-hub, profiel).
+
+### S-P3-490 - Appstore: voorziening voor een beheerder en een dienstaccount zonder geheim in het formulier bouwen (C-12)
+- **Repo:** appstore-en-fork | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee
+- **Werkpakketten en tests:** B08-001 (deel: de voorziening uit besluit C-12 in de manifeststandaard, de validator en de vertaling)
+- **Vooraf:** S-P3-000 klaar; S-P2-510 (de ontwerpstap van C-12 in de baan appstore-en-fork van STAPPEN_P2.md) is in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` afgevinkt en zijn ontwerp-ADR is gepusht; vraagt dat ADR een wijziging van [CONTRACT] (kop "3.1 Uitgangspunten" of kop "9. Manifeststandaard"; S-P2-510 bouwpunt 2e: gemeld onder `contract_meldingen`, contractwerk voor ai-server-manager met poort P-CONTRACT), dan is eerst die contractronde gedaan en de wijziging vóór het begin van P3 in alle repos overgenomen (hoofdstuk 2.1: het contract verandert niet tijdens P3; V-018) - anders start deze stap niet; geen keten van P2 actief in deze repo. Deze stap hangt niet af van S-P3-500 (zie de kop van deze baan).
+- **Al gedaan?** `grep -l -i 'C-12' <WERKMAP>/appstore-en-fork/docs/adr/*.md` en daarna in het gevonden ADR de naam van het nieuwe veld of de nieuwe parametersoort, en `grep -n '<die naam>' <WERKMAP>/appstore-en-fork/schemas/manifest-v1.schema.json <WERKMAP>/appstore-en-fork/apps/api/src/appstore/manifest/*.py` -> het veld staat in het schema, het model, de regels en de vertaling, met tests: klaar. Op 2026-11-11 (`7b3159d`) bestond de voorziening niet: `Parameter.type` kende `string, integer, boolean, port, path, dataset, url, timezone, duration, secret_ref, gpu` en er was geen veld voor accounts.
+- **Lees eerst:** BESLUITEN, kop "C-12 — Hoe krijgt Node-RED een beheerder en een dienstaccount?" (besluit van de gebruiker op 2026-11-11: optie 1, "voorziening zonder geheim in het formulier via de manifeststandaard (appstore-en-fork); profiel van home-control-hub vervalt of wordt daaraan gelijkgetrokken"; `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker"); het ontwerp-ADR van de ontwerpstap van C-12 (in `docs/adr/`); [CONTRACT] koppen "3.1 Uitgangspunten" ("Nooit geheimen in het Custom App-formulier", met als enige uitzondering het eenmalige enrollment-token) en "9. Manifeststandaard (B08-001, eigenaar `appstore-en-fork`)"; `docs/MANIFESTSTANDAARD.md`; `schemas/manifest-v1.schema.json` en `apps/api/src/appstore/manifest/manifest-v1.schema.json`; `apps/api/src/appstore/manifest/model.py`, `rules.py`, `findings.py`, `translate.py`, `truenas.py`; `docs/TRUENAS_APP_VALUES.md`; in home-control-hub (alleen lezen) `apps/api/src/integrations/domains/automation/policy.py` (`build_profile`, `define_arguments`) en in jelly-leon-platform (alleen lezen) `install/manifests/node-red.manifest.yaml` en `docs/adr/ADR-0023-node-red-als-custom-app.md`
+- **Bouw:**
+  1. Bouw precies de voorziening uit het ontwerp-ADR, niets daarbuiten. Wat het ADR open laat, wordt niet zelf ontworpen: stoppen.
+  2. Schema (beide kopieen van `manifest-v1.schema.json` gelijk), model, regels met Nederlandse foutcodes in `findings.py` en `docs/MANIFESTSTANDAARD.md`, en de vertaling (`translate`/`preview`) naar het formulier.
+  3. De eis uit [CONTRACT] kop 3.1: in het manifest en in de formulierwaarden die de vertaling maakt staat geen wachtwoord, hash, `credentialSecret` of token. De validator weigert een manifest dat een geheime waarde voor een account probeert mee te geven (nieuwe foutcode volgens het ADR); de vertaling weigert hetzelfde (zoals de weigering van geheime waarden voor catalogusapps, V-123).
+  4. Bestaande manifesten zonder de voorziening blijven precies zo valideren als vóór de stap (geen nieuwe verplichting).
+  5. De kopieen van de validator in andere repos worden niet in deze stap bijgewerkt; jelly-leon-platform doet dat in S-P3-445.
+- **Tests (verplicht):** `make lint && make typecheck`, daarna `cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH nice -n 10 ../../.venv/bin/python -m pytest -q -n 4 tests/unit`; daarna per manifest in de werkmap `.venv/bin/jl-manifest validate --strict <pad>` voor en na de stap (`ls <WERKMAP>/*/deploy/manifest/*.manifest.yaml <WERKMAP>/jelly-leon-platform/install/manifests/*.manifest.yaml`): dezelfde uitkomst per manifest (exitcodes en meldingen in het rapport). Negatief: (a) een manifest met een wachtwoord, bcrypt-hash of `credentialSecret` als waarde in de voorziening, in `custom_app.env` of in een parameter-`default` geeft de foutcode; (b) de voorziening zonder de velden die het ADR verplicht noemt faalt; (c) de uitvoer van `translate`/`preview` voor een proefmanifest met de voorziening bevat geen geheime waarde (zoek de testwaarde in de uitvoer); (d) de test die de twee schemakopieen vergelijkt faalt bij een verschil (bestaat hij niet: toevoegen).
+- **Poort:** P-appstore-en-fork (snel en volledig) + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
+- **Valkuilen:** V-018, V-123, V-094, V-003, V-017
+- **Bewijs:** B08-001 blijft "Bezig" met "Sim-getest; NIET GEVALIDEERD (echte NAS)"; vul de opmerking aan met "voorziening voor beheerder en dienstaccount zonder geheim (besluit C-12; ADR <nummer>)".
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-MANIFEST (tegelijk; R-VEILIG VERPLICHT: accounts en geheimen in het formulier, [CONTRACT] kop 3.1; R-MANIFEST VERPLICHT: wijziging van de manifeststandaard) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard (moeilijkheid hoog: A-BOUW en A-HERSTEL N4)
+- **Stop en vraag als:** de ontwerpstap van C-12 niet is afgevinkt of het ADR de voorziening niet volledig beschrijft; het ADR een contractwijziging vraagt die nog niet in alle repos is overgenomen; de voorziening alleen kan met een geheim in het formulier; een bestaand manifest door de wijziging anders valideert dan vóór de stap.
 
 ### S-P3-500 - Appstore: register van de bestaande apps laten meebewegen met de A-documenten
 - **Repo:** appstore-en-fork | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
@@ -1378,3 +1473,1040 @@ bewaakt dat. Het register zegt niets over de NAS (geen versies, poorten of paden
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** A-BOUW N2 (kleine mechanische stap); verder standaard
 - **Stop en vraag als:** de kopie meer bestanden wijzigt dan de A-documenten (dan is de bron verder veranderd dan S-P3-180; eerst nagaan wat); de contractversie in de bron niet meer 1.3 is.
+
+## Baan media-guard-ultimate (MediaGuard: scopes, connector, schema, image, manifest)
+
+Werkmap `<WERKMAP>/media-guard-ultimate`. Poort: P-media-guard-ultimate. Een testbestand van de kern draaien:
+`cd apps/core && ../../.venv/bin/ruff check . && ../../.venv/bin/python -m pytest -q -p no:cacheprovider <pad onder tests/>`.
+Na elke wijziging van een route: `.venv/bin/python scripts/export-openapi.py` en daarna
+`.venv/bin/python scripts/export-openapi.py --check` (de drifttest is `apps/core/tests/test_openapi_export.py`).
+Nieuwe migratie: bestanden in `apps/core/mediaguard/migrations/` worden op naam gesorteerd en een keer toegepast
+(`schema_migrations`); de nummerreeksen per domein staan in `apps/core/mediaguard/migrations/README.md`. Op 2026-11-11
+was de reeks 150-159 al in gebruik voor mediaservers (`150_mediaserver_servers.sql`); de reeks "140-159
+platformkoppeling" die [DM-MG] kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" voorstelt kan dus niet meer.
+Nieuw ADR: volgend vrij nummer (`ls docs/adr | tail -3`; op 2026-11-11 was ADR-0023 de laatste).
+
+Vaste regels van deze baan (gelden voor ELKE stap hieronder, ook als de stap ze niet herhaalt):
+
+- **HARDE EIS.** De database van MediaGuard bevat de MediaGuard-voortgang. Elke stap eindigt met het upgradebewijs
+  uit POORTEN, P-media-guard-ultimate, kop "4. Volledig (CI-volgorde)", punt 3, op de bestaande 1.2.2-fixture
+  (`deploy/upgradebewijs/vorige-release.json`, `tests/fixtures/aio/`). Verplichte uitkomst: exitcode 0 en in het
+  rapport "Upgrade: niets verloren" en "terugzetten: niets verloren". Het bestand
+  `tests/fixtures/aio/upgradebewijs-uitzonderingen.json` krijgt in P3 geen enkele nieuwe uitzondering; is er een nodig
+  om groen te worden, dan stopt de stap (hoofdstuk 3, regel 5). R-HARDE-EIS is in elke stap VERPLICHT.
+- **Emby.** De bestaande Emby-koppeling (`apps/core/mediaguard/mediaserver/`) wordt in P3 niet gewijzigd en krijgt
+  geen nieuwe schrijfroute naar Emby (reviewcorrectie RV1). Raakt een stap die map toch, dan geldt ook POORTEN,
+  P-media-guard-ultimate, kop "4. Volledig (CI-volgorde)", punt 9 (contracttest mediaservers).
+- **Geen release.** Er wordt geen tag gemaakt, `deploy/release-manifest.json` wordt niet voor een release opgehoogd
+  en `.github/workflows/release.yml` wordt niet gestart (C1.3-MGU-02 is "Geblokkeerd": T-01).
+- **Gereserveerde acties.** Herstellen, zoeken en ondertitels zoeken via de Hub blijven dicht tot BG-05 (BLOK-08).
+  De enige actie die de Hub in P3 bij MediaGuard mag laten uitvoeren is "noodstop aan" ([CONTRACT], kop "2.3 Bestaande
+  apps (MediaGuard, MSO, my_house, Jellyfin/Jelly Leon, Emby)", regel 2).
+- **Zwaar.** Elke stap heeft door het upgradebewijs een image-build onder `docker-build.lock`; in de kolom "Zwaar" staat
+  daarom overal "ja". Een stap mag zonder lock beginnen; alleen het upgradebewijs wacht op de lock.
+
+### S-P3-600 - MediaGuard: scopes op API-sleutels
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** C1.3-MGU-05 (deel scopes); B04-003 (deel 003a: sleutel die alleen de noodstop aan mag zetten); B04-009 (deel 009b: API-allowlist); MG-bouwlijst P3-02
+- **Vooraf:** S-P3-000 klaar; S-P2-610 en S-P2-620 klaar (een schrijver per repo; de baan van P2 in deze repo ligt stil)
+- **Al gedaan?** `ls <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/migrations | grep -i scope; grep -n 'scopes' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/apikeys.py | head -3` -> een migratie met `scope` in de naam plus het veld in `apikeys.py` en een test met "scope" in `apps/core/tests/test_api_keys.py` betekent klaar. Op 2026-11-11 kende `apikeys.py` alleen `ROLES = ("viewer", "operator")` en geen scopes. Half werk (migratie zonder test of omgekeerd): afmaken, niet opnieuw beginnen.
+- **Lees eerst:** [DM-MG], kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-02 en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-02; [CONF], kop "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)" punt C1.3-MGU-05; [CONTRACT], kop "2.3 Bestaande apps (MediaGuard, MSO, my_house, Jellyfin/Jelly Leon, Emby)" regels 2 en 3; `apps/core/mediaguard/apikeys.py`, `apps/core/mediaguard/auth.py` (`require`, `ROLE_RANK`) en `apps/core/mediaguard/api/system.py` (route `POST /system/emergency-stop`); BESLUITEN, koppen "BG-05" en "BLOK-08"
+- **Bouw:**
+  1. Migratie: `apps/core/mediaguard/migrations/005_api_key_scopes.sql` (nieuw), in de kernreeks 001-019 waar `004_api_keys.sql` ook staat (K.5). Alleen `ALTER TABLE api_keys ADD COLUMN scopes TEXT NULL`; geen bestaande rij wijzigt. Bestaat `005_` al: het volgende vrije nummer in 005-019 (`ls apps/core/mediaguard/migrations | head -8`).
+  2. `apps/core/mediaguard/apikeys.py`: een sleutel heeft naast zijn rol optioneel een lijst scopes. `NULL` betekent het oude gedrag: de rol bepaalt alles (de sleutels van MSO en de naamgebonden app-sleutel uit `apps/core/mediaguard/mobile.py`, functie `_is_app`, blijven werken zoals nu). Een onbekende scope wordt bij het aanmaken geweigerd met een Nederlandse foutmelding.
+  3. Scope `emergency_stop:on`: een sleutel met rol `viewer` en deze scope mag `POST /api/v1/system/emergency-stop` ALLEEN met `active: true`. Met `active: false` geeft MediaGuard 403, ook met de scope. Leg dat vast in `apps/core/mediaguard/api/system.py` via een eigen controlefunctie naast `require_operator`, niet door `require` zelf losser te maken.
+  4. Scope `wanted:search`: alleen bouwen als de regisseur bij de start van deze stap meldt dat BG-05 met optie 1 is beantwoord. Zonder dat antwoord komt deze scope er NIET (C1.3-MGU-05: "na BG-05 (acties)"); noteer dat in de EVIDENCE-opmerking.
+  5. `GET /api/v1/auth/me` en de sleutellijst (`GET /api/v1/auth/api-keys`) tonen de scopes; de sleutel zelf nooit.
+  6. Web: het veld "Rechten (scopes)" in het bestaande scherm `apps/web/app/(app)/instellingen/api-sleutels/` met de bestaande Peil-onderdelen; teksten in `apps/web/lib/i18n/messages/` in nl en en (zelfde patroon als `apps/web/lib/i18n/messages/en/apikeys.ts`). A-ONTWERP levert eerst een korte notitie (veld, uitleg, fouttoestand).
+  7. OpenAPI-export bijwerken (kop van deze baan).
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_api_keys.py`. Negatief: (a) sleutel met `emergency_stop:on` en `active: false` geeft 403; (b) dezelfde sleutel op elke andere schrijvende route geeft 403 (loop de schrijvende routes uit `scripts/platform-v2-routes.py --json` af); (c) een onbekende scope bij aanmaken wordt geweigerd; (d) een bestaande sleutel zonder scopes (NULL) werkt na de migratie precies als ervoor; (e) ingetrokken sleutel met scope geeft 401; (f) de sleutel staat niet in audit of log. Commando's: het testcommando uit de kop van deze baan met `tests/test_api_keys.py tests/test_openapi_export.py`; `cd apps/web && npm run check:peil && npm run lint && npm run typecheck && npm run test:unit`; web-e2e van het scherm: `cd apps/web && nice -n 10 npm run build && MG_E2E_PYTHON=<WERKMAP>/media-guard-ultimate/.venv/bin/python nice -n 10 npm run e2e -- e2e/werk-apikeys.spec.ts`; daarna het upgradebewijs (kop van deze baan).
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3, 5, 6 en 8) + P-VEILIG + P-HARDE-EIS + P-CONTRACT + P-PEIL + P-GIT + P-EERLIJK
+- **Valkuilen:** V-043, V-055, V-094, V-116, V-117, V-066; een scope die via een tweede weg (de app-sleutel, `/app/control`) toch meer mag is precies de fout die R-VEILIG zoekt
+- **Bewijs:** C1.3-MGU-05 naar "Bezig", "Unit-getest; Sim-getest" (opmerking: alleen scopes en `emergency_stop:on`; gereserveerde acties dicht tot BG-05). B04-003 en B04-009 blijven "Niet gestart" of "Bezig" zoals gemeten; vul alleen de opmerking aan. Echte sleutel in de echte Hub: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog); R-VEILIG N5 - Winst: dit is de kern van de authenticatie van MediaGuard; een scope die meer opent dan "noodstop aan" geeft de Hub (en elke gelekte sleutel) schrijfrechten in de app met de MediaGuard-voortgang, en dat is met tests op de afnemers (S-P3-110) niet meer te vinden. R-HARDE-EIS N4 (de migratie voegt alleen een kolom toe). Leg de inzet vast in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, tabel "Topmodel-inzet".
+- **Stop en vraag als:** een bestaande sleutel na de migratie anders werkt; de noodstoproute alleen met een rolverhoging voor de scope te openen is; iemand `wanted:search` wil bouwen zonder vastgelegd antwoord op BG-05; het upgradebewijs iets anders meldt dan "niets verloren".
+
+### S-P3-610 - MediaGuard: connector deel 1 (discover, health, healthz, readyz)
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** C1.3-MGU-06 (deel discover, health, healthz, readyz); B04-002 (deel connector); MG-bouwlijst P3-01 (eerste helft)
+- **Vooraf:** S-P3-600 klaar
+- **Al gedaan?** `ls <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/connector 2>/dev/null; grep -c '/connector/v1/' <WERKMAP>/media-guard-ultimate/docs/openapi/mediaguard.openapi.json; grep -n 'healthz\|readyz' <WERKMAP>/media-guard-ultimate/apps/web/server.mjs` -> de map met een router, `discover` en `health` in de export en `/healthz` en `/readyz` doorgezet in `server.mjs` betekent klaar. Op 2026-11-11 bestond de map niet en kende `server.mjs` geen `healthz`.
+- **Lees eerst:** [CONTRACT], koppen "5. Gemeenschappelijke API-regels" (foutcatalogus), "6. Connectorcontract (elke dienst én elke adapter voor bestaande apps)" en "6.2 Versheid (`observed_at` en `max_age`)"; [DM-MG], kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-01 en kop "D. Hub-adapter: bestaande routes vs connectorcontract (§6) en enrollment (§3)"; [CONF], kop "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)" punt C1.3-MGU-06; `apps/core/mediaguard/app.py` (waar routers worden opgenomen); `apps/core/mediaguard/health_summary.py`
+- **Bouw:**
+  1. Nieuwe map `apps/core/mediaguard/connector/` (nieuw) met een router onder `/connector/v1`, opgenomen in `apps/core/mediaguard/app.py`. De bestaande routes onder `/api/v1` houden hun eigen foutformaat; het contractfoutformaat geldt alleen onder `/connector/v1`.
+  2. `GET /connector/v1/discover`: dienst, versie, ondersteunde itemtypen, en `actions` leeg (in P3 biedt MediaGuard via de connector geen acties aan; "noodstop aan" loopt via de bestaande route met een gescopete sleutel, S-P3-600).
+  3. `GET /connector/v1/health`: per onderdeel een check met `observed_at`; de slechtste check bepaalt de toestand; een check ouder dan `max_age` is `unknown`, nooit `healthy`. Hergebruik `apps/core/mediaguard/health_summary.py`; bouw geen tweede meting.
+  4. `POST /connector/v1/propose`, `/apply` en `/rollback`: `501 capability_unavailable` in het contractformaat.
+  5. `GET /healthz` (proces leeft) en `GET /readyz` (database bereikbaar en migraties klaar) in de kern, en doorgezet in `apps/web/server.mjs` zoals de bestaande `/api`-doorgifte.
+  6. Toegang: elke route onder `/connector/v1` vraagt een sleutel of sessie met minstens rol `viewer` (de Hub-sleutel heet in MediaGuard `hub`, rol viewer; [DM-MG] kop "D. ..."). `/healthz` en `/readyz` zijn zonder sleutel en geven geen inhoud prijs.
+  7. OpenAPI-export bijwerken.
+- **Tests (verplicht):** nieuw `apps/core/tests/test_connector_lezen.py` (nieuw). Negatief: (a) zonder sleutel 401 op `/connector/v1/health`; (b) een check ouder dan `max_age` maakt `health` `unknown`; (c) `propose`, `apply` en `rollback` geven 501 in het contractformaat; (d) `/healthz` en `/readyz` geven geen versie, pad of instelling terug; (e) een fout onder `/api/v1` heeft nog steeds het oude formaat (bestaande test blijft groen). Commando: het testcommando uit de kop van deze baan met `tests/test_connector_lezen.py tests/test_openapi_export.py`; `cd apps/web && npm run lint && npm run typecheck && npm run test:unit`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3, 5 en 8) + P-CONTRACT + P-VEILIG + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-129, V-051, V-052, V-066, V-087, V-116
+- **Bewijs:** C1.3-MGU-06 naar "Bezig", "Unit-getest". B04-002 naar "Bezig", "Unit-getest" (opmerking: connector deel 1; items en de vijf datasets volgen in S-P3-615). Echte Hub tegen echte MediaGuard: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** het contract in `discover` een veld eist dat MediaGuard alleen met een nieuwe migratie kan leveren; `server.mjs` de doorgifte alleen met een wijziging van de bestaande `/api`-afhandeling kan doen.
+
+### S-P3-615 - MediaGuard: connector deel 2 (items, evidence en de vijf datasets)
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-002; C1.3-MGU-06 (deel items en evidence); B04-008 (deel 008c: `owner_app` in incidenten); MG-bouwlijst P3-01 (tweede helft) en P3-12 (deel `owner_app`)
+- **Vooraf:** S-P3-610 klaar
+- **Al gedaan?** `grep -n 'items\|evidence' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/connector/*.py 2>/dev/null | head -5; grep -c 'connector/v1/items\|connector/v1/evidence' <WERKMAP>/media-guard-ultimate/docs/openapi/mediaguard.openapi.json` -> beide routes in code en export plus een test voor de vijf datasets betekent klaar.
+- **Lees eerst:** [DM-MG], kop "B04-002 — Hub read-model adapter (F1)", kop "K.4 Nieuwe rijen (ontbraken in de matrix)" (rijen N-02 en N-10) en kop "B04-008 — Aanvullende randgevallen (F4)" (rij 008c); [CONTRACT], kop "6. Connectorcontract (elke dienst én elke adapter voor bestaande apps)"; `apps/core/mediaguard/attention.py`; `apps/core/mediaguard/audit.py`; `apps/core/mediaguard/encoding/resources.py`
+- **Bouw:**
+  1. `GET /connector/v1/items?type=...&cursor=&limit=` (pagina's van hooguit 200 met `next_cursor`) voor de vijf datasets van B04-002: `wanted`, `status`, `downloads`, `av1_lanes` (uit `apps/core/mediaguard/encoding/resources.py`) en `incidents` (uit `apps/core/mediaguard/attention.py`). Elk item heeft een stabiel ID, `observed_at` en een `deep_link` naar het scherm in MediaGuard.
+  2. Incidenten krijgen `owner_app: "mediaguard"` en waar het kan `instance_id` (rij 008c). De Hub verzint geen oorzaak; MediaGuard levert de eigen oorzaakcode.
+  3. Veldenwitte lijst: per itemtype een vaste lijst velden; `sessions`, `hold.reason`, `actions`, `tests` en `last` komen nooit in een item (zelfde lijst als de Hub-adapter in S-P3-030). Bouw elk item op uit toegestane velden, kopieer nooit een heel intern object.
+  4. `GET /connector/v1/evidence/{id}`: een bewijspakket per audit- of job-ID (rij N-02): tijdstippen, versie, geredigeerde request en response, auditregel met `undo_hint`. Geen sleutel, geen pad met een geheim.
+  5. OpenAPI-export bijwerken.
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_connector_lezen.py`. Negatief: (a) een intern object met `sessions`, `hold.reason`, `actions`, `tests` en `last`: geen van die waarden komt in een item; (b) `limit` boven 200 wordt 200; (c) een onbekend `type` geeft de contractfout, geen lege lijst; (d) `evidence` van een onbekend ID geeft 404 in het contractformaat; (e) de testsleutel komt in geen enkel antwoord voor; (f) dezelfde aanvraag twee keer geeft dezelfde ID's (vergelijking van de vijf datasets met de bestaande `/api/v1`-routes). Commando: het testcommando uit de kop van deze baan met `tests/test_connector_lezen.py tests/test_openapi_export.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-CONTRACT + P-VEILIG + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-046, V-051, V-066, V-094, V-116
+- **Bewijs:** B04-002 blijft "Bezig", nu "Unit-getest; Sim-getest". C1.3-MGU-06 blijft "Bezig". B04-008: opmerking "owner_app in connector-incidenten" erbij. Echte Hub: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** een dataset alleen met een rol boven viewer te lezen is (dan beslist de regisseur, niet de bouwer); een item een veld nodig heeft dat op de verboden lijst staat.
+
+### S-P3-620 - MediaGuard: events met cursor
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** C1.3-MGU-06 (deel events); B04-002, B04-007 (deel events); EX46 (MediaGuard-deel: stabiele `event_id`); MG-bouwlijst P3-03
+- **Vooraf:** S-P3-610 klaar
+- **Al gedaan?** `grep -c 'connector/v1/events' <WERKMAP>/media-guard-ultimate/docs/openapi/mediaguard.openapi.json; grep -rn 'cursor_expired' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard | head -3` -> de route in de export en `cursor_expired` in de code met een test betekent klaar.
+- **Lees eerst:** [DM-MG], kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-03, kop "K.4 Nieuwe rijen (ontbraken in de matrix)" (rijen N-15 en N-24) en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-03; [CONTRACT], kop "7. Event-envelope"; `apps/core/mediaguard/events.py`; `apps/core/mediaguard/api/events.py`; `apps/core/mediaguard/maintenance/housekeeping.py` (instelling `maintenance.retention_days_events`)
+- **Bouw:**
+  1. `GET /connector/v1/events?cursor=&limit=` over de bestaande `outbox_events`, in de envelope van het contract (domein `media`, werkwoord, `ernst`, `source_event_id`, `classification`).
+  2. `event_id` is een UUIDv5 uit een vaste naamruimte plus het bron-ID, zodat dezelfde gebeurtenis bij herhaald ophalen hetzelfde ID heeft (rij N-24).
+  3. Een cursor van voor de oudste bewaarde regel geeft expliciet `cursor_expired` (rij N-15); nooit stil overslaan. Pagina's van hooguit 200 met `next_cursor`.
+  4. Redactie: geen sleutel, geen pad met geheim, geen vrije tekst van een kijkpauze in een event.
+  5. De bewaartermijn van de outbox (`maintenance.retention_days_events`, standaard 14 dagen) verandert niet.
+  6. OpenAPI-export bijwerken.
+- **Tests (verplicht):** nieuw `apps/core/tests/test_connector_events.py` (nieuw). Negatief: (a) cursor ouder dan de oudste regel geeft `cursor_expired`; (b) twee keer ophalen geeft dezelfde `event_id`'s en geen dubbele; (c) een event bevat geen sleutel of geheim (zoek de testsleutel); (d) zonder sleutel 401. Commando: het testcommando uit de kop van deze baan met `tests/test_connector_events.py tests/test_openapi_export.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-CONTRACT + P-VEILIG + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-046, V-066, V-094, V-005
+- **Bewijs:** C1.3-MGU-06 blijft "Bezig". B04-002 blijft "Bezig". B04-007: opmerking "events in envelope" (de padtest volgt in S-P3-675). EX46 is een regel van het programma en blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de outbox geen oplopend ID heeft waarop een cursor kan rusten (dan vraagt het een migratie: eerst melden); het contract een werkwoord eist dat MediaGuard niet kent.
+
+### S-P3-625 - MediaGuard: bescherming tegen een database van een nieuwere versie
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** ja (image-build voor het upgradebewijs en de proef met een oudere image)
+- **Werkpakketten en tests:** B04-009 (rij "tag-only rollback blokkeren"); EX15 (MediaGuard-deel); MG-bouwlijst P3-04
+- **Vooraf:** S-P3-600 klaar (de nieuwe migratie `005_api_key_scopes.sql` is dan het eerste "onbekende" schema voor de 1.2.2-image)
+- **Al gedaan?** `grep -n -i 'nieuwer\|onbekend\|unknown' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/db.py | head -5` -> een controle in `Database.initialize` op versies in `schema_migrations` die de code niet kent, plus een test, betekent klaar. Op 2026-11-11 deed `initialize` alleen `pending = [f ... if f.stem not in applied]` en zag een onbekende versie niet.
+- **Lees eerst:** [DM-MG], kop "B04-009 — MediaGuard-upgrade-gate (F5)" (rij "tag-only rollback blokkeren (EX15)") en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-04; `apps/core/mediaguard/db.py` (`Database.initialize`, `_backup_before_migration`); `apps/core/mediaguard/emergency.py`; `apps/core/mediaguard/maintenance/preupdate.py`; POORTEN, P-media-guard-ultimate, kop "4. Volledig (CI-volgorde)", punt 3
+- **Bouw:**
+  1. In `Database.initialize` in `apps/core/mediaguard/db.py`: staat er in `schema_migrations` een versie die niet als bestand in `apps/core/mediaguard/migrations/` bestaat, dan is de database van een nieuwere (of andere) versie. Dan: geen migratie, geen back-up voor migratie, geen schrijfactie in `schema_migrations`.
+  2. MediaGuard zet in dat geval zelf de noodstop aan (bestaand mechanisme in `apps/core/mediaguard/emergency.py`) en toont een duidelijke Nederlandse melding: "database is van een nieuwere MediaGuard-versie; zet de bijpassende versie of de set van vóór de update terug". Geen startweigering die de webinterface onbereikbaar maakt (K.5).
+  3. De controle vergelijkt de verzameling versies, niet een letterlijke tekst (V-086).
+  4. Herstel loopt via de bestaande set van vóór de update en terugzetten (`apps/core/mediaguard/maintenance/preupdate.py`); er komt geen nieuw herstelmechanisme en geen automatische terugzetting.
+  5. Dezelfde controle voor de database van de AV1-engine als die een eigen schemaversie heeft: ONBEKEND - eerst vaststellen met: `grep -rn 'schema_versie\|schema_version' <WERKMAP>/media-guard-ultimate/services/encoder/app | head`. Heeft hij er een, bouw dan dezelfde controle; anders meld het.
+  6. Documenteer het gedrag in `docs/INSTALL_TRUENAS.md` in een alinea: wat de gebruiker ziet en dat de oplossing de bijpassende image-versie in het formulier van de Custom App of de snapshot van voor de update is. Geen terminalstappen.
+- **Tests (verplicht):** nieuwe tests in een nieuw bestand `apps/core/tests/test_schema_nieuwer.py` (nieuw). Negatief: (a) database met een onbekende versie in `schema_migrations`: na `initialize` is de inhoud van alle tabellen byte-gelijk aan ervoor (meet met de functie `meet_db` uit `scripts/upgradebewijs.py`), de noodstop staat aan en er is geen back-up-set gemaakt; (b) database op het huidige schema start gewoon; (c) database op een ouder schema migreert zoals nu (bestaande test blijft groen). Proef met de echte oudere image: start de 1.2.2-image uit `deploy/upgradebewijs/vorige-release.json` op een kopie van de datamap NA het upgradebewijs (de map bevat dan `005_api_key_scopes`); verwacht: de oude image weigert te migreren of meldt het, en het upgradebewijs-rapport "terugzetten: niets verloren" blijft gelden. Leg in het rapport vast wat de 1.2.2-image precies doet; die image heeft deze controle zelf nog niet, dus deze proef toont alleen dat er niets verloren gaat. Commando's: het testcommando uit de kop van deze baan met `tests/test_schema_nieuwer.py tests/test_upgradebewijs.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-070, V-086, V-112, V-116, V-117
+- **Bewijs:** B04-009 naar "Bezig", "Unit-getest; Sim-getest" (opmerking: schemabescherming). EX15 is een regel van het programma en blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md stap S-P6-20.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog: migratiecode); R-HARDE-EIS N5 - Winst: dit is de code die beslist of er over de database met de MediaGuard-voortgang gemigreerd wordt; een fout laat een oudere image een nieuwere database half migreren, en dat is na een terugzetting op de NAS niet meer te herstellen zonder de oude set. Leg de inzet vast in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, tabel "Topmodel-inzet".
+- **Stop en vraag als:** de controle alleen te bouwen is door `schema_migrations` van vorm te veranderen; de noodstop bij een nieuwer schema iets anders stillegt dan encoderen en opruimen (dan eerst melden); de proef met de 1.2.2-image gegevens verandert.
+
+### S-P3-630 - MediaGuard: correlatie-ID op externe verzoeken
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-004 (deel 004b); I03-03-08 (bouwdeel); MG-bouwlijst P3-05
+- **Vooraf:** S-P3-610 klaar
+- **Al gedaan?** `grep -rn -i 'x-correlation-id' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard | head -3` -> een middleware die de kop overneemt en teruggeeft, plus een test, betekent klaar.
+- **Lees eerst:** [DM-MG], kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-05 en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-05; [DM-MG], kop "B04-004 — Diagnoseketen met MSO (F2)"; [CONTRACT], kop "5. Gemeenschappelijke API-regels"; `apps/core/mediaguard/audit.py` (veld `correlation_id`); `apps/core/mediaguard/app.py`
+- **Bouw:**
+  1. Middleware in de kern: neem `X-Correlation-Id` over als het een geldige UUID is, anders een nieuwe; zet hem in het antwoord terug.
+  2. Bij een sleutelmutatie (aanmaken, intrekken) en bij de noodstop komt de waarde in `audit.correlation_id`.
+  3. Alleen de kop in en uit plus de audit. De bestaande correlatie in de body tussen kern en engine blijft zoals hij is (K.5).
+  4. Een ongeldige waarde (te lang, geen UUID, met een regeleinde) wordt niet overgenomen en niet gelogd.
+- **Tests (verplicht):** nieuw `apps/core/tests/test_correlatie.py` (nieuw). Negatief: (a) een waarde met een regeleinde of van meer dan 64 tekens wordt vervangen door een nieuwe UUID; (b) zonder kop krijgt het antwoord een nieuwe UUID; (c) een sleutel intrekken met een kop laat dezelfde waarde in de auditregel. Commando: het testcommando uit de kop van deze baan met `tests/test_correlatie.py tests/test_api_keys.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-CONTRACT + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-050, V-094
+- **Bewijs:** B04-004 naar "Bezig", "Unit-getest" (opmerking: alleen de MediaGuard-kant; de keten zelf is van de Hub, S-P3-075). I03-03-08 is een regel van `jelly-leon-platform` (S-P3-410).
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N2 (kleine mechanische stap); verder standaard
+- **Stop en vraag als:** de middleware de bestaande SSE-stroom (`apps/core/mediaguard/api/events.py`) verandert.
+
+### S-P3-635 - MediaGuard: herstelrapport voor de Hub
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-006 (rijen 006a, 006b en 006c); MG-bouwlijst P3-06
+- **Vooraf:** S-P3-615 klaar
+- **Al gedaan?** `grep -rn 'backups' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/connector/*.py 2>/dev/null | head -3` -> itemtype `backups` met een test voor "ontbrekende fork-back-up is degraded" betekent klaar.
+- **Lees eerst:** [DM-MG], kop "B04-006 — Back-up en rollback-integratie (F3)", kop "K.4 Nieuwe rijen (ontbraken in de matrix)" (rij N-10) en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-06; `apps/core/mediaguard/maintenance/bundle.py` (functie `status`); `apps/core/mediaguard/maintenance/api.py`; `apps/core/mediaguard/notify/offsite.py` en `apps/core/mediaguard/notify/api.py` (route `GET /offsite`); `apps/core/mediaguard/instances/manage.py` (route `GET /backups`)
+- **Bouw:**
+  1. Itemtype `backups` in `GET /connector/v1/items` (S-P3-615): laatste geverifieerde back-up van kern en AV1-engine (sha256, schema, leeftijd), bundelstatus met de vingerafdruk uit `bundle.status()` (nooit de sleutel), laatste back-up per fork-instantie, offsite-status (soort doel, laatste geverifieerde kopie, leeftijd; nooit de doel-URL of een geheim).
+  2. Dekking per onderdeel: ontbreekt een back-up of is hij niet geverifieerd, dan is dat onderdeel `degraded`; nooit groen zonder geverifieerde back-up.
+  3. Alleen lezen. Er komt geen route die een back-up of herstel start voor de Hub, en de offsite-route voor beheerders wordt niet opengezet voor andere rollen.
+  4. OpenAPI-export bijwerken.
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_connector_lezen.py`. Negatief: (a) een ontbrekende fork-back-up maakt het rapport `degraded`; (b) een niet-geverifieerde back-up telt niet; (c) de bundelsleutel en de offsite-URL komen in geen antwoord voor; (d) een viewer-sleutel kan `GET /api/v1/notify/offsite` nog steeds niet lezen. Commando: het testcommando uit de kop van deze baan met `tests/test_connector_lezen.py tests/test_bundle.py tests/test_notify.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-CONTRACT + P-VEILIG + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-051, V-085, V-094, V-005
+- **Bewijs:** B04-006 naar "Bezig", "Unit-getest; Sim-getest". Herstel op de echte NAS en de appdata-snapshot via de executor: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-02.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de leeftijd of verificatie van een fork-back-up alleen te bepalen is door de fork zelf aan te roepen met een schrijvende route.
+
+### S-P3-640 - MediaGuard: download-opruimer volgt een gemeten zieke pool
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-008 (rij 008a "NAS degraded", gemeten deel); EX11 (MediaGuard-deel); MG-bouwlijst P3-14 (K.5)
+- **Vooraf:** S-P3-600 klaar
+- **Al gedaan?** `grep -n 'pool_degraded' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/downloads/janitor.py` -> een aanroep in `run_once` plus een test in `apps/core/tests/test_download_janitor.py` betekent klaar. Op 2026-11-11 gebruikte `janitor.py` `pool_degraded` niet.
+- **Lees eerst:** [DM-MG], kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel "P3-14 (nieuw, P1)" en kop "K.4 Nieuwe rijen (ontbraken in de matrix)" (rijen N-16 en N-17); `apps/core/mediaguard/downloads/janitor.py` (`run_once`); `apps/core/mediaguard/storage_forecast.py` (`pool_degraded`); `apps/core/mediaguard/recovery/release_check.py` (bestaand voorbeeld dat `pool_degraded` gebruikt); `docs/adr/ADR-0014-platform-v2-tweede-lezing.md`
+- **Bouw:**
+  1. In `run_once` van `apps/core/mediaguard/downloads/janitor.py`: geeft `pool_degraded(ctx)` een gemeten zieke pool, dan wordt er niets definitief verwijderd en niets nieuws naar de prullenbak verplaatst, en komt er een melding.
+  2. Zonder TrueNAS-sleutel (status onbekend) blijft het gedrag ongewijzigd: dat geval hoort bij S-P3-690 en vraagt eerst een ADR.
+  3. De standaardinstellingen van de opruimer en de behandeling van `mso-<categorie>` veranderen niet (rij N-17).
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_download_janitor.py`. Negatief: (a) gemeten zieke pool: `trashed == purged == 0` en er is een melding; (b) gezonde pool: gedrag ongewijzigd; (c) pool niet ingesteld: gedrag ongewijzigd; (d) de bestaande noodstoptest blijft groen. Commando: het testcommando uit de kop van deze baan met `tests/test_download_janitor.py tests/test_bewaking.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-005, V-051
+- **Bewijs:** B04-008 naar "Bezig", "Unit-getest" (opmerking: opruimer volgt een gemeten zieke pool). EX11 blijft "Geblokkeerd" (programma): "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md stap S-P6-20.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de wijziging het gedrag voor een losse installatie zonder TrueNAS-sleutel zou veranderen.
+
+### S-P3-645 - MediaGuard: contracttest met de routes die MSO gebruikt
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-009 (rijen 009a en 009d); MG-bouwlijst P3-09
+- **Vooraf:** S-P3-600 klaar
+- **Al gedaan?** `ls <WERKMAP>/media-guard-ultimate/tests/contract/mso 2>/dev/null; grep -n 'contract/mso' <WERKMAP>/media-guard-ultimate/.github/workflows/ci.yml` -> de map met een gepinde routelijst en een stap in `ci.yml` betekent klaar.
+- **Lees eerst:** [DM-MG], kop "B04-009 — MediaGuard-upgrade-gate (F5)" (rijen 009a en 009d) en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-09; `apps/core/tests/test_api_keys.py`; `scripts/platform-v2-routes.py`; `<WERKMAP>/media-source-optimizer/apps/core/mso/features/mediaguard/compat.py` (alleen lezen: de routes die MSO verwacht)
+- **Bouw:**
+  1. `tests/contract/mso/` (nieuw): een gepinde kopie (JSON) van de routespecificaties die MSO verwacht, met de bron (`media-source-optimizer@<commit>:apps/core/mso/features/mediaguard/compat.py`) en de datum in het bestand. Niet met de hand overtypen: lees ze uit dat bestand met een klein script dat in de map staat.
+  2. Een test die de lijst legt naast de routetabel van `scripts/platform-v2-routes.py --json`: elke route bestaat, met de methode en de minimale rol die MSO verwacht. Een ontbrekende route of een strengere rol laat de test falen.
+  3. Een stap in de job `core` van `.github/workflows/ci.yml` die deze test draait; omdat `release.yml` `ci.yml` aanroept, blokkeert een rode test ook een release (rij 009d).
+  4. Het bestaande verschil "MSO verwacht `openapi.json` zonder rol, MediaGuard eist admin" komt als vastgelegde uitzondering met reden in de lijst; er komt geen route bij en geen rol wordt losser.
+- **Tests (verplicht):** de nieuwe contracttest. Negatief: (a) haal in een proefkopie van de lijst een route weg uit de routetabel: de test faalt; (b) een route waarvoor MediaGuard een hogere rol eist dan de lijst: de test faalt. Commando: `cd apps/core && ../../.venv/bin/python -m pytest -q -p no:cacheprovider ../../tests/contract/mso` (bestaat de verzamelplek anders, gebruik het pad dat `ci.yml` gebruikt); `actionlint .github/workflows/*.yml`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-CONTRACT + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-001, V-003, V-033, V-101
+- **Bewijs:** B04-009 blijft "Bezig" (opmerking: contracttest MSO-routes, met de MSO-commit). Tegen de MSO op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** MSO een route verwacht die MediaGuard niet heeft (dat is een bevinding voor beide repos: melden, geen route bijbouwen in deze stap).
+
+### S-P3-650 - MediaGuard: healthcheck die eerst naar 568 wisselt
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** ja (alles-in-een image bouwen en de rooktest)
+- **Werkpakketten en tests:** C1.3-MGU-07; C1.3-ALG-04 (deel MediaGuard)
+- **Vooraf:** S-P3-610 klaar (de healthcheck gebruikt `/readyz`)
+- **Al gedaan?** `sed -n 1,12p <WERKMAP>/media-guard-ultimate/deploy/aio/healthcheck.sh; grep -n 'HEALTHCHECK' -A2 <WERKMAP>/media-guard-ultimate/deploy/aio/Dockerfile; grep -n 'CapPrm\|CapBnd\|NoNewPrivs' <WERKMAP>/media-guard-ultimate/scripts/aio-smoke.py` -> een healthcheck in exec-vorm die eerst naar 568 wisselt plus controles op `CapPrm`, `CapBnd` en `NoNewPrivs` in `scripts/aio-smoke.py` betekent klaar. Op 2026-11-11 was de healthcheck een shellscript (`CMD ["sh", "/usr/local/bin/mg-aio-healthcheck"]`) dat alleen een statusbestand las, en had `aio-smoke.py` geen van die controles.
+- **Lees eerst:** [CONTRACT], kop "2.2 Custom App-realiteit (gemeten in de bronnen, niet op een echte NAS)" (alinea's "Healthcheck en `docker exec`" en "Rooktest"); [CONF], kop "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)" punt C1.3-MGU-07; `deploy/aio/healthcheck.sh`, `deploy/aio/Dockerfile` (`HEALTHCHECK`, `ENTRYPOINT ["/usr/bin/tini", "--"]`); `apps/core/mediaguard/aio.py`; `scripts/aio-smoke.py`; ter vergelijking `<WERKMAP>/media-source-optimizer/deploy/allinone/healthcheck.py` (na S-P3-250)
+- **Bouw:**
+  1. Vervang de healthcheck door een programma in exec-vorm (geen `sh -c`, geen `sh <script>`) dat als eerste handeling, voor elke controle: als root de bounding set leegt, `setgroups([])`, `setgid(568)`, `setuid(568)` en `prctl(PR_SET_NO_NEW_PRIVS, 1)` doet; als 568 alleen no_new_privs. Mislukt de wissel: exit 1. Gebruik `PUID`/`PGID` zoals `apps/core/mediaguard/aio.py` dat doet.
+  2. De controle zelf: het bestaande statusbestand (max. 90 s oud, "ok") EN `GET /readyz` van de kern. Bewaar de lage kosten per controle (de reden staat bovenin `healthcheck.sh`); meet het geheugengebruik van de nieuwe controle en zet het in het rapport.
+  3. Een controlevlag (bijvoorbeeld `--controle`) die na de wissel `Uid`, `CapEff`, `CapPrm`, `CapAmb` en `NoNewPrivs` meldt en stopt.
+  4. `apps/core/mediaguard/aio.py`: bij een start als root legt de bewaker de bounding set leeg voor hij naar 568 wisselt.
+  5. PID 1 is `tini` als root. Meet eerst (`docker exec <container> cat /proc/1/status`). Blijft PID 1 root, kies de kleinste ingreep (de bewaker als PID 1, of `tini` pas na de wissel) en leg hem vast in een nieuw ADR `docs/adr/ADR-<nummer>-healthcheck-als-568.md` (nieuw).
+  6. `scripts/aio-smoke.py`: controleer voor elk proces in de boom van PID 1 `Uid 568`, `CapEff`, `CapPrm` en `CapAmb` 0, `NoNewPrivs 1`, en bij een start als root `CapBnd` 0; de healthcheck met de controlevlag apart.
+  7. Bouwen: de aio-image wordt gebouwd uit de component-images. Het lokale bouwcommando is ONBEKEND - eerst vaststellen met: `sed -n '/^  aio-image:/,/^  aio-smoke:/p' .github/workflows/release.yml` en `sed -n 2,16p scripts/build-all.sh`. Elke build onder `flock <WERKMAP>/.lokaal/docker-build.lock nice -n 10`. De rooktest draait zoals in de job `aio-smoke` van `release.yml` (met `sudo`, dat mag op deze machine), onder `flock <WERKMAP>/.lokaal/stack.lock`.
+- **Tests (verplicht):** de uitgebreide rooktest plus `cd apps/core && ../../.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_aio.py tests/test_release_pipeline.py`. Negatief: (a) de healthcheck als root in een container waar de wissel niet kan eindigt met exit 1, niet met "gezond"; (b) de rooktest faalt aantoonbaar als de wissel uit de healthcheck wordt gehaald (een keer proberen, uitkomst in het rapport, terugdraaien); (c) een statusbestand ouder dan 90 s geeft nog steeds "ongezond". Daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-INSTALLATIE + P-VEILIG + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-052, V-053, V-083, V-084, V-087, V-011, V-013, V-014, V-088
+- **Bewijs:** C1.3-MGU-07 naar "Bezig", "Sim-getest". Op een echte NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-MANIFEST + R-HARDE-EIS (tegelijk; R-VEILIG, R-MANIFEST en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog: rechten en procesboom); verder standaard
+- **Stop en vraag als:** de component-images alleen met een inlog op GHCR te halen zijn (T-01); het bouwen van de AV1-engine meer geheugen vraagt dan `free -m` toelaat; de wissel van PID 1 de GPU-toegang van de AV1-engine verandert.
+
+### S-P3-655 - MediaGuard: terugkeerpad na inloggen volgens het contract
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** C1.3-MGU-08 (deel terugkeerpad)
+- **Vooraf:** S-P3-600 klaar
+- **Al gedaan?** STAND media-guard-ultimate C1.3-MGU-08 en `grep -n 'next' <WERKMAP>/media-guard-ultimate/apps/web/app/login/page.tsx` -> een losse, geteste functie met de regel uit het contract betekent klaar. Op 2026-11-11 stond in `page.tsx` alleen `next && next.startsWith("/") && !next.startsWith("//")`.
+- **Lees eerst:** [CONTRACT], kop "4.1 Gebruikers, noodlogin (break-glass) en SSO" (zoek op "terugkeerpad"); [CONF], kop "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)" punt C1.3-MGU-08; `apps/web/app/login/page.tsx`; `apps/web/lib/session.tsx` (maakt `/login?next=...`)
+- **Bouw:**
+  1. Een functie in een eigen bestand onder `apps/web/lib/` (nieuw; naam vrij) met de regel uit het contract, letterlijk: alleen een pad dat voldoet aan `^/(?![/\\])[!-~]*$`, hooguit 256 tekens, zonder `://` en zonder backslash; anders `/`.
+  2. Gebruik hem in `apps/web/app/login/page.tsx` en op elke andere plek die na het inloggen doorstuurt (`grep -rn 'router.replace\|router.push' apps/web/app/login apps/web/app/setup`).
+  3. Een pad naar `/login` zelf wordt niet gevolgd.
+- **Tests (verplicht):** nieuw testbestand onder `apps/web/tests/unit/`. Negatief, elk geval geeft `/`: `//evil.example`, `/\evil`, `https://evil.example`, `/a://b`, een pad met een spatie, een teken buiten `!` tot `~`, 257 tekens, een lege waarde. Positief: een pad van precies 256 tekens blijft staan. Commando: `cd apps/web && npm run lint && npm run typecheck && npm run test:unit`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3, 5 en 8) + P-VEILIG + P-CONTRACT + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-064, V-003
+- **Bewijs:** C1.3-MGU-08 blijft "Bezig", nu "Unit-getest" voor het terugkeerpad (de adresvalidatie was al NU-werk).
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK. Geen A-ONTWERP: het scherm verandert niet.
+- **Niveau:** A-BOUW N2 (kleine mechanische stap); verder standaard
+- **Stop en vraag als:** de Android-app ook een terugkeerpad gebruikt (dan wordt de stap groter).
+
+### S-P3-660 - MediaGuard: manifest en installatiedocument (standaard Custom App)
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** C1.3-MGU-09; I03-03-04 (documentdeel); MG-bouwlijst P3-07
+- **Vooraf:** S-P3-650 klaar (het manifest noemt de nieuwe healthcheck)
+- **Al gedaan?** `ls <WERKMAP>/media-guard-ultimate/deploy/manifest/mediaguard.manifest.yaml <WERKMAP>/media-guard-ultimate/deploy/truenas/CUSTOM_APP.md <WERKMAP>/media-guard-ultimate/.env.example 2>&1` -> alle drie aanwezig en het manifest slaagt in de strikte validatie: klaar. Op 2026-11-11 bestonden ze niet (wel `deploy/truenas/compose.yaml` en `deploy/truenas/env.example`).
+- **Lees eerst:** [CONTRACT], kop "9. Manifeststandaard (B08-001, eigenaar `appstore-en-fork`)"; [CONF], kop "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)" punt C1.3-MGU-09; [DM-MG], kop "G. Controle: installeerbaar als standaard Custom App (alles-in-één)?" en kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-07; `README.md` en `docs/INSTALL_TRUENAS.md`; `<WERKMAP>/ai-server-manager/deploy/manifest/ai-server-manager.manifest.yaml` (voorbeeld van een geldig manifest)
+- **Bouw:**
+  1. Nieuw `deploy/manifest/mediaguard.manifest.yaml`: `install.method: custom_app`, de image `mediaguard-core` met tag `<versie>-aio`, `healthcheck.monitor` (pad, verwachte status, timeout, interval), `backup.db_export: stopped_snapshot` of een `accepted_findings`-regel voor SQLite met een Nederlandse reden, `network.ports` als enige bron voor poorten, geen `compose`-veld, geen parameter of omgevingsvariabele die met `HUB_` begint, geen `latest`. Zolang er geen release is: `accepted_findings` met `digest_pending_release` (BLOK-06). Elke waarde komt uit de image of de bestaande documentatie.
+  2. Nieuw `deploy/truenas/CUSTOM_APP.md`: de velden van het formulier van de standaard Custom App in de volgorde van het formulier, met `<POOL>` als plaatshouder; GPU-doorgifte en de mappen van 568 zoals `docs/INSTALL_TRUENAS.md` ze al beschrijft.
+  3. Nieuw `.env.example` in de root, alleen voor ontwikkeling, zonder echte waarden.
+  4. `README.md` (§3.3) en `docs/INSTALL_TRUENAS.md` (§5): het compose-deel krijgt bovenaan "alleen voor ontwikkeling, geen installatieweg"; de standaard Custom App is de enige installatieweg. `deploy/truenas/compose.yaml` blijft voor ontwikkeling en wordt nergens als installatieweg genoemd.
+  5. Terugdraaien in de documentatie: snapshot terugzetten in de TrueNAS-webinterface plus de vorige image-versie in het formulier; nooit alleen de tag terugzetten (S-P3-625).
+- **Tests (verplicht):** `<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest validate --strict deploy/manifest/mediaguard.manifest.yaml` (exitcode 0). Negatief: (a) een proefkopie buiten de repo met een parameter `HUB_URL` geeft de fout `reserved_env`; (b) een proefkopie met een `compose`-veld wordt geweigerd; (c) `grep -rn '/mnt/' deploy/manifest deploy/truenas/CUSTOM_APP.md` geeft alleen regels met `<POOL>`; (d) `grep -n -i 'install via yaml' README.md docs/INSTALL_TRUENAS.md` geeft geen installatie-instructie meer. Daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (snel) + P-INSTALLATIE + P-CONTRACT + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-089, V-096, V-097, V-085, V-070
+- **Bewijs:** C1.3-MGU-09 naar "Bezig", "Sim-getest" (alleen gevalideerd met de validator). Installeren op de NAS via het formulier: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05. I03-03-04 is een regel van `jelly-leon-platform` (S-P3-410, S-P3-450).
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST + R-HARDE-EIS (tegelijk; R-MANIFEST en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de validator een veld eist dat alleen op de NAS te meten is; de keuze tussen `stopped_snapshot` en `accepted_findings` voor SQLite een keuze over de voortgangsdatabase vraagt die het contract niet beslist (dan beslist de gebruiker via een keuzemenu).
+
+### S-P3-665 - MediaGuard: vaste digests, SBOM en `release/digests.json`
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build)
+- **Werkpakketten en tests:** B04-009 (rij 009b); MG-bouwlijst P3-08
+- **Vooraf:** S-P3-650 klaar
+- **Al gedaan?** `grep -rn '^FROM\|^ARG .*IMAGE' <WERKMAP>/media-guard-ultimate/deploy/aio/Dockerfile <WERKMAP>/media-guard-ultimate/apps/core/Dockerfile <WERKMAP>/media-guard-ultimate/apps/web/Dockerfile 2>/dev/null | grep -v '@sha256' | head; grep -n -i 'sbom\|digests.json' <WERKMAP>/media-guard-ultimate/.github/workflows/release.yml` -> geen regel zonder `@sha256` (de eigen component-images uitgezonderd, die komen uit dezelfde run) en een SBOM-stap betekent klaar. Op 2026-11-11 had `release.yml` geen SBOM en geen `digests.json`.
+- **Lees eerst:** [DM-MG], kop "B04-009 — MediaGuard-upgrade-gate (F5)" (rij 009b) en kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-08; `.github/workflows/release.yml`; `.github/workflows/ci.yml`; de Dockerfiles van kern, web, encoder en forks (`grep -rln '^FROM' --include=Dockerfile* .`); BESLUITEN, kop "BLOK-06"
+- **Bouw:**
+  1. Elke externe basis-image in de Dockerfiles krijgt een exacte versie plus `@sha256:<digest>`, opgevraagd met `docker buildx imagetools inspect <image>:<tag>`; nooit uit het hoofd.
+  2. Een controle in `ci.yml` (job `core` of een eigen stap) die faalt als een externe `FROM` of `ARG ..._IMAGE` geen `@sha256:` heeft.
+  3. `release.yml`: na het bouwen `release/digests.json` (nieuw) met per image de digest, een SBOM per image. De workflow wordt in deze stap niet gestart.
+  4. Geen tag, geen ophoging van `deploy/release-manifest.json`.
+- **Tests (verplicht):** Negatief: de controle uit bouwpunt 2 faalt op een proef-Dockerfile met een regel zonder digest (test op het controlescript). Commando's: `actionlint .github/workflows/*.yml`; de build van de kern met `flock <WERKMAP>/.lokaal/docker-build.lock nice -n 10 scripts/build-all.sh --only core`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 3 en 8) + P-INSTALLATIE + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-011, V-035, V-088, V-090
+- **Bewijs:** B04-009 blijft "Bezig". Geen release, dus geen digest van de eigen image: BLOK-06 blijft staan.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST + R-HARDE-EIS (tegelijk; R-MANIFEST en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N2 (kleine mechanische stap); verder standaard
+- **Stop en vraag als:** een basis-image op de vaste digest niet meer bouwt; de encoder-build (ffmpeg) door de vaste digest anders wordt.
+
+### S-P3-670 - MediaGuard: begrensde platformpauze voor AV1
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-005 (rijen 005a "voor back-up, ZFS-scrub, resourcedruk" en 005b); MG-bouwlijst P3-10 (eigenaarlogica; zonder de connectoracties)
+- **Vooraf:** S-P3-600 klaar
+- **Al gedaan?** `grep -rn 'Platform:' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/encoding <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/mediaserver | head -3` -> een pauzereden met voorvoegsel `Platform:`, een TTL en een frequentiegrens plus tests betekent klaar.
+- **Lees eerst:** [DM-MG], kop "B04-005 — Globale resource-scheduler-hooks (F2)" en kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-10; [DM-MG], kop "K.4 Nieuwe rijen (ontbraken in de matrix)" (rij N-05); `apps/core/mediaguard/mediaserver/service.py` (functies `apply_hold` en `combine_hold`); `apps/core/mediaguard/encoding/client.py` (`set_playback_hold`); `apps/core/mediaguard/encoding/resources.py`
+- **Bouw:**
+  1. Eigenaarlogica in MediaGuard: een platformpauze voor de AV1-banen met een reden met voorvoegsel `Platform:` (los van `Kijken:`), een TTL van hooguit 6 uur die MediaGuard zelf laat aflopen, en minimaal 15 minuten tussen twee wijzigingen. Volg het patroon van `apply_hold` in `apps/core/mediaguard/mediaserver/service.py`; bouw geen tweede pauzemechanisme in de engine.
+  2. Een platformpauze heft nooit een `Kijken:`-pauze op en een einde van de platformpauze laat een lopende `Kijken:`-pauze staan.
+  3. Valt de engine uit tijdens een platformpauze, dan is de status `unknown`, nooit "gepauzeerd" (rij N-05).
+  4. Aanroepen: in P3 alleen intern en in de tests. De aanroep via `POST /connector/v1/propose` en `/apply` met een ondertekend verzoek en `Idempotency-Key` komt NIET in deze stap: `propose` blijft `501 capability_unavailable` tot een Hub-policy-sleutel en een contractronde er zijn. Leg dat vast in de EVIDENCE-opmerking.
+  5. `/app/control` (`pause_lane`/`resume_lane` in `apps/core/mediaguard/mobile.py`) verandert niet; de Hub gebruikt die route nooit.
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_mediaserver.py` of een nieuw `apps/core/tests/test_platformpauze.py` (nieuw). Negatief: (a) een lopende `Kijken:`-pauze blijft staan als de platformpauze start en eindigt; (b) een TTL van meer dan 6 uur wordt 6 uur; (c) een tweede wijziging binnen 15 minuten wordt geweigerd; (d) engine onbereikbaar geeft `unknown`; (e) de bestaande tests `test_watching_holds_encodes_and_marks_recent` en `test_paused_viewer_does_not_hold` blijven groen. Commando: het testcommando uit de kop van deze baan met `tests/test_mediaserver.py tests/test_mediaserver_dual.py tests/test_encoding_lanes.py` plus het nieuwe bestand; daarna het upgradebewijs. Raakt de stap `apps/core/mediaguard/mediaserver/`, dan ook de contracttest mediaservers (POORTEN, P-media-guard-ultimate, kop "4. Volledig (CI-volgorde)", punt 9).
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3, 4 en 8; punt 9 als de mediaservermap is geraakt) + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-005, V-051, V-110, V-119
+- **Bewijs:** B04-005 naar "Bezig", "Unit-getest" (opmerking: eigenaarlogica; de aanroep via de connector wacht op de Hub-policy-sleutel). Echte A310 en echte stream: "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT: raakt de kijkpauze naast de Emby-koppeling) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog: gelijktijdigheid van twee pauzeredenen); verder standaard
+- **Stop en vraag als:** de pauze alleen te bouwen is door VMAF-, time-out- of CPU-regels te wijzigen; de bouwer de aanroep via de connector toch wil openen.
+
+### S-P3-675 - MediaGuard: Jellyfin-pad behouden en verversen melden
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** ja (image-build voor het upgradebewijs; contracttest mediaservers)
+- **Werkpakketten en tests:** B04-007 (rijen 007b en 007d); MG-bouwlijst P3-11
+- **Vooraf:** S-P3-620 klaar (events met cursor)
+- **Al gedaan?** `grep -rn 'mediaserver.refresh' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard | head -3` -> outbox-events `mediaserver.refresh.requested` en `.failed` met een test betekent klaar.
+- **Lees eerst:** [DM-MG], kop "B04-007 — Jellyfin-fork-events (F3)" en kop "K.4 Nieuwe rijen (ontbraken in de matrix)" (rij N-06); `apps/core/mediaguard/mediaserver/service.py` (`refresh_pending`); `apps/core/mediaguard/mediaserver/clients.py`; `apps/core/tests/test_mediaserver.py` (`test_refresh_after_handoff_then_playback_test`, `test_unmapped_path_falls_back_to_full_scan_once`); `docs/DATA_RECOVERY.md`
+- **Bouw:**
+  1. Outbox-events `mediaserver.refresh.requested` en `mediaserver.refresh.failed` met `correlation_id` gelijk aan de bestaande `transaction_id` (rij 007b).
+  2. Server offline: een keer `mediaserver.refresh.failed` met backoff, nooit "ververst" (rij N-06).
+  3. Simulatortest: na een AV1-vervanging blijven pad en ItemId gelijk; verandert het pad (bijvoorbeeld `.mp4` naar `.mkv`), dan alleen een melding. MediaGuard verandert nooit kijkgegevens (UserData) van de mediaserver en leest of schrijft nooit de database van Jellyfin of Emby (rij 007d).
+  4. Geen nieuwe aanroep naar Emby: de bestaande aanroepen (`POST /Library/Media/Updated`, `/Library/Refresh`) blijven zoals ze zijn (C1.3-MGU-04, RV1).
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_mediaserver.py` en `apps/core/tests/test_mediaserver_dual.py`. Negatief: (a) server offline geeft precies een `failed`-event en geen "ververst"; (b) een padwissel geeft een melding en geen aanroep die kijkgegevens wijzigt (test op de nagebootste client: geen `POST` naar een UserData-route); (c) de Emby-kant doet na de wijziging precies dezelfde aanroepen als ervoor. Commando's: het testcommando uit de kop van deze baan met `tests/test_mediaserver.py tests/test_mediaserver_dual.py`; de contracttest mediaservers (POORTEN, P-media-guard-ultimate, kop "4. Volledig (CI-volgorde)", punt 9); daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3, 8 en 9) + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-110, V-112, V-114, V-119, V-009
+- **Bewijs:** B04-007 naar "Bezig", "Unit-getest; Sim-getest". Echte Jellyfin/Jelly Leon en echte kijkgegevens: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-05.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT: Emby-koppeling en kijkgegevens) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog: raakt de mediaservercode naast Emby); verder standaard
+- **Stop en vraag als:** de contracttest een aanroep naar Emby toont die de vorige release niet deed; een padwissel alleen op te lossen lijkt door kijkgegevens te herschrijven.
+
+### S-P3-680 - MediaGuard: Peil-ronde web (768 breed, toetsenbord) en kernteksten
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (web-e2e van ongeveer 12 minuten; image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-008 (deel A-05 en A-11); C1.3-ALG-05 (deel MediaGuard); MG-bouwlijst P3-12 (deel 768 en toetsenbord); repowerk uit [CONF] kop 6 ("één kleurregel", "Overzicht periodiek verversen", "SysteemStatusPaneel met rijen per onderdeel")
+- **Vooraf:** S-P3-615 klaar
+- **Al gedaan?** `grep -rn '768' <WERKMAP>/media-guard-ultimate/apps/web/e2e/*.spec.ts | head -3` -> een e2e op 768 breed en een uitgebreide toetsenbordtest in `apps/web/e2e/mediaguard.spec.ts` betekent dat het testdeel klaar is; het repowerk staat in `docs/ontwerp/PEIL_REVIEW.md`.
+- **Lees eerst:** [DM-MG], kop "K.5 Correcties en aanscherpingen op de bouwlijst (§I)" regel P3-12; [CONF], kop "6. media-guard-ultimate (MediaGuard, bestaande app; P3 en P4-0)", alinea "Repowerk (inventaris C09, C12)"; [PEIL]; `docs/ontwerp/PEIL_REVIEW.md`; `apps/web/e2e/mediaguard.spec.ts` en `apps/web/e2e/peil.spec.ts`
+- **Bouw:**
+  1. A-ONTWERP eerst: loop de schermen na op 768 breed en met alleen het toetsenbord; lever een lijst van afwijkingen van Peil plus een ontwerp voor de drie punten van het repowerk. Alleen die lijst wordt gebouwd.
+  2. Browsertests op 768 breed en uitbreiding van de toetsenbordtest in `apps/web/e2e/mediaguard.spec.ts`.
+  3. Herstel de afwijkingen met Peil-onderdelen. Peil wordt nooit lokaal omzeild; punten die op Peil 1.1.1 wachten (bijvoorbeeld het woord "Niet beschikbaar", E13) blijven open en komen in de opmerking.
+  4. Teksten in nl en en (beide tegelijk).
+  5. Nieuwe schermafdrukken onder `docs/screenshots/peil/` met alleen testgegevens.
+- **Tests (verplicht):** Negatief: (a) op 768 breed geen horizontaal schuiven van de pagina; (b) elke knop van het Overzicht is met het toetsenbord bereikbaar en heeft een zichtbare focus; (c) een verouderde waarde op het SysteemStatusPaneel is niet groen. Commando's: `cd apps/web && npm run check:peil && npm run lint && npm run typecheck && npm run test:unit`; `cd apps/web && nice -n 10 npm run build && MG_E2E_PYTHON=<WERKMAP>/media-guard-ultimate/.venv/bin/python nice -n 10 npm run e2e`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 3, 5, 6 en 8) + P-PEIL + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-058, V-061, V-062, V-063
+- **Bewijs:** B04-008 blijft "Bezig". C1.3-ALG-05 blijft "Bezig" met de punten die op Peil 1.1.1 wachten in de opmerking. Echte toestellen: "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT; leescontrole dat de UI-ronde geen datamodel wijzigt) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** een afwijking alleen op te lossen is door een Peil-onderdeel lokaal aan te passen; de ronde een wijziging aan de database vraagt (C1.3-MGU-03: UI-rondes wijzigen geen datamodel).
+
+### S-P3-685 - MediaGuard: Peil-ronde Android
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (Gradle onder `gradle.lock`)
+- **Werkpakketten en tests:** C1.3-ALG-05 (deel Android); repowerk uit [CONF] kop 6 voor de Android-app (zelfde drie punten als S-P3-680, voor zover de app ze toont)
+- **Vooraf:** S-P3-680 klaar (zelfde teksten en ontwerp)
+- **Al gedaan?** `git -C <WERKMAP>/media-guard-ultimate log --oneline -3 -- apps/android` en `grep -n -i 'android' <WERKMAP>/media-guard-ultimate/docs/ontwerp/PEIL_REVIEW.md | tail -3` -> een commit van na S-P3-680 op `apps/android` en een reviewkop over deze ronde betekent klaar.
+- **Lees eerst:** het ontwerp van S-P3-680 in `docs/ontwerp/PEIL_REVIEW.md`; `docs/ANDROID.md`; `docs/adr/ADR-0023-android-app-ook-in-en-us.md`; POORTEN, P-media-guard-ultimate, kop "4. Volledig (CI-volgorde)", punt 7, en kop "7. Valkuilen"
+- **Bouw:**
+  1. A-ONTWERP eerst: bepaal welke punten uit het ontwerp van S-P3-680 de Android-app raken (SysteemStatusPaneel, kleurregel, verversen van het Overzicht). Alleen die worden gebouwd.
+  2. Bouw ze in `apps/android/app/src/main/java/nl/mediaguard/app/ui/` met de bestaande Peil-tokens; teksten in `values/strings.xml` en `values-en/strings.xml` tegelijk.
+  3. Referentiebeelden alleen opnieuw opnemen in deze ontwerpstap en alleen voor de schermen die echt veranderen (`:app:recordPaparazziDebug`), daarna `verifyPaparazziDebug`.
+- **Tests (verplicht):** `cd apps/android && python3 tools/peil_tokens.py --check`; `ANDROID_HOME=$HOME/android-sdk JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 flock <WERKMAP>/.lokaal/gradle.lock nice -n 10 ./gradlew --no-daemon --max-workers=4 -Dorg.gradle.jvmargs=-Xmx2g :app:verifyPaparazziDebug :app:assembleDebug` (vanuit `apps/android`). Negatief: (a) een verouderde waarde is op het paneel niet groen; (b) de tests in `TaalTest.kt` blijven slagen (Nederlands blijft de standaard). Daarna het upgradebewijs (vaste regel van deze baan); R-HARDE-EIS controleert daarnaast met `git diff --stat` dat alleen `apps/android` en documentatie zijn geraakt.
+- **Poort:** P-media-guard-ultimate (volledig, punten 3, 7 en 8) + P-PEIL + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-075, V-079, V-080, V-033, V-063
+- **Bewijs:** C1.3-ALG-05 blijft "Bezig", "Unit-getest; Sim-getest; NIET GEVALIDEERD (hardware)": echte telefoon, STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT als leescontrole) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de Gradle-build twee keer achter elkaar om een andere reden dan V-075 faalt; een tekst alleen in een taal bestaat en de vertaling een keuze van de gebruiker vraagt.
+
+### S-P3-690 - MediaGuard: poolstatus van de Hub als extra invoer (ADR eerst)
+- **Repo:** media-guard-ultimate | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build voor het upgradebewijs)
+- **Werkpakketten en tests:** B04-008 (rij 008a "NAS degraded", deel "onbekend = pauzeren in platformmodus"); EX11 (MediaGuard-deel); MG-bouwlijst P3-13
+- **Vooraf:** S-P3-640 klaar (of de Hub de poolstatus al aanbiedt, stelt bouwpunt 2 vast; daar wacht deze stap niet op)
+- **Al gedaan?** `ls <WERKMAP>/media-guard-ultimate/docs/adr | grep -i pool` en `grep -rn -i 'hub.*pool\|platformmodus' <WERKMAP>/media-guard-ultimate/apps/core/mediaguard/storage_forecast.py | head -3` -> een ADR over poolstatus in platformmodus plus code en test betekent klaar.
+- **Lees eerst:** [DM-MG], kop "B04-008 — Aanvullende randgevallen (F4)" (rij 008a "NAS degraded") en kop "I. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-13; `apps/core/mediaguard/storage_forecast.py` (`pool_degraded`); `apps/core/tests/test_bewaking.py` (`test_pool_not_configured_means_no_pause`); [CONTRACT], kop "2.3 Bestaande apps (MediaGuard, MSO, my_house, Jellyfin/Jelly Leon, Emby)"
+- **Bouw:**
+  1. Eerst een ADR `docs/adr/ADR-<nummer>-poolstatus-in-platformmodus.md` (nieuw): wanneer MediaGuard "gekoppeld aan de Hub" is, waar de poolstatus van de Hub vandaan komt, hoe oud hij mag zijn, en dat "onbekend" in platformmodus het opruimen pauzeert. Voor een losse installatie verandert niets.
+  2. Waar de Hub de poolstatus aanbiedt is ONBEKEND - eerst vaststellen met: `grep -rn -i 'pool' <WERKMAP>/ai-server-manager/docs/openapi/*.json | head` en `grep -n -i 'pool' <DOCS>/PLATFORM_CONTRACTEN.md | head`. Staat er geen route of contractregel voor: alleen het ADR schrijven, de bouw niet doen, en de stap melden als "wacht op een contractpunt" (zie "Stop en vraag als").
+  3. Als er een route is: MediaGuard leest de poolstatus van de Hub met de bestaande TrueNAS-lezing als eerste bron; ontbreekt die en is MediaGuard gekoppeld, dan pauzeert "onbekend" of "verouderd" het opruimen met een melding.
+- **Tests (verplicht):** uitbreiding van `apps/core/tests/test_bewaking.py`. Negatief: (a) platformmodus en status onbekend: opruimen pauzeert; (b) losse installatie en status onbekend: gedrag ongewijzigd (`test_pool_not_configured_means_no_pause` blijft groen); (c) een Hub-status ouder dan de grens uit het ADR telt als onbekend. Commando: het testcommando uit de kop van deze baan met `tests/test_bewaking.py tests/test_download_janitor.py`; daarna het upgradebewijs.
+- **Poort:** P-media-guard-ultimate (volledig, punten 1, 3 en 8) + P-CONTRACT + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-051, V-005, V-018
+- **Bewijs:** B04-008 blijft "Bezig" (opmerking: poolstatus in platformmodus, of "alleen ADR; wacht op contractpunt"). EX11 blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md stap S-P6-20.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de Hub geen route en het contract geen regel heeft voor de poolstatus (de regisseur legt dan een keuzemenu voor: een contractpunt laten opnemen in een volgende contractronde, of deze stap na het ADR sluiten); het ADR het standaardgedrag van een losse installatie zou wijzigen.
+
+## Baan my_house (alles-in-een image, bewaakt schrijfpad, herstel zonder terminal)
+
+Werkmap `<WERKMAP>/my_house`. Poort: P-my_house (geen Makefile; de commando's staan in POORTEN en in
+`.github/workflows/ci.yml`). Een testbestand van de API draaien:
+`cd apps/api && PATH=/usr/lib/postgresql/16/bin:$PATH SHC_TEST_PG=postgresql://postgres@127.0.0.1:5432 nice -n 10 ../../.venv/bin/python -m pytest -q tests/<bestand>`.
+Na elke wijziging van een route: de OpenAPI-export opnieuw maken met het commando in de docstring van
+`apps/api/tests/test_openapi_snapshot.py` en de test `test_openapi_export_matches_snapshot` draaien. Nieuwe migratie: het
+volgende vrije nummer in `apps/api/src/shc_api/migrations/versions/` (`ls apps/api/src/shc_api/migrations/versions/0*.py | tail -3`;
+op 2026-11-11 was `0004_legacy_phones.py` de laatste), altijd met een werkende `downgrade`. Nieuw ADR: volgend vrij nummer
+(`ls docs/adr | tail -3`; op 2026-11-11 was ADR-0014 de laatste).
+
+Vaste regels van deze baan:
+
+- **Eigenaar.** my_house blijft de enige schrijver van het huis. De boilerblokkade (`apps/api/src/shc_api/policy.py`, de
+  hercontrole in de worker, `relay_allowed=False`) wordt nooit verzwakt, omzeild of gedupliceerd. Apparaten worden nooit
+  automatisch op "getest" gezet ([DM-MH], kop "10. Wat in P3 nooit mag (samengevat)" en kop "11.7 Ook nooit dubbel bouwen
+  (aanvulling op §10)").
+- **HARDE EIS.** my_house bevat geen kijkgeschiedenis en geen MediaGuard-voortgang ([DM-MH], kop "12. Contract 1.3
+  (2026-11-10)", slotalinea). De eigen gebruikers en gegevens van my_house blijven bij elke migratie en elke update
+  behouden; daarom krijgt elke stap met een migratie, een image of herstel R-HARDE-EIS (VERPLICHT).
+- **Installatie.** Alleen de standaard TrueNAS Custom App met een alles-in-een image. `infra/scripts/install.sh`,
+  `infra/scripts/render_truenas.py` en `infra/compose/compose.yaml` blijven voor ontwikkeling en CI en worden nergens als
+  installatieweg genoemd.
+- **Geen release.** Geen tag, geen wijziging van `VERSION` om een release te starten; `release.yml` en `edge.yml` worden
+  niet gestart.
+- **Leesadapter.** De leesadapter is van de Hub (S-P3-050; [DM-MH], kop "11.6 Bijgestelde bouwlijst (vervangt de genoemde
+  regels van §9)", regel P3-03). my_house bouwt geen leesconnector (`/connector/v1/health` en `items`) tenzij het ADR van
+  S-P3-010 daar uitdrukkelijk om vraagt; de service-identiteit met outbox (regel P3-04) is optioneel en wordt in P3 niet
+  gebouwd.
+
+### S-P3-700 - my_house: weiger een database van een nieuwere versie
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** hoog | **Zwaar:** nee
+- **Werkpakketten en tests:** B06-008 (deel); EX15 (my_house-deel); my_house-bouwlijst P3-09 (P0 volgens [DM-MH] kop "11.6 Bijgestelde bouwlijst (vervangt de genoemde regels van §9)")
+- **Vooraf:** S-P3-000 klaar; S-P2-700 klaar (een schrijver per repo)
+- **Al gedaan?** `sed -n '/^def migrate/,/^def \|^# ---/p' <WERKMAP>/my_house/apps/api/src/shc_api/cli.py | grep -n -i 'nieuwer\|onbekend\|unknown'` -> een controle op een onbekende revisie VOOR de dump plus een test betekent klaar. Op 2026-11-11 maakte `migrate` bij een onbekende revisie eerst een dump en faalde daarna ([DM-MH], kop "11.8 Gedraaide controles (deze sessie)": "3× `CommandError`, 3 dumps").
+- **Lees eerst:** [DM-MH], kop "9. Geprioriteerde bouwlijst fase P3 (alleen hiaten)" regel P3-09, kop "11.6 ..." regel P3-09 en kop "11.8 Gedraaide controles (deze sessie)" (probe c); `apps/api/src/shc_api/cli.py` (functie `migrate`, `pre_migration_dump`); `apps/api/src/shc_api/backup.py` (`head_revision`, `alembic_config`); `docs/adr/ADR-0004-alles-in-een-custom-app.md`, besluit 9
+- **Bouw:**
+  1. In `migrate` in `apps/api/src/shc_api/cli.py`: is de huidige revisie van de database niet bekend in de eigen migratiemap, dan is de database van een nieuwere versie. Herken dat VOOR de dump: geen dump, geen migratie, geen schrijfactie.
+  2. In plaats van een herstartlus start de API in een herstelmodus met een Nederlandse pagina: "database is van een nieuwere my_house-versie; kies in het formulier van de Custom App de bijpassende versie of zet de snapshot van voor de update terug". Nooit automatisch downgraden.
+  3. De worker start in die toestand niet (geen schrijvende rondes).
+  4. De controle vergelijkt revisies uit de migratieketen, geen letterlijke versietekst (V-086).
+  5. Documenteer het gedrag in `docs/onderhoud.md` in een alinea, zonder terminalstappen.
+- **Tests (verplicht):** uitbreiding van `apps/api/tests/test_ws_followups.py` of een nieuw `apps/api/tests/test_schema_nieuwer.py` (nieuw). Negatief: (a) database met revisie `0099_toekomst` (zoals in de probe van 11.8): geen dump in de back-upmap, de inhoud van de tabellen is daarna gelijk, `migrate` geeft de eigen fout; (b) de API in herstelmodus geeft op `/api/v1/health` een duidelijke status en op elke schrijvende route een weigering; (c) een database op het huidige schema start gewoon; (d) een database op een ouder schema migreert zoals nu (met dump). Commando: het testcommando uit de kop van deze baan met het testbestand; daarna `.venv/bin/ruff check apps/api/src apps/api/tests`.
+- **Poort:** P-my_house (snel en volledig, punten 1 en 4) + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-070, V-086, V-003, V-130
+- **Bewijs:** B06-008 blijft "Bezig", "Unit-getest" (opmerking: startweigering bij nieuwer schema). EX15 is een regel van het programma en blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md stap S-P6-20.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT: migratiecode) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog: migratiecode); verder standaard. Geen topmodel: de database van my_house bevat geen kijkgeschiedenis en geen MediaGuard-voortgang.
+- **Stop en vraag als:** de herkenning alleen kan door de alembic-tabel van vorm te veranderen; de herstelmodus de bestaande veilige modus of waakhond zou vervangen.
+
+### S-P3-705 - my_house: boilerblokkade als regressietest op elke weg
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** B06-003; EX27 (my_house-deel); my_house-bouwlijst P3-06 (met de aanscherping uit 11.6)
+- **Vooraf:** S-P3-700 klaar
+- **Al gedaan?** `grep -n 'policy_denied' <WERKMAP>/my_house/apps/api/tests/test_api.py | head -5; grep -n -A12 '@router.patch("/zones/{zone_id}")' <WERKMAP>/my_house/apps/api/src/shc_api/routers/zones.py | grep -n 'ac_unit'` -> tests met `detail.code == "policy_denied"` voor zone-route, lichtroute en knop, en een controle op `ac_unit` in de PATCH-route betekent klaar. Op 2026-11-11 gaf `PATCH /zones/{id}` met een boiler 200 en de lichtroute 404 ([DM-MH], kop "11.8 ...", probe a+b).
+- **Lees eerst:** [DM-MH], kop "B06-003 — Harde boilerschakelblokkade (F1, P0, risico hoog)", kop "9. ..." regel P3-06, kop "11.6 ..." regel P3-06 en kop "11.8 ..." (probe a+b); `apps/api/src/shc_api/policy.py`; `apps/api/src/shc_api/routers/zones.py` (route `PATCH /zones/{zone_id}`); `apps/api/src/shc_api/routers/lights.py`; `apps/api/tests/test_api.py` (`test_boiler_socket_can_never_switch`)
+- **Bouw:**
+  1. `PATCH /zones/{id}` accepteert als unit alleen een apparaat van soort `ac_unit` en als sensor alleen een sensor; een boiler of ander beschermd apparaat geeft 409 met `detail.code == "policy_denied"`.
+  2. Lichtroute en knopkoppeling: een beschermd doel geeft 409 `policy_denied` (nu 404 op de lichtroute); pas de bestaande 404-assert aan.
+  3. Geen nieuwe beleidslaag: de bestaande drie lagen (`policy.py`, de hercontrole in de worker, `relay_allowed=False`) blijven zoals ze zijn; alleen de antwoordcode en de PATCH-controle veranderen.
+  4. De connectorroute volgt in S-P3-742 en krijgt daar dezelfde test.
+- **Tests (verplicht):** uitbreiding van `apps/api/tests/test_api.py`. Negatief: (a) zone-route met de boiler als doel: 409 `policy_denied`; (b) lichtroute met de boiler: 409 `policy_denied`; (c) knopkoppeling naar de boiler: 409; (d) `PATCH /zones/{id}` met de boiler als unit: 409; (e) dezelfde vier als beheerder: ook 409; (f) `test_boiler_socket_can_never_switch` en de tests in `integrations/tests/test_homewizard.py` blijven groen. Commando: het testcommando uit de kop van deze baan met `tests/test_api.py tests/test_core_logic.py`; daarna `nice -n 10 .venv/bin/python -m pytest -q integrations/tests/test_homewizard.py`.
+- **Poort:** P-my_house (snel en volledig, punten 1, 3 en 4) + P-VEILIG + P-GIT + P-EERLIJK
+- **Valkuilen:** V-055, V-003
+- **Bewijs:** B06-003 blijft "Bezig", "Unit-getest" (opmerking: regressie op elke weg). EX27 is een regel van het programma en blijft "Geblokkeerd": "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md stap S-P6-21.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: boilerverbod en risicoklasse) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** een bestaande client (de Android-app) op de 404 van de lichtroute rekent.
+
+### S-P3-710 - my_house: inbedrijfstellingsgate (geen bediening van ongeteste apparaten)
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** B06-001, B06-002, B06-009 (deel software); my_house-bouwlijst P3-07 (met de aanscherping uit 11.6)
+- **Vooraf:** S-P3-705 klaar
+- **Al gedaan?** `grep -n -i 'untested\|getest' <WERKMAP>/my_house/apps/api/src/shc_api/policy.py | head -5` -> een weigering in `check_command` voor een ongetest apparaat plus een test betekent klaar. Op 2026-11-11 kende `policy.py` die weigering niet.
+- **Lees eerst:** `docs/adr/ADR-0005-inbedrijfstellingsgate-geen-ongeteste-bediening.md`; [DM-MH], kop "9. ..." regel P3-07 en kop "11.6 ..." regel P3-07; `apps/api/src/shc_api/policy.py` (`check_command`); `apps/api/src/shc_api/routers/devices.py`; `apps/api/tests/test_ws_devices_api.py` (`test_device_test_probe_tested_and_diagnostics`, `test_compatibility_matrix_as_data`)
+- **Bouw:**
+  1. `check_command` in `apps/api/src/shc_api/policy.py` weigert een bedienopdracht voor een apparaat dat niet als getest te boek staat: 409 met een eigen code en een Nederlandse uitleg ("apparaat is nog niet getest; test het eerst onder Apparaten").
+  2. Migratie met het volgende vrije nummer: kolommen voor de detectiemethode en de terugval per apparaat (11.6: geen nieuwe velden voor host, protocolversie, firmware of testlog; die bestaan al).
+  3. Toon de geschiedenis van `device_marked_tested` per apparaat op het bestaande apparaatscherm (`apps/web/src/pages/Devices.tsx` of de map `apps/web/src/devices/`), met bestaande Peil-onderdelen. A-ONTWERP levert eerst een korte notitie.
+  4. Volgorde in de wizard volgens ADR-0005: meters, Hue lezen, Hue testen, Gree pas na D12. Een stap die op D12 wacht toont dat in gewone taal.
+  5. Nooit automatisch op "getest" zetten; alleen de bestaande testprobe of een beheerder.
+- **Tests (verplicht):** uitbreiding van `apps/api/tests/test_ws_devices_api.py`. Negatief: (a) bedienopdracht voor een ongetest apparaat geeft 409, ook als beheerder; (b) een apparaat wordt na een geslaagde ontdekking niet vanzelf "getest"; (c) migratie omhoog, omlaag en weer omhoog (zoals `test_migration_0003_upgrade_and_downgrade` in `apps/api/tests/test_ws_followups.py`) laat bestaande apparaten en hun testmarkering ongewijzigd. Commando's: het testcommando uit de kop van deze baan met `tests/test_ws_devices_api.py tests/test_ws_followups.py tests/test_openapi_snapshot.py`; `cd apps/web && npx tsc --noEmit && npm test`.
+- **Poort:** P-my_house (snel en volledig, punten 1, 4 en 6) + P-HARDE-EIS (migratie) + P-VEILIG + P-PEIL + P-GIT + P-EERLIJK
+- **Valkuilen:** V-003, V-055, V-061, V-066
+- **Bewijs:** B06-001 en B06-002 blijven "Bezig", "Unit-getest". B06-009 blijft "Geblokkeerd": "NIET GEVALIDEERD (hardware): echte Hue, HomeWizard en Gree (D12) nog testen; STAPPEN_P6.md onderdeel N-P6-06".
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** bestaande, nu werkende bediening van een apparaat door de gate stopt (dan beslist de gebruiker via een keuzemenu of dat apparaat eerst getest wordt); D12 nodig blijkt om de wizard af te maken.
+
+### S-P3-715 - my_house: tests voor verouderde sensoren, commando-TTL en herstart, en een wisselvallige test
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** B06-004, B06-002; EX29 (my_house-deel); my_house-bouwlijst P3-08 (met 11.6) en P3-12
+- **Vooraf:** S-P3-700 klaar
+- **Al gedaan?** `grep -rn 'sensor_round\|_recover_interrupted' <WERKMAP>/my_house/apps/api/tests | head -5` -> tests die `sensor_round` en `_recover_interrupted` aanroepen betekent dat het testdeel klaar is; `grep -n -B3 'def test_push_stream_batches_and_restarts' <WERKMAP>/my_house/apps/api/tests/test_ws_devices_core.py` toont of de wisselvallige test is begrensd.
+- **Lees eerst:** [DM-MH], kop "9. ..." regels P3-08 en P3-12 en kop "11.6 ..." regel P3-08; `apps/api/src/shc_api/worker/health.py` (`sensor_round`); `apps/api/src/shc_api/worker/commands.py` (`_recover_interrupted`, de TTL); `apps/api/tests/test_ws_devices_core.py` (`test_push_stream_batches_and_restarts`)
+- **Bouw:**
+  1. Test voor de melding bij een verouderde sensor (`sensor_round` in `apps/api/src/shc_api/worker/health.py`): een sensor ouder dan `stale_after_s` geeft precies een melding en de waarde wordt niet als actueel gebruikt.
+  2. Tests voor de commando-TTL en voor `_recover_interrupted` in `apps/api/src/shc_api/worker/commands.py`: een commando ouder dan de TTL wordt `failed` met "Commando te oud"; een onderbroken verzending wordt na een herstart niet dubbel uitgevoerd.
+  3. `test_push_stream_batches_and_restarts`: zoek de oorzaak van het wisselvallige gedrag en begrens de wachttijd in de test. De test wordt niet uitgezet en niet met herhalingen groen gemaakt.
+  4. Geen wijziging in de productiecode tenzij een test een echte fout aantoont; dan de kleinste wijziging, met de test die eerst faalt.
+- **Tests (verplicht):** de nieuwe tests zijn de verplichte tests. Negatief: (a) verouderde sensor: geen regeling op de oude waarde; (b) commando boven de TTL: `failed`, niet `confirmed`; (c) de wisselvallige test 20 keer achter elkaar: `for i in $(seq 20); do <testcommando> -k test_push_stream_batches_and_restarts || break; done` zonder fout. Commando: het testcommando uit de kop van deze baan met `tests/test_ws_devices_core.py tests/test_ws_climate_worker.py tests/test_core_logic.py`.
+- **Poort:** P-my_house (snel en volledig, punten 1 en 4) + P-GIT + P-EERLIJK
+- **Valkuilen:** V-032, V-003, V-057
+- **Bewijs:** B06-004 en B06-002 blijven "Bezig", "Unit-getest". EX29 is een regel van het programma en blijft "Geblokkeerd": "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de oorzaak van de wisselvallige test in de productiecode zit en een gedragswijziging vraagt.
+
+### S-P3-720 - my_house: alles-in-een image deel 1 (image, bewaker, healthcheck, eerste start)
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** ja (image-build)
+- **Werkpakketten en tests:** C1.3-MH-03; C1.3-ALG-04 (deel my_house); B06-008 (deel); I05-05-01, I05-05-02, I05-05-03 (bouwdeel); I05-05-07 (bouwdeel: optioneel Zigbee2MQTT-proces, besluit Z-17); my_house-bouwlijst P3-01 (met 11.6: `/healthz` en `/readyz` erbij)
+- **Vooraf:** S-P3-700 klaar (de herstelmodus bij een nieuwer schema hoort in de image); besluit Z-08 genomen of de regel "zonder besluit geldt" toegepast (BESLUITEN, kop "Z-08"); besluit Z-17 is genomen (gebruiker, 2026-11-11, keuzemenu: "Zigbee2MQTT in de image van my_house, optioneel: alleen aan als in het formulier een USB-apparaat is opgegeven"; BESLUITEN, kop "Z-17 — Zigbee2MQTT in of naast de image van my_house", optie 1 = variant a van ADR-0004 besluit 6; `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, kop "Wacht op de gebruiker")
+- **Al gedaan?** `ls <WERKMAP>/my_house/deploy/allinone 2>&1` -> `Dockerfile`, `supervisor.py` en `healthcheck.py` aanwezig met tests betekent dat deel 1 klaar is. Op 2026-11-11 bestond de map `deploy` niet (BLOK-13).
+- **Lees eerst:** `docs/adr/ADR-0004-alles-in-een-custom-app.md` (besluiten 1 tot en met 9); [CONTRACT], kop "2.2 Custom App-realiteit (gemeten in de bronnen, niet op een echte NAS)"; [DM-MH], kop "7. Custom App-controle (alles-in-één)" en kop "9. ..." regel P3-01; `<WERKMAP>/media-source-optimizer/deploy/allinone/` (voorbeeld: `Dockerfile`, `supervisor.py`, `healthcheck.py`); `apps/api/Dockerfile`, `apps/web/Dockerfile` en `apps/web/nginx.conf.template`; voor Zigbee2MQTT (besluit Z-17): `infra/compose/compose.yaml` (dienst `zigbee2mqtt`: image `koenkk/zigbee2mqtt:2.14.3`, apparaat naar `/dev/zigbee`, `Z2M_ONBOARD_NO_SERVER: "1"`, gebruiker 1000 met groep `dialout`), `infra/compose/config/zigbee2mqtt.yaml.template` (`serial.port: /dev/zigbee`, `frontend.enabled: false`, sleutels `GENERATE`), `infra/compose/config/acl` (rechten van de MQTT-gebruikers `zigbee2mqtt` en `shc`), `infra/scripts/install.sh` (kop "Zigbee2MQTT" en de keuze `SHC_ZIGBEE_ADAPTER`: `ember`, `zstack`, `deconz`, `zigate` of `zboss`, standaard `ember`), `apps/api/src/shc_api/views/status.py` (`zigbee_parts`, `zigbee2mqtt_included`); BESLUITEN, kop "Z-17 — ..."
+- **Bouw:**
+  1. `deploy/allinone/Dockerfile` (nieuw) volgens ADR-0004 besluit 1: basis op een vaste versie plus `@sha256:` (opgevraagd met `docker buildx imagetools inspect`), PostgreSQL 16, nginx met de bestaande `apps/web/nginx.conf.template`, mosquitto, de gebouwde web-app en de twee Python-pakketten uit het lock-bestand met hashes. Een eventuele CA-bundel alleen als optioneel BuildKit-geheim.
+  2. `deploy/allinone/supervisor.py` (nieuw) volgens besluit 2: postgres, `shc-api migrate` (met de bestaande dump en de weigering uit S-P3-700), api, worker pas als de api gezond is, nginx, mosquitto. Start als root alleen voor `chown 568:568` van `/appdata`, daarna alles als 568 met de bounding set leeg en `no_new_privs`.
+  3. Eerste start (besluit 3): maak ontbrekende geheimen in `/appdata/secrets` (0600, 568) en overschrijf NOOIT een bestaand geheim. Mappen: `postgres/`, `app/`, `backups/`, `secrets/`, `mosquitto/`.
+  4. `deploy/allinone/healthcheck.py` (nieuw) in exec-vorm: als eerste handeling de wissel naar 568 met lege bounding set en `no_new_privs`; daarna nginx `/healthz`, API `/readyz` (afgeleid van `/api/v1/health` en de kritieke checks) en het liveness-bestand van de worker. Een controlevlag die `Uid`, `CapEff`, `CapPrm`, `CapAmb` en `NoNewPrivs` meldt.
+  5. Een poort (8080, nginx). Database en MQTT alleen binnen de container. De API vertrouwt `X-Forwarded-*` alleen van 127.0.0.1 (besluit 5). De tunnel staat uit in deze image.
+  6. Zigbee2MQTT als OPTIONEEL proces in deze image (besluit Z-17; variant a van ADR-0004 besluit 6):
+     a. De image bevat Zigbee2MQTT op een vaste versie (zoals `infra/compose/compose.yaml`: 2.14.3, tenzij A-VERKEN een reden vindt om af te wijken; die meldt hij) met de Node.js-runtime die die versie vraagt. Elke externe bron op een vaste versie plus `@sha256:` of met een integriteitshash; geen `latest`, geen `npm install` zonder lock-bestand met hashes.
+     b. Aan of uit. De bewaker start Zigbee2MQTT alleen als het containerpad `/dev/zigbee` bestaat en een tekenapparaat is: dat is het doelpad van de apparaat-doorgifte in het formulier (hetzelfde pad als in de compose en in de sjabloon). Uit (geen apparaat opgegeven): geen proces, geen herstartlus, geen fout of waarschuwing in het containerlog, de healthcheck blijft gezond en controleert Zigbee2MQTT niet. Aan: start na mosquitto; stopt het proces, dan herstart de bewaker het met een oplopende wachttijd, maar de container wordt er niet ongezond door (dan zou de hele app herstarten); de storing is zichtbaar via het bestaande dongle-onderdeel van de statuspagina (`zigbee_parts` in `apps/api/src/shc_api/views/status.py`).
+     c. Eerste start (besluit 3): `/appdata/zigbee2mqtt/` met `configuration.yaml` uit de bestaande sjabloon (MQTT-server binnen de container op 127.0.0.1, `serial.port: /dev/zigbee`, de adapter uit een gewone, niet-geheime formuliervariabele met dezelfde waarden als `SHC_ZIGBEE_ADAPTER`, standaard `ember`) en `secret.yaml` met een eigen gegenereerd MQTT-wachtwoord voor de broker-gebruiker `zigbee2mqtt` (rechten volgens `infra/compose/config/acl`). Een bestaande `configuration.yaml` of `secret.yaml` wordt NOOIT overschreven: Zigbee2MQTT zet bij de eerste start de echte netwerksleutel in `configuration.yaml`, en overschrijven breekt het Zigbee-netwerk. Geen geheim in het log.
+     d. Apparaattoegang (R-VEILIG): ook Zigbee2MQTT draait als 568 met een lege bounding set en `no_new_privs`, nooit als 0; geen `privileged`, geen `cap_add`, geen extra hostkoppeling buiten `/appdata` en het ene apparaat (de compose koppelt `/run/udev`; de image niet). Heeft 568 geen leesrecht op `/dev/zigbee`, dan mag de bewaker (alleen bij een start als root) het Zigbee2MQTT-proces de groep van het apparaat als aanvullende groep geven, nooit groep 0; lukt dat niet (start met `--user 568`, of het apparaat is alleen voor root), dan start Zigbee2MQTT niet en meldt de bewaker de reden in gewone taal in het log. Of 568 de dongle op de echte NAS kan openen is NIET GEVALIDEERD (echte NAS) en (hardware), D01 en D13.
+     e. Geen extra poort: de webinterface van Zigbee2MQTT blijft uit (`frontend.enabled: false`, `Z2M_ONBOARD_NO_SERVER=1`); de image houdt een poort (8080).
+     f. Back-up: `/appdata/zigbee2mqtt` zit in de volledige back-up (zoals nu: `zigbee2mqtt_included`); zonder Zigbee werkt de back-up ongewijzigd.
+     Leg in een nieuw ADR `docs/adr/ADR-<nummer>-alles-in-een-gebouwd.md` (nieuw) vast wat gebouwd is, dat ADR-0004 besluit 6 met Z-17 is beslist (variant a, optioneel), hoe aan/uit werkt en wat NIET GEVALIDEERD is.
+  7. Het Hub-adres: zoals Z-08 is beantwoord (zonder besluit: ongewijzigd, het adres is volgens het contract niet geheim). Geen manifestparameter met `HUB_` (C1.3-MH-02).
+- **Tests (verplicht):** unittests voor `supervisor.py` en `healthcheck.py` onder `infra/tests/` (bestaande map; `python3 -m unittest discover -s infra/tests -v`). Negatief: (a) een bestaand geheim wordt bij een tweede start niet overschreven (byte-gelijk); (b) de healthcheck als root in een omgeving waar de wissel niet kan eindigt met exit 1; (c) een database van een nieuwere versie laat de bewaker in de herstelmodus starten, niet in een herstartlus. Zigbee2MQTT, beide standen (unittests met een nagebootst `/dev/zigbee`): (d) uit: zonder `/dev/zigbee` start de bewaker geen Zigbee2MQTT, schrijft hij geen fout of waarschuwing en geeft de healthcheck exit 0; (e) aan: met `/dev/zigbee` start de bewaker Zigbee2MQTT als 568 (nooit als 0) na mosquitto; (f) een bestaande `configuration.yaml` en `secret.yaml` in `zigbee2mqtt/` zijn na een tweede start byte-gelijk; (g) een Zigbee2MQTT-proces dat telkens stopt maakt de healthcheck niet rood en geeft geen snelle herstartlus; (h) zonder leesrecht op het apparaat start Zigbee2MQTT niet en krijgt het nooit groep 0. Daarna de image bouwen: `flock <WERKMAP>/.lokaal/docker-build.lock nice -n 10 docker buildx build --load --provenance=false -f deploy/allinone/Dockerfile -t my_house-aio:lokaal .` en een eerste start op een lege map (`docker run` met `--user 0` en met `--user 568`): gezond binnen de `start-period`. Daarna beide Zigbee-standen in een container (onder `flock <WERKMAP>/.lokaal/stack.lock`): zonder `--device` staat er geen Zigbee2MQTT-proces in de boom van PID 1 (`docker exec ... ps -eo user,args`) en is de container gezond; met `--device /dev/null:/dev/zigbee` (een nep-apparaat; een echte dongle is er niet) meldt de bewaker de start van Zigbee2MQTT als 568 met lege capabilities (controlevlag of log), blijft de container gezond als Zigbee2MQTT op het nep-apparaat faalt, en staat er geen geheim in `docker logs`. Ruim de testcontainers en -mappen op (V-088). Echte dongle: NIET GEVALIDEERD (hardware), D13. De volledige rooktest volgt in S-P3-725.
+- **Poort:** P-my_house (snel) + P-INSTALLATIE + P-VEILIG + P-HARDE-EIS + P-GIT + P-EERLIJK
+- **Valkuilen:** V-053, V-083, V-084, V-068, V-087, V-088, V-089, V-011, V-013, V-014, V-130
+- **Bewijs:** C1.3-MH-03 naar "Bezig", "Sim-getest" (opmerking: deel 1, rooktest volgt; Zigbee2MQTT optioneel in de image volgens Z-17, beide standen getest met een nep-apparaat). I05-05-01...03 en I05-05-07 zijn regels van `jelly-leon-platform` (S-P3-440). Installatie op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-06. Zigbee met een echte dongle: "NIET GEVALIDEERD (hardware)" (D13, N-P6-06).
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-MANIFEST + R-HARDE-EIS (tegelijk; R-VEILIG, R-MANIFEST en R-HARDE-EIS VERPLICHT; R-VEILIG leest ook de apparaattoegang van Zigbee2MQTT: gebruiker 568, geen groep 0, geen extra rechten, geen geheim in het log, nooit overschrijven van de Zigbee-sleutels) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog: procesboom, rechten, geheimen); verder standaard
+- **Stop en vraag als:** Zigbee2MQTT in de image alleen kan met root, `privileged`, een extra capability, groep 0 of een extra hostkoppeling (zoals `/run/udev`); "uit" niet te bouwen is zonder een fout of herstartlus; de Node.js-runtime of Zigbee2MQTT niet op een vaste versie met `@sha256:` of integriteitshash te krijgen is; `free -m` "available" onder 3000 MB blijft; de bestaande pre-migratiedump in de image niet werkt zonder een recht dat de container niet heeft.
+
+### S-P3-725 - my_house: alles-in-een image deel 2 (CI, rooktest, digests)
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build en rooktest)
+- **Werkpakketten en tests:** C1.3-MH-03; C1.3-ALG-04 (deel my_house); my_house-bouwlijst P3-01 (CI-deel) en P3-02
+- **Vooraf:** S-P3-720 klaar
+- **Al gedaan?** `grep -n 'allinone' <WERKMAP>/my_house/.github/workflows/ci.yml; grep -n 'latest' <WERKMAP>/my_house/.github/workflows/release.yml` -> een CI-job die de alles-in-een image bouwt en start, en geen `:latest` meer in `release.yml`, betekent klaar. Op 2026-11-11 publiceerde `release.yml` nog `-api:latest` en `-web:latest`.
+- **Lees eerst:** [DM-MH], kop "9. ..." regels P3-01 en P3-02 en kop "8. Releasestatus — wat ontbreekt voor een echte release (zonder zelf te taggen of te publiceren)"; `.github/workflows/ci.yml` (jobs `e2e` en `stack`); `.github/workflows/release.yml` en `.github/workflows/edge.yml`; `infra/scripts/smoke_test.py`; POORTEN, P-my_house, kop "4. Volledig (CI-volgorde)", punt 9
+- **Bouw:**
+  1. Een CI-job in `ci.yml` (nieuw, naast `stack`) die de alles-in-een image bouwt en twee keer start: als root en met `--user 568`. Per start: gezond, en voor elk proces in de boom van PID 1 `Uid 568`, `CapEff`, `CapPrm` en `CapAmb` 0, `NoNewPrivs 1`, bij een start als root `CapBnd` 0; de healthcheck met de controlevlag apart. Zigbee2MQTT (Z-17) in beide standen: de twee starts zonder apparaat tonen geen Zigbee2MQTT-proces; een derde start met `--device /dev/null:/dev/zigbee` toont dat de bewaker Zigbee2MQTT als 568 start en dat de container gezond blijft (zelfde controles als in S-P3-720).
+  2. `infra/scripts/smoke_test.py` draait tegen die container (zelfde basis-URL-optie als nu). De browsertests van `apps/web/e2e` draaien tegen dezelfde container zodra dat zonder de compose-stack kan; anders blijft de bestaande job `e2e` het browserbewijs en staat dat in de job beschreven.
+  3. `release.yml` en `edge.yml`: geen `:latest` meer; na het bouwen `release/digests.json` (nieuw) met de digests. Dockerfiles en de dev-compose op `@sha256:`. Dependabot blijft. De workflows worden in deze stap niet gestart.
+  4. Een controle in `ci.yml` die faalt als een externe basis-image zonder `@sha256:` in een Dockerfile staat.
+- **Tests (verplicht):** de nieuwe CI-job lokaal nagebootst: build onder `flock <WERKMAP>/.lokaal/docker-build.lock nice -n 10`, de twee starts onder `flock <WERKMAP>/.lokaal/stack.lock`, daarna `python3 infra/scripts/smoke_test.py --base http://127.0.0.1:<poort>`. Negatief: (a) de rooktest faalt aantoonbaar als de wissel uit de healthcheck wordt gehaald (een keer proberen, uitkomst in het rapport, terugdraaien); (b) `smoke_test.py --expect-unavailable` met de API gestopt meldt "niet beschikbaar"; (c) de digestcontrole faalt op een proef-Dockerfile zonder digest. `actionlint .github/workflows/*.yml`.
+- **Poort:** P-my_house (volledig, punten 8, 9 en 11) + P-INSTALLATIE + P-VEILIG + P-GIT + P-EERLIJK
+- **Valkuilen:** V-033, V-035, V-036, V-052, V-083, V-084, V-088, V-090
+- **Bewijs:** C1.3-MH-03 blijft "Bezig", nu "Sim-getest" met de CI-run. Op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-06.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-MANIFEST (tegelijk; R-VEILIG en R-MANIFEST VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de CI-job alleen met `sudo` in een testscript kan (V-036); `release.yml` door de wijziging iets anders zou publiceren dan nu.
+
+### S-P3-730 - my_house: herstel en overstap zonder terminal
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** nee
+- **Werkpakketten en tests:** B06-008; I05-05-08 (bouwdeel); my_house-bouwlijst P3-11 (met 11.6); ADR-0004 besluit 8
+- **Vooraf:** S-P3-725 klaar
+- **Al gedaan?** `grep -n 'safe-mode/enable\|rekey\|herstelcode' <WERKMAP>/my_house/apps/api/src/shc_api/routers/system.py <WERKMAP>/my_house/apps/api/src/shc_api/routers/auth.py | head` -> routes voor de handmatige veilige modus, rekey vanuit de webinterface en een herstelcode betekent klaar. Op 2026-11-11 bestond alleen `POST /system/safe-mode/release` en liep rekey via de opdrachtregel (`shc-api rekey --old-key-file`).
+- **Lees eerst:** [DM-MH], kop "9. ..." regel P3-11 en kop "11.6 ..." regel P3-11; `docs/adr/ADR-0004-alles-in-een-custom-app.md`, besluit 8 ("Bestaande compose-installaties migreren zonder shell"); `apps/api/src/shc_api/cli.py` (functie `rekey`); `apps/api/src/shc_api/routers/system.py` (routes `restore/verify`, `restore/apply`, `restore/compare`, `safe-mode/release`); `apps/api/tests/test_ws_backup_restore.py`
+- **Bouw:**
+  1. Rekey vanuit de webinterface: een beheerder uploadt de oude hoofdsleutel; de server roept dezelfde logica aan als `rekey` in `apps/api/src/shc_api/cli.py` (geen tweede implementatie). De oude sleutel wordt na gebruik niet bewaard en komt in geen log.
+  2. Wachtwoord vergeten: alleen voor de enige beheerder (11.6, G8) een eenmalige herstelcode die bij de start in het containerlog verschijnt (zoals de setupcode van de Hub), met een vervaltijd. Werkt alleen als er precies een beheerder is.
+  3. Herstelproef starten vanuit de webinterface (dezelfde logica als `restore-drill` in de CLI) en `restore/compare` toont dubbele apparaten.
+  4. Handmatige noodstop: `POST /system/safe-mode/enable` (nieuw) voor een beheerder; uitzetten via het bestaande `safe-mode/release`.
+  5. Overstap van een bestaande compose-installatie (besluit 8): in de oude app een volledige versleutelde back-up maken, in de nieuwe app terugzetten via de webinterface. Leg de stappen vast in `docs/onderhoud.md` zonder terminal.
+  6. A-ONTWERP eerst voor de schermen (bestaande Systeem-pagina, `apps/web/src/pages/System.tsx` en `apps/web/src/pages/system/`); daarna bouwen met bestaande Peil-onderdelen; toestanden leeg, bezig, fout.
+  7. Herstel blijft van my_house; de Hub krijgt geen route om dit te starten.
+- **Tests (verplicht):** uitbreiding van `apps/api/tests/test_ws_backup_restore.py` en `apps/api/tests/test_ws_security_accounts.py`. Negatief: (a) een herstelcode werkt een keer en niet na de vervaltijd; (b) met twee beheerders is er geen herstelcode; (c) de geüploade oude sleutel staat na afloop nergens op schijf of in een log (zoek de testwaarde); (d) een gewone gebruiker kan de veilige modus niet aanzetten (403); (e) een terugzetting van een back-up van een nieuwere versie wordt geweigerd. Commando's: het testcommando uit de kop van deze baan met de twee testbestanden en `tests/test_openapi_snapshot.py`; `cd apps/web && npx tsc --noEmit && npm test`; de browsertest van `apps/web/e2e/06-backup.e2e.ts` volgens POORTEN, P-my_house, kop "4. Volledig (CI-volgorde)", punt 7.
+- **Poort:** P-my_house (volledig, punten 1, 4, 6 en 7) + P-VEILIG + P-HARDE-EIS + P-PEIL + P-INSTALLATIE (leescontrole: geen terminalweg) + P-GIT + P-EERLIJK
+- **Valkuilen:** V-043, V-085, V-094, V-096, V-063
+- **Bewijs:** B06-008 blijft "Bezig", nu "Sim-getest". Overstap van de echte compose-installatie op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-06. I05-05-08 is een regel van `jelly-leon-platform`.
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT: geheimen, wachtwoordherstel, herstel van gebruikers) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog); verder standaard
+- **Stop en vraag als:** de herstelcode alleen veilig kan met een tweede kanaal dat er niet is; de overstap gegevens van de bestaande installatie zou overschrijven zonder dat de gebruiker de vergelijking (`restore/compare`) heeft gezien.
+
+### S-P3-735 - my_house: proef back-up A naar herstel B met twee alles-in-een containers
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build en twee containers)
+- **Werkpakketten en tests:** B06-008; EX50 (my_house-deel); my_house-bouwlijst P3-10 (met 11.6)
+- **Vooraf:** S-P3-730 klaar
+- **Al gedaan?** `grep -n -i 'herstel B\|restore.*B\|two.*container\|twee' <WERKMAP>/my_house/.github/workflows/ci.yml | head -3; grep -rn 'head.*base.*head\|"base"' <WERKMAP>/my_house/apps/api/tests/*.py | head -3` -> een CI-proef met twee containers en een test `head -> base -> head` betekent klaar.
+- **Lees eerst:** [DM-MH], kop "9. ..." regel P3-10 en kop "11.6 ..." regel P3-10; `apps/api/tests/test_ws_backup_restore.py` (`test_restore_drill_compares_counts_and_checks_the_current_key`); `apps/api/tests/test_ws_followups.py` (`test_migration_0003_upgrade_and_downgrade`); de CI-job uit S-P3-725
+- **Bouw:**
+  1. Een test `head -> base -> head` voor de hele migratieketen (11.6, G9), in de vorm van `test_migration_0003_upgrade_and_downgrade`.
+  2. Een proef in de CI met twee alles-in-een containers op twee aparte mappen en een ander intern adres: in A gegevens maken (gebruiker, woning, zone, apparaat), een versleutelde back-up maken, die in B terugzetten via de webinterface-route, en vergelijken met `restore/compare`. Verwacht: alles terug, inloggen in B werkt.
+  3. Negatief in de proef: een back-up met een verkeerde sleutel wordt in B geweigerd en B blijft leeg.
+  4. De proef schrijft zijn rapport naar `docs/testlog.md` (alleen testgegevens, geen adressen van de machine).
+- **Tests (verplicht):** de proef zelf en de nieuwe migratietest. Negatief: zie bouwpunt 3; daarnaast (a) een herstel in B wijzigt niets in A. Commando's: het testcommando uit de kop van deze baan met `tests/test_ws_followups.py tests/test_ws_backup_restore.py`; de proef onder `flock <WERKMAP>/.lokaal/stack.lock nice -n 10` (exact commando zoals in de CI-job; leg het vast in `README.md`).
+- **Poort:** P-my_house (volledig, punten 4, 9 en 11) + P-HARDE-EIS + P-INSTALLATIE + P-GIT + P-EERLIJK
+- **Valkuilen:** V-005, V-008, V-088, V-063, V-097
+- **Bewijs:** B06-008 blijft "Bezig", "Sim-getest" (opmerking: proef A naar B). EX50 is een regel van het programma en blijft "Geblokkeerd": "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de terugzetting in B gegevens mist die in A stonden (dat is een fout in de back-up: stoppen en melden, niet de test aanpassen).
+
+### S-P3-740 - my_house: verificatiekern voor ondertekende verzoeken en de geplakte Hub-sleutelset
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee
+- **Werkpakketten en tests:** C1.3-MH-04 (deel verificatie en sleutelset); B06-006 (deel); EX17, EX18, EX20 (my_house-deel); my_house-bouwlijst P3-05 (eerste helft)
+- **Vooraf:** S-P3-700 klaar; S-P3-015 gepusht (ADR over rotatie bij een geplakte sleutelset, RV8)
+- **Al gedaan?** `grep -rln -i 'ed25519\|ExecutionRequest' <WERKMAP>/my_house/apps/api/src/shc_api | head; grep -rn 'HN69-2PHK-XV2D-X85W' <WERKMAP>/my_house/apps/api/tests | head -2` -> een verificatiemodule en een test met de testvector betekent klaar.
+- **Lees eerst:** [CONTRACT], kop "4.5 Sleutelpinning, vingerafdruk en rotatie" (vingerafdruk, testvectoren, rotatie); [CONTRACT], kop "8. Risicobeleid, voorstel, goedkeuring en executor" (velden van het `ExecutionRequest`); [CONTRACT], kop "2.3 Bestaande apps (MediaGuard, MSO, my_house, Jellyfin/Jelly Leon, Emby)" regel 3; [CONF], kop "8. my_house (bestaande app; P3)" punt C1.3-MH-04; het ADR van S-P3-015 in `<WERKMAP>/ai-server-manager/docs/adr/`
+- **Bouw:**
+  1. Een module (nieuw, onder `apps/api/src/shc_api/`) die een geplakte Hub-sleutelset leest, de publieke policy-sleutels pint en de sleutelset-vingerafdruk berekent volgens [CONTRACT] kop 4.5: over ALLE policy-sleutels, gesorteerd op bytewaarde, Crockford-base32 in groepen van 4. Invoer vergelijken na normalisatie (hoofdletterongevoelig, `O` naar `0`, `I`/`L` naar `1`, streepjes en spaties negeren).
+  2. Verificatie van een `ExecutionRequest`: Ed25519-handtekening tegen de gepinde policy-sleutels (vergelijking op de sleutel zelf, niet alleen op `kid`), vervaltijd, eenmalige nonce. Een nonce wordt atomair vastgelegd (tabel `connector_nonces`, nieuw) zodat twee gelijktijdige verzoeken met dezelfde nonce nooit allebei slagen.
+  3. `Idempotency-Key` (tabel `idempotency_keys`, nieuw): zelfde sleutel en zelfde verzoek geeft hetzelfde antwoord zonder tweede uitvoering; zelfde sleutel met een ander verzoek geeft de contractfout.
+  4. Migratie met het volgende vrije nummer voor de twee tabellen en de opslag van de gepinde set; met `downgrade`.
+  5. Rotatie: een nieuwe policy-sleutel komt alleen via een ondertekende rotatie of opnieuw plakken, nooit via een opgehaalde JWKS ([CONTRACT] kop 4.5). Hoe my_house een rotatie bevestigt volgt het ADR van S-P3-015.
+  6. Zonder gepinde set geeft elke ondertekende route `501 capability_unavailable` (dat leest de Hub in S-P3-130).
+  7. `risk_claim` in een verzoek wordt nooit gebruikt.
+- **Tests (verplicht):** nieuw `apps/api/tests/test_connector_verificatie.py` (nieuw). Negatief: (a) de drie testvectoren uit [CONTRACT] kop 4.5 geven `MEGG-8GFG-2E4Y-K2RQ`, `CYRC-JS8C-14AN-JR17` en `HN69-2PHK-XV2D-X85W`; (b) een handtekening van een niet-gepinde sleutel met een bekende `kid` wordt geweigerd; (c) een verlopen verzoek wordt geweigerd; (d) dezelfde nonce twee keer tegelijk (echte race, twee taken) geeft precies een acceptatie; (e) een gewijzigd veld na ondertekenen wordt geweigerd; (f) zonder gepinde set 501; (g) migratie omhoog, omlaag, omhoog laat bestaande gegevens ongewijzigd. Commando: het testcommando uit de kop van deze baan met `tests/test_connector_verificatie.py tests/test_ws_followups.py`.
+- **Poort:** P-my_house (snel en volledig, punten 1 en 4) + P-VEILIG + P-CONTRACT + P-HARDE-EIS (migratie) + P-GIT + P-EERLIJK
+- **Valkuilen:** V-043, V-044, V-055, V-091, V-094, V-003
+- **Bewijs:** C1.3-MH-04 naar "Bezig", "Unit-getest" (opmerking: verificatiekern; routes volgen in S-P3-742). EX17, EX18 en EX20 zijn regels van het programma en blijven "Geblokkeerd": "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog); R-VEILIG N5 - Winst: dit is de kern van de verificatie van ondertekende verzoeken in de enige bestaande app die de Hub in P3 laat schrijven (lampen en klimaat); een fout in de vingerafdruk, de nonce of de sleutelvergelijking laat een vervalst verzoek fysieke apparaten bedienen, en dat is met tests op de afnemer (S-P3-130) niet te vinden. R-HARDE-EIS N4. Leg de inzet vast in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`, tabel "Topmodel-inzet".
+- **Stop en vraag als:** het ADR van S-P3-015 nog niet gepusht is; de vorm van het `ExecutionRequest` in het contract een veld vraagt dat my_house niet kan controleren; een bibliotheek voor Ed25519 nieuw in het lock-bestand moet (dan eerst melden: het lock-bestand heeft hashes).
+
+### S-P3-742 - my_house: routes propose, apply, rollback en evidence
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee
+- **Werkpakketten en tests:** C1.3-MH-04 (deel routes); C1.3-MH-05 (deel foutcatalogus en `max_age` van de nieuwe routes); B06-006, B06-007 (my_house-kant); EX17, EX18, EX20, EX27, EX45 (my_house-deel); my_house-bouwlijst P3-05 (tweede helft)
+- **Vooraf:** S-P3-740, S-P3-705 en S-P3-710 klaar
+- **Al gedaan?** `grep -rn 'connector/v1/propose\|connector/v1/apply' <WERKMAP>/my_house/docs/openapi/my_house.openapi.json | head -3` -> de routes in de export met tests betekent klaar.
+- **Lees eerst:** [DM-MH], kop "B06-007 — Spraak en AI (F3, P0, risico hoog)", kop "9. ..." regel P3-05 en kop "11.6 ..." regel P3-05; [CONTRACT], koppen "5. Gemeenschappelijke API-regels", "6. Connectorcontract (elke dienst én elke adapter voor bestaande apps)" en "8. Risicobeleid, voorstel, goedkeuring en executor"; `apps/api/src/shc_api/commanding.py` en `apps/api/src/shc_api/policy.py`; de module van S-P3-740
+- **Bouw:**
+  1. `GET /connector/v1/discover` met alleen `actions[]`: `light.group.set`, `light.scene.recall`, `zone.command`, `zone.resume` en `zone.schedule.propose` (alleen concept), elk met `target_type`, `params_schema` (uit de bestaande zone-capabilities, G4) en `min_role`. Geen leesconnector daarnaast (kop van deze baan).
+  2. `POST /connector/v1/propose`: verifieert het verzoek (S-P3-740), controleert de allowlist en het parameterschema en geeft `before` (huidige stand plus `resource_etag`). ETag per zone en lichtgroep via een versiekolom (migratie met het volgende vrije nummer, met `downgrade`).
+  3. `POST /connector/v1/apply`: verifieert opnieuw, controleert de ETag, roept de bestaande `request_zone_command` of `queue_command` aan (geen tweede bedienpad), met de bestaande TTL. Elke opdracht gaat door `check_command`: de boiler en elk beschermd doel geven 409 `policy_denied` (ook met `actor.type=ai`), een ongetest apparaat geeft 409 (S-P3-710).
+  4. `POST /connector/v1/rollback`: `501 capability_unavailable`.
+  5. `GET /connector/v1/evidence/{id}`: `before`, `after` uit de readback (`sent` is niet `confirmed`), hashes, tijdstippen. Onbetrouwbare Gree-readback: `failed`, nooit geslaagd.
+  6. Foutformaat van het contract alleen op deze routes; bestaande routes houden `{"detail":{"code","message"}}`.
+  7. OpenAPI-export bijwerken.
+- **Tests (verplicht):** nieuw `apps/api/tests/test_connector_routes.py` (nieuw). Negatief: (a) boilerdoel via `apply`, ook met `actor.type=ai` en met een geldige handtekening: 409 `policy_denied` en geen opdracht in de wachtrij (EX27); (b) een actie buiten de allowlist (EX17, EX45); (c) `risk_claim` verandert niets (EX18); (d) hetzelfde verzoek twee keer: een uitvoering (EX20); (e) verouderde ETag: 409, niets uitgevoerd; (f) Gree-readback die niet klopt: evidence zegt `failed`; (g) `zone.schedule.propose` voert niets uit. Commando: het testcommando uit de kop van deze baan met `tests/test_connector_routes.py tests/test_connector_verificatie.py tests/test_api.py tests/test_openapi_snapshot.py`; daarna `nice -n 10 .venv/bin/python -m pytest -q integrations/tests/test_gree.py`.
+- **Poort:** P-my_house (snel en volledig, punten 1, 3 en 4) + P-VEILIG + P-CONTRACT + P-HARDE-EIS (migratie) + P-GIT + P-EERLIJK
+- **Valkuilen:** V-001, V-003, V-046, V-055, V-066
+- **Bewijs:** C1.3-MH-04 blijft "Bezig", nu "Sim-getest". C1.3-MH-05: opmerking "nieuwe connectorroutes volgens §5/§6". B06-006 en B06-007 blijven "Bezig"/"Geblokkeerd" zoals gemeten; vul de opmerking aan. Echte lampen en airco: "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md stap S-P6-21 en onderdeel N-P6-06.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG + R-HARDE-EIS (tegelijk; R-VEILIG en R-HARDE-EIS VERPLICHT) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4, A-HERSTEL N4 (moeilijkheid hoog); verder standaard. Geen topmodel: dit is een afnemer van de verificatiekern uit S-P3-740.
+- **Stop en vraag als:** een actie alleen via een nieuw bedienpad naast `commanding.py` kan; de Hub (S-P3-130) een actie vraagt die niet in de allowlist staat.
+
+### S-P3-745 - my_house: scherm om de Hub-sleutelset te plakken en te controleren
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** C1.3-MH-04 (deel geplakte sleutelset in de UI)
+- **Vooraf:** S-P3-740 klaar
+- **Al gedaan?** `grep -rln -i 'sleutelset\|vingerafdruk' <WERKMAP>/my_house/apps/web/src | head -3` -> een scherm met plakken, vingerafdruk en bevestigen plus een test betekent klaar.
+- **Lees eerst:** [CONTRACT], kop "4.5 Sleutelpinning, vingerafdruk en rotatie"; het ADR van S-P3-015; [PEIL]; `apps/web/src/pages/System.tsx` en `apps/web/src/pages/system/`; `<WERKMAP>/ai-server-manager/apps/web/src/app/instellingen/diensten/DienstenScreen.tsx` (alleen lezen: waar de gebruiker de sleutelset in de Hub kopieert)
+- **Bouw:**
+  1. A-ONTWERP eerst: een onderdeel op de Systeem-pagina "Koppeling met de Hub (bediening)": plakveld, berekende vingerafdruk, het veld waarin de gebruiker de vingerafdruk uit de Hub overtypt, knop "Vastleggen", en de toestanden leeg, bezig, fout, gepind en "rotatie wacht op bevestiging".
+  2. Vastleggen alleen als de overgetypte vingerafdruk na normalisatie gelijk is aan de berekende. Alleen een beheerder.
+  3. Een rotatie volgens het ADR van S-P3-015 toont de oude en nieuwe vingerafdruk en vraagt een bevestiging; zonder bevestiging blijft de oude set gepind.
+  4. Teksten in gewone taal: wat de koppeling doet (de Hub mag lampen en klimaat bedienen met jouw goedkeuring in de Hub; de boiler nooit).
+- **Tests (verplicht):** componenttests en een browsertest in `apps/web/e2e/` (nieuw bestand, volgend nummer na `12-grafiek-24-uur.e2e.ts`). Negatief: (a) verkeerde vingerafdruk: niet vastgelegd, foutmelding bij het veld; (b) een gewone gebruiker ziet het onderdeel niet; (c) de geplakte tekst staat na het vastleggen niet meer in het veld. Commando's: `cd apps/web && npx tsc --noEmit && npm test`; de browsertests volgens POORTEN, P-my_house, kop "4. Volledig (CI-volgorde)", punt 7.
+- **Poort:** P-my_house (volledig, punten 6 en 7) + P-PEIL + P-VEILIG + P-GIT + P-EERLIJK
+- **Valkuilen:** V-058, V-061, V-063, V-064
+- **Bewijs:** C1.3-MH-04 blijft "Bezig". Plakken van de echte sleutelset uit de echte Hub: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-06.
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** het ontwerp een onderdeel vraagt dat Peil niet heeft.
+
+### S-P3-750 - my_house: terugkeerpad na inloggen volgens het contract
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** C1.3-MH-05 (deel terugkeerpad)
+- **Vooraf:** S-P3-700 klaar
+- **Al gedaan?** STAND my_house C1.3-MH-05 -> een opmerking over het terugkeerpad met een test betekent klaar.
+- **Lees eerst:** [CONTRACT], kop "4.1 Gebruikers, noodlogin (break-glass) en SSO" (zoek op "terugkeerpad"); [CONF], kop "8. my_house (bestaande app; P3)" punt C1.3-MH-05; `apps/web/src/App.tsx` (toont `AuthPage` in plaats van een doorverwijzing); `apps/web/src/pages/Auth.tsx`; `apps/web/src/api/client.ts` (doorverwijzing naar de inlog van Cloudflare Access)
+- **Bouw:**
+  1. Stel eerst vast of my_house na het inloggen ergens naartoe stuurt op grond van een parameter: `grep -rn 'next\|returnTo\|redirect_url\|location.href\|location.assign' apps/web/src`. Op 2026-11-11 toonde `App.tsx` de inlogpagina op dezelfde plek (geen doorverwijzing) en maakte `client.ts` alleen een `redirect_url` voor Cloudflare Access.
+  2. Is er een plek die na het inloggen doorstuurt: een functie in een eigen bestand onder `apps/web/src/lib/` (nieuw) met de regel uit het contract, letterlijk: alleen een pad dat voldoet aan `^/(?![/\\])[!-~]*$`, hooguit 256 tekens, zonder `://` en zonder backslash; anders `/`; en die functie op elke plek gebruiken.
+  3. Is er geen enkele plek: bouw niets aan de code, voeg een test toe die bewijst dat een parameter in de URL na het inloggen geen doorverwijzing geeft, en leg dat vast in de EVIDENCE-opmerking ("conform: geen terugkeerpad").
+  4. De `redirect_url` voor Cloudflare Access wijst altijd naar het eigen adres; controleer dat met een test.
+- **Tests (verplicht):** testbestand onder `apps/web/src/test/`. Negatief (bij bouwpunt 2), elk geval geeft `/`: `//evil.example`, `/\evil`, `https://evil.example`, `/a://b`, een pad met een spatie, 257 tekens, een lege waarde. Bij bouwpunt 3: een URL met `?next=https://evil.example` blijft na inloggen op de eigen pagina. Commando: `cd apps/web && npx tsc --noEmit && npm test`.
+- **Poort:** P-my_house (snel, web) + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
+- **Valkuilen:** V-064, V-003
+- **Bewijs:** C1.3-MH-05 naar "Bezig", "Unit-getest" (opmerking: terugkeerpad; de leesconnector vervalt volgens [DM-MH] kop "11.6 ..." regel P3-03 tenzij het ADR van S-P3-010 erom vraagt).
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT) -> A-HERSTEL -> R-EERLIJK. Geen A-ONTWERP: het scherm verandert niet.
+- **Niveau:** A-BOUW N2 (kleine mechanische stap); verder standaard
+- **Stop en vraag als:** het ADR van S-P3-010 my_house vraagt toch een leesconnector te bouwen (dan is dat een eigen nieuwe stap, niet deze).
+
+### S-P3-755 - my_house: manifest en installatiedocument (standaard Custom App)
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** C1.3-MH-06; I05-05-01, I05-05-02, I05-05-03 (documentdeel); I05-05-07 (documentdeel: apparaat-doorgifte voor Zigbee, besluit Z-17); my_house-bouwlijst P3-01 (documentdeel) en P3-14 (deel README en installatiedocs)
+- **Vooraf:** S-P3-725 klaar
+- **Al gedaan?** `ls <WERKMAP>/my_house/deploy/manifest/my_house.manifest.yaml <WERKMAP>/my_house/deploy/truenas/CUSTOM_APP.md <WERKMAP>/my_house/.env.example 2>&1` -> alle drie aanwezig en het manifest slaagt in de strikte validatie: klaar.
+- **Lees eerst:** [CONTRACT], kop "9. Manifeststandaard (B08-001, eigenaar `appstore-en-fork`)"; [CONF], kop "8. my_house (bestaande app; P3)" punt C1.3-MH-06; `docs/adr/ADR-0004-alles-in-een-custom-app.md` (besluiten 3, 4 en 9); `docs/installatie-truenas.md` en `README.md`; `<WERKMAP>/ai-server-manager/deploy/manifest/ai-server-manager.manifest.yaml` (voorbeeld); voor de Zigbee-dongle (besluit Z-17): het ADR van S-P3-720, BESLUITEN kop "Z-17 — ...", `<WERKMAP>/appstore-en-fork/docs/MANIFESTSTANDAARD.md` (rij `privileges` + `privilege_reason` en de alinea's "Apparaten" en "GPU als optionele parameter"), `<WERKMAP>/appstore-en-fork/schemas/manifest-v1.schema.json` (`Privileges.devices`, `CustomApp`, `Parameter.type`) en `<WERKMAP>/appstore-en-fork/docs/TRUENAS_APP_VALUES.md` (rij "Devices")
+- **Bouw:**
+  1. Nieuw `deploy/manifest/my_house.manifest.yaml`: `install.method: custom_app`, `healthcheck.monitor`, het blok `backup` (export, datasets, `rpo`, `rto`), `network.ports` (containerpoort 8080; het hostpoortvoorstel uit ADR-0003), geen `compose`-veld, geen parameter of omgevingsvariabele die met `HUB_` begint (C1.3-MH-02, RV5), geen `latest`. Zolang er geen release is: `accepted_findings` met `digest_pending_release` (BLOK-06).
+     Zigbee-dongle (Z-17): BESLUITEN noemt bij Z-17 optie 1 als gevolg "het manifest krijgt `devices` voor de dongle met `privilege_reason`" (zo ook ADR-0004 besluit 10). Gemeten op 2026-11-11 in appstore-en-fork (`7b3159d`): `privileges.devices[]` eist een vast `host_device` (patroon `^/dev/[A-Za-z0-9._/-]+$`), `custom_app` heeft geen veld voor apparaten, `Parameter.type` kent geen apparaattype (alleen de GPU heeft een optionele parameter), en de vertaling (`translate.py`) zet `privileges.devices` letterlijk in het formulier. Een optioneel apparaat waarvan de gebruiker het pad in het formulier kiest, is daarmee niet uit te drukken; een vast `/dev/serial/by-id/...`-pad verzinnen mag niet (de naam is een gegeven van de NAS, V-097). A-VERKEN meet dit opnieuw (`grep -n -A12 '"devices"' <WERKMAP>/appstore-en-fork/schemas/manifest-v1.schema.json`; `grep -n '"enum": \["string"' -A3 <WERKMAP>/appstore-en-fork/schemas/manifest-v1.schema.json`). Staat het er nog zo: het manifest krijgt GEEN apparaat en GEEN verzonnen pad, A-BOUW maakt de rest van de stap af, en de regisseur legt de vraag voor (zie "Stop en vraag als"). Kan de standaard het inmiddels wel: `devices` (of de parameter) voor de dongle met `privilege_reason` (seriele Zigbee-coordinator voor Zigbee2MQTT, alleen als de gebruiker hem opgeeft, toegang als 568) en de juiste regel in `decisions_required` (D13; D01 voor de apparaat-doorgifte).
+  2. Nieuw `deploy/truenas/CUSTOM_APP.md`: de velden van het formulier in de volgorde van het formulier, met `<POOL>` als plaatshouder. Zigbee (besluit Z-17): een optioneel onderdeel "Zigbee-stick (alleen als je er een hebt)": in het formulierveld voor apparaten het apparaat van de stick (`/dev/serial/by-id/<NAAM-VAN-JE-STICK>` als plaatshouder) doorgeven naar `/dev/zigbee` in de container, en de adapter kiezen (de variabele uit S-P3-720, standaard `ember`). Zonder stick dit onderdeel overslaan: Zigbee staat dan uit en dat is geen fout. Vermeld dat het formulier van de echte TrueNAS-versie apparaat-doorgifte moet bieden en dat 568 de stick moet kunnen lezen: NIET GEVALIDEERD (echte NAS) en (hardware), D01 en D13. Geen shell-commando om de naam van de stick te vinden (V-096); verwijs naar het scherm van TrueNAS waar het formulier de apparaten toont, zonder een pad te verzinnen.
+  3. Nieuw `.env.example` in de root, alleen voor ontwikkeling.
+  4. Nieuw `deploy/dev/compose.yaml` alleen voor ontwikkeling, met bovenaan dat het geen installatieweg is (my_house-bouwlijst P3-01).
+  5. `README.md` en `docs/installatie-truenas.md`: de standaard Custom App is de enige installatieweg; `install.sh`, `render_truenas.py` en "Install via YAML" staan alleen nog onder een kop "Alleen voor ontwikkeling". Updaten en terugdraaien via het formulier (andere versie) plus de snapshot van voor de update (ADR-0004 besluit 9).
+- **Tests (verplicht):** `<WERKMAP>/appstore-en-fork/.venv/bin/jl-manifest validate --strict deploy/manifest/my_house.manifest.yaml` (exitcode 0). Negatief: (a) een proefkopie buiten de repo met een parameter `HUB_URL` geeft `reserved_env`; (b) een proefkopie met een `compose`-veld wordt geweigerd; (c) `grep -rn '/mnt/' deploy/manifest deploy/truenas/CUSTOM_APP.md` geeft alleen regels met `<POOL>`; (d) `grep -n -i 'install via yaml\|install.sh' README.md docs/installatie-truenas.md` toont alleen regels onder "Alleen voor ontwikkeling". (e) `grep -n -i 'zigbee\|/dev/' deploy/truenas/CUSTOM_APP.md deploy/manifest/my_house.manifest.yaml` toont geen echt apparaatpad (alleen `<NAAM-VAN-JE-STICK>` en `/dev/zigbee`) en geen shell-commando; (f) een proefkopie van het manifest buiten de repo met een apparaat zonder `privilege_reason` geeft `device_without_reason`. Daarna `shellcheck infra/scripts/*.sh apps/web/docker/*.sh apps/web/e2e/*.sh && python3 -m unittest discover -s infra/tests -v && bash infra/scripts/validate_compose.sh`.
+- **Poort:** P-my_house (snel) + P-INSTALLATIE + P-VEILIG + P-CONTRACT + P-GIT + P-EERLIJK
+- **Valkuilen:** V-089, V-096, V-097, V-069, V-130
+- **Bewijs:** C1.3-MH-06 naar "Bezig", "Sim-getest" (alleen gevalideerd met de validator; opmerking: Zigbee-dongle optioneel volgens Z-17, en of het manifest het apparaat kon vastleggen). Installeren op de NAS: "NIET GEVALIDEERD (echte NAS)", STAPPEN_P6.md onderdeel N-P6-06. Zigbee met een echte stick: "NIET GEVALIDEERD (hardware)" (D13). I05-05-01...03 en I05-05-07 zijn regels van `jelly-leon-platform` (S-P3-440, S-P3-450).
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-MANIFEST + R-VEILIG (tegelijk; R-MANIFEST VERPLICHT; R-VEILIG VERPLICHT: apparaattoegang van de Zigbee-stick in manifest en formuliertekst, `privilege_reason`, geen verzonnen of echt apparaatpad) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** de validator een veld eist dat alleen op de NAS te meten is; de manifeststandaard het optionele Zigbee-apparaat niet kan uitdrukken (stand 2026-11-11, bouwpunt 1): de regisseur legt dan besluit Z-21 voor met een keuzemenu (BESLUITEN_EN_BLOKKADES.md, kop "Z-21": hoe het manifest de optionele Zigbee-stick vastlegt; open); de rest van de stap gaat wel door en wordt gepusht, het manifest zonder apparaat; een uitbreiding van de manifeststandaard is geen werk van deze stap (eigenaar `appstore-en-fork`, [CONTRACT] kop 9; het contract verandert niet tijdens P3, hoofdstuk 2.1).
+
+### S-P3-765 - my_house: schermbreedtes, schermafdrukken en huishouding
+- **Repo:** my_house | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** B06-001 (deel oplevering); my_house-bouwlijst P3-13 en P3-14
+- **Vooraf:** S-P3-755 klaar
+- **Al gedaan?** `grep -n 'width' <WERKMAP>/my_house/apps/web/playwright.config.ts | head; head -5 <WERKMAP>/my_house/docs/testlog.md; git -C <WERKMAP>/my_house ls-files | grep -c 'whl$'` -> projecten voor 390, 768 en 1440, een testlog voor de huidige versie en 0 gevolgde `.whl`-bestanden betekent klaar. Op 2026-11-11 stond er al geen `.whl`-bestand meer in git.
+- **Lees eerst:** [DM-MH], kop "9. ..." regels P3-13 en P3-14; [PEIL]; `apps/web/playwright.config.ts`; `apps/web/e2e/10-mobile.e2e.ts`; `docs/testlog.md`, `CHANGELOG.md`
+- **Bouw:**
+  1. A-ONTWERP eerst: loop de schermen na op 390, 768 en 1440 breed; lever een lijst van afwijkingen van Peil. Alleen die worden gebouwd. Punten die op Peil 1.1.1 wachten (het woord "Verzonden", ondernavigatie op 320 px, rand-token, `-soft`-contrast; [CONF] kop 8, "Repowerk") blijven open.
+  2. Browsertests op 390, 768 en 1440 breed; schermafdrukken voor web en mobiel in `docs/screenshots/` met alleen testgegevens.
+  3. `docs/testlog.md` naar de huidige versie (`VERSION`); `CHANGELOG.md` met het werk van P3.
+  4. Huishouding uit regel P3-14 voor zover nog open (de `.whl` was op 2026-11-11 al weg).
+- **Tests (verplicht):** Negatief: (a) op 390 breed geen horizontaal schuiven van de pagina; (b) een verouderde waarde wordt niet als actueel getoond. Commando's: `cd apps/web && npx tsc --noEmit && npm test`; de browsertests volgens POORTEN, P-my_house, kop "4. Volledig (CI-volgorde)", punt 7.
+- **Poort:** P-my_house (volledig, punten 6, 7 en 11) + P-PEIL + P-GIT + P-EERLIJK
+- **Valkuilen:** V-058, V-061, V-063
+- **Bewijs:** B06-001 blijft "Bezig". Echte toestellen: "NIET GEVALIDEERD (hardware)", STAPPEN_P6.md onderdeel N-P6-06.
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** standaard
+- **Stop en vraag als:** een afwijking alleen met een lokale aanpassing van Peil op te lossen is.
+
+---
+
+## 7. Fase-afsluiting
+
+Volgorde: S-P3-900 (bewijs samenvoegen, Excel eerste keer) -> S-P3-910 (A-GATE met de lijst van 7.1) -> 7.2 (Excel
+nog een keer) -> 7.3 (STATUS.md en VOORTGANG.md) -> 7.4 (melden aan de gebruiker). Niemand slaat een onderdeel over.
+Dit volgt AGENTEN, kop "2.2 Het protocol", stap 10.
+
+### S-P3-900 - Bewijs samenvoegen: programmabewijs, Excel en STATUS
+- **Repo:** ai-server-manager | **Fase:** P3 | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** geen eigen ID's; schrijft de faseregel `P3` in `<DOCS>/EVIDENCE_PROGRAMMA.json` en controleert dat elk ID uit hoofdstuk 8 (delen A, B, C en D) met een stap van dit bestand een eerlijke EVIDENCE-regel heeft
+- **Vooraf:** alle stappen S-P3-000 tot en met S-P3-765 zijn in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` afgevinkt of staan er met reden als geblokkeerd of uitgesteld; er is geen keten open in ai-server-manager (P-EXCEL: een schrijver in die repo)
+- **Al gedaan?** `python3 -c "import json;[print(f['id'],f['status'],f['validatie'],sep=' | ') for f in json.load(open('<DOCS>/EVIDENCE_PROGRAMMA.json'))['fasen']]"` -> klaar als er een regel "P3 | Bezig | ..." staat met "NIET GEVALIDEERD (echte NAS)" in de validatie; `grep -n '^## P3' <DOCS>/OVERDRACHT/STATUS.md` -> klaar als er een kop voor P3 staat. Half werk (wel een faseregel, geen Excel-commit, of omgekeerd): maak de ontbrekende helft af.
+- **Lees eerst:** POORTEN, kop "P-EXCEL"; `tools/excel/README.md` (in ai-server-manager); [CONTRACT], kop "11. Bewijs en Excel (EVIDENCE.json)"; STAPPEN_P2.md, stap S-P2-900 (zelfde werkwijze, andere fase); AGENTEN, kop "1.1 Wat de regisseur zelf doet"
+- **Bouw:**
+  1. A-BOUW controleert de repos van P3 (`ai-server-manager`, `media-guard-ultimate`, `media-source-optimizer`, `my_house`, `home-control-hub`, `jelly-leon-platform`, `appstore-en-fork`): `for r in ai-server-manager media-guard-ultimate media-source-optimizer my_house home-control-hub jelly-leon-platform appstore-en-fork; do echo "$r: $(git -C <WERKMAP>/$r status --short | wc -l) gewijzigd; $(git -C <WERKMAP>/$r rev-list --count @{u}..HEAD) niet gepusht"; done`. Elke regel moet "0 gewijzigd; 0 niet gepusht" zijn. Staat er in een andere repo werk van een andere fase in de werkboom, dan meldt hij dat (het Excel-commando leest de EVIDENCE.json van ALLE repos).
+  2. A-BOUW meet per ID uit hoofdstuk 8 met een stap van dit bestand de EVIDENCE-regel met STAND (hoofdstuk 3, regel 4), in de repo uit de kolom "Repo met de EVIDENCE-regel". Tabel: ID | repo | status | validatie | blokkade ja/nee. Een ID zonder regel, "Niet gestart" terwijl de stap is afgevinkt, of "Bezig" zonder "NIET GEVALIDEERD" waar de NAS, hardware of een account nodig is: bevinding. Hij herstelt die NIET in een andere repo; de regisseur start daar een herstelketen (A-HERSTEL -> R-EERLIJK) en deze stap wacht.
+  3. A-BOUW voegt in `<DOCS>/EVIDENCE_PROGRAMMA.json`, lijst `fasen`, een regel toe met dezelfde velden als de bestaande regels: `id` "P3"; `status` "Bezig"; `validatie` "Sim-getest; NIET GEVALIDEERD (echte NAS)"; `bewijs` een zin per baan met de laatste commit en het run-ID van de CI (zelf nagekeken met `gh run view <run-ID> -R lvos04/<repo>`, en het run-ID gevonden met `gh run list -R lvos04/<repo> --commit <volle hash>`); `blokkade` de lijst uit 7.4 punt 3; `bijgewerkt` de datum van vandaag. Bestaande regels blijven ongewijzigd.
+  4. A-BOUW voegt aan het einde van `<DOCS>/OVERDRACHT/STATUS.md` een kop "## P3 — eigen apps koppelen: gebouwd en in de simulator getest (<datum>)" toe met: per repo wat er staat (met stap-ID's), wat NIET GEVALIDEERD is (uitgeschreven), de open besluiten (Z-02, Z-03, Z-08, Z-10, BG-05, Z-18 over de I05-titels met de optie die gold), de besluiten die tijdens P3 golden (Z-17, 2026-11-11: Zigbee2MQTT in de image van my_house, optioneel, alleen aan als in het formulier een USB-apparaat is opgegeven; C-12, 2026-11-11: voorziening zonder geheim via de manifeststandaard, S-P3-490, S-P3-445, S-P3-360), wat er van Zigbee NIET GEVALIDEERD is (de stick op de echte NAS: D01, D13; en of het manifest de stick kon vastleggen, S-P3-755) en de uitkomst van de gate ("volgt"). [CONF] wordt niet gewijzigd.
+  5. A-BOUW doet de punten 2, 3 en 4 van de afvinklijst P-EXCEL (tests van het gereedschap, een proefrun met `--out <bestand buiten de repo>.xlsx`, elke waarschuwing lezen en verklaren).
+  6. A-BOUW commit en pusht alleen `docs/platform-v2/EVIDENCE_PROGRAMMA.json` en `docs/platform-v2/OVERDRACHT/STATUS.md` (bij naam toevoegen, nooit `git add -A`) volgens P-GIT en wacht op de CI.
+  7. De REGISSEUR doet daarna zelf de punten 5 tot en met 9 van P-EXCEL (de echte run, een tweede run zonder wijzigingen, het `.xlsx.bak`-bestand verwijderen, commit en push met een Nederlands bericht dat "P3" noemt, de CI-job `excel` controleren) en noteert het aantal bijgewerkte rijen per blad in VOORTGANG.md.
+  8. R-EERLIJK vergelijkt twintig rijen van de Excel met de EVIDENCE.json van de repo van herkomst (minstens twee per baan, en alle rijen die van status wisselden): geen rij is "beter" dan het bewijs.
+- **Tests (verplicht):** `<WERKMAP>/.lokaal/excel-venv/bin/python -m pytest -q tools/excel/tests` (in ai-server-manager); de proefrun en de echte run uit P-EXCEL; `python3 -c "import json,glob,sys;b=[(p,r['id'],r['status']) for p in glob.glob(sys.argv[1]) for r in json.load(open(p)) if r['status'] in ('Gereed','Geslaagd')];print(b);sys.exit(1 if b else 0)" '<WERKMAP>/*/docs/platform-v2/EVIDENCE.json'` (verwachting: lege lijst, exitcode 0). Negatief: de bestaande tests `test_weigert_gereed_en_geslaagd` en `test_idempotent` in `tools/excel/tests/test_update_excel.py` slagen; de tweede echte run meldt nul gewijzigde onderdelen.
+- **Poort:** P-EXCEL (alle punten) + P-ai-server-manager (snel) + P-EERLIJK + P-GIT. Extra: de CI-jobs van ai-server-manager zijn groen op precies de laatste commit.
+- **Valkuilen:** V-108, V-107, V-106, V-104, V-022, V-100
+- **Bewijs:** faseregel `P3` in `<DOCS>/EVIDENCE_PROGRAMMA.json` -> "Bezig" met "Sim-getest; NIET GEVALIDEERD (echte NAS)". Geen enkele rij wordt "Gereed" of "Geslaagd".
+- **Agents:** A-BOUW -> R-EERLIJK, met tussendoor de regisseur voor bouwpunt 7. Kortere keten met reden: zuivere documentatie- en controlestap zonder code. Geen A-VERKEN: bouwpunt 1 en 2 meten de stand opnieuw.
+- **Niveau:** standaard
+- **Stop en vraag als:** een repo niet schoon of niet gepusht is; een waarschuwing van het Excel-script niet te verklaren is; een ID uit hoofdstuk 8 geen rij in de Excel heeft; een status in de Excel na de run beter is dan in EVIDENCE.
+
+### S-P3-910 - Gate P3: onafhankelijke controle
+- **Repo:** ai-server-manager, media-guard-ultimate, media-source-optimizer, my_house, home-control-hub, jelly-leon-platform en appstore-en-fork, alle alleen lezen (uitzondering op "een stap = een repo": dit is de gatecontrole; A-GATE schrijft alleen `<WERKMAP>/.lokaal/ketens/GATE-P3/RAPPORT-A-GATE.md`) | **Fase:** P3 | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** ja (A-GATE draait per repo de volledige poort opnieuw, de repos na elkaar, achter de locks)
+- **Werkpakketten en tests:** geen eigen ID's; beoordeelt de gate-eisen G-01 tot en met G-23 uit paragraaf 7.1 (nummers van dit plan, geen ID's uit ALLE_IDS.txt)
+- **Vooraf:** S-P3-900 afgevinkt; in geen van de zeven repos is een keten open
+- **Al gedaan?** `ls <WERKMAP>/.lokaal/ketens/GATE-P3/RAPPORT-A-GATE.md && grep -n '^ *oordeel:' <WERKMAP>/.lokaal/ketens/GATE-P3/RAPPORT-A-GATE.md` -> klaar als het rapport bestaat, het oordeel "GATE GEHAALD" is EN de HEAD van elke repo nog gelijk is aan het veld `per_repo` van het rapport (`git -C <WERKMAP>/<repo> rev-parse --short HEAD`). Is er sinds het rapport gecommit, dan loopt de gate opnieuw voor de eisen die die repo raken.
+- **Lees eerst:** hoofdstuk 2, hoofdstuk 3 en paragraaf 7.1 van dit bestand; [GATES], koppen "Fase P3 — Eigen apps koppelen" en "Gate matrix"; AGENTEN, kop "2.2 Het protocol", stap 10, en de prompt onder kop "A-GATE"; POORTEN, kop "0.1 Wie draait wat, en wanneer" en de zeven blokken P-<repo>; `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`
+- **Bouw:** (er wordt niets gebouwd; A-GATE levert een rapport)
+  1. De regisseur vult de prompt A-GATE: Gate "P3"; Repos de zeven hierboven; Gate-eisen `STAPPEN_P3.md`, paragraaf 7.1; onder "Besluiten en bijzonderheden" alleen feiten: de besluiten die de gebruiker tijdens P3 nam (met ID) en de stappen die met reden zijn uitgesteld.
+  2. A-GATE volgt de werkwijze uit zijn prompt: per repo schoon, gepusht en CI groen op HEAD; VOORTGANG.md tegen de werkelijkheid; per repo de VOLLEDIGE variant van P-<repo>; de algemene poorten; de bewijscontrole; daarna per eis G-01 tot en met G-23 het oordeel VOLDAAN, NIET VOLDAAN of ALLEEN OP DE ECHTE NAS TE BEWIJZEN, met het bewijs dat hij zelf zag.
+  3. Volgorde van de zware poorten (een tegelijk): appstore-en-fork, jelly-leon-platform, home-control-hub, my_house, media-source-optimizer, media-guard-ultimate (met het upgradebewijs), ai-server-manager. Tussen twee repos: `free -m` en `df -h /`.
+  4. De regisseur doet na de melding K1, K3 en K7 (AGENTEN, kop "2.1 De goedkope controles K1 tot en met K7") voor elke repo.
+  5. "GATE GEHAALD": de regisseur vinkt de gate af in VOORTGANG.md en volgt 7.2 tot en met 7.4. "GATE NIET GEHAALD": per tekortkoming een herstelketen (A-HERSTEL met het gate-rapport, daarna R-EERLIJK), daarna S-P3-900 bouwpunt 7 opnieuw als er bewijs is gewijzigd, en dan A-GATE opnieuw voor de eisen die niet gehaald waren (`RAPPORT-A-GATE-2.md`). Tweede keer niet gehaald: keuzemenu aan de gebruiker.
+- **Tests (verplicht):** per repo de volledige variant uit POORTEN, elk commando met exitcode en slotregel in het rapport; overgeslagen tests zijn niet groen. Negatief (door A-GATE zelf opnieuw gedraaid): de tests achter G-07 (boiler: S-P3-705, S-P3-742, S-P3-130), G-08 (ongetest apparaat: S-P3-710), G-13 (upgradebewijs MediaGuard, exitcode 0 en beide zinnen) en G-22 (sleutel met `emergency_stop:on` en `active: false` geeft 403: S-P3-600).
+- **Poort:** de zeven blokken P-<repo> (volledig) + P-GIT + P-CONTRACT + P-EERLIJK + P-VEILIG + P-HARDE-EIS + P-INSTALLATIE + P-PEIL, alle als controle. P-EXCEL alleen als lezer.
+- **Valkuilen:** V-098, V-002, V-005, V-112, V-116, V-033, V-011, V-004
+- **Bewijs:** A-GATE wijzigt geen EVIDENCE.json. De uitkomst komt in het rapport, in VOORTGANG.md en (via 7.3) in `<DOCS>/OVERDRACHT/STATUS.md`. De faseregel `P3` blijft "Bezig" met "NIET GEVALIDEERD (echte NAS)", ook bij "GATE GEHAALD".
+- **Agents:** A-GATE. Kortere keten met reden: zuivere controlestap; A-GATE is zelf de onafhankelijke controle. Bij tekortkomingen: A-HERSTEL -> R-EERLIJK per repo, daarna A-GATE opnieuw.
+- **Niveau:** A-GATE N5 - Winst: dit is de enige plek waar iemand zonder voorkennis de zeven repos van P3 tegelijk naast de gate-eisen legt; een gemist gat in de HARDE EIS (upgradebewijs van MediaGuard) of in het bewaakte schrijfpad naar my_house wordt na P3 de basis van P4 en van de eerste installatie op de NAS (geval d: A-GATE aan het einde van een hele fase).
+- **Stop en vraag als:** er tijdens de controle in een repo wordt geschreven; er te weinig geheugen of schijf is voor een volledige poort (wat niet gedraaid kon worden is NIET VOLDAAN); A-GATE een eis vindt die volgens [GATES] bij P3 hoort maar niet in 7.1 staat (melden, niet stilzwijgend toevoegen); de gate een tweede keer niet gehaald wordt.
+
+### 7.1 Gatecontrole P3 (afvinklijst voor A-GATE)
+
+De nummers G-01 tot en met G-23 zijn nummers van dit plan. Tekst tussen aanhalingstekens komt letterlijk uit [GATES]
+(koppen "Fase P3 — Eigen apps koppelen" en "Gate matrix"). Oordelen zoals in STAPPEN_P2.md, paragraaf 9.1:
+VOLDAAN alleen met zelf gezien bewijs; ALLEEN OP DE ECHTE NAS TE BEWIJZEN als het simulatordeel bewezen is EN de
+EVIDENCE-regel "NIET GEVALIDEERD (...)" draagt; anders NIET VOLDAAN. Kolom "Hoogste": "V" = VOLDAAN mogelijk, "NAS" =
+hooguit ALLEEN OP DE ECHTE NAS TE BEWIJZEN. "GATE GEHAALD" kan alleen als geen eis NIET VOLDAAN is.
+
+**Deel 1 - [GATES], kop "Fase P3 — Eigen apps koppelen"**
+
+| Nr | Eis | Geleverd door | Zo controleert A-GATE | Hoogste |
+|---|---|---|---|---|
+| G-01 | Opgeleverd: "één incident en downloadketen" | S-P3-075, S-P3-080, S-P3-615, S-P3-630, S-P3-230 | De ketentests van S-P3-075 opnieuw draaien; MSO onbereikbaar geeft "onbekend", geen 500 | NAS (N-P6-05) |
+| G-02 | Opgeleverd: "één smart-home paneel" | S-P3-050, S-P3-090 | Test (a) van S-P3-090: geen knop of formulier dat een POST doet; de adapter bevat alleen GET plus de twee koppelroutes | NAS (N-P6-06) |
+| G-03 | Opgeleverd: "energy provenance" | S-P3-150, S-P3-160, S-P3-300 tot en met S-P3-350 | Elk getal heeft `measurement_quality` en een bron; zonder meter geen bedrag (tests van S-P3-150 en S-P3-330) | NAS (N-P6-06) |
+| G-04 | Opgeleverd: "bestaande eigen app DB behouden" | elke stap in media-guard-ultimate (upgradebewijs); S-P3-205, S-P3-260 (MSO); S-P3-700, S-P3-735 (my_house) | Upgradebewijs MediaGuard zelf draaien; de upgradescenario's van MSO en de proef A naar B van my_house in de CI-run op HEAD | NAS (N-P6-05, N-P6-06) |
+| G-05 | Doel: "live API contracten" | S-P3-265, S-P3-645, S-P3-030, S-P3-040 | Contracttests opnieuw draaien; niet overgeslagen | NAS (N-P6-05) |
+| G-06 | No-go: "wijzigingen aan Prowlarr/SABnzbd vanuit twee eigenaren" | S-P3-120, S-P3-180, S-P3-640 | `grep -rn -i 'sabnzbd\|prowlarr\|qbittorrent' <WERKMAP>/ai-server-manager/policy/acties.yaml` geeft geen schrijvende actie; A11 en A13 noemen een eigenaar | V |
+| G-07 | No-go: "boiler schakelen" | S-P3-705, S-P3-742, S-P3-130, S-P3-330, S-P3-340 | Negatieve boilertests in my_house, de Hub en home-control-hub zelf draaien | V |
+| G-08 | No-go: "ongeteste Gree aansturing" | S-P3-710, S-P3-742, S-P3-130 | Test: ongetest apparaat geeft 409; `zone.command` in de Hub geblokkeerd zolang G-10 niet is afgevinkt | V |
+
+**Deel 2 - [GATES], kop "Gate matrix" (alleen de rijen die P3 raken)**
+
+| Nr | Eis | Geleverd door | Zo controleert A-GATE | Hoogste |
+|---|---|---|---|---|
+| G-09 | "MediaGuard/MSO API contract live verified" | S-P3-265, S-P3-645 | Simulatordeel als G-05; EVIDENCE B05-006 en B04-009 dragen "NIET GEVALIDEERD (echte NAS)" | NAS (N-P6-05) |
+| G-10 | "my_house fysieke apparaten gevalideerd" | S-P3-710 (softwaregate) | B06-009 staat "Geblokkeerd" met D12, D13, D14 in de blokkade | NAS (N-P6-06) |
+| G-11 | "ZFS snapshots en pre-change database-export" | S-P3-100, S-P3-635, S-P3-205, S-P3-625, S-P3-700 | Dekkingstests van S-P3-100; geen dekking "groen" zonder verse meting | NAS (N-P6-02) |
+| G-12 | "Risk policy + privileged executor tested" (voorwaarde van S-P3-110, S-P3-120, S-P3-130) | Gate P2 | VOORTGANG.md: Gate P2 afgevinkt VOOR de eerste commit van S-P3-110, S-P3-120 en S-P3-130 (`git log`) | V |
+
+**Deel 3 - Vaste regels en opdracht van P3**
+
+| Nr | Eis | Geleverd door | Zo controleert A-GATE | Hoogste |
+|---|---|---|---|---|
+| G-13 | HARDE EIS: upgradebewijs MediaGuard op HEAD met exitcode 0, "Upgrade: niets verloren" en "terugzetten: niets verloren"; `tests/fixtures/aio/upgradebewijs-uitzonderingen.json` in P3 niet gewijzigd | baan media-guard-ultimate | Zelf draaien; `git -C <WERKMAP>/media-guard-ultimate log --oneline -- tests/fixtures/aio/upgradebewijs-uitzonderingen.json` | V |
+| G-14 | Emby: geen nieuwe schrijfroute; contracttest mediaservers groen als `apps/core/mediaguard/mediaserver/` in P3 is geraakt | S-P3-670, S-P3-675 | `git log` op die map sinds het begin van P3; contracttest (POORTEN, P-media-guard-ultimate, punt 9) | V |
+| G-15 | Installatie: de drie manifesten valideren strikt; geen compose, YAML of terminal als installatieweg in de documentatie | S-P3-290, S-P3-660, S-P3-755, S-P3-450 | `jl-manifest validate --strict` op de drie manifesten; grep uit de negatieve tests van die stappen | NAS (N-P6-05, N-P6-06) |
+| G-16 | Images: healthcheck in exec-vorm met wissel naar 568; rooktest controleert `CapPrm`, `CapAmb`, `CapBnd` en `NoNewPrivs` | S-P3-250, S-P3-650, S-P3-720, S-P3-725, S-P3-170 | CI-runs op HEAD; een proef zonder de wissel moet falen (rapporten van de stappen) | NAS |
+| G-17 | Herstel en terugdraaien zonder terminal | S-P3-730, S-P3-290, S-P3-660, S-P3-755 | Lezen van de documenten; geen terminalweg als hoofdroute | NAS (N-P6-06) |
+| G-18 | Elk contractpunt met Moment P3 (hoofdstuk 8, deel C) heeft een EVIDENCE-regel die klopt met de stap | alle stappen | STAND per punt | V |
+| G-19 | Nergens "Gereed" of "Geslaagd"; elke NAS-, hardware- of accountafhankelijke regel draagt "NIET GEVALIDEERD (...)" | S-P3-900 | Het commando uit de tests van S-P3-900 | V |
+| G-20 | Peil: elke UI-stap heeft een ontwerpreview (R-ONTWERP) met schermafdrukken met testgegevens | UI-stappen | VOORTGANG.md en de reviewkoppen in de repos | V |
+| G-21 | Geen geheimen, geen IP-adressen, geen NAS-gegevens in de commits van P3 | alle stappen | P-VEILIG; zoek de testsleutels van de stappen in `git log -p` sinds het begin van P3 | V |
+| G-22 | Gereserveerde MediaGuard-acties dicht tot BG-05: de Hub heeft geen MediaGuard-actie behalve "noodstop aan"; geen `wanted:search` zonder vastgelegd besluit | S-P3-600, S-P3-110 | `grep -n 'mediaguard' <WERKMAP>/ai-server-manager/policy/acties.yaml`; test (a) van S-P3-600 | V |
+| G-23 | Controlelijsten I03, I04, I05 en I15 tot en met I20 bestaan, valideren, en de validatortest is niet overgeslagen | S-P3-400 tot en met S-P3-450 | `make validator-venv` en de testcommando's van de baan jelly-leon-platform met `-rs`: nul overgeslagen validatortests | NAS (N-P6-05, N-P6-06) |
+
+### 7.2 Excel nog een keer
+
+Na "GATE GEHAALD" draait de regisseur P-EXCEL punt 5 nog een keer (idempotent; als er sinds S-P3-900 niets aan het
+bewijs veranderde, meldt de run nul wijzigingen). Wijzigt er wel iets: commit en push volgens P-GIT met een Nederlands
+bericht dat "P3" noemt, en de CI-job `excel` controleren.
+
+### 7.3 STATUS.md en VOORTGANG.md
+
+- [ ] **STATUS.md** (via een A-BOUW in ai-server-manager, alleen dat bestand): onder de kop van S-P3-900 de uitkomst
+      van de gate, met het aantal eisen per oordeel en de verwijzing naar het gate-rapport.
+- [ ] **VOORTGANG.md** (de regisseur zelf): de gate van P3 afgevinkt met datum en de verwijzing naar
+      `<WERKMAP>/.lokaal/ketens/GATE-P3/RAPPORT-A-GATE.md`; de tabel "Topmodel-inzet" aangevuld met S-P3-910 (en met
+      de inzet bij S-P3-220, S-P3-600, S-P3-625 en S-P3-740, met per regel of het iets opleverde); de lijst
+      "Geblokkeerd" bijgewerkt; de open besluiten met hun stand.
+- [ ] **Per repo** blijft EVIDENCE.json de waarheid. De regisseur wijzigt zelf geen EVIDENCE.json.
+
+### 7.4 Melden aan de gebruiker
+
+In het Nederlands, kort, zonder "gereed" of "geslaagd", afgesloten met een keuzemenu (BESLUITEN_EN_BLOKKADES, kop "0.5
+Sjabloon van een keuzemenu"):
+
+1. **Uitkomst van de gate** met het aantal eisen per oordeel.
+2. **Wat er nu staat, per repo** (een regel per baan, met de laatste commit en het run-ID): de Hub leest MediaGuard,
+   MSO en my_house en toont Media, Huis en Kosten; MediaGuard heeft gescopete sleutels, een leesconnector, events,
+   schemabescherming, een healthcheck als 568 en een manifest; MSO heeft een machine-sleutel, een connector en een
+   manifest; my_house heeft een alles-in-een image (met Zigbee2MQTT als optioneel proces, besluit Z-17), een bewaakt schrijfpad en
+   herstel zonder terminal; home-control-hub heeft energie met herkomst en een Node-RED-profiel volgens C-12;
+   jelly-leon-platform heeft de controlelijsten, de manifestkopieen en het Node-RED-manifest volgens C-12;
+   appstore-en-fork heeft de voorziening voor een beheerder en een dienstaccount zonder geheim (C-12).
+3. **Wat NIET GEVALIDEERD is**: niets is op de echte NAS, met echte apparaten of met echte accounts geprobeerd. In het
+   bijzonder: de drie apps als Custom App installeren (N-P6-05, N-P6-06), de Hub tegen de echte MediaGuard, MSO en
+   my_house (N-P6-05, N-P6-06), lampen, airco, meters en Zigbee (D12, D13, D14; N-P6-06; ook of het formulier de Zigbee-stick doorgeeft en 568 hem kan
+   lezen, D01), back-up en herstel op de echte
+   pool (N-P6-02), de integrale scenario's (STAPPEN_P6.md).
+4. **De HARDE EIS:** Emby is niet aangeraakt; het upgradebewijs van MediaGuard meldt "niets verloren", gemeten op de
+   gevulde 1.2.2-testdatabase en niet op de productiedatabase.
+5. **Open besluiten:** Z-02, Z-03, Z-08, Z-10, BG-05, Z-18 over de I05-titels (S-P3-440; gold zonder besluit optie 1,
+   tenzij de gebruiker koos), de vraag hoe het manifest van my_house de optionele Zigbee-stick vastlegt (alleen als
+   S-P3-755 daarop stopte), T-01 (GHCR-pakketten van MediaGuard), en stappen die op een contractpunt wachten (S-P3-110 bij een
+   ontbrekende actienaam, S-P3-690 bij een ontbrekende poolroute). Genomen en in P3 uitgevoerd (niet opnieuw vragen):
+   Z-17 (Zigbee2MQTT in de image van my_house, optioneel; S-P3-720, S-P3-725, S-P3-755) en C-12 (voorziening zonder
+   geheim via de manifeststandaard; S-P3-490, S-P3-445, S-P3-360), elk met wat er NIET GEVALIDEERD is.
+6. **Inzet van het topmodel:** de regels uit de tabel "Topmodel-inzet" van P3 met wat ze opleverden.
+7. **Keuzemenu**, bijvoorbeeld: (1) doorgaan met P4-0 of P4 volgens het stappenbestand en de gate-matrix (alleen bij
+   "GATE GEHAALD"); (2) eerst een open besluit nemen; (3) eerst zelf de NAS-onderdelen N-P6-05 en N-P6-06 doen;
+   (4) stoppen en de stand laten staan.
+
+Er wordt geen PR gemaakt en niets naar `main` overgenomen zonder dat de gebruiker daar uitdrukkelijk om vraagt.
+
+---
+
+## 8. Dekking
+
+Elke rij is een ID. De EERSTE stap in een rij vult de EVIDENCE-regel; de stappen erna leveren een deel. Een ID dat niet
+in P3 hoort staat er met de reden en de plek waar het wel wordt opgepakt. De ID's van deel A, B en D staan in
+`<WERKMAP>/.lokaal/plan/uit/ALLE_IDS.txt`; de contractpunten van deel C komen uit [CONF] en staan daar niet in (ze hebben
+wel een regel in de EVIDENCE.json van hun repo).
+
+### 8.1 Deel A - Werkpakketten
+
+| ID | Repo met de EVIDENCE-regel | Stap of reden |
+|---|---|---|
+| B01-011 | ai-server-manager | S-P3-150; S-P3-010 (besluit bron), S-P3-160 (UI), S-P3-170 (images). Opmerking: de plaatshouder `kosten` noemt "P5"; OVERDRACHT_PROMPT par. 4 zet B01-011 in P3 en STAPPEN_P5.md verwijst hierheen |
+| B04-001 | media-guard-ultimate | gebouwd in P0 (1.2.2-basis, "Bezig"); geen bouwstap in P3; elke stap van de baan media-guard-ultimate houdt het upgradebewijs op de 1.2.2-fixture; NAS-deel -> STAPPEN_P6.md onderdeel N-P6-05 |
+| B04-002 | media-guard-ultimate | S-P3-610, S-P3-615, S-P3-620; Hub-kant S-P3-030, S-P3-080 |
+| B04-003 | media-guard-ultimate | S-P3-600 (scope noodstop aan); Hub-kant S-P3-110, S-P3-080 |
+| B04-004 | media-guard-ultimate | S-P3-630; Hub-kant S-P3-075 |
+| B04-005 | media-guard-ultimate | S-P3-670; Hub-kant S-P3-080 |
+| B04-006 | media-guard-ultimate | S-P3-635; Hub-kant S-P3-100 |
+| B04-007 | media-guard-ultimate | S-P3-675; S-P3-620 (events) |
+| B04-008 | media-guard-ultimate | S-P3-640; S-P3-690, S-P3-615 (`owner_app`), S-P3-680 |
+| B04-009 | media-guard-ultimate | S-P3-625; S-P3-645, S-P3-665, S-P3-600; Hub-kant S-P3-015 |
+| B04-010 | media-guard-ultimate | niet in P3: proefmigratie en productiecontrole op de echte NAS ("Geblokkeerd"); zie STAPPEN_P6.md stap S-P6-33 |
+| B05-001 | media-source-optimizer | S-P3-200; S-P3-205, S-P3-210, S-P3-250, S-P3-255, S-P3-260 |
+| B05-002 | media-source-optimizer | S-P3-280; Hub-kant S-P3-075 |
+| B05-003 | media-source-optimizer | S-P3-280 |
+| B05-004 | media-source-optimizer | S-P3-270 |
+| B05-005 | media-source-optimizer | S-P3-240; Hub-kant S-P3-120 |
+| B05-006 | media-source-optimizer | S-P3-265 |
+| B05-007 | media-source-optimizer | niet in P3: live acceptatie met echte SABnzbd, qBittorrent en Prowlarr ("Geblokkeerd"); zie STAPPEN_P6.md onderdeel N-P6-05 |
+| B05-008 | media-source-optimizer | S-P3-280; Hub-kant S-P3-150 |
+| B05-009 | media-source-optimizer | S-P3-220; S-P3-230, S-P3-240; Hub-kant S-P3-040, S-P3-120 |
+| B05-010 | media-source-optimizer | S-P3-205; S-P3-260, S-P3-290; Hub-kant S-P3-100 |
+| B06-001 | my_house | S-P3-710; S-P3-765 |
+| B06-002 | my_house | S-P3-710; S-P3-715 |
+| B06-003 | my_house | S-P3-705; Hub-kant S-P3-050, S-P3-090, S-P3-130 |
+| B06-004 | my_house | S-P3-715; Hub-kant S-P3-090 |
+| B06-005 | my_house | gebouwd in P0/P1 (energiedatakwaliteit in my_house, "Bezig"); P3 leest alleen: S-P3-300 (home-control-hub), S-P3-090 (Hub); echte meters -> STAPPEN_P6.md onderdeel N-P6-06 |
+| B06-006 | my_house | S-P3-742; S-P3-740; Hub-kant S-P3-050, S-P3-070, S-P3-090, S-P3-130 |
+| B06-007 | my_house | S-P3-742 (my_house-kant: allowlist, schema's, readback); Hub-kant S-P3-130; chat en spraak in de Hub zijn geen werk van my_house (zie STAPPEN_P5.md, S-P5-20) |
+| B06-008 | my_house | S-P3-700; S-P3-720, S-P3-730, S-P3-735; Hub-kant S-P3-100 |
+| B06-009 | my_house | S-P3-710 (softwaregate); S-P3-440 (controlelijst); echte hardware "Geblokkeerd" (D12, D13, D14) -> STAPPEN_P6.md onderdeel N-P6-06 |
+| B08-001 | appstore-en-fork | S-P3-490 (deel: voorziening voor beheerder en dienstaccount zonder geheim, besluit C-12; blijft "Bezig" met "NIET GEVALIDEERD (echte NAS)"); afnemers S-P3-445, S-P3-360; echte NAS -> STAPPEN_P6.md onderdeel N-P6-05 (de C-12-voorziening in het formulier van Node-RED: N-P6-04, punt 5) |
+| B08-002 | appstore-en-fork | S-P3-500 (register beweegt mee; blijft "Geblokkeerd") |
+| B12-003 | ai-server-manager | S-P3-100 (dekking van de bestaande apps; blijft "Bezig") |
+| B14-001 | home-control-hub | S-P3-300; S-P3-350; Hub-kant S-P3-150, S-P3-160 |
+| B14-002 | home-control-hub | S-P3-310; Hub-kant S-P3-150 |
+| B14-003 | home-control-hub | S-P3-320 |
+| B14-004 | home-control-hub | S-P3-330; Hub-kant S-P3-160 |
+| B14-005 | home-control-hub | S-P3-340; S-P3-350 |
+| B11-001 | home-control-hub | gebouwd en gereviewd in P2 (STAPPEN_P2.md: S-P2-290, S-P2-295, S-P2-310); in P3 alleen het profiel op de voorziening van C-12: S-P3-360 (opmerking aanvullen, status zoals gemeten) |
+
+### 8.2 Deel B - Integrale tests (EX) die P3-stappen raken
+
+De integrale tests zijn regels van het programma en blijven "Geblokkeerd" tot de proef op de echte omgeving. P3 levert
+alleen het deel in de eigen repo; het oordeel valt in STAPPEN_P6.md.
+
+| ID | Repo met de EVIDENCE-regel | Stap of reden |
+|---|---|---|
+| EX11 | programma | S-P3-640, S-P3-690 (MediaGuard-deel); integrale test -> STAPPEN_P6.md stap S-P6-20 |
+| EX15 | programma | S-P3-205, S-P3-260, S-P3-625, S-P3-700 (deel per app); integrale test -> STAPPEN_P6.md stap S-P6-20 |
+| EX16 | programma | S-P3-220, S-P3-120 (deel); integrale test -> STAPPEN_P6.md |
+| EX17 | programma | S-P3-740, S-P3-742, S-P3-130 (deel); integrale test -> STAPPEN_P6.md |
+| EX18 | programma | S-P3-110, S-P3-130, S-P3-740, S-P3-742 (deel); integrale test -> STAPPEN_P6.md |
+| EX19 | programma | S-P3-110, S-P3-120, S-P3-240 (deel); integrale test -> STAPPEN_P6.md stap S-P6-18 |
+| EX20 | programma | S-P3-110, S-P3-120, S-P3-130, S-P3-240, S-P3-740, S-P3-742 (deel); integrale test -> STAPPEN_P6.md stap S-P6-18 |
+| EX27 | programma | S-P3-705, S-P3-742, S-P3-130, S-P3-340 (deel); integrale test -> STAPPEN_P6.md stap S-P6-21 |
+| EX28 | programma | S-P3-310, S-P3-150 (deel); integrale test -> STAPPEN_P6.md stap S-P6-21 |
+| EX29 | programma | S-P3-715 (deel); integrale test -> STAPPEN_P6.md |
+| EX30 | programma | S-P3-150 (deel); integrale test -> STAPPEN_P6.md |
+| EX39 | programma | S-P3-075 (Hub-deel van de keten); integrale test -> STAPPEN_P6.md stap S-P6-16 |
+| EX40 | programma | S-P3-075 (Hub-deel van de keten); integrale test -> STAPPEN_P6.md stap S-P6-16 |
+| EX41 | programma | S-P3-075 (Hub-deel van de keten); integrale test -> STAPPEN_P6.md stap S-P6-16 |
+| EX42 | programma | S-P3-075 (Hub-deel van de keten); integrale test -> STAPPEN_P6.md stap S-P6-16 |
+| EX45 | programma | S-P3-742, S-P3-130 (deel); integrale test -> STAPPEN_P6.md |
+| EX46 | programma | S-P3-620 (MediaGuard-deel: stabiele `event_id`); integrale test -> STAPPEN_P6.md |
+| EX50 | programma | S-P3-735 (my_house-deel); integrale test -> STAPPEN_P6.md |
+
+### 8.3 Deel C - Contractpunten met Moment P3 ([CONF])
+
+| ID | Repo met de EVIDENCE-regel | Stap of reden |
+|---|---|---|
+| C1.3-ALG-04 | per repo | S-P3-250 (MSO), S-P3-650 (MediaGuard), S-P3-720 en S-P3-725 (my_house); S-P3-170 (Hub-images blijven voldoen) |
+| C1.3-ALG-05 | per repo | S-P3-280 (MSO), S-P3-680 en S-P3-685 (MediaGuard); Moment "na Peil 1.1.1": wat op Peil 1.1.1 wacht blijft open |
+| C1.3-ASM-19 | ai-server-manager | S-P3-015 (ADR); S-P3-110, S-P3-120, S-P3-130. MediaGuard-acties buiten "noodstop aan" pas na BG-05 (BLOK-08) |
+| C1.3-ASM-21 | ai-server-manager | S-P3-020; S-P3-010, S-P3-030, S-P3-040, S-P3-050, S-P3-060, S-P3-070, S-P3-075, S-P3-080, S-P3-090, S-P3-100, S-P3-170 |
+| C1.3-MGU-05 | media-guard-ultimate | S-P3-600 (scopes); de acties zelf na BG-05 (BLOK-08) |
+| C1.3-MGU-06 | media-guard-ultimate | S-P3-610; S-P3-615, S-P3-620 |
+| C1.3-MGU-07 | media-guard-ultimate | S-P3-650 |
+| C1.3-MGU-08 | media-guard-ultimate | S-P3-655 (terugkeerpad, P3); het NU-deel (adresvalidatie `system.hub_url`) hoort bij STAPPEN_P2.md |
+| C1.3-MGU-09 | media-guard-ultimate | S-P3-660; kopie in S-P3-450 |
+| C1.3-MSO-03 | media-source-optimizer | S-P3-250 |
+| C1.3-MSO-04 | media-source-optimizer | S-P3-230; S-P3-220, S-P3-240 |
+| C1.3-MSO-05 | media-source-optimizer | S-P3-215 |
+| C1.3-MSO-06 | media-source-optimizer | S-P3-290; kopie in S-P3-450 |
+| C1.3-MH-03 | my_house | S-P3-720; S-P3-725 |
+| C1.3-MH-04 | my_house | S-P3-740; S-P3-742, S-P3-745; Hub-kant S-P3-015, S-P3-130 |
+| C1.3-MH-05 | my_house | S-P3-750 (terugkeerpad); S-P3-742 (foutcatalogus en `max_age` van de nieuwe routes); de leesconnector vervalt ([DM-MH] kop "11.6 ...", regel P3-03) tenzij het ADR van S-P3-010 erom vraagt |
+| C1.3-MH-06 | my_house | S-P3-755; kopie in S-P3-450 |
+
+Niet in P3 (ter controle, want ze staan in dezelfde koppen van [CONF]): C1.3-MGU-01, C1.3-MSO-01, C1.3-MSO-02, C1.3-MH-01,
+C1.3-MH-02, C1.3-MH-07 (Moment NU; STAPPEN_P2.md); C1.3-MGU-02 (stap van de gebruiker, T-01; "Geblokkeerd");
+C1.3-MGU-03 (NU, gate voor de eerste release; STAPPEN_P2.md, S-P2-610; in P3 bewaakt door het upgradebewijs in elke
+stap van de baan media-guard-ultimate); C1.3-MGU-04 (P4-0; STAPPEN_P2.md, S-P2-600).
+
+### 8.4 Deel D - Installatiedocumenten en bestaande apps
+
+| ID | Repo met de EVIDENCE-regel | Stap of reden |
+|---|---|---|
+| I03-03-01 | jelly-leon-platform | S-P3-410; S-P3-400 |
+| I03-03-02 | jelly-leon-platform | S-P3-410 |
+| I03-03-03 | jelly-leon-platform | S-P3-410 |
+| I03-03-04 | jelly-leon-platform | S-P3-410; S-P3-660 (manifest), S-P3-450 (kopie) |
+| I03-03-05 | jelly-leon-platform | S-P3-410 |
+| I03-03-06 | jelly-leon-platform | S-P3-410 (echte GPU: N-P6-05) |
+| I03-03-07 | jelly-leon-platform | S-P3-410 (echte telefoon: N-P6-05) |
+| I03-03-08 | jelly-leon-platform | S-P3-410; S-P3-030, S-P3-070, S-P3-630 |
+| I04-04-01 | jelly-leon-platform | S-P3-410; S-P3-210, S-P3-290, S-P3-450 |
+| I04-04-02 | jelly-leon-platform | S-P3-410; S-P3-290 |
+| I04-04-03 | jelly-leon-platform | S-P3-410; S-P3-265 |
+| I04-04-04 | jelly-leon-platform | S-P3-410 (echte Prowlarr en clients: N-P6-05) |
+| I04-04-05 | jelly-leon-platform | S-P3-410 |
+| I04-04-06 | jelly-leon-platform | S-P3-410 (akkoord van de gebruiker, T-12: N-P6-05) |
+| I04-04-07 | jelly-leon-platform | S-P3-410; S-P3-260, S-P3-290 |
+| I04-04-08 | jelly-leon-platform | S-P3-410; S-P3-230, S-P3-040, S-P3-070 |
+| I05-05-01 | jelly-leon-platform | S-P3-440; S-P3-720, S-P3-755 |
+| I05-05-02 | jelly-leon-platform | S-P3-440 (Z-18; zonder besluit optie 1); S-P3-720, S-P3-755 |
+| I05-05-03 | jelly-leon-platform | S-P3-440 (Z-18; zonder besluit optie 1); S-P3-720, S-P3-755, S-P3-450 |
+| I05-05-04 | jelly-leon-platform | S-P3-440 (hardware: N-P6-06) |
+| I05-05-05 | jelly-leon-platform | S-P3-440 (hardware: N-P6-06) |
+| I05-05-06 | jelly-leon-platform | S-P3-440 (hardware, D12: N-P6-06) |
+| I05-05-07 | jelly-leon-platform | S-P3-440 (hardware, D13: N-P6-06); S-P3-720 (optioneel Zigbee2MQTT-proces, Z-17), S-P3-755 (formulierveld) |
+| I05-05-08 | jelly-leon-platform | S-P3-440; S-P3-730 |
+| I10-10-01 | jelly-leon-platform | gebouwd in P2 (STAPPEN_P2.md: S-P2-395, S-P2-410; besluit C-11); in P3 alleen het manifest op de voorziening van C-12: S-P3-445 (opmerking aanvullen, blijft "Geblokkeerd": N-P6-04) |
+| I15-15-01 | jelly-leon-platform | S-P3-420 |
+| I15-15-02 | jelly-leon-platform | S-P3-420 (account: N-P6-02) |
+| I15-15-03 | jelly-leon-platform | S-P3-420 |
+| I15-15-04 | jelly-leon-platform | S-P3-420 |
+| I15-15-05 | jelly-leon-platform | S-P3-420 |
+| I15-15-06 | jelly-leon-platform | S-P3-420 |
+| I16-16-01 | jelly-leon-platform | S-P3-420 |
+| I16-16-02 | jelly-leon-platform | S-P3-420 |
+| I16-16-03 | jelly-leon-platform | S-P3-420 |
+| I16-16-04 | jelly-leon-platform | S-P3-420 |
+| I16-16-05 | jelly-leon-platform | S-P3-420 |
+| I16-16-06 | jelly-leon-platform | S-P3-420 |
+| I17-17-01 | jelly-leon-platform | S-P3-420 |
+| I17-17-02 | jelly-leon-platform | S-P3-420 |
+| I17-17-03 | jelly-leon-platform | S-P3-420 |
+| I17-17-04 | jelly-leon-platform | S-P3-420 |
+| I17-17-05 | jelly-leon-platform | S-P3-420 |
+| I17-17-06 | jelly-leon-platform | S-P3-420 |
+| I18-18-01 | jelly-leon-platform | S-P3-430 |
+| I18-18-02 | jelly-leon-platform | S-P3-430 |
+| I18-18-03 | jelly-leon-platform | S-P3-430 |
+| I18-18-04 | jelly-leon-platform | S-P3-430 |
+| I18-18-05 | jelly-leon-platform | S-P3-430 |
+| I18-18-06 | jelly-leon-platform | S-P3-430 |
+| I19-19-01 | jelly-leon-platform | S-P3-430 |
+| I19-19-02 | jelly-leon-platform | S-P3-430 |
+| I19-19-03 | jelly-leon-platform | S-P3-430 |
+| I19-19-04 | jelly-leon-platform | S-P3-430 |
+| I19-19-05 | jelly-leon-platform | S-P3-430 |
+| I19-19-06 | jelly-leon-platform | S-P3-430 |
+| I20-20-01 | jelly-leon-platform | S-P3-430 |
+| I20-20-02 | jelly-leon-platform | S-P3-430 |
+| I20-20-03 | jelly-leon-platform | S-P3-430 (hardware: N-P6-05) |
+| I20-20-04 | jelly-leon-platform | S-P3-430 |
+| I20-20-05 | jelly-leon-platform | S-P3-430 (besluit van de gebruiker) |
+| APP-09 | appstore-en-fork | S-P3-180 (document); S-P3-500 (register); blijft "Geblokkeerd" -> STAPPEN_P6.md onderdeel N-P6-05 |
+| APP-10 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-11 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-12 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-13 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-14 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-17 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-18 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-19 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+| APP-20 | appstore-en-fork | S-P3-180; S-P3-500; blijft "Geblokkeerd" (N-P6-05) |
+
+Telling: deel A 39 ID's, deel B 18, deel C 17 contractpunten, deel D 70. Controle door de regisseur (alleen lezen):
+`grep -c -E '^\| (B[0-9]{2}-[0-9]{3}|EX[0-9]{2}|I[0-9]{2}-[0-9]{2}-[0-9]{2}|APP-[0-9]{2}) ' <WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md`
+moet 127 geven (39 + 18 + 70), en
+`grep -o -E '^\| C1\.3-[A-Z]+-[0-9]+ ' <WERKMAP>/.lokaal/plan/uit/STAPPEN_P3.md | sort -u | wc -l` moet 17 geven.

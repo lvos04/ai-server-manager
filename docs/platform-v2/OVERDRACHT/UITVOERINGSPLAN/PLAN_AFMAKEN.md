@@ -1,5 +1,9 @@
 # PLAN AFMAKEN - eerste werk van de regisseur
 
+**AFGEROND op 2026-11-11 om 12:05.** PA-1 tot en met PA-11 zijn klaar, gevolgd door drie rondes kruismeldingen
+(rapporten in `<WERKMAP>/.lokaal/plan/afmaakrapporten/`). dekking.py --voortgang en --streng: exitcode 0. Dit bestand is
+nu alleen nog naslag.
+
 Stand: 2026-11-11. Lees dit direct na 00_LEES_EERST.md. Het vervalt zodra de tabel "Plan afmaken" in VOORTGANG.md helemaal
 is afgevinkt.
 
@@ -16,20 +20,24 @@ heeft de repo gelijk. Twijfel je of een stap klopt, start dan eerst A-VERKEN en 
 
 | Bestand | Geschreven | Compleet | Onafhankelijk gecontroleerd |
 |---|---|---|---|
-| 00_LEES_EERST.md, STARTPROMPT.md, PLAN_AFMAKEN.md | door de vorige regisseur zelf | ja | NEE |
-| VOORTGANG.md | met een script uit de stapbestanden (301 rijen; klopt met dekking.py) | ja | NEE |
-| AGENTEN.md | door een agent | ja (deel 0 tot en met 7) | NEE (controle afgebroken; al deels hersteld) |
-| POORTEN.md, BESLUITEN_EN_BLOKKADES.md, VALKUILEN.md | door agents | lijkt compleet | NEE (controle afgebroken) |
-| STAPPEN_P2.md (38 stappen) | door een agent | ja (tot en met fase-afsluiting en dekking) | NEE (controle afgebroken; al deels hersteld) |
-| STAPPEN_P3.md (47 stappen) | door een agent | NEE: houdt op in de baan appstore-en-fork; fase-afsluiting en dekking ontbreken | NEE |
-| STAPPEN_P4_GOLF1_2.md (35 stappen) | door een agent | NEE: fase-afsluiting en dekking ontbreken | NEE |
-| STAPPEN_P4_GOLF3_4.md (73 stappen) | door een agent | waarschijnlijk NEE: geen aparte fase-afsluiting en dekking gezien | NEE |
-| STAPPEN_P5.md (65 stappen) | door een agent | lijkt compleet | NEE |
-| STAPPEN_P6.md (29 stappen, 14 NAS-onderdelen) | door een agent | lijkt compleet | NEE |
-| dekking.py, DEKKING.tsv | door een agent (afgebroken) | draait; niet nagelopen | NEE |
-| maak_voortgang.py | - | BESTAAT NIET | - |
+| 00_LEES_EERST.md, STARTPROMPT.md, PLAN_AFMAKEN.md | door de regisseur | ja | door PA-2 vergeleken met AGENTEN.md; meldingen verwerkt |
+| VOORTGANG.md | met maak_voortgang.py | ja | dekking.py --voortgang klopt |
+| AGENTEN.md | agent; PA-2 schreef o.a. 2.4 | ja | ja (PA-2) |
+| POORTEN.md, BESLUITEN_EN_BLOKKADES.md, VALKUILEN.md | agents | ja | ja (PA-3); ronde 2 loopt voor besluiten en poorten |
+| STAPPEN_P2.md (45 stappen) | agent; PA-1 schreef 7 stappen bij | ja | ja (PA-1); ronde 2 loopt (C-11, dubbele review jelly-leon) |
+| STAPPEN_P3.md (81 stappen) | agent; PA-5 schreef 34 stappen, afsluiting en dekking | ja | ja (PA-5) |
+| STAPPEN_P4_GOLF1_2.md (58 stappen) | agent; PA-6 schreef golf 2, S-G1-15, afsluiting en dekking | ja | ja (PA-6) |
+| STAPPEN_P4_GOLF3_4.md (78 stappen) | agent; PA-7 schreef afsluiting en dekking | ja | ja (PA-7); ronde 2 loopt |
+| STAPPEN_P5.md (67 stappen) | agent | ja | ja (PA-8) |
+| STAPPEN_P6.md (29 stappen, 14 NAS-onderdelen) | agent; PA-9 schreef de dekking | ja | ja (PA-9); ronde 2 loopt |
+| dekking.py, DEKKING.tsv, maak_voortgang.py | PA-4 | ja | ja (PA-4) |
 
-Wat `python3 <PLANMAP>/dekking.py --voortgang` op 2026-11-11 meldt (exitcode 1):
+"Gecontroleerd" betekent: de eigenaar heeft het bestand helemaal gelezen en tegen de repos gelegd; elk rapport noemt onder
+GECONTROLEERD welke stappen NIET inhoudelijk tegen hun bron zijn gelegd. De droogloop (PA-11) volgt nog.
+
+Wat `python3 <PLANMAP>/dekking.py --voortgang` op 2026-11-11 om 10:32 meldt (exitcode 1; ONGEDEKT is dan al 0, en de nieuwe
+controle vindt 60 stappen die in "Volgorde en banen" staan maar geen eigen kop hebben: P2 5, P3 34, golf 2 19, golf 4 2).
+De stand bij de overdracht was:
 
 - ONGEDEKT (geen stap, geen NAS-onderdeel, geen dekkingsrij): B09-006 en B12-002.
 - "Vooraf" verwijst naar een stap die niet bestaat: S-P3-110 (S-P3-600), S-P3-130 (S-P3-742), S-P3-450 (S-P3-660 en
@@ -88,7 +96,7 @@ Zet elke taak in de tabel "Lopend" van VOORTGANG.md (rol: "plan-eigenaar"; ze te
    een melding een vaste regel van de gebruiker of de HARDE EIS: leg haar voor met een keuzemenu.
 4. **PA-10:** draai `python3 <PLANMAP>/dekking.py --voortgang`. Het moet eindigen zonder FOUT (exitcode 0). Wat overblijft
    geef je aan de eigenaar van het bestand (ronde 2). Is een stapbestand gewijzigd, draai dan eerst
-   `python3 <PLANMAP>/maak_voortgang.py` (maak vooraf een kopie van VOORTGANG.md in /tmp en vergelijk daarna met `diff`:
+   `python3 <PLANMAP>/maak_voortgang.py --droog` en dan zonder optie (maak vooraf een kopie van VOORTGANG.md in /tmp en vergelijk daarna met `diff`:
    niets wat is ingevuld of afgevinkt mag weg zijn).
 5. **PA-11:** start de droogloop (N2). Blokkerende bevindingen gaan naar de eigenaar van het bestand (ronde 2); de rest
    noteer je in VOORTGANG.md bij de taak.

@@ -4,9 +4,11 @@ Dit is een kopie van het uitvoeringsplan voor de regisseur, vastgelegd op 2026-1
 staat op de bouwmachine in `/home/transcode/truenas-v2/.lokaal/plan/uit` en is leidend; daar staat ook de bijgehouden
 `VOORTGANG.md`. Deze kopie is er om het plan niet kwijt te raken.
 
-**Status: concept, NIET volledig gecontroleerd.** Het plan is door agents geschreven; de onafhankelijke controle is
-afgebroken. `STAPPEN_P3.md`, `STAPPEN_P4_GOLF1_2.md` en `STAPPEN_P4_GOLF3_4.md` zijn niet af. Wat er nog moet gebeuren staat
-in `PLAN_AFMAKEN.md` (taken PA-1 tot en met PA-11); de opdrachten daarvoor staan in `afmaakopdrachten/`.
+**Status (2026-11-11, 12:05): afgemaakt en gecontroleerd.** Elk planbestand is door een eigen subagent afgemaakt en tegen
+de repos gelegd, gevolgd door drie rondes met kruismeldingen tussen de bestanden en een droogloop (`PLAN_AFMAKEN.md`).
+`dekking.py --voortgang --streng` eindigt zonder fouten. Elk controlerapport noemt welke stappen NIET inhoudelijk tegen hun
+bron zijn gelegd; het plan is dus gecontroleerd, maar niet foutloos gegarandeerd. Open besluiten van de gebruiker staan in
+`BESLUITEN_EN_BLOKKADES.md` en in `VOORTGANG.md` ("Wacht op de gebruiker").
 
 Begin bij `00_LEES_EERST.md`. De stand van het werk waarop het plan begint staat in `STAND_RONDE3.md`.
 

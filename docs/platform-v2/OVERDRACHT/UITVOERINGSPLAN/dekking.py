@@ -5,6 +5,7 @@ Gebruik (vanuit elke map; alle paden zijn relatief aan de map waarin dit script 
 
     python3 dekking.py               dekking + vormcontroles; schrijft DEKKING.tsv
     python3 dekking.py --voortgang   idem, en controleert bovendien VOORTGANG.md
+    python3 dekking.py --voortgang /tmp/VOORTGANG.md   idem, met een kopie (om maak_voortgang.py te testen)
     python3 dekking.py --streng      vormfouten (ontbrekende velden, N5 zonder "Winst:") ook laten tellen voor de exitcode
 
 Leest: ALLE_IDS.txt, STAPPEN_*.md, AGENTEN.md, VALKUILEN.md, POORTEN.md (en met --voortgang VOORTGANG.md).
@@ -12,15 +13,20 @@ Schrijft: alleen DEKKING.tsv (kolommen ID, categorie, waar, bestand).
 
 Categorieen per ID uit ALLE_IDS.txt:
     stap      het ID staat in de regel "Werkpakketten en tests" van een stap (### S-...), of een rij van een
-              tabel onder een kop "Dekking" noemt voor dit ID een bestaande stap
+              tabel onder een kop "Dekking" noemt voor dit ID een bestaande stap. De kolom "waar" maakt onderscheid:
+                "bouwstap: S-..."          het ID staat in "Werkpakketten en tests" van een stap die niet alleen een
+                                           gate is (een gatestap: rol A-GATE in "Agents" zonder A-BOUW, A-VERKEN of
+                                           A-ONTWERP)
+                "...; genoemd: S-..."      daarnaast genoemd in een Dekking-tabel of in de regel van een gatestap
+                "alleen genoemd: S-... (Dekking-tabel|gate)"   geen bouwstap; staat apart onder "Ter controle"
     nas       geen stap, wel een NAS-onderdeel (### N-...) dat het ID in zijn regel "Rijen" noemt, of een
               Dekking-rij die het ID naar de echte NAS verwijst
     gebouwd   geen stap; een Dekking-rij zegt dat het al gebouwd is
     besluit   geen stap; het ID is een besluit (Dnn) of een Dekking-rij wacht op een besluit
     ONGEDEKT  niets van het bovenstaande (ook: alleen een verwijzing "zie STAPPEN_..." zonder stap)
 
-Exitcode 1 bij een ONGEDEKT ID of een kapotte verwijzing (Vooraf naar een onbekende stap, dubbel stap-ID,
-onbekende rol, V-nnn of P-<naam>), en met --voortgang bij een verschil tussen de STAPPEN-bestanden en VOORTGANG.md.
+Exitcode 1 bij een ONGEDEKT ID of een kapotte verwijzing (Vooraf of Voorwaarden naar een onbekende stap, dubbel stap-ID,
+onbekende rol, V-nnn of P-<naam>, een stap in "Volgorde en banen" zonder eigen kop), en met --voortgang bij een verschil tussen de STAPPEN-bestanden en VOORTGANG.md.
 Alleen standaardbibliotheek.
 """
 
@@ -347,15 +353,35 @@ def is_tabelkop_dekking(cellen):
 # ---------------------------------------------------------------------------------------------
 
 N5_RE = re.compile(r"(?<![\w\-])N5(?![\w\-])")
+# Tekst tussen aanhalingstekens of backticks is een citaat (bv. de kop "7.3 Het topmodel (N5): ..." van AGENTEN.md),
+# geen inzet.
+CITAAT_RE = re.compile(r'"[^"\n]*"|\u201c[^\u201d\n]*\u201d|\u201e[^\u201d\u201c\n]*[\u201d\u201c]|`[^`\n]*`')
+TOPMODEL_RE = re.compile(r"topmodel\s*\(\s*N5\s*\)", re.I)
+# Grens van een zinsdeel: een ontkenning werkt niet over deze tekens heen.
+ZINSDEEL_RE = re.compile(r"[.;:,()\[\]\n]|\s-\s|\s\u2013\s")
+ONTKENNING = ("geen", "niet", "nooit", "zonder")
 
 
 def heeft_n5(niveau):
-    """True als de regel "Niveau" een inzet op N5 noemt (niet: "N5-review ... in S-...", "geen N5")."""
+    """True als de regel "Niveau" een inzet op N5 noemt.
+
+    Telt niet mee: "N5-review ... in S-..." (N5 met een koppelteken erachter), een citaat tussen aanhalingstekens of
+    backticks (bv. de kop "7.3 Het topmodel (N5): ..."), "topmodel (N5)", "hoger dan N5", en een N5 met in hetzelfde
+    zinsdeel hooguit drie woorden ervoor een ontkenning: "Geen N5: ...", "R-HARDE-EIS geen N5", "(geen N5: ...)",
+    "niet op N5", "geen A-BOUW N5". Een zinsdeel eindigt bij . ; : , ( ) [ ] een regeleinde of " - ".
+    """
     if not niveau:
         return False
-    for m in N5_RE.finditer(niveau):
-        voor = niveau[max(0, m.start() - 14):m.start()].lower()
-        if re.search(r"(geen|niet|nooit|zonder|dan)\s+(op\s+)?$", voor):
+    tekst = CITAAT_RE.sub(lambda m: " " * len(m.group(0)), niveau)
+    tekst = TOPMODEL_RE.sub(lambda m: " " * len(m.group(0)), tekst)
+    for m in N5_RE.finditer(tekst):
+        voor = tekst[:m.start()]
+        grenzen = list(ZINSDEEL_RE.finditer(voor))
+        deel = voor[grenzen[-1].end():] if grenzen else voor
+        woorden = deel.lower().split()
+        if woorden and woorden[-1] == "dan":
+            continue
+        if any(w in ONTKENNING for w in woorden[-3:]):
             continue
         return True
     return False
@@ -363,6 +389,13 @@ def heeft_n5(niveau):
 
 def rollen(tekst):
     return list(OrderedDict.fromkeys(ROL_RE.findall(tekst or "")))
+
+
+def is_gatestap(stap):
+    """Een stap die alleen een gate is: A-GATE in "Agents", zonder A-BOUW, A-VERKEN of A-ONTWERP
+    (A-HERSTEL, reviewers en R-EERLIJK mogen erbij)."""
+    r = rollen(stap.veld("Agents"))
+    return "A-GATE" in r and not any(x in r for x in ("A-BOUW", "A-VERKEN", "A-ONTWERP"))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -382,7 +415,8 @@ def kort(t, n=140):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Dekkingscontrole van het uitvoeringsplan (schrijft DEKKING.tsv).")
-    ap.add_argument("--voortgang", action="store_true", help="controleer ook VOORTGANG.md tegen de STAPPEN-bestanden")
+    ap.add_argument("--voortgang", nargs="?", const=os.path.join(HIER, "VOORTGANG.md"), default=None, metavar="PAD",
+                    help="controleer ook VOORTGANG.md (of het opgegeven bestand, bv. een kopie) tegen de STAPPEN-bestanden")
     ap.add_argument("--streng", action="store_true", help="vormfouten tellen ook voor de exitcode")
     args = ap.parse_args(argv)
 
@@ -399,6 +433,7 @@ def main(argv=None):
     bestaand = set(stap_ids)
     alleen_s = [s for s in stappen if s.soort == "stap"]
     s_ids = set(s.id for s in alleen_s)
+    gatestap = set(s.id for s in alleen_s if is_gatestap(s))
 
     # 1. ID's uit "Werkpakketten en tests" (stappen) en "Rijen" (NAS-onderdelen)
     werk = defaultdict(list)      # ID -> [stap-ID's] via Werkpakketten
@@ -433,14 +468,27 @@ def main(argv=None):
                 dek_reden[i].append((rest, bestand))
 
     # 3. Categorie per ID
+    def op_volgorde(lijst):
+        lijst = list(OrderedDict.fromkeys(lijst))
+        lijst.sort(key=lambda x: per_id[x][0].positie if x in per_id else 10**9)
+        return lijst
+
     rijen = []
     telling = OrderedDict((k, 0) for k in ("stap", "gebouwd", "nas", "besluit", "ONGEDEKT"))
     ongedekt = []
+    alleen_genoemd = []
     for i in alle_ids:
-        stapset = list(OrderedDict.fromkeys(werk.get(i, []) + dek_stap.get(i, [])))
-        stapset.sort(key=lambda x: per_id[x][0].positie if x in per_id else 10**9)
-        if stapset:
-            cat, waar = "stap", ", ".join(stapset)
+        stapset = op_volgorde(werk.get(i, []) + dek_stap.get(i, []))
+        bouw = op_volgorde(x for x in werk.get(i, []) if x not in gatestap)
+        genoemd = [x for x in stapset if x not in bouw]
+        if bouw:
+            cat, waar = "stap", "bouwstap: " + ", ".join(bouw)
+            if genoemd:
+                waar += "; genoemd: " + ", ".join(genoemd)
+        elif stapset:
+            hoe = ["%s (%s)" % (x, "gate" if x in werk.get(i, []) else "Dekking-tabel") for x in genoemd]
+            cat, waar = "stap", "alleen genoemd: " + ", ".join(hoe)
+            alleen_genoemd.append((i, ", ".join(hoe)))
         elif i in nasrij and re.fullmatch(r"D\d{2}", i):
             cat, waar = "besluit", ("gegeven of besluit van de gebruiker; vastleggen in NAS-onderdeel "
                                     + ", ".join(OrderedDict.fromkeys(nasrij[i])))
@@ -500,6 +548,15 @@ def main(argv=None):
         print("  " + ", ".join(alleen_nas))
         print("  (terecht als het werkpakket in P0/P1 al gebouwd is; anders ontbreekt er een bouwstap)")
 
+    # ID's die alleen genoemd worden (Dekking-tabel of regel van een gatestap), zonder bouwstap: ter controle
+    print()
+    print("== Ter controle: ID's met categorie 'stap' zonder bouwstap, alleen genoemd in een Dekking-tabel of in de "
+          "regel 'Werkpakketten en tests' van een gatestap: %d" % len(alleen_genoemd))
+    for i, hoe in alleen_genoemd:
+        print("  %s: %s" % (i, hoe))
+    if alleen_genoemd:
+        print("  (terecht als de genoemde stap het ID echt bouwt of het al gebouwd is; anders ontbreekt er een bouwstap)")
+
     # ID's buiten ALLE_IDS (contractpunten): alleen ter informatie
     extra = set()
     for i in list(werk) + list(dek_stap) + list(dek_reden):
@@ -534,15 +591,44 @@ def main(argv=None):
     # Vooraf naar niet-bestaande stappen
     print()
     kapot_vooraf = []
-    for s in alleen_s:
-        vooraf = s.veld("Vooraf") or ""
+    for s in stappen:
+        # stappen: regel "Vooraf"; NAS-onderdelen (### N-...): regel "Voorwaarden"
+        vooraf = (s.veld("Vooraf") if s.soort == "stap" else s.veld("Voorwaarden", "Vooraf")) or ""
         for ref in haal_stappen(vooraf, stap_ids):
             if ref not in bestaand:
                 kapot_vooraf.append((s, ref))
-    print("== 'Vooraf' verwijst naar een stap die niet bestaat: %d" % len(kapot_vooraf))
+    print("== 'Vooraf' (bij een NAS-onderdeel 'Voorwaarden') verwijst naar een stap die niet bestaat: %d"
+          % len(kapot_vooraf))
     for s, ref in kapot_vooraf:
         print("  %s (%s): %s" % (s.id, s.bestand, ref))
     if kapot_vooraf:
+        fout = True
+
+    # Stappen die in een tabel onder "Volgorde en banen" staan maar geen eigen kop (### S-...) hebben
+    print()
+    kapot_volgorde = []
+    for pad in stapbestanden():
+        naam = os.path.basename(pad)
+        niveau_vb = None
+        for nr, (r, in_code) in enumerate(lees_regels(pad), 1):
+            kop = KOP_RE.match(r) if not in_code else None
+            if kop:
+                niveau = len(kop.group(1))
+                if niveau_vb is not None and niveau <= niveau_vb:
+                    niveau_vb = None
+                if niveau_vb is None and re.search(r"Volgorde en banen", kop.group(2)):
+                    niveau_vb = niveau
+                continue
+            if niveau_vb is None or in_code or not r.lstrip().startswith("|"):
+                continue
+            eerste = r.strip().strip("|").split("|")[0].strip().strip("`* ")
+            m = STAP_KERN_RE.match(eerste)
+            if m and m.group(1) not in bestaand:
+                kapot_volgorde.append((naam, nr, m.group(1)))
+    print("== Stappen in een tabel onder 'Volgorde en banen' zonder eigen kop (### S-...): %d" % len(kapot_volgorde))
+    for naam, nr, sid in kapot_volgorde:
+        print("  %s:%d: %s" % (naam, nr, sid))
+    if kapot_volgorde:
         fout = True
 
     # Vormcontroles per stap
@@ -645,9 +731,9 @@ def main(argv=None):
     # VOORTGANG.md
     if args.voortgang:
         print()
-        vpad = os.path.join(HIER, "VOORTGANG.md")
+        vpad = args.voortgang
         if not os.path.exists(vpad):
-            print("== VOORTGANG.md ontbreekt")
+            print("== %s ontbreekt" % vpad)
             fout = True
         else:
             in_v = defaultdict(int)
@@ -672,7 +758,8 @@ def main(argv=None):
             vaker = [(s, n) for s, n in in_v.items() if n > 1]
             deel = [s for s in in_v if s not in bestaand and re.sub(r"[a-z]$", "", s) in bestaand]
             vreemd_v = [s for s in in_v if s not in bestaand and s not in deel]
-            print("== VOORTGANG.md: %d stap-rijen; %d stappen/onderdelen in de STAPPEN-bestanden" % (sum(in_v.values()), len(set(stap_ids))))
+            print("== %s: %d stap-rijen; %d stappen/onderdelen in de STAPPEN-bestanden"
+                  % (os.path.basename(vpad), sum(in_v.values()), len(set(stap_ids))))
             print("  ontbreken in VOORTGANG.md (%d): %s" % (len(niet_in_v), ", ".join(niet_in_v)))
             print("  meer dan een keer in VOORTGANG.md (%d): %s" % (len(vaker), ", ".join("%s (%dx)" % x for x in vaker)))
             print("  in VOORTGANG.md maar niet in de STAPPEN-bestanden (%d): %s" % (len(vreemd_v), ", ".join(vreemd_v)))

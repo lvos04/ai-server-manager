@@ -285,6 +285,8 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
 - Bouwronde 3 is op 2026-11-11 afgebroken op verzoek van de gebruiker. De stand per repo (wat gepusht is, wat niet is
   gereviewd, wat als half werk niet-gecommit in de werkmap staat) staat in `UITVOERINGSPLAN/STAND_RONDE3.md`.
 - Voor het vervolg is een uitvoeringsplan voor een regisseur met subagents geschreven: `UITVOERINGSPLAN/` (begin bij
-  `00_LEES_EERST.md`). **Het is een concept en NIET volledig gecontroleerd**: de onafhankelijke controle is afgebroken en
-  drie stapbestanden (P3 en beide P4-bestanden) zijn niet af. Eerste werk van de regisseur: `UITVOERINGSPLAN/PLAN_AFMAKEN.md`.
+  `00_LEES_EERST.md`). Stand 2026-11-11 12:05: afgemaakt en gecontroleerd (per bestand een eigen controle, drie rondes
+  kruismeldingen en een droogloop; zie `UITVOERINGSPLAN/LEESMIJ.md`). Besluiten van de gebruiker van 2026-11-11 (Z-04, Z-05,
+  C-11, C-12, Z-17, Z-19, Z-20) staan in `UITVOERINGSPLAN/BESLUITEN_EN_BLOKKADES.md` kop 1.5; de vastlegging in de
+  besluitendocumenten volgt in stap S-P2-005.
 - Het werkexemplaar met de bijgehouden voortgang staat op de bouwmachine in `/home/transcode/truenas-v2/.lokaal/plan/uit`.

@@ -25,6 +25,12 @@ Golf 3 en golf 4 maken de zes functies van Jelly Leon af op de ontwikkelmachine,
   (B03-036, 037, 039), het P4-deel van B03-049, Hub voor kwaliteit (B03-058), lanewrapper, gedeeld GPU-budget, probe,
   geleerde profielen en bescherming van stock-clients (B03-004/005 aanvullingen, B03-063 t/m B03-069),
   correctie-editor, skipknoppen en koppelingen voor segmenten (B03-075 t/m B03-078) en de afronding van B03-007.
+- **Besluit Z-20 (genomen 2026-11-11: "in P4 bouwen; per werkpakket eerst A-VERKEN, dan stappen in een golf"):** de
+  zes werkpakketten zonder golf in FASERING#3 worden hier gebouwd, zo ver als de ontwikkelmachine toelaat. Golf 3:
+  metadata en anime-mapping (B03-006: S-G3-28, S-G3-29), universele bibliotheek (B03-002: S-G3-30, S-G3-31) en
+  beschikbaarheid van clients (B03-003: S-G3-32). Golf 4: scènezoeker (B03-008: S-G4-49, S-G4-50), offline downloaden
+  (B03-011: S-G4-51, S-G4-52) en live-tv en DVR (B03-012: S-G4-53, S-G4-54). Echte apparaten, tuners en de NAS:
+  STAPPEN_P6.md, N-P6-09.
 
 Niet in dit bestand (fase P5): B03-038, B03-044, B03-045, B03-046, B03-048, de rest van B03-049, B03-059, B03-079.
 Niet in dit bestand (fase P6, echte NAS of echte apparaten): de testrijen JLT-06, JLT-15, JLT-26, JLT-39, JLT-49,
@@ -38,10 +44,14 @@ Bron: `<WERKMAP>/ai-server-manager/docs/platform-v2/02_BOUWPLANNEN/B03_FASERING.
 
 | Gate | Inhoud in het kort | Bron |
 |---|---|---|
-| Gate P4-0 | jelly-leon en jelly-leon-web op 12.x; JLT-60 t/m JLT-64, JLT-67, JLT-70 t/m JLT-73 Sim-geslaagd; baselines opnieuw gemeten op de digest van de forkbasis | B03_FASERING.md#Gate P4-0 (vóór elk B03-modulewerk) |
-| Gate golf 1 | een plugin met modules bewezen; JLT-68, JLT-64, JLT-65 Sim-geslaagd; foutcatalogus, analyzer, UserDeleted groen; werker met SBOM; planner (pauze binnen 5 s, hooguit 2 threads en 1 GiB batch); JLT-66 Sim-geslaagd of batchmodules blijven op de NAS uit (BG-07) | B03_FASERING.md#Gate golf 1 (vóór elk functiewerk in P4) |
-| Gates golf 2 | WT-1-gate (decorator of core-patch, B03-021), G-F2-1 t/m G-F2-5 (B03-031 t/m B03-035), F5-S1 en F5-S3 (B03-061, B03-062), F6-S1 t/m F6-S3 (B03-071, 072, 073; JLT-51 nultolerantie) | B03_FASERING.md#3. Golven en werkpakketten, rij Golf 2 |
+| Gate P4-0 | jelly-leon en jelly-leon-web op 12.x; JLT-60 t/m JLT-64, JLT-67, JLT-70 t/m JLT-73 Sim-geslaagd; baselines opnieuw gemeten op de digest van de forkbasis | B03_FASERING.md#Gate P4-0 (vóór elk B03-modulewerk); stap S-P40-95 (STAPPEN_P4_GOLF1_2.md) |
+| Gate golf 1 | een plugin met modules bewezen; JLT-68, JLT-64, JLT-65 Sim-geslaagd; foutcatalogus, analyzer, UserDeleted groen; werker met SBOM; planner (pauze binnen 5 s, hooguit 2 threads en 1 GiB batch); JLT-66 Sim-geslaagd of batchmodules blijven op de NAS uit (BG-07) | B03_FASERING.md#Gate golf 1 (vóór elk functiewerk in P4); stap S-G1-90 (STAPPEN_P4_GOLF1_2.md) |
+| Gates golf 2 | WT-1-gate (decorator of core-patch, B03-021), G-F2-1 t/m G-F2-5 (B03-031 t/m B03-035), F5-S1 en F5-S3 (B03-061, B03-062), F6-S1 t/m F6-S3 (B03-071, 072, 073; JLT-51 nultolerantie) | B03_FASERING.md#3. Golven en werkpakketten, rij Golf 2; stap S-G2-90 (STAPPEN_P4_GOLF1_2.md), rapport `<WERKMAP>/.lokaal/ketens/GATE-GOLF-2/RAPPORT-A-GATE.md` |
 | Contractregel | "Een plugin met modules + belastingtest binnen de manifestresources" voor B03-batch op de NAS; "Hub-sleutelpin in Jelly Leon (JL4)" voor Hub-kaarten van B03 | `<WERKMAP>/ai-server-manager/docs/platform-v2/01_ARCHITECTUUR/06_FASERING_EN_GATES.md#Fase P4 — Universele mediaplatform` |
+
+Golf 3 begint pas als de gate van golf 2 (S-G2-90) gehaald is en de gebruiker daar in het keuzemenu "doorgaan naar
+golf 3" koos (STAPPEN_P4_GOLF1_2.md, S-G2-90 bouwpunt 4 en "Stop en vraag als"). Die gate veronderstelt de gates van
+P4-0 en golf 1. Ook S-G4-25 en S-G4-31, die al tijdens golf 3 mogen lopen (hoofdstuk 7), starten dus niet eerder.
 
 Let op: Δ-MG-AUTH en Δ-MG-DUAL (eigenaar: media-guard-ultimate) zijn exitcriteria van P4-0. Volgens de vervolgpunten
 zijn ze niet opgeleverd. P4 mag dan op de ontwikkelmachine verder met een MediaGuard-simulator, maar er draait geen
@@ -92,7 +102,7 @@ besluit" is de veiligste stand; daarmee mag een stap doorgaan als dat er staat.
 | BG-25 | Gecorrigeerde ondertitelkopie bij slechte sync | S-G3-13 | alleen melden: geen gecorrigeerde kopie, ook niet op verzoek |
 | BG-03 | Wat is een kinderprofiel (hoort voor golf 1) | S-G3-18 | STOP als `IsKid(user)` in de code nog geen vastgelegde definitie heeft |
 | BG-08 | Swiftfin | S-G4-27, S-G4-28 (voor golf 4) | geen eigen patches |
-| BG-12 | Chat en reacties | S-G4-10, S-G4-24; S-G4-44 (tabblad "Chat en reacties") | uit; routes geven 501; S-G4-24 vervalt |
+| BG-12 | Chat en reacties | S-G4-10, S-G4-24; S-G4-44 (tabblad "Chat en reacties") | uit; B03-028 wordt niet gebouwd: S-G4-10 en S-G4-24 vervallen, B03-028 staat op "Geblokkeerd (besluit BG-12)" |
 | BG-15 | Rij "Aanbevolen voor jou" | S-G4-20, S-G4-45, S-G4-29 | STOP: zonder besluit geen webhaak H-HOME |
 | BG-26 | Afspeelprofiel aanpassen voor officiele apps en stock-tv-apps | S-G4-06, S-G4-07, S-G4-41, S-G4-42 | alleen opt-in per apparaat, alleen beperkend |
 | BG-28 | Volle of uitgevallen GPU's | S-G4-03, S-G4-04, S-G4-08 | standaardgedrag van upstream; nooit weigeren |
@@ -104,6 +114,10 @@ besluit" is de veiligste stand; daarmee mag een stap doorgaan als dat er staat.
 | BG-34 | Wie labelt de echte afleveringen (genomen: de gebruiker of een aangewezen persoon) | S-G3-22, S-G4-40 | alleen de synthetische testset telt; het deel met echte afleveringen blijft Geblokkeerd |
 | BG-36 | Module uit: eigen segmenten wissen of verbergen (hoort bij golf 2) | S-G4-16 | STOP als de code van golf 2 dit gedrag nog niet heeft vastgelegd; S-G4-16 kiest het niet zelf |
 | BG-37 | Testdata met een beperkende licentie (genomen) | S-G4-12, S-G4-34 | testdata met een beperkende licentie alleen lokaal, nooit in een repo of image; evaluatie op echte kijkgeschiedenis is JLT-15 en hoort in STAPPEN_P6.md |
+| BG-17 | Online metadata (TMDb/OMDb); moment "bij B03-006" | S-G3-28 (de regisseur legt het voor vóór die stap) | aan laten (standaardgedrag van Jellyfin); S-G3-28 verandert niets aan de online metadata-instellingen |
+| BG-06 | Optionele lokale modellen (embeddings, spraakherkenning); hoort bij P5 | S-G4-49 | geen tweede producent: in P4 geen spraakherkenning en geen embeddings; de scènezoeker zoekt alleen in tekst van bestaande ondertitelsporen |
+| Z-19 | "Module uit": 404 of 501 (genomen 2026-11-11) | elke route van een module in golf 3 en golf 4; gatecontrole golf 4 | n.v.t. (genomen): 404 zoals jelly-leon ADR-0030; de afwijking van WP-JSON (B03-033 en B03-035 vragen 501) staat letterlijk in het bewijs van die twee ID's (golf 2). Niet aangemeld blijft 401. 501 `capability_unavailable` blijft alleen waar een functie BINNEN een aangezette module uit staat (bv. chat bij BG-12, miniaturen bij BG-24) en voor `propose`/`apply`/`rollback` van de connector |
+| Z-20 | Zes B03-werkpakketten zonder golf (genomen 2026-11-11) | S-G3-28 t/m S-G3-32; S-G4-49 t/m S-G4-54 | n.v.t. (genomen): in P4 bouwen, per werkpakket eerst A-VERKEN, dan stappen in een golf; vastleggen in FASERING en WP-JSON is een documentatiestap in ai-server-manager (BESLUITEN_EN_BLOKKADES.md 0.3), niet in dit bestand |
 
 **Spanning BG-04 (melden, niet zelf oplossen):** BG-04 is genomen: de MediaGuard-sleutel van Jelly Leon loopt via de
 Hub (Hub-vault; bij voorkeur zonder sleuteloverdracht, Jelly Leon vraagt de MediaGuard-gegevens via de Hub met een
@@ -144,6 +158,12 @@ AFKORTINGEN
               (lijst van objecten; zoek het object met "ID"; lees Taak, Uitvoering, Acceptatie, Afhankelijkheid)
 - TEST-JSON = <WERKMAP>/ai-server-manager/docs/platform-v2/08_EXCEL/b03/testen.json
               (lijst van rijen [ID, titel, opzet, verwacht])
+- TASKS-JSON= <WERKMAP>/ai-server-manager/docs/platform-v2/08_EXCEL/tasks.json
+              (lijst van objecten; zoek het object met "ID"; lees Taak, Uitvoering, Acceptatie, Afhankelijkheid).
+              Voor B03-002, B03-003, B03-006, B03-008, B03-011 en B03-012 bestaat GEEN object in WP-JSON; daar
+              zijn TASKS-JSON en BOUWPLAN#4. Bouwfasen (verplichte volgorde) (kop "#### B03-0nn — ...") de bron.
+- E2E-JSON  = <WERKMAP>/ai-server-manager/docs/platform-v2/08_EXCEL/e2e_cases.json
+              (lijst van rijen [ID, titel, opzet, verwacht]; de EX-rijen)
 - PLUGIN    = <WERKMAP>/jelly-leon/plugins/JellyLeon/src/Jellyfin.Plugin.JellyLeon
 - PLUGINTEST= <WERKMAP>/jelly-leon/plugins/JellyLeon/tests/Jellyfin.Plugin.JellyLeon.Tests
 - EVIDENCE  = <WERKMAP>/<repo>/docs/platform-v2/EVIDENCE.json (lijst van objecten met "id") en EXCEL_TAKEN.json
@@ -230,7 +250,8 @@ Niet vastgesteld en daarom door A-VERKEN eerst op te zoeken:
   vormgeving volgt upstream Jellyfin.
 - **Topmodel (N5)** staat in dit bestand op drie plaatsen: R-VEILIG van S-G3-10 (authenticatie op streamroutes zelf),
   R-HARDE-EIS van S-G3-08 alleen als BG-21 `reset` of `remap` toestaat en die schrijvende code wordt gebouwd, en A-GATE
-  aan het einde van de fase (hoofdstuk 10). Daarnaast alleen als escalatie: na twee keer vastlopen op N3/N4 een
+  aan het einde van de fase (S-G4-95 in hoofdstuk 10). De gate van golf 3 (S-G3-90) is het einde van een golf en loopt
+  op N4. Daarnaast alleen als escalatie: na twee keer vastlopen op N3/N4 een
   enkele poging A-HERSTEL op N5. Elke N5-inzet komt in VOORTGANG.md, tabel "Topmodel-inzet".
 - **Vangnet geheugen:** voor een extra keten met "Zwaar: ja" draait de regisseur `free -m`; bij minder dan 3000 MB
   beschikbaar start hij alleen stappen met "Zwaar: nee" of wacht hij. Reviewers en herstellers van lopende ketens
@@ -245,17 +266,23 @@ van de tabel. Banen lopen naast elkaar.
 
 ### 6.1 Golf 3
 
+Elke stap van golf 3 wacht op S-G2-90 (gate golf 2, STAPPEN_P4_GOLF1_2.md; hoofdstuk 2). "Vooraf" hieronder noemt
+daarnaast wat een stap binnen golf 3 nodig heeft.
+
 | Stap | Baan (repo) | Vooraf | Zwaar | Kan tegelijk met |
 |---|---|---|---|---|
-| S-G3-01 Quality fundament (B03-050) | jelly-leon | Gate golf 1 | nee | S-G3-24 zodra S-G3-04 klaar is; alle andere banen |
+| S-G3-01 Quality fundament (B03-050) | jelly-leon | S-G2-90 (gate golf 2) | nee | S-G3-24 zodra S-G3-04 klaar is; alle andere banen |
 | S-G3-02 Jobtypes quality in planner (B03-053) | jelly-leon | S-G3-01; B03-018 | nee | andere banen |
-| S-G3-03 Subtitles fundament en inventaris (B03-040) | jelly-leon | Gate golf 1 | nee | andere banen |
-| S-G3-04 Telemetrieroute Watch Together (B03-024 serverdeel) | jelly-leon | WT-1-gate (B03-021) | nee | andere banen |
+| S-G3-03 Subtitles fundament en inventaris (B03-040) | jelly-leon | S-G2-90 (gate golf 2) | nee | andere banen |
+| S-G3-04 Telemetrieroute Watch Together (B03-024 serverdeel) | jelly-leon | S-G2-90 met de WT-1-gate (B03-021) | nee | andere banen |
+| S-G3-28 Metadata en anime-mapping, serverdeel (B03-006; besluit Z-20) | jelly-leon | S-G2-90 (gate golf 2); BG-17 voorgelegd (zonder besluit: aan laten) | nee | andere banen |
+| S-G3-29 Pluginpagina "Metadata-suggesties" (B03-006 schermdeel) | jelly-leon | S-G3-28 | ja (image, browsertest achter stack.lock) | banen zonder stack.lock |
+| S-G3-30 Universele bibliotheek: anime apart, serverdeel (B03-002; besluit Z-20) | jelly-leon | S-G3-28 | nee | andere banen |
 | S-G3-05 Ondertiteltoolkit in de werker (B03-041) | jelly-leon | S-G3-03; B03-018 | ja (image) | banen zonder image-build |
 | S-G3-06 Ondertitelsync (B03-042) | jelly-leon | S-G3-05 | ja (image, meting) | banen zonder image-build |
 | S-G3-07 Beslisregels en MediaGuard-leesroutes (B03-043) | jelly-leon | S-G3-03; B03-009; BG-05 | nee | andere banen |
 | S-G3-08 Publicatie en spoorkeuzes (B03-047) | jelly-leon | S-G3-06; BG-19; BG-21 | ja (differentiele run) | banen zonder stack.lock |
-| S-G3-09 Streamroutes: meting en ADR (B03-010) | jelly-leon | Gate golf 1 | ja (server + clients) | banen zonder stack.lock |
+| S-G3-09 Streamroutes: meting en ADR (B03-010) | jelly-leon | S-G2-90 (gate golf 2) | ja (server + clients) | banen zonder stack.lock |
 | S-G3-10 Streamroutes: authenticatiefilter (B03-010) | jelly-leon | S-G3-09 | ja (clienttest) | banen zonder stack.lock |
 | S-G3-11 Quality niveau 0/1/1,5 (B03-051) | jelly-leon | S-G3-02; BG-23 | nee | andere banen |
 | S-G3-12 Quality niveau 2 (B03-052) | jelly-leon | S-G3-11 | ja (meting in image) | banen zonder stack.lock |
@@ -263,22 +290,26 @@ van de tabel. Banen lopen naast elkaar.
 | S-G3-14 Bewijs, verificatie, feedback (B03-055) | jelly-leon | S-G3-13; BG-24 | nee | andere banen |
 | S-G3-15 Quality en MediaGuard (B03-056) | jelly-leon | S-G3-14; B03-009; BG-05 | nee | andere banen |
 | S-G3-16 Pluginpagina Mediakwaliteit (B03-057 serverdeel) | jelly-leon | S-G3-15 | ja (image, browsertest) | banen zonder stack.lock |
-| S-G3-17 Zichtbaarheid en uitnodigingen (B03-022) | jelly-leon | WT-1-gate; BG-11 | nee | andere banen |
+| S-G3-17 Zichtbaarheid en uitnodigingen (B03-022) | jelly-leon | S-G2-90 met de WT-1-gate; BG-11 | nee | andere banen |
 | S-G3-18 Kinderregels Watch Together (B03-023) | jelly-leon | S-G3-17; BG-03 | nee | andere banen |
 | S-G3-19 Haperbeleid (B03-025 deel beleid) | jelly-leon | S-G3-17; B03-018; BG-13 | ja (hapermeting achter stack.lock) | banen zonder stack.lock |
-| S-G3-20 Volgmodus server (B03-026) | jelly-leon | S-G3-17; BG-10 | nee | andere banen |
+| S-G3-20 Volgmodus server (B03-026) | jelly-leon | S-G3-17; S-G3-32 (WP-JSON B03-026 noemt B03-003 als afhankelijkheid); BG-10 | nee | andere banen |
 | S-G3-21 Volgmodus in de Android TV-emulator (JLT-07) | jelly-leon | S-G3-20 | ja (emulator) | geen andere emulator- of Gradle-stap |
-| S-G3-22 Cues, hoofdstuksignalen en families (B03-074) | jelly-leon | B03-071, B03-072 (golf 2) | nee | andere banen |
+| S-G3-22 Cues, hoofdstuksignalen en families (B03-074) | jelly-leon | S-G2-90 (B03-071, B03-072); cue-extractie uit de bestandspas S-G1-34 | nee | andere banen |
 | S-G3-23 Extern via VPN (B03-027) | jelly-leon | BG-09; S-G3-17; voor gasten S-G3-10 | ja (netwerkproef) | banen zonder stack.lock |
 | S-G3-24 Webplugin Watch Together (B03-024 webdeel) | jelly-leon-web | S-G3-04; haakmodule B03-017; BG-14 | ja (npm-build, e2e) | jelly-leon-stappen zonder stack.lock |
 | S-G3-25 Kwaliteitslabel op de itempagina (B03-057 webdeel) | jelly-leon-web | S-G3-14; S-G3-24 klaar; BG-24 | ja (npm-build, e2e) | jelly-leon-stappen zonder stack.lock |
+| S-G3-31 Universele bibliotheek, webdeel (B03-002; alleen als het dossier van S-G3-30 een webdeel noemt) | jelly-leon-web | S-G3-30; haakmodule B03-017 | ja (npm-build, e2e) | jelly-leon-stappen zonder stack.lock |
+| S-G3-32 Beschikbaarheid van clients: gaten op de ontwikkelmachine (B03-003; besluit Z-20) | jelly-leon-clients | S-G2-90 (gate golf 2) | ja (Gradle, emulator) | geen andere emulator- of Gradle-stap |
 | S-G3-26 Native SyncPlay Android TV (alleen na BG-10 "clientpatch") | jelly-leon-clients | BG-10; S-G3-20 | ja (Gradle, emulator) | geen andere emulator- of Gradle-stap |
-| S-G3-27 Compat-regressie per module-oplevering (herhaalstap) | jelly-leon | na S-G3-08, S-G3-16, S-G3-22 en S-G3-23 | ja (stack.lock) | niets met stack.lock |
+| S-G3-27 Compat-regressie per module-oplevering (herhaalstap) | jelly-leon | na S-G3-08, S-G3-16, S-G3-22, S-G3-30 en S-G3-23 (of S-G3-20 als BG-09 "uit" is) | ja (stack.lock) | niets met stack.lock |
+| S-G3-90 Gatecontrole golf 3 (A-GATE, alleen lezen) | geen (leest jelly-leon en jelly-leon-web; jelly-leon-clients als S-G3-26 liep) | alle stappen van golf 3 die niet door een besluit of door hun dossier (S-G3-31) zijn vervallen, en de vijf runs van S-G3-27 | nee | S-G4-25 en S-G4-31 (andere repos); in jelly-leon en jelly-leon-web wordt tijdens de gate niet geschreven |
 
 ### 6.2 Golf 4
 
 De rijen staan in de volgorde waarin de stappen in hoofdstuk 9 staan. De nummers S-G4-40 tot en met S-G4-46 zijn later
-toegevoegd; ze staan in deze tabel en in hoofdstuk 9 op hun plaats in de volgorde en niet op nummer.
+toegevoegd, S-G4-47 en S-G4-48 bij de controle van 2026-11-11, S-G4-49 tot en met S-G4-54 na besluit Z-20
+(2026-11-11); ze staan in deze tabel en in hoofdstuk 9 op hun plaats in de volgorde en niet op nummer.
 
 | Stap | Baan (repo) | Vooraf | Zwaar | Kan tegelijk met |
 |---|---|---|---|---|
@@ -304,7 +335,10 @@ toegevoegd; ze staan in deze tabel en in hoofdstuk 9 op hun plaats in de volgord
 | S-G4-19 Contractcontrole events, foutcatalogus en pin (C1.3-JL-06, -07, -08) | jelly-leon | S-G4-11, -13, -14, -17, -18 | nee | andere banen |
 | S-G4-42 Pluginpagina "Apparaten" voor beheerders (B03-066, B03-068) | jelly-leon | S-G4-07; S-G4-18; BG-26 | ja (image, browsertest achter stack.lock) | banen zonder stack.lock |
 | S-G4-44 Pluginpagina "Watch Together" afmaken (B03-029, B03-022, B03-023) | jelly-leon | S-G4-11 | ja (image, browsertest achter stack.lock) | banen zonder stack.lock |
-| S-G4-20 Rij "Aanbevolen voor jou" (B03-036 deel rij) | jelly-leon-web | B03-035; BG-15; haakmodule | ja (npm-build, e2e) | jelly-leon-stappen zonder stack.lock |
+| S-G4-49 Scènezoeker: zoeken in ondertitelcues met tijdcode en rechten (B03-008 serverdeel; besluit Z-20) | jelly-leon | S-G3-22; S-G3-06; S-G3-10; cue-extractie S-G1-34; BG-06 (zonder besluit: geen spraakherkenning, geen embeddings) | nee (ONBEKEND of de indexbouw een werkertaak in de image vraagt; A-VERKEN stelt vast) | andere banen |
+| S-G4-51 Offline downloaden: rechten, verlopen en uitgezet account (B03-011 serverdeel; besluit Z-20) | jelly-leon | S-G3-10 | nee | andere banen |
+| S-G4-53 Live-tv en DVR: overlap, opnamestatus, bewaren, gids (B03-012 serverdeel; besluit Z-20) | jelly-leon | S-G4-04 | ja (server met nagebootste tuner achter stack.lock; ONBEKEND, A-VERKEN stelt vast) | banen zonder stack.lock |
+| S-G4-20 Rij "Aanbevolen voor jou" (B03-036 deel rij) | jelly-leon-web | B03-035; BG-15; haakmodule; S-G3-30 (en S-G3-31 als die niet vervalt): WP-JSON B03-036 noemt B03-002 (startscherm) als afhankelijkheid | ja (npm-build, e2e) | jelly-leon-stappen zonder stack.lock |
 | S-G4-45 Aanbevelingen: drie dialogen (B03-036 deel dialogen) | jelly-leon-web | S-G4-20 | ja (npm-build, e2e) | idem |
 | S-G4-21 Capability-probe en rolbepaling (B03-065 webdeel 1) | jelly-leon-web | S-G4-05; S-G4-25 voor de marker | ja (npm-build, e2e) | idem |
 | S-G4-22 Stall-detectie, label en "Waarom?" (B03-065 webdeel 2, B03-067 webdeel) | jelly-leon-web | S-G4-21; S-G4-08; BG-29 | ja (npm-build, e2e) | idem |
@@ -313,12 +347,15 @@ toegevoegd; ze staan in deze tabel en in hoofdstuk 9 op hun plaats in de volgord
 | S-G4-46 Hint na aftiteling, "Klopt niet", correctiepaneel (B03-075, B03-076 webdeel) | jelly-leon-web | S-G4-23; S-G4-15 | ja (npm-build, e2e) | idem |
 | S-G4-43 Dialoog capaciteitsadvies (B03-025 webdeel) | jelly-leon-web | S-G4-09; S-G3-24; BG-13 | ja (npm-build, e2e) | idem |
 | S-G4-24 Chat-strook web (B03-028 webdeel; alleen na BG-12 "aan") | jelly-leon-web | BG-12; S-G4-10; S-G3-24 | ja (npm-build, e2e) | idem |
+| S-G4-50 Scènezoeker web: zoekscherm met tijdcode (B03-008 webdeel) | jelly-leon-web | S-G4-49; haak H-ROUTE | ja (npm-build, e2e) | idem |
+| S-G4-54 Live-tv web: overlapwaarschuwing en opnamestatus (B03-012 webdeel) | jelly-leon-web | S-G4-53 | ja (npm-build, e2e) | idem |
 | S-G4-25 Marker `jellyLeonBuild` in android en desktop (B03-069) | jelly-leon-clients | geen; mag voor de gate van golf 3 starten | ja (Gradle) | geen andere Gradle- of emulatorstap |
 | S-G4-26 Android TV: capabilityrapport (B03-069) | jelly-leon-clients | S-G4-05; S-G4-06; BG-30 | ja (Gradle, emulator) | idem |
 | S-G4-27 Skipknoppen Android TV (B03-077) | jelly-leon-clients | S-G4-16; BG-31; BG-08 | ja (Gradle, emulator) | idem |
 | S-G4-28 Skipknop Android en desktop-marge (B03-077) | jelly-leon-clients | S-G4-27; BG-31; BG-08; S-P40-90 voor het desktopdeel | ja (Gradle, emulator) | idem |
-| S-G4-29 Clientmatrix aanbevelingen (B03-037) | jelly-leon-clients | S-G4-20; S-G4-45; S-G4-12; BG-15 | ja (emulator, stack.lock) | niets met stack.lock of emulator |
+| S-G4-29 Clientmatrix aanbevelingen (B03-037) | jelly-leon-clients | S-G4-20; S-G4-45; S-G4-12; S-G3-32 (WP-JSON B03-037 noemt B03-003); BG-15 | ja (emulator, stack.lock) | niets met stack.lock of emulator |
 | S-G4-30 Clientmatrix golf 4 (JLT-25, -38, -42, -46, -55) | jelly-leon-clients | S-G4-07, -13, -14, -23, -26, -27, -28, -29, -46; S-G3-25 | ja (emulator, stack.lock) | niets met stack.lock of emulator |
+| S-G4-52 Offline downloaden in de Android-app (B03-011 clientdeel) | jelly-leon-clients | S-G4-51; S-G4-30; BG-08 | ja (Gradle, emulator) | geen andere Gradle- of emulatorstap |
 | S-G4-31 Hub-adapter Jelly Leon en "Hub-sleutelset kopieren" (C1.3-ASM-21) | ai-server-manager | S-P3-010, S-P3-020, S-P3-070 (STAPPEN_P3.md); JL4-pin in de plugin (golf 1); mag voor de gate van golf 3 starten | nee | alle Jelly Leon-banen |
 | S-G4-32 Hub: kaartbasis B03 op het scherm Media | ai-server-manager | S-G4-31; S-P3-075 en S-P3-080 (STAPPEN_P3.md) | ja (next build, review) | Jelly Leon-banen zonder npm-build |
 | S-G4-33 Hub-kaart Watch Together (B03-029) | ai-server-manager | S-G4-32; S-G4-11 | ja (next build, review) | idem |
@@ -327,21 +364,35 @@ toegevoegd; ze staan in deze tabel en in hoofdstuk 9 op hun plaats in de volgord
 | S-G4-37 Hub-kaarten Afspelen en GPU-banen (B03-069) | ai-server-manager | S-G4-32; S-G4-18 | ja (next build, review) | idem |
 | S-G4-38 Hub-kaart Intro en aftiteling (B03-078) | ai-server-manager | S-G4-32; S-G4-17 | ja (next build, review) | idem |
 | S-G4-35 Hub: alle B03-kaarten samen, kinderschil en ontwerpreview (sluit de Hub-baan af) | ai-server-manager | S-G4-33, -34, -36, -37, -38 | ja (next build, review) | idem |
-| S-G4-39 Compat-regressie per oplevering en clientmatrixdocument (herhaalstap) | jelly-leon | na S-G4-07, S-G4-09, S-G4-14, S-G4-19, na S-G4-42 en S-G4-44, en na de laatste web- en clientstap | ja (stack.lock) | niets met stack.lock |
+| S-G4-47 Winstmeting apparaatprofielen (JLT-40) | jelly-leon | S-G4-07; S-G4-22; S-G4-41; harnas B03-060 (S-P40-64) | ja (meetslot achter stack.lock) | niets met stack.lock |
+| S-G4-48 Winstmeting segmenten (JLT-50) | jelly-leon | S-G4-16; S-G4-40; harnas B03-070 (S-P40-66) | ja (meetslot achter stack.lock) | niets met stack.lock |
+| S-G4-39 Compat-regressie per oplevering en clientmatrixdocument (herhaalstap) | jelly-leon | na S-G4-07, S-G4-09, S-G4-14, S-G4-19, na S-G4-42 en S-G4-44, na S-G4-49, S-G4-51 en S-G4-53, en na de laatste web- en clientstap | ja (stack.lock) | niets met stack.lock |
+| S-G4-90 Bewijs samenvoegen: programmabewijs, Excel en STATUS (hoofdstuk 10) | ai-server-manager | alle stappen van golf 4 afgevinkt of met reden geblokkeerd; laatste run van S-G4-39; geen keten open in een van de vier repos | nee | niets (leest de EVIDENCE.json van alle repos) |
+| S-G4-95 Gate einde P4 (A-GATE, alleen lezen; hoofdstuk 10) | geen (leest jelly-leon, jelly-leon-web, jelly-leon-clients, ai-server-manager) | S-G4-90 | ja (volledige poort per repo, na elkaar) | niets in deze vier repos |
 
 ## 7. Startbezetting
 
-**Bij de start van golf 3** lopen hooguit drie ketens van dit bestand tegelijk, omdat bijna al het werk in een repo
+**Bij de start van golf 3** (na S-G2-90 en de keuze "doorgaan naar golf 3") lopen hooguit vier ketens van dit bestand tegelijk, omdat bijna al het werk in een repo
 ligt:
 
-1. Baan jelly-leon: S-G3-01, daarna in tabelvolgorde. Dit is het kritieke pad (23 stappen na elkaar).
+1. Baan jelly-leon: begin met S-G3-04 (klein; na S-G2-90 alleen de WT-1-gate vooraf), zodat de web-baan zo vroeg mogelijk kan starten;
+   daarna S-G3-01 en verder in tabelvolgorde. Dit is het kritieke pad (27 stappen na elkaar, plus de vijf runs van
+   S-G3-27). S-G3-28 en S-G3-30 (B03-006 en B03-002) staan vroeg in de tabel omdat werkpakketten van golf 2 en golf 4
+   ze als afhankelijkheid noemen (zie de rij Z-20 in hoofdstuk 3). Voor golf 2 (B03-032 in S-G2-22, B03-072 in S-G2-42)
+   en P4-0 (B03-016, B03-019, B03-020 naar B03-003) is die afhankelijkheid zacht: die stappen wachten er niet op; wat
+   hier later aansluit staat in hun "Vooraf" in STAPPEN_P4_GOLF1_2.md.
 2. Baan jelly-leon-web: start pas als S-G3-04 klaar is (S-G3-24). Tot dan ligt hier geen werk van golf 3.
-3. Baan jelly-leon-clients: alleen S-G3-26, en alleen als BG-10 een clientpatch toestaat. Anders ligt hier geen werk
-   van golf 3.
+3. Baan jelly-leon-clients: eerst S-G3-32 (B03-003; S-G3-20 wacht erop). S-G3-26 alleen als BG-10 een clientpatch
+   toestaat. Daarnaast mag S-G4-25 (marker `jellyLeonBuild`) hier al tijdens golf 3 lopen (hangt niet aan de gate van
+   golf 3; niet tegelijk met S-G3-26 of S-G3-32).
+4. Baan ai-server-manager: S-G4-31 (Hub-adapter) mag al tijdens golf 3 lopen zodra S-P3-010, S-P3-020 en S-P3-070
+   (STAPPEN_P3.md) klaar zijn; S-G4-32 volgt als ook S-P3-075 en S-P3-080 klaar zijn.
 
-**Geen werk van golf 3 in:** ai-server-manager, jelly-leon-platform en (meestal) jelly-leon-clients. De regisseur kan
-daar ketens van een andere fase of golf laten lopen. Let op in ai-server-manager: tijdens de verkenning stond daar
-niet-vastgelegd werk aan de executor; eerst `git -C <WERKMAP>/ai-server-manager status --short` bekijken.
+**Geen werk van golf 3 (en vóór de gate ook geen golf 4-werk) in:** jelly-leon-platform. De regisseur kan daar en in
+de banen die stilliggen ketens van een andere fase of golf laten lopen (binnen de gate-matrix) om de 8 banen te vullen.
+Let op in ai-server-manager: na ronde 3 staat daar niet-vastgelegd half werk aan de executor
+(`<WERKMAP>/.lokaal/plan/STAND_RONDE3.md`); eerst `git -C <WERKMAP>/ai-server-manager status --short` bekijken en
+geen Hub-stap starten zolang dat half werk er staat.
 
 **Bij de start van golf 4** kunnen vier ketens tegelijk lopen: jelly-leon (S-G4-01), jelly-leon-web (S-G4-20, als
 BG-15 genomen is), jelly-leon-clients (S-G4-25) en ai-server-manager (S-G4-31). Daarna komt per baan de volgende stap
@@ -352,10 +403,14 @@ STAPPEN_P5.md) en staat daarom niet in dit bestand; S-G4-35 is de gezamenlijke a
 
 **Later toegevoegde nummers:** S-G4-40 tot en met S-G4-46 staan in tabel 6.2 en in hoofdstuk 9 op hun plaats in de
 volgorde (S-G4-40 na S-G4-15; S-G4-42 en S-G4-44 na S-G4-19; S-G4-45 na S-G4-20; S-G4-41 na S-G4-22; S-G4-46 en
-S-G4-43 na S-G4-23). De regisseur volgt de tabel, niet de nummering.
+S-G4-43 na S-G4-23; S-G4-47 en S-G4-48 voor de laatste run van S-G4-39). Na besluit Z-20 kwamen erbij: in golf 3
+S-G3-28 tot en met S-G3-30 (na S-G3-04), S-G3-31 (na S-G3-25) en S-G3-32 (voor S-G3-26); in golf 4 S-G4-49, S-G4-51
+en S-G4-53 (na S-G4-44), S-G4-50 en S-G4-54 (na S-G4-24) en S-G4-52 (na S-G4-30). De regisseur volgt de tabel, niet de
+nummering.
 
 **Excel en fase-afsluiting:** het bijwerken van de Excel (POORTEN.md, blok P-EXCEL) schrijft in ai-server-manager.
-Die stap loopt daarom nooit naast een stap van de Hub-baan (S-G4-31 tot en met S-G4-38) en pas als die baan stilligt.
+Die stap (S-G4-90) loopt daarom nooit naast een stap van de Hub-baan (S-G4-31 tot en met S-G4-38) en pas als die baan
+stilligt. S-G4-95 (A-GATE) loopt pas als S-G4-90 klaar is en in geen van de vier repos een keten open is.
 
 **Geen werk van golf 4 in:** jelly-leon-platform. Er is in dit deel van het plan geen enkele stap voor die repo.
 
@@ -383,11 +438,28 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
   mediamap schrijft is fout.
 - **OpenAPI:** elke nieuwe route komt in de OpenAPI van de plugin; drift mag alleen additief zijn (bestaande tests
   `OpenApiDriftTests` en `OpenApiContractTests` in PLUGINTEST blijven groen).
+- **Stappen uit besluit Z-20** (S-G3-28 tot en met S-G3-32 en S-G4-49 tot en met S-G4-54; geldt ook in hoofdstuk 9):
+  - Bron: er is GEEN object in WP-JSON. De bron is TASKS-JSON (object met het B03-ID) plus BOUWPLAN#4. Bouwfasen
+    (verplichte volgorde), kop "#### B03-0nn — ...", en de raakvlakken die de stap noemt. Wat daar niet staat, is
+    ONBEKEND en wordt niet verzonnen.
+  - "Waar haalbaar" (06_FASERING_EN_GATES.md, Fase P4: "scene search, live-tv/DVR, offline apps waar haalbaar")
+    betekent in dit plan: bouwen en testen zo ver als de ontwikkelmachine toelaat, met simulator, emulator of
+    wegwerpcontainer (00_LEES_EERST.md deel 7). Wat een echte NAS, echte apparaten, een echte tuner of een account
+    vraagt, wordt niet nagebootst als bewijs (V-099) maar staat op "Geblokkeerd" met NIET GEVALIDEERD; de handeling
+    hoort bij STAPPEN_P6.md, N-P6-09.
+  - A-VERKEN legt de scope vast: bouwpunt 1 van zo'n stap is altijd "Scope". A-VERKEN zet per onderdeel van de bron in
+    het dossier (veld per_punt): "doet upstream Jellyfin 12.x in de fork al" (dan niet opnieuw bouwen; S7 van de
+    prompt) | "ontbreekt en haalbaar" | "alleen met echte NAS, apparaten of account". A-BOUW bouwt alleen wat het
+    dossier "ontbreekt en haalbaar" noemt. Noemt het dossier meer werk dan één subagent in één keer afrondt: AGENTEN.md
+    6.7 (splitsen). Valt een onderdeel van de bron af of schuift het naar een andere fase: dat is een besluit, keuzemenu
+    (AGENTEN.md 6.8); A-VERKEN zet het onder besluit_nodig.
+  - Een nieuwe route krijgt een schema in de OpenAPI van de plugin (additief). Noemt BOUWPLAN geen schema, dan legt
+    A-BOUW het vast in een ADR in `docs/adr/` van de repo; de reviewers toetsen het.
 
 ### S-G3-01 - Module Quality: fundament, eigen opslag en alleen-lezen-garanties
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** groot | **Moeilijkheid:** gewoon | **Zwaar:** nee (plugin-build en -test achter docker-build.lock)
 - **Werkpakketten en tests:** B03-050; JLT-35 (deel fundament); JLT-39 (alleen bewijsregel)
-- **Vooraf:** Gate P4-0 en Gate golf 1 aantoonbaar (B03-001, B03-013, B03-017 in EVIDENCE van jelly-leon). Geen besluit nodig.
+- **Vooraf:** S-G2-90 gehaald (gate golf 2; rapport `<WERKMAP>/.lokaal/ketens/GATE-GOLF-2/RAPPORT-A-GATE.md`; die gate veronderstelt Gate P4-0 en Gate golf 1: B03-001, B03-013, B03-017 in EVIDENCE van jelly-leon). Geen besluit nodig.
 - **Al gedaan?** `grep -c '"id": "B03-050"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart. `grep -rln "quality.db" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = opslag nog niet gebouwd. `ls <WERKMAP>/jelly-leon/plugins/JellyLeon/src/Jellyfin.Plugin.JellyLeon/Modules/Quality` -> tijdens de verkenning alleen `QualityController.cs` en `QualityModule.cs` (skelet uit golf 1): daarop voortbouwen.
 - **Lees eerst:** WP-JSON object B03-050; BOUWPLAN#F4.4 Gegevens en bescherming; BOUWPLAN#F4.5.3 Endpoints in Jelly Leon; BOUWPLAN#F4.8 Bouwfasen (regel QC-0); BOUWPLAN#10.9 Opslag en gegevensbescherming
 - **Bouw:**
@@ -429,7 +501,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-03 - Module Subtitles: fundament, stabiele spoorsleutels en NL-dekking (alleen lezen)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** groot | **Moeilijkheid:** gewoon | **Zwaar:** nee
 - **Werkpakketten en tests:** B03-040; JLT-20 (baselinedeel); JLT-24 (deel: geen schrijfacties); JLT-26 (alleen bewijsregel)
-- **Vooraf:** Gate golf 1 (B03-017; spoorsleutel volgens bouwsteen 10.12). Geen besluit nodig.
+- **Vooraf:** S-G2-90 gehaald (gate golf 2; daarin Gate golf 1 met B03-017; spoorsleutel volgens bouwsteen 10.12). Geen besluit nodig.
 - **Al gedaan?** `grep -c '"id": "B03-040"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart. `ls <WERKMAP>/jelly-leon/plugins/JellyLeon/src/Jellyfin.Plugin.JellyLeon/Modules` -> tijdens de verkenning alleen `Devices` en `Quality`; een map voor ondertitels ontbreekt. `grep -rln "subtitles/coverage" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = niet gestart.
 - **Lees eerst:** WP-JSON object B03-040; BOUWPLAN#F3.4.1 Eigen opslag; BOUWPLAN#F3.5.2 Clientroutes en beheerroutes; BOUWPLAN#10.12 Stabiele spoorsleutel; BOUWPLAN#F3.8 Bouwfasen (regel 3A)
 - **Bouw:**
@@ -450,7 +522,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-04 - Watch Together: telemetrieroute en diagnose (serverdeel van B03-024)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
 - **Werkpakketten en tests:** B03-024 (serverdeel); JLT-01 en JLT-02 (voorwaarde; meting in S-G3-24)
-- **Vooraf:** WT-1-gate geslaagd (B03-021: decorator of core-patch); B03-020 (baseline) in EVIDENCE.
+- **Vooraf:** WT-1-gate geslaagd volgens het rapport van S-G2-90 (`<WERKMAP>/.lokaal/ketens/GATE-GOLF-2/RAPPORT-A-GATE.md`; B03-021: decorator of core-patch); B03-020 (baseline) in EVIDENCE.
 - **Al gedaan?** `grep -rln "watch/telemetry" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = niet gestart. `grep -rln "watch/capabilities" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = de module Watch Together van golf 2 ontbreekt: STOP.
 - **Lees eerst:** WP-JSON object B03-024; BOUWPLAN#F1.5.2 Endpoints (E1, E9, E10); BOUWPLAN#F1.5.3 Schema's; BOUWPLAN#F1.7 Configuratieopties
 - **Bouw:**
@@ -466,6 +538,67 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard; A-BOUW N2 mag als A-VERKEN bevestigt dat de routes alleen de bestaande bouwstenen gebruiken
 - **Stop en vraag als:** de WT-1-gate niet aantoonbaar is of B03-021 op de core-patch-route zit zonder geregistreerde patch in `<WERKMAP>/jelly-leon/docs/platform-v2/PATCHES.md`.
+
+### S-G3-28 - Metadata en anime-mapping: externe ID's met versie, zekerheid en eigen correcties (B03-006, serverdeel)
+- **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee (plugin-build en -test achter docker-build.lock)
+- **Werkpakketten en tests:** B03-006 (serverdeel)
+- **Vooraf:** S-G2-90 gehaald (gate golf 2). Besluit Z-20 genomen (in P4 bouwen). BG-17 (online metadata, moment "bij B03-006"): de regisseur legt het voor vóór deze stap; zonder besluit geldt "aan laten" (standaardgedrag van Jellyfin) en deze stap verandert niets aan de instellingen voor online metadata.
+- **Al gedaan?** `grep -c '"id": "B03-006"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart (op 2026-11-11: 0). `git -C <WERKMAP>/jelly-leon ls-files plugins/JellyLeon/src/Jellyfin.Plugin.JellyLeon/Modules | cut -d/ -f6 | sort -u` -> op 2026-11-11 alleen `Devices` en `Quality`: er is geen module of opslag voor metadata.
+- **Lees eerst:** TASKS-JSON object B03-006; BOUWPLAN#B03-006 — Metadata en anime mapping; BOUWPLAN#2. Datamodel en levensduur (entiteiten `external_id` en `episode_map`, en het blok "Aanvulling 2.0": eigen SQLite per module, nooit schrijven in `jellyfin.db`); BOUWPLAN#10.1 Uitbreidingsladder en pluginverpakking; `<WERKMAP>/.lokaal/plan/uit/BESLUITEN_EN_BLOKKADES.md`, kop "BG-17"; E2E-JSON rij EX37 (het eindscenario zelf is S-P6-15 in STAPPEN_P6.md); TEST-JSON rij JLT-72 (absolute anime-nummering bij de overname, raakvlak); WP-JSON objecten B03-032 en B03-072 (die noemen B03-006 als afhankelijkheid)
+- **Bouw:**
+  1. Scope (A-VERKEN, volgens de afspraak "Stappen uit besluit Z-20" in hoofdstuk 8): wat de fork (upstream Jellyfin 12.x) al doet voor provider-ID's per item en voor afleveringsnummering (de serie-instelling met de opties airdate, dvd en absolute in `MediaBrowser.Controller/Entities/TV/Series.cs`), en wat ontbreekt voor de bron: externe ID's met versie en zekerheid, correcties door de beheerder die een metadataverversing overleven, conflictreview. ONBEKEND of de koppeling aflevering-bestand bij absolute nummering upstream al stabiel blijft - A-VERKEN stelt vast met `grep -rln -i "absolute" <WERKMAP>/jelly-leon/MediaBrowser.Controller/Entities/TV <WERKMAP>/jelly-leon/MediaBrowser.Providers --include=*.cs` en de bijbehorende tests. A-VERKEN zet ook in het dossier of de correcties van deze stap de afleveringsvolgorde of seizoensgrenzen veranderen waarop de segmentenmodule (S-G2-42, B03-072) haar partners kiest; zo ja, welke herberekening dat vraagt (wordt geen eigen bouwwerk in deze stap: keuzemenu).
+  2. Externe ID's met versie, zekerheid en correcties van de beheerder in eigen opslag van de plugin (welke opslagbouwsteen van golf 1: A-VERKEN noemt hem), nooit rechtstreeks in `jellyfin.db`; schrijven in Jellyfin-metadata alleen via de officiële API van de server. Bron: TASKS-JSON B03-006 (Uitvoering), BOUWPLAN#2 (Aanvulling 2.0).
+  3. Correcties van de beheerder blijven staan na een metadataverversing ("behoud eigen wijzigingen"). Bron: BOUWPLAN#B03-006 (Schermen/bediening).
+  4. Achtergrondscans vertraagd ("delayed background scans") via de planner van golf 1 (B03-018); geen eigen planner. Bron: TASKS-JSON B03-006.
+  5. Nooit de wanted-stand van MediaGuard wijzigen; MediaGuard alleen lezen via de viewerclient van B03-009, en alleen als het dossier dat nodig vindt. Bron: TASKS-JSON B03-006.
+  6. Routes voor beheerders (lezen, corrigeren, conflict afhandelen), additief in de OpenAPI; schema volgens de afspraak in hoofdstuk 8. Module uit: 404 (besluit Z-19).
+  7. Tests en EVIDENCE.
+- **Tests (verplicht):** xUnit onder PLUGINTEST (map volgens de module of bouwsteen die A-VERKEN noemt): de acceptatie uit TASKS-JSON B03-006 "S01E01 versus absolute E13 blijft correct gelinkt na metadata refresh" op een synthetische testserie. ONBEKEND welk corpusrecept absolute nummering heeft - A-VERKEN stelt vast met `grep -rln -i "absolute\|anime" <WERKMAP>/jelly-leon/tools/b03-harnas/b03h/corpus`. Negatief: (a) een correctie van de beheerder overleeft een verversing; (b) gezien-status en hervatpunt van een testgebruiker op de betrokken afleveringen zijn voor en na de verversing gelijk; (c) 0 aanroepen naar schrijvende MediaGuard-routes; (d) een niet-beheerder krijgt 403 op elke corrigerende route; (e) module uit -> 404. Commando: T-JL-PLUGIN met het filter van de module of bouwsteen, daarna T-JL-PLUGIN volledig.
+- **Poort:** P-jelly-leon (plugin, volledig) + P-CONTRACT + P-HARDE-EIS.
+- **Valkuilen:** V-003, V-005, V-066. Eigen: een verkeerde koppeling van aflevering en bestand verplaatst kijkgeschiedenis naar een ander item; een test die alleen het nieuwe gedrag bekijkt en niet de kijkgegevens ervoor en erna, bewijst dat niet.
+- **Bewijs:** B03-006 -> Bezig (Unit-getest). Blokkadetekst voor de echte bibliotheek: "NIET GEVALIDEERD (echte NAS): echte anime-bibliotheek en metadatabronnen; zie STAPPEN_P6.md, N-P6-09." EX37 blijft bij S-P6-15.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT: de koppeling van afleveringen bepaalt bij welk item gezien-status en hervatpunten horen) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog); R-HARDE-EIS N4; overige standaard
+- **Stop en vraag als:** BG-17 nog niet is voorgelegd (de regisseur legt het eerst voor; zonder antwoord geldt "aan laten"); de bouw een schrijfactie in `jellyfin.db` of op de wanted-stand van MediaGuard zou vragen; een correctie kijkgegevens naar een ander item zou verplaatsen; er geen testserie met absolute nummering in het corpus is (geen eigen media toevoegen zonder licentie, BG-37).
+
+### S-G3-29 - Pluginpagina "Metadata-suggesties" voor beheerders (B03-006, schermdeel)
+- **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (image en browsertest achter stack.lock)
+- **Werkpakketten en tests:** B03-006 (schermdeel)
+- **Vooraf:** S-G3-28 (routes voor beheerders).
+- **Al gedaan?** `python3 -c "import json,sys;[print(r.get('opmerking','')) for r in json.load(open(sys.argv[1])) if r['id']=='B03-006']" <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> noemt de opmerking een pluginpagina met rapportpad, dan is deze stap gedaan; geen regel of geen pagina = niet gestart.
+- **Lees eerst:** BOUWPLAN#B03-006 — Metadata en anime mapping (Schermen/bediening: "Metadata-suggesties met bron en behoud eigen wijzigingen"); stap S-G3-16 in dit bestand (zelfde vorm voor een pluginpagina: browsertest en toestanden); het dossier en de rapporten van S-G3-28 in `<WERKMAP>/.lokaal/ketens/S-G3-28/`
+- **Bouw:**
+  1. Scope (A-VERKEN): welke routes S-G3-28 opleverde en wat de pagina daarmee kan tonen; de pagina toont niets wat geen route levert.
+  2. Pluginpagina voor beheerders: per suggestie de bron en de zekerheid; aannemen of afwijzen; eigen wijzigingen blijven zichtbaar als "eigen". Vormgeving volgt upstream Jellyfin (buiten Peil).
+  3. Elke toestand zichtbaar: laden, leeg, fout, geen rechten, module uit.
+  4. Tests en EVIDENCE.
+- **Tests (verplicht):** Playwright in Chromium, Firefox en WebKit (de opzet van S-G3-16): de pagina laadt met een gevulde testdatabase; aannemen en afwijzen werken. Negatief: (a) een niet-beheerder krijgt 403 op pagina en routes; (b) een afgewezen suggestie verandert niets aan het item; (c) module uit -> de pagina toont "module uit" en doet geen verzoek dat een fout geeft. Commando's: T-JL-PLUGIN; T-JL-IMAGE; de browsertest achter `flock <WERKMAP>/.lokaal/stack.lock nice -n 10`.
+- **Poort:** P-jelly-leon (plugin, image bouwen en proeven).
+- **Valkuilen:** V-003, V-005.
+- **Bewijs:** B03-006 -> Bezig bijwerken met "schermdeel: pluginpagina" en het rapportpad.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: pluginpagina's vallen buiten Peil)
+- **Niveau:** standaard
+- **Stop en vraag als:** S-G3-28 geen routes heeft opgeleverd waar een pagina op kan bouwen.
+
+### S-G3-30 - Universele bibliotheek: anime apart van films en series, met externe ID's (B03-002, serverdeel)
+- **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee (plugin-build en -test achter docker-build.lock)
+- **Werkpakketten en tests:** B03-002 (serverdeel)
+- **Vooraf:** S-G3-28 (externe ID's van B03-006; TASKS-JSON B03-002 Uitvoering: "add overlay for anime metadata + external IDs"). Besluit Z-20 genomen.
+- **Al gedaan?** `grep -c '"id": "B03-002"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart (op 2026-11-11: 0). `grep -rln "Anime.LibraryIds\|GenreNames" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> uitvoer = de anime-herkenning van F2 (golf 2, B03-035) bestaat; daarop voortbouwen, geen tweede definitie van "anime".
+- **Lees eerst:** TASKS-JSON object B03-002; BOUWPLAN#B03-002 — Universele bibliotheek; BOUWPLAN, hoofdstuk F2, alinea "9. Anime-herkenning" (eerste regel die past; "Later volgt de anime-splitsing van B03-002"); WP-JSON objecten B03-036 en B03-072 (die noemen B03-002 als afhankelijkheid); het dossier en de rapporten van S-G3-28
+- **Bouw:**
+  1. Scope (A-VERKEN): wat upstream al levert voor "film, series, anime, muziek in één ervaring met filters, collecties, tags, genres, persoon en talen" (BOUWPLAN#B03-002) en wat ontbreekt. A-VERKEN zet ook in het dossier of de schermen uit de bron ("Unified homepage, watchlist, anime-splits, details en muziek") iets vragen wat upstream jellyfin-web niet heeft: dat bepaalt of S-G3-31 loopt.
+  2. Anime-overlay op basis van de externe ID's van S-G3-28 en de ene definitie van "anime" uit F2 (alinea 9); geen tweede definitie.
+  3. Anime met absolute afleveringen en een film met dezelfde titel blijven aparte items; nooit items samenvoegen of splitsen via de database. Bron: TASKS-JSON B03-002 (Acceptatie, Uitvoering "no DB direct edits").
+  4. Routes alleen als het dossier ze nodig vindt (afspraak in hoofdstuk 8). Module uit: 404 (besluit Z-19).
+  5. Tests en EVIDENCE.
+- **Tests (verplicht):** xUnit: de acceptatie uit TASKS-JSON B03-002 "Anime met absolute episodes en film met zelfde titel blijven aparte items" met synthetische items. Negatief: (a) een film en een anime met dezelfde titel: twee items, en de kijkgegevens van een testgebruiker staan elk op het eigen item; (b) UserData van de testgebruikers is voor en na een volledige bibliotheekscan gelijk; (c) een item dat volgens F2 geen anime is, verandert niet van soort. Commando: T-JL-PLUGIN met het filter van de module of bouwsteen, daarna volledig. De differentiele run met alle modules aan volgt in S-G3-27 (run na S-G3-30).
+- **Poort:** P-jelly-leon (plugin, volledig) + P-CONTRACT + P-HARDE-EIS.
+- **Valkuilen:** V-003, V-005, V-066.
+- **Bewijs:** B03-002 -> Bezig (Unit-getest; "webdeel: S-G3-31" of "webdeel niet nodig: <reden uit het dossier>"). "NIET GEVALIDEERD (echte NAS): echte bibliotheek; zie STAPPEN_P6.md, N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-HARDE-EIS (tegelijk; R-HARDE-EIS VERPLICHT: items samenvoegen of splitsen verplaatst kijkgeschiedenis) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog); R-HARDE-EIS N4; overige standaard
+- **Stop en vraag als:** de overlay alleen met een wijziging in upstream-code kan (dan eerst melden: een corepatch hoort in het patchregister); de anime-herkenning van F2 ontbreekt of anders werkt dan BOUWPLAN F2 alinea 9; een scan items samenvoegt of splitst.
 
 ### S-G3-05 - Ondertiteltoolkit in de analysewerker (subtitle.inventory, subtitle.qc)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build; docker-build.lock)
@@ -541,10 +674,10 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
   3. Publicatie als extern spoor in het interne metadatapad van het item (`item.GetInternalMetadataPath()`), met de naam `<videonaam>.Gesynchroniseerd.<taal>.srt`: atomair schrijven, nooit overschrijven, padbewaking, nooit als standaardspoor. De naam met `Machinevertaling` hoort bij P5. Bron: WP-JSON B03-047.
   4. Ligt het metadatapad in een mediamap, dan `storage_blocked` en geen publicatie; ook met `SaveSubtitlesWithMedia = true` komen er 0 bestanden in mediamappen.
   5. `RememberedSelectionPolicy` met `hold` als standaard (geen enkele schrijfactie in gebruikersgegevens). `reset` en `remap` alleen bouwen als BG-21 dat toestaat; anders weigert de configuratieroute die waarden. Bron: BOUWPLAN#F3.4.4.
-  6. Depubliceren, uitzetten en terug naar stock volgens BOUWPLAN#F3.4.6; komt er later menselijke NL, dan gelden de regels van BOUWPLAN#F3.4.3 Menselijke NL komt later. Verwijderen van een gepubliceerd bestand alleen na controle van pad, markeringstoken in de naam en sha256 tegen de hoofdkopie; anders niet verwijderen en een incident. Bij `hold`: een publicatie die een onthouden spoorkeuze naar een ander geldig spoor zou laten wijzen, gaat niet door en wacht op de beheerder (WP-JSON B03-047, veld Uitvoering).
+  6. Depubliceren, uitzetten en terug naar stock volgens BOUWPLAN#F3.4.6; komt er later menselijke NL, dan gelden de regels van BOUWPLAN#F3.4.3 Menselijke NL komt later. Verwijderen van een gepubliceerd bestand alleen na controle van pad, markeringstoken in de naam en sha256 tegen de hoofdkopie; anders niet verwijderen en een incident. Bij `hold`: een publicatie die een onthouden spoorkeuze naar een ander geldig spoor zou laten wijzen, gaat niet door en wacht op de beheerder (WP-JSON B03-047, veld Uitvoering). Verder uit hetzelfde veld: de beheeractie "Alles depubliceren" en `OnUninstalling` ruimen gepubliceerde kopieen op, met readback; opnieuw koppelen na een vervanging door MediaGuard, met een stroomonderbreker bij massale wezen (meer dan 5 % of meer dan 50 items: stoppen en een incident); back-up van `subtitles.db` voor elke schemamigratie.
   7. Lijst met toegestane verschillen voor de differentiele run van deze module (alleen `MediaStreamInfos` en de refreshkolommen van `BaseItems`).
   8. Tests en EVIDENCE.
-- **Tests (verplicht):** xUnit: tweede publicatie overschrijft niets; naam en plaats kloppen. Negatief: (a) videonaam of symlink die buiten het metadatapad wijst -> geweigerd; (b) metadatapad in mediamap -> `storage_blocked`; (c) bij `hold` is na publiceren en depubliceren geen enkele UserData-rij veranderd; (d) differentiele run: `PYTHONPATH=tools/b03-harnas python -m b03h diffrun --image-a <stock-12.x-image> --image-b <lokale-tag> --toegestaan <lijst-van-deze-module.json> --uit <rapport.json>` toont alleen toegestane verschillen en 0 verschillen in MediaSegments, TrickplayInfos, KeyframeData en Chapters, en dezelfde run met `--negatieve-proef` vindt een opzettelijk aangebrachte wijziging wel; (e) HARDE EIS: een voortgangsmelding die tijdens de publicatie binnenkomt blijft volledig behouden (positie, gezien-status, aantal keer afgespeeld; vergelijk de UserData-rij voor en na); (f) bij `hold` en een publicatie die een onthouden keuze naar een ander spoor zou laten wijzen: geen publicatie, status "wacht op beheerder", 0 gewijzigde UserData-rijen; (g) een gepubliceerd bestand zonder markeringstoken of met een afwijkende sha256 wordt niet verwijderd en geeft een incident; (h) terugzetproef: back-up van `subtitles.db` terugzetten geeft dezelfde inhoud (aantal rijen en sha256 van de hoofdkopieen gelijk). De diffrun draait achter `flock <WERKMAP>/.lokaal/stack.lock`.
+- **Tests (verplicht):** xUnit: tweede publicatie overschrijft niets; naam en plaats kloppen. Negatief: (a) videonaam of symlink die buiten het metadatapad wijst -> geweigerd; (b) metadatapad in mediamap -> `storage_blocked`; (c) bij `hold` is na publiceren en depubliceren geen enkele UserData-rij veranderd; (d) differentiele run: `PYTHONPATH=tools/b03-harnas python -m b03h diffrun --image-a <stock-12.x-image> --image-b <lokale-tag> --toegestaan <lijst-van-deze-module.json> --uit <rapport.json>` toont alleen toegestane verschillen en 0 verschillen in MediaSegments, TrickplayInfos, KeyframeData en Chapters, en dezelfde run met `--negatieve-proef` vindt een opzettelijk aangebrachte wijziging wel; (e) HARDE EIS: een voortgangsmelding die tijdens de publicatie binnenkomt blijft volledig behouden (positie, gezien-status, aantal keer afgespeeld; vergelijk de UserData-rij voor en na); (f) bij `hold` en een publicatie die een onthouden keuze naar een ander spoor zou laten wijzen: geen publicatie, status "wacht op beheerder", 0 gewijzigde UserData-rijen; (g) een gepubliceerd bestand zonder markeringstoken of met een afwijkende sha256 wordt niet verwijderd en geeft een incident; (h) terugzetproef: back-up van `subtitles.db` terugzetten geeft dezelfde inhoud (aantal rijen en sha256 van de hoofdkopieen gelijk); (i) een nagebootste MediaGuard-vervanging die meer dan 5 % van de gepubliceerde items tot wees maakt, laat de stroomonderbreker afgaan: 0 verwijderde bestanden en een incident; (j) na "Alles depubliceren" staat er geen gepubliceerde kopie meer en is de readback leeg. De diffrun draait achter `flock <WERKMAP>/.lokaal/stack.lock`.
 - **Poort:** P-jelly-leon (plugin, image bouwen en proeven) + P-HARDE-EIS + P-CONTRACT.
 - **Valkuilen:** V-027, V-077, V-095, V-111, V-112, V-113. Eigen: een differentiele run die niets vindt bewijst pas iets als de negatieve proef wel iets vindt.
 - **Bewijs:** B03-047 -> Bezig (Sim-getest; gekozen refreshmodus en beleid `hold` noemen). JLT-24 -> Bezig. JLT-26 blijft Geblokkeerd (zie S-G3-03).
@@ -555,7 +688,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-09 - Streamroutes zonder inlog: meting per client, spike en ADR
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (server met clients achter stack.lock; emulator achter gradle.lock)
 - **Werkpakketten en tests:** B03-010 (golf 3-deel: meting en keuze); JLT-63 (meetdeel)
-- **Vooraf:** Gate golf 1 (deel IsKid van B03-010 en de IStartupFilter-spike). Geen besluit van de gebruiker nodig voor de meting.
+- **Vooraf:** S-G2-90 gehaald (gate golf 2; daarin Gate golf 1 met het deel IsKid van B03-010 en de IStartupFilter-spike). Geen besluit van de gebruiker nodig voor de meting.
 - **Al gedaan?** `ls <WERKMAP>/jelly-leon/docs/adr | grep -i "stream"` -> geen uitvoer = nog geen ADR. `grep -c '"id": "B03-010"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> lees de bestaande regel (het deel IsKid van golf 1 kan er al staan).
 - **Lees eerst:** WP-JSON object B03-010; `<WERKMAP>/jelly-leon/docs/adr/ADR-0009-upstream-risicos-niet-patchen-in-p0.md`; BOUWPLAN#F1.4.5 Fail-closed; BOUWPLAN#10.14 Clientmatrix; `<WERKMAP>/jelly-leon/docs/platform-v2/CLIENT_COMPAT_MATRIX.md#1. Protocol`
 - **Bouw:**
@@ -628,7 +761,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
   7. EVIDENCE met n, recall, Wilson-ondergrens per klasse.
 - **Tests (verplicht):** in de image: recall per codecklasse met Wilson-95 %-ondergrens minstens 0,80 bij n van minstens 30 (anders noemt het bewijs het een smoke-gate); audioklassen n minstens 20 en ondergrens minstens 0,70. Negatief: (a) 0 bevindingen hoog of middel op N-QC en N-QC-rommelig; (b) transcode-fps van een live stream wijkt met de controle aan hooguit 5 % af; (c) PlaybackStart tijdens een decode -> gestopt binnen 5 s, geen achtergebleven ffmpeg-proces; (d) sha256 van het corpus voor en na gelijk. Commando's: T-JL-IMAGE, daarna de meting achter `flock <WERKMAP>/.lokaal/stack.lock nice -n 10`; voor het transcode-deel vanuit `<WERKMAP>/jelly-leon`: `PYTHONPATH=tools/b03-harnas python -m b03h baseline --metingen transcode --runs 3 --image <lokale-tag> --label definitief-forkbasis --uit <rapport.json>` (opties staan in `tools/b03-harnas/b03h/baseline.py`; controleer ze daar voor gebruik). De recall-meting per klasse heeft nog geen harnasonderdeel: de bouwer voegt die toe en schrijft het commando in het README van het harnas.
 - **Poort:** P-jelly-leon (plugin, image bouwen en proeven).
-- **Valkuilen:** V-005, V-006, V-009, V-014, V-032. Eigen: een run met een gemiddelde belasting boven 2,0 bij de start is ongeldig en telt niet mee.
+- **Valkuilen:** V-005, V-006, V-009, V-014, V-032. Eigen: een run is ongeldig (telt niet mee, en is niet "mislukt") als de 1-minuut-loadavg vóór de run boven 4 ligt, als andere processen meer dan 4 kernen gebruiken of als een ander zwaar slot actief is: de lastgrens `LASTGRENS` (standaard 4.0) van het harnas `tools/b03-harnas/b03h/meetslot.py`, functie `beoordeel`, zoals ook `<WERKMAP>/jelly-leon/tools/b03-harnas/README.md` en BOUWPLAN#F1.1.3, #F5.1.3 en #F6.1.3 zeggen ("loadavg(1 min) > 4"). Gebruik de functies van het harnas en zet `B03_LASTGRENS` niet hoger. BOUWPLAN#F4.9.5 zegt "loadavg > aantal toegewezen CPU's + 1"; de bouwer noemt in het bewijs welke grens gold en hoeveel CPU's de container had.
 - **Bewijs:** B03-052 -> Bezig (Sim-getest, met n en ondergrens per klasse). B03-051 -> bijwerken met de gemeten recall. JLT-30, JLT-31, JLT-36 -> Bezig. Klassen met te weinig n: "smoke-gate, n=<n>".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** A-BOUW N4 en A-HERSTEL N4; overige standaard
@@ -722,7 +855,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-17 - Watch Together: zichtbaarheid, uitnodigingen en deelnemersbeheer
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** nee (plugin-build en -test achter docker-build.lock)
 - **Werkpakketten en tests:** B03-022; JLT-05 (deel privacy en uitnodigingen); JLT-09 (deel: geen gewijzigde UserPolicy)
-- **Vooraf:** WT-1-gate geslaagd (B03-021). BG-11 genomen: zonder besluit start deze stap NIET (privacykeuze; zie hoofdstuk 3). De standaardzichtbaarheid is de stand die de gebruiker koos.
+- **Vooraf:** WT-1-gate geslaagd volgens het rapport van S-G2-90 (B03-021). BG-11 genomen: zonder besluit start deze stap NIET (privacykeuze; zie hoofdstuk 3). De standaardzichtbaarheid is de stand die de gebruiker koos.
 - **Al gedaan?** `grep -rln "InviteNotifier" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = niet gestart. `grep -rln "wt_audit" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = audit nog niet gebouwd. `grep -rln "watch/capabilities" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = module van golf 2 ontbreekt: STOP.
 - **Lees eerst:** WP-JSON object B03-022; BOUWPLAN#F1.5.2 Endpoints (E2 tot en met E8, E16); BOUWPLAN#F1.5.3 Schema's; BOUWPLAN#F1.4.4 Privacy; BOUWPLAN#F1.8 Bouwfasen (regel WT-2)
 - **Bouw:**
@@ -735,11 +868,11 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
   7. Lijst met toegestane verschillen voor de differentiele run van deze module (geen enkele wijziging in UserPolicy).
   8. Tests en EVIDENCE.
 - **Tests (verplicht):** xUnit en integratie over de volledige rollenmatrix (eigenaar, lid, genodigde, niet-genodigde huishoudgebruiker, gast, verborgen gebruiker, beheerder): 0 lekken van groep of deelnemersnamen via `GET /SyncPlay/List` en `GET /SyncPlay/{id}`, ook bij een lege wachtrij. Negatief: (a) JoinGroup op een niet-zichtbare groep geeft hetzelfde antwoord als op een niet-bestaande groep; (b) verlopen of ingetrokken uitnodiging geeft geen toegang; (c) een verborgen of niet-bestaande gebruiker uitnodigen geeft dezelfde `niet_uitnodigbaar`; (d) analyzer: een Send-commando met lege controllingSessionId buiten `InviteNotifier` breekt de build; (e) E3 zonder If-Match wordt geweigerd. Commando: T-JL-PLUGIN met `--filter "FullyQualifiedName~Watch"`, daarna volledig.
-- **Poort:** P-jelly-leon (plugin, volledig) + P-CONTRACT + P-VEILIG.
-- **Valkuilen:** V-003, V-046, V-055. Eigen: een filter op alleen de eigen routes laat de upstream-routes `/SyncPlay/*` lekken; test daarom altijd via de upstream-routes.
+- **Poort:** P-jelly-leon (plugin, volledig) + P-CONTRACT + P-VEILIG + P-HARDE-EIS.
+- **Valkuilen:** V-003, V-046, V-055, V-111. Eigen: een filter op alleen de eigen routes laat de upstream-routes `/SyncPlay/*` lekken; test daarom altijd via de upstream-routes.
 - **Bewijs:** B03-022 -> Bezig (Unit-getest; "stock-web en officiele apps volgen in S-G3-27 en S-G4-30"). JLT-05 -> Bezig met "deel". JLT-06 -> Geblokkeerd: "NIET GEVALIDEERD (echte NAS): echte apparaten en echte Tailscale nodig; zie STAPPEN_P6.md".
-- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> R-VEILIG (VERPLICHT: zichtbaarheid en rechten) -> A-HERSTEL -> R-EERLIJK
-- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog); R-VEILIG N4; overige standaard
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> R-VEILIG (VERPLICHT: zichtbaarheid en rechten) + R-HARDE-EIS (tegelijk; VERPLICHT: de stap raakt gebruikers, UserPolicy en de pseudonimisering bij UserDeleted; de lijst met toegestane verschillen moet UserPolicy uitsluiten) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog); R-VEILIG N4; R-HARDE-EIS N4; overige standaard
 - **Stop en vraag als:** WT-1 de core-patch-route koos en het filter niet in de decorator kan; een upstream-route de groep toch toont en dat alleen met een nieuwe core-patch te dichten is.
 
 ### S-G3-18 - Watch Together: kinderprofiel en ouderlijk toezicht
@@ -789,7 +922,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-20 - Watch Together: volgmodus voor clients zonder SyncPlay (serverdeel)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
 - **Werkpakketten en tests:** B03-026 (serverdeel); JLT-07 (unitdeel)
-- **Vooraf:** S-G3-17. BG-10 genomen: zonder besluit start deze stap NIET (BESLUITEN_EN_BLOKKADES.md, kop BG-10). Beide opties bevatten geen clientpatch voor de volgmodus zelf; de clientpatch is S-G3-26.
+- **Vooraf:** S-G3-17; S-G3-32 (WP-JSON B03-026 noemt B03-003 als afhankelijkheid). BG-10 genomen: zonder besluit start deze stap NIET (BESLUITEN_EN_BLOKKADES.md, kop BG-10). Beide opties bevatten geen clientpatch voor de volgmodus zelf; de clientpatch is S-G3-26.
 - **Al gedaan?** `grep -rln "FollowController" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = niet gestart.
 - **Lees eerst:** WP-JSON object B03-026; BOUWPLAN#F1.5.2 Endpoints (E11, E12, E13); BOUWPLAN#F1.6.2 Andere clients; BOUWPLAN#F1.9.5 Negatief en veiligheid
 - **Bouw:**
@@ -832,12 +965,12 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-22 - Segmenten: ondertitel- en hoofdstuksignalen en families
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** groot | **Moeilijkheid:** gewoon | **Zwaar:** nee (signalen zonder videodecode)
 - **Werkpakketten en tests:** B03-074; JLT-53; JLT-57
-- **Vooraf:** B03-071 en B03-072 (golf 2: module met `segments.db`); de gedeelde cue-extractie (B03-008). BG-34: zonder bevestigde labels van echte afleveringen telt alleen de synthetische set.
+- **Vooraf:** S-G2-90 gehaald, met B03-071 en B03-072 (S-G2-40, S-G2-42: module met `segments.db`); de cue-extractie uit de bestandspas en featurecache van S-G1-34 (B03-018 deel b, "Eén audiopas per bestand ... cue-extractie"; STAPPEN_P4_GOLF1_2.md). WP-JSON B03-074 noemt die cue-extractie "gedeeld met B03-008" (de semantische scenezoeker). B03-008 wordt na besluit Z-20 in golf 4 gebouwd (S-G4-49) en bouwt op deze stap voort; deze stap hangt niet van B03-008 af en bouwt er niets van. BG-34: zonder bevestigde labels van echte afleveringen telt alleen de synthetische set.
 - **Al gedaan?** `grep -rln "Previously on" <WERKMAP>/jelly-leon/plugins <WERKMAP>/jelly-leon/tools` -> geen uitvoer = niet gestart. `grep -rln "segments.db" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = module van golf 2 ontbreekt: STOP.
 - **Lees eerst:** WP-JSON object B03-074; BOUWPLAN#F6.3.3 Detectiepijplijn; BOUWPLAN#F6.3.4 Post-credit-bescherming en grensregels; BOUWPLAN#F6.5.4 Endpoints (7 en 8); BOUWPLAN#F6.9.4 Negatieve, veiligheids- en gegevensbeschermingstests
 - **Bouw:**
   1. Hoofdstuknamen als signaal (patronen NL, EN en Japans in Latijns schrift); dummy- en genummerde hoofdstukken negeren. Bron: WP-JSON B03-074.
-  2. Ondertitelcues uit de gedeelde cue-extractie (stabiele spoorsleutel; externe bestanden via een pad-hash; alleen lezen): "Previously on", "Eerder in", "Wat voorafging", dichtheid van muzieknoten, ASS-stijlnamen OP en ED, aftitelingcues.
+  2. Ondertitelcues uit de cue-extractie van de bestandspas (S-G1-34; via de Core-dienst voor kenmerken, nooit zelf een tool starten; stabiele spoorsleutel; externe bestanden via een pad-hash; alleen lezen): "Previously on", "Eerder in", "Wat voorafging", dichtheid van muzieknoten, ASS-stijlnamen OP en ED, aftitelingcues.
   3. Machinevertalingen van F3 (herkenbaar aan het titeltoken) tellen nooit als bewijs.
   4. Fusie met audio en beeld via een gekalibreerde score; ondertitels zijn alleen zwak bewijs (ze kunnen verschoven zijn).
   5. Families: zonder classificatie blijft een familie intern "terugkerend fragment" tot een editor een type kiest; routes 7 `GET /media/v1/segments/families` en 8 `PUT /media/v1/segments/families/{familyId}`. Bron: BOUWPLAN#F6.5.4.
@@ -848,7 +981,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 - **Bewijs:** B03-074 -> Bezig (Sim-getest op de synthetische set). JLT-53 en JLT-57 -> Bezig. Zonder labels: het deel Pioneer One apart als Geblokkeerd met "NIET GEVALIDEERD (echte NAS): bevestigde labels van echte afleveringen nodig (BG-34)".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard
-- **Stop en vraag als:** de module of de cue-extractie van golf 2 ontbreekt; iemand labels van echte afleveringen zelf wil invullen (labels komen alleen van de gebruiker).
+- **Stop en vraag als:** de segmentmodule van golf 2 (S-G2-40) of de cue-extractie van de bestandspas (S-G1-34, golf 1) ontbreekt; iemand labels van echte afleveringen zelf wil invullen (labels komen alleen van de gebruiker).
 
 ### S-G3-23 - Watch Together: externe deelnemers via VPN (alleen na BG-09)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** ja (netwerkproef met vertraging achter stack.lock)
@@ -896,7 +1029,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 - **Stop en vraag als:** de config.json-generator in jelly-leon moet worden aangepast om de plugin te laden (dat is werk voor de jelly-leon-baan; melden aan de regisseur); de haak meer dan een import en een aanroep in het upstream-bestand vraagt.
 
 ### S-G3-25 - Kwaliteitslabel op de itempagina (webdeel van B03-057)
-- **Repo:** jelly-leon-web | **Fase:** P4 (golf 3) | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (npm-build; e2e achter stack.lock)
+- **Repo:** jelly-leon-web | **Fase:** P4 (golf 3) | **Omvang:** klein | **Moeilijkheid:** hoog (haak in een upstream-bestand van de fork) | **Zwaar:** ja (npm-build; e2e achter stack.lock)
 - **Werkpakketten en tests:** B03-057 (webdeel); EX36 (webdeel); JLT-38 (deel web)
 - **Vooraf:** S-G3-14 (route Q2 bestaat); S-G3-24 is klaar (zelfde baan). BG-24: zonder besluit staat het label uit (`Quality.ShowLabelToUsers`).
 - **Al gedaan?** `grep -rn "media/v1/quality" <WERKMAP>/jelly-leon-web/src -l` -> geen uitvoer = niet gestart.
@@ -909,11 +1042,49 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
   5. Tests en EVIDENCE.
 - **Tests (verplicht):** e2e in Modern en Legacy: label zichtbaar bij een item met een bevinding als de instelling aan staat. Negatief: (a) een item waar de gebruiker niet bij mag -> 404 en geen label (EX36); (b) instelling uit -> geen label; (c) een geforceerde fout in de fork-code -> de itempagina werkt als upstream; (d) tegen een stock-server zonder plugin -> geen fout in de console. Commando's: T-JLW-STATISCH, T-JLW-NPM, T-JLW-E2E.
 - **Poort:** P-jelly-leon-web (volledig).
-- **Valkuilen:** V-060, V-067, V-072.
+- **Valkuilen:** V-060, V-067, V-072, V-126.
 - **Bewijs:** B03-057 -> Bezig (Sim-getest; webdeel). EX36 -> Bezig (deel web). JLT-38 -> Bezig met "deel web; clientmatrix en Hub-kaart volgen in golf 4".
-- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
-- **Niveau:** standaard
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: Jelly Leon-web valt buiten Peil)
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog: de haak H-ITEMDETAILS is een ingreep in een upstream-bestand); overige standaard
 - **Stop en vraag als:** de haak nog niet bestaat en meer dan een regel in het upstream-bestand vraagt; het label alleen kan met een titel of pad in het verzoek.
+
+### S-G3-31 - Universele bibliotheek: webdeel (B03-002; alleen als het dossier van S-G3-30 een webdeel noemt)
+- **Repo:** jelly-leon-web | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (npm-build; e2e achter stack.lock)
+- **Werkpakketten en tests:** B03-002 (webdeel)
+- **Vooraf:** S-G3-30, en zijn dossier (`<WERKMAP>/.lokaal/ketens/S-G3-30/DOSSIER.md`) noemt een scherm uit BOUWPLAN#B03-002 dat upstream jellyfin-web niet heeft. Noemt het dossier geen webdeel, dan vervalt deze stap: de regisseur zet hem in VOORTGANG.md op "vervallen" met de reden uit het dossier. De webhaakmodule van B03-017 (golf 1).
+- **Al gedaan?** `ls <WERKMAP>/jelly-leon-web/src/jelly-leon` -> bestaat niet = de haakmodule van golf 1 ontbreekt: STOP. `grep -n '"B03-002"' <WERKMAP>/jelly-leon-web/docs/platform-v2/EVIDENCE.json` -> geen uitvoer = niet gestart.
+- **Lees eerst:** BOUWPLAN#B03-002 — Universele bibliotheek (Schermen/bediening); het dossier van S-G3-30; `<WERKMAP>/jelly-leon-web/docs/platform-v2/PATCHES.md` (kop "Geplande haken op de 12.x-basis")
+- **Bouw:**
+  1. Scope (A-VERKEN): alleen de schermdelen die het dossier van S-G3-30 noemt; per deel de haak uit PATCHES.md waarlangs het komt. Een haak die daar niet staat, is een nieuwe patch met een nummer in het register.
+  2. Bouw die delen in de vormgeving van upstream (buiten Peil), via de haakmodule.
+  3. Module uit (404), een stock-server of een fout in de fork-code: het scherm is gelijk aan upstream.
+  4. Tests en EVIDENCE.
+- **Tests (verplicht):** T-JLW-STATISCH; T-JLW-NPM; T-JLW-E2E (achter stack.lock). Negatief: (a) module uit of stock-server: de DOM van de betrokken schermen is gelijk aan stock; (b) een geforceerde fout in de fork-code laat het upstream-scherm werken; (c) T-JLW-STATISCH faalt als de nieuwe haak niet in het register staat.
+- **Poort:** P-jelly-leon-web.
+- **Valkuilen:** V-003, V-005.
+- **Bewijs:** B03-002 (jelly-leon-web) -> Bezig (Sim-getest), webdeel. "NIET GEVALIDEERD (hardware): echte tv's en browsers op apparaten; zie N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: Jelly Leon-web valt buiten Peil)
+- **Niveau:** standaard
+- **Stop en vraag als:** het dossier van S-G3-30 een webdeel noemt dat een wijziging buiten een haak vraagt; de haakmodule ontbreekt.
+
+### S-G3-32 - Beschikbaarheid van clients: wat op de ontwikkelmachine nog ontbreekt (B03-003)
+- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (Gradle en emulator achter gradle.lock; server achter stack.lock; volgorde: eerst stack.lock, dan gradle.lock)
+- **Werkpakketten en tests:** B03-003
+- **Vooraf:** S-G2-90 gehaald (gate golf 2). Besluit Z-20 genomen. BG-08 (Swiftfin: zonder besluit geen eigen patches) en ADR-0008 van jelly-leon-clients (eigen builds niet verspreiden) blijven gelden.
+- **Al gedaan?** `python3 -c "import json,sys;[print(r['status'],'|',r['validatie'],'|',r.get('blokkade','')) for r in json.load(open(sys.argv[1])) if r['id']=='B03-003']" <WERKMAP>/jelly-leon-clients/docs/platform-v2/EVIDENCE.json` -> op 2026-11-11: "Geblokkeerd | Sim-getest; NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (Mac/Xcode); NIET GEVALIDEERD (account)". Gedaan (P0, contract 1.2 en JC3 van P4-0, tegen 12.4): telefoon, Android TV en desktop 2.0.0 onder Xvfb Sim-getest (inloggen, hervatten, Direct Play, transcode, ondertitels); tablet-emulator Sim-mislukt; smart-tv, Chromecast en AirPlay onbekend tot D15. Deze stap herhaalt dat niet zonder reden en bouwt alleen wat het dossier als gat noemt.
+- **Lees eerst:** TASKS-JSON object B03-003; BOUWPLAN#B03-003 — Beschikbaarheid van clients; de EVIDENCE-regel B03-003 in jelly-leon-clients (velden bewijs, blokkade, opmerking); `<WERKMAP>/jelly-leon-clients/docs/platform-v2/INVENTARIS.md`; `<WERKMAP>/jelly-leon-clients/docs/adr/ADR-0011-clientcompatibiliteit-12x.md`; `<WERKMAP>/jelly-leon-clients/docs/adr/ADR-0008-geen-truenas-app-voor-clients.md`; WP-JSON objecten B03-026 en B03-037 (die noemen B03-003 als afhankelijkheid)
+- **Bouw:**
+  1. Scope (A-VERKEN): per onderdeel van de bron (web, Android, iOS, Android TV, tv-browser, Chromecast/AirPlay waar de client het ondersteunt; toegankelijkheid; responsieve speler, afstandsbediening, keuze van ondertitel- en audiospoor; "PWA shell"): al Sim-getest | ontbreekt en haalbaar | alleen met echte apparaten, Mac of account. Een webdeel (PWA-schil) hoort in jelly-leon-web: noemt het dossier dat als gat, dan keuzemenu (AGENTEN.md 6.8: aparte stap in jelly-leon-web of niet in P4); het hoort niet in deze stap.
+  2. De matrix voor ondertitels, hervatten en afspelen opnieuw tegen de jelly-leon-image van de actuele stand (na golf 2, op 12.x), met stock 12.x op dezelfde digest als controlegroep: T-JLC-COMPAT.
+  3. Alleen de gaten uit het dossier die op de ontwikkelmachine te bouwen en te testen zijn, als geregistreerde JLC-patch met test (T-JLC-STATISCH controleert het register). De tablet-emulator: ONBEKEND of die stabiel kan binnen de grenzen van de Opdrachtkop - A-VERKEN leest de rapporten `docs/platform-v2/test-evidence/p4-0-jc3-android-tablet-herhaling-1.json` en `-2.json`; blijft hij Sim-mislukt, dan staat dat zo in het bewijs.
+  4. EVIDENCE bijwerken.
+- **Tests (verplicht):** T-JLC-STATISCH; T-JLC-BOUW voor de clients die het dossier noemt; T-JLC-COMPAT (achter stack.lock en gradle.lock, in die volgorde). Negatief: (a) stock 12.x met dezelfde scenario's als controlegroep, 0 regressies; (b) de hervatproef telt elke poging (`python3 tools/clients/client_compat.py hervatproef`, opties eerst met `--help`); (c) T-JLC-STATISCH faalt bij een JLC-patch zonder registerregel.
+- **Poort:** P-jelly-leon-clients.
+- **Valkuilen:** V-011, V-012, V-057.
+- **Bewijs:** B03-003 (jelly-leon-clients) blijft "Geblokkeerd" (de acceptatie vraagt echte tv's en apparaten) met "Sim-getest" en de nieuwe rapportpaden. "NIET GEVALIDEERD (hardware): echte tv's en apparaten (D15); NIET GEVALIDEERD (Mac/Xcode): Swiftfin; zie STAPPEN_P6.md, N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: de clients vallen buiten Peil)
+- **Niveau:** standaard
+- **Stop en vraag als:** het dossier een gat noemt dat een eigen build op een echt apparaat of verspreiding vraagt (ADR-0008); een emulator het geheugen van de machine overschrijdt (AGENTEN.md 3.3); een regressie tegen stock optreedt.
 
 ### S-G3-26 - Native SyncPlay op Android TV (alleen als BG-10 "clientpatch" zegt)
 - **Repo:** jelly-leon-clients | **Fase:** P4 (golf 3) | **Omvang:** ONBEKEND tot na de verkenning (zie bouwpunt 1) | **Moeilijkheid:** hoog | **Zwaar:** ja (Gradle achter gradle.lock; emulator)
@@ -938,7 +1109,7 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 ### S-G3-27 - Compat-regressie en differentiele run per module-oplevering (herhaalstap)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build achter docker-build.lock; proeven achter stack.lock)
 - **Werkpakketten en tests:** JLT-63; JLT-64; JLT-65; JLT-24 (differentieel deel); JLT-35; JLT-05 (deel stock-web)
-- **Vooraf:** deze stap draait vier keer: na S-G3-08 (Subtitles), na S-G3-16 (Quality), na S-G3-22 (Segments) en na S-G3-23 of S-G3-20 (Watch Together). Elke keer met een verse image van de actuele main.
+- **Vooraf:** deze stap draait vijf keer: na S-G3-08 (Subtitles), na S-G3-16 (Quality), na S-G3-22 (Segments), na S-G3-30 (metadata en universele bibliotheek, S-G3-28 tot en met S-G3-30) en na S-G3-23 of S-G3-20 (Watch Together). Elke keer met een verse image van de actuele main.
 - **Al gedaan?** `ls <WERKMAP>/jelly-leon/docs/platform-v2/test-evidence | grep -i "diffrun\|compat"` -> vergelijk de datum en de commit in het rapport met `git -C <WERKMAP>/jelly-leon log -1 --format=%H`; een rapport van een oudere commit telt niet.
 - **Lees eerst:** FASERING#Gates per functie; BOUWPLAN#F4.9.7 Gegevensbescherming; BOUWPLAN#F3.9.4 Differentiele controle-run; BOUWPLAN#F1.9.6 Gegevensbescherming; `<WERKMAP>/jelly-leon/tools/b03-harnas/README.md`
 - **Bouw:**
@@ -956,10 +1127,22 @@ regisseur plant metingen daarom aan het eind van een blok en niet tussendoor.
 - **Niveau:** standaard; R-HARDE-EIS N4; A-BOUW N2 mag bij de tweede en latere run als er geen code verandert
 - **Stop en vraag als:** de differentiele run een verschil buiten de lijsten toont (no-go: schrijven in kijkgeschiedenis); een stock-client niet meer afspeelt.
 
-### Gatecontrole golf 3 (afvinklijst voor A-GATE, niveau N4)
+### S-G3-90 - Gatecontrole golf 3 (A-GATE, alleen lezen)
+- **Repo:** jelly-leon, jelly-leon-web en jelly-leon-clients (S-G3-32; en S-G3-26 als die liep), alleen lezen. Uitzondering op "een stap = een repo": dit is de gatecontrole; A-GATE schrijft alleen `<WERKMAP>/.lokaal/ketens/GATE-GOLF-3/RAPPORT-A-GATE.md` | **Fase:** P4 (golf 3) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (A-GATE draait per repo de volledige poort opnieuw, de repos na elkaar, achter de locks)
+- **Werkpakketten en tests:** geen eigen ID's; beoordeelt de gate van golf 3 (B03_FASERING.md#3. Golven en werkpakketten, rij Golf 3: JLT-03, 05, 07, 08, 20, 22, 23, 24, 30 tot en met 37, 53, 57) met de afvinklijst hieronder
+- **Vooraf:** S-G3-01 tot en met S-G3-25, S-G3-28 tot en met S-G3-32 en de vijf runs van S-G3-27 klaar of met reden vervallen (S-G3-31 vervalt als het dossier van S-G3-30 geen webdeel noemt; S-G3-26 alleen als BG-10 een clientpatch koos; S-G3-23 alleen als BG-09 "aan" is; S-G3-17 tot en met S-G3-21 alleen na BG-11 en BG-10); in jelly-leon, jelly-leon-web en jelly-leon-clients is geen keten open
+- **Al gedaan?** `ls <WERKMAP>/.lokaal/ketens/GATE-GOLF-3/RAPPORT-A-GATE.md && grep -n "gate golf 3" <WERKMAP>/.lokaal/ketens/GATE-GOLF-3/RAPPORT-A-GATE.md` -> klaar als het rapport bestaat, de uitkomst "gate golf 3 gehaald" is EN `git -C <WERKMAP>/jelly-leon rev-parse --short HEAD` (en idem voor jelly-leon-web) nog gelijk is aan de HEAD die het rapport noemt. Is er sindsdien gecommit, dan loopt de gate opnieuw voor wat die commits raken.
+- **Lees eerst:** hoofdstuk 2 (Gates) en de afvinklijst hieronder; FASERING#Gates per functie; `<WERKMAP>/.lokaal/plan/uit/AGENTEN.md` (prompt "A-GATE" en kop "2.2 Het protocol"); POORTEN.md, blokken P-jelly-leon en P-jelly-leon-web (kop "4. Volledig (CI-volgorde)"); `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md`
+- **Bouw:** er wordt niets gebouwd. A-GATE loopt de afvinklijst hieronder af, draait per repo de volledige poort (eerst jelly-leon-clients, dan jelly-leon-web, dan jelly-leon; tussen twee repos `free -m` en `df -h /`) en schrijft per punt "ja", "nee" of "niet vast te stellen" met het commando of bestand waarop het oordeel rust.
+- **Tests (verplicht):** de volledige poort per repo (POORTEN.md, kop "4. Volledig (CI-volgorde)"), elk commando met exitcode en slotregel in het rapport. Negatief (door A-GATE zelf opnieuw gedraaid, niet overgenomen uit een rapport): de negatieve proef van de laatste differentiele run van S-G3-27 vindt een verschil; T-JL-REGISTER faalt als een haak of patch uit het register wordt weggelaten (alleen lezen van de test, niets wijzigen).
+- **Poort:** P-jelly-leon, P-jelly-leon-web en P-jelly-leon-clients (volledig) + P-GIT + P-EERLIJK + P-HARDE-EIS + P-VEILIG, alle als controle.
+- **Valkuilen:** V-098, V-005, V-027, V-034, V-112. Eigen: een gate-rij die alleen op de NAS te bewijzen is telt niet als gehaald en niet als fout; zij staat apart in het rapport.
+- **Bewijs:** geen wijziging in een EVIDENCE.json; de uitkomst staat in het gate-rapport en in VOORTGANG.md.
+- **Agents:** A-GATE. Kortere keten met reden: zuivere controlestap; A-GATE is zelf de onafhankelijke controle en herstelt niets. Bij tekortkomingen: A-HERSTEL -> R-EERLIJK in de betreffende repo, daarna A-GATE opnieuw alleen voor de open punten.
+- **Niveau:** A-GATE N4 (einde van een golf, niet van een fase)
+- **Stop en vraag als:** tijdens de controle in een van de repos wordt geschreven; een gate-rij volgens TEST-JSON of FASERING bij golf 3 hoort maar niet in de afvinklijst staat (tekortkoming van het plan: melden); de gate een tweede keer niet gehaald wordt (keuzemenu aan de gebruiker).
 
-De regisseur zet deze controle uit als S-G3-01 tot en met S-G3-25 en de vier runs van S-G3-27 klaar zijn (S-G3-26
-alleen als BG-10 een clientpatch koos; S-G3-23 alleen als BG-09 "aan" is). A-GATE bouwt niets en leest alleen.
+Afvinklijst gate golf 3 (A-GATE bouwt niets en leest alleen):
 
 - [ ] Elke stap van golf 3 heeft in EVIDENCE van de repo een regel met status "Bezig" of "Geblokkeerd"; nergens
       "Gereed" of "Geslaagd". Controle: `grep -n '"status"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json | grep -ci "gereed\|geslaagd"` -> 0
@@ -971,16 +1154,24 @@ alleen als BG-10 een clientpatch koos; S-G3-23 alleen als BG-09 "aan" is). A-GAT
 - [ ] Subfase-gates: WT-2 (S-G3-17, S-G3-18), WT-3 (S-G3-24), WT-4 (S-G3-19), WT-5 (S-G3-20, S-G3-21), WT-6
       (S-G3-23 of "wacht op BG-09"), 3A en 3B (S-G3-03 tot en met S-G3-08), QC-0 tot en met QC-5 (S-G3-01, S-G3-02,
       S-G3-11 tot en met S-G3-16), F6-S4 (S-G3-22).
+- [ ] Besluit Z-20, golf 3: B03-006 (S-G3-28, S-G3-29), B03-002 (S-G3-30, en S-G3-31 of de reden dat hij verviel) en
+      B03-003 (S-G3-32) hebben elk een EVIDENCE-regel in de repo van de stap met "Bezig" of "Geblokkeerd" en
+      NIET GEVALIDEERD voor wat echte apparaten of de NAS vraagt; de dossiers noemen per onderdeel van de bron de scope
+      (afspraak "Stappen uit besluit Z-20" in hoofdstuk 8). Deze werkpakketten hebben geen gate-rij in FASERING; hun
+      ontbreken is een tekortkoming van de stap, niet van de gate.
+- [ ] Module uit (besluit Z-19): de routes van de modules van golf 3 geven 404 als de module uit staat (niet
+      aangemeld: 401), elk met een test.
 - [ ] No-go-lijst uit hoofdstuk 2: geen schrijven in kijkgeschiedenis, gebruikers, UserPolicy of mediabestanden
       (laatste run van S-G3-27, met de negatieve proef erbij); geen MediaGuard-mutatie; geen weigering van een
       stock-client.
 - [ ] De NAS-rijen JLT-06, JLT-26 en JLT-39 staan op "Geblokkeerd" met "NIET GEVALIDEERD (...)" en wat nog nodig is.
 - [ ] Patchregisters kloppen: T-JL-REGISTER en T-JLW-STATISCH groen; elke nieuwe haak of patch heeft een nummer.
-- [ ] CI van de laatste commit op de branch is groen in jelly-leon en jelly-leon-web (POORTEN.md, kop "0.5
+- [ ] CI van de laatste commit op de branch is groen in jelly-leon, jelly-leon-web en jelly-leon-clients (POORTEN.md, kop "0.5
       CI-controle na elke push").
 - [ ] Geen modelnaam, geen geheim, geen adres van de gebruiker in de commits van deze golf (P-VEILIG).
-- [ ] Excel bijgewerkt volgens P-EXCEL (POORTEN.md) en `docs/platform-v2/OVERDRACHT/STATUS.md` in ai-server-manager
-      noemt golf 3 met de open punten.
+- [ ] VOORTGANG.md noemt elke stap van golf 3 met zijn stand; vervallen stappen staan er met het besluit (BG-09,
+      BG-10, BG-11) of met de reden uit het dossier (S-G3-31). De Excel en `docs/platform-v2/OVERDRACHT/STATUS.md` worden niet bij deze golfgate bijgewerkt maar
+      een keer bij de fase-afsluiting (S-G4-90 in hoofdstuk 10); dat is geen tekortkoming van golf 3.
 
 Uitkomst van A-GATE: "gate golf 3 gehaald" of een lijst met wat ontbreekt per stap. Bij een gat gaat de stap terug
 naar A-HERSTEL; de regisseur start golf 4 in de jelly-leon-baan pas na een gehaalde gate. De banen jelly-leon-clients
@@ -988,7 +1179,8 @@ naar A-HERSTEL; de regisseur start golf 4 in de jelly-leon-baan pas na een gehaa
 
 ## 9. Stappen golf 4
 
-De vaste afspraken uit hoofdstuk 8 (half werk, poort, bewijs, testbestanden, media, OpenAPI) gelden hier ook. Extra
+De vaste afspraken uit hoofdstuk 8 (half werk, poort, bewijs, testbestanden, media, OpenAPI, stappen uit besluit Z-20)
+gelden hier ook. Extra
 voor golf 4:
 
 - **Module-namen:** de module voor apparaten en afspelen heet in de code `Devices`
@@ -1199,11 +1391,11 @@ voor golf 4:
 ### S-G4-10 - Watch Together: chat en reacties, serverdeel (alleen na BG-12)
 - **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
 - **Werkpakketten en tests:** B03-028 (serverdeel); JLT-05 (voorwaardelijk deel chat); JLT-09 (deel: alleen in het geheugen)
-- **Vooraf:** S-G3-18 (kinderregels). BG-12: zegt het besluit "niet bouwen" of ontbreekt het, dan alleen bouwpunt 1 met zijn test, en blijft B03-028 Geblokkeerd (besluit BG-12).
+- **Vooraf:** S-G3-18 (kinderregels). BG-12 genomen met "aan". Zegt het besluit "uit" of ontbreekt het, dan VERVALT deze stap (BESLUITEN_EN_BLOKKADES.md, kop BG-12: "B03-028 wordt niet gebouwd"); de regisseur zet dan alleen de bewijsregel B03-028 -> "Geblokkeerd (besluit BG-12)" via de eerstvolgende stap in jelly-leon.
 - **Al gedaan?** `grep -rn "groups/{[a-zA-Z]*}/messages" <WERKMAP>/jelly-leon/plugins/JellyLeon/src --include=*.cs -l` -> geen uitvoer = niet gestart.
 - **Lees eerst:** WP-JSON object B03-028; BOUWPLAN#F1.5.2 Endpoints (E14, E15); BOUWPLAN#F1.4.4 Privacy; BOUWPLAN#F1.9.5 Negatief en veiligheid; BOUWPLAN#F1.8 Bouwfasen (regel WT-7)
 - **Bouw:**
-  1. Routes E14 `POST /media/v1/watch/groups/{id}/messages` en E15 `GET .../messages` (long-poll met `after` en `wait` van hooguit 25 s). Standaard uit: beide geven 501 `capability_unavailable`. Bron: WP-JSON B03-028.
+  1. Routes E14 `POST /media/v1/watch/groups/{id}/messages` en E15 `GET .../messages` (long-poll met `after` en `wait` van hooguit 25 s). Met de instelling uit (de standaard na installatie) geven beide 501 `capability_unavailable`. Bron: WP-JSON B03-028.
   2. Aan: vaste reacties (duim, lach, verbaasd, hart, applaus) en korte tekst van hooguit 200 tekens, zonder HTML en zonder links.
   3. Opslag alleen in het geheugen: nooit in een database, logboek, event of antwoord aan de Hub. Na het einde van de groep of een herstart van de server is alles weg.
   4. Snelheidslimiet 5 berichten per 10 s per gebruiker, op de aangemelde gebruiker en niet op een header van de aanvrager.
@@ -1213,10 +1405,10 @@ voor golf 4:
 - **Tests (verplicht):** standaard uit geeft 501 op E14 en E15. Aan: een lid stuurt en een ander lid leest. Negatief: (a) een niet-lid krijgt hetzelfde antwoord als bij een niet-bestaande groep; (b) meer dan 5 berichten in 10 s geeft 429 met Retry-After; (c) tekst met HTML of script komt als platte tekst terug, een link en een tekst van 201 tekens worden geweigerd; (d) een kind zonder toestemming krijgt 403 op sturen en lezen; (e) na de test bevat geen enkel bestand in de datamap, geen logregel en geen outbox-rij de unieke testtekst (zoek op een unieke tekenreeks); (f) na het einde van de groep geeft E15 niets meer terug. Commando: T-JL-PLUGIN met `--filter "FullyQualifiedName~Watch"`, daarna volledig.
 - **Poort:** P-jelly-leon (plugin, volledig) + P-CONTRACT + P-VEILIG.
 - **Valkuilen:** V-042, V-049, V-050, V-094. Eigen: een logregel op debugniveau met de berichttekst breekt de regel "alleen in het geheugen".
-- **Bewijs:** B03-028 -> Bezig (Unit-getest; "webdeel volgt in S-G4-24") of Geblokkeerd met "besluit BG-12 ontbreekt of is nee; routes geven 501". JLT-05 en JLT-09 -> Bezig met "deel chat".
+- **Bewijs:** B03-028 -> Bezig (Unit-getest; "webdeel volgt in S-G4-24"). JLT-05 en JLT-09 -> Bezig met "deel chat". (Vervalt de stap door BG-12: B03-028 -> "Geblokkeerd (besluit BG-12)".)
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> R-VEILIG (VERPLICHT: invoer van gebruikers, snelheidslimiet, kinderregel, niets op schijf) -> A-HERSTEL -> R-EERLIJK
 - **Niveau:** standaard; R-VEILIG N4
-- **Stop en vraag als:** BG-12 niet genomen is en de regisseur toch het volledige serverdeel vraagt; de long-poll alleen werkt met opslag buiten het geheugen.
+- **Stop en vraag als:** BG-12 niet "aan" is (de stap had dan niet mogen starten); de long-poll alleen werkt met opslag buiten het geheugen.
 
 ### S-G4-11 - Watch Together: connector-items en events voor de Hub
 - **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee
@@ -1250,7 +1442,7 @@ voor golf 4:
   2. Toegang als in S-G4-11: Hub-JWT na pin, zonder pin 401 `not_linked`, rol kind 403.
   3. Regels UG-F2-1 tot en met UG-F2-8 in `docs/platform-v2/UPSTREAM_GEDRAG.md`, elk met een contracttest; F2 opnemen in de proef voor bijwerken vanaf upstream (`tools/jelly-leon/upstream_sync.py`; opties in het bestand lezen).
   4. Een bibliotheek van 10 000 nagebootste items voor de meting. Of het harnas die al kan maken: ONBEKEND - eerst vaststellen met: `grep -rln "10000\|10_000" <WERKMAP>/jelly-leon/tools/b03-harnas/b03h <WERKMAP>/jelly-leon/tools/jelly-leon`. Bestaat het niet, dan bouwt deze stap het in het harnas, met een pytest erbij.
-  5. Meting in het exclusieve meetslot (`tools/b03-harnas/b03h/meetslot.py`): minstens 3 runs, stock en Jelly Leon afwisselend; een run met een 1-minuut-belasting boven 2,0 is ongeldig en telt niet als mislukt.
+  5. Meting in het exclusieve meetslot (`tools/b03-harnas/b03h/meetslot.py`): minstens 3 runs, stock en Jelly Leon afwisselend; een run met een 1-minuut-belasting boven 2,0 is ongeldig en telt niet als mislukt (BOUWPLAN#F2.9.6 en WP-JSON B03-039 noemen 2,0; dat is strenger dan de standaard van het harnas, `LASTGRENS` 4.0: draai deze meting daarom met `B03_LASTGRENS=2.0` en zet dat in het rapport).
   6. Gemeten worden: startschermrij p95 koud en warm, Similar p95 tegenover stock, extra geheugen (PSS), volledige herberekening op 1 thread, plannerpauze bij Direct Play en bij transcode, en gelezen bytes op de mediamap.
   7. Rapport onder `docs/platform-v2/test-evidence/` en EVIDENCE.
 - **Tests (verplicht):** grenzen uit de acceptatie: startschermrij p95 hooguit 250 ms koud en 50 ms warm; Similar p95 hooguit 1,5 keer stock; extra PSS hooguit 200 MiB; herberekening hooguit 120 s op 1 thread bij 10 000 items; gelezen bytes op media = 0. Negatief: (a) een ongeldige run (belasting boven 2,0) wordt in het rapport als ongeldig geteld en niet stil weggelaten; (b) de herberekening pauzeert bij een actieve sessie van beide soorten; (c) zonder pin 401; (d) de syncproef is groen of faalt terecht met exitcode 2 en een leesbare reden. Commando's: T-JL-PLUGIN met `--filter "FullyQualifiedName~Recommend"` (controleer de naam van de modulemap), T-JL-REGISTER, T-JL-HARNAS, T-JL-IMAGE, daarna de meting achter stack.lock.
@@ -1362,7 +1554,7 @@ voor golf 4:
   5. Instelling `OutroEofGuardSeconds` (0 tot 5, standaard 1,0) zichtbaar op het tabblad Taken en instellingen; de marge zelf is in golf 2 gebouwd (B03-073): hier alleen aantonen met een test "marge 0 tegen 1,0 s".
   6. Afronding B03-007, punt voor punt met bewijs aanwijzen: (a) 0 s beschermde scene binnen een overslaanbaar segment op de bevroren testset (JLT-51) na de stappen S-G4-15 en S-G4-40 opnieuw gemeten; (b) geen segment gepubliceerd zonder afgeronde steekproef of menselijke bevestiging, en nergens automatisch overslaan als standaard; (d) module uit geeft hetzelfde gedrag als stock (JLT-56). Punt (c), de clients, volgt in S-G4-23, -27, -28 en -30.
   7. Browsertest in het harnas en EVIDENCE.
-- **Tests (verplicht):** Playwright in Chromium, Firefox en WebKit, Modern en Legacy: elk tabblad laadt met een gevulde testdatabase. Negatief: (a) een gewone kijker krijgt 403 op de pagina en de routes; (b) publiceren zonder afgeronde steekproef geeft 409 `qc_sample_incomplete`; (c) opruimen van wezen zonder export van hooguit 24 uur geeft 409 `export_required`; (d) module uit: de pagina zegt dat en doet geen verzoeken in een lus; (e) met marge 0 eindigt het segment op het einde van het bestand, met 1,0 s ervoor. Opnieuw meten van JLT-51: het commando staat bij het werk van golf 2; ONBEKEND - eerst vaststellen met: `grep -rn "JLT-51" <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json <WERKMAP>/jelly-leon/tools/b03-harnas/README.md`. Browsertest: toevoegen aan `<WERKMAP>/jelly-leon/tools/b03-harnas/playwright/harnas.mjs` naast de test van S-G3-16; het exacte commando in het README van het harnas. Draaien achter `flock <WERKMAP>/.lokaal/stack.lock`.
+- **Tests (verplicht):** Playwright in Chromium, Firefox en WebKit, Modern en Legacy: elk tabblad laadt met een gevulde testdatabase. Negatief: (a) een gewone kijker krijgt 403 op de pagina en de routes; (b) publiceren zonder afgeronde steekproef geeft 409 `qc_sample_incomplete`; (c) opruimen van wezen zonder export van hooguit 24 uur geeft 409 `export_required`; (d) module uit: de pagina zegt dat en doet geen verzoeken in een lus; (e) met marge 0 eindigt het segment op het einde van het bestand, met 1,0 s ervoor. Opnieuw meten van JLT-51: met het commando van S-G2-44 (STAPPEN_P4_GOLF1_2.md; evaluatieharnas van S-P40-66); vaststellen met: `grep -rn "JLT-51" <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json <WERKMAP>/jelly-leon/tools/b03-harnas/README.md`. Browsertest: toevoegen aan `<WERKMAP>/jelly-leon/tools/b03-harnas/playwright/harnas.mjs` naast de test van S-G3-16; het exacte commando in het README van het harnas. Draaien achter `flock <WERKMAP>/.lokaal/stack.lock`.
 - **Poort:** P-jelly-leon (plugin, image bouwen en proeven, job `b03-harnas`) + P-CONTRACT + P-HARDE-EIS.
 - **Valkuilen:** V-058, V-060, V-063, V-065, V-067, V-112.
 - **Bewijs:** B03-076 -> Bezig (Sim-getest; "webdeel knoppen volgt in S-G4-23"). B03-007 -> Bezig (Sim-getest; per acceptatiepunt het rapportpad; "clients volgen"). JLT-56 -> Bezig. JLT-55 -> Bezig met "serverdeel".
@@ -1480,10 +1672,70 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-11 (zie de 
 - **Niveau:** standaard; R-VEILIG N4; R-HARDE-EIS N4
 - **Stop en vraag als:** een tabblad een instelling vraagt die niet in BOUWPLAN#F1.7 staat; E18 meer zou wissen dan de eigen tabellen van de module.
 
+### S-G4-49 - Scènezoeker: zoeken in ondertitelcues met tijdcode en rechten per gebruiker (B03-008, serverdeel)
+- **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** nee (plugin-build en -test achter docker-build.lock; ONBEKEND of de indexbouw een werkertaak in de image vraagt - A-VERKEN stelt vast; dan image-build achter docker-build.lock)
+- **Werkpakketten en tests:** B03-008 (serverdeel)
+- **Vooraf:** S-G3-22 (cues en families; WP-JSON B03-074: cue-extractie "gedeeld met B03-008"); de cue-extractie van de bestandspas S-G1-34 (STAPPEN_P4_GOLF1_2.md); S-G3-06 (de ene syncmeter B03-042; BOUWPLAN noemt B03-008 als afnemer); S-G3-10 (rechten op streamroutes, B03-010: een kinderaccount krijgt geen volwassen media "via zoeken"). Besluit Z-20 genomen. BG-06 (P5): zonder besluit geen tweede producent, dus in P4 geen spraakherkenning en geen embeddings.
+- **Al gedaan?** `grep -c '"id": "B03-008"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart (op 2026-11-11: 0). `grep -rln "media/v1/scenes\|media/v1/search" <WERKMAP>/jelly-leon/plugins/JellyLeon/src` -> geen uitvoer = routes nog niet gebouwd.
+- **Lees eerst:** TASKS-JSON object B03-008; BOUWPLAN#B03-008 — Semantische scènezoeker; BOUWPLAN#3. API en integratie-contracten (blok "Aanvulling 2.0 — API": "`GET /media/v1/search` en `GET /media/v1/scenes` blijven B03-008"); in BOUWPLAN de tabelrij "F4/F6/B03-008 spraak (P5)" (zoek op "faster-whisper"); WP-JSON objecten B03-042 en B03-074; `<WERKMAP>/.lokaal/plan/uit/BESLUITEN_EN_BLOKKADES.md`, kop "BG-06"; E2E-JSON rij EX36; de ADR van S-G3-10 over streamroutes
+- **Bouw:**
+  1. Scope (A-VERKEN, afspraak "Stappen uit besluit Z-20" in hoofdstuk 8): per onderdeel van de bron (zoeken op omschrijving of op uitgesproken dialoog; scènedetectie; ondertitelsync; vectorindex met rechten per gebruiker; batch alleen bij rust) wat zonder spraakherkenning en zonder embeddings haalbaar is. Zoeken op omschrijving en een vectorindex vragen embeddings (BG-06, P5) en horen niet in deze stap. Scènedetectie (beeld): ONBEKEND - A-VERKEN stelt vast of de bestandspas (S-G1-34) of kwaliteitscontrole niveau 2 (S-G3-12) al scènegrenzen levert; zo niet, dan niet bouwen en onder besluit_nodig zetten.
+  2. Een index van de tekst van bestaande ondertitelsporen met tijdcode per item (cues uit de bestandspas, stabiele spoorsleutel), in eigen opslag van de plugin; bouwen via de planner van golf 1 en alleen bij rust (B03-018); de module start zelf nooit een tool.
+  3. Routes `GET /media/v1/search` en `GET /media/v1/scenes`, additief in de OpenAPI; schema volgens de afspraak in hoofdstuk 8 (BOUWPLAN noemt alleen de paden). Module uit: 404 (besluit Z-19).
+  4. Rechten: een resultaat alleen voor items die de gebruiker mag zien (bibliotheekrechten, ouderlijk toezicht, kind volgens de ene definitie van B03-010); een verborgen item geeft hetzelfde antwoord als een niet-bestaand item.
+  5. Zonder tekstspoor of zonder recht: geen resultaat en geen verzonnen tekst. Bron: TASKS-JSON B03-008 (Acceptatie).
+  6. Tests en EVIDENCE.
+- **Tests (verplicht):** xUnit: een zin uit een ondertitelspoor van het corpus geeft het item met de tijdcode van die cue. Negatief (acceptatie TASKS-JSON B03-008: "Zonder transcript of permissie geen hallucinaties of lek van verborgen media"): (a) een item zonder ondertitelspoor geeft geen resultaat; (b) een kind of een gebruiker zonder bibliotheekrecht ziet het item niet, ook niet via `/scenes` of via aantallen (EX36); (c) een zoekterm die alleen in een verborgen item staat geeft hetzelfde antwoord als een zoekterm zonder treffer; (d) module uit -> 404; (e) een PlaybackStart pauzeert de indexbouw (planner). Commando: T-JL-PLUGIN met het filter van de module, daarna volledig.
+- **Poort:** P-jelly-leon (plugin, volledig) + P-CONTRACT + P-VEILIG.
+- **Valkuilen:** V-003, V-005, V-066, V-099.
+- **Bewijs:** B03-008 -> Bezig (Unit-getest) met de opmerking "alleen tekst uit bestaande ondertitelsporen; zoeken op omschrijving en spraak wachten op BG-06 (P5)". "NIET GEVALIDEERD (echte NAS): echte bibliotheek; zie STAPPEN_P6.md, N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: rechten per gebruiker en geen lek van verborgen media) -> A-HERSTEL -> R-EERLIJK
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog); R-VEILIG N4; overige standaard
+- **Stop en vraag als:** de cue-extractie van S-G1-34 geen tekst met tijdcode levert; de stap spraakherkenning of embeddings zou vragen (BG-06); scènedetectie nodig blijkt waar geen bouwsteen voor is.
+
+### S-G4-51 - Offline downloaden: downloadrechten, verlopen en uitgezet account (B03-011, serverdeel)
+- **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** nee (plugin-build en -test achter docker-build.lock)
+- **Werkpakketten en tests:** B03-011 (serverdeel)
+- **Vooraf:** S-G3-10 (authenticatiefilter op streamroutes; B03-010 Acceptatie: een kinderaccount krijgt geen volwassen media "via ... download API"). Besluit Z-20 genomen.
+- **Al gedaan?** `grep -c '"id": "B03-011"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart (op 2026-11-11: 0).
+- **Lees eerst:** TASKS-JSON object B03-011; BOUWPLAN#B03-011 — Offline downloaden; BOUWPLAN#B03-010 — Accounts en parental control (Acceptatie); E2E-JSON rij EX35 (het eindscenario zelf is S-P6-13 in STAPPEN_P6.md); de ADR van S-G3-10 over streamroutes
+- **Bouw:**
+  1. Scope (A-VERKEN): welke upstream-routes en welk gebruikersbeleid het downloaden regelen en wat ze al afdwingen. ONBEKEND - A-VERKEN stelt vast met `grep -rln "Download" <WERKMAP>/jelly-leon/Jellyfin.Api/Controllers --include=*.cs` en de upstream-tests. Wat ontbreekt voor de bron: een uitgezet account start geen nieuwe download; verlopen rechten; een kind krijgt geen volwassen media via de download-API. Versleutelde opslag, opslagquota en het downloadoverzicht zitten in de client (S-G4-52).
+  2. Alleen wat ontbreekt, in de plugin. Kan het alleen met een wijziging in upstream-code: niet bouwen, melden (een corepatch hoort in het patchregister).
+  3. Tests en EVIDENCE.
+- **Tests (verplicht):** xUnit en, als het dossier dat nodig vindt, een proef tegen een container met de server. Negatief: (a) een uitgezet account start geen nieuwe download; (b) een kind kan een item boven zijn grens niet downloaden en krijgt hetzelfde antwoord als bij een niet-bestaand item; (c) een ingetrokken token geeft geen download; (d) een stock-client die mag downloaden kan dat nog (zelfde antwoord als stock 12.x). Commando: T-JL-PLUGIN.
+- **Poort:** P-jelly-leon (plugin, volledig) + P-VEILIG.
+- **Valkuilen:** V-003, V-005.
+- **Bewijs:** B03-011 (jelly-leon) -> Bezig (Unit-getest of Sim-getest). "NIET GEVALIDEERD (hardware): echte telefoons; zie STAPPEN_P6.md, N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: tokens en rechten) -> A-HERSTEL -> R-EERLIJK. R-HARDE-EIS erbij (VERPLICHT) als de bouw gebruikersbeleid of gebruikers schrijft of wijzigt.
+- **Niveau:** standaard; R-VEILIG N4; R-HARDE-EIS N4 als hij loopt
+- **Stop en vraag als:** afdwingen alleen kan met een wijziging in upstream-code of in het beleid van bestaande gebruikers; een stock-client anders zou beslissen dan met de plugin uit.
+
+### S-G4-53 - Live-tv en DVR: overlapmelding, opnamestatus, bewaartermijn en gids (B03-012, serverdeel)
+- **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** ja (proef met een server en een nagebootste tuner in een container achter stack.lock; ONBEKEND welke tuner na te bootsen is - A-VERKEN stelt vast)
+- **Werkpakketten en tests:** B03-012 (serverdeel)
+- **Vooraf:** S-G4-04 (gedeeld GPU-budget: opnames die transcoderen lopen over dezelfde lanes; TASKS-JSON B03-012 noemt "GPU capability tests" als afhankelijkheid). Besluit Z-20 genomen.
+- **Al gedaan?** `grep -c '"id": "B03-012"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> 0 = niet gestart (op 2026-11-11: 0). `git -C <WERKMAP>/jelly-leon ls-files src/Jellyfin.LiveTv | wc -l` -> upstream-live-tv is aanwezig (op 2026-11-11 onder meer `TunerHosts/HdHomerun/`, `Listings/SchedulesDirect.cs`, `IO/EncodedRecorder.cs`).
+- **Lees eerst:** TASKS-JSON object B03-012; BOUWPLAN#B03-012 — Live-tv en DVR; E2E-JSON rij EX38 (het eindscenario zelf is S-P6-17 in STAPPEN_P6.md); hoofdstuk 2 van dit bestand (no-go "media muteren buiten MediaGuard"); stap S-G3-01 bouwpunt 3 (media alleen-lezen gekoppeld)
+- **Bouw:**
+  1. Scope (A-VERKEN): wat upstream `src/Jellyfin.LiveTv` al doet (tuners, gids, opnameplanner) tegen de bron (EPG, tuner, opnameplanner, overlapdetectie, opslagquota, opnamestatus, bewaartermijn, gidssync, veilig hervatten na herstart). Welke tuner op de ontwikkelmachine na te bootsen is zonder echte tuner of gidsprovider met account: ONBEKEND - A-VERKEN stelt vast met `git -C <WERKMAP>/jelly-leon ls-files src/Jellyfin.LiveTv/TunerHosts src/Jellyfin.LiveTv/Listings`. Waar opnames worden weggeschreven: nooit in een mediamap van de bibliotheek (die is alleen-lezen gekoppeld).
+  2. Overlap vooraf herkennen en de beperking melden ("Overlappende opname meldt beperkingen"; EX38 "Conflict wordt vooraf getoond"). Bron: TASKS-JSON B03-012.
+  3. Status per opname; na een herstart hervat de planner veilig (geen dubbele en geen verloren opname). Bron: TASKS-JSON B03-012 (Acceptatie).
+  4. Bewaartermijn en opslagquota voor een opnamemap die geen mediamap is.
+  5. Routes additief in de OpenAPI (afspraak in hoofdstuk 8). Module uit: 404 (besluit Z-19); upstream-live-tv blijft dan werken zoals stock.
+  6. Tests en EVIDENCE.
+- **Tests (verplicht):** acceptatie met de nagebootste tuner: twee overlappende opnames op één tuner -> melding vooraf; een herstart van de server tijdens een geplande opname -> de planner hervat zonder dubbele of verloren opname. Negatief: (a) een opnamepad in een alleen-lezen mediamap -> geweigerd met een code uit de foutcatalogus, niets geschreven; (b) quota vol -> geen nieuwe opname en een melding; (c) een niet-beheerder krijgt 403 op beheerroutes; (d) met de module uit is het gedrag gelijk aan stock 12.x. Commando's: T-JL-PLUGIN; de containerproef achter `flock <WERKMAP>/.lokaal/stack.lock nice -n 10` (commando legt A-BOUW vast in het rapport).
+- **Poort:** P-jelly-leon (plugin, volledig; image als het dossier een containerproef nodig vindt) + P-VEILIG; P-INSTALLATIE als het installatiemanifest wijzigt.
+- **Valkuilen:** V-003, V-005, V-099. Eigen: een nagebootste tuner bewijst geen echte ontvangst.
+- **Bewijs:** B03-012 -> Bezig (Sim-getest). "NIET GEVALIDEERD (hardware): echte tuner en antenne of kabel; NIET GEVALIDEERD (account): gidsprovider met account als de gebruiker die wil; zie STAPPEN_P6.md, N-P6-09." EX38 blijft bij S-P6-17.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: tuners in het netwerk, ontdekking en verbinding, en gidsbronnen) -> A-HERSTEL -> R-EERLIJK. R-MANIFEST erbij (VERPLICHT) als er iets aan de image of het installatiemanifest wijzigt (bijvoorbeeld een opnamemap).
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog); R-VEILIG N4; overige standaard
+- **Stop en vraag als:** opnames in een mediamap zouden komen (no-go); het installatieformulier geen schrijfbare opnamemap heeft en er een nodig is (wijziging aan de Custom App: eerst de gebruiker via een keuzemenu); geen tuner na te bootsen is (dan alleen unit-tests, de rest "Geblokkeerd", en melden).
+
 ### S-G4-20 - Rij "Aanbevolen voor jou" op het startscherm (haak en rij)
 - **Repo:** jelly-leon-web | **Fase:** P4 (golf 4) | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** ja (npm-build; e2e achter stack.lock)
 - **Werkpakketten en tests:** B03-036 (deel rij en kaartmenu); JLT-14 (deel web, Chromium)
-- **Vooraf:** B03-035 (routes van de module Recommendations, golf 2); de webhaakmodule van B03-017 (golf 1). BG-15 (plaats van de rij en gedrag op officiele apps): zonder besluit start deze stap niet.
+- **Vooraf:** B03-035 (routes van de module Recommendations, golf 2); de webhaakmodule van B03-017 (golf 1); S-G3-30 en S-G3-31 (of de reden dat S-G3-31 verviel): WP-JSON B03-036 noemt B03-002 (startscherm) als afhankelijkheid. BG-15 (plaats van de rij en gedrag op officiele apps): zonder besluit start deze stap niet.
 - **Al gedaan?** `ls <WERKMAP>/jelly-leon-web/src/jelly-leon` -> bestaat niet = de haakmodule van golf 1 ontbreekt: STOP. `ls <WERKMAP>/jelly-leon-web/src/jelly-leon/recommendations` -> bestaat niet = niet gestart. `grep -n "home.sections" <WERKMAP>/jelly-leon-web/src/components/homesections/homesections.js` -> geen uitvoer = haak nog niet geplaatst.
 - **Lees eerst:** WP-JSON object B03-036; BOUWPLAN#F2.6.1 jelly-leon-web; BOUWPLAN#F2.5.3 Routes voor gebruikers; `<WERKMAP>/jelly-leon-web/docs/platform-v2/PATCHES.md` (kop "Geplande haken op de 12.x-basis", rij H-HOME); BOUWPLAN#F2.9.5 Clientmatrix
 - **Bouw:**
@@ -1575,7 +1827,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap direct na S-G4-20 (
 
 ### S-G4-41 - Web: scherm "Dit apparaat" en de bevestigingsproef
 Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-22 (zie de tabel in 6.2).
-- **Repo:** jelly-leon-web | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (npm-build; e2e achter stack.lock)
+- **Repo:** jelly-leon-web | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** hoog (routehaak in twee upstream-bestanden) | **Zwaar:** ja (npm-build; e2e achter stack.lock)
 - **Werkpakketten en tests:** B03-066 (webdeel: regels bekijken, bevestigen en afwijzen); B03-065 (webdeel: opt-in op een officiele app); JLT-42 (deel: een verruimende regel blijft voorgesteld tot bevestiging)
 - **Vooraf:** S-G4-21 en S-G4-22; S-G4-06 (routes E6, E7, E8 en E8b in de plugin). BG-26.
 - **Al gedaan?** `grep -rn "devices/self" <WERKMAP>/jelly-leon/plugins/JellyLeon/src -l` -> geen uitvoer = de serverroutes ontbreken: STOP en melden (werk voor de jelly-leon-baan). `grep -rn "ASYNC_USER_ROUTES" <WERKMAP>/jelly-leon-web/src/apps/modern/routes/asyncRoutes/user.ts <WERKMAP>/jelly-leon-web/src/apps/legacy/routes/asyncRoutes/user.ts` -> lees of er al een `jlHook`-aanroep bij staat (routehaak van een eerdere stap).
@@ -1594,7 +1846,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-22 (zie de 
 - **Valkuilen:** V-005, V-032, V-067, V-072.
 - **Bewijs:** B03-066 -> Bezig (Sim-getest; "web in Chromium; echte beoordeling van beeld en geluid door een mens op echte apparaten NIET GEVALIDEERD (hardware)"). JLT-42 -> Bezig met "deel web".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> R-VEILIG (VERPLICHT: wie een regel mag bevestigen; het kind mag dat nooit) -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: Jelly Leon-web valt buiten Peil)
-- **Niveau:** standaard; R-VEILIG N4
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog: routehaak H-ROUTE in twee upstream-bestanden); R-VEILIG N4; overige standaard
 - **Stop en vraag als:** de routehaak per bestand meer vraagt dan een import en een aanroep; BG-26 anders uitvalt dan "de gebruiker bevestigt zelf, de beheerder mag ook".
 
 ### S-G4-23 - Web: skipknoppen per type, standaardactie en groepsregel (drie haken)
@@ -1605,7 +1857,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-22 (zie de 
 - **Lees eerst:** WP-JSON object B03-076; BOUWPLAN#F6.6.1 jelly-leon-web — speler; BOUWPLAN#F6.3.9 Upstream-sync, gedragsregister en compatibiliteit; `<WERKMAP>/jelly-leon-web/docs/platform-v2/PATCHES.md` (rijen H-SKIPTEXT, H-SEGACTION, H-SYNCPLAY-SKIP); BOUWPLAN#F6.9.3 Clientmatrix
 - **Bouw:**
   1. Haak H-SKIPTEXT in `src/components/playback/skipsegment.ts`, in `setButtonText`: de knoptekst per segmenttype: "Sla intro over", "Sla samenvatting over", "Sla aftiteling over", "Sla vooruitblik over" en "Sla reclame over"; Engels "Skip intro", "Skip recap", "Skip credits"; andere talen houden de upstream-tekst (`MediaSegmentSkipPrompt`). Bron: BOUWPLAN#F6.6.1 en PATCHES.md, rij H-SKIPTEXT.
-  2. Haak H-SEGACTION in `src/apps/legacy/features/playback/utils/mediaSegmentSettings.ts` (bij `DEFAULT_ACTIONS` en `getMediaSegmentAction`): de standaardactie voor Intro, Recap en Outro is "Vragen om over te slaan" (BG-31), en de voorkeur per profiel van S-G4-46 telt alleen als standaard wanneer op dit apparaat geen uitdrukkelijke upstream-instelling bestaat. De haak leest alleen; hij schrijft nooit een `segmentTypeAction`-sleutel en gebruikt geen persistente browseropslag.
+  2. Haak H-SEGACTION in `src/apps/legacy/features/playback/utils/mediaSegmentSettings.ts` (bij `DEFAULT_ACTIONS` en `getMediaSegmentAction`): de standaardactie voor Intro, Recap en Outro is "Vragen om over te slaan" (BG-31), en de voorkeur per gebruiker uit route 17 (`GET /media/v1/segments/preferences/me`, gebouwd in S-G4-15; het menu om haar te zetten volgt pas in S-G4-46) telt alleen als standaard wanneer op dit apparaat geen uitdrukkelijke upstream-instelling bestaat. De haak leest alleen; hij schrijft nooit een `segmentTypeAction`-sleutel en gebruikt geen persistente browseropslag.
   3. Haak H-SYNCPLAY-SKIP in `src/apps/legacy/features/playback/utils/mediaSegmentManager.ts`, in `skipSegment`: in een SyncPlay-groep gedraagt "Overslaan" zich als "Vragen" (ook voor kinderen); een klik wordt een enkele groeps-seek naar `EndTicks`; tooltip "In een groep vraagt Jelly Leon eerst".
   4. Elke haak: een import en een aanroep met foutgrens; elk een eigen eerstvolgend vrij JLW-nummer in PATCHES.md.
   5. De eigen keuze van de gebruiker in de upstream-instellingen wint altijd van de standaard uit punt 2.
@@ -1617,7 +1869,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-22 (zie de 
 - **Bewijs:** B03-076 -> Bezig (Sim-getest; "knoppen in Chromium; hint en correctiepaneel in S-G4-46; drie browsers in S-G4-39"). JLT-55 -> Bezig met "deel web". B03-007 -> bijwerken met "punt clients: web".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: Jelly Leon-web valt buiten Peil)
 - **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog: drie haken in upstream-bestanden); overige standaard
-- **Stop en vraag als:** BG-31 "automatisch overslaan als standaard" zou vragen (dat botst met de afronding van B03-007; melden); een haak meer dan een import en een aanroep vraagt; de herbasisproef een conflict geeft.
+- **Stop en vraag als:** BG-31 "automatisch overslaan als standaard" zou vragen (vraag b, optie 2; dat botst met de afronding van B03-007; melden); BG-31 vraag c met optie 2 (automatisch overslaan in een groep) is gekozen: bouwpunt 3 dan niet zelf aanpassen, melden; een haak meer dan een import en een aanroep vraagt; de herbasisproef een conflict geeft.
 
 ### S-G4-46 - Web: hint na de aftiteling, "Klopt niet", correctiepaneel en voorkeur per gebruiker
 Dit nummer is later toegevoegd; in de volgorde hoort de stap direct na S-G4-23 (zie de tabel in 6.2).
@@ -1688,8 +1940,46 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Niveau:** standaard; R-VEILIG N4
 - **Stop en vraag als:** BG-12 niet "aan" is; de strook alleen kan met een nieuwe haak in de videoroute.
 
+### S-G4-50 - Scènezoeker web: zoekscherm met tijdcode en "afspelen vanaf hier" (B03-008, webdeel)
+- **Repo:** jelly-leon-web | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (npm-build; e2e achter stack.lock)
+- **Werkpakketten en tests:** B03-008 (webdeel)
+- **Vooraf:** S-G4-49 (routes `/media/v1/search` en `/media/v1/scenes`); de webhaakmodule van B03-017 (golf 1); haak H-ROUTE (BOUWPLAN: "H-ROUTE (JLW-0002 + F5-routehaak samengevoegd)", gebruikt door de scènezoeker en F5 "Dit apparaat").
+- **Al gedaan?** `grep -n "H-ROUTE" <WERKMAP>/jelly-leon-web/docs/platform-v2/PATCHES.md` -> op 2026-11-11 alleen een rij onder "Geplande haken op de 12.x-basis (nog NIET uitgevoerd)"; staat H-ROUTE daar met een nummer (bijvoorbeeld door S-G4-41), dan bouwt deze stap erop voort. `grep -n '"B03-008"' <WERKMAP>/jelly-leon-web/docs/platform-v2/EVIDENCE.json` -> geen uitvoer = niet gestart.
+- **Lees eerst:** BOUWPLAN#B03-008 — Semantische scènezoeker (Schermen/bediening: "Zoekresultaat met tijdcode, titel, reden, open stream at timestamp"); `<WERKMAP>/jelly-leon-web/docs/platform-v2/PATCHES.md` (kop "Geplande haken op de 12.x-basis", rij H-ROUTE); de rapporten van S-G4-49
+- **Bouw:**
+  1. Scope (A-VERKEN): wat S-G4-49 aan routes en velden opleverde; of H-ROUTE al bestaat (S-G4-41) of in deze stap komt.
+  2. Zoekscherm via H-ROUTE: per resultaat titel, tijdcode en de cue als reden; "afspelen vanaf de tijdcode" via de upstream-speler. Vormgeving volgt upstream (buiten Peil).
+  3. Toestanden: laden, leeg ("geen treffer"), fout, module uit (404: het menupunt bestaat dan niet), stock-server.
+  4. Tests en EVIDENCE.
+- **Tests (verplicht):** T-JLW-STATISCH; T-JLW-NPM; T-JLW-E2E (achter stack.lock): een zoekterm uit de testset geeft een resultaat en "afspelen" start op de tijdcode. Negatief: (a) module uit of stock-server: geen menupunt en de DOM van de upstream-zoekpagina is gelijk aan stock; (b) een geforceerde fout in de fork-code laat de upstream-zoekpagina werken; (c) de client toont alleen wat de server teruggeeft en vult niets aan (kinderprofiel).
+- **Poort:** P-jelly-leon-web.
+- **Valkuilen:** V-003, V-005.
+- **Bewijs:** B03-008 (jelly-leon-web) -> Bezig (Sim-getest), webdeel. "NIET GEVALIDEERD (hardware): echte tv's en apparaten; zie N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: Jelly Leon-web valt buiten Peil)
+- **Niveau:** standaard
+- **Stop en vraag als:** H-ROUTE niet als geregistreerde haak te plaatsen is; S-G4-49 geen tijdcode per resultaat levert.
+
+### S-G4-54 - Live-tv web: overlapwaarschuwing vóór het plannen en opnamestatus (B03-012, webdeel)
+- **Repo:** jelly-leon-web | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (npm-build; e2e achter stack.lock)
+- **Werkpakketten en tests:** B03-012 (webdeel)
+- **Vooraf:** S-G4-53; de webhaakmodule van B03-017 (golf 1).
+- **Al gedaan?** `grep -n '"B03-012"' <WERKMAP>/jelly-leon-web/docs/platform-v2/EVIDENCE.json` -> geen uitvoer = niet gestart. `git -C <WERKMAP>/jelly-leon-web ls-files | grep -i livetv | head` -> de upstream-schermen voor live-tv (op 2026-11-11 onder meer `src/apps/dashboard/controllers/livetvtuner.js` en `livetvguideprovider.js`).
+- **Lees eerst:** BOUWPLAN#B03-012 — Live-tv en DVR (Schermen/bediening: "Gids, live player, geplande opnames, overlapwaarschuwing"); E2E-JSON rij EX38; de rapporten van S-G4-53; `<WERKMAP>/jelly-leon-web/docs/platform-v2/PATCHES.md`
+- **Bouw:**
+  1. Scope (A-VERKEN): welke schermen upstream al heeft (gids, live player, geplande opnames) en wat ontbreekt: de overlapwaarschuwing vóór het opslaan van een opname en de opnamestatus uit S-G4-53. Per deel de haak; een haak die niet in PATCHES.md staat is een nieuwe patch met een nummer.
+  2. Bouw alleen die delen, via de haakmodule, in de vormgeving van upstream.
+  3. Module uit (404), stock-server of een fout: het scherm is gelijk aan upstream.
+  4. Tests en EVIDENCE.
+- **Tests (verplicht):** T-JLW-STATISCH; T-JLW-NPM; T-JLW-E2E (achter stack.lock, tegen de server met de nagebootste tuner van S-G4-53): twee overlappende opnames plannen -> de waarschuwing staat er vóór het opslaan (EX38). Negatief: (a) module uit of stock-server: de DOM is gelijk aan stock; (b) een geforceerde fout in de fork-code laat de upstream-schermen werken.
+- **Poort:** P-jelly-leon-web.
+- **Valkuilen:** V-003, V-099.
+- **Bewijs:** B03-012 (jelly-leon-web) -> Bezig (Sim-getest), webdeel. "NIET GEVALIDEERD (hardware): echte tuner; zie N-P6-09."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (geen A-ONTWERP en geen R-ONTWERP: Jelly Leon-web valt buiten Peil)
+- **Niveau:** standaard
+- **Stop en vraag als:** een deel een wijziging buiten een haak vraagt; S-G4-53 geen overlapmelding of status levert.
+
 ### S-G4-25 - Clients: marker `jellyLeonBuild` in de Android- en desktop-build
-- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (Gradle-build achter gradle.lock; desktop-build achter docker-build.lock)
+- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** klein | **Moeilijkheid:** hoog (eerste patches in upstream-appcode van de fork) | **Zwaar:** ja (Gradle-build achter gradle.lock; desktop-build achter docker-build.lock)
 - **Werkpakketten en tests:** B03-069 (deel marker); JLT-42 (deel: de rol "Jelly Leon-app" wordt herkend)
 - **Vooraf:** geen stap van dit bestand; mag starten voor de gate van golf 3. Contractpunt C1.3-JLC-02: de eigen applicationId's wachten op bevestiging van de gebruiker; builds van deze stap niet verspreiden.
 - **Al gedaan?** `grep -rn "jellyLeonBuild" <WERKMAP>/jelly-leon-clients/android <WERKMAP>/jelly-leon-clients/desktop/native` -> geen uitvoer = niet gestart. `grep -n "^| JLC-" <WERKMAP>/jelly-leon-clients/docs/platform-v2/PATCHES.md` -> het hoogste nummer is het laatst gebruikte (bij de verkenning JLC-0004).
@@ -1706,7 +1996,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Valkuilen:** V-021, V-075, V-076, V-080, V-128.
 - **Bewijs:** B03-069 -> Bezig (Unit-getest; "marker gebouwd; herkenning in de webclient volgt in S-G4-21 en S-G4-30"). "Swiftfin: geen marker; NIET GEVALIDEERD (Mac/Xcode)."
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
-- **Niveau:** standaard
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog: patch in upstream-appcode, moet een upstream-sync overleven); overige standaard
 - **Stop en vraag als:** de desktop-build niet lokaal te bouwen is zonder de desktopspike van S-P40-90 (dan alleen android opleveren en desktop als "Geblokkeerd (desktopspike)" melden); het veld alleen door te geven is met een wijziging in jelly-leon-web.
 
 ### S-G4-26 - Android TV: capabilityrapport automatisch sturen en beperkende regels samenvoegen
@@ -1732,7 +2022,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Stop en vraag als:** BG-30 niet genomen is; KVM in de container niet beschikbaar is; de emulator niet binnen 4 GiB blijft (een herhaling met 5 GiB is toegestaan, beide uitkomsten in het bewijs; daarna stoppen en melden).
 
 ### S-G4-27 - Android TV: overlay-tekst per segmenttype en Recap standaard "vragen"
-- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** ja (Gradle-build achter gradle.lock; emulator een tegelijk)
+- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** klein | **Moeilijkheid:** hoog (patch in upstream-appcode) | **Zwaar:** ja (Gradle-build achter gradle.lock; emulator een tegelijk)
 - **Werkpakketten en tests:** B03-077 (deel Android TV); B03-007 (afronding, punt clients: Android TV); JLT-55 (deel Android TV, fork-app)
 - **Vooraf:** S-G4-16. BG-31 met optie a1 (eigen knopteksten en daarmee clientpatches) en BG-08 (welke clients een eigen patch krijgen): zonder een van beide start deze stap niet; bewijs "Geblokkeerd (besluit BG-31)" of "(besluit BG-08)".
 - **Al gedaan?** `grep -n "segment_action_skip" <WERKMAP>/jelly-leon-clients/androidtv/app/src/main/java/org/jellyfin/androidtv/ui/playback/overlay/SkipOverlayView.kt` -> staat er alleen de ene upstream-tekst = niet gestart. `grep -n "RECAP" <WERKMAP>/jelly-leon-clients/androidtv/app/src/main/java/org/jellyfin/androidtv/preference/UserPreferences.kt` -> geen uitvoer = Recap heeft nog geen standaard.
@@ -1748,12 +2038,12 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Valkuilen:** V-021, V-075, V-076, V-080, V-128.
 - **Bewijs:** B03-077 -> Bezig (Sim-getest in de emulator). JLT-55 -> Bezig met "deel Android TV". "Echte tv's NIET GEVALIDEERD (hardware); Swiftfin heeft geen skipknoppen en is NIET GEVALIDEERD (Mac/Xcode)."
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
-- **Niveau:** standaard
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog: patch in upstream-appcode); overige standaard
 - **Stop en vraag als:** BG-08 geen clientpatch toestaat (dan vervalt de stap: "Geblokkeerd (besluit BG-08)"); de overlay in de emulator niet verschijnt terwijl de server segmenten levert (eerst met de officiele app vergelijken en de uitkomst melden). Let op: de optie `--migratie-van` van het harnas migreert de gegevens van de server (JLT-60) en installeert geen oudere app; gebruik hem niet voor deze stap.
 
 ### S-G4-28 - Android: knoptekst per type in de native speler; desktop: marge aan het einde meten
-- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (Gradle-build achter gradle.lock; emulator een tegelijk)
-- **Werkpakketten en tests:** B03-077 (deel Android en desktop); JLT-55 (deel Android fork-app en officiele app; deel desktop voorwaardelijk)
+- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** hoog (patch in upstream-appcode) | **Zwaar:** ja (Gradle-build achter gradle.lock; emulator een tegelijk)
+- **Werkpakketten en tests:** B03-077 (deel Android en desktop); B03-007 (afronding, punt clients: Android en desktop); JLT-55 (deel Android fork-app en officiele app; deel desktop voorwaardelijk)
 - **Vooraf:** S-G4-27. BG-31 (optie a1) en BG-08; zonder een van beide start deze stap niet. Het desktop-deel alleen als de desktopspike van S-P40-90 (STAPPEN_P4_GOLF1_2.md) is geslaagd.
 - **Al gedaan?** `grep -n "skip_media_segment" <WERKMAP>/jelly-leon-clients/android/app/src/main/java/org/jellyfin/mobile/player/ui/playermenuhelper/SkipMediaSegmentButton.kt` -> staat er alleen de ene upstream-tekst = niet gestart.
 - **Lees eerst:** WP-JSON object B03-077; BOUWPLAN#F6.6.3 Clients; het bestand uit "Al gedaan?"; BOUWPLAN#F6.9.3 Clientmatrix; `<WERKMAP>/jelly-leon-clients/tools/clients/compat/scenario.py` (`beoordeel_segmenten`)
@@ -1766,15 +2056,15 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Tests (verplicht):** unit-test voor de tekst per type. T-JLC-STATISCH; T-JLC-BOUW (`make android-bouw`). Emulatorproef telefoon: `python3 tools/clients/client_compat.py android --image <jelly-leon-image> --soorten telefoon --bediend fork --uit <rapport.json>` en daarna dezelfde proef met `--bediend officieel --aanvullen`. Negatief: (a) de officiele app toont na de proef nog steeds "Skip" (de patch zit alleen in de fork-app); (b) een eigen keuze van de gebruiker blijft na een update staan; (c) desktop met marge 0 mag vastlopen aan het einde (bekend upstream-gedrag): leg vast wat er gebeurt, en met 1,0 s mag het niet vastlopen.
 - **Poort:** P-jelly-leon-clients.
 - **Valkuilen:** V-021, V-075, V-076, V-080, V-128.
-- **Bewijs:** B03-077 -> Bezig (Sim-getest; per client de versie en sha256). JLT-55 -> Bezig met "deel Android"; het desktop-deel "Sim-getest" of "Geblokkeerd (desktopspike S-P40-90 niet geslaagd)". "Tablet volgt in S-G4-30."
+- **Bewijs:** B03-077 -> Bezig (Sim-getest; per client de versie en sha256). JLT-55 -> Bezig met "deel Android"; het desktop-deel "Sim-getest" of "Geblokkeerd (desktopspike S-P40-90 niet geslaagd)". "Tablet volgt in S-G4-30." B03-007 -> bijwerken met "punt clients: Android (en desktop als de desktopspike slaagde)".
 - **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK
-- **Niveau:** standaard
+- **Niveau:** A-BOUW N4 en A-HERSTEL N4 (moeilijkheid hoog: patch in upstream-appcode); overige standaard
 - **Stop en vraag als:** de native speler van de fork-app in de emulator niet te kiezen is (dan alleen de webspeler meten en dat melden); de desktop-build ontbreekt.
 
 ### S-G4-29 - Clientmatrix aanbevelingen in de emulators (met loggende proxy)
 - **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (emulator een tegelijk; stack.lock en gradle.lock)
 - **Werkpakketten en tests:** B03-037 (deel emulators en desktop); JLT-14 (deel Android, Android TV, desktop)
-- **Vooraf:** S-G4-20 en S-G4-45 (rij en dialogen in web); S-G4-12 (providervolgorde). BG-15 (Android TV-rij als clientpatch ja of nee): het besluit wordt in de matrix vastgelegd; zonder besluit staat er "open besluit BG-15".
+- **Vooraf:** S-G4-20 en S-G4-45 (rij en dialogen in web); S-G4-12 (providervolgorde); S-G3-32 (WP-JSON B03-037 noemt B03-003 als afhankelijkheid). BG-15 (Android TV-rij als clientpatch ja of nee): het besluit wordt in de matrix vastgelegd; zonder besluit staat er "open besluit BG-15".
 - **Al gedaan?** `grep -il proxy <WERKMAP>/jelly-leon-clients/tools/clients/compat/*.py` -> geen uitvoer = de loggende proxy ontbreekt (bij de verkenning ontbrak hij). `grep -n "recommendations" <WERKMAP>/jelly-leon-clients/tools/clients/compat/scenario.py` -> geen uitvoer = het scenario ontbreekt.
 - **Lees eerst:** WP-JSON object B03-037; BOUWPLAN#F2.9.5 Clientmatrix; TEST-JSON rij JLT-14; `<WERKMAP>/jelly-leon-clients/tools/clients/compat/scenario.py`; `<WERKMAP>/jelly-leon-clients/tools/clients/compat/emulator.py`
 - **Bouw:**
@@ -1801,14 +2091,14 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Al gedaan?** `ls <WERKMAP>/jelly-leon-clients/docs/platform-v2/` en `grep -c "JLT-55" <WERKMAP>/jelly-leon-clients/docs/platform-v2/EVIDENCE.json` -> 0 = nog geen bewijs van deze matrix.
 - **Lees eerst:** TEST-JSON rijen JLT-25, JLT-38, JLT-46 en JLT-55; BOUWPLAN#F6.9.3 Clientmatrix; BOUWPLAN#F5.9.4 Clientmatrix; `<WERKMAP>/jelly-leon-clients/tools/clients/compat/scenario.py`; het rapport van S-G4-29
 - **Bouw:** de stap wordt in vier runs gedaan, een per onderwerp; elke run vult hetzelfde rapport aan (`--aanvullen`). Een run die niet af komt is geen reden om de andere over te slaan.
-  1. Ondertitels (JLT-25): in elke client is het gemarkeerde spoor te kiezen en draagt het "Machinevertaling" in de naam; afspeelmethode en omzetredenen zijn met en zonder het spoor gelijk; de standaardkeuze per client wordt vastgelegd; de gesynchroniseerde kopie is nooit de standaard.
+  1. Ondertitels (JLT-25): in elke client is het gemarkeerde spoor te kiezen en draagt het de markering "Gesynchroniseerd" in de naam (vastgelegd in S-G3-08; het spoor "Machinevertaling" bestaat pas in P5, S-P5-115); afspeelmethode en omzetredenen zijn met en zonder het spoor gelijk; de standaardkeuze per client wordt vastgelegd; de gesynchroniseerde kopie is nooit de standaard.
   2. Kwaliteit (JLT-38): Android TV en de officiele apps werken ongewijzigd (inloggen en afspelen); geen kwaliteitslabel in stock-clients.
   3. Apparaten (JLT-46, JLT-42): officiele Android TV-app en de officiele Android-app (native speler en webspeler) krijgen in de standen plugin uit, aan en aan met opt-in voor een ander apparaat dezelfde afspeelbeslissing; de Jelly Leon-app met marker wordt als Jelly Leon-app herkend; de Android TV-build van S-G4-26 stuurt het rapport.
   4. Skipknoppen (JLT-55): telefoon en tablet-AVD, fork-app en officiele app, webweergave en native speler, voor en na het opslaan van de webinstellingen; Android TV fork-app en officiele app; teksten per type, juiste moment, nooit automatisch overslaan als standaard.
   5. Per run de versie en sha256 van elk pakket in het rapport; de rol per client (stock-client of Jelly Leon-web-client).
   6. Desktop per onderwerp alleen na de geslaagde desktopspike; anders "Geblokkeerd" met de reden.
   7. Samenvatting per JLT-rij in EVIDENCE, met het rapportpad.
-- **Tests (verplicht):** T-JLC-STATISCH. Proef per run: `python3 tools/clients/client_compat.py android --image <jelly-leon-image> --stock-image <stock-12.x-image> --soorten telefoon,tablet,tv --vergelijk-soorten telefoon,tv --bediend fork --uit <rapport.json>` en dezelfde run met `--bediend officieel --aanvullen`, achter stack.lock en gradle.lock. Negatief: (a) tegen de stock-server gedragen fork-app en officiele app zich als upstream: geen spoor "Machinevertaling", geen label, geen eigen skiptekst door de server; (b) de afspeelbeslissing van een niet-gekozen apparaat verandert in geen van de drie standen; (c) de officiele native speler crasht niet op een Recap-segment (gedrag vastleggen, niet "verbeteren"); (d) een run met een gefaalde emulator krijgt "Sim-mislukt" en telt niet als gehaald.
+- **Tests (verplicht):** T-JLC-STATISCH. Proef per run: `python3 tools/clients/client_compat.py android --image <jelly-leon-image> --stock-image <stock-12.x-image> --soorten telefoon,tablet,tv --vergelijk-soorten telefoon,tv --bediend fork --uit <rapport.json>` en dezelfde run met `--bediend officieel --aanvullen`, achter stack.lock en gradle.lock. Negatief: (a) tegen de stock-server gedragen fork-app en officiele app zich als upstream: geen gemarkeerd spoor ("Gesynchroniseerd" of "Machinevertaling"), geen label, geen eigen skiptekst door de server; (b) de afspeelbeslissing van een niet-gekozen apparaat verandert in geen van de drie standen; (c) de officiele native speler crasht niet op een Recap-segment (gedrag vastleggen, niet "verbeteren"); (d) een run met een gefaalde emulator krijgt "Sim-mislukt" en telt niet als gehaald.
 - **Poort:** P-jelly-leon-clients + P-HARDE-EIS (spoorkeuzes en hervatpunten van de testgebruiker zijn na de runs gelijk aan ervoor: `python3 tools/clients/client_compat.py hervatproef --image <jelly-leon-image> --soort tv --bediend fork -n 3 --uit <rapport.json>`; `--image` is verplicht).
 - **Valkuilen:** V-021, V-075, V-076, V-080, V-128.
 - **Bewijs:** JLT-25, JLT-38, JLT-42, JLT-46, JLT-55 -> Bezig (Sim-getest, "deel emulators"; per rij het rapportpad). "De emulator heeft geen echte decoder; Swiftfin, Safari en tvOS NIET GEVALIDEERD (Mac/Xcode); derden-clients, Chromecast, DLNA en echte apparaten NIET GEVALIDEERD (hardware)."
@@ -1816,10 +2106,29 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Niveau:** standaard; R-HARDE-EIS N4
 - **Stop en vraag als:** een stock-client met de plugin aan anders beslist dan met de plugin uit (dat is een fout in de plugin: stoppen, melden, de jelly-leon-baan herstelt); de vier runs samen niet binnen een werksessie passen (dan na elke run committen en de rest als vervolg melden).
 
+### S-G4-52 - Offline downloaden in de Android-app: rechten, verlopen, hervatten en offline kijken (B03-011, clientdeel)
+- **Repo:** jelly-leon-clients | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (Gradle en emulator; eerst stack.lock, dan gradle.lock)
+- **Werkpakketten en tests:** B03-011 (clientdeel)
+- **Vooraf:** S-G4-51 (rechten aan de serverkant); S-G4-30 (de vorige emulatorstap in deze baan). BG-08: zonder besluit geen eigen patches voor Swiftfin. ADR-0008 van jelly-leon-clients (eigen builds niet verspreiden) blijft gelden.
+- **Al gedaan?** `git -C <WERKMAP>/jelly-leon-clients ls-files android/app/src/main/java/org/jellyfin/mobile/downloads` -> upstream-downloadbeheer aanwezig (op 2026-11-11 onder meer `DownloadManager.kt`, `DownloadWorker.kt`, `DownloadsFragment.kt`). `grep -n '"B03-011"' <WERKMAP>/jelly-leon-clients/docs/platform-v2/EVIDENCE.json` -> geen uitvoer = niet gestart.
+- **Lees eerst:** TASKS-JSON object B03-011; BOUWPLAN#B03-011 — Offline downloaden; `<WERKMAP>/jelly-leon-clients/docs/platform-v2/INVENTARIS.md`; `<WERKMAP>/jelly-leon-clients/docs/platform-v2/PATCHES.md`; `<WERKMAP>/jelly-leon-clients/docs/adr/ADR-0008-geen-truenas-app-voor-clients.md`; de rapporten van S-G4-51
+- **Bouw:**
+  1. Scope (A-VERKEN): wat upstream jellyfin-android al doet (downloadbeheer, hervatten en opnieuw proberen, kwaliteit van de download) tegen de bron ("geautoriseerde media versleuteld lokaal opslaan in de client waar mogelijk, verlopen rechten en opslagquota"; overzicht met voortgang, opslag, kwaliteit en opruimen). Android TV en desktop: ONBEKEND of upstream daar downloaden heeft - A-VERKEN stelt vast met `git -C <WERKMAP>/jelly-leon-clients ls-files androidtv desktop | grep -i download`. Of offline kijken voortgang of gezien-status naar de server terugschrijft: ONBEKEND - A-VERKEN stelt het vast (dat bepaalt R-HARDE-EIS).
+  2. Alleen wat ontbreekt en op de emulator te testen is, als geregistreerde JLC-patch met test.
+  3. Emulatorproef: downloaden, netwerk weg, offline kijken; daarna een uitgezet account (S-G4-51) en een nieuwe download. Bron: TASKS-JSON B03-011 (Acceptatie).
+  4. EVIDENCE bijwerken.
+- **Tests (verplicht):** T-JLC-STATISCH; T-JLC-BOUW (`make android-bouw`); de emulatorproef uit punt 3 met `make compat-android JL_IMAGE=<jelly-leon-image>` of het commando dat A-VERKEN in `tools/clients/compat` vindt (eerst `--help`). Negatief: (a) een uitgezet account start geen nieuwe download; (b) een download met ingetrokken rechten speelt niet meer af als de bron dat vraagt (ONBEKEND of upstream dit kent; A-VERKEN); (c) T-JLC-STATISCH faalt bij een JLC-patch zonder registerregel.
+- **Poort:** P-jelly-leon-clients.
+- **Valkuilen:** V-011, V-012, V-057.
+- **Bewijs:** B03-011 (jelly-leon-clients) -> Bezig (Sim-getest). "NIET GEVALIDEERD (hardware): echte telefoons; NIET GEVALIDEERD (Mac/Xcode): Swiftfin; zie STAPPEN_P6.md, N-P6-09." EX35 blijft bij S-P6-13.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: tokens en versleutelde opslag op het toestel) -> A-HERSTEL -> R-EERLIJK. R-HARDE-EIS erbij (VERPLICHT) als offline kijken hervatpunten of gezien-status naar de server terugschrijft.
+- **Niveau:** standaard; R-VEILIG N4; R-HARDE-EIS N4 als hij loopt
+- **Stop en vraag als:** het gat alleen met een eigen build op een echt toestel of met verspreiding te testen is (ADR-0008); een emulator het geheugen van de machine overschrijdt (AGENTEN.md 3.3).
+
 ### S-G4-31 - Hub: adapter voor Jelly Leon en de stap "Hub-sleutelset kopieren"
 - **Repo:** ai-server-manager | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** hoog | **Zwaar:** nee (alleen de afsluitende `make web-build` en `make web-e2e` zijn zwaar: na elkaar, niet naast een andere npm-build)
 - **Werkpakketten en tests:** contractpunt C1.3-ASM-21 (deel Jelly Leon, Moment P4); voorwaarde voor B03-029, B03-039, B03-058, B03-069, B03-078 (Hub-kaarten)
-- **Vooraf:** S-P3-010, S-P3-020 en S-P3-070 (STAPPEN_P3.md: ADR, adapterbasis en koppelscherm); het pinmechanisme JL4 in de plugin (golf 1, B03-012). Mag starten voor de gate van golf 3.
+- **Vooraf:** S-P3-010, S-P3-020 en S-P3-070 (STAPPEN_P3.md: ADR, adapterbasis en koppelscherm); het pinmechanisme JL4 in de plugin (golf 1, B03-017). Mag starten voor de gate van golf 3.
 - **Al gedaan?** Lees eerst in het ADR van S-P3-010 welke adaptermap is gekozen (voorstel in STAPPEN_P3.md: `apps/api/src/hub/adapters`). `ls <WERKMAP>/ai-server-manager/<adaptermap>` -> map ontbreekt = S-P3-020 is niet klaar: STOP. `grep -rni "jelly" <WERKMAP>/ai-server-manager/<adaptermap> -l` -> geen uitvoer = niet gestart. `grep -n "Jelly Leon-plugin" <WERKMAP>/ai-server-manager/apps/web/src/app/instellingen/diensten/DienstenScreen.tsx` -> geen uitvoer = de kopieerstap voor de plugin ontbreekt (let op: de regel "Jelly Leon-platform (jelly-leon-platform)" in `EIGEN_DIENSTEN` is een andere dienst en telt niet).
 - **Lees eerst:** `<WERKMAP>/ai-server-manager/docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md` (rij C1.3-ASM-21); BOUWPLAN#10.4 Hub-koppeling (JL4); het ADR van S-P3-010 (vinden met `ls <WERKMAP>/ai-server-manager/docs/adr | grep -i adapter`); `<WERKMAP>/ai-server-manager/apps/api/src/hub/servicecalls.py` en `keys.py`; de basismodule van S-P3-020 in de adaptermap
 - **Bouw:**
@@ -1854,11 +2163,11 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
   6. Het deel "Jelly Leon" van het scherm Media is niet langer "gepland"; zonder koppeling verwijst het naar het scherm Diensten.
   7. Componenttests, e2e-test (nieuw bestand met een nummer tussen 10 en 90) en de Peil-review (`make web-review`).
 - **Tests (verplicht):** T-HUB-API en T-HUB-WEB. Negatief: (a) adapter "niet gekoppeld" of onbekend: de sectie toont "Onbekend" en geen groene status; (b) een kind ziet de sectie niet en de leesroute geeft 403; (c) een event met een onbekend type maakt geen incident; (d) een event met een veld dat niet in het schema staat wordt geweigerd; (e) een meting ouder dan de grens is "verouderd", niet actueel.
-- **Poort:** P-ai-server-manager (snel en volledig) + P-PEIL + P-CONTRACT.
+- **Poort:** P-ai-server-manager (snel en volledig) + P-PEIL + P-CONTRACT + P-VEILIG.
 - **Valkuilen:** V-051, V-058, V-061, V-062, V-063, V-079.
 - **Bewijs:** de voortgang van Δ-HUB-2 in de statusregel van C1.3-ASM-21 ("Bezig", Sim-getest). Geen B03-rij wordt door deze stap alleen bijgewerkt.
-- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
-- **Niveau:** standaard
+- **Agents:** A-VERKEN -> A-ONTWERP -> A-BOUW -> R-TECH + R-VEILIG (tegelijk; R-VEILIG VERPLICHT: nieuwe leesroute in de Hub-API met rolcontrole voor de kinderschil, en eventinvoer van een andere dienst in de incidentregels) -> A-HERSTEL -> R-ONTWERP (VERPLICHT) -> R-EERLIJK
+- **Niveau:** standaard; R-VEILIG N4
 - **Stop en vraag als:** de ernst van een eventtype niet in het bouwplan staat (niet zelf kiezen: melden); het ontwerp een actieknop richting Jelly Leon of MediaGuard nodig lijkt te hebben (in deze golf zijn er alleen deeplinks).
 
 ### S-G4-33 - Hub-kaart "Watch Together"
@@ -1990,7 +2299,7 @@ Dit nummer is later toegevoegd; in de volgorde hoort de stap na S-G4-46 (zie de 
 - **Stop en vraag als:** de ontwerpreview een wijziging aan Peil zelf vraagt (tokens of onderdelen in `design/ontwerptaal`): dat is een besluit voor de regisseur en de gebruiker.
 
 ### S-G4-39 - Compat-regressie per oplevering en het clientmatrixdocument (herhaalstap golf 4)
-Deze stap draait meer dan eens: na S-G4-07, na S-G4-09, na S-G4-14, na S-G4-19, na S-G4-42 en S-G4-44, en na de laatste web- en clientstap. Elke run krijgt een eigen rapport.
+Deze stap draait meer dan eens: na S-G4-07, na S-G4-09, na S-G4-14, na S-G4-19, na S-G4-42 en S-G4-44, na S-G4-49, S-G4-51 en S-G4-53, en na de laatste web- en clientstap. Elke run krijgt een eigen rapport.
 - **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (image-build achter docker-build.lock; proeven achter stack.lock)
 - **Werkpakketten en tests:** B03-029 (deel clientmatrixdocument), B03-037 (webrijen), B03-068 (deel regressie); JLT-63, JLT-64, JLT-65 (per oplevering); JLT-09, JLT-48 (deel terug naar stock); JLT-14, JLT-25, JLT-38, JLT-55 (webrijen: drie browsers, UA-simulatie, stock-web)
 - **Vooraf:** de stap waarna de run is gepland; een lokale image van de actuele stand. De werkwijze is die van S-G3-27.
@@ -2010,7 +2319,49 @@ Deze stap draait meer dan eens: na S-G4-07, na S-G4-09, na S-G4-14, na S-G4-19, 
 - **Niveau:** standaard; R-HARDE-EIS N4; A-BOUW N2 mag bij de tweede en latere run als er geen code verandert
 - **Stop en vraag als:** een kijkgegeven na een run verschilt (alles stilleggen in jelly-leon en melden); de toegestane lijst moet groeien zonder dat het bouwplan het verschil noemt.
 
-### Gatecontrole golf 4 (afvinklijst voor A-GATE; wordt uitgevoerd in de fase-afsluiting van hoofdstuk 10, niveau N5)
+### S-G4-47 - Winstmeting apparaatprofielen tegen standaard Jellyfin (JLT-40)
+Dit nummer is later toegevoegd (bij de controle van 2026-11-11); in de volgorde hoort de stap na S-G4-22, S-G4-41 en S-G4-07 en voor de laatste run van S-G4-39 (zie de tabel in 6.2).
+- **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (meting in het exclusieve meetslot achter stack.lock; image-build achter docker-build.lock)
+- **Werkpakketten en tests:** JLT-40 (winstmeting F5; webdeel volgens BOUWPLAN#F5.8 Bouwfasen, regel F5-S5); B03-065, B03-066 (bewijs bijwerken)
+- **Vooraf:** S-G4-07, S-G4-22 en S-G4-41 klaar; S-P40-64 klaar (STAPPEN_P4_GOLF1_2.md): het meetharnas van B03-060 met de bevroren gecontroleerde-foutenset en, uit bouwpunt 6, het meetcommando voor JLT-40 onder een eigen kop in `tools/b03-harnas/README.md`. Geen besluit nodig; BG-26 bepaalt alleen welke rollen advies krijgen.
+- **Al gedaan?** `grep -n '"id": "JLT-40"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> geen uitvoer = niet gestart; staat er een regel, lees dan of het rapportpad een commit noemt die gelijk is aan `git -C <WERKMAP>/jelly-leon log -1 --format=%h -- plugins` (anders opnieuw meten). `grep -n "JLT-40" <WERKMAP>/jelly-leon/tools/b03-harnas/README.md` -> geen uitvoer = bouwpunt 6 van S-P40-64 is niet gedaan: STOP (het recept `b03h/corpus/r_f5_fouten.py` bestond al op 2026-11-11 en bewijst dus niets).
+- **Lees eerst:** TEST-JSON rij JLT-40; BOUWPLAN#F5.8 Bouwfasen (regels F5-S5 en F5-S6); de metriektabel K1 tot en met K9 in BOUWPLAN hoofdstuk F5 (zoek met `grep -n "Onterechte Direct Play" <WERKMAP>/ai-server-manager/docs/platform-v2/02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md`); FASERING#Gates per functie; `<WERKMAP>/jelly-leon/tools/b03-harnas/README.md`
+- **Bouw:**
+  1. Bouw de image van de actuele stand (T-JL-IMAGE) met de modules Devices aan.
+  2. Draai de meting van TEST-JSON rij JLT-40 (opzet en verwacht letterlijk uit die rij) in het exclusieve meetslot: minstens 3 runs, stock en Jelly Leon afwisselend, loadavg per run; drie browsers en de Tizen- en webOS-UA-simulatie. Het commando: precies het commando onder de kop voor JLT-40 in `<WERKMAP>/jelly-leon/tools/b03-harnas/README.md` (vastgelegd door S-P40-64, bouwpunt 6: subcommando van `b03h`, opties, bevroren set en uitvoer); niet zelf samenstellen. Op 2026-11-11 stond het er nog niet (alleen de algemene regel `b03h baseline --metingen dp,orakel,transcode,functies --runs 3`); ontbreekt het, dan STOP.
+  3. Vergelijk per client met baseline (a) stock-standaard en (b) stock-best op dezelfde 12.x-digest; noem n en het Wilson-interval. De drempels en de testset worden niet aangepast.
+  4. Emulator- en desktopdelen niet zelf meten: neem de uitkomst van S-G4-30 over met verwijzing.
+  5. Rapport onder `docs/platform-v2/test-evidence/` en EVIDENCE.
+- **Tests (verplicht):** T-JL-HARNAS; de meting uit bouwpunt 2. Negatief: (a) een bestand uit de foutenset met een liegende codec verschijnt als "onterechte Direct Play" bij de eerste start en NIET bij de tweede; verschijnt het nooit, dan meet het orakel niet en is de run ongeldig; (b) officiele apps zonder opt-in geven dezelfde beslissingen als stock; (c) een run boven de lastgrens van het meetslot (loadavg(1 min) > 4 of andere processen > 4 kernen; BOUWPLAN#F5.1.3 Metrieken en drempels en `LASTGRENS` in `tools/b03-harnas/b03h/meetslot.py`) telt als ongeldig en wordt in het rapport genoemd.
+- **Poort:** P-jelly-leon (job `b03-harnas`; image proeven).
+- **Valkuilen:** V-005, V-006, V-009, V-032, V-098.
+- **Bewijs:** JLT-40 -> Bezig (Sim-geslaagd of Sim-mislukt met de gemeten waarden, n en het aantal geldige runs; "aantoonbaar beter" alleen als alle drempels tegen stock-best gehaald zijn, anders "smoke-gate"). "Echte tv's en echte GPU's: NIET GEVALIDEERD (hardware); zie STAPPEN_P6.md."
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (R-EERLIJK VERPLICHT: controleert dat geen winst wordt geclaimd die de meting niet draagt)
+- **Niveau:** standaard
+- **Stop en vraag als:** het meetharnas van B03-060, de bevroren foutenset of het vastgelegde JLT-40-commando in het README ontbreekt; een drempel niet gehaald wordt (melden met de waarden; niets aanpassen); het meetslot drie keer achter elkaar ongeldig is door belasting.
+
+### S-G4-48 - Winstmeting segmenten tegen standaard Jellyfin en Intro Skipper (JLT-50)
+Dit nummer is later toegevoegd (bij de controle van 2026-11-11); in de volgorde hoort de stap na S-G4-16 en S-G4-40 en voor de laatste run van S-G4-39 (zie de tabel in 6.2).
+- **Repo:** jelly-leon | **Fase:** P4 (golf 4) | **Omvang:** middel | **Moeilijkheid:** gewoon | **Zwaar:** ja (meting op de bevroren testset achter stack.lock; image-build achter docker-build.lock)
+- **Werkpakketten en tests:** JLT-50 (winstmeting F6, herhaling na golf 4; de eerste meting is van golf 2: S-G2-42 voor Intro, Recap en Preview, S-G2-44 voor Outro); B03-007 (acceptatie, deel winst); B03-070 (alleen het bewijs bijwerken)
+- **Vooraf:** S-G4-16 en S-G4-40 klaar; de bevroren testset, het evaluatieharnas en het meetcommando voor JLT-50 in `tools/b03-harnas/README.md` (STAPPEN_P4_GOLF1_2.md, S-P40-66 bouwpunt 6); de golf-2-meting van JLT-50 uit S-G2-42 en S-G2-44 (rapportpaden in EVIDENCE) als vergelijkingspunt. Baseline (b) met Intro Skipper alleen als BG-32 en de spike S-IS dat toelaten (zie S-P40-66); anders is dat deel "Geblokkeerd" met reden. BG-34: echte afleveringen alleen met bevestigde labels.
+- **Al gedaan?** `grep -n '"id": "JLT-50"' <WERKMAP>/jelly-leon/docs/platform-v2/EVIDENCE.json` -> geen uitvoer = golf 2 heeft JLT-50 niet gemeten (S-G2-42, S-G2-44): STOP en melden; staat er een regel, vergelijk de commit in het nieuwste rapport met `git -C <WERKMAP>/jelly-leon log -1 --format=%h -- plugins` (gelijk en het rapport is van na S-G4-40 = klaar; anders meten). `grep -n "JLT-50" <WERKMAP>/jelly-leon/tools/b03-harnas/README.md` -> geen uitvoer = bouwpunt 6 van S-P40-66 is niet gedaan: STOP (het recept `b03h/corpus/r_f6_segmenten.py` bestond al op 2026-11-11 en bewijst dus niets).
+- **Lees eerst:** TEST-JSON rij JLT-50; BOUWPLAN#F6.8 Bouwfasen (regel F6-S0: herhaling bij elke gate); BOUWPLAN#F6.1.3 Testopzet, n en statistiek; FASERING#Gates per functie; `<WERKMAP>/jelly-leon/tools/b03-harnas/README.md`
+- **Bouw:**
+  1. Bouw de image van de actuele stand (T-JL-IMAGE).
+  2. Draai de evaluatie van TEST-JSON rij JLT-50 op de bevroren testset (nooit de devset): drie instanties op dezelfde 12.x-tag en -digest (stock standaard, stock met Intro Skipper als dat mag, Jelly Leon), per type n, precisie, recall en grensfout met Wilson-95 %-interval. Het commando: precies het commando onder de kop voor JLT-50 in `<WERKMAP>/jelly-leon/tools/b03-harnas/README.md` (vastgelegd door S-P40-66, bouwpunt 6; hetzelfde dat S-G2-42 en S-G2-44 gebruikten), met dezelfde bevroren testset (zelfde manifest-sha256 als in hun rapporten); niet zelf samenstellen. Op 2026-11-11 stond het er nog niet; ontbreekt het, dan STOP.
+  3. Controleer tegelijk dat er 0 s beschermde scene binnen een gepubliceerd overslaanbaar segment valt (JLT-51 nultolerantie); een schending is een no-go.
+  4. Zet de uitkomst per type naast die van golf 2 (S-G2-42, S-G2-44) en noem elke verandering; de drempels zijn die van de pre-registratie in S-P40-66 (bouwpunt 7) en worden niet verschoven.
+  5. Rapport onder `docs/platform-v2/test-evidence/` en EVIDENCE.
+- **Tests (verplicht):** T-JL-HARNAS; de evaluatie uit bouwpunt 2, twee runs met gelijke cijfers. Negatief: (a) een opzettelijk 10 s verschoven label laat de F1 dalen (het harnas kan falen); (b) een testset waarvan de sha256 niet overeenkomt met het manifest wordt geweigerd; (c) onder de streef-n heet de uitkomst "smoke-gate" en niet "beter".
+- **Poort:** P-jelly-leon (job `b03-harnas`) + P-HARDE-EIS (geen publicatie in de gegevens van de testserver buiten de eigen provider).
+- **Valkuilen:** V-005, V-006, V-032, V-098, V-112.
+- **Bewijs:** JLT-50 -> Bezig (Sim-geslaagd of Sim-mislukt, met n en intervallen per type; deel Intro Skipper "Geblokkeerd (BG-32 of spike S-IS)" als dat niet mocht). Het deel met echte series: "Geblokkeerd" met "NIET GEVALIDEERD (echte NAS): bevestigde labels van echte afleveringen nodig (BG-34)". B03-007 -> bijwerken met het rapportpad.
+- **Agents:** A-VERKEN -> A-BOUW -> R-TECH -> A-HERSTEL -> R-EERLIJK (R-EERLIJK VERPLICHT: controleert dat geen winst wordt geclaimd die de meting niet draagt)
+- **Niveau:** standaard
+- **Stop en vraag als:** de testset of het evaluatieharnas ontbreekt of niet bevroren is; een beschermde scene binnen een overslaanbaar segment valt (no-go; melden); iemand de testset na het afstemmen wil wijzigen.
+
+### Gatecontrole golf 4 (afvinklijst voor A-GATE; wordt uitgevoerd in S-G4-95 in hoofdstuk 10, niveau N5)
 
 Gate golf 4 is het einde van P4 op de ontwikkelmachine. Daarom loopt deze lijst niet als losse controle maar als deel van de ene A-GATE-run van hoofdstuk 10. A-GATE leest en controleert; hij bouwt en herstelt niet. Elk punt krijgt "ja", "nee" of "niet vast te stellen" met het commando of het bestand waarop het oordeel rust.
 
@@ -2021,11 +2372,315 @@ Gate golf 4 is het einde van P4 op de ontwikkelmachine. Daarom loopt deze lijst 
 - [ ] Subfase-gates van golf 4 zijn per functie nagelopen: WT-7 en WT-8, G-F2-6, G-F2-7 en G-F2-9, QC-6, F5-S2 en F5-S4 tot en met F5-S8, F6-S5 tot en met F6-S7 (de definities staan in het bouwplan in de hoofdstukken Fx.8, bijvoorbeeld BOUWPLAN#F5.8 Bouwfasen); wat niet gehaald is staat met reden in de melding.
 - [ ] De no-go-lijst van het bouwplan is nagelopen: geen schrijfactie naar MediaGuard, geen schrijfactie op de mediamap, geen wijziging aan Emby, geen stock-client die anders beslist dan met de plugin uit.
 - [ ] De NAS-rijen JLT-06, JLT-15, JLT-26, JLT-39, JLT-49 en JLT-59 staan op "Geblokkeerd" met NIET GEVALIDEERD en wat nog nodig is; niemand heeft ze als gehaald gemeld.
-- [ ] Stappen die door een besluit zijn vervallen (BG-12, BG-30, BG-08) staan als "Geblokkeerd (besluit ...)" in het bewijs en niet als gehaald.
+- [ ] Stappen die door een besluit zijn vervallen (onder meer BG-12, BG-15, BG-30, BG-31, BG-08) staan als "Geblokkeerd (besluit ...)" in het bewijs en niet als gehaald.
 - [ ] Patchregisters kloppen: T-JL-REGISTER, T-JLW-STATISCH en T-JLC-STATISCH zijn groen; elke nieuwe haak en elke nieuwe JLC-patch staat in het register met een test.
 - [ ] Hub: P-PEIL is voor elke kaartstap gehaald (rapport van R-ONTWERP aanwezig); geen kaart is groen bij onbekend; een kind ziet niets.
 - [ ] De CI is groen in alle vier de repos (POORTEN.md, kop "0.5 CI-controle na elke push").
 - [ ] Geen modelnaam, geen geheim en geen adres in commits, code of documenten van deze golf (P-VEILIG).
-- [ ] Excel is bijgewerkt volgens P-EXCEL en STATUS.md is bijgewerkt (hoofdstuk 10).
+- [ ] De winstmetingen JLT-40 (S-G4-47) en JLT-50 (S-G4-48) hebben een bewijsregel met rapportpad, n en interval
+      (Sim-geslaagd, Sim-mislukt of Geblokkeerd met reden).
+- [ ] Geen winstclaim zonder meting: een EVIDENCE-regel of document dat een functie "aantoonbaar beter" noemt, steunt
+      op de Fx.1-drempels tegen stock-best op dezelfde 12.x-digest, met n en Wilson-interval; anders staat er
+      "smoke-gate" (FASERING#Gates per functie; hoofdstuk 2, regel "aantoonbaar beter").
+- [ ] Doel van fase P4 volgens `<WERKMAP>/ai-server-manager/docs/platform-v2/01_ARCHITECTUUR/06_FASERING_EN_GATES.md`,
+      kop "Fase P4 — Universele mediaplatform": naast de zes functies noemt die kop ook scene search, live-tv/DVR en
+      offline apps "waar haalbaar". Besluit Z-20 (genomen 2026-11-11): de zes werkpakketten zonder golf worden in P4
+      gebouwd. A-GATE toetst per ID: B03-006 (S-G3-28, S-G3-29), B03-002 (S-G3-30, S-G3-31 of de reden dat die
+      verviel), B03-003 (S-G3-32), B03-008 (S-G4-49, S-G4-50), B03-011 (S-G4-51, S-G4-52) en B03-012 (S-G4-53,
+      S-G4-54) hebben in elke repo van hun stappen een EVIDENCE-regel met "Bezig" of "Geblokkeerd" en NIET GEVALIDEERD
+      voor wat echte apparaten, een echte tuner, een account of de NAS vraagt; elk dossier noemt per onderdeel van de
+      bron de scope ("doet upstream al", "ontbreekt en haalbaar", "alleen met echte NAS, apparaten of account"), en
+      wat "ontbreekt en haalbaar" heette, is gebouwd en getest. Een onderdeel dat volgens een dossier afviel of naar
+      een andere fase schoof, heeft een keuze van de gebruiker (VOORTGANG.md, "Wacht op de gebruiker"); zonder die
+      keuze is het "nee". Deze werkpakketten hebben geen gate-rij in FASERING.
+- [ ] Module uit (besluit Z-19, genomen 2026-11-11: 404 zoals jelly-leon ADR-0030): de routes van elke module van
+      golf 3 en golf 4 geven 404 als de module uit staat (niet aangemeld: 401), elk met een test; de afwijking van
+      WP-JSON (B03-033 en B03-035 vragen 501) staat letterlijk in het bewijs van die twee ID's. 501
+      `capability_unavailable` komt alleen voor bij een functie die binnen een aangezette module uit staat (bv. chat
+      bij BG-12, miniaturen en melden bij BG-24) en bij `propose`/`apply`/`rollback` van de connector. De web- en
+      clientstappen behandelen 404 en 501 beide als "niet beschikbaar" (upstream-gedrag); dat is geen afwijking.
+- [ ] Excel is bijgewerkt volgens P-EXCEL, de faseregel `P4` staat in `EVIDENCE_PROGRAMMA.json` op "Bezig" met
+      "NIET GEVALIDEERD (echte NAS)", STATUS.md heeft een kop voor P4 en de tabel "Topmodel-inzet" in VOORTGANG.md
+      heeft een regel per inzet van het topmodel in dit bestand (S-G3-10, S-G3-08 als BG-21 dat vroeg, S-G4-95)
+      (S-G4-90).
 
 Uitkomst van A-GATE: "gate golf 4 gehaald" of een lijst met wat ontbreekt. Bij een lijst zet de regisseur per punt een A-HERSTEL uit in de juiste repo; daarna controleert een A-GATE op N4 alleen de open punten opnieuw (geen tweede run op N5).
+
+Let op: deze afvinklijst dekt alleen golf 3 en golf 4. De gates van P4-0, golf 1 en golf 2 staan in
+STAPPEN_P4_GOLF1_2.md (S-P40-95, S-G1-90, S-G2-90); S-G4-95 controleert alleen dat hun gate-rapporten bestaan en
+"gehaald" zeggen, en draait ze niet opnieuw.
+
+## 10. Fase-afsluiting
+
+Gate golf 4 is het einde van fase P4 op de ontwikkelmachine. Volgorde: S-G4-90 (bewijs samenvoegen, Excel eerste
+keer) -> S-G4-95 (A-GATE met de afvinklijst "Gatecontrole golf 4" aan het einde van hoofdstuk 9) -> 10.1 (Excel nog
+een keer) -> 10.2 (STATUS.md en VOORTGANG.md) -> 10.3 (melden aan de gebruiker). Niemand slaat een onderdeel over.
+De vorm volgt STAPPEN_P2.md, hoofdstuk 9 (S-P2-900 en S-P2-910). `<DOCS>` hieronder is
+`<WERKMAP>/ai-server-manager/docs/platform-v2`.
+
+### S-G4-90 - Bewijs samenvoegen voor P4: programmabewijs, Excel en STATUS
+- **Repo:** ai-server-manager | **Fase:** P4 (afsluiting) | **Omvang:** klein | **Moeilijkheid:** gewoon | **Zwaar:** nee
+- **Werkpakketten en tests:** geen eigen ID's; schrijft de faseregel `P4` in `<DOCS>/EVIDENCE_PROGRAMMA.json` en controleert dat elk ID uit hoofdstuk 11 (delen A, C en D) een eerlijke EVIDENCE-regel heeft
+- **Vooraf:** elke stap van golf 3 en golf 4 is in `<WERKMAP>/.lokaal/plan/uit/VOORTGANG.md` afgevinkt of staat er met reden als vervallen of geblokkeerd; S-G3-90 gehaald; de laatste run van S-G4-39 is gedaan na de laatste codewijziging in jelly-leon; in geen enkele repo is een schrijvende keten open (P-EXCEL punt 1); de gates van P4-0, golf 1 en golf 2 (STAPPEN_P4_GOLF1_2.md: S-P40-95, S-G1-90, S-G2-90) zijn gehaald
+- **Al gedaan?** `python3 -c "import json;[print(f['id'],f['status'],f['validatie'],sep=' | ') for f in json.load(open('<DOCS>/EVIDENCE_PROGRAMMA.json'))['fasen']]"` -> klaar als er een regel "P4 | Bezig | ..." staat met "NIET GEVALIDEERD (echte NAS)" in de validatie (op 2026-11-11 stonden er alleen P0 en P1); `grep -n '^## P4' <DOCS>/OVERDRACHT/STATUS.md` -> klaar als er een kop voor P4 staat; `git -C <WERKMAP>/ai-server-manager log --oneline -5 -- docs/platform-v2/08_EXCEL docs/platform-v2/EVIDENCE_PROGRAMMA.json docs/platform-v2/OVERDRACHT/STATUS.md` -> klaar als de laatste commit op deze paden na de laatste P4-commit van de vier repos ligt. Half werk (alleen een deel van deze drie): verder bouwen op wat er staat.
+- **Lees eerst:** POORTEN.md, blok P-EXCEL (de afvinklijst en de regels eronder); `<WERKMAP>/ai-server-manager/tools/excel/README.md`; hoofdstuk 11 van dit bestand; `<DOCS>/OVERDRACHT/STATUS.md` (vorm van een bestaande kop, bijvoorbeeld "Contract 1.3 — toegepast in de Hub en de executor (2026-11-10)"); STAPPEN_P2.md, stap S-P2-900 (zelfde werkwijze)
+- **Bouw:**
+  1. Controleer de vier repos van dit bestand en de andere zeven: `for r in ai-server-manager home-control-hub appstore-en-fork jelly-leon-platform zoeken-en-persoonlijke-ai media-guard-ultimate media-source-optimizer my_house jelly-leon jelly-leon-web jelly-leon-clients; do echo "$r: $(git -C <WERKMAP>/$r status --short | wc -l) gewijzigd; $(git -C <WERKMAP>/$r rev-list --count @{u}..HEAD) niet gepusht"; done`. Voor jelly-leon, jelly-leon-web, jelly-leon-clients en ai-server-manager moet dat "0 gewijzigd; 0 niet gepusht" zijn. Staat er in ai-server-manager ander werk in de werkmap (bijvoorbeeld het halve werk van ronde 3): stoppen en melden; nooit `git add -A`.
+  2. Meet per ID uit hoofdstuk 11 (delen A, C en D) de EVIDENCE-regel in de repo uit de kolom "Repos met een regel": `python3 -c "import json,sys;d={r['id']:r for r in json.load(open(sys.argv[1]))};r=d.get(sys.argv[2]);print(sys.argv[2], r['status'] if r else 'GEEN REGEL', (r or {}).get('validatie',''))" <WERKMAP>/<repo>/docs/platform-v2/EVIDENCE.json <ID>`. Maak een tabel ID | repo | status | validatie | blokkadetekst aanwezig ja/nee. Een bevinding is: een ID zonder regel terwijl de stap is afgevinkt; een regel "Niet gestart" na een afgevinkte stap; een regel "Bezig" zonder "NIET GEVALIDEERD (...)" waar de echte NAS, hardware of een account nodig is; "Gereed" of "Geslaagd" ergens. Herstel dat NIET in een andere repo: de regisseur start daar A-HERSTEL -> R-EERLIJK en deze stap wacht.
+  3. Voeg in `<DOCS>/EVIDENCE_PROGRAMMA.json`, lijst `fasen`, een regel toe met precies de velden van de bestaande regels (lees ze eerst): `id` "P4"; `status` "Bezig"; `validatie` "Sim-getest; NIET GEVALIDEERD (echte NAS)"; `bewijs` een zin per repo met de laatste commit en het run-ID van de CI (uit VOORTGANG.md, zelf nagekeken met `gh run list -R lvos04/<repo> -b ccr-c133d7a0-kuz1cv -c <volle hash>` of `gh run view <run-ID> -R lvos04/<repo>`; de volle hash uit `git -C <WERKMAP>/<repo> rev-parse <hash>`: met een korte hash geeft `-c` geen run); `blokkade` wat de cutover-gate (P6) nog vraagt (de NAS-rijen JLT-06, -15, -26, -39, -49, -59, -69, -74 en de echte apparaten); `bijgewerkt` de datum van vandaag. Bestaande regels blijven ongewijzigd. Staat er al een regel "P4" (bijvoorbeeld van P4-0), dan die bijwerken en niet een tweede toevoegen.
+  4. Voeg aan het einde van `<DOCS>/OVERDRACHT/STATUS.md` een kop "## P4 — universele mediaserver, golf 3 en golf 4: gebouwd en in de simulator getest (<datum>)" toe met vier korte delen: wat er per repo staat (een regel per repo met de stap-ID's), wat NIET GEVALIDEERD is (uitgeschreven, niet alleen een verwijzing), de open besluiten (hoofdstuk 3 met hun stand) en de uitkomst van de gate ("volgt"; de regisseur laat dit na S-G4-95 invullen, zie 10.2). `CONTRACT_1.3_CONFORMITEIT.md` wordt NIET gewijzigd (V-106).
+  5. Doe de punten 2, 3 en 4 van P-EXCEL: de tests van het gereedschap, een proefrun met `--out <bestand buiten de repo>.xlsx`, en elke waarschuwing lezen en verklaren. Exitcode 2 of een onverklaarde waarschuwing: stoppen en melden.
+  6. Commit en push `docs/platform-v2/EVIDENCE_PROGRAMMA.json` en `docs/platform-v2/OVERDRACHT/STATUS.md` volgens P-GIT (eerst `git pull --rebase`, bestanden bij naam toevoegen) en wacht op de CI.
+  7. De REGISSEUR doet daarna zelf de punten 5 tot en met 8 van P-EXCEL (AGENTEN.md, kop "1.1 Wat de regisseur zelf doet", punt 7): de echte run, een tweede run zonder gewijzigde onderdelen, het `.xlsx.bak`-bestand verwijderen, commit en push met een Nederlands bericht dat "P4" noemt, en de CI-job `excel` controleren. Hij noteert het aantal bijgewerkte rijen per blad en alle waarschuwingen in VOORTGANG.md.
+  8. R-EERLIJK vergelijkt twintig rijen van de Excel met de EVIDENCE.json van de repo van herkomst (minstens drie per repo, en alle rijen die in deze run van status wisselden): geen enkele rij is "beter" dan het bewijs.
+- **Tests (verplicht):** `<WERKMAP>/.lokaal/excel-venv/bin/python -m pytest -q tools/excel/tests` (vanuit `<WERKMAP>/ai-server-manager`); de proefrun en de echte run uit P-EXCEL, punten 3 en 5; `python3 -c "import json,glob,sys;b=[(p,r['id'],r['status']) for p in glob.glob(sys.argv[1]) for r in json.load(open(p)) if r['status'] in ('Gereed','Geslaagd')];print(b);sys.exit(1 if b else 0)" '<WERKMAP>/*/docs/platform-v2/EVIDENCE.json'` (verwachting: lege lijst, exitcode 0). Negatief: een tweede run van het Excel-script meldt nul gewijzigde onderdelen; een ID uit hoofdstuk 11 zonder regel komt in de tabel van bouwpunt 2 als "GEEN REGEL" terug en niet als leeg (V-005).
+- **Poort:** P-EXCEL (alle punten) + P-ai-server-manager (snel, regel `tools/excel`) + P-EERLIJK + P-GIT. Extra: de CI-jobs `python` en `excel` zijn groen op precies de laatste commit.
+- **Valkuilen:** V-108, V-107, V-106, V-104, V-100, V-022.
+- **Bewijs:** faseregel `P4` in `<DOCS>/EVIDENCE_PROGRAMMA.json` -> "Bezig" met "Sim-getest; NIET GEVALIDEERD (echte NAS)". Blokkade: "NIET GEVALIDEERD (echte NAS): Jelly Leon draait niet als Custom App op de NAS, geen echte apparaten, geen A310 en UHD 770, geen echte MediaGuard met viewerrol, geen echte Hub-koppeling; zie STAPPEN_P6.md." Geen enkele rij wordt "Gereed" of "Geslaagd".
+- **Agents:** A-BOUW -> R-EERLIJK, met tussendoor de regisseur voor bouwpunt 7. Kortere keten met reden: zuivere documentatie- en controlestap; er verandert geen code. Geen A-VERKEN (de stand komt uit VOORTGANG.md en wordt in bouwpunt 1 en 2 opnieuw gemeten).
+- **Niveau:** A-BOUW N2 (mechanisch: meten en twee documenten bijwerken); R-EERLIJK N3
+- **Stop en vraag als:** een repo niet schoon of niet gepusht is; een waarschuwing van het script niet te verklaren is; een ID uit hoofdstuk 11 geen rij in de Excel heeft (een rij toevoegen is een eigen stap volgens `tools/excel/README.md`, geen handwerk); een status in de Excel na de run beter is dan in EVIDENCE.
+
+### S-G4-95 - Gate einde P4: onafhankelijke controle
+- **Repo:** jelly-leon, jelly-leon-web, jelly-leon-clients en ai-server-manager, alle alleen lezen (uitzondering op "een stap = een repo": dit is de gatecontrole; A-GATE schrijft alleen `<WERKMAP>/.lokaal/ketens/GATE-P4/RAPPORT-A-GATE.md`) | **Fase:** P4 (afsluiting) | **Omvang:** groot | **Moeilijkheid:** hoog | **Zwaar:** ja (A-GATE draait per repo de volledige poort opnieuw, de repos na elkaar, achter de locks)
+- **Werkpakketten en tests:** geen eigen ID's; beoordeelt de afvinklijst "Gatecontrole golf 4" (einde van hoofdstuk 9) en de gate-rijen van golf 4 uit B03_FASERING.md#3. Golven en werkpakketten (JLT-09, 14, 38, 41 tot en met 48, 54, 55, 56, 58; JLT-63 en 64 per oplevering, JLT-65 per module-oplevering)
+- **Vooraf:** S-G4-90 afgevinkt; in geen van de vier repos is een keten open; de gate-rapporten `<WERKMAP>/.lokaal/ketens/GATE-P4-0/RAPPORT-A-GATE.md`, `GATE-GOLF-1/RAPPORT-A-GATE.md`, `GATE-GOLF-2/RAPPORT-A-GATE.md` (S-G2-90, STAPPEN_P4_GOLF1_2.md) en `GATE-GOLF-3/RAPPORT-A-GATE.md` (S-G3-90) bestaan
+- **Al gedaan?** `ls <WERKMAP>/.lokaal/ketens/GATE-P4/RAPPORT-A-GATE.md && grep -n "gate golf 4" <WERKMAP>/.lokaal/ketens/GATE-P4/RAPPORT-A-GATE.md` -> klaar als het rapport bestaat, de uitkomst "gate golf 4 gehaald" is EN de HEAD van elk van de vier repos (`git -C <WERKMAP>/<repo> rev-parse --short HEAD`) nog gelijk is aan wat het rapport noemt. Op 2026-11-11 bestond de map `<WERKMAP>/.lokaal/ketens/` nog niet.
+- **Lees eerst:** hoofdstuk 2 (Gates) en de afvinklijst "Gatecontrole golf 4" van dit bestand; `<WERKMAP>/ai-server-manager/docs/platform-v2/01_ARCHITECTUUR/06_FASERING_EN_GATES.md`, koppen "Fase P4 — Universele mediaplatform" en "Gate matrix"; FASERING#4. Gates; AGENTEN.md, prompt "A-GATE" en kop "2.2 Het protocol"; POORTEN.md, de vier blokken P-<repo> (kop "4. Volledig (CI-volgorde)")
+- **Bouw:** (er wordt niets gebouwd; A-GATE levert een rapport)
+  1. De regisseur vult de prompt A-GATE: Gate "P4 (golf 4, einde van de fase)"; Repos de vier hierboven; Gate-eisen: de afvinklijst "Gatecontrole golf 4" in dit bestand; onder "Besluiten en bijzonderheden" alleen feiten: de besluiten die de gebruiker tijdens golf 3 en golf 4 nam (met ID), de stappen die door een besluit vervielen, en de genomen besluiten Z-20 ("in P4 bouwen; per werkpakket eerst A-VERKEN, dan stappen in een golf", voor B03-002, B03-003, B03-006, B03-008, B03-011 en B03-012) en Z-19 ("module uit: 404 zoals ADR-0030; afwijking van WP-JSON in het bewijs"), letterlijk met datum; per Z-20-stap of hij liep, verviel (met reden) of gesplitst is; en elke keuze van de gebruiker over een onderdeel dat volgens een dossier afviel. De regisseur en A-GATE kiezen hier zelf niets.
+  2. A-GATE volgt de werkwijze uit zijn prompt: per repo schoon, gepusht en CI groen op HEAD; VOORTGANG.md tegen de werkelijkheid; per repo de volledige poort, de repos na elkaar (volgorde: jelly-leon-clients, jelly-leon-web, ai-server-manager, jelly-leon; tussen twee repos `free -m` en `df -h /`); de algemene poorten; daarna per punt van de afvinklijst "ja", "nee" of "niet vast te stellen", met het bewijs dat hij zelf zag.
+  3. A-GATE draait zelf opnieuw (niet overnemen uit een rapport): de negatieve proef van de laatste differentiele run (T-JL-COMPAT met `--negatieve-proef`), de opsommende contracttest van S-G4-19 en een schemacontrole op de Hub-leesroutes van S-G4-35.
+  4. De regisseur doet na de melding de controles K1, K3 en K7 (AGENTEN.md, kop "2.1 De goedkope controles K1 tot en met K7") voor elke repo.
+  5. Uitkomst "gate golf 4 gehaald": de regisseur vinkt de gate af in VOORTGANG.md en volgt 10.1 tot en met 10.3. Anders: per tekortkoming een herstelketen in de betreffende repo (A-HERSTEL met het gate-rapport, daarna R-EERLIJK), daarna S-G4-90 bouwpunt 7 opnieuw als er bewijs is gewijzigd, en dan A-GATE op N4 alleen voor de open punten (rapport `RAPPORT-A-GATE-2.md`). Tweede keer niet gehaald: keuzemenu aan de gebruiker. P5-stappen in de banen jelly-leon en jelly-leon-web starten nooit zonder gehaalde gate (STAPPEN_P5.md, tabel met startvoorwaarden).
+- **Tests (verplicht):** per repo de volledige variant uit POORTEN.md (P-jelly-leon, P-jelly-leon-web, P-jelly-leon-clients en P-ai-server-manager, kop "4. Volledig (CI-volgorde)"), elk commando met exitcode en slotregel in het rapport; overgeslagen tests zijn niet groen. Negatief (verplicht, door A-GATE zelf gedraaid): de drie controles uit bouwpunt 3; `grep -n '"Gereed"\|"Geslaagd"'` over de vier EVIDENCE.json-bestanden geeft geen uitvoer.
+- **Poort:** de vier blokken P-<repo> (volledig) + P-GIT + P-CONTRACT + P-EERLIJK + P-VEILIG + P-HARDE-EIS + P-INSTALLATIE + P-PEIL, alle als controle (A-GATE wijzigt niets). P-EXCEL alleen als lezer: de Excel-commit van S-G4-90 bestaat en de CI-job `excel` is groen.
+- **Valkuilen:** V-098, V-002, V-005, V-027, V-034, V-112, V-033.
+- **Bewijs:** geen wijziging in een EVIDENCE.json door A-GATE. De uitkomst komt in `<WERKMAP>/.lokaal/ketens/GATE-P4/RAPPORT-A-GATE.md`, in VOORTGANG.md en (via 10.2) in `<DOCS>/OVERDRACHT/STATUS.md`. De faseregel `P4` blijft "Bezig" met "NIET GEVALIDEERD (echte NAS)", ook bij "gate golf 4 gehaald".
+- **Agents:** A-GATE. Kortere keten met reden: zuivere controlestap; A-GATE is zelf de onafhankelijke controle en herstelt niets.
+- **Niveau:** A-GATE N5. Winst: dit is de enige plek waar iemand zonder voorkennis vier repos en zes functies tegelijk naast de gate van P4 legt; een gemist verschil in kijkgegevens, een gat in de Hub-toegang of een stock-client die anders beslist, wordt na P4 de basis van de cutover in P6, waar zo'n fout pas met echte gebruikers zichtbaar wordt (geval d: A-GATE aan het einde van een hele fase). Een herhaling voor alleen de open punten loopt op N4.
+- **Stop en vraag als:** er tijdens de controle in een van de vier repos wordt geschreven; er te weinig geheugen of schijf is voor een volledige poort (wat niet gedraaid kon worden is "niet vast te stellen" tot het gedraaid is); A-GATE een eis vindt die volgens 06_FASERING_EN_GATES.md of B03_FASERING.md bij P4 hoort maar niet in de afvinklijst staat (tekortkoming van het plan: melden, niet stilzwijgend toevoegen of weglaten); de gate een tweede keer niet gehaald wordt.
+
+### 10.1 Excel bijwerken
+
+De eerste, volledige run is S-G4-90 (bouwpunten 5 en 7). Na "gate golf 4 gehaald" doet de REGISSEUR zelf (AGENTEN.md,
+kop "1.1 Wat de regisseur zelf doet", punt 7):
+
+- [ ] Controleer dat in ai-server-manager geen keten open is en de werkboom schoon is:
+      `git -C <WERKMAP>/ai-server-manager status --short` (verwachting: geen uitvoer).
+- [ ] Is er sinds S-G4-90 bewijs gewijzigd (een herstelketen na de gate)? Dan eerst P-EXCEL punten 2 en 3 (tests en
+      proefrun), daarna de echte run (P-EXCEL punt 5) en een tweede run die nul gewijzigde onderdelen meldt. Is er
+      niets gewijzigd, dan meldt de run nul wijzigingen en is er niets te committen.
+- [ ] Lees elke waarschuwing; exitcode 2 of een onverklaarde waarschuwing: stoppen; de fout wordt in de EVIDENCE.json
+      van de repo van herkomst hersteld, niet in het script en niet in de Excel.
+- [ ] Verwijder het `.xlsx.bak`-bestand na controle; commit en push volgens P-GIT (Nederlands bericht met "P4",
+      eerst `git pull --rebase`, bestanden bij naam toevoegen); controleer de CI-job `excel` op precies die commit.
+- [ ] Noteer in VOORTGANG.md het aantal bijgewerkte rijen per blad, alle waarschuwingen en het run-ID van de CI.
+
+Geen enkele rij wordt "Gereed" of "Geslaagd", ook niet na "gate golf 4 gehaald".
+
+### 10.2 STATUS.md en VOORTGANG.md bijwerken
+
+- [ ] **STATUS.md** (`<DOCS>/OVERDRACHT/STATUS.md`): de kop voor P4 bestaat sinds S-G4-90 met de uitkomst "volgt".
+      De regisseur start een korte keten A-BOUW (N2) -> R-EERLIJK in ai-server-manager die onder die kop invult: de
+      uitkomst van A-GATE (letterlijk), de datum, per punt van de afvinklijst het oordeel in een tabel, en de lijst van
+      wat alleen op de echte NAS te bewijzen is met het onderdeel van STAPPEN_P6.md dat het oppakt. Geen woord
+      "klaar", "gereed" of "geslaagd" voor iets dat alleen in de simulator is gemeten. Commit en push volgens P-GIT;
+      de CI moet groen zijn. Doe dit VOOR de laatste Excel-run van 10.1.
+- [ ] **VOORTGANG.md** (door de regisseur zelf): de gate van P4 afgevinkt met datum en de verwijzing naar
+      `<WERKMAP>/.lokaal/ketens/GATE-P4/RAPPORT-A-GATE.md`; de tabel "Topmodel-inzet" aangevuld met S-G4-95 (en
+      S-G3-10, en S-G3-08 als daar N5 is ingezet); de lijst "Geblokkeerd" bijgewerkt; de besluiten van hoofdstuk 3
+      met hun stand.
+- [ ] **Per repo** blijft EVIDENCE.json de waarheid. De regisseur wijzigt zelf geen EVIDENCE.json.
+
+### 10.3 Melden aan de gebruiker
+
+De regisseur meldt in het Nederlands, kort en zonder vakjargon, en sluit af met een keuzemenu
+(BESLUITEN_EN_BLOKKADES.md, kop "0.5 Sjabloon van een keuzemenu"). Hij schrijft nergens dat iets "gereed" of
+"geslaagd" is. Onderdelen, in deze volgorde:
+
+1. **Uitkomst van de gate:** "gate golf 4 gehaald" of niet, met het aantal punten per oordeel.
+2. **Wat er nu staat, per repo:** jelly-leon (Watch Together, ondertitelsync en publicatie zonder vertaling,
+   kwaliteitscontrole, apparaten en GPU-banen, segmenten met correctie en leren, connector voor de Hub,
+   metadata en anime-mapping, universele bibliotheek, scènezoeker op ondertitels, downloadrechten, live-tv en DVR),
+   jelly-leon-web (webplugins en haken), jelly-leon-clients (marker, Android TV-patches, emulatormatrix, offline
+   downloaden, beschikbaarheid van clients),
+   ai-server-manager (adapter en vijf Jelly Leon-kaarten op het scherm Media). Per repo de laatste commit en het
+   run-ID van de CI.
+3. **Wat NIET GEVALIDEERD is:** niets is op de echte NAS, met echte apparaten (tv's, telefoons, Swiftfin) of met de
+   A310 en UHD 770 geprobeerd; MediaGuard en de Hub zijn alleen als simulator of nagebootste plugin gebruikt. Per punt
+   welk onderdeel van STAPPEN_P6.md het oppakt (NAS-rijen JLT-06, -15, -26, -39, -49, -59).
+4. **De HARDE EIS:** kijkgeschiedenis, spoorkeuzes en gebruikers zijn in de differentiele runs ongewijzigd gebleven
+   (rapportpaden van S-G3-27 en S-G4-39); Emby is niet aangeraakt; MediaGuard is alleen gelezen.
+5. **Besluiten:** welke van hoofdstuk 3 genomen zijn en welke stappen daardoor vervielen of "Geblokkeerd (besluit
+   ...)" staan; welke nog open zijn.
+6. **Wat het plan niet wist:** de punten "ONBEKEND" die tijdens de bouw zijn vastgesteld, en per werkpakket uit
+   besluit Z-20 (B03-002, B03-003, B03-006, B03-008, B03-011, B03-012) de scope uit het dossier: wat upstream al deed,
+   wat gebouwd is en wat alleen op de echte NAS of met echte apparaten, een tuner of een account kan. Zoeken op
+   omschrijving en spraak in de scènezoeker wachten op BG-06 (P5). "Module uit" geeft 404 (besluit Z-19). Staat er
+   nog een keuze open over een onderdeel dat volgens een dossier afviel, dan komt die in het keuzemenu.
+7. **Inzet van het topmodel:** de regels uit de tabel "Topmodel-inzet" met per regel wat het opleverde.
+8. **Keuzemenu**, bijvoorbeeld:
+   1. Doorgaan met P5 (alleen bij "gate golf 4 gehaald"). Gevolg: de open besluiten voor P5 (BG-06, BG-18) komen
+      eerst langs (S-P5-01).
+   2. Eerst een open besluit van hoofdstuk 3 nemen, zodat een vervallen stap alsnog kan worden gebouwd.
+   3. Eerst zelf op de echte NAS proberen wat P6 vraagt.
+   4. Stoppen en de stand laten staan.
+
+Er wordt geen PR gemaakt en niets naar `main` overgenomen zonder dat de gebruiker daar uitdrukkelijk om vraagt.
+
+---
+
+## 11. Dekking
+
+Elke rij is een ID. "Stappen" noemt de stappen van dit bestand die het ID bouwen, meten of bijwerken; de EERSTE stap
+in de rij zet de EVIDENCE-regel op "Bezig" (of "Geblokkeerd" met reden), de stappen erna leveren een deel. In S-G4-90
+moet elk ID uit de delen A, C en D een eerlijke EVIDENCE-regel hebben. Deel B noemt de ID's die NIET in dit bestand
+horen, met de plek waar ze wel staan. Herkomst: de B03-, JLT- en EX-ID's staan in
+`<WERKMAP>/.lokaal/plan/bron/ALLE_IDS.txt`; de contractpunten (C1.3-...) en Δ-HUB-2 komen uit
+`<WERKMAP>/ai-server-manager/docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md` (kolom "Moment" = P4) en staan niet in
+ALLE_IDS.txt. Bij elke rij met echte NAS, hardware of accounts hoort naast "Bezig" de tekst "NIET GEVALIDEERD (...)";
+de echte uitvoering staat in STAPPEN_P6.md.
+
+### 11.1 Deel A - Werkpakketten van golf 3 en golf 4
+
+| ID | Repos met een regel | Stappen of reden |
+|---|---|---|
+| B03-002 | jelly-leon, jelly-leon-web | besluit Z-20: S-G3-30 (serverdeel), S-G3-31 (webdeel, alleen als het dossier van S-G3-30 een webdeel noemt); echte bibliotheek -> STAPPEN_P6.md (N-P6-09) |
+| B03-003 | jelly-leon-clients | besluit Z-20: S-G3-32 (gaten op de ontwikkelmachine); de regel blijft "Geblokkeerd" (acceptatie op echte tv's en apparaten) -> STAPPEN_P6.md (N-P6-09) |
+| B03-004 | jelly-leon | aanvulling F5: S-G4-03 (delen 1, 3, 4), S-G4-04 (deel 2); echte GPU's -> STAPPEN_P6.md |
+| B03-005 | jelly-leon | aanvulling F5: S-G4-05, S-G4-08, S-G4-22 (webdeel uitleg); echte DV-apparaten -> STAPPEN_P6.md |
+| B03-006 | jelly-leon | besluit Z-20: S-G3-28 (serverdeel; BG-17 vooraf), S-G3-29 (pluginpagina); eindscenario EX37 in STAPPEN_P6.md (S-P6-15) |
+| B03-007 | jelly-leon | afronding: S-G4-16 (serverdeel, punten a, b, d), S-G4-23 (web), S-G4-27 (Android TV), S-G4-28 (Android, desktop), S-G4-30 (matrix), S-G4-48 (winstmeting JLT-50); begin van de aanvulling in golf 2 (STAPPEN_P4_GOLF1_2.md, S-G2-50) |
+| B03-008 | jelly-leon, jelly-leon-web | besluit Z-20: S-G4-49 (serverdeel, alleen tekst uit ondertitelsporen), S-G4-50 (webdeel); spraak en zoeken op omschrijving wachten op BG-06 (P5) |
+| B03-010 | jelly-leon | golf 3-deel streamroutes: S-G3-09 (meting, ADR), S-G3-10 (filter); deel IsKid in golf 1 (STAPPEN_P4_GOLF1_2.md, S-G1-18) |
+| B03-011 | jelly-leon, jelly-leon-clients | besluit Z-20: S-G4-51 (serverdeel), S-G4-52 (Android); echte telefoons en EX35 -> STAPPEN_P6.md (N-P6-09, S-P6-13) |
+| B03-012 | jelly-leon, jelly-leon-web | besluit Z-20: S-G4-53 (serverdeel), S-G4-54 (webdeel); echte tuner en EX38 -> STAPPEN_P6.md (N-P6-09, S-P6-17) |
+| B03-022 | jelly-leon | S-G3-17; S-G4-44 (beheerpagina) |
+| B03-023 | jelly-leon | S-G3-18; S-G4-44 (beheerpagina) |
+| B03-024 | jelly-leon, jelly-leon-web | S-G3-04 (serverdeel), S-G3-24 (webdeel) |
+| B03-025 | jelly-leon, jelly-leon-web | S-G3-19 (haperbeleid), S-G4-09 (diagnose, advies), S-G4-43 (webdialoog) |
+| B03-026 | jelly-leon, jelly-leon-clients | alleen na BG-10: S-G3-20, S-G3-21; S-G3-26 alleen bij de keuze "clientpatch"; zonder besluit "Geblokkeerd (besluit BG-10)" |
+| B03-027 | jelly-leon | alleen na BG-09 "aan": S-G3-23; anders "Geblokkeerd (besluit BG-09)" (bewijsregel in S-G3-23) |
+| B03-028 | jelly-leon, jelly-leon-web | alleen na BG-12 "aan": S-G4-10, S-G4-24; anders "Geblokkeerd (besluit BG-12)" |
+| B03-029 | jelly-leon, ai-server-manager | S-G4-11 (connector, events), S-G4-44 (beheerpagina), S-G4-33 (Hub-kaart), S-G4-35 (Hub samen), S-G4-39 (clientmatrixdocument); voorwaarde S-G4-31, S-G4-32 |
+| B03-036 | jelly-leon-web | alleen na BG-15: S-G4-20 (rij), S-G4-45 (dialogen) |
+| B03-037 | jelly-leon-clients, jelly-leon | S-G4-29 (emulators, desktop), S-G4-39 (webrijen) |
+| B03-039 | jelly-leon, ai-server-manager | S-G4-12 (connector, register, meting), S-G4-34 (Hub-kaart), S-G4-35 |
+| B03-040 | jelly-leon | S-G3-03; S-G3-05 (taal uit tekst) |
+| B03-041 | jelly-leon | S-G3-05 |
+| B03-042 | jelly-leon | S-G3-06 |
+| B03-043 | jelly-leon | S-G3-07 |
+| B03-047 | jelly-leon | S-G3-08 (alleen na BG-19; anders stopt de stap en blijft het ID "Niet gestart" met de reden "wacht op besluit BG-19") |
+| B03-049 | jelly-leon, jelly-leon-clients | alleen het P4-deel: S-G4-13, S-G4-30; de rest hoort bij P5 (STAPPEN_P5.md: S-P5-107, S-P5-62, S-P5-111, S-P5-115, S-P5-120) |
+| B03-050 | jelly-leon | S-G3-01 |
+| B03-051 | jelly-leon | S-G3-11; S-G3-12 (recall bijwerken) |
+| B03-052 | jelly-leon | S-G3-12 |
+| B03-053 | jelly-leon | S-G3-02 |
+| B03-054 | jelly-leon | S-G3-13 |
+| B03-055 | jelly-leon | S-G3-14 |
+| B03-056 | jelly-leon | S-G3-15 |
+| B03-057 | jelly-leon, jelly-leon-web | S-G3-16 (pluginpagina), S-G3-25 (label op de itempagina) |
+| B03-058 | jelly-leon, ai-server-manager, jelly-leon-clients | S-G4-14 (connector), S-G4-36 (Hub-kaart), S-G4-30 (clients), S-G4-35 |
+| B03-063 | jelly-leon | S-G4-01 (spike, ADR), S-G4-02 (wrapper, socket), S-G4-03 (image, planner) |
+| B03-064 | jelly-leon | S-G4-04 |
+| B03-065 | jelly-leon, jelly-leon-web | S-G4-05 (server), S-G4-21, S-G4-22, S-G4-41 (web) |
+| B03-066 | jelly-leon, jelly-leon-web | S-G4-06; S-G4-42 (beheerpagina), S-G4-41 (web) |
+| B03-067 | jelly-leon, jelly-leon-web | S-G4-08 (server), S-G4-22 (web) |
+| B03-068 | jelly-leon, jelly-leon-clients | S-G4-07; S-G4-42 (beheerpagina), S-G4-30 (officiele apps), S-G4-39 (regressie) |
+| B03-069 | jelly-leon, jelly-leon-clients, ai-server-manager | S-G4-18 (connector), S-G4-25 (marker), S-G4-26 (Android TV, alleen na BG-30), S-G4-37 (Hub-kaarten), S-G4-35 |
+| B03-074 | jelly-leon | S-G3-22 |
+| B03-075 | jelly-leon, jelly-leon-web | S-G4-15 (routes, rechten), S-G4-40 (leren), S-G4-46 (web) |
+| B03-076 | jelly-leon, jelly-leon-web | S-G4-16 (beheerpagina), S-G4-23 (knoppen, alleen na BG-31 a1), S-G4-46 (hint, correctiepaneel) |
+| B03-077 | jelly-leon-clients | alleen na BG-31 a1 en BG-08: S-G4-27, S-G4-28; S-G4-30 (matrix); anders "Geblokkeerd (besluit BG-31)" of "(besluit BG-08)" |
+| B03-078 | jelly-leon, ai-server-manager | S-G4-17 (planner, MediaGuard, connector), S-G4-38 (Hub-kaart), S-G4-35 |
+
+### 11.2 Deel B - B03-werkpakketten die NIET in dit bestand horen
+
+| ID | Waar wel | Reden |
+|---|---|---|
+| B03-038, B03-044, B03-045, B03-046, B03-048, B03-059, B03-079 en de rest van B03-049 | STAPPEN_P5.md | rij "P5" in FASERING#3. Golven en werkpakketten |
+| B03-020, B03-030, B03-060, B03-070 | STAPPEN_P4_GOLF1_2.md (S-P40-60, S-P40-62, S-P40-64, S-P40-66) | golf 0 en P4-0 |
+| B03-014, B03-015, B03-016, B03-019 | STAPPEN_P4_GOLF1_2.md en STAPPEN_P6.md | P4-0 en doorlopend; B03-019 komt hier alleen terug als de compat-runs S-G3-27 en S-G4-39 |
+| B03-009, B03-017, B03-018 | STAPPEN_P4_GOLF1_2.md (golf 1) | golf 1; de stappen hier gebruiken ze alleen |
+| B03-021, B03-031 tot en met B03-035, B03-061, B03-062, B03-071, B03-072, B03-073 | STAPPEN_P4_GOLF1_2.md (golf 2, S-G2-10 tot en met S-G2-44) | golf 2 |
+| B03-001, B03-013 | STAPPEN_P6.md (B03-013 eindproef) | forkstrategie (P0, regel al "Bezig") en terugkeer naar upstream (doorlopend; eindproef in P6 volgens FASERING#3, rij P6) |
+
+B03-002, B03-003, B03-006, B03-008, B03-011 en B03-012 stonden hier tot 2026-11-11 als "geen bouwstap". Na besluit
+Z-20 (in P4 bouwen) staan ze in deel A met hun stappen. De cue-extractie die WP-JSON B03-074 "gedeeld met B03-008"
+noemt, komt uit S-G1-34 (B03-018, STAPPEN_P4_GOLF1_2.md).
+
+### 11.3 Deel C - Testrijen
+
+| ID | Repos met een regel | Stappen of reden |
+|---|---|---|
+| JLT-01, JLT-02 | jelly-leon, jelly-leon-web | hermeting met de plugin aan: S-G3-24; voorwaarde S-G3-04; de voormeting hoort bij B03-020 (STAPPEN_P4_GOLF1_2.md, S-P40-60) |
+| JLT-03 | jelly-leon | S-G3-19 (gate golf 3) |
+| JLT-04 | jelly-leon, jelly-leon-web | S-G4-09, S-G4-43; A310 en UHD 770 -> STAPPEN_P6.md |
+| JLT-05 | jelly-leon, jelly-leon-web | S-G3-17, S-G3-18, S-G3-27 (stock-web), S-G4-44, S-G4-10 en S-G4-24 (chat-deel alleen na BG-12) (gate golf 3) |
+| JLT-06 | jelly-leon | NAS-rij: alleen bewijsregel "Geblokkeerd" (S-G3-17); uitvoering in STAPPEN_P6.md |
+| JLT-07 | jelly-leon, jelly-leon-clients | S-G3-20, S-G3-21; S-G3-26 (native deel); zonder BG-10 "Geblokkeerd (besluit BG-10)" (gate golf 3) |
+| JLT-08 | jelly-leon | S-G3-23 alleen na BG-09; anders "Geblokkeerd (besluit BG-09)" (gate golf 3) |
+| JLT-09 | jelly-leon | S-G3-17, S-G4-10, S-G4-11, S-G4-44, S-G4-39 (gate golf 4) |
+| JLT-14 | jelly-leon-web, jelly-leon-clients, jelly-leon | S-G4-20, S-G4-45, S-G4-29, S-G4-39 (gate golf 4) |
+| JLT-15 | jelly-leon | NAS-rij: bewijsregel "Geblokkeerd" (S-G4-12, S-G4-20); uitvoering in STAPPEN_P6.md |
+| JLT-19 | jelly-leon | S-G4-12 |
+| JLT-20 | jelly-leon | S-G3-03, S-G3-05 (gate golf 3) |
+| JLT-22 | jelly-leon | S-G3-06 (gate golf 3) |
+| JLT-23 | jelly-leon | S-G3-07 (gate golf 3) |
+| JLT-24 | jelly-leon | S-G3-03, S-G3-08, S-G3-27 (gate golf 3) |
+| JLT-25 | jelly-leon, jelly-leon-clients | P4-deel: S-G4-13, S-G4-30, S-G4-39; machinevertaling in P5 (S-P5-111, S-P5-115) |
+| JLT-26 | jelly-leon | NAS-rij: bewijsregel "Geblokkeerd" (S-G3-03, S-G4-13); uitvoering in STAPPEN_P6.md |
+| JLT-30 | jelly-leon | S-G3-11, S-G3-12 (gate golf 3) |
+| JLT-31 | jelly-leon | S-G3-12 (gate golf 3) |
+| JLT-32 | jelly-leon | S-G3-11, S-G3-13 (gate golf 3); het deel spraakherkenning in P5 (S-P5-108) |
+| JLT-33 | jelly-leon | S-G3-13 (gate golf 3) |
+| JLT-34 | jelly-leon | S-G3-14 (gate golf 3) |
+| JLT-35 | jelly-leon | S-G3-01, S-G3-27 (gate golf 3) |
+| JLT-36 | jelly-leon | S-G3-02, S-G3-12 (gate golf 3) |
+| JLT-37 | jelly-leon | S-G3-15 (gate golf 3) |
+| JLT-38 | jelly-leon, jelly-leon-web, jelly-leon-clients, ai-server-manager | S-G3-16, S-G3-25, S-G4-14, S-G4-36, S-G4-30, S-G4-35, S-G4-39 (gate golf 4) |
+| JLT-39 | jelly-leon | NAS-rij: bewijsregel "Geblokkeerd" (S-G3-01); uitvoering in STAPPEN_P6.md |
+| JLT-41 | jelly-leon, jelly-leon-web | S-G4-06 (serverdeel), S-G4-22 (meting) (gate golf 4) |
+| JLT-42 | jelly-leon, jelly-leon-web, jelly-leon-clients | S-G4-05, S-G4-06, S-G4-42, S-G4-21, S-G4-41, S-G4-25, S-G4-26, S-G4-30 (gate golf 4) |
+| JLT-43 | jelly-leon | hermeting met de wrapper: S-G4-03; de eerste meting hoort bij B03-062 (golf 2, STAPPEN_P4_GOLF1_2.md, S-G2-32) (gate golf 4) |
+| JLT-44 | jelly-leon | S-G4-01, S-G4-02, S-G4-03 (gate golf 4) |
+| JLT-45 | jelly-leon | S-G4-04 (gate golf 4) |
+| JLT-46 | jelly-leon, jelly-leon-clients | S-G4-07, S-G4-42, S-G4-30 (gate golf 4) |
+| JLT-47 | jelly-leon, jelly-leon-web | S-G4-08, S-G4-22 (gate golf 4) |
+| JLT-48 | jelly-leon, jelly-leon-web, ai-server-manager | S-G4-02, S-G4-05, S-G4-07, S-G4-18, S-G4-21, S-G4-37, S-G4-39 (gate golf 4) |
+| JLT-40 | jelly-leon | S-G4-47 (winstmeting F5; emulator- en desktopdelen uit S-G4-30; meetcommando uit S-P40-64 bouwpunt 6, STAPPEN_P4_GOLF1_2.md); geen gate-rij in FASERING, wel nodig voor de regel "aantoonbaar beter" |
+| JLT-49 | jelly-leon | NAS-rij: bewijsregel "Geblokkeerd" (S-G4-03, S-G4-21); uitvoering in STAPPEN_P6.md |
+| JLT-51 | jelly-leon | hoort bij golf 2 (B03-073; STAPPEN_P4_GOLF1_2.md); hier alleen de hermeting in S-G4-16 |
+| JLT-50 | jelly-leon | eerste meting in golf 2 (STAPPEN_P4_GOLF1_2.md: S-G2-42 Intro, Recap en Preview; S-G2-44 Outro; meetcommando uit S-P40-66 bouwpunt 6; nagelopen in S-G2-90); hier de herhaling na golf 4 in S-G4-48 (winstmeting F6); geen gate-rij in FASERING, wel nodig voor de regel "aantoonbaar beter"; echte series -> STAPPEN_P6.md |
+| JLT-53 | jelly-leon | audiodeel golf 2 (S-G2-42, STAPPEN_P4_GOLF1_2.md); cues en hoofdstuksignalen S-G3-22 (gate golf 3) |
+| JLT-54 | jelly-leon, jelly-leon-web | S-G4-15, S-G4-40, S-G4-46 (gate golf 4) |
+| JLT-55 | jelly-leon, jelly-leon-web, jelly-leon-clients | S-G4-16, S-G4-23, S-G4-46, S-G4-27, S-G4-28, S-G4-30, S-G4-39 (gate golf 4) |
+| JLT-56 | jelly-leon | S-G4-16 (eindrun), S-G4-15 (onderdeel h) (gate golf 4) |
+| JLT-57 | jelly-leon | S-G3-22 (gate golf 3) |
+| JLT-58 | jelly-leon, ai-server-manager | S-G4-17, S-G4-38 (gate golf 4) |
+| JLT-59 | jelly-leon | NAS-rij: bewijsregel "Geblokkeerd" (S-G4-15, S-G4-17, S-G4-46); uitvoering in STAPPEN_P6.md |
+| JLT-63 | jelly-leon | per oplevering: S-G3-27, S-G4-39; daarnaast S-G3-09, S-G3-10; eerdere delen in STAPPEN_P4_GOLF1_2.md |
+| JLT-64 | jelly-leon | per oplevering: S-G3-27, S-G4-39; daarnaast S-G3-10, S-G4-19; eerdere delen in STAPPEN_P4_GOLF1_2.md |
+| JLT-65 | jelly-leon | per module-oplevering: S-G3-27, S-G4-39; eerdere delen in STAPPEN_P4_GOLF1_2.md |
+| JLT-69, JLT-74 | - | alleen genoemd in hoofdstuk 1; NAS-rijen van P6 (STAPPEN_P6.md) |
+
+Niet in dit bestand: JLT-10, JLT-11, JLT-12, JLT-13, JLT-16, JLT-17 en JLT-52 (golf 2, STAPPEN_P4_GOLF1_2.md;
+JLT-10 hoort volgens TEST-JSON bij B03-030 en B03-032); JLT-18, JLT-21, JLT-27, JLT-28 en JLT-29 (P5, STAPPEN_P5.md); JLT-60, JLT-61, JLT-62,
+JLT-66, JLT-67, JLT-68 en JLT-70 tot en met JLT-73 (P4-0 en golf 1, STAPPEN_P4_GOLF1_2.md).
+
+### 11.4 Deel D - Excel-testrijen, contractpunten en repowerk
+
+| ID | Repos met een regel | Stappen of reden |
+|---|---|---|
+| EX06 | jelly-leon (alleen het Jelly Leon-deel; eigenaar volgens ai-server-manager controleren, zie S-G3-15) | S-G3-15; de rest in STAPPEN_P6.md |
+| EX08 | jelly-leon (deels) | S-G4-04; het MediaGuard-deel wacht op MediaGuard; rest in STAPPEN_P6.md |
+| EX16 | jelly-leon (alleen het Jelly Leon-deel) | S-G3-15; andere delen in STAPPEN_P2.md, STAPPEN_P3.md en STAPPEN_P6.md |
+| EX34 | jelly-leon (alleen het Jelly Leon-deel) | S-G3-23 alleen na BG-09; anders "Geblokkeerd (besluit BG-09)"; rest in STAPPEN_P5.md en STAPPEN_P6.md |
+| EX36 | jelly-leon, jelly-leon-web | S-G3-16 (serverdeel), S-G3-25 (webdeel), S-G4-49 (scènezoeker, negatieve test b); rest in STAPPEN_P5.md en STAPPEN_P6.md |
+| C1.3-JL-06 | jelly-leon | S-G4-19 (Moment P4) |
+| C1.3-JL-07 | jelly-leon | S-G4-19 (Moment P4) |
+| C1.3-JL-08 | jelly-leon | S-G4-19 (Moment "P4 (na BG-04; acties na BG-05)") |
+| C1.3-ASM-21 | ai-server-manager | deel Jelly Leon-plugin (Moment P4): S-G4-31, S-G4-35; de delen P3 en P4-0 in STAPPEN_P3.md en STAPPEN_P4_GOLF1_2.md |
+| Δ-HUB-2 | ai-server-manager (geen eigen regel; voortgang in de statusregel van C1.3-ASM-21) | S-G4-32, S-G4-35 |
+| C1.3-JLC-02 | jelly-leon-clients | niet in dit bestand (Moment NU); S-G4-25 houdt zich alleen aan de regel "builds niet verspreiden" |

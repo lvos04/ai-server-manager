@@ -29,14 +29,18 @@ een commando, of vragen met een keuzemenu. Nooit gokken.
 1. Antwoord in het Nederlands. Stel vragen via een keuzemenu. Gok niets.
 2. `ai-factory` niet aanraken.
 3. Geen pull requests zonder het te vragen.
-4. Altijd `git pull --rebase` vóór elke push. Geen force-push. Nederlandse commitberichten.
+4. Altijd `git pull --rebase` vóór elke push (met geparkeerd half werk in de werkmap: `--autostash`, AGENTEN.md 2.4 vorm D).
+   Geen force-push. Nederlandse commitberichten, met als laatste regel `Co-Authored-By: Claude <noreply@anthropic.com>`.
+   Nooit `docker system prune -a`, `docker builder prune -a` of `docker volume prune`.
 5. Geen geheimen (sleutels, tokens, wachtwoorden) en geen NAS-gegevens in commits, code, docs, rapporten of opdrachten.
 6. Geen modelnaam of model-ID in commits, code, docs, VOORTGANG.md, opdrachten of rapporten. Daar staat alleen het niveau
    (N1 tot en met N5).
 7. Excel en bewijs: nooit "Gereed" of "Geslaagd". Wat is gebouwd en op de ontwikkelmachine getest heet "Bezig". Wat de
    echte NAS, echte hardware of een echt account nodig heeft heet "Geblokkeerd" met de aantekening NIET GEVALIDEERD.
-8. De machine heeft passwordless sudo; dat mag gebruikt worden voor wat nodig is.
-9. Installatieweg op de NAS is het manifest via de Hub, niet een los compose- of YAML-bestand.
+8. De machine heeft passwordless sudo; dat mag gebruikt worden voor wat nodig is (bijvoorbeeld een systeeminstallatie die een
+   stap nodig heeft), maar nooit in scripts of code van een repo.
+9. Installatie op de NAS is altijd een standaard TrueNAS Custom App (één alles-in-één image per repo). Nooit YAML of
+   compose als installatieweg; compose alleen voor ontwikkeling, CI en E2E (contract, kop 1).
 10. Ontwerp: vóór elke UI-bouwstap een ontwerpstap (A-ONTWERP), na elke UI-bouwstap een ontwerpreview (R-ONTWERP).
     Ontwerptaal Peil (Tailwind 4, shadcn/ui, lucide). De web- en clientschermen van Jelly Leon vallen buiten Peil.
 
@@ -54,14 +58,14 @@ gebruikers, kijkgegevens, de Emby-koppeling of de MediaGuard-voortgang raakt kri
 |---|---|---|
 | `00_LEES_EERST.md` | dit hoofdplan | start van elke sessie, helemaal |
 | `PLAN_AFMAKEN.md` | de eerlijke stand van het plan zelf en de taken PA-1 tot en met PA-11 om het af te maken en te laten controleren | direct na dit bestand, zolang de tabel "Plan afmaken" in VOORTGANG.md niet helemaal is afgevinkt |
-| `VOORTGANG.md` | afvinkgrootboek: "Lopend", "Wacht op de gebruiker", "Topmodel-inzet", "Half werk uit ronde 3", alle stappen per fase, gates | start van elke sessie, helemaal; daarna bij elke melding bijwerken |
-| `AGENTEN.md` | draaiboek van de regisseur en de prompt per rol | start van elke sessie: deel 0 tot en met 4, deel 6 en deel 7 helemaal. Deel 5 (prompts): per rol, op het moment dat je die rol start (`grep -n '^### ' <PLANMAP>/AGENTEN.md`, lees van de kop van de rol tot de volgende kop) |
+| `VOORTGANG.md` | afvinkgrootboek: "Lopend", "Wacht op de gebruiker", "Topmodel-inzet", "Half werk uit ronde 3", alle stappen per fase, gates | start van elke sessie: alles boven de staptabellen, de staptabel van de LOPENDE fase en de rij van die fase in "Gates" (de rest niet); daarna bij elke melding bijwerken |
+| `AGENTEN.md` | draaiboek van de regisseur en de prompt per rol | start van elke sessie: deel 0 tot en met 4 (met 2.4, de vier ketenvormen: A standaard, B reviewstap, C half werk afmaken, D geparkeerd half werk), deel 7 helemaal; van deel 6 alleen de korte lijst bovenaan (het geval zelf lees je pas als het zich voordoet). Deel 5 (prompts): per rol, op het moment dat je die rol start (`grep -n '^### ' <PLANMAP>/AGENTEN.md`, lees van de kop van de rol tot de volgende kop) |
 | `STAPPEN_P2.md`, `STAPPEN_P3.md`, `STAPPEN_P4_GOLF1_2.md`, `STAPPEN_P4_GOLF3_4.md`, `STAPPEN_P5.md`, `STAPPEN_P6.md` | de stappen per fase | van de LOPENDE fase: de delen vóór de stappen (doel, gates, vaste regels, "Volgorde en banen", "Startbezetting") helemaal; een stap zelf pas als je hem gaat starten (`grep -n '^### S-' <bestand>`). De fase-afsluiting lees je als de laatste stap van de fase dicht is |
 | `POORTEN.md` | de kwaliteitspoort per repo (P-<repo>) en de algemene poorten (P-GIT, P-CONTRACT, P-VEILIG, P-EERLIJK, P-PEIL, P-HARDE-EIS, P-INSTALLATIE, P-EXCEL) | deel 0 één keer per sessie; een poort als een stap hem noemt. Subagents lezen hun eigen poort zelf |
 | `BESLUITEN_EN_BLOKKADES.md` | genomen besluiten, open besluiten (met de tekst voor het keuzemenu), taken van de gebruiker, blokkades | deel 0 en deel 1 één keer per sessie; een open besluit als een stap het achter "Vooraf" of "Stop en vraag als" noemt (`grep -n '<besluit-ID>'`) |
 | `VALKUILEN.md` | lessen uit het eerdere werk (V-001 en verder) | niet vooraf. Subagents lezen de V-nummers die hun stap noemt; jij leest er een als een controle faalt |
 | `dekking.py`, `DEKKING.tsv` | controle dat elk werkpakket en elke test in een stap staat | bij het sluiten van een fase: `python3 <PLANMAP>/dekking.py --voortgang` |
-| `maak_voortgang.py` (bestaat nog niet; taak PA-4 maakt het) | zet de staptabellen in VOORTGANG.md gelijk met de stapbestanden, behoudt wat is afgevinkt | alleen nadat een stapbestand is gewijzigd (bijvoorbeeld een stap gesplitst volgens AGENTEN.md 6.7) |
+| `maak_voortgang.py` | zet de staptabellen in VOORTGANG.md gelijk met de stapbestanden, behoudt wat is afgevinkt of ingevuld | alleen nadat een stapbestand is gewijzigd (bijvoorbeeld een stap gesplitst volgens AGENTEN.md 6.7): eerst `python3 <PLANMAP>/maak_voortgang.py --droog` (toont het verschil), dan zonder optie. `--bestand PAD` werkt op een kopie; `dekking.py --voortgang PAD` controleert een kopie |
 
 Buiten de planmap: `<WERKMAP>/.lokaal/plan/MODELKEUZE.md` (welke waarden van `model` en `effort` bij N1 tot en met N5
 horen; alleen de gebruiker wijzigt dat bestand), `<WERKMAP>/.lokaal/plan/STAND_RONDE3.md` (de stand waarop dit plan begint),
@@ -70,7 +74,7 @@ zelf aan).
 
 ## 4. Sessiestart (elke sessie, in deze volgorde)
 
-1. Lees dit bestand, daarna VOORTGANG.md, daarna AGENTEN.md deel 0 tot en met 4, 6 en 7.
+1. Lees dit bestand, daarna VOORTGANG.md (zoals deel 3 zegt), daarna AGENTEN.md deel 0 tot en met 4 en 7, en van deel 6 de korte lijst.
 2. Niveaus: `ls <WERKMAP>/.lokaal/plan/MODELKEUZE.md` en vergelijk de tabel met de niveautabel in de startprompt
    (AGENTEN.md 7.8 zegt wat je doet als er een ontbreekt of als ze verschillen).
 3. Loopt er nog iets? `ps aux | grep -E 'gradle|docker build|dotnet|pytest|vitest|playwright' | grep -v grep` en
@@ -80,7 +84,8 @@ zelf aan).
    `for r in ai-server-manager home-control-hub appstore-en-fork jelly-leon-platform zoeken-en-persoonlijke-ai media-guard-ultimate media-source-optimizer my_house jelly-leon jelly-leon-web jelly-leon-clients; do echo "== $r: $(git -C <WERKMAP>/$r log -1 --format='%h %s') | branch: $(git -C <WERKMAP>/$r rev-parse --abbrev-ref HEAD) | gewijzigd: $(git -C <WERKMAP>/$r status --short | wc -l) | achter/vooruit: $(git -C <WERKMAP>/$r rev-list --left-right --count @{u}...HEAD)"; done`
    Gewijzigde bestanden of niet-gepushte commits in een repo waar volgens "Lopend" geen keten open is: dat is half werk.
    Gooi niets weg en commit niets zelf; zie deel 6.
-5. Ruimte: `free -m` (kolom "available") en `df -h /` (kolom "Avail"). De grenzen staan in AGENTEN.md 3.1 en 3.3.
+5. Ruimte: `free -m` (kolom "available" en de regel "Swap") en `df -h /` (kolom "Avail"). De grenzen staan in AGENTEN.md 3.1
+   en 3.3 (swap meer dan 90 % vol telt alleen als er ook minder dan 6000 MB "available" is; besluit van de gebruiker).
 6. Bepaal de bezetting met het beslisschema van AGENTEN.md 3.1 en start. Meld de gebruiker in twee of drie regels waar je
    staat en wat je start.
 
@@ -88,10 +93,11 @@ zelf aan).
 
 - **Eén stap = één keten in één repo**: A-VERKEN (stapdossier) -> A-ONTWERP (alleen bij UI) -> A-BOUW -> de reviewers van
   de regel "Agents" van de stap, tegelijk -> A-HERSTEL -> herreview waar nodig -> R-ONTWERP (alleen bij UI) -> R-EERLIJK.
-  Pas na het oordeel KLOPT van R-EERLIJK en jouw eigen controles K1 tot en met K7 vink je de stap af.
+  Pas na het oordeel KLOPT van R-EERLIJK en jouw eigen controles K1 tot en met K7 vink je de stap af. Andere ketenvormen
+  (reviewstap, half werk afmaken, geparkeerd half werk): AGENTEN.md 2.4.
 - **Grenzen**: hooguit 10 subagents tegelijk (alles meegeteld); hooguit 8 ketens open; nooit twee schrijvers tegelijk in één
   repo; reviewers en herstellers van open ketens gaan vóór een nieuwe keten. Vangnet: toont `free -m` minder dan 3000 MB
-  "available", dan geen extra zware keten. Zware commando's lopen via de flock-locks in `<WERKMAP>/.lokaal/`.
+  "available" (of de swap is meer dan 90 % vol terwijl "available" onder 6000 MB ligt), dan geen extra zware keten. Zware commando's lopen via de flock-locks in `<WERKMAP>/.lokaal/`.
 - **Niveaus**: bij ELKE Agent-aanroep vul je `model` en `effort` in volgens het niveau (regel "Niveau" van de stap, anders
   de standaard per rol in AGENTEN.md 7.2). Het topniveau N5 alleen in de vijf gevallen van AGENTEN.md 7.3, en elke inzet
   noteer je in de tabel "Topmodel-inzet".
@@ -131,9 +137,9 @@ Wat je doet:
    dat halve werk over: A-VERKEN beoordeelt eerst wat er staat (`git status`, `git diff`, tests draaien) en zet in het
    dossier wat af is, wat half is en wat ontbreekt; A-BOUW maakt het af; daarna de gewone keten. NIETS ongezien weggooien
    en NIETS ongezien committen. De ketenvorm staat in AGENTEN.md 2.4 (vorm C, half werk afmaken).
-3. Werk dat al gepusht is maar niet gereviewd, krijgt een reviewstap zonder A-BOUW (reviewers -> A-HERSTEL -> R-EERLIJK,
-   met het commitbereik als basis). De ketenvorm staat in AGENTEN.md 2.4 (vorm B, reviewstap).
-4. Het halve werk in jelly-leon hoort bij golf 1 (STAPPEN_P4_GOLF1_2.md). Laat het onaangeroerd in de werkmap staan tot
+3. Werk dat al gepusht is maar niet gereviewd, krijgt een reviewstap zonder A-BOUW: A-VERKEN (stelt `review_basis` vast)
+   -> eerst K5 (CI op HEAD) -> reviewers -> A-HERSTEL -> R-EERLIJK, met het commitbereik als basis. De ketenvorm staat in AGENTEN.md 2.4 (vorm B, reviewstap).
+4. Het halve werk in jelly-leon hoort bij golf 1 (STAPPEN_P4_GOLF1_2.md, stap S-G1-15). Laat het onaangeroerd in de werkmap staan tot
    de stap die het dekt aan de beurt is volgens zijn regel "Vooraf" (AGENTEN.md 2.4, vorm D, geparkeerd half werk); de
    reservekopie staat in de map halfwerk.
 
