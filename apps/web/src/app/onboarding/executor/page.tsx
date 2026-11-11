@@ -15,15 +15,20 @@ export default function Page() {
       />
       <div className="stack">
         <section className="card stack" aria-labelledby="status" data-testid="executor-status">
-          <h2 id="status">Status</h2>
+          <h2 id="status">Wat de executor uitvoert</h2>
           <p>
-            De executor voert alleen door de Hub ondertekende acties uit een vaste lijst uit (apps starten, stoppen, herstarten,
-            installeren, verwijderen zonder data, bijwerken en terugzetten, en snapshots maken). Hij controleert elk verzoek zelf
-            opnieuw en leest na afloop terug of de wijziging klopt; wijkt er iets af, dan stopt hij en volgt er een melding.
+            De executor voert alleen acties uit deze vaste lijst uit: apps starten, stoppen, herstarten, installeren, verwijderen
+            (zonder data), bijwerken en terugzetten, een snapshot maken en een snapshot klonen naar een afgeschermde testdataset.
+            Bijwerken en terugzetten weigert de Hub nog, tot er herstelpunten per app zijn.
           </p>
           <p>
-            Zolang de executor niet is gekoppeld, blijven de gates ‘Apps installeren’ en ‘R2/R3-acties’ dicht. Zie{" "}
-            <Link href="/onboarding">Wat mag nu?</Link>
+            De executor controleert elk verzoek zelf opnieuw en leest na afloop terug of de wijziging klopt. Wijkt er iets af, dan
+            stopt hij: de Hub maakt een incident onder Problemen en de executor voert niets meer uit tot een beheerder hem op zijn
+            statuspagina vrijgeeft.
+          </p>
+          <p>
+            Zolang de executor niet is gekoppeld, blijven de gates ‘Apps installeren’ en ‘R2/R3-acties’ dicht. Koppelen alleen
+            opent ze niet: ze hebben ook andere voorwaarden. Zie <Link href="/onboarding">Wat mag nu?</Link>
           </p>
         </section>
         <section className="card stack" aria-labelledby="installeren">
@@ -67,8 +72,9 @@ export default function Page() {
           <ExecutorKoppelen />
           <Melding soort="nogniet" titel="Schermen voor voorstellen en goedkeuren volgen later in fase P2">
             <p>
-              Het beleid, de goedkeuringen en de uitvoering werken al via de Hub-API. De schermen om een actie voor te stellen, de
-              preview te bekijken en goed te keuren zijn nog niet gebouwd.
+              Het beleid, de goedkeuringen en de uitvoering zitten al in de Hub, maar de schermen om een actie voor te stellen, de
+              preview te bekijken en goed te keuren zijn nog niet gebouwd. Tot die er zijn, kun je zelf nog geen actie voorstellen
+              of goedkeuren.
             </p>
           </Melding>
         </section>
