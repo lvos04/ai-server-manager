@@ -30,7 +30,7 @@ from typing import Any
 
 from asm_policy import etag as etags
 from asm_policy.canonical import canonical_sha256
-from asm_policy.engine import recognize
+from asm_policy.engine import recognize_all
 from asm_policy.execreq import iso
 from asm_policy.loader import ActieDef, Policy
 from asm_policy.params import IX_APP, expected_image, vault_refs
@@ -410,7 +410,7 @@ class Uitvoerder:
         # "emby" heet), bereikt TrueNAS niet eens; de herkenning op de image uit de eigen readback volgt hierna en
         # kan alleen strenger zijn.
         doelnaam = prop["target"].get("app_id") if isinstance(prop.get("target"), Mapping) else None
-        op_naam = recognize(policy, doelnaam if isinstance(doelnaam, str) else None)
+        op_naam = recognize_all(policy, doelnaam if isinstance(doelnaam, str) else None)
         actie, _eigen, w = check_decision(policy, request, now=now, herkend_als=op_naam, uitvoerder="executor")
         if w is not None and w.code in (
             "actie_geweigerd",
@@ -474,7 +474,8 @@ class Uitvoerder:
                 return _nas_fout(exc)
             verwachte_image = expected_image(prop["parameters"])
             refs = etags.app_images(doel.app) if doel.app else [str((verwachte_image or {}).get("repository") or "")]
-            herkend = recognize(policy, doel.naam if doel.soort.startswith("app") else None, [r for r in refs if r])
+            naam = doel.naam if doel.soort.startswith("app") else None
+            herkend = recognize_all(policy, naam, [r for r in refs if r])
             _a, eigen, w = check_decision(policy, request, now=now, herkend_als=herkend, uitvoerder="executor")
             if w is not None or eigen is None:
                 return _weiger(w) if w else fout(403, "actie_niet_toegestaan", "Deze actie staat niet op de allowlist.")

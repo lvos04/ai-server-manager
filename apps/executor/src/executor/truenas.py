@@ -8,12 +8,17 @@ Regels (contract 1.3 §3.9 en §8, ADR-0030):
 - Er is geen vrije doorgeefroute: alleen de leesmethoden hieronder en de methoden die het beleid noemt
   (``policy/acties.yaml`` → ``truenas``) kunnen worden aangeroepen. Elke andere naam is ``methode_niet_toegestaan``.
 - Elke fout wordt een :class:`NasFout` met een stabiele code; niets wordt stil overgeslagen.
+- De verbinding draait op een **eigen event loop in één eigen thread**: alleen die thread raakt het TLS-object aan.
+  De synchrone websockets-client leest en schrijft vanuit twee threads tegelijk op hetzelfde TLS-object; onder
+  belasting liep de handdruk daardoor af en toe vast (gemeten tegen de fake: enkele op de 1600 verbindingen, met de
+  asyncio-client nul). Voor de aanroeper blijft de client synchroon. Nooit via een proxy uit de omgeving.
 
 Alleen tegen de in-repo fake getest: NIET GEVALIDEERD (echte NAS).
 """
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import hashlib
 import hmac
@@ -22,15 +27,19 @@ import itertools
 import json
 import socket
 import ssl
+import threading
 import time
+from collections.abc import Coroutine
 from types import TracebackType
 from typing import Any
 
-from websockets.exceptions import ConnectionClosed, InvalidHandshake, InvalidURI
-from websockets.sync.client import ClientConnection, connect
+from websockets.asyncio.client import ClientConnection, connect
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 API_PATH = "/api/current"
 MAX_MESSAGE_BYTES = 64 * 1024 * 1024
+# Vangnet bovenop de eigen tijdslimiet van een aanroep: zo lang wacht de aanroeper hooguit extra op de eigen thread.
+RUN_GRACE_SECONDS = 5.0
 # Lezen (readback) en inloggen. ``app.config`` kan geheimen bevatten: alleen de executor leest het, voor terugzetten.
 READ_METHODS: frozenset[str] = frozenset(
     {
@@ -103,7 +112,11 @@ def has_write_role(roles: list[str]) -> bool:
 
 
 class NasClient:
-    """Eén verbinding; gebruik als context manager. ``allowed`` = de schrijfmethoden uit het beleid."""
+    """Eén verbinding; gebruik als context manager. ``allowed`` = de schrijfmethoden uit het beleid.
+
+    Synchroon voor de aanroeper, niet bedoeld voor gebruik vanuit meerdere threads tegelijk. De verbinding zelf leeft
+    op een eigen event loop in een eigen thread (zie de kop van dit bestand).
+    """
 
     def __init__(
         self, host: str, port: int, fingerprint: str, *, allowed: frozenset[str] = frozenset(), timeout: float = 15.0
@@ -113,6 +126,8 @@ class NasClient:
         self.timeout = timeout
         self._ids = itertools.count(1)
         self._ws: ClientConnection | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
 
     def __enter__(self) -> NasClient:
         self.open()
@@ -121,71 +136,126 @@ class NasClient:
     def __exit__(self, et: type[BaseException] | None, ev: BaseException | None, tb: TracebackType | None) -> None:
         self.close()
 
-    def open(self) -> None:
+    # ------------------------------------------------------------ eigen event loop
+    def _run[T](self, coro: Coroutine[Any, Any, T], limit: float) -> T:
+        """Voer ``coro`` uit op de eigen loop en wacht hooguit ``limit`` seconden op het resultaat."""
+        loop = self._loop
+        if loop is None:
+            coro.close()
+            raise NasFout("truenas_onbereikbaar", "geen verbinding")
+        fut = asyncio.run_coroutine_threadsafe(coro, loop)
         try:
-            ws = connect(
-                ws_url(self.host, self.port),
-                ssl=_context(),
-                open_timeout=self.timeout,
-                close_timeout=2,
-                max_size=MAX_MESSAGE_BYTES,
-                legacy=True,  # de verbinding leeft langer dan één blok: open() … close()
-            )
-        except (OSError, ssl.SSLError, TimeoutError, InvalidHandshake, InvalidURI, ValueError) as exc:
-            raise NasFout("truenas_onbereikbaar", type(exc).__name__) from None
-        der: bytes | None = None
-        with contextlib.suppress(AttributeError, ValueError, OSError):
-            der = ws.socket.getpeercert(binary_form=True)  # type: ignore[attr-defined]
+            return fut.result(limit)
+        except TimeoutError:
+            fut.cancel()
+            raise
+
+    def _stop_loop(self) -> None:
+        loop, thread = self._loop, self._thread
+        self._loop = self._thread = None
+        if loop is None:
+            return
+
+        async def opruimen() -> None:
+            taken = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+            for t in taken:
+                t.cancel()
+            await asyncio.gather(*taken, return_exceptions=True)
+
+        with contextlib.suppress(Exception):
+            asyncio.run_coroutine_threadsafe(opruimen(), loop).result(RUN_GRACE_SECONDS)
+        loop.call_soon_threadsafe(loop.stop)
+        if thread is not None:
+            thread.join(RUN_GRACE_SECONDS)
+        if not loop.is_running():
+            loop.close()
+
+    async def _open(self) -> ClientConnection:
+        ws = await connect(
+            ws_url(self.host, self.port),
+            ssl=_context(),
+            open_timeout=self.timeout,
+            close_timeout=2,
+            max_size=MAX_MESSAGE_BYTES,
+            proxy=None,  # LAN-verbinding; nooit via een proxy uit de omgeving
+            user_agent_header="ai-server-manager-executor",
+            ping_interval=None,
+        )
+        # De vingerafdruk wordt hier, op de thread van de loop, gelezen en vergeleken: vóór er iets geheims gaat.
+        sslobj = ws.transport.get_extra_info("ssl_object")
+        der = sslobj.getpeercert(binary_form=True) if sslobj is not None else None
         found = hashlib.sha256(der).hexdigest() if der else ""
         if not found or not hmac.compare_digest(found, self.fingerprint):
             with contextlib.suppress(Exception):
-                ws.close()
+                await ws.close()
             raise NasFout("certificaat_gewijzigd")
-        self._ws = ws
+        return ws
 
-    def close(self) -> None:
-        if self._ws is not None:
-            with contextlib.suppress(Exception):
-                self._ws.close()
-            self._ws = None
-
-    def call(self, method: str, *params: Any, timeout: float | None = None) -> Any:
-        if method not in self.allowed:
-            raise NasFout("methode_niet_toegestaan", method)
-        if self._ws is None:
-            raise NasFout("truenas_onbereikbaar", "geen verbinding")
-        mid = next(self._ids)
-        deadline = time.monotonic() + (timeout or self.timeout)
-        try:
-            self._ws.send(json.dumps({"jsonrpc": "2.0", "id": mid, "method": method, "params": list(params)}))
+    @staticmethod
+    async def _exchange(ws: ClientConnection, payload: str, mid: int, limit: float) -> dict[str, Any]:
+        async with asyncio.timeout(limit):
+            await ws.send(payload)
             while True:
-                left = deadline - time.monotonic()
-                if left <= 0:
-                    raise NasFout("truenas_timeout", method)
-                try:
-                    raw = self._ws.recv(timeout=left)
-                except TimeoutError:
-                    raise NasFout("truenas_timeout", method) from None
+                raw = await ws.recv()
                 try:
                     msg = json.loads(raw)
                 except ValueError:
                     continue
-                if not isinstance(msg, dict) or msg.get("id") != mid:
-                    continue  # meldingen en events van TrueNAS horen niet bij deze aanroep
-                err = msg.get("error")
-                if err is not None:
-                    data = err.get("data") if isinstance(err, dict) else None
-                    data = data if isinstance(data, dict) else {}
-                    naam = str(data.get("errname") or "")
-                    reden = str(data.get("reason") or (err.get("message") if isinstance(err, dict) else "") or "")
-                    code = (
-                        "truenas_geen_toegang" if naam in ("EACCES", "EPERM", "ENOTAUTHENTICATED") else "truenas_fout"
-                    )
-                    raise NasFout(code, f"{method}: [{naam}] {reden}" if naam else f"{method}: {reden}")
-                return msg.get("result")
+                if isinstance(msg, dict) and msg.get("id") == mid:
+                    return msg
+                # meldingen en events van TrueNAS horen niet bij deze aanroep
+
+    # ------------------------------------------------------------ verbinding
+    def open(self) -> None:
+        self.close()
+        loop = asyncio.new_event_loop()
+        thread = threading.Thread(target=loop.run_forever, name="nas-client", daemon=True)
+        thread.start()
+        self._loop, self._thread = loop, thread
+        try:
+            self._ws = self._run(self._open(), self.timeout + RUN_GRACE_SECONDS)
+        except NasFout:
+            self._stop_loop()
+            raise
+        except (OSError, ssl.SSLError, TimeoutError, WebSocketException, ValueError, EOFError) as exc:
+            self._stop_loop()
+            raise NasFout("truenas_onbereikbaar", type(exc).__name__) from None
+        except BaseException:
+            self._stop_loop()
+            raise
+
+    def close(self) -> None:
+        ws, self._ws = self._ws, None
+        if ws is not None and self._loop is not None:
+            with contextlib.suppress(Exception):
+                self._run(ws.close(), RUN_GRACE_SECONDS)
+        self._stop_loop()
+
+    def call(self, method: str, *params: Any, timeout: float | None = None) -> Any:
+        if method not in self.allowed:
+            raise NasFout("methode_niet_toegestaan", method)
+        ws = self._ws
+        if ws is None or self._loop is None:
+            raise NasFout("truenas_onbereikbaar", "geen verbinding")
+        mid = next(self._ids)
+        limit = timeout or self.timeout
+        payload = json.dumps({"jsonrpc": "2.0", "id": mid, "method": method, "params": list(params)})
+        try:
+            msg = self._run(self._exchange(ws, payload, mid, limit), limit + RUN_GRACE_SECONDS)
+        except TimeoutError:
+            raise NasFout("truenas_timeout", method) from None
         except (ConnectionClosed, OSError) as exc:
             self.close()
             raise NasFout("truenas_onbereikbaar", type(exc).__name__) from None
+        err = msg.get("error")
+        if err is not None:
+            data = err.get("data") if isinstance(err, dict) else None
+            data = data if isinstance(data, dict) else {}
+            naam = str(data.get("errname") or "")
+            reden = str(data.get("reason") or (err.get("message") if isinstance(err, dict) else "") or "")
+            code = "truenas_geen_toegang" if naam in ("EACCES", "EPERM", "ENOTAUTHENTICATED") else "truenas_fout"
+            raise NasFout(code, f"{method}: [{naam}] {reden}" if naam else f"{method}: {reden}")
+        return msg.get("result")
 
     def login(self, api_key: str) -> None:
         if self.call("auth.login_with_api_key", api_key) is not True:

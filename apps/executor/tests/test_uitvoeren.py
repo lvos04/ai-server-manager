@@ -178,7 +178,8 @@ def test_handtekening_tijden_en_policy_hash(stack: Stack) -> None:
 def test_nonce_van_het_verzoek_is_eenmalig(stack: Stack) -> None:
     hub, c, nas = stack
     req = signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
-    assert execute(c, hub, req).status_code == 200
+    r = execute(c, hub, req)
+    assert r.status_code == 200, r.text
     # Hetzelfde ondertekende verzoek met een nieuw token en een nieuwe Idempotency-Key: de executor kent de nonce.
     r = execute(c, hub, req)
     assert r.status_code == 409 and r.json()["code"] == "nonce_al_gebruikt", r.text
@@ -188,7 +189,8 @@ def test_nonce_van_het_verzoek_is_eenmalig(stack: Stack) -> None:
 def test_nonce_overleeft_een_herstart_van_de_executor(stack: Stack) -> None:
     hub, c, nas = stack
     req = signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
-    assert execute(c, hub, req).status_code == 200
+    r = execute(c, hub, req)
+    assert r.status_code == 200, r.text
     r = execute(hub_client(hub), hub, req)  # nieuwe app-instantie, zelfde datamap
     assert r.status_code == 409 and r.json()["code"] == "nonce_al_gebruikt", r.text
 
