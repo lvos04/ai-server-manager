@@ -9,6 +9,7 @@ import importlib.util
 import re
 import warnings
 from datetime import UTC, datetime
+from html import unescape
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -260,6 +261,51 @@ def test_onleesbaar_koppelbestand_met_sleutel_biedt_beheer_als_herstel() -> None
     assert "daarna kun je opnieuw koppelen met een koppelcode" in html
     zonder = onleesbaar_melding()
     assert "nog geen TrueNAS-schrijfsleutel ingesteld" in zonder["tekst"] and "CUSTOM_APP.md" in zonder["tekst"]
+
+
+REPO = Path(__file__).resolve().parents[3]
+HERSTELDOC = REPO / "deploy" / "truenas" / "CUSTOM_APP.md"
+# Verwijzing naar een kop: "deploy/truenas/CUSTOM_APP.md, kop 'Herstel'" (in de README met backticks om het pad).
+KOPVERWIJZING = re.compile(r"deploy/truenas/CUSTOM_APP\.md`?, kop ['\"]([^'\"]+)['\"]")
+
+
+def _sectie(doc: str, kop: str) -> str:
+    """De tekst onder ``## <kop>`` tot de volgende kop van hetzelfde niveau; de kop moet precies één keer bestaan."""
+    regels = doc.splitlines()
+    begin = [i for i, r in enumerate(regels) if r == f"## {kop}"]
+    assert len(begin) == 1, f"CUSTOM_APP.md heeft {len(begin)} keer de kop '## {kop}' (verwacht: precies 1)"
+    eind = next((i for i in range(begin[0] + 1, len(regels)) if regels[i].startswith("## ")), len(regels))
+    return "\n".join(regels[begin[0] + 1 : eind])
+
+
+def test_herstelverwijzing_wijst_naar_een_bestaande_kop_met_beide_toestanden() -> None:
+    """R-ONTWERP-1: bij een onleesbaar koppelbestand zonder schrijfsleutel en bij een onleesbare sleutelopslag
+    verwijzen de statuspagina en de README naar een kop in CUSTOM_APP.md. Die kop bestaat en beschrijft beide codes,
+    het herstel met een schrijfsleutel op de statuspagina en de weg zonder (een nieuwe datamap via Host Path)."""
+    sleutelopslag = executor_page(
+        versie="0.1.0",
+        link=LINKED,
+        ready_checks=READY,
+        csrf="",
+        now=NOW,
+        nas={"ingesteld": False, "onleesbaar": True},
+        allowlist=ACTIES,
+        policy=BELEID,
+    )
+    teksten = {
+        "statuspagina, rij sleutelopslag_onleesbaar": unescape(sleutelopslag),
+        "statuspagina, koppelstatus onleesbaar zonder sleutel": onleesbaar_melding()["tekst"],
+        "apps/executor/README.md": (REPO / "apps" / "executor" / "README.md").read_text(encoding="utf-8"),
+    }
+    doc = HERSTELDOC.read_text(encoding="utf-8")
+    for waar, tekst in teksten.items():
+        assert "(herstel)" not in tekst, f"{waar}: verwijst nog naar '(herstel)' zonder bestaande kop"
+        koppen = KOPVERWIJZING.findall(tekst)
+        assert koppen, f"{waar}: geen verwijzing naar een kop in deploy/truenas/CUSTOM_APP.md"
+        for kop in koppen:
+            sectie = _sectie(doc, kop)
+            for woord in ("koppelstatus_onleesbaar", "sleutelopslag_onleesbaar", "Ontkoppelen van de Hub", "Host Path"):
+                assert woord in sectie, f"{waar}: kop '{kop}' in CUSTOM_APP.md noemt '{woord}' niet"
 
 
 def test_niet_gekoppeld_heeft_eigen_toon_en_formulier_met_verplichte_velden() -> None:

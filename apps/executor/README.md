@@ -25,8 +25,9 @@ gevalideerd (NIET GEVALIDEERD (hardware)).
   atomair, `schema_version` `"1.3"`; lezers accepteren elke `1.x`). Een onleesbaar bestand (geen JSON, andere major,
   ontbrekende velden, verkeerde eigenaar of rechten, symlink) is fail-closed: geen vertrouwen, geen formulier,
   `koppelstatus_onleesbaar`, en het bestand wordt nooit stil teruggezet. De executor kent geen env-token (§3.9): herstel
-  gaat met de TrueNAS-schrijfsleutel op de statuspagina (zie hieronder); is er nog geen sleutel ingesteld, dan zie
-  `deploy/truenas/CUSTOM_APP.md` (herstel).
+  gaat met de TrueNAS-schrijfsleutel op de statuspagina (zie hieronder); is er nog geen sleutel ingesteld, of is de
+  opgeslagen TrueNAS-koppeling zelf onleesbaar (`sleutelopslag_onleesbaar`), kijk dan in
+  `deploy/truenas/CUSTOM_APP.md`, kop "Herstel".
 - `GET /connector/v1/hub-link` controleert inkomende Hub-JWT's in de volgorde en met de redenen van §4.7 (`aud` precies
   één string; geen header, ander schema of lege waarde → `invalid_token`; header zonder `kid` → `unknown_key`).
 - Elke POST/PUT/PATCH/DELETE met een Hub-JWT verbruikt de `jti` in een persistente replaycache

@@ -221,6 +221,64 @@ stuurt de API-documentatie van de Hub (`/api/docs`) niet mee.
   digest) weer invullen → **Update**, alleen naar een tag met hetzelfde databaseschema; anders eerst de
   back-up/snapshot van vóór de update terugzetten (tag-only rollback is niet veilig bij schemawijzigingen).
 
+## Herstel
+
+Dit deel hoort bij de **executor**. Zijn statuspagina verwijst hiernaar bij twee codes. In beide gevallen voert de
+executor niets uit en zet hij het bestand nooit zelf terug (fail-closed).
+
+| Code op de statuspagina | Bestand | Wat er onleesbaar is |
+|---|---|---|
+| `koppelstatus_onleesbaar` | `/appdata/secrets/hub-link.json` | de koppeling met de Hub; de executor vertrouwt de Hub dan niet |
+| `sleutelopslag_onleesbaar` | `/appdata/secrets/naslink.json` | de opgeslagen TrueNAS-koppeling: NAS-adres, certificaat en schrijfsleutel |
+
+Onleesbaar is: kapotte of onvolledige inhoud, een andere hoofdversie, een symlink, een andere eigenaar dan de executor
+zelf (gebruiker 568), of rechten voor groep of anderen (alleen `0600` is goed).
+
+**Eerst: stop en start de app** (Apps → `ai-server-manager-executor`). Is de eigenaar van de map `/appdata/secrets`
+veranderd, dan maakt de executor bij de start die map en de bestanden erin weer van gebruiker 568 en is de melding weg.
+Andere oorzaken herstelt een herstart niet; ga dan hieronder verder.
+
+**Koppelbestand onleesbaar (`koppelstatus_onleesbaar`), met een ingestelde schrijfsleutel.** De statuspagina toont dan
+het blok **Ontkoppelen of sleutel vervangen**.
+
+1. Vul daar de huidige TrueNAS-API-sleutel met schrijfrechten in, laat **Nieuwe sleutel** leeg en kies **Ontkoppelen
+   van de Hub**. De executor test de sleutel eerst live tegen het vastgelegde NAS-adres en certificaat en wist pas
+   daarna het koppelbestand. NAS-adres, certificaat, sleutel en journaal blijven bewaard.
+2. Het koppelformulier komt terug. Maak in de Hub een nieuwe koppelcode op de pagina **Executor installeren en
+   koppelen** (Onboarding → *Uitleg executor*) met **Koppelcode voor de executor maken** (alleen een beheerder), en
+   koppel zoals in stap 3, "Koppelen met de Hub", punt 2 en 3. In de Hub hoef je vooraf niets te ontkoppelen.
+
+Meldt de executor bij punt 1 `certificaat_gewijzigd` (het certificaat van TrueNAS is veranderd sinds het vastleggen),
+dan kan het niet op de statuspagina: volg **Nieuwe datamap** hieronder.
+
+**Koppelbestand onleesbaar, zonder schrijfsleutel.** Het blok **Ontkoppelen of sleutel vervangen** ontbreekt en de
+executor koppelt niet met een koppeltoken, dus op de statuspagina kan het niet. Volg **Nieuwe datamap**.
+
+**Sleutelopslag onleesbaar (`sleutelopslag_onleesbaar`), met of zonder eerder ingestelde schrijfsleutel.** De
+statuspagina toont dan geen sleutelformulier en geen blok **Ontkoppelen of sleutel vervangen**, en de executor
+overschrijft de onleesbare opslag nooit. Ook met de sleutel bij de hand kan het dus niet op de statuspagina. Volg
+**Nieuwe datamap**.
+
+**Nieuwe datamap** (alles in de TrueNAS-web-UI, geen terminal):
+
+1. Maak een nieuwe dataset voor de executor, zoals in stap 1 (*Dataset Preset* **Apps**).
+2. **Apps → `ai-server-manager-executor` → Edit** → *Storage Configuration*: zet **Host Path** op de nieuwe dataset;
+   *Mount Path* blijft `/appdata`. Kies **Update**.
+3. Bij de start maakt de executor een nieuwe eigen identiteit en `vault.key`, en de statuspagina toont weer het
+   koppelformulier. Koppel opnieuw met een nieuwe koppelcode (zoals hierboven) en stel daarna de TrueNAS-sleutel met
+   schrijfrechten opnieuw in, met de controle van de vingerafdruk (stap 3).
+4. De oude dataset gebruikt de executor niet meer; hij blijft ongewijzigd staan. De nieuwe datamap begint met een leeg
+   journaal, dus ook zonder een eerdere stop na een afwijking. Stond de executor op **Gestopt**, bekijk dan eerst in de
+   Hub het incident onder **Problemen**, voordat je de schrijfsleutel opnieuw instelt.
+
+Weet je niet hoe de sleutelopslag onleesbaar werd, maak dan in TrueNAS een nieuwe API-key voor de executorgebruiker en
+trek de oude in (Credentials → API Keys): de oude sleutel staat versleuteld in de oude dataset, samen met de
+`vault.key` die hem ontsluit.
+
+> **Verificatiestatus:** het herstel met de sleutel (kapot koppelbestand → **Ontkoppelen van de Hub** → het
+> koppelformulier komt terug) is Sim-getest tegen een nagebouwde TrueNAS-API. Herstarten, een nieuwe dataset en het
+> wijzigen van Host Path in de TrueNAS-web-UI zijn **NIET GEVALIDEERD (echte NAS)**.
+
 ## Problemen
 
 | Melding in de app-log | Oplossing |

@@ -37,6 +37,8 @@ TOTAAL_TONEN = frozenset({"gezond", "beperkt", "storing", "onbekend"})
 MELDING_ROLLEN = frozenset({"alert", "status", ""})
 KOPPELBESTAND = "/appdata/secrets/hub-link.json"
 SLEUTELBESTAND = "/appdata/secrets/naslink.json"
+# Herstel zonder bruikbare schrijfsleutel staat in het installatiedocument; een test controleert dat de kop bestaat.
+HERSTEL = "Zie deploy/truenas/CUSTOM_APP.md, kop 'Herstel'."
 
 
 def template() -> str:
@@ -235,8 +237,7 @@ def executor_page(
                 "label": "Onleesbaar",
                 "tijd": tijd,
                 "iso": iso,
-                "reden": "De opgeslagen TrueNAS-koppeling is onleesbaar; de executor voert niets uit. Zie "
-                "deploy/truenas/CUSTOM_APP.md (herstel).",
+                "reden": f"De opgeslagen TrueNAS-koppeling is onleesbaar; de executor voert niets uit. {HERSTEL}",
                 "reden_code": "sleutelopslag_onleesbaar",
             }
         )
@@ -499,7 +500,7 @@ def onleesbaar_melding(*, sleutel_ingesteld: bool = False) -> dict[str, str]:
             if sleutel_ingesteld
             else "De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. De executor koppelt niet "
             "met een koppeltoken, en er is nog geen TrueNAS-schrijfsleutel ingesteld waarmee je dit hier kunt "
-            "herstellen. Zie deploy/truenas/CUSTOM_APP.md (herstel). Het bestand:"
+            f"herstellen. {HERSTEL} Het bestand:"
         ),
         "pad": KOPPELBESTAND,
         "code": "koppelstatus_onleesbaar",
