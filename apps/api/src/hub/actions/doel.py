@@ -4,12 +4,16 @@ De Hub leest het doel met zijn alleen-lezen TrueNAS-sleutel en rekent de ``resou
 executor (:mod:`asm_policy.etag`). Kan de Hub het doel niet lezen, dan is de toestand onbekend en komt er geen preview
 en geen goedkeuring (fail-closed) — onbekend telt nooit als "ongewijzigd". De herkenning van een app (naam,
 catalogusapp en images) komt uit :func:`asm_policy.engine.herken_app`, net als in de executor; is niet vast te stellen
-wat er in een bestaande app draait (gestopt, geen catalogusapp), dan weigert het beleid elke actie erop.
+wat er in een bestaande app draait (gestopt, geen catalogusapp), dan weigert het beleid elke actie erop. Ook de image
+ná de actie telt mee: de nieuwe image bij ``app.update``, en bij ``app.rollback`` met ``herstel_van`` de images van
+vóór die wijziging zoals de Hub ze toen zag (de preview van dat verzoek; de bewaarde waarden zelf kent alleen de
+executor, die herkent er zelf op). Een herkenning maakt alleen strenger (S-P2-010, R-VEILIG-2).
 """
 
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -22,6 +26,7 @@ from asm_policy.params import expected_image, verwachte_catalogus
 from sqlalchemy.orm import Session
 
 from hub.config import Settings
+from hub.models import ActionRequest
 from hub.truenas.client import TrueNASClient, TrueNASError
 from hub.truenas.connection import API_KEY_REF, connection_row, current_target, tls_for
 from hub.vault import Vault
@@ -74,8 +79,31 @@ async def _snapshots(client: TrueNASClient, dataset: str) -> list[str]:
     return sorted(n for n in names if n.split("@", 1)[0] == dataset)
 
 
+def vorige_images(db: Session, actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[str, Any]) -> list[str]:
+    """Bij ``app.rollback`` met ``herstel_van``: de images van het doel vóór die wijziging, uit de preview van dat
+    verzoek (``huidig.images``). Leeg als het verzoek er niet is of bij een ander doel hoort; de executor herkent dan
+    zelf op de waarden die hij bewaarde."""
+    if actie.action_id != "app.rollback" or not isinstance(parameters, Mapping) or "herstel_van" not in parameters:
+        return []
+    try:
+        request_id = uuid.UUID(str(parameters["herstel_van"]))
+    except ValueError:
+        return []
+    vorig = db.get(ActionRequest, request_id)
+    if vorig is None or not isinstance(vorig.target, dict) or vorig.target.get("app_id") != target.get("app_id"):
+        return []
+    huidig = (vorig.preview or {}).get("huidig") if isinstance(vorig.preview, dict) else None
+    images = huidig.get("images") if isinstance(huidig, dict) else None
+    return [str(i) for i in images if i] if isinstance(images, list) else []
+
+
 async def _lees(
-    client: TrueNASClient, policy: Policy, actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[str, Any]
+    client: TrueNASClient,
+    policy: Policy,
+    actie: ActieDef,
+    target: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    na_actie: list[str] | None = None,
 ) -> Doel:
     if actie.doel in ("app", "app_nieuw"):
         name = str(target["app_id"])
@@ -93,7 +121,7 @@ async def _lees(
                 policy,
                 name,
                 app,
-                [str((verwacht or {}).get("repository") or "")],
+                [str((verwacht or {}).get("repository") or ""), *(na_actie or [])],
                 catalogus=verwachte_catalogus(parameters),
             ),
         )
@@ -145,6 +173,7 @@ def lees_doel(
     if not api_key:
         raise DoelOnbekend("not_configured", "Er is nog geen alleen-lezen-API-key ingesteld.")
     tls = tls_for(connection_row(db), nas, settings)
+    na_actie = vorige_images(db, actie, target, parameters)
 
     async def run() -> Doel:
         async with TrueNASClient(
@@ -154,7 +183,7 @@ def lees_doel(
             connect_timeout=settings.truenas_connect_timeout,
             read_timeout=settings.truenas_read_timeout,
         ) as client:
-            return await _lees(client, policy, actie, target, parameters)
+            return await _lees(client, policy, actie, target, parameters, na_actie)
 
     try:
         return asyncio.run(run())

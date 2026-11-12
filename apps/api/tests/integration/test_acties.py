@@ -28,7 +28,7 @@ from conftest import idem, login_as, make_user
 from executorhelpers import write_nas
 from fakes.fake_gotify import FakeGotify
 from fakes.fake_truenas import FakeTrueNAS
-from policyhelpers import install_params
+from policyhelpers import DIGEST, install_params
 
 from hub.models import ActionRequest
 
@@ -253,6 +253,139 @@ def test_een_tweede_emby_installeren_onder_een_andere_naam_wordt_geweigerd(stack
     # Alleen de dynamische blokkade van deze opstelling zonder executor; geen statische weigering.
     assert [b["code"] for b in r.json()["blokkades"]] == ["executor_niet_gekoppeld"], r.text
     assert schrijfaanroepen(stack.nas) == []
+
+
+def _nest(diepte: int, blad: Any) -> Any:
+    v = blad
+    for i in range(diepte):
+        v = {f"k{i}": v}
+    return v
+
+
+def _lijst(stack: Stack) -> list[dict[str, Any]]:
+    return list(stack.admin.get("/api/v1/actions").json()["items"])
+
+
+def test_diep_geneste_waarden_worden_geweigerd_en_niet_bewaard(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-1 (dicht bij twijfel): een catalogusapp met privileged, compose, docker.sock en hostpad "/"
+    diep in de waarden geeft 422: tot de dieptegrens met de eigen code, dieper ``te_diep_genest``. Er wordt niets
+    voorgesteld of bewaard. De boiler diep genest geeft 403 (EX27) en het geweigerde voorstel bewaart geen
+    parameterwaarden. Vroeger werd beide voorgesteld (R2), goedgekeurd en via ``app.create`` uitgevoerd."""
+    from asm_policy.params import MAX_PARAMETER_DIEPTE
+
+    admin = stack.admin
+    blad = {
+        "privileged": True,
+        "host_path_config": {"path": "/"},
+        "custom_compose_config": {"services": {}},
+        "sock": "/var/run/docker.sock",
+    }
+    for diepte, codes in (
+        (MAX_PARAMETER_DIEPTE - 6, {"privileged_verboden", "hostpad_verboden", "compose_verboden"}),
+        (MAX_PARAMETER_DIEPTE, {"te_diep_genest"}),
+    ):
+        r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", _nest(diepte, blad)))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+        assert codes <= {f["code"] for f in r.json()["details"]["fouten"]}, (diepte, r.text)
+    assert _lijst(stack) == []
+    boiler = _catalogus_waarden("huis", _nest(MAX_PARAMETER_DIEPTE, {"x": "boiler aan"}))
+    key, r = _voorstel(admin, "app.install", app_target("huis"), boiler)
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "boiler_verboden" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(key))
+        assert rij is not None and rij.status == "geweigerd" and rij.parameters == {}
+    assert schrijfaanroepen(stack.nas) == []
+
+
+def _catalogus_waarden(naam: str, values: Any) -> dict[str, Any]:
+    params = _catalogus_install(naam, "home-assistant")
+    params["app_create"].update(train="community", values=values)
+    return params
+
+
+def test_catalogusapp_met_extra_rechten_wordt_geweigerd(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-3 (ADR-0030 besluit 6): ook de eigen waarden van een catalogusapp krijgen geen extra
+    capabilities, apparaten, host-PID/-IPC, gedeeld netwerk of GPU zonder ``gpu: intel_render``, ook genest. De Hub
+    geeft 422 met de code per sleutel en bewaart niets. Tegenproef: dezelfde app zonder die waarden wordt
+    voorgesteld."""
+    values = {
+        "app": {
+            "capabilities": {"add": ["SYS_ADMIN"]},
+            "devices": [{"host_device": "/dev/sda"}],
+            "host_pid": True,
+            "host_ipc": True,
+            "networks": ["gedeeld"],
+        },
+        "resources": {"gpus": {"use_all_gpus": True}},
+    }
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    codes = {f["code"] for f in r.json()["details"]["fouten"]}
+    verwacht = {
+        "capabilities_verboden",
+        "devices_verboden",
+        "host_pid_verboden",
+        "host_ipc_verboden",
+        "netwerk_verboden",
+        "gpu_zonder_d08",
+    }
+    assert verwacht <= codes, codes
+    assert _lijst(stack) == [] and schrijfaanroepen(stack.nas) == []
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", {"app": {"tz": "x"}}))
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+
+
+def test_bijwerken_of_terugzetten_naar_een_emby_image_wordt_geweigerd(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): ``app.update`` van een bestaande Custom App naar een Emby-image
+    maakt er een tweede Emby van. De Hub herkent het doel ook op de image ná de actie: 403 met de Emby-regel, ook
+    voor een beheerder; TrueNAS krijgt niets. Tegenproef: bijwerken binnen dezelfde repository blijft R2. Bij
+    terugzetten (``herstel_van``) telt de image van vóór die wijziging, zoals de Hub hem toen zag."""
+    admin = stack.admin
+    emby = {"image": {"repository": "emby/embyserver", "tag": f"4.8.10.0@{DIGEST}"}}
+    key, r = _voorstel(admin, "app.update", app_target("my-house"), emby)
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert haal(admin, key)["status"] == "geweigerd"
+    zelfde = {"image": {"repository": "ghcr.io/lvos04/my_house", "tag": f"0.2.0@{DIGEST}"}}
+    r = stel_voor(admin, "app.update", app_target("my-house"), zelfde)
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert "emby_nooit_door_platform" not in str(r.json()["blokkades"]), r.text
+    update_id = r.json()["request_id"]
+    # Terugzetten naar de toestand van vóór die update: daar draaide (volgens de preview van toen) een Emby-image.
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(update_id))
+        assert rij is not None
+        preview = copy.deepcopy(rij.preview)
+        preview["huidig"]["images"] = ["docker.io/emby/embyserver:4.8.10.0"]
+        rij.preview = preview
+        db.commit()
+    key, r = _voorstel(admin, "app.rollback", app_target("my-house"), {"herstel_van": update_id})
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    # Tegenproef: terugzetten naar een gewone vorige image wordt voorgesteld (R2).
+    r = stel_voor(admin, "app.update", app_target("my-house"), zelfde)
+    assert r.status_code == 201, r.text
+    r = stel_voor(admin, "app.rollback", app_target("my-house"), {"herstel_van": r.json()["request_id"]})
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert schrijfaanroepen(stack.nas) == []
+
+
+def test_losse_surrogaat_in_de_parameters_geeft_422(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-6: een losse surrogaat (``"\\ud800"`` in JSON) is geen UTF-8. Vroeger gaf dat een
+    onverwachte fout (500); nu 422 ``parameters_ongeldig`` met ``niet_canoniek``, en er wordt niets bewaard."""
+    for parameters in ('{"app_create":{"x":"\\ud800"}}', '{"image":{"\\udc80":"x"}}'):
+        actie = "app.install" if "app_create" in parameters else "app.update"
+        body = (
+            f'{{"action_id":"{actie}","target":{{"host_id":"{HOST}","app_id":"my-house"}},'
+            f'"parameters":{parameters},"reason":"test"}}'
+        )
+        r = stack.admin.post(
+            "/api/v1/actions", content=body.encode(), headers={**idem(), "Content-Type": "application/json"}
+        )
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+        assert [f["code"] for f in r.json()["details"]["fouten"]] == ["niet_canoniek"], r.text
+    assert _lijst(stack) == [] and schrijfaanroepen(stack.nas) == []
 
 
 @pytest.mark.parametrize(

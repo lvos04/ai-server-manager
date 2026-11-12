@@ -9,7 +9,8 @@ uitgevoerd):
 4. allowlist, blokkades, doel- en parameterschema (zonder NAS);
 5. schrijfsleutel aanwezig → verbinding met de vastgelegde vingerafdruk → ``core.get_methods``;
 6. **eigen readback** van het doel → herkenning (naam, catalogusapp, images; niet vast te stellen wat er in een
-   bestaande app draait → geweigerd) → risicoklasse en goedkeuring opnieuw;
+   bestaande app draait → geweigerd; ook de image ná de actie: de nieuwe image bij ``app.update``, de bewaarde vorige
+   image bij ``app.rollback``) → risicoklasse en goedkeuring opnieuw;
 7. nonce van de goedkeuring (EX20), ETag van het doel (EX19), pools gezond bij een opslagmutatie (EX11);
 8. methode kiezen die deze TrueNAS-versie kent (anders ``capability_unavailable``);
 9. uitvoeren → readback → vergelijken met de verwachting. **Afwijking → de executor stopt** en meldt ``afwijking``;
@@ -474,12 +475,23 @@ class Uitvoerder:
                     )
                 return _nas_fout(exc)
             verwachte_image = expected_image(prop["parameters"])
+            # Ook de image ná de actie telt voor de herkenning (S-P2-010, R-VEILIG-2): de nieuwe image bij app.update,
+            # de bewaarde vorige image bij app.rollback. Een herkenning maakt alleen strenger.
+            na_actie = [str((verwachte_image or {}).get("repository") or "")]
+            bewaard = (
+                self.journal.load_values(str(prop["parameters"]["herstel_van"]))
+                if actie.action_id == "app.rollback" and "herstel_van" in prop["parameters"]
+                else None
+            )
+            vorig_image = bewaard[1].get("image") if bewaard is not None and bewaard[0] == doel.naam else None
+            if isinstance(vorig_image, dict):
+                na_actie.append(str(vorig_image.get("repository") or ""))
             herkend = (
                 herken_app(
                     policy,
                     doel.naam,
                     doel.app,
-                    [str((verwachte_image or {}).get("repository") or "")],
+                    na_actie,
                     catalogus=verwachte_catalogus(prop["parameters"]),
                 )
                 if doel.soort.startswith("app")
@@ -525,7 +537,6 @@ class Uitvoerder:
             if geweigerd is not None:
                 return geweigerd
             if actie.action_id == "app.rollback" and "herstel_van" in prop["parameters"]:
-                bewaard = self.journal.load_values(str(prop["parameters"]["herstel_van"]))
                 if bewaard is None or bewaard[0] != doel.naam:
                     return fout(
                         409,

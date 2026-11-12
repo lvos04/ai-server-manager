@@ -505,6 +505,77 @@ def test_een_tweede_emby_installeren_onder_een_andere_naam_weigert_de_executor_z
     assert writes(nas) == [] and nas.created == [] and nas.app("mediaspeler") is None
 
 
+def _nest(diepte: int, blad: Any) -> Any:
+    v = blad
+    for i in range(diepte):
+        v = {f"k{i}": v}
+    return v
+
+
+def test_te_diep_geneste_waarden_weigert_de_executor_zelf(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-1: een door de Hub ondertekend en goedgekeurd verzoek (R3) met een catalogusapp waarvan de
+    waarden dieper genest zijn dan de grens (privileged, compose, docker.sock en hostpad "/" daaronder) wordt
+    geweigerd (``te_diep_genest``); met de boiler diep genest is het een statische weigering (EX27). Vroeger kwam dit
+    via ``app.create`` bij TrueNAS. TrueNAS krijgt niets, de schrijfsleutel wordt niet eens gebruikt."""
+    from asm_policy.params import MAX_PARAMETER_DIEPTE
+
+    hub, c, nas = stack
+
+    def catalogus(naam: str, values: Any) -> dict[str, Any]:
+        params = install_params(naam)
+        params["app_create"].update(catalog_app="home-assistant", train="community", version="1.2.3", values=values)
+        params["manifest"] = {"app_id": naam, "install_reason": "proef met een catalogusapp"}
+        return proposal("app.install", app_target(naam), params, expected_version=ABSENT)
+
+    blad = {
+        "privileged": True,
+        "host_path_config": {"path": "/"},
+        "custom_compose_config": {"services": {}},
+        "sock": "/var/run/docker.sock",
+    }
+    r = execute(c, hub, approved(hub, catalogus("huis-a", _nest(MAX_PARAMETER_DIEPTE, blad)), risk_class="R3"))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    assert "te_diep_genest" in [f["code"] for f in r.json()["details"]["fouten"]], r.text
+    r = execute(
+        c, hub, approved(hub, catalogus("huis-b", _nest(MAX_PARAMETER_DIEPTE, {"x": "boiler aan"})), risk_class="R3")
+    )
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "boiler_verboden" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+
+
+def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
+    tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en
+    goedgekeurd verzoek (R3) met de Emby-regel; TrueNAS krijgt niets. Tegenproef: bijwerken binnen dezelfde
+    repository blijft R2 en wordt uitgevoerd."""
+    hub, c, nas = stack
+    emby = {"image": {"repository": "emby/embyserver", "tag": f"4.8.10.0@{DIGEST}"}}
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.update", "my-house", emby), risk_class="R3"))
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert writes(nas) == [] and nas.updated == []
+    zelfde = {"image": {"repository": "ghcr.io/lvos04/my_house", "tag": f"0.2.0@{DIGEST_B}"}}
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.update", "my-house", zelfde), risk_class="R2"))
+    assert r.status_code == 200 and r.json()["methode"] == "app.update", r.text
+    assert writes(nas) == ["app.update"]
+
+
+def test_terugzetten_naar_een_bewaarde_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
+    """S-P2-010, R-VEILIG-2: bij ``app.rollback`` met ``herstel_van`` herkent de executor het doel ook op de image uit
+    de bewaarde vorige waarden. Staat daar een Emby-image (bv. omdat het beleid sindsdien strenger is), dan wordt het
+    terugzetten geweigerd met de Emby-regel; TrueNAS krijgt niets."""
+    hub, c, nas = stack
+    herstel_van = str(uuid.uuid4())
+    vorige = {"image": {"repository": "emby/embyserver", "tag": f"4.8.10.0@{DIGEST}", "pull_policy": "missing"}}
+    Journal(hub.settings.replay_db, hub.settings.secrets_dir).save_values(herstel_van, "my-house", vorige)
+    prop = app_prop(nas, "app.rollback", "my-house", {"herstel_van": herstel_van})
+    r = execute(c, hub, approved(hub, prop, risk_class="R3"))
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert writes(nas) == [] and nas.updated == []
+
+
 def test_installeren_over_een_bestaande_app_wordt_geweigerd(stack: Stack) -> None:
     hub, c, nas = stack
     r = execute(c, hub, approved(hub, install_prop("my-house")))
