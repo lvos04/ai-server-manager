@@ -32,12 +32,19 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    verboden blokkade heeft een test met haar eigen code (`apps/policy/tests/test_policy.py`).
 5. **Boiler (EX27).** Gezocht in `action_id`, doel en alle sleutels en tekstwaarden van de parameters. Uitzondering:
    de vrije tekst van `notification.send` — een melding óver de boiler schakelt niets en de bewaking moet erover
-   kunnen melden. Het doel en de `action_id` van een melding tellen wel.
+   kunnen melden. Het doel en de `action_id` van een melding tellen wel. Diepte (S-P2-010, dicht bij twijfel):
+   parameters zijn hooguit 16 niveaus diep genest (`422 parameters_ongeldig`, `te_diep_genest`); de boilercontrole en
+   de EX47-controle kijken tot de grens van de canonieke JSON (32 niveaus) en weigeren dieper in plaats van stil te
+   stoppen (dieper telt als boiler).
 6. **`app.install` (B01-003, EX47).** Alleen `app.create` met `custom_app` afwezig of `false`. De standaard Custom App
    is `catalog_app: ix-app`, trein `stable`, met ix-app-waarden uit een witte lijst. Geweigerd vóór uitvoering:
    `custom_compose_config(_string)` op elke diepte, privileged, host-netwerk/-PID/-IPC, extra capabilities, devices,
    Docker-socket, hostpaden buiten `/mnt/<pool>/<dataset>`, `latest` of een tag zonder digest. Een catalogusapp vraagt
-   een exacte versie en een `install_reason`.
+   een exacte versie en een `install_reason`. Ook de eigen waarden van een catalogusapp krijgen op elke diepte geen
+   compose, privileged, host-netwerk zonder reden, host-PID/-IPC, extra capabilities, devices, gedeeld netwerk, GPU
+   zonder `gpu: intel_render` in het manifest of Docker-socket (S-P2-010). Een hostpad weigert ook elk teken uit de
+   Unicode-categorieën Cc, Cf, Zl en Zp en een spatie aan het begin of eind van een mapnaam. Een tekst die geen
+   geldige UTF-8 is (een losse surrogaat) is niet canoniek: `422 parameters_ongeldig` (`niet_canoniek`).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -162,7 +169,12 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     vaste engine-regels (`engine_regels`), uitgerekend met de engine zelf; de runbooks noemen bij `app.stop`
     "Custom App: R2" (S-P2-010). `Herkenning.na_stop_herkenbaar` heeft geen standaardwaarde (dicht bij twijfel). Bij
     `app.install` telt ook de catalogusapp uit het voorstel (`app_create.catalog_app`, behalve `ix-app`) mee voor de
-    herkenning, in Hub en executor: een tweede Emby onder een andere naam is ook Emby.
+    herkenning, in Hub en executor: een tweede Emby onder een andere naam is ook Emby. Bij een bestaande app telt ook
+    de image ná de actie mee: de nieuwe image bij `app.update`; bij `app.rollback` met `herstel_van` in de executor de
+    bewaarde vorige image en in de Hub de images van vóór die wijziging uit de preview van dat verzoek. Een bestaande
+    app omzetten naar een Emby-image is dus ook een tweede Emby; volledig is de herkenning alleen op wat er nu te zien
+    is (S-P2-010). Zonder `Herkenning` (bv. een aanroep zonder readback) is `app.stop` op een app ook R2: niet bekend
+    is dat de app gestopt herkenbaar blijft (dicht bij twijfel).
 22. **Fout mét of zonder vastlegging.** Een weigering die de toestand van het verzoek verandert (goedkeuring vervallen,
     voorstel verlopen, uitvoering mislukt, afwijking, uitkomst onbekend) wordt samen met die wijziging vastgelegd en
     is daarna het idempotente antwoord op dezelfde sleutel. Elke andere fout laat de database ongemoeid.
@@ -228,6 +240,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 ## Gevolgen
 
 - Een wijziging van het beleid vraagt een nieuwe image van Hub én executor met dezelfde `policy_hash`; anders weigert
-  de executor alles (`policy_hash_verschilt`). De rooktest vergelijkt de hash van beide images.
+  de executor alles (`policy_hash_verschilt`). De rooktest (`deploy/smoke.sh`) vergelijkt de `policy_hash` van beide
+  images met elkaar en met `policy/` in de repo, en een unittest bewaakt dat beide Dockerfiles precies alle
+  `policy/*.yaml` kopiëren (S-P2-010).
 - De JSON-RPC-methoden en hun parameters (`app.create`, `app.update`, `app.delete`, `app.config`, `core.get_jobs`)
   zijn gebouwd naar de publieke API-beschrijving en alleen tegen de fake getest: **NIET GEVALIDEERD (echte NAS)**.

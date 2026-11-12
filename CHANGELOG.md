@@ -4,6 +4,20 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — herstel na de review van het policy-pakket (S-P2-010; ADR-0030)
+- Diep geneste parameters glippen niet meer langs de boiler- en EX47-controle: parameters zijn hooguit 16 niveaus
+  diep (`te_diep_genest`), en de doorzoekers kijken tot 32 niveaus en weigeren dieper in plaats van stil te stoppen.
+- `app.update` (en `app.rollback` met `herstel_van`) herkent het doel ook op de image ná de actie, in de Hub én de
+  executor: een bestaande app omzetten naar een Emby-image wordt geweigerd met de Emby-regel (HARDE EIS).
+- Eigen waarden van een catalogusapp: extra capabilities, devices, host-PID/-IPC, gedeeld netwerk en GPU zonder
+  `gpu: intel_render` worden op elke diepte geweigerd, net als bij de standaard Custom App.
+- `app.stop` zonder herkenning van het doel is R2 (dicht bij twijfel); een hostpad weigert ook Unicode-stuurtekens
+  (Cc, Cf, Zl, Zp) en een spatie aan het begin of eind van een mapnaam; een losse surrogaat in de parameters geeft
+  `422 parameters_ongeldig` (`niet_canoniek`) in plaats van een 500.
+- De rooktest vergelijkt de `policy_hash` van de Hub- en de executor-image met elkaar en met `policy/`; een unittest
+  bewaakt dat beide Dockerfiles precies `policy/*.yaml` kopiëren. Runbooktekst: "het platform weigert dit bij een
+  gestopte Custom App".
+
 ### Gerepareerd — controle van het policy-pakket (S-P2-010; ADR-0030)
 - `GET /api/v1/policy` noemt per app-actie ook de klasse voor een Custom App (`risk_class_custom_app`: `app.stop` is
   daar R2) en de twee vaste engine-regels (`engine_regels`: `STOP-EENRICHTING`, `DOEL-ONHERKENBAAR`), uitgerekend met
