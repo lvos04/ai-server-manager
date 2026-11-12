@@ -25,6 +25,11 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    strengste regel wint; herkenning van een app maakt alleen strenger.
 4. **Verboden patronen gelden per segment.** `system.sudo`, `app.shell.exec` en `pool.dataset.delete` zijn geweigerd,
    niet alleen `shell.*`. Destructieve acties worden in deze versie niet aangeboden, ook niet met goedkeuring.
+   Precies: BLK-SHELL, BLK-DESTRUCTIEF en BLK-DB-DIRECT toetsen elk segment; BLK-BEVEILIGING en BLK-NETWERK alleen
+   het eerste segment (`policy.…`, `network.…`) en BLK-BETAALD een deelstring. Een `action_id` met zo'n woord verderop
+   (bv. `app.network.set`) staat nooit op de allowlist en wordt als onbekend geweigerd (`403 actie_niet_toegestaan`).
+   De patronen blijven zo (besluit van de regisseur, 2026-11-12; een wijziging geeft een nieuwe `policy_hash`). Elke
+   verboden blokkade heeft een test met haar eigen code (`apps/policy/tests/test_policy.py`).
 5. **Boiler (EX27).** Gezocht in `action_id`, doel en alle sleutels en tekstwaarden van de parameters. Uitzondering:
    de vrije tekst van `notification.send` — een melding óver de boiler schakelt niets en de bewaking moet erover
    kunnen melden. Het doel en de `action_id` van een melding tellen wel.
@@ -153,6 +158,11 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     zeggen dat ook. `app.stop` op een catalogusapp blijft R1: die blijft gestopt herkenbaar en start gewoon weer.
     Aan de beschermde regels (Emby nooit; MediaGuard en de mediaserver geen update, terugzet of verwijdering zonder
     bewijs) verandert niets.
+    `GET /api/v1/policy` toont naast de yaml-klasse ook de klasse voor een Custom App (`risk_class_custom_app`) en de
+    vaste engine-regels (`engine_regels`), uitgerekend met de engine zelf; de runbooks noemen bij `app.stop`
+    "Custom App: R2" (S-P2-010). `Herkenning.na_stop_herkenbaar` heeft geen standaardwaarde (dicht bij twijfel). Bij
+    `app.install` telt ook de catalogusapp uit het voorstel (`app_create.catalog_app`, behalve `ix-app`) mee voor de
+    herkenning, in Hub en executor: een tweede Emby onder een andere naam is ook Emby.
 22. **Fout mét of zonder vastlegging.** Een weigering die de toestand van het verzoek verandert (goedkeuring vervallen,
     voorstel verlopen, uitvoering mislukt, afwijking, uitkomst onbekend) wordt samen met die wijziging vastgelegd en
     is daarna het idempotente antwoord op dezelfde sleutel. Elke andere fout laat de database ongemoeid.
@@ -185,7 +195,10 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 28. **Geheimen in installatiewaarden.** Waarden van omgevingsvariabelen staan nooit in een preview, log of audit
     (alleen de namen). Zolang een voorstel open is, bewaart de Hub ze in zijn database (nodig voor het uitvoeren); na
     afloop (uitgevoerd, mislukt, afwijking, onbekend, afgewezen, geweigerd of verlopen) wist hij ze daar, zodat ze
-    niet voor altijd in klare tekst in de database en de back-up staan. De namen en `parameters_sha256` blijven. Een
+    niet voor altijd in klare tekst in de database en de back-up staan. Hetzelfde geldt voor de vrije tekst in
+    `command`, `entrypoint`, `labels` en `notes` (`vrije_tekst_gewist` noemt de gewiste velden; S-P2-010). De namen
+    en `parameters_sha256` blijven. Eigen waarden van een catalogusapp (buiten de ix-app-velden) wist de Hub nog
+    niet; zie de open punten. Een
     verwijzing `vault://app/<app_id>/<parameter>` is het enige toegestane formaat; het invullen ervan door de executor
     bestaat nog niet, dus een installatie met zo'n verwijzing geeft eerlijk `501 capability_unavailable`.
 29. **Testnaden.** Tests zetten alleen de *invoer* van de gates (`blokkades.gate_inputs`: besluiten, eigen back-up) en
@@ -202,6 +215,13 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 - **Gate `r2_r3_acties`** hangt af van `data_mutatie` (ADR-0007). Daardoor is élke R2-actie geblokkeerd bij een
   ongezonde pool of een rode back-upgate, ook een die geen opslag raakt (bv. een kritieke app herstarten). Veilig, maar
   mogelijk strenger dan bedoeld; aanpassen is een besluit over de gates, niet over dit beleid.
+- **Engine-regels buiten de `policy_hash`.** `STOP-EENRICHTING` en `DOEL-ONHERKENBAAR` staan in de code van de
+  engine, niet in de yaml. Een Hub en een executor met verschillende engineversies maar dezelfde yaml zien dat
+  verschil niet. Een engineversie naast de `policy_hash` vraagt een veld in `ExecutionRequest.policy_decision`
+  (contract §8: precies `risk_class`, `rule_ids`, `policy_hash`) of bij het koppelen: contractvraag, niet gebouwd
+  (S-P2-010, bouwpunt 6d; open voor S-P2-030).
+- **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
+  bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
   (contract §4.5) is een `kid` in het verzoek duidelijker. Contractvraag.
 

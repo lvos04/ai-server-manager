@@ -4,6 +4,20 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — controle van het policy-pakket (S-P2-010; ADR-0030)
+- `GET /api/v1/policy` noemt per app-actie ook de klasse voor een Custom App (`risk_class_custom_app`: `app.stop` is
+  daar R2) en de twee vaste engine-regels (`engine_regels`: `STOP-EENRICHTING`, `DOEL-ONHERKENBAAR`), uitgerekend met
+  de engine zelf. De runbooks noemen bij `app.stop` "Custom App: R2" en bieden na een stop geen terugzetten van een
+  Custom App via het platform meer aan zonder de weg via de TrueNAS-web-UI.
+- `app.install` van een catalogusapp wordt ook herkend op `app_create.catalog_app`, in de Hub én de executor: een
+  tweede Emby onder een andere naam (`catalog_app: "emby"`) valt onder de Emby-regel en wordt geweigerd.
+- Een hostpad met een tab, regeleinde of ander stuurteken wordt geweigerd (`hostpad_verboden`).
+- `Herkenning.na_stop_herkenbaar` heeft geen standaardwaarde meer (dicht bij twijfel).
+- Na afloop van een voorstel wist de Hub ook de vrije tekst in `command`, `entrypoint`, `labels` en `notes` van de
+  installatiewaarden, net als de waarden van omgevingsvariabelen (ook na "geweigerd" en "onbekend").
+- Tests voor elke verboden blokkade met haar eigen code (BLK-BEVEILIGING, BLK-BETAALD, BLK-DB-DIRECT, BLK-NETWERK
+  erbij); `policy/README.md` en de engine noemen voor een onbekende `action_id` nu `403 actie_niet_toegestaan`.
+
 ### Toegevoegd — fase P2 deel 1: policy-engine, goedkeuringen en executor (ADR-0030; contract 1.3 §8)
 - **Risicoclassificatie (B02-005):** `policy/*.yaml` (acties, apps, blokkades) read-only ingebakken in de Hub- én de
   executor-image, met `policy_hash`; gedeeld pakket `asm_policy` (deterministisch, R0–R3; `risk_claim` wordt bewaard

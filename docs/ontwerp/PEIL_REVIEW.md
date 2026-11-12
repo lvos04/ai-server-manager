@@ -337,7 +337,8 @@ Gereedschap `apps/web/review/` (`peil-review.spec.ts`, `in-pagina.js`, `samenvat
   woord voor een menselijke goedkeuring (R2/R3), terwijl R1 automatisch binnen het beleid loopt. Voorstel bij de
   volgende webstap: "Hij voert alleen acties uit een vaste lijst uit die de Hub heeft ondertekend — nooit shell, sudo
   of Docker."
-- **O-S2-005-3 (klein) — open, belegd bij stap S-P2-010:** de reviewcontrole "status alleen kleur" meldt op de executor-statuspagina na een mislukte
+- **O-S2-005-3 (klein) — open, verplaatst naar een latere webstap (besluit van de regisseur, 2026-11-12: niet in
+  S-P2-010):** de reviewcontrole "status alleen kleur" meldt op de executor-statuspagina na een mislukte
   koppelpoging `input#koppelcode` en `input#vingerafdruk` (rand in `down`). Op de afdruk staat onder elk veld wel een
   `octagon-x` met de fouttekst ("Koppelcode: 12 tekens in groepen van 4 …"), dus de status is niet alleen kleur; de
   controle in `apps/web/review/in-pagina.js` (`semantiek`) ziet de fouttekst naast het veld niet. De statuspagina is in
