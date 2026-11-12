@@ -10,7 +10,8 @@ Regels (in deze volgorde, de strengste wint):
    geweigerd. Een LLM die "R0" claimt voor ``pool.dataset.delete`` krijgt dus R3 en een weigering.
 3. Boiler in action_id, doel of parameters → R3 en geweigerd (EX27).
 4. Gereserveerde acties (MediaGuard tot BG-05/P3-02; my_house/MSO tot P3) → ``capability_unavailable``.
-5. Onbekende action_id (niet in de allowlist) → ``known=False``: de aanroeper geeft 422 en voert niets uit.
+5. Onbekende action_id (niet in de allowlist) → ``known=False``: Hub en executor geven 403 ``actie_niet_toegestaan``
+   en voeren niets uit.
 6. Basisklasse uit ``acties.yaml``; kritieke apps (``apps.yaml``) → ``klasse_kritiek``. Nooit lager.
 7. Beschermde apps (Emby altijd; Hub/executor niet stoppen; MediaGuard en de mediaserver geen update zonder bewijs)
    → geweigerd. Is van een bestaande app niet vast te stellen wat erin draait (geen image te zien, zoals bij een
@@ -93,8 +94,9 @@ class Herkenning:
     volledig: bool
     # Blijft de app na ``app.stop`` herkenbaar? Alleen een catalogusapp: zijn catalogusnaam zegt ook zonder image wat
     # erin draait. Een Custom App (ix-app of compose) toont gestopt geen image meer; het platform kan hem dan niet
-    # meer starten (``DOEL_ONHERKENBAAR``). Daarom is ``app.stop`` daar R2 (``STOP_EENRICHTING``).
-    na_stop_herkenbaar: bool = True
+    # meer starten (``DOEL_ONHERKENBAAR``). Daarom is ``app.stop`` daar R2 (``STOP_EENRICHTING``). Bewust zonder
+    # standaardwaarde (dicht bij twijfel): wie een Herkenning maakt, moet het zeggen (S-P2-010).
+    na_stop_herkenbaar: bool
 
 
 DOEL_ONHERKENBAAR = Blokkade(
@@ -108,6 +110,11 @@ DOEL_ONHERKENBAAR = Blokkade(
 # niet meer starten. Stoppen is daar dus eenrichtingsverkeer: altijd R2 (goedkeuring van een beheerder), nooit
 # automatisch, ook niet op voorstel van de AI, een flow of een runbook. Een catalogusapp blijft R1.
 STOP_EENRICHTING = "STOP-EENRICHTING"
+STOP_EENRICHTING_REDEN = (
+    "Een Custom App die het platform stopt, kan het daarna niet meer starten: van een gestopte Custom App is niet te "
+    "zien wat erin draait (doel_niet_herkenbaar). Daarom vraagt stoppen van een Custom App altijd de goedkeuring van "
+    "een beheerder (R2) en gebeurt het nooit automatisch; een catalogusapp blijft R1."
+)
 
 
 def max_class(*classes: str) -> str:
@@ -152,16 +159,26 @@ def recognize_all(
 
 
 def herken_app(
-    policy: Policy, name: str | None, app: Mapping[str, Any] | None, verwachte_images: Iterable[str] = ()
+    policy: Policy,
+    name: str | None,
+    app: Mapping[str, Any] | None,
+    verwachte_images: Iterable[str] = (),
+    *,
+    catalogus: str | None = None,
 ) -> Herkenning:
     """Herkenning van het doel uit de ruwe readback (``app.query``), voor Hub én executor.
 
     Bestaat de app (``app``), dan tellen de naam, de catalogusapp en de images die TrueNAS toont. Volledig is de
     herkenning alleen als er een image te zien is of als de catalogusapp zegt wat er draait; anders niet (dicht bij
     twijfel). Na een stop blijft alleen een catalogusapp herkenbaar (``na_stop_herkenbaar``). Bestaat de app nog
-    niet (installeren), dan tellen de naam en de image die geïnstalleerd gaat worden."""
+    niet (installeren), dan tellen de naam, de image die geïnstalleerd gaat worden en de catalogusapp uit het
+    voorstel (``catalogus``, zie :func:`asm_policy.params.verwachte_catalogus`): een tweede Emby onder een andere naam
+    is ook Emby."""
     if app is None:
-        return Herkenning(recognize_all(policy, name, [i for i in verwachte_images if i]), True)
+        cat = (catalogus or "").strip().lower() or None
+        return Herkenning(
+            recognize_all(policy, name, [i for i in verwachte_images if i], catalogus=cat), True, bool(cat)
+        )
     images = app_images(app)
     catalogus = catalogus_app(app)
     return Herkenning(

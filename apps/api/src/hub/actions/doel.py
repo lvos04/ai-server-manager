@@ -18,7 +18,7 @@ from asm_policy import Policy
 from asm_policy import etag as etags
 from asm_policy.engine import Herkenning, herken_app
 from asm_policy.loader import ActieDef
-from asm_policy.params import expected_image
+from asm_policy.params import expected_image, verwachte_catalogus
 from sqlalchemy.orm import Session
 
 from hub.config import Settings
@@ -42,8 +42,9 @@ class Doel:
     etag: str
     bestaat: bool
     staat: dict[str, Any] = field(default_factory=dict)
-    # Alle herkenningen (naam, catalogusapp en image; de regels van allemaal gelden) en of die volledig is.
-    herkend_als: Herkenning = field(default_factory=lambda: Herkenning((), True))
+    # Alle herkenningen (naam, catalogusapp en image; de regels van allemaal gelden) en of die volledig is. De standaard
+    # (doelen zonder app) zegt "na een stop niet herkenbaar": dicht bij twijfel (S-P2-010).
+    herkend_als: Herkenning = field(default_factory=lambda: Herkenning((), True, False))
     extra_bestaat: bool = False  # snapshot of sandbox-dataset bestaat al
 
     @property
@@ -88,7 +89,13 @@ async def _lees(
             etags.app_etag(app, images),
             app is not None,
             etags.app_state(app, images) if app is not None else {"naam": name, "afwezig": True},
-            herken_app(policy, name, app, [str((verwacht or {}).get("repository") or "")]),
+            herken_app(
+                policy,
+                name,
+                app,
+                [str((verwacht or {}).get("repository") or "")],
+                catalogus=verwachte_catalogus(parameters),
+            ),
         )
     tree = await client.call("pool.dataset.query")
     if actie.doel == "dataset":

@@ -21,7 +21,8 @@ Regels:
   Custom App → elke actie geweigerd, ook met goedkeuring) en `STOP-EENRICHTING` (`app.stop` op een app die na het
   stoppen niet meer herkenbaar is, dus elke Custom App → altijd R2: goedkeuring van een beheerder, nooit
   automatisch; een catalogusapp blijft R1). Besluit van de gebruiker, 2026-11-11; ADR-0030 besluit 21.
-- `risk_claim` van AI of flow wordt nooit gelezen (EX18). Een onbekende `action_id` → `422`.
+- `risk_claim` van AI of flow wordt nooit gelezen (EX18). Een onbekende `action_id` → `403 actie_niet_toegestaan`
+  (Hub en executor); er wordt niets voorgesteld of uitgevoerd.
 - Er bestaat nooit een shell-, sudo-, exec-, Docker-, cron- of vrije-tekstactie, en geen actie die data, datasets,
   snapshots of media verwijdert.
 - De boiler wordt nooit geschakeld (EX27): een `action_id`, doel of parameter die naar de boiler verwijst, wordt

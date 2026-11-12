@@ -37,6 +37,8 @@ UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 VAULT_REF_RE = re.compile(r"^vault://app/[a-z0-9][a-z0-9_-]{0,63}/[a-z0-9_.-]{1,128}$")
 CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+# Een hostpad is strenger dan vrije tekst: ook tab en regeleinde zijn daar geen gewone tekens (S-P2-010, 6f).
+HOSTPAD_STUURTEKEN_RE = re.compile(r"[\x00-\x1f\x7f]")
 HOST_IDS = ("nas-primary",)
 IX_APP = "ix-app"
 RESTART_POLICIES = ("no", "unless-stopped", "on-failure", "always")
@@ -288,7 +290,7 @@ def host_path_problem(path: Any) -> str | None:
     """``None`` als het hostpad een dataset onder ``/mnt/<pool>/<dataset>`` is; anders de reden (NL)."""
     if not isinstance(path, str) or not path.startswith("/"):
         return "het hostpad moet absoluut zijn"
-    if CONTROL_RE.search(path) or "//" in path or path != path.rstrip("/") or len(path) > 512:
+    if HOSTPAD_STUURTEKEN_RE.search(path) or "//" in path or path != path.rstrip("/") or len(path) > 512:
         return "ongeldig hostpad"
     parts = path.split("/")[1:]
     if any(p in ("", ".", "..") for p in parts):
@@ -555,6 +557,16 @@ def expected_image(params: Mapping[str, Any]) -> dict[str, str | None] | None:
     tag = str(img.get("tag") or "")
     version, _sep, in_tag = tag.partition("@")
     return {"repository": str(img.get("repository") or ""), "tag": tag, "versie": version, "digest": in_tag or digest}
+
+
+def verwachte_catalogus(params: Mapping[str, Any]) -> str | None:
+    """De catalogusapp die ``app.install`` gaat installeren (``app_create.catalog_app``), voor de herkenning van het
+    doel; ``None`` bij de standaard Custom App (``ix-app`` zegt niets over de inhoud) of zonder ``app_create``."""
+    ac = params.get("app_create") if isinstance(params, Mapping) else None
+    cat = ac.get("catalog_app") if isinstance(ac, Mapping) else None
+    if not isinstance(cat, str) or not cat.strip() or cat.strip().lower() == IX_APP:
+        return None
+    return cat.strip().lower()
 
 
 def vault_refs(value: Any) -> list[str]:

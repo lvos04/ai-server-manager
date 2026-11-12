@@ -34,7 +34,7 @@ from asm_policy.canonical import canonical_sha256
 from asm_policy.engine import herken_app, recognize_all
 from asm_policy.execreq import iso
 from asm_policy.loader import ActieDef, Policy
-from asm_policy.params import IX_APP, expected_image, vault_refs
+from asm_policy.params import IX_APP, expected_image, vault_refs, verwachte_catalogus
 from asm_policy.verify import Weigering, check_decision, check_envelope
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -475,7 +475,13 @@ class Uitvoerder:
                 return _nas_fout(exc)
             verwachte_image = expected_image(prop["parameters"])
             herkend = (
-                herken_app(policy, doel.naam, doel.app, [str((verwachte_image or {}).get("repository") or "")])
+                herken_app(
+                    policy,
+                    doel.naam,
+                    doel.app,
+                    [str((verwachte_image or {}).get("repository") or "")],
+                    catalogus=verwachte_catalogus(prop["parameters"]),
+                )
                 if doel.soort.startswith("app")
                 else None
             )

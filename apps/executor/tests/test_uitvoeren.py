@@ -490,6 +490,21 @@ def test_latest_tag_en_gevaarlijke_waarden_worden_geweigerd(stack: Stack) -> Non
     assert nas.created == [] and nas.logins == 0
 
 
+def test_een_tweede_emby_installeren_onder_een_andere_naam_weigert_de_executor_zelf(stack: Stack) -> None:
+    """HARDE EIS (S-P2-010, bouwpunt 6g): de executor herkent een installatie ook op ``app_create.catalog_app``. Een
+    door de Hub ondertekend en goedgekeurd verzoek (R3) voor ``catalog_app: "emby"`` onder een andere naam wordt
+    geweigerd met de Emby-regel; TrueNAS krijgt niets."""
+    hub, c, nas = stack
+    params = install_params("mediaspeler")
+    params["app_create"].update(catalog_app="emby", version="1.0.0", values={})
+    params["manifest"] = {"app_id": "mediaspeler", "install_reason": "proef met een catalogusapp"}
+    prop = proposal("app.install", app_target("mediaspeler"), params, expected_version=ABSENT)
+    r = execute(c, hub, approved(hub, prop, risk_class="R3"))
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert writes(nas) == [] and nas.created == [] and nas.app("mediaspeler") is None
+
+
 def test_installeren_over_een_bestaande_app_wordt_geweigerd(stack: Stack) -> None:
     hub, c, nas = stack
     r = execute(c, hub, approved(hub, install_prop("my-house")))

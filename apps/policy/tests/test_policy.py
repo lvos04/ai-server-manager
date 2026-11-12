@@ -133,6 +133,66 @@ def test_verboden_patronen(action_id: str, code: str) -> None:
     assert code in [b.code for b in c.blokkades]
 
 
+# Per verboden patroon uit policy/blokkades.yaml minstens één action_id, met de eigen id en code (S-P2-010, bouwpunt 3).
+# De code is de bewering: een onbekend action_id geeft óók R3, dus "R3" of "geweigerd" alleen bewijst niets (V-003).
+VERBODEN_PER_BLOKKADE = [
+    ("shell.exec", "BLK-SHELL", "actie_verboden_shell"),
+    ("app.shell.exec", "BLK-SHELL", "actie_verboden_shell"),
+    ("pool.dataset.delete", "BLK-DESTRUCTIEF", "actie_verboden_destructief"),
+    ("policy.update", "BLK-BEVEILIGING", "actie_verboden_beveiligingsbeleid"),
+    ("roles.grant", "BLK-BEVEILIGING", "actie_verboden_beveiligingsbeleid"),
+    ("breakglass.reset", "BLK-BEVEILIGING", "actie_verboden_beveiligingsbeleid"),
+    ("vault.secret.read", "BLK-BEVEILIGING", "actie_verboden_beveiligingsbeleid"),
+    ("ai.credits.purchase", "BLK-BETAALD", "actie_verboden_betaald"),
+    ("abonnement.opwaarderen", "BLK-BETAALD", "actie_verboden_betaald"),
+    ("billing.topup", "BLK-BETAALD", "actie_verboden_betaald"),
+    ("emby.db.write", "BLK-DB-DIRECT", "actie_verboden_database"),
+    ("mediaguard_core.sqlite.update", "BLK-DB-DIRECT", "actie_verboden_database"),
+    ("app.postgres.query_write", "BLK-DB-DIRECT", "actie_verboden_database"),
+    ("network.interface.update", "BLK-NETWERK", "actie_verboden_netwerk"),
+    ("firewall.rule.add", "BLK-NETWERK", "actie_verboden_netwerk"),
+    ("tailscale.up", "BLK-NETWERK", "actie_verboden_netwerk"),
+    ("dns.record.set", "BLK-NETWERK", "actie_verboden_netwerk"),
+]
+
+
+@pytest.mark.parametrize(("action_id", "blokkade_id", "code"), VERBODEN_PER_BLOKKADE)
+def test_elke_verboden_blokkade_weigert_met_haar_eigen_code(action_id: str, blokkade_id: str, code: str) -> None:
+    """Elk verboden patroon weigert met zijn eigen id en code, ook voor de AI, een flow en met goedkeuring (R3); en
+    het is géén onbekende actie (``known`` blijft waar), zodat de test rood wordt als de blokkade uit het beleid
+    verdwijnt."""
+    for actor in ("user", "ai", "flow"):
+        c = classify(POLICY, action_id=action_id, target={"host_id": HOST}, parameters={}, actor_type=actor)
+        assert c.known and c.geweigerd and c.risk_class == "R3", (action_id, actor)
+        assert blokkade_id in c.rule_ids and code in [b.code for b in c.blokkades], (action_id, c.rule_ids)
+        assert "ONBEKEND" not in c.rule_ids
+
+
+def test_elke_verboden_blokkade_uit_het_beleid_heeft_een_test() -> None:
+    """Een nieuw verboden patroon in ``policy/blokkades.yaml`` zonder regel in ``VERBODEN_PER_BLOKKADE`` maakt deze
+    test rood, en een id in de lijst die niet (meer) in het beleid staat ook."""
+    assert {b for _a, b, _c in VERBODEN_PER_BLOKKADE} == {v.id for v in POLICY.verboden}
+    codes = {v.id: v.code for v in POLICY.verboden}
+    assert all(codes[b] == c for _a, b, c in VERBODEN_PER_BLOKKADE)
+
+
+@pytest.mark.parametrize("action_id", ["app.network.set", "app.policy.update", "app.auth.reset", "app.vpn.up"])
+def test_onbekend_id_met_een_verboden_woord_verderop_wordt_als_onbekend_geweigerd(action_id: str) -> None:
+    """BLK-BEVEILIGING en BLK-NETWERK toetsen alleen het eerste segment (besluit van de regisseur, 2026-11-12: patronen
+    blijven zoals ze zijn). Zo'n action_id staat nooit op de allowlist en wordt dus als onbekend geweigerd: in de
+    engine (``known`` onwaar, R3) en in het besluit van Hub én executor (``actie_niet_toegestaan``)."""
+    c = classify(POLICY, action_id=action_id, target={"host_id": HOST}, parameters={}, actor_type="ai")
+    assert not c.known and c.risk_class == "R3" and c.rule_ids == ("ONBEKEND",)
+    assert POLICY.actie(action_id) is None
+    prop = proposal(action_id, APP, expected_version=ETAG)
+    approval = approval_for(prop, policy_hash=POLICY.hash, risk_class="R3", now=NU)
+    key = Ed25519PrivateKey.generate()
+    req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R3", approval=approval, now=NU)
+    for uitvoerder in ("executor", "hub:gotify"):
+        _a, _c, w = check_decision(POLICY, req, now=NU, herkend_als=None, uitvoerder=uitvoerder)
+        assert w is not None and (w.status, w.code) == (403, "actie_niet_toegestaan"), uitvoerder
+
+
 @pytest.mark.parametrize(
     ("action_id", "target", "parameters"),
     [
@@ -396,6 +456,56 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_een_catalogusapp_niet() -
     assert w is None and eigen is not None and eigen.risk_class == "R1"
 
 
+def test_herkenning_zonder_na_stop_herkenbaar_bestaat_niet() -> None:
+    """S-P2-010, bouwpunt 6c (dicht bij twijfel): ``na_stop_herkenbaar`` heeft geen standaardwaarde meer. Een
+    :class:`Herkenning` die het niet zegt, kan niet ontstaan; zo wordt ``app.stop`` op een Custom App nooit stil R1."""
+    from asm_policy.engine import Herkenning
+
+    with pytest.raises(TypeError):
+        Herkenning(("my_house",), True)  # type: ignore[call-arg]
+    for herkenbaar, klasse in ((False, "R2"), (True, "R1")):
+        h = Herkenning((), True, herkenbaar)
+        c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=h)
+        assert c.risk_class == klasse and c.requires_approval is (klasse == "R2"), herkenbaar
+    # Een app die nog moet worden geïnstalleerd: niet "na een stop herkenbaar" tenzij het een catalogusapp is.
+    assert not herken_app(POLICY, "demo-app", None, ["ghcr.io/voorbeeld/demo-app"]).na_stop_herkenbaar
+    assert herken_app(POLICY, "films", None, [], catalogus="jellyfin").na_stop_herkenbaar
+
+
+def test_installeren_van_een_catalogusapp_herkent_op_de_catalogusnaam() -> None:
+    """S-P2-010, bouwpunt 6g (HARDE EIS): ``app.install`` met ``catalog_app: "emby"`` onder een andere naam is een
+    tweede Emby en valt onder APP-EMBY; herkend op ``parameters.app_create.catalog_app``, niet alleen op de doelnaam.
+    ``ix-app`` zegt niets over de inhoud en herkent niets."""
+    from asm_policy.params import verwachte_catalogus
+
+    params = install_params("mediaspeler")
+    params["app_create"].update(catalog_app="emby", version="1.0.0", values={})
+    params["manifest"] = {"app_id": "mediaspeler", "install_reason": "proef"}
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], {"app_id": "mediaspeler"}, params) == []
+    assert verwachte_catalogus(params) == "emby"
+    h = herken_app(POLICY, "mediaspeler", None, [], catalogus=verwachte_catalogus(params))
+    assert h.apps == ("emby",) and h.volledig
+    for actor in ("user", "ai"):
+        c = classify(POLICY, action_id="app.install", target=APP, parameters=params, actor_type=actor, herkend_als=h)
+        assert c.geweigerd and "emby_nooit_door_platform" in [b.code for b in c.blokkades], actor
+    # Executorkant: ook een ondertekend en goedgekeurd verzoek (R3) wordt geweigerd.
+    prop = proposal("app.install", {"host_id": HOST, "app_id": "mediaspeler"}, params)
+    approval = approval_for(prop, policy_hash=POLICY.hash, risk_class="R3", now=NU)
+    req = execution_request(
+        Ed25519PrivateKey.generate(), prop, policy_hash=POLICY.hash, risk_class="R3", approval=approval, now=NU
+    )
+    _a, _c, w = check_decision(POLICY, req, now=NU, herkend_als=h, uitvoerder="executor")
+    assert w is not None and w.code == "actie_geweigerd"
+    # Tegenproeven: de standaard Custom App (ix-app) en een gewone catalogusapp herkennen niets extra.
+    assert verwachte_catalogus(install_params()) is None
+    assert herken_app(POLICY, "demo-app", None, [], catalogus=verwachte_catalogus(install_params())).apps == ()
+    immich = install_params("fotos")
+    immich["app_create"].update(catalog_app="immich")
+    assert verwachte_catalogus(immich) == "immich"
+    assert herken_app(POLICY, "fotos", None, [], catalogus="immich").apps == ("immich",)
+    assert verwachte_catalogus({}) is None and verwachte_catalogus({"app_create": "x"}) is None
+
+
 # ------------------------------------------------------------------ doel en parameters
 def test_doelschema() -> None:
     restart = POLICY.acties["app.restart"]
@@ -529,6 +639,32 @@ def test_ex47_hostmount_buiten_een_dataset(pad: str) -> None:
     fouten = validate_parameters(POLICY, inst, APP, install_params(storage=opslag))
     codes = [f.code for f in fouten]
     assert "hostpad_verboden" in codes or "docker_socket_verboden" in codes, codes
+
+
+@pytest.mark.parametrize("teken", ["\t", "\n", "\r", "\x0b", "\x0c", "\x00", "\x7f"], ids=repr)
+@pytest.mark.parametrize("vorm", ["/mnt/testpool/apps/a{t}b", "/mnt/testpool/apps/demo{t}", "/mnt/testpool/{t}.."])
+def test_ex47_hostpad_met_een_stuurteken_wordt_geweigerd(teken: str, vorm: str) -> None:
+    """Een tab of regeleinde in een hostpad (zoals ``'/mnt/testpool/x\\n'``) is geen gewone mapnaam: weigeren, net als
+    elk ander stuurteken (S-P2-010, bouwpunt 6f). Ook via ``host_path`` dieper in de waarden (``_deep_forbidden``)."""
+    from asm_policy.params import host_path_problem
+
+    pad = vorm.format(t=teken)
+    assert host_path_problem(pad) is not None, repr(pad)
+    inst = POLICY.acties["app.install"]
+    opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": {"path": pad}}]
+    codes = [f.code for f in validate_parameters(POLICY, inst, APP, install_params(storage=opslag))]
+    assert "hostpad_verboden" in codes, (repr(pad), codes)
+
+
+def test_ex47_hostpad_zonder_stuurteken_blijft_geldig_en_notities_mogen_regeleinden() -> None:
+    """Tegenproef: een gewoon hostpad blijft geldig, en de strengere hostpadcontrole raakt andere tekstvelden niet
+    (een notitie of omgevingswaarde met een regeleinde blijft toegestaan)."""
+    from asm_policy.params import host_path_problem
+
+    assert host_path_problem("/mnt/testpool/apps/demo-app") is None
+    inst = POLICY.acties["app.install"]
+    params = install_params(notes="regel 1\nregel 2", envs=[{"name": "LIJST", "value": "a\tb\nc"}])
+    assert validate_parameters(POLICY, inst, APP, params) == []
 
 
 def test_ex47_docker_socket_ergens_in_de_waarden() -> None:
