@@ -7,6 +7,7 @@ tegen het vastgelegde NAS-adres en certificaat. Elke formulier-POST volgt de reg
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -14,16 +15,24 @@ import re
 import stat
 import subprocess
 import sys
+import threading
+import time
 import typing
+import uuid
 from collections.abc import Iterator
 from html import unescape
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from executorhelpers import (
+    AUD,
     BASE,
     NAS_HOST,
+    POLICY,
     READ_KEY,
     WRITE_KEY,
     Hub,
@@ -37,13 +46,14 @@ from executorhelpers import (
 from executorhelpers import client as hub_client
 from fakes.fake_truenas import FakeTrueNAS, KeyProfile
 from fastapi.testclient import TestClient
-from policyhelpers import HOST, proposal
+from policyhelpers import HOST, approval_for, execution_request, proposal
 
 import executor.app as executor_app
 from executor.app import create_app
 from executor.config import Settings
 from executor.firststart import ensure_secrets
-from executor.naslink import NasLinkStore
+from executor.hublink import keyset_fingerprint
+from executor.naslink import NasLinkOnleesbaar, NasLinkStore
 from executor.truenas import display_fingerprint, fetch_fingerprint
 
 NEW_KEY = "tweede-test-key-xxxxyyyyzzzz"
@@ -51,6 +61,8 @@ NEW_KEY = "tweede-test-key-xxxxyyyyzzzz"
 SNAP_KEY = "snapshot-test-key-ssssnnnnaaaa"
 APPS_KEY = "apps-test-key-aaaappppssss"
 APPS_SNAP_KEY = "apps-snap-test-key-aassaass"
+# Een schrijfsleutel die alleen een ander (niet vastgelegd) TrueNAS kent.
+ANDERE_NAS_KEY = "ander-nas-test-key-nnnnaaaassss"
 SLEUTEL = "/schrijfsleutel"
 BEHEER = "/beheer"
 # Het groene totaal bovenaan de pagina (Peil-sjabloon: pil "Gezond" in de regel "totaal").
@@ -103,6 +115,149 @@ def restart_request(hub: Hub, nas: FakeTrueNAS) -> dict[str, Any]:
     etag = app_etag(nas.app("my-house"), nas.data["app.image.query"])
     prop = proposal("app.restart", {"host_id": HOST, "app_id": "my-house"}, expected_version=etag)
     return signed(hub, prop, risk_class="R1")
+
+
+def _b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+class AndereHub:
+    """Een andere Hub op loopback (alleen in tests, met ``allow_loopback_hub``): geeft voor elke koppelcode een geldig
+    enroll-antwoord met eigen sleutels. Zo test je wat een Hub na een ontkoppeling kan, ook die van een aanvaller op
+    het LAN (proef P1 van R-VEILIG, S-P2-020)."""
+
+    def __init__(self) -> None:
+        raw = (serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self.jwt_key = Ed25519PrivateKey.generate()
+        self.policy_key = Ed25519PrivateKey.generate()
+        self.jwk = {"kty": "OKP", "crv": "Ed25519", "x": _b64(self.jwt_key.public_key().public_bytes(*raw))}
+        self.pjwk = {"kty": "OKP", "crv": "Ed25519", "x": _b64(self.policy_key.public_key().public_bytes(*raw))}
+        self.fingerprint = keyset_fingerprint([self.jwk], [self.pjwk])
+        self.sid = str(uuid.uuid4())
+        self.enrolls: list[dict[str, Any]] = []
+        hub = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args: Any) -> None:
+                pass
+
+            def _json(self, status_code: int, body: Any) -> None:
+                data = json.dumps(body).encode()
+                self.send_response(status_code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self) -> None:
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                hub.enrolls.append(body)
+                self._json(
+                    200,
+                    {
+                        "schema_version": "1.3",
+                        "service_id": hub.sid,
+                        "app_id": body["app_id"],
+                        "service_token": "svc_" + "b" * 43,
+                        "token_type": "Bearer",
+                        "hub_issuer": "hub",
+                        "jwks": {"keys": [{**hub.jwk, "kid": "ander-jwt", "use": "sig", "alg": "EdDSA"}]},
+                        "policy_public_key": {**hub.pjwk, "kid": "ander-policy", "use": "sig", "alg": "EdDSA"},
+                        "keyset_fingerprint": hub.fingerprint,
+                        "rotation_sequence": 0,
+                        "jwks_url": "/api/v1/auth/jwks",
+                        "events_inbox_url": "/api/v1/events/inbox",
+                        "key_rotation_url": "/api/v1/auth/key-rotations",
+                        "enrollment_replayed": False,
+                    },
+                )
+
+            def do_GET(self) -> None:
+                if self.path.startswith("/api/v1/services/self"):
+                    self._json(
+                        200,
+                        {
+                            "service_id": hub.sid,
+                            "app_id": AUD,
+                            "status": "actief",
+                            "version": "0",
+                            "enrolled_at": "2026-11-12T00:00:00Z",
+                            "keyset_fingerprint": hub.fingerprint,
+                        },
+                    )
+                else:
+                    self._json(200, {"items": []})
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+    def koppelen(self, c: TestClient) -> Any:
+        return post(
+            c,
+            "/koppelen",
+            {"hub_adres": self.url, "koppelcode": "ABCD-EFGH-JKMN", "hub_vingerafdruk": self.fingerprint},
+        )
+
+    def execute(self, c: TestClient, request: dict[str, Any]) -> Any:
+        t = int(time.time())
+        claims = {
+            "iss": "hub",
+            "aud": AUD,
+            "sub": "hub",
+            "token_use": "hub_service",
+            "roles": ["service"],
+            "service_id": self.sid,
+            "iat": t,
+            "nbf": t,
+            "exp": t + 60,
+            "jti": str(uuid.uuid4()),
+        }
+        head = _b64(json.dumps({"alg": "EdDSA", "typ": "JWT", "kid": "ander-jwt"}).encode())
+        body = _b64(json.dumps(claims).encode())
+        token = f"{head}.{body}.{_b64(self.jwt_key.sign(f'{head}.{body}'.encode()))}"
+        return c.post(
+            "/api/v1/execute",
+            json=request,
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": str(uuid.uuid4())},
+        )
+
+    def r1(self, nas: FakeTrueNAS) -> dict[str, Any]:
+        from asm_policy.etag import app_etag
+
+        etag = app_etag(nas.app("my-house"), nas.data["app.image.query"])
+        prop = proposal("app.restart", {"host_id": HOST, "app_id": "my-house"}, expected_version=etag)
+        return execution_request(self.policy_key, prop, policy_hash=POLICY.hash, risk_class="R1")
+
+    def r2(self, nas: FakeTrueNAS) -> dict[str, Any]:
+        """Een R2-actie met een 'goedkeuring' die deze Hub zelf ondertekent."""
+        from asm_policy.etag import app_etag
+
+        etag = app_etag(nas.app("my-house"), nas.data["app.image.query"])
+        prop = proposal("app.stop", {"host_id": HOST, "app_id": "my-house"}, expected_version=etag)
+        appr = approval_for(prop, policy_hash=POLICY.hash, risk_class="R2", backup_checkpoint_id=str(uuid.uuid4()))
+        return execution_request(self.policy_key, prop, policy_hash=POLICY.hash, risk_class="R2", approval=appr)
+
+
+@pytest.fixture
+def lan_hub(tmp_path: Path, nas: FakeTrueNAS) -> Hub:
+    """Gekoppelde executor die ook een Hub op loopback mag aanspreken (alleen in tests; in het echt een LAN-adres)."""
+    return nas_hub(tmp_path / "appdata", nas, allow_loopback_hub=True)
+
+
+@pytest.fixture
+def andere_hub() -> Iterator[AndereHub]:
+    h = AndereHub()
+    yield h
+    h.stop()
+
+
+def hub_link(hub: Hub) -> dict[str, Any]:
+    return dict(json.loads((hub.settings.secrets_dir / "hub-link.json").read_text()))
 
 
 # ------------------------------------------------------------------ instellen in twee stappen
@@ -614,37 +769,202 @@ def test_vrijgeven_na_een_afwijking(hub: Hub, nas: FakeTrueNAS) -> None:
     assert execute(c, hub, restart_request(hub, nas)).status_code == 200
 
 
-def test_vervangen_en_vrijgeven_in_een_keer(hub: Hub, nas: FakeTrueNAS) -> None:
-    from executor.journal import Journal
-
+def test_vervangen_met_een_nieuwe_sleutel_tijdens_een_stop_houdt_hem_gestopt(hub: Hub, nas: FakeTrueNAS) -> None:
+    """R-TECH-5 (S-P2-020): "Sleutel vervangen" met een NIEUWE sleutel geeft nooit vrij; wie na een incident alleen de
+    sleutel wisselt, houdt de executor gestopt. Vrijgeven blijft "Sleutel vervangen" met een leeg veld "Nieuwe sleutel"
+    en de huidige sleutel als bewijs; een ongeldig bewijs verandert niets."""
     set_write_key(hub, nas)
-    Journal(hub.settings.replay_db, hub.settings.secrets_dir).stop({"code": "staat_verschilt", "at": "nu"})
+    _gestopt(hub)
     c = hub_client(hub)
     r = post(c, BEHEER, {"truenas_sleutel": WRITE_KEY, "nieuwe_sleutel": NEW_KEY, "actie": "vervangen"})
-    assert r.status_code == 200 and "vervangen en de executor is vrijgegeven" in r.text, r.text
-    assert status(c)["gestopt"] is None and status(c)["schrijfsleutel"]["laatste4"] == NEW_KEY[-4:]
+    assert r.status_code == 200 and "De schrijfsleutel is vervangen." in r.text, r.text
+    assert "vrijgegeven" not in r.text and "blijft gestopt" in r.text
+    st = status(c)
+    assert st["gestopt"] is not None and st["schrijfsleutel"]["laatste4"] == NEW_KEY[-4:]
+    assert st["uitvoeren"] == {"mogelijk": False, "reden": "executor_gestopt"}
+    assert execute(c, hub, restart_request(hub, nas)).json()["code"] == "executor_gestopt"
+    # Ongeldig bewijs (de oude sleutel is niet meer de huidige): niets verandert, hij blijft gestopt.
+    voor = naslink_file(hub).read_bytes()
+    r = post(c, BEHEER, {"truenas_sleutel": WRITE_KEY, "actie": "vervangen"})
+    assert r.status_code == 400 and code_van(r) == "sleutel_niet_huidig", r.text
+    assert naslink_file(hub).read_bytes() == voor and status(c)["gestopt"] is not None
+    # Leeg veld "Nieuwe sleutel" met de huidige sleutel als bewijs: vrijgegeven, sleutel ongewijzigd.
+    r = post(c, BEHEER, {"truenas_sleutel": NEW_KEY, "actie": "vervangen"})
+    assert r.status_code == 200 and "De executor is vrijgegeven." in r.text, r.text
+    st = status(c)
+    assert st["gestopt"] is None and st["schrijfsleutel"]["laatste4"] == NEW_KEY[-4:]
+    assert execute(c, hub, restart_request(hub, nas)).status_code == 200
 
 
-def test_ontkoppelen_met_bewijs_en_opnieuw_koppelen_mogelijk(hub: Hub, nas: FakeTrueNAS) -> None:
+ONTKOPPELD_MELDING = "Ontkoppeld van de Hub op deze pagina"
+
+
+def test_ontkoppelen_met_bewijs_en_opnieuw_koppelen_mogelijk(
+    lan_hub: Hub, nas: FakeTrueNAS, andere_hub: AndereHub
+) -> None:
+    """R-VEILIG-1 met BN-1 (a) (S-P2-020): ontkoppelen wist de schrijfsleutel; NAS-adres en vingerafdruk blijven vast,
+    first_linked_at blijft staan, state wordt "ontkoppeld" en de pins gaan naar previous_pins (§3.5, §3.8). Het
+    koppelformulier komt terug; na opnieuw koppelen voert de executor niets uit tot de sleutel opnieuw is ingesteld,
+    tegen het vastgelegde adres en de vastgelegde vingerafdruk."""
+    hub = lan_hub
     vinger = set_write_key(hub, nas)
+    oud = hub_link(hub)
     c = hub_client(hub)
     request = restart_request(hub, nas)
     r = post(c, BEHEER, {"truenas_sleutel": WRITE_KEY, "actie": "ontkoppelen"})
     assert r.status_code == 200 and "Ontkoppeld van de Hub." in r.text, r.text
+    assert "De koppeling met de Hub en de schrijfsleutel zijn gewist" in r.text and WRITE_KEY not in r.text
     st = status(c)
     assert st["gekoppeld"] is False and st["uitvoeren"] == {"mogelijk": False, "reden": "niet_gekoppeld"}
-    # NAS-adres, certificaat en sleutel blijven bewaard; de Hub wordt niet meer vertrouwd.
-    assert st["schrijfsleutel"]["ingesteld"] is True
+    assert st["toelichting"].startswith("Ontkoppeld op de executorpagina; de TrueNAS-schrijfsleutel is gewist.")
+    # De sleutel is weg; NAS-adres en certificaat blijven vastgelegd.
+    assert st["schrijfsleutel"]["ingesteld"] is False and st["schrijfsleutel"]["laatste4"] is None
     assert st["truenas"] == {"adres": NAS_HOST, "poort": nas.port, "tls_vingerafdruk": vinger}
+    with pytest.raises(NasLinkOnleesbaar):
+        NasLinkStore(hub.settings.secrets_dir).api_key()
+    assert json.loads(naslink_file(hub).read_text())["key"] is None
+    link = hub_link(hub)
+    assert link["state"] == "ontkoppeld" and link["first_linked_at"] == oud["first_linked_at"]
+    assert link["pins"] is None and link["previous_pins"] == oud["pins"]
+    assert link["service_token"] is None and link["service_token_last4"] is None
     assert execute(c, hub, request).status_code == 401
     assert [m for m in nas.mutations if m != "app.config"] == []
-    # Het koppelformulier is terug (opnieuw koppelen met een koppelcode), het beheerformulier blijft.
+    # Het koppelformulier is terug, met een melding die zegt wat er gebeurd is; geen beheer- of sleutelformulier.
     pagina = c.get("/").text
-    assert 'action="/koppelen"' in pagina and 'action="/beheer"' in pagina and 'action="/schrijfsleutel"' not in pagina
+    assert 'action="/koppelen"' in pagina and ONTKOPPELD_MELDING in pagina
+    assert 'action="/beheer"' not in pagina and 'action="/schrijfsleutel"' not in pagina
+    assert "De Hub heeft deze dienst ontkoppeld" not in pagina
+
+    # Opnieuw koppelen met een koppelcode (hier een andere Hub).
+    r = andere_hub.koppelen(c)
+    assert r.status_code == 200 and "Gekoppeld met de Hub." in r.text, r.text
+    link = hub_link(hub)
+    assert link["state"] == "gekoppeld" and link["first_linked_at"] == oud["first_linked_at"]
+    assert link["previous_pins"] == oud["pins"]
+    st = status(c)
+    assert st["gekoppeld"] is True and st["uitvoeren"] == {"mogelijk": False, "reden": "schrijfsleutel_ontbreekt"}
+    pagina = c.get("/").text
+    assert 'action="/schrijfsleutel"' in pagina and "Opnieuw gekoppeld: controleer eerst de Hub" in pagina
+    assert andere_hub.url in pagina and andere_hub.fingerprint in pagina
+    # Tot de sleutel opnieuw is ingesteld voert de executor niets uit, ook niet voor de nieuwe Hub.
+    logins = nas.logins
+    r = andere_hub.execute(c, andere_hub.r1(nas))
+    assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    assert nas.logins == logins and [m for m in nas.mutations if m != "app.config"] == []
+
+    # Sleutel opnieuw instellen: één stap, live getest tegen het vastgelegde adres en de vastgelegde vingerafdruk.
+    r = post(c, SLEUTEL, {"truenas_sleutel": WRITE_KEY})
+    assert r.status_code == 200 and "De schrijfsleutel is getest en opgeslagen." in r.text, r.text
+    assert WRITE_KEY not in r.text and nas.logins == logins + 1
+    st = status(c)
+    assert st["schrijfsleutel"]["ingesteld"] is True and st["uitvoeren"] == {"mogelijk": True, "reden": None}
+    assert st["truenas"] == {"adres": NAS_HOST, "poort": nas.port, "tls_vingerafdruk": vinger}
+    assert "Opnieuw gekoppeld: controleer eerst de Hub" not in c.get("/").text
+    assert andere_hub.execute(c, andere_hub.r1(nas)).status_code == 200
+    # Tegenproef (P1): gekoppeld en first_linked_at gezet → het koppelformulier is dicht, de Hub krijgt niets.
+    enrolls = len(andere_hub.enrolls)
+    r = andere_hub.koppelen(c)
+    assert r.status_code == 409 and code_van(r) == "al_gekoppeld", r.text
+    assert len(andere_hub.enrolls) == enrolls
+
+
+def test_na_ontkoppelen_kan_een_andere_hub_hooguit_koppelen_maar_niets_laten_uitvoeren(
+    lan_hub: Hub, nas: FakeTrueNAS, andere_hub: AndereHub
+) -> None:
+    """Proef P1 van R-VEILIG-1 (S-P2-020) als negatieve test. Na "Ontkoppelen van de Hub" koppelt iemand op het LAN
+    zonder TrueNAS-sleutel de executor aan een eigen Hub. Dat kan (afwijking van §3.9 letterlijk, ADR-0030 besluit 13),
+    maar die Hub laat niets uitvoeren: de schrijfsleutel is gewist (geen app.*-aanroep, geen aanmelding bij TrueNAS),
+    en een sleutel instellen kan alleen met een sleutel die op het vastgelegde NAS-adres en certificaat werkt."""
+    hub = lan_hub
+    set_write_key(hub, nas)
+    beheerder = hub_client(hub)
+    r = post(beheerder, BEHEER, {"truenas_sleutel": WRITE_KEY, "actie": "ontkoppelen"})
+    assert r.status_code == 200 and "Ontkoppeld van de Hub." in r.text, r.text
+    logins, mutaties = nas.logins, list(nas.mutations)
+
+    aanvaller = TestClient(create_app(hub.settings), base_url=BASE)
+    st = status(aanvaller)
+    assert st["schrijfsleutel"]["ingesteld"] is False and st["uitvoeren"]["mogelijk"] is False
+    r = andere_hub.koppelen(aanvaller)
+    assert r.status_code == 200 and "Gekoppeld met de Hub." in r.text, r.text
+    st = status(aanvaller)
+    assert st["uitvoeren"] == {"mogelijk": False, "reden": "schrijfsleutel_ontbreekt"}
+    for verzoek in (andere_hub.r1(nas), andere_hub.r2(nas)):
+        r = andere_hub.execute(aanvaller, verzoek)
+        assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    assert nas.logins == logins and nas.mutations == mutaties
+    with pytest.raises(NasLinkOnleesbaar):
+        NasLinkStore(hub.settings.secrets_dir).api_key()
+    # Beheer kan niets zonder sleutel; een sleutel zonder rechten op het vastgelegde NAS wordt niet opgeslagen.
+    assert code_van(post(aanvaller, BEHEER, {"truenas_sleutel": WRITE_KEY, "actie": "ontkoppelen"})) == (
+        "geen_schrijfsleutel"
+    )
+    for sleutel, code in ((ONBEKEND, "sleutel_geweigerd"), (READ_KEY, "schrijfrechten_ontbreken")):
+        r = post(aanvaller, SLEUTEL, {"truenas_sleutel": sleutel})
+        assert r.status_code == 400 and code_van(r) == code, r.text
+    assert status(aanvaller)["schrijfsleutel"]["ingesteld"] is False
+    # Een ander NAS-adres (bv. een eigen TrueNAS waar de aanvaller wél een schrijfsleutel heeft) telt niet: de sleutel
+    # gaat alleen naar het vastgelegde adres en certificaat.
+    ander = write_nas().start()
+    try:
+        ander.keys[ANDERE_NAS_KEY] = KeyProfile(roles=["FULL_ADMIN"], write=True)
+        elders = TestClient(create_app(hub.settings.model_copy(update={"truenas_port": ander.port})), base_url=BASE)
+        for _ in range(2):  # twee keer: er is geen stap 1 met een nieuwe vingerafdruk
+            r = post(elders, SLEUTEL, {"truenas_sleutel": ANDERE_NAS_KEY})
+            assert r.status_code == 400 and code_van(r) == "sleutel_geweigerd", r.text
+        assert ander.logins == 0 and ander.calls == []
+    finally:
+        ander.stop()
+    st = status(aanvaller)
+    assert st["schrijfsleutel"]["ingesteld"] is False and st["truenas"]["poort"] == nas.port
+    r = andere_hub.execute(aanvaller, andere_hub.r1(nas))
+    assert r.status_code == 501 and nas.mutations == mutaties
+
+
+def test_ontkoppeld_met_een_opgeslagen_sleutel_houdt_het_koppelformulier_dicht(
+    lan_hub: Hub, nas: FakeTrueNAS, andere_hub: AndereHub
+) -> None:
+    """Zolang er een schrijfsleutel ligt, nooit koppelen zonder sleutelbewijs: ook niet als hub-link.json (bv. na een
+    onderbroken ontkoppeling of een teruggezette kopie) "ontkoppeld" zegt terwijl de sleutel er nog is (R-VEILIG-1)."""
+    from executor.hublink import HubLinkStore
+
+    hub = lan_hub
+    set_write_key(hub, nas)
+    with HubLinkStore(hub.settings.secrets_dir).update() as link:
+        link.update(state="ontkoppeld", service_token=None, pins=None)
+    c = hub_client(hub)
+    pagina = c.get("/").text
+    assert 'action="/koppelen"' not in pagina and 'action="/beheer"' in pagina
+    r = andere_hub.koppelen(c)
+    assert r.status_code == 409 and code_van(r) == "al_gekoppeld", r.text
+    assert andere_hub.enrolls == [] and hub_link(hub)["state"] == "ontkoppeld"
+
+
+def test_na_wissen_van_de_sleutel_blijven_adres_en_vingerafdruk_vast(hub: Hub, nas: FakeTrueNAS) -> None:
+    """BN-1 a: de opslag weigert na het wissen een ander adres, een andere poort of een andere vingerafdruk, ook voor
+    een nieuwe sleutel; een nieuwe stap 1 (vingerafdruk ophalen) kan niet meer."""
+    vinger = set_write_key(hub, nas)
+    store = NasLinkStore(hub.settings.secrets_dir)
+    store.wis_sleutel()
+    assert store.vastgelegd() == (NAS_HOST, nas.port, vinger) and not store.configured()
+    for host, port, vingerafdruk in (
+        (NAS_HOST, nas.port + 1, vinger),
+        ("192.0.2.9", nas.port, vinger),
+        (NAS_HOST, nas.port, "0" * 64),
+    ):
+        with pytest.raises(NasLinkOnleesbaar):
+            store.save_key(host, port, vingerafdruk, WRITE_KEY, ["FULL_ADMIN"], nieuw=True)
+    with pytest.raises(NasLinkOnleesbaar):
+        store.set_pending(NAS_HOST, nas.port + 1, vinger)
+    assert not store.configured() and store.pending() is None
+    store.save_key(NAS_HOST, nas.port, vinger, WRITE_KEY, ["FULL_ADMIN"], nieuw=True)
+    assert store.api_key() == WRITE_KEY
 
 
 def test_onleesbaar_koppelbestand_herstellen_met_de_sleutel(hub: Hub, nas: FakeTrueNAS) -> None:
-    set_write_key(hub, nas)
+    """Herstel van een onleesbaar koppelbestand met de huidige sleutel: het origineel blijft bewaard als
+    hub-link.json.onleesbaar-<tijd> (0600, §3.5), de sleutel wordt gewist en het koppelformulier komt terug."""
+    vinger = set_write_key(hub, nas)
     (hub.settings.secrets_dir / "hub-link.json").write_text("{kapot", encoding="utf-8")
     c = hub_client(hub)
     pagina = c.get("/").text
@@ -653,8 +973,18 @@ def test_onleesbaar_koppelbestand_herstellen_met_de_sleutel(hub: Hub, nas: FakeT
     assert "vul onder" in pagina and "daarna kun je opnieuw koppelen met een koppelcode" in pagina
     r = post(c, BEHEER, {"truenas_sleutel": WRITE_KEY, "actie": "ontkoppelen"})
     assert r.status_code == 200 and "Ontkoppeld van de Hub." in r.text, r.text
+    bewaard = sorted(hub.settings.secrets_dir.glob("hub-link.json.onleesbaar-*"))
+    assert len(bewaard) == 1 and bewaard[0].read_text(encoding="utf-8") == "{kapot"
+    assert stat.S_IMODE(bewaard[0].stat().st_mode) == 0o600
+    assert re.fullmatch(r"hub-link\.json\.onleesbaar-\d{8}T\d{6}Z", bewaard[0].name), bewaard[0].name
+    link = hub_link(hub)
+    assert link["state"] == "ontkoppeld" and link["first_linked_at"] and link["unreadable_replaced_at"]
+    st = status(c)
+    assert st["schrijfsleutel"]["ingesteld"] is False
+    assert st["truenas"] == {"adres": NAS_HOST, "poort": nas.port, "tls_vingerafdruk": vinger}
     pagina = c.get("/").text
     assert "De koppelstatus is onleesbaar" not in pagina and 'action="/koppelen"' in pagina
+    assert ONTKOPPELD_MELDING in pagina
 
 
 def test_onleesbare_sleutelopslag_geen_formulier_en_geen_beheer(hub: Hub, nas: FakeTrueNAS) -> None:

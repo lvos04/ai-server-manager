@@ -3,7 +3,9 @@
 - Bestand ``/appdata/secrets/naslink.json`` (0600, atomair vervangen). De sleutel staat er alleen versleuteld in
   (AES-256-GCM met ``vault.key``); buiten deze module is alleen ``laatste4`` zichtbaar.
 - Adres en vingerafdruk worden **één keer** vastgelegd (eerst als ``pending``, pas na bevestiging en een geslaagde live
-  test definitief). Daarna verandert alleen de sleutel; een ander adres of certificaat vraagt een nieuwe datamap.
+  test definitief). Daarna verandert alleen de sleutel; een ander adres of certificaat vraagt een nieuwe datamap. Ook
+  als de sleutel bij het ontkoppelen is gewist (BN-1 a, S-P2-020), blijven adres en vingerafdruk vast: een nieuwe
+  sleutel gaat alleen daarheen.
 - Onleesbaar bestand → ``_onleesbaar``: de executor voert niets uit en biedt geen sleutelformulier aan (fail-closed).
 """
 
@@ -213,10 +215,25 @@ class NasLinkStore:
         }
 
     # ------------------------------------------------------------------ schrijven
+    def vastgelegd(self) -> tuple[str, int, str] | None:
+        """Het vastgelegde NAS-adres, de poort en de vingerafdruk (ook als de sleutel gewist is), of ``None`` als die
+        nog niet zijn vastgelegd. :class:`NasLinkOnleesbaar` bij een onleesbare opslag."""
+        data = self.read()
+        if data.get("_onleesbaar"):
+            raise NasLinkOnleesbaar(FILE_NAME)
+        host, port, fingerprint = data.get("host"), data.get("port"), data.get("fingerprint")
+        if host is None:
+            return None
+        if not (isinstance(host, str) and isinstance(port, int) and isinstance(fingerprint, str) and fingerprint):
+            raise NasLinkOnleesbaar(FILE_NAME)
+        return host, port, fingerprint
+
     def set_pending(self, host: str, port: int, fingerprint: str) -> None:
         with self.update() as data:
             if data.get("key") is not None:
                 raise NasLinkConflict("al ingesteld")
+            if data.get("host") is not None:
+                raise NasLinkConflict("adres en certificaat liggen al vast")
             data["pending"] = {"host": host, "port": port, "fingerprint": fingerprint, "started_at": now_iso()}
 
     def clear_pending(self) -> None:
@@ -232,11 +249,12 @@ class NasLinkStore:
         with self.update() as data:
             if nieuw and data.get("key") is not None:
                 raise NasLinkConflict("al ingesteld")
-            if data.get("key") is not None and (data["host"], data["port"], data["fingerprint"]) != (
-                host,
-                port,
-                fingerprint,
-            ):
+            # Vastgelegd is vastgelegd, ook als de sleutel bij het ontkoppelen is gewist (BN-1 a, S-P2-020).
+            if (data.get("key") is not None or data.get("host") is not None) and (
+                data.get("host"),
+                data.get("port"),
+                data.get("fingerprint"),
+            ) != (host, port, fingerprint):
                 raise NasLinkConflict("adres of certificaat ligt al vast")
             data.update(
                 host=host,
@@ -248,3 +266,9 @@ class NasLinkStore:
                 rollen=sorted(roles),
                 pending=None,
             )
+
+    def wis_sleutel(self) -> None:
+        """De schrijfsleutel wissen bij het ontkoppelen (BN-1 a, S-P2-020). Adres, poort en vingerafdruk blijven vast;
+        een nieuwe sleutel gaat alleen daarheen. Tot hij opnieuw is ingesteld voert de executor niets uit."""
+        with self.update() as data:
+            data.update(key=None, laatste4=None, ingesteld_op=None, rollen=[], pending=None)

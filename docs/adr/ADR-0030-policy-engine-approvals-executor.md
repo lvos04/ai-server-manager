@@ -118,7 +118,9 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       adres en SHA-256-vingerafdruk van het certificaat. Stap 2 (dezelfde sleutel opnieuw, binnen 15 minuten) stuurt
       de sleutel alleen over een verbinding met precies die vingerafdruk. Live test: `auth.login_with_api_key`,
       rolcontrole via `auth.me` en `core.get_methods`. Dit is vertrouwen bij eerste gebruik: de beheerder vergelijkt
-      de vingerafdruk met die in TrueNAS.
+      de vingerafdruk met die in TrueNAS. Na een ontkoppeling (zie **Ontkoppelen**) is er geen stap 1 meer: adres en
+      vingerafdruk liggen al vast, en de nieuwe sleutel wordt in één stap live getest tegen precies dat adres en die
+      vingerafdruk, nooit tegen het adres van de pagina of een gewijzigde `EXECUTOR_TRUENAS_HOST`.
     - **Rollen (S-P2-020, R-TECH-1).** Een sleutel telt alleen als schrijfsleutel als zijn rollen de app- **én**
       snapshotacties van de allowlist dekken: `FULL_ADMIN`, of `APPS_WRITE` samen met `SNAPSHOT_WRITE`. Een
       alleen-lezen-sleutel geeft `schrijfrechten_ontbreken`; alleen `APPS_WRITE` of alleen `SNAPSHOT_WRITE` geeft
@@ -142,9 +144,27 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       gevallen verandert er niets. Pas daarna volgt de live test. Is de huidige sleutel in TrueNAS ingetrokken (of zijn
       zijn rechten weg), dan weigert TrueNAS hem en kan vervangen, vrijgeven of ontkoppelen niet meer op de pagina:
       dan is herinstallatie met een nieuwe datamap nodig.
-    - **Ontkoppelen.** Verwijdert alleen de Hub-koppeling; adres, vingerafdruk en sleutel blijven staan, zodat opnieuw
-      koppelen met een koppelcode volstaat. `POST /api/v1/hub-link/unlink` vanuit de Hub (§3.8) blijft
-      `501 capability_unavailable`: §3.9 eist bewijs met de schrijfsleutel en de Hub mag die sleutel nooit zien.
+    - **Ontkoppelen (S-P2-020, R-VEILIG-1, BN-1 a; tussenstap).** Na het bewijs met de huidige sleutel wist de
+      executor eerst de schrijfsleutel en daarna de Hub-koppeling. Adres en vingerafdruk van TrueNAS blijven vast.
+      `hub-link.json` gaat naar `state: ontkoppeld`: service-token weg, pins naar `previous_pins` (alleen audit),
+      `first_linked_at` blijft altijd staan (§3.5, §3.8). Een onleesbaar `hub-link.json` wordt eerst bewaard als
+      `hub-link.json.onleesbaar-<UTC-tijd>` (0600) met `unreadable_replaced_at`; `first_linked_at` is dan het moment
+      van vervangen (de echte waarde is niet te lezen). In `ontkoppeld` komt het bestaande koppelformulier terug,
+      maar alleen zolang er geen sleutel ligt; daarna stelt de beheerder de sleutel opnieuw in met het bestaande
+      sleutelformulier, tegen het vastgelegde adres en de vastgelegde vingerafdruk. Tot dan voert de executor niets
+      uit (`capability_unavailable`, reden `schrijfsleutel_ontbreekt`), ook niet voor een nieuw gekoppelde Hub.
+      **Afwijking van §3.9 letterlijk:** opnieuw koppelen na een ontkoppeling gaat zonder sleutelbewijs. Wie op het
+      LAN de pagina bereikt, kan in dat venster de executor aan een eigen Hub koppelen, maar die Hub krijgt geen
+      rechten: er is geen schrijfsleutel, en een nieuwe sleutel werkt alleen als hij op het vastgelegde NAS-adres en
+      certificaat schrijfrechten heeft (zoals het restrisico van §3.7: "de dienst heeft dan nog geen data of
+      rechten"). De pagina toont adres en vingerafdruk van de gekoppelde Hub, met een vaste melding: vul de sleutel
+      alleen in als dat jouw Hub is. Is het een andere Hub, dan is er zonder sleutel geen beheerformulier: herstel
+      is een nieuwe datamap (of de sleutel instellen en direct ontkoppelen; in dat korte venster kan die Hub wel
+      acties aanbieden, dus dat raden de docs niet aan). De volledige
+      vorm (opnieuw koppelen mét sleutelbewijs in het koppelformulier, plus een eigen vrijgeefknop) vraagt een nieuwe
+      Peil-versie van de statuspagina en is een eigen latere stap (zie Open punten). `POST /api/v1/hub-link/unlink`
+      vanuit de Hub (§3.8) blijft `501 capability_unavailable`: §3.9 eist bewijs met de schrijfsleutel en de Hub mag
+      die sleutel nooit zien.
     - **Fail-closed.** Onleesbare sleutelopslag: geen formulieren, niets wordt overschreven, uitvoeren geeft
       `schrijfsleutel_onleesbaar` (503). Onleesbaar is ook een `vault.key` die de opgeslagen sleutel niet opent (bv.
       verloren en bij de start opnieuw gemaakt): status en pagina openen de sleutel echt en tonen dan
@@ -166,7 +186,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     uitkomst onbekend (time-out of verbroken verbinding ná de aanroep), dan zet de executor zichzelf op "gestopt" en
     weigert hij elke volgende uitvoering (`executor_gestopt`) tot een beheerder hem op de executorpagina vrijgeeft.
     Het sjabloon heeft geen aparte vrijgaveknop: vrijgeven is "Sleutel vervangen" met de huidige sleutel en een leeg
-    veld voor de nieuwe sleutel. Het antwoord aan de Hub is `afwijking`; de Hub legt een incident vast en zet de
+    veld voor de nieuwe sleutel. "Sleutel vervangen" met een nieuwe sleutel geeft nooit vrij; de executor blijft dan
+    gestopt (S-P2-020, R-TECH-5). Ontkoppelen laat een stop ook staan. Het antwoord aan de Hub is `afwijking`; de Hub legt een incident vast en zet de
     actie op `afwijking`. Geen automatische herhaling. Weigert TrueNAS de aanroep en is het doel aantoonbaar
     onveranderd, dan is het `uitvoering_mislukt` zonder stop. Een onleesbaar journaal telt als gestopt: vóór de
     aanroep `journaal_niet_beschikbaar` (er is niets uitgevoerd), erna `afwijking`.
@@ -301,17 +322,14 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
   (contract §4.5) is een `kid` in het verzoek duidelijker. Contractvraag.
-- **Opnieuw koppelen na ontkoppelen zonder sleutelbewijs (S-P2-020, R-VEILIG-1, blokkerend; nog niet hersteld).**
-  Na "Ontkoppelen van de Hub" wist de executor nu de hele koppeling (ook `first_linked_at`) en houdt hij de sleutel;
-  wie daarna het koppelformulier gebruikt, koppelt zonder TrueNAS-sleutel aan een eigen Hub, die dan acties laat
-  uitvoeren met de opgeslagen sleutel. De gekozen oplossing (ontkoppelen wist de sleutel; `first_linked_at` blijft;
-  opnieuw koppelen alleen met een live geverifieerde schrijfsleutel in hetzelfde formulier, §3.5/§3.8/§3.9) vraagt een
-  extra veld in het koppelformulier. Dat formulier is het vaste Peil-sjabloon (`design/ontwerptaal/statuspagina.html`,
-  byte-gelijk gepind); een wijziging daarvan is een nieuwe Peil-versie. Wacht op dat besluit.
-- **Vrijgeven is geen eigen actie (S-P2-020, R-TECH-5; nog niet hersteld).** Vrijgeven gaat via "Sleutel vervangen"
-  (zie besluit 14), en een geslaagde vervanging tijdens een stop geeft de executor ook vrij. Een eigen knop "Vrijgeven"
-  (alleen zichtbaar als hij gestopt is) vraagt eveneens een wijziging van het Peil-sjabloon. Wacht op hetzelfde
-  besluit.
+- **Opnieuw koppelen mét sleutelbewijs en een eigen vrijgeefknop (S-P2-020, vervolg op R-VEILIG-1 en R-TECH-5).**
+  De tussenstap van besluit 13 (ontkoppelen wist de sleutel) en besluit 14 (vervangen met een nieuwe sleutel geeft
+  nooit vrij) staan; de volledige vorm van §3.9 (sleutelveld in het koppelformulier na een ontkoppeling) en een eigen
+  knop "Vrijgeven" (alleen zichtbaar als de executor gestopt is) vragen een nieuwe Peil-versie van
+  `design/ontwerptaal/statuspagina.html` (nu 1.1.1, byte-gelijk gepind). Ook de vaste teksten van het koppelformulier
+  ("Niet gekoppeld", "nog niet met de Hub gekoppeld") en het sjablooncommentaar ("koppelformulier: nog NOOIT
+  gekoppeld") passen niet bij `ontkoppeld`; tot die stap legt een vaste melding op de pagina uit wat er aan de hand
+  is. Eigen latere stap.
 
 ## Gevolgen
 

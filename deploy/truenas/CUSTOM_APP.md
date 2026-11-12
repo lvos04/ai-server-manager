@@ -248,10 +248,15 @@ het blok **Ontkoppelen of sleutel vervangen**.
 
 1. Vul daar de huidige TrueNAS-API-sleutel met schrijfrechten in, laat **Nieuwe sleutel** leeg en kies **Ontkoppelen
    van de Hub**. De executor test de sleutel eerst live tegen het vastgelegde NAS-adres en certificaat en wist pas
-   daarna het koppelbestand. NAS-adres, certificaat, sleutel en journaal blijven bewaard.
+   daarna de schrijfsleutel en de koppeling. Het onleesbare koppelbestand blijft bewaard als
+   `/appdata/secrets/hub-link.json.onleesbaar-<UTC-tijd>`. NAS-adres, certificaat en journaal blijven bewaard.
 2. Het koppelformulier komt terug. Maak in de Hub een nieuwe koppelcode op de pagina **Executor installeren en
    koppelen** (Onboarding → *Uitleg executor*) met **Koppelcode voor de executor maken** (alleen een beheerder), en
    koppel zoals in stap 3, "Koppelen met de Hub", punt 2 en 3. In de Hub hoef je vooraf niets te ontkoppelen.
+3. Controleer op de statuspagina dat het adres en de vingerafdruk van de Hub die van jouw Hub zijn (zie de Hub-UI).
+   Vul daarna de TrueNAS-API-sleutel met schrijfrechten opnieuw in. De executor test hem in één stap tegen het
+   vastgelegde NAS-adres en certificaat. Tot dan voert hij niets uit. Staat er een andere Hub, vul de sleutel dan niet
+   in en volg **Nieuwe datamap** hieronder.
 
 Meldt de executor bij punt 1 `certificaat_gewijzigd` (het certificaat van TrueNAS is veranderd sinds het vastleggen),
 dan kan het niet op de statuspagina: volg **Nieuwe datamap** hieronder.

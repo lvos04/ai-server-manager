@@ -59,6 +59,7 @@ from executor.hublink import (
     b64url_decode,
     confirm,
     enroll_with_pairing_code,
+    koppelen_toegestaan,
     melding_nl,
     pending_expired,
     public_status,
@@ -71,7 +72,7 @@ from executor.hublink import (
 from executor.journal import Journal, JournalUnavailable
 from executor.naslink import MAX_KEY_LEN, NasLinkConflict, NasLinkOnleesbaar, NasLinkStore
 from executor.replay import ReplayCache, ReplayUnavailable
-from executor.statuspagina import executor_page, onleesbaar_melding, vingerafdruk_melding
+from executor.statuspagina import HERSTEL, executor_page, onleesbaar_melding, vingerafdruk_melding
 from executor.truenas import NasFout, display_fingerprint, fetch_fingerprint, verify_key
 from executor.uitvoeren import Uitvoerder
 
@@ -244,6 +245,26 @@ FORM_MESSAGES: dict[str, tuple[int, str, str]] = {
         "Het journaal is niet beschikbaar",
         "De executor kon zijn journaal niet lezen. Er is niets gewijzigd; controleer de opslag in /appdata.",
     ),
+}
+# Bestaande toestand na "Ontkoppelen van de Hub" op deze pagina (BN-1 a, S-P2-020): vaste tekst, geen live-rol.
+ONTKOPPELD_MELDING: dict[str, str] = {
+    "toon": "info",
+    "rol": "",
+    "titel": "Ontkoppeld van de Hub op deze pagina",
+    "tekst": "Een beheerder heeft de executor hier ontkoppeld; daarbij is ook de TrueNAS-schrijfsleutel gewist. Het "
+    "NAS-adres en het certificaat liggen nog vast. Koppel hieronder opnieuw met een koppelcode en de vingerafdruk uit "
+    "de Hub, en vul daarna de TrueNAS-API-sleutel met schrijfrechten opnieuw in. Tot die sleutel opnieuw is ingesteld, "
+    "voert de executor niets uit.",
+}
+# Bestaande toestand: opnieuw gekoppeld na zo'n ontkoppeling, nog zonder sleutel. In dit venster kan iemand op het LAN
+# de executor aan een eigen Hub hebben gekoppeld (ADR-0030 besluit 13): eerst de Hub controleren, dan pas de sleutel.
+OPNIEUW_GEKOPPELD_MELDING: dict[str, str] = {
+    "toon": "info",
+    "rol": "",
+    "titel": "Opnieuw gekoppeld: controleer eerst de Hub",
+    "tekst": "De executor is na een ontkoppeling opnieuw gekoppeld en heeft nog geen TrueNAS-schrijfsleutel. Vul de "
+    "sleutel alleen in als het adres en de vingerafdruk van de Hub hieronder die van jouw Hub zijn (zie de Hub-UI). Is "
+    f"het een andere Hub, vul de sleutel dan niet in: zonder sleutel voert de executor niets uit. {HERSTEL}",
 }
 VELD_BIJ_FOUT = {
     "hub_vingerafdruk_onjuist": "vingerafdruk",
@@ -428,6 +449,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             toelichting = "Gekoppeld met de Hub; voert alleen ondertekende acties van de allowlist uit."
         elif raw.get("_onleesbaar"):
             toelichting = "De koppelstatus is onleesbaar: de executor vertrouwt de Hub niet en voert niets uit."
+        elif raw.get("state") == "ontkoppeld":
+            toelichting = (
+                "Ontkoppeld op de executorpagina; de TrueNAS-schrijfsleutel is gewist. Koppel opnieuw met een "
+                "koppelcode en vul daarna de sleutel opnieuw in; tot dan voert de executor niets uit."
+            )
         elif not linked:
             toelichting = (
                 "Nog niet gekoppeld. Koppel met een koppelcode (30 min) en de vingerafdruk uit de Hub-UI; vul daarna "
@@ -743,6 +769,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             out.append({**{k: v for k, v in row.items() if k != "nonce"}, "target": target})
         return JSONResponse({"request_id": rid, "uitvoeringen": out, "gestopt": stopped is not None})
 
+    def _koppelformulier_open(raw: dict[str, Any]) -> bool:
+        """Het koppelformulier: nooit gekoppeld, of ontkoppeld op deze pagina én zonder opgeslagen schrijfsleutel
+        (die is bij het ontkoppelen gewist; BN-1 a, S-P2-020). Zolang er een sleutel ligt, nooit zonder
+        sleutelbewijs."""
+        if not koppelen_toegestaan(raw):
+            return False
+        if not raw.get("first_linked_at"):
+            return True
+        nas = naslink.read()
+        return not nas.get("_onleesbaar") and nas.get("key") is None
+
     def _page(
         melding: dict[str, str] | None = None,
         *,
@@ -756,7 +793,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         linked = not raw.get("_onleesbaar") and raw.get("state") == "gekoppeld"
         wacht = naslink.pending() if linked and not nas.get("ingesteld") and not nas.get("onleesbaar") else None
         show_form = (
-            (not raw.get("_onleesbaar") and not raw.get("first_linked_at") and raw.get("pending") is None)
+            (_koppelformulier_open(raw) and raw.get("pending") is None)
             or (linked and not nas.get("ingesteld") and not nas.get("onleesbaar"))
             or bool(nas.get("ingesteld"))
         )
@@ -775,6 +812,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "tekst": str(last.get("melding") or "Koppelen is mislukt."),
                     "code": str(last.get("code")),
                 }
+            elif raw.get("state") == "ontkoppeld" and raw.get("pending") is None:
+                # Bestaande toestand (geen live-rol). De vaste tekst van het koppelformulier ("nog niet met de Hub
+                # gekoppeld") komt uit het Peil-sjabloon; deze melding zegt wat er werkelijk aan de hand is.
+                melding = ONTKOPPELD_MELDING
+            elif linked and raw.get("previous_pins") and not nas.get("ingesteld") and not nas.get("onleesbaar"):
+                melding = OPNIEUW_GEKOPPELD_MELDING
         html = executor_page(
             versie=__version__,
             link=raw,
@@ -860,7 +903,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         link = store.read()
         if link.get("_onleesbaar"):
             return _afgehandeld("koppelstatus_onleesbaar", trace)
-        if link.get("first_linked_at"):
+        if not _koppelformulier_open(link):
             return _afgehandeld("al_gekoppeld", trace)
         if link.get("pending") is not None and not pending_expired(link):
             return _afgehandeld("koppelen_bezig", trace)
@@ -951,6 +994,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         code = code if code in FORM_MESSAGES else "truenas_fout"
         return _afgehandeld(code, trace, soort=soort, veld={"sleutel": FORM_MESSAGES[code][2]} if veld else None)
 
+    async def _sleutel_opnieuw(vast: tuple[str, int, str], api_key: str, trace: str, soort: str) -> HTMLResponse:
+        host, port, fingerprint = vast
+        try:
+            roles, _methods = await run_in_threadpool(
+                verify_key, host, port, fingerprint, api_key, timeout=settings.truenas_timeout_seconds
+            )
+            naslink.save_key(host, port, fingerprint, api_key, roles, nieuw=True)
+        except NasFout as exc:
+            return _sleutelfout(
+                exc.code,
+                trace,
+                soort,
+                veld=exc.code in ("sleutel_geweigerd", "schrijfrechten_ontbreken", "schrijfrechten_onvolledig"),
+            )
+        except NasLinkConflict:
+            return _afgehandeld("sleutel_al_ingesteld", trace, soort=soort)
+        except NasLinkOnleesbaar:
+            return _afgehandeld("sleutelopslag_onleesbaar", trace, soort=soort)
+        except OSError:
+            return _afgehandeld("sleutelopslag_niet_schrijfbaar", trace, soort=soort)
+        return _gelukt(
+            "sleutel_ingesteld",
+            trace,
+            "De schrijfsleutel is getest en opgeslagen.",
+            "TrueNAS accepteerde de sleutel op het vastgelegde NAS-adres en certificaat, en hij heeft "
+            "schrijfrechten. De sleutel staat versleuteld in deze dienst en de Hub ziet hem nooit.",
+            soort=soort,
+        )
+
     @app.post("/schrijfsleutel", response_class=HTMLResponse, include_in_schema=False)
     async def write_key(request: Request) -> HTMLResponse:
         """Eerste keer de schrijfsleutel instellen, in twee stappen. Stap 1 haalt alleen de TLS-vingerafdruk van TrueNAS
@@ -974,6 +1046,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         api_key = form.get("truenas_sleutel", "")
         if not _sleutel_ok(api_key):
             return _sleutelfout("sleutel_ongeldig", trace, soort, veld=True)
+        try:
+            vast = naslink.vastgelegd()
+        except NasLinkOnleesbaar:
+            return _afgehandeld("sleutelopslag_onleesbaar", trace, soort=soort)
+        if vast is not None:
+            # Na een ontkoppeling (de sleutel is gewist): adres en vingerafdruk liggen al vast en zijn bij de eerste
+            # keer bevestigd. Eén stap: live test tegen precies dat adres en certificaat, nooit tegen het adres van
+            # deze pagina of EXECUTOR_TRUENAS_HOST (BN-1 a, S-P2-020).
+            return await _sleutel_opnieuw(vast, api_key, trace, soort)
         adres = _nas_adres(request)
         if adres is None:
             return _afgehandeld("nas_adres_onbekend", trace, soort=soort)
@@ -1025,7 +1106,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/beheer", response_class=HTMLResponse, include_in_schema=False)
     async def manage(request: Request) -> HTMLResponse:
-        """Ontkoppelen van de Hub, de sleutel vervangen of een gestopte executor vrijgeven. Bewijs van TrueNAS-beheer:
+        """Ontkoppelen van de Hub, de sleutel vervangen of een gestopte executor vrijgeven ("Sleutel vervangen" met
+        een leeg veld "Nieuwe sleutel"; vervangen met een nieuwe sleutel geeft nooit vrij, R-TECH-5). Ontkoppelen wist
+        ook de schrijfsleutel (BN-1 a, S-P2-020). Bewijs van TrueNAS-beheer:
         alleen de **huidige** opgeslagen sleutel. Eerst een vergelijking in constante tijd met de ontsleutelde sleutel
         (onleesbare opslag of ``vault.key`` = weigeren; er gaat dan niets naar TrueNAS), daarna de live test tegen het
         vastgelegde NAS-adres en certificaat (BN-2 a, S-P2-020). Een ander adres of certificaat kan hier niet worden
@@ -1066,14 +1149,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 verify_key, host, port, fingerprint, bewijs, timeout=settings.truenas_timeout_seconds
             )
             if actie == "ontkoppelen":
-                store.reset()
+                # Eerst de sleutel wissen, dan pas ontkoppelen: lukt het tweede niet, dan is de executor nog met de
+                # oude Hub gekoppeld maar zonder sleutel (voert niets uit). Nooit andersom: dan zou het koppelformulier
+                # open staan terwijl de sleutel er nog ligt (R-VEILIG-1, BN-1 a, S-P2-020).
+                naslink.wis_sleutel()
+                store.ontkoppel()
                 return _gelukt(
                     "ontkoppeld",
                     trace,
                     "Ontkoppeld van de Hub.",
-                    "De koppeling met de Hub is gewist; de executor voert niets uit tot hij opnieuw is gekoppeld. Het "
-                    "NAS-adres, het certificaat en de schrijfsleutel blijven bewaard. Koppel opnieuw met een "
-                    "koppelcode uit de Hub.",
+                    "De koppeling met de Hub en de schrijfsleutel zijn gewist; het NAS-adres en het certificaat liggen "
+                    "nog vast. Koppel opnieuw met een koppelcode uit de Hub en vul daarna de TrueNAS-API-sleutel met "
+                    "schrijfrechten opnieuw in. Tot dan voert de executor niets uit.",
                     soort=soort,
                 )
             vervangen = False
@@ -1083,7 +1170,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
                 naslink.save_key(host, port, fingerprint, nieuw, roles)
                 vervangen = True
-            vrijgegeven = stopped is not None and journal.release()
+            if not vervangen and stopped is not None:
+                # Vrijgeven alleen met een leeg veld "Nieuwe sleutel": een nieuwe sleutel geeft nooit vrij (R-TECH-5).
+                journal.release()
         except NasFout as exc:
             return _sleutelfout(exc.code, trace, soort, veld=False)
         except NasLinkOnleesbaar:
@@ -1093,10 +1182,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except OSError:
             # Schijf- of rechtenfout bij opslaan of ontkoppelen: vaste melding, nooit een kale 500 (R-TECH-4, V-041).
             return _afgehandeld("sleutelopslag_niet_schrijfbaar", trace, soort=soort)
-        if vervangen and vrijgegeven:
+        if vervangen and stopped is not None:
             titel, tekst = (
-                "De schrijfsleutel is vervangen en de executor is vrijgegeven.",
-                "De nieuwe sleutel is live getest en opgeslagen. De executor voert weer ondertekende acties uit.",
+                "De schrijfsleutel is vervangen.",
+                "De nieuwe sleutel is live getest en versleuteld opgeslagen; de oude sleutel is hier gewist. De "
+                "executor blijft gestopt. Vrijgeven: vul de nieuwe sleutel in als huidige sleutel, laat 'Nieuwe "
+                "sleutel' leeg en kies 'Sleutel vervangen'.",
             )
         elif vervangen:
             titel, tekst = (

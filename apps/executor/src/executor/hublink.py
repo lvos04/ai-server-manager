@@ -1,13 +1,15 @@
 """Koppeling van de executor met de Hub (contract 1.3 §3.2–§3.9, §4.5, §4.7).
 
 - Koppelen alleen met een **koppelcode (30 min) + Hub-vingerafdruk** op de eigen statuspagina (§3.9); de Hub geeft voor
-  de executor geen enrollment-token uit. Daarna geen koppelformulier meer: ontkoppelen/opnieuw koppelen vraagt een live
-  geverifieerde TrueNAS-schrijfkey tegen het vastgelegde NAS-adres + certificaat (``/beheer`` op de executorpagina).
+  de executor geen enrollment-token uit. Daarna geen koppelformulier meer, tot een ontkoppeling op de executorpagina
+  (``/beheer``, met een live geverifieerde TrueNAS-schrijfkey tegen het vastgelegde NAS-adres + certificaat). Die wist
+  ook de schrijfsleutel; in ``ontkoppeld`` komt het koppelformulier terug, en de executor voert niets uit tot de sleutel
+  opnieuw is ingesteld (BN-1 a, S-P2-020; ADR-0030 besluit 13).
 - Opslag in ``/appdata/secrets/hub-link.json`` (0600, atomair, onder ``hub-link.lock``), nooit in een database. Een
   onleesbaar bestand (geen geldige JSON, andere major, ontbrekende velden, verkeerde eigenaar of rechten) is
   **fail-closed** (§3.5): geen vertrouwen, geen formulier, ``koppelstatus_onleesbaar``; een gewone schrijfactie zet
   het nooit stil terug. De executor heeft geen env-token (§3.9): herstel gaat alleen met de live geverifieerde
-  schrijfsleutel (:meth:`HubLinkStore.reset`, aangeroepen door ``/beheer``).
+  schrijfsleutel (:meth:`HubLinkStore.ontkoppel`, aangeroepen door ``/beheer``).
 - Hub-sleutels worden gepind uit het enroll-antwoord; een via HTTP opgehaalde JWKS voegt nooit vertrouwen toe.
 - Aanroepen naar de Hub: ``http.client`` (geen redirects, geen proxy-omgeving), 5 s connect / 15 s read; de host
   wordt bij elke verbinding opgelost en gecontroleerd (§3.2) en de verbinding gaat naar precies dat adres.
@@ -268,19 +270,48 @@ class HubLinkStore:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
-    def reset(self) -> None:
-        """Koppeling volledig wissen (terug naar ``nooit_gekoppeld``), ook als het bestand onleesbaar is. Alleen aan te
-        roepen na een live geverifieerde TrueNAS-schrijfkey op de executorpagina (contract 1.3 §3.9): dat is het bewijs
-        van TrueNAS-beheer. Pins, service-token en een lopende poging verdwijnen; daarna kan opnieuw worden gekoppeld
-        met een koppelcode."""
+    def ontkoppel(self) -> None:
+        """Ontkoppelen op de executorpagina, na een live geverifieerde TrueNAS-schrijfsleutel (contract 1.3 §3.9; de
+        aanroeper wist eerst de schrijfsleutel, BN-1 a, S-P2-020). Net als bij een ontkoppeling door de Hub (§3.8):
+        ``state`` wordt ``ontkoppeld``, service-token weg, pins naar ``previous_pins`` (alleen audit, geen vertrouwen),
+        een lopende poging weg. ``first_linked_at`` blijft **altijd** staan (§3.5).
+
+        Is het bestand onleesbaar, dan blijft het origineel bewaard als ``hub-link.json.onleesbaar-<UTC-tijd>`` (0600,
+        §3.5) en komt er een nieuw bestand met ``unreadable_replaced_at``. De echte ``first_linked_at`` is dan niet te
+        lezen; omdat er een schrijfsleutel lag, is de executor eerder gekoppeld geweest, en ``first_linked_at`` wordt
+        het moment van vervangen (nooit leeg: een leeg veld zou "nooit gekoppeld" betekenen)."""
         self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            with contextlib.suppress(FileNotFoundError):
-                # Een symlink of een bestand met verkeerde rechten nooit volgen of hergebruiken: eerst weg.
-                os.unlink(self.path)
-            self._write(empty_link())
+            at = now_iso()
+            data = self._load()
+            if data is None:
+                bewaard = self.dir / f"{FILE_NAME}.onleesbaar-{at.replace('-', '').replace(':', '')}"
+                # Hernoemen volgt nooit een symlink (die wordt zelf hernoemd); een gewoon bestand krijgt 0600.
+                os.rename(self.path, bewaard)
+                with contextlib.suppress(OSError):
+                    kopie = os.open(bewaard, os.O_RDONLY | os.O_NOFOLLOW)
+                    try:
+                        if stat.S_ISREG(os.fstat(kopie).st_mode):
+                            os.fchmod(kopie, 0o600)
+                    finally:
+                        os.close(kopie)
+                data = {**empty_link(), "unreadable_replaced_at": at}
+            if data.get("pins"):
+                data["previous_pins"] = data["pins"]
+            data.update(
+                schema_version=SCHEMA_VERSION,
+                state="ontkoppeld",
+                first_linked_at=data.get("first_linked_at") or at,
+                confirmed_at=None,
+                service_token=None,
+                service_token_last4=None,
+                pins=None,
+                pending=None,
+                last_error=None,
+            )
+            self._write(data)
         finally:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
@@ -521,6 +552,15 @@ def pending_expired(link: Mapping[str, Any], now: datetime | None = None) -> boo
     return ((now or datetime.now(UTC)) - started).total_seconds() > PENDING_MAX_SECONDS
 
 
+def koppelen_toegestaan(link: Mapping[str, Any]) -> bool:
+    """Of het koppelformulier mag (§3.7, §3.9): nooit gekoppeld (``first_linked_at`` leeg), of ontkoppeld op de
+    executorpagina. Dat laatste kan alleen na een live geverifieerde schrijfsleutel, en die is dan gewist: tot hij
+    opnieuw is ingesteld voert de executor niets uit (BN-1 a, S-P2-020). Nooit bij een onleesbaar bestand."""
+    if link.get("_onleesbaar"):
+        return False
+    return not link.get("first_linked_at") or link.get("state") == "ontkoppeld"
+
+
 def enroll_with_pairing_code(
     store: HubLinkStore,
     *,
@@ -538,7 +578,7 @@ def enroll_with_pairing_code(
     secret_hash = hashlib.sha256(normalize_code(pairing_code).encode()).hexdigest()
     try:
         with store.update() as link:
-            if link.get("first_linked_at"):
+            if not koppelen_toegestaan(link):
                 raise EnrollFailed("al_gekoppeld")
             if link.get("pending") is not None and not pending_expired(link):
                 raise EnrollFailed("koppelen_bezig")

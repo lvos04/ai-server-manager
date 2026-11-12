@@ -74,10 +74,15 @@ sleutel live tegen het vastgelegde adres en certificaat, en pas dan verandert er
 ingetrokken, dan kan beheer niet meer op deze pagina: installeer de executor opnieuw met een nieuwe datamap
 (`deploy/truenas/CUSTOM_APP.md`, kop "Herstel").
 
-- *Sleutel vervangen*: nieuwe sleutel invullen; ook die wordt eerst live getest.
+- *Sleutel vervangen*: nieuwe sleutel invullen; ook die wordt eerst live getest. Een nieuwe sleutel geeft een gestopte
+  executor nooit vrij.
 - *Vrijgeven na een afwijking*: huidige sleutel invullen, "Nieuwe sleutel" leeg laten en "Sleutel vervangen" kiezen.
-- *Ontkoppelen van de Hub*: de Hub wordt niet meer vertrouwd; NAS-adres, certificaat en sleutel blijven bewaard en het
-  koppelformulier komt terug. Dit is ook het herstel bij een onleesbaar koppelbestand.
+- *Ontkoppelen van de Hub*: de Hub wordt niet meer vertrouwd en de schrijfsleutel wordt gewist; NAS-adres en
+  certificaat blijven vast, `first_linked_at` blijft staan (toestand `ontkoppeld`) en het koppelformulier komt terug.
+  Na opnieuw koppelen vul je de sleutel opnieuw in; dat gaat in één stap tegen het vastgelegde adres en certificaat.
+  Tot dan voert de executor niets uit, ook niet voor een nieuw gekoppelde Hub. Opnieuw koppelen vraagt (nog) geen
+  sleutelbewijs; zie ADR-0030 besluit 13. Dit is ook het herstel bij een onleesbaar koppelbestand; dat bestand blijft
+  bewaard als `hub-link.json.onleesbaar-<UTC-tijd>`.
 
 Voor alle drie de formulieren gelden de regels van §3.7 (herkomst, `Host`, formuliercode, pogingenlimiet). Een schijf-
 of rechtenfout in `/appdata/secrets` geeft `sleutelopslag_niet_schrijfbaar` (503) met een vaste melding; een sleutel die

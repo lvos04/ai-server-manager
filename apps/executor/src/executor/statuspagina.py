@@ -165,13 +165,17 @@ def executor_page(
     state = link.get("state")
     linked = state == "gekoppeld" and not onleesbaar
     bevestigd = linked and bool(link.get("confirmed_at"))
-    formulier = not onleesbaar and not link.get("first_linked_at")
-    bezig = not onleesbaar and link.get("pending") is not None
-    fout = dict(veldfout or {})
     nas = dict(nas or {})
-    policy = dict(policy or {})
     sleutel = bool(nas.get("ingesteld"))
     sleutel_onleesbaar = bool(nas.get("onleesbaar"))
+    # Het koppelformulier: nooit gekoppeld, of ontkoppeld op deze pagina zonder opgeslagen schrijfsleutel (die is bij
+    # het ontkoppelen gewist; BN-1 a, S-P2-020). Afwijking van het sjablooncommentaar ("nog NOOIT gekoppeld"): ADR-0030.
+    formulier = not onleesbaar and (
+        not link.get("first_linked_at") or (state == "ontkoppeld" and not sleutel and not sleutel_onleesbaar)
+    )
+    bezig = not onleesbaar and link.get("pending") is not None
+    fout = dict(veldfout or {})
+    policy = dict(policy or {})
     sleutelformulier = linked and not sleutel and not sleutel_onleesbaar
     checks: list[dict[str, Any]] = [{"naam": "Proces", "toon": "gezond", "label": "Gezond", "tijd": tijd, "iso": iso}]
     ready_ok = True
@@ -496,7 +500,8 @@ def onleesbaar_melding(*, sleutel_ingesteld: bool = False) -> dict[str, str]:
         "tekst": (
             "De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. De executor koppelt niet met "
             "een koppeltoken. Herstel: vul onder 'Ontkoppelen of sleutel vervangen' de TrueNAS-schrijfsleutel in en "
-            "kies 'Ontkoppelen van de Hub'; daarna kun je opnieuw koppelen met een koppelcode. Het bestand:"
+            "kies 'Ontkoppelen van de Hub' (dat wist ook de sleutel); daarna kun je opnieuw koppelen met een "
+            "koppelcode en vul je de sleutel opnieuw in. Het bestand:"
             if sleutel_ingesteld
             else "De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. De executor koppelt niet "
             "met een koppeltoken, en er is geen bruikbare TrueNAS-schrijfsleutel (niet ingesteld of onleesbaar) "
