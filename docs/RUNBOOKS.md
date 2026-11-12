@@ -1,7 +1,7 @@
 # Operator-runbooks (B09-006)
 
 Gegenereerd uit `apps/api/src/hub/runbooks/catalogus.py` (`python -m hub export-runbooks`); niet met de hand
-bewerken. `runbook_hash`: `aeb6db2a12b930c00fabefae77d0629ab56285ca6b8881149c16ab0019bcefac`.
+bewerken. `runbook_hash`: `2025b189ee3df08b83296c4fe953353b9f0ad00e1fcff6652e34d3aafa797f89`.
 
 Elke stap is getypeerd: **Hub toont** (alleen lezen), **Zelf doen** (in een bestaande UI, nooit een
 terminal) of **Voorstel** (een actie uit de executor-allowlist van contract §8 met minimale risicoklasse; de
@@ -64,12 +64,13 @@ Een app start niet of meldt een mislukte schemamigratie na een update.
 
 **Mitigeren**
 
-- Voorstel: Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit een goedkeuring van een beheerder (R2), en daarna weigert het platform app.rollback en app.start op die app (doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI. — `app.stop` (minimaal R1)
+- Voorstel: Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit een goedkeuring van een beheerder (R2), en daarna weigert het platform app.rollback en app.start op die app (doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI. — `app.stop` (minimaal R1; Custom App: R2)
 
 **Terugdraaien**
 
-- Voorstel: Een tag-terugzet alleen als de migratie niets schreef; anders is herstel van de database nodig (R3, via de eigenaar). — `app.rollback` (minimaal R2)
 - Voorstel: Maak eerst een snapshot van de data-dataset. — `zfs.snapshot.create` (minimaal R1)
+- Voorstel: Alleen bij een catalogusapp: een versie-terugzet, en alleen als de migratie niets schreef; anders is herstel van de database nodig (R3, via de eigenaar). — `app.rollback` (minimaal R2; een gestopte Custom App weigert het platform)
+- Zelf doen: Een gestopte Custom App zet je zelf terug in de TrueNAS-web-UI: het platform ziet bij een gestopte Custom App niet wat erin draait en weigert app.rollback (doel_niet_herkenbaar). — `TrueNAS-web-UI`
 
 **Bewijs verzamelen**
 
@@ -103,11 +104,11 @@ Een pool of dataset raakt vol, een quota is bereikt, of een pool is niet gezond.
 **Mitigeren**
 
 - Zelf doen: Ruim op via de eigenaar van de data (MediaGuard/MSO); de Hub verwijdert nooit zelf media of datasets.
-- Voorstel: Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit een goedkeuring van een beheerder (R2) en start de app daarna alleen weer in de TrueNAS-web-UI. — `app.stop` (minimaal R1)
+- Voorstel: Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit een goedkeuring van een beheerder (R2) en start de app daarna alleen weer in de TrueNAS-web-UI. — `app.stop` (minimaal R1; Custom App: R2)
 
 **Terugdraaien**
 
-- Voorstel: Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is. — `app.start` (minimaal R1)
+- Voorstel: Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is. — `app.start` (minimaal R1; een gestopte Custom App weigert het platform)
 - Zelf doen: Een gepauzeerde Custom App start je zelf in de TrueNAS-web-UI: het platform ziet bij een gestopte Custom App niet wat erin draait en weigert app.start (doel_niet_herkenbaar). — `TrueNAS-web-UI`
 
 **Bewijs verzamelen**

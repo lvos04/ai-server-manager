@@ -108,7 +108,11 @@ def test_r1_herstart_zonder_goedkeuring_met_readback(stack: Stack) -> None:
 
 def test_operator_voert_r1_uit_kijker_niet(stack: Stack) -> None:
     """``jellyfin`` is hier een catalogusapp: stoppen blijft R1 (een Custom App stoppen is R2, zie
-    test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder)."""
+    test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder). In de fake staat jellyfin gestopt; de test
+    zet hem eerst aan, zodat "gestopt" na afloop iets bewijst (R-VEILIG-6 van S-P2-005, V-003)."""
+    nas = stack.nas
+    nas._set_state(nas.app("jellyfin"), "RUNNING")
+    assert nas.app("jellyfin")["state"] == "RUNNING"
     make_user(stack.admin, "oscar", "operator")
     make_user(stack.admin, "vera", "viewer")
     oscar, vera = login_as(stack.app, "oscar"), login_as(stack.app, "vera")
@@ -119,9 +123,10 @@ def test_operator_voert_r1_uit_kijker_niet(stack: Stack) -> None:
     assert v["actor"] == {"type": "user", "id": "oscar"} and v["risk_class"] == "R1"
     assert vera.get(f"/api/v1/actions/{v['request_id']}").status_code == 200  # lezen mag
     assert voer_uit(vera, v).status_code == 403
+    assert schrijfaanroepen(nas) == [] and nas.app("jellyfin")["state"] == "RUNNING"
     r = voer_uit(oscar, v)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
-    assert stack.nas.app("jellyfin")["state"] == "STOPPED"
+    assert schrijfaanroepen(nas) == ["app.stop"] and nas.app("jellyfin")["state"] == "STOPPED"
     # Een voorstel namens iemand anders bestaat niet.
     r = stel_voor(oscar, "app.start", app_target("jellyfin"), actor={"type": "user", "id": "beheerder"})
     assert r.status_code == 422 and r.json()["code"] == "actor_past_niet", r.text
@@ -166,7 +171,10 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder(
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
     assert naar_executor == [v["request_id"]] and schrijfaanroepen(nas) == ["app.stop"]
     assert nas.app("my-house")["state"] == "STOPPED"
-    # Een catalogusapp stoppen blijft R1: een operator voert het zonder goedkeuring uit, en starten kan weer.
+    # Een catalogusapp stoppen blijft R1: een operator voert het zonder goedkeuring uit, en starten kan weer. In de fake
+    # staat jellyfin gestopt: eerst aanzetten, anders bewijst "gestopt" niets (R-VEILIG-6 van S-P2-005, V-003).
+    nas._set_state(nas.app("jellyfin"), "RUNNING")
+    assert nas.app("jellyfin")["state"] == "RUNNING"
     r = stel_voor(oscar, "app.stop", app_target("jellyfin"))
     assert r.status_code == 201, r.text
     w = r.json()
@@ -174,6 +182,13 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder(
     assert "STOP-EENRICHTING" not in w["rule_ids"] and w["preview"]["terugdraaien"] == "Starten met app.start."
     assert voer_uit(oscar, w).status_code == 200 and nas.app("jellyfin")["state"] == "STOPPED"
     assert schrijfaanroepen(nas) == ["app.stop", "app.stop"]
+    r = stel_voor(oscar, "app.start", app_target("jellyfin"))
+    assert r.status_code == 201, r.text
+    s = r.json()
+    assert s["risk_class"] == "R1" and s["status"] == "klaar" and s["blokkades"] == [], r.text
+    r = voer_uit(oscar, s)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert nas.app("jellyfin")["state"] == "RUNNING" and schrijfaanroepen(nas) == ["app.stop", "app.stop", "app.start"]
 
 
 def test_kritieke_app_is_r2_ook_als_de_aanvrager_r0_claimt(stack: Stack) -> None:
@@ -358,6 +373,94 @@ def test_installatiewaarden_blijven_na_afloop_niet_in_de_hub(stack: Stack) -> No
     # De hash van de parameters blijft gelijk (preview en audit verwijzen ernaar).
     for v in (a, b, c):
         assert haal(admin, v)["parameters_sha256"] == v["parameters_sha256"]
+    assert schrijfaanroepen(nas) == ["app.create"]
+
+
+def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """S-P2-010, bouwpunt 6e (ADR-0030 besluit 28): naast de waarden van omgevingsvariabelen kan ook vrije tekst in
+    ``command``, ``entrypoint``, ``labels`` en ``notes`` een geheim bevatten (bv. een wachtwoord als argument). Na
+    afloop staat die nergens meer in de database van de Hub: na uitgevoerd, afgewezen, verlopen, geweigerd bij de
+    herberekening (``_herbereken``) en onbekend (``_sluit``). Zolang een voorstel open is, staat hij er wel."""
+    import shutil
+
+    from asm_policy import load_policy
+    from policyhelpers import POLICY_DIR
+
+    from hub.actions import service
+    from hub.models import ActionRequest
+    from hub.timeutil import utcnow
+
+    admin, nas = stack.admin, stack.nas
+
+    def voorstel(app_id: str, w: str) -> dict[str, Any]:
+        params = install_params(
+            app_id,
+            envs=[{"name": "PROEF_WACHTWOORD", "value": f"{w}-env"}],
+            command=["--wachtwoord", f"{w}-cmd"],
+            entrypoint=[f"/start-{w}-ep"],
+            notes=f"notitie {w}-notes",
+            labels=[{"key": "proef", "value": f"{w}-label", "containers": [app_id]}],
+        )
+        r = stel_voor(admin, "app.install", app_target(app_id), params)
+        assert r.status_code == 201, r.text
+        for veld in ("env", "cmd", "ep", "notes", "label"):
+            assert _tabellen_met(stack.app, f"{w}-{veld}") == ["action_request"], (w, veld)
+        return dict(r.json())
+
+    # Uitgevoerd: TrueNAS kreeg de waarden; daarna staan ze niet meer in de Hub.
+    a = voorstel("demo-app", "geheim-uit-6101")
+    assert keur_goed(admin, a).status_code == 200
+    r = voer_uit(admin, a)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert nas.created[0]["values"]["command"] == ["--wachtwoord", "geheim-uit-6101-cmd"]
+    # Afgewezen en verlopen.
+    b = voorstel("demo-b", "geheim-af-6102")
+    r = admin.post(f"/api/v1/actions/{b['request_id']}/reject", json={"reden": "niet nu"}, headers=idem())
+    assert r.status_code == 200 and r.json()["status"] == "afgewezen", r.text
+    c = voorstel("demo-c", "geheim-verl-6103")
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(c["request_id"]))
+        rij.geldig_tot = utcnow() - timedelta(seconds=1)
+        db.commit()
+    assert haal(admin, c)["status"] == "verlopen"
+    # Geweigerd bij de herberekening: het beleid is inmiddels strenger (nieuwe Hub-image) en herkent de naam als Emby.
+    d = voorstel("demo-d", "geheim-gew-6104")
+    assert keur_goed(admin, d).status_code == 200
+    streng = tmp_path / "beleid-streng"
+    shutil.copytree(POLICY_DIR, streng)
+    apps = streng / "apps.yaml"
+    oud = "emby: {namen: [emby, embyserver, emby-server]}"
+    nieuw = "emby: {namen: [emby, embyserver, emby-server, demo-d]}"
+    assert oud in apps.read_text(encoding="utf-8")
+    apps.write_text(apps.read_text(encoding="utf-8").replace(oud, nieuw), encoding="utf-8")
+    with monkeypatch.context() as mp:
+        mp.setattr(service, "get_policy", lambda: load_policy(streng))
+        r = voer_uit(admin, d)
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [x["code"] for x in r.json()["details"]["blokkades"]], r.text
+    assert haal(admin, d)["status"] == "geweigerd"
+    # Onbekend: de executor is weg tijdens het uitvoeren.
+    e = voorstel("demo-e", "geheim-onb-6105")
+    r = keur_goed(admin, e)
+    assert r.status_code == 200, r.text
+    stack.servers.pop().stop()
+    r = voer_uit(admin, e)
+    assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
+    assert haal(admin, e)["status"] == "onbekend"
+    for w in ("geheim-uit-6101", "geheim-af-6102", "geheim-verl-6103", "geheim-gew-6104", "geheim-onb-6105"):
+        for veld in ("env", "cmd", "ep", "notes", "label"):
+            assert _tabellen_met(stack.app, f"{w}-{veld}") == [], (w, veld)
+    for v in (a, b, c, d, e):
+        assert haal(admin, v)["parameters_sha256"] == v["parameters_sha256"]
+    # Wat er gewist is, staat er eerlijk bij; de namen van de variabelen blijven.
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(e["request_id"]))
+        values = rij.parameters["app_create"]["values"]
+        assert values["envs"] == [{"name": "PROEF_WACHTWOORD", "waarde_gewist": True}]
+        assert sorted(values["vrije_tekst_gewist"]) == ["command", "entrypoint", "labels", "notes"]
+        assert not {"command", "entrypoint", "labels", "notes"} & set(values)
     assert schrijfaanroepen(nas) == ["app.create"]
 
 

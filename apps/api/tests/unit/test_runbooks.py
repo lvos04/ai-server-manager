@@ -5,7 +5,20 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from hub.models import Incident
-from hub.runbooks.catalogus import BY_ID, FASEN, RUNBOOKS, H, L, Runbook, V, runbook_hash, validate
+from hub.runbooks.catalogus import (
+    ALLOWLIST,
+    ALLOWLIST_CUSTOM_APP,
+    BY_ID,
+    FASEN,
+    NA_STOP_GEWEIGERD,
+    RUNBOOKS,
+    H,
+    L,
+    Runbook,
+    V,
+    runbook_hash,
+    validate,
+)
 from hub.runbooks.engine import runbook_for
 
 SCENARIO_IDS = {
@@ -46,6 +59,66 @@ def test_validatie_vangt_verboden_stappen() -> None:
     assert any("terminal" in e for e in errors) and any("shell.exec" in e for e in errors)
     assert any("minimale klasse" in e for e in errors) and any("bewijs is leeg" in e for e in errors)
     assert any("poort open" in e for e in errors)
+
+
+def test_stoppen_van_een_custom_app_is_r2_en_daarna_doet_het_platform_niets_meer() -> None:
+    """S-P2-010, bouwpunt 6a (R-VEILIG-5 van S-P2-005): elke ``app.stop`` in een runbook noemt R2 voor een Custom App,
+    gelijk aan wat de engine uitrekent (``STOP-EENRICHTING``). Na een stop biedt een runbook ``app.rollback`` of
+    ``app.start`` alleen aan met de vermelding dat het platform dat op een gestopte Custom App weigert, en geeft het de
+    weg via de TrueNAS-web-UI. ``docs/RUNBOOKS.md`` zegt niet meer alleen "minimaal R1"."""
+    from asm_policy import load_policy
+    from asm_policy.engine import Herkenning, classify
+
+    from hub.runbooks.export import render
+
+    policy = load_policy()
+    custom = Herkenning((), True, False)  # draaiende Custom App: na een stop niet meer herkenbaar
+    for aid, klasse in ALLOWLIST_CUSTOM_APP.items():
+        c = classify(policy, action_id=aid, target={}, parameters={}, actor_type="user", herkend_als=custom)
+        assert c.risk_class == klasse and klasse != ALLOWLIST[aid], aid
+    stops = [s for r in RUNBOOKS for f in FASEN for s in r.stappen()[f] if s.action_id == "app.stop"]
+    assert len(stops) >= 2 and all(s.custom_app == "R2" for s in stops)
+    db = BY_ID["db_migratie_mislukt"]
+    terug = [s for s in db.terugdraaien if s.action_id in ("app.rollback", "app.start")]
+    assert terug and all(s.custom_app == NA_STOP_GEWEIGERD for s in terug)
+    assert any(s.soort == "handmatig" and s.bron == "TrueNAS-web-UI" for s in db.terugdraaien)
+    md = render()
+    assert "`app.stop` (minimaal R1)" not in md and md.count("`app.stop` (minimaal R1; Custom App: R2)") == len(stops)
+
+
+def test_validatie_vangt_app_stop_zonder_custom_app_klasse_en_terugzetten_na_een_stop() -> None:
+    def rb(*stappen: object) -> Runbook:
+        return Runbook(
+            "proef",
+            "Proef",
+            "test",
+            observeren=(L("x"),),
+            isoleren=(H("x"),),
+            mitigeren=tuple(stappen),  # type: ignore[arg-type]
+            terugdraaien=(V("Zet terug.", "app.rollback", "R2"),),
+            bewijs=(L("x"),),
+            oorzaak=(H("x"),),
+            test_na_herstel=("Binnenkant gezond.",),
+        )
+
+    fouten = validate((rb(V("Stop de app.", "app.stop", "R1")),))
+    assert any("app.stop" in e and "Custom App" in e for e in fouten), fouten
+    assert any("app.rollback" in e and "na app.stop" in e for e in fouten), fouten
+    assert validate((rb(V("Herstart.", "app.restart", "R1")),)) == []  # zonder stop mag terugzetten gewoon
+    goed = Runbook(
+        "proef",
+        "Proef",
+        "test",
+        observeren=(L("x"),),
+        isoleren=(H("x"),),
+        mitigeren=(V("Stop de app.", "app.stop", "R1", custom_app="R2"),),
+        terugdraaien=(V("Zet terug.", "app.rollback", "R2", custom_app=NA_STOP_GEWEIGERD),),
+        bewijs=(L("x"),),
+        oorzaak=(H("x"),),
+        test_na_herstel=("Binnenkant gezond.",),
+    )
+    assert validate((goed,)) == []
+    assert any("onbekende waarde" in e for e in validate((rb(V("Stop.", "app.stop", "R1", custom_app="R9")),)))
 
 
 def _inc(soort: str, bron: str = "ai-server-manager") -> Incident:

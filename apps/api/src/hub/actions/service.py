@@ -168,22 +168,37 @@ def haal(db: Session, request_id: uuid.UUID, *, vergrendel: bool = False) -> Act
     return req
 
 
+# Vrije tekst in de waarden van de standaard Custom App (``IX_VALUES_KEYS``) waarin een gebruiker een geheim kan zetten,
+# bijvoorbeeld een wachtwoord als argument (S-P2-010, bouwpunt 6e).
+VRIJE_TEKST_VELDEN = ("command", "entrypoint", "labels", "notes")
+
+
 def _wis_waarden(req: ActionRequest) -> None:
-    """Na afloop van een voorstel heeft de Hub de waarden van omgevingsvariabelen niet meer nodig: hij voert nooit iets
-    opnieuw uit. Ze verdwijnen dan uit ``parameters``, zodat de database van de Hub (en zijn back-up) ze niet voor
-    altijd in klare tekst bewaart; de namen blijven. ``parameters_sha256`` in de preview en de audit blijft gelijk
-    (ADR-0030 besluit 28)."""
+    """Na afloop van een voorstel heeft de Hub de waarden van omgevingsvariabelen en de vrije tekst in ``command``,
+    ``entrypoint``, ``labels`` en ``notes`` niet meer nodig: hij voert nooit iets opnieuw uit. Ze verdwijnen dan uit
+    ``parameters``, zodat de database van de Hub (en zijn back-up) ze niet voor altijd in klare tekst bewaart; de namen
+    van de variabelen blijven en ``vrije_tekst_gewist`` noemt de gewiste velden. ``parameters_sha256`` in de preview en
+    de audit blijft gelijk (ADR-0030 besluit 28)."""
     params = req.parameters if isinstance(req.parameters, dict) else {}
     ac = params.get("app_create")
     values = ac.get("values") if isinstance(ac, dict) else None
-    envs = values.get("envs") if isinstance(values, dict) else None
-    if not isinstance(envs, list) or not any(isinstance(e, dict) and "value" in e for e in envs):
+    if not isinstance(values, dict):
+        return
+    envs = values.get("envs")
+    env_waarden = isinstance(envs, list) and any(isinstance(e, dict) and "value" in e for e in envs)
+    vrij = [k for k in VRIJE_TEKST_VELDEN if k in values]
+    if not env_waarden and not vrij:
         return
     nieuw = copy.deepcopy(params)
-    for e in nieuw["app_create"]["values"]["envs"]:
+    nv = nieuw["app_create"]["values"]
+    for e in nv.get("envs") if env_waarden else []:
         if isinstance(e, dict) and "value" in e:
             del e["value"]
             e["waarde_gewist"] = True
+    for k in vrij:
+        del nv[k]
+    if vrij:
+        nv["vrije_tekst_gewist"] = sorted(set(vrij) | set(nv.get("vrije_tekst_gewist") or []))
     req.parameters = nieuw
 
 

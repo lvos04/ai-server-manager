@@ -36,6 +36,12 @@ ALLOWLIST: dict[str, Risico] = {
     "zfs.snapshot.clone_to_sandbox": "R1",
     "notification.send": "R0",
 }
+# Wat de engine voor een Custom App strenger maakt (STOP-EENRICHTING, ADR-0030 besluit 21): stoppen is daar R2.
+ALLOWLIST_CUSTOM_APP: dict[str, Risico] = {"app.stop": "R2"}
+# Na een stop ziet het platform niet meer wat er in een Custom App draait (doel_niet_herkenbaar) en weigert het elke
+# actie op die app. Een runbookstap na ``app.stop`` met een van deze acties zegt dat (``custom_app``).
+NA_STOP_GEWEIGERD = "gestopt_geweigerd"
+NA_STOP_ACTIES = ("app.start", "app.restart", "app.update", "app.rollback", "app.uninstall")
 VERBODEN_WOORDEN = ("sudo", "ssh ", "shell", "terminal", "docker exec", "docker.sock", "rm -rf", "sh -c", "chmod 777")
 
 
@@ -46,6 +52,8 @@ class Stap:
     bron: str | None = None  # Hub-route of UI-plek
     action_id: str | None = None
     risico: Risico | None = None
+    # Wat er anders is voor een Custom App: een hogere klasse ("R2") of ``NA_STOP_GEWEIGERD``; ``None`` = hetzelfde.
+    custom_app: str | None = None
 
 
 @dataclass(frozen=True)
@@ -81,8 +89,8 @@ def H(tekst: str, bron: str | None = None) -> Stap:
     return Stap(tekst, "handmatig", bron)
 
 
-def V(tekst: str, action_id: str, risico: Risico) -> Stap:
-    return Stap(tekst, "voorstel", None, action_id, risico)
+def V(tekst: str, action_id: str, risico: Risico, *, custom_app: str | None = None) -> Stap:
+    return Stap(tekst, "voorstel", None, action_id, risico, custom_app)
 
 
 INCIDENT = "/api/v1/incidents/{incident_id}"
@@ -149,16 +157,23 @@ RUNBOOKS: tuple[Runbook, ...] = (
                 "(doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI.",
                 "app.stop",
                 "R1",
+                custom_app="R2",
             ),
         ),
         terugdraaien=(
+            V("Maak eerst een snapshot van de data-dataset.", "zfs.snapshot.create", "R1"),
             V(
-                "Een tag-terugzet alleen als de migratie niets schreef; anders is herstel van de database nodig "
-                "(R3, via de eigenaar).",
+                "Alleen bij een catalogusapp: een versie-terugzet, en alleen als de migratie niets schreef; anders is "
+                "herstel van de database nodig (R3, via de eigenaar).",
                 "app.rollback",
                 "R2",
+                custom_app=NA_STOP_GEWEIGERD,
             ),
-            V("Maak eerst een snapshot van de data-dataset.", "zfs.snapshot.create", "R1"),
+            H(
+                "Een gestopte Custom App zet je zelf terug in de TrueNAS-web-UI: het platform ziet bij een gestopte "
+                "Custom App niet wat erin draait en weigert app.rollback (doel_niet_herkenbaar).",
+                "TrueNAS-web-UI",
+            ),
         ),
         bewijs=(L("Supportbundel en de exacte foutregel van de migratie vastleggen.", INCIDENT + "/supportbundel"),),
         oorzaak=(H("Leg vast welke migratie faalde en waarom (versie, schema, data)."),),
@@ -189,10 +204,16 @@ RUNBOOKS: tuple[Runbook, ...] = (
                 "beheerder (R2) en start de app daarna alleen weer in de TrueNAS-web-UI.",
                 "app.stop",
                 "R1",
+                custom_app="R2",
             ),
         ),
         terugdraaien=(
-            V("Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is.", "app.start", "R1"),
+            V(
+                "Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is.",
+                "app.start",
+                "R1",
+                custom_app=NA_STOP_GEWEIGERD,
+            ),
             H(
                 "Een gepauzeerde Custom App start je zelf in de TrueNAS-web-UI: het platform ziet bij een gestopte "
                 "Custom App niet wat erin draait en weigert app.start (doel_niet_herkenbaar).",
@@ -323,9 +344,12 @@ def runbook_hash() -> str:
 
 
 def validate(runbooks: tuple[Runbook, ...] = RUNBOOKS) -> list[str]:
-    """Fouten in de catalogus (lege fase, verboden woord, onbekende action_id of te lage risicoklasse)."""
+    """Fouten in de catalogus (lege fase, verboden woord, onbekende action_id, te lage risicoklasse, ``app.stop`` zonder
+    de klasse voor een Custom App, of een actie op de app na een stop zonder de vermelding dat het platform een
+    gestopte Custom App weigert)."""
     errors: list[str] = []
     for r in runbooks:
+        gestopt = False
         for fase, stappen in r.stappen().items():
             if not stappen:
                 errors.append(f"{r.id}: fase {fase} is leeg")
@@ -337,6 +361,8 @@ def validate(runbooks: tuple[Runbook, ...] = RUNBOOKS) -> list[str]:
                         errors.append(f"{r.id}: onbekende action_id {s.action_id}")
                     elif RISICO_RANK[s.risico] < RISICO_RANK[ALLOWLIST[s.action_id]]:
                         errors.append(f"{r.id}: {s.action_id} onder de minimale klasse")
+                    errors.extend(_custom_app_fouten(r.id, s, gestopt))
+                    gestopt = gestopt or s.action_id == "app.stop"
                 elif s.action_id is not None:
                     errors.append(f"{r.id}: action_id alleen bij een voorstel")
         if not r.test_na_herstel:
@@ -345,6 +371,22 @@ def validate(runbooks: tuple[Runbook, ...] = RUNBOOKS) -> list[str]:
             errors.append(f"{r.id}: test na herstel mag niet alleen 'poort open' zijn")
         if r.herstart_voorstel is not None and r.herstart_voorstel not in ALLOWLIST:
             errors.append(f"{r.id}: onbekend herstartvoorstel")
+    return errors
+
+
+def _custom_app_fouten(rid: str, s: Stap, gestopt: bool) -> list[str]:
+    errors: list[str] = []
+    if s.custom_app is not None and s.custom_app != NA_STOP_GEWEIGERD and s.custom_app not in RISICO_RANK:
+        errors.append(f"{rid}: onbekende waarde custom_app '{s.custom_app}' bij {s.action_id}")
+    minimum = ALLOWLIST_CUSTOM_APP.get(str(s.action_id))
+    if minimum is not None and (
+        s.custom_app not in RISICO_RANK or RISICO_RANK[str(s.custom_app)] < RISICO_RANK[minimum]
+    ):
+        errors.append(f"{rid}: {s.action_id} zonder de klasse voor een Custom App ({minimum})")
+    if gestopt and s.action_id in NA_STOP_ACTIES and s.custom_app != NA_STOP_GEWEIGERD:
+        errors.append(
+            f"{rid}: {s.action_id} na app.stop zonder de vermelding dat het platform een gestopte Custom App weigert"
+        )
     return errors
 
 

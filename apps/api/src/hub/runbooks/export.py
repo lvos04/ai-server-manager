@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from hub.runbooks.catalogus import FASEN, RUNBOOKS, runbook_hash
+from hub.runbooks.catalogus import FASEN, NA_STOP_GEWEIGERD, RUNBOOKS, runbook_hash
 
 FASE_TITEL = {
     "observeren": "Observeren",
@@ -40,7 +40,12 @@ def render() -> str:
             for s in r.stappen()[fase]:
                 extra = ""
                 if s.action_id:
-                    extra = f" — `{s.action_id}` (minimaal {s.risico})"
+                    klasse = f"minimaal {s.risico}"
+                    if s.custom_app == NA_STOP_GEWEIGERD:
+                        klasse += "; een gestopte Custom App weigert het platform"
+                    elif s.custom_app is not None:
+                        klasse += f"; Custom App: {s.custom_app}"
+                    extra = f" — `{s.action_id}` ({klasse})"
                 elif s.bron:
                     extra = f" — `{s.bron}`"
                 lines.append(f"- {SOORT[s.soort]}: {s.tekst}{extra}")

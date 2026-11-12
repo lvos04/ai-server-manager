@@ -96,6 +96,52 @@ def test_beleid_is_leesbaar_en_ingebakken(stack: Stack) -> None:
     assert v["policy_hash"] == b["policy_hash"]
 
 
+def test_beleid_noemt_de_engine_regels_en_r2_voor_het_stoppen_van_een_custom_app(stack: Stack) -> None:
+    """S-P2-010, bouwpunt 6a (R-VEILIG-5 van S-P2-005): ``GET /api/v1/policy`` toont niet alleen de yaml-klasse.
+    ``app.stop`` is R1 voor een catalogusapp, maar R2 met goedkeuring voor een Custom App (``STOP-EENRICHTING``), en de
+    weergave noemt de twee vaste engine-regels. De weergave rekent dat met de engine zelf uit; een echt voorstel voor
+    een Custom App (``my-house``) krijgt dezelfde klasse."""
+    b = stack.admin.get("/api/v1/policy").json()
+    acties = {a["action_id"]: a for a in b["acties"]}
+    stop = acties["app.stop"]
+    assert (stop["risk_class"], stop["goedkeuring_nodig"]) == ("R1", False)
+    assert (stop["risk_class_custom_app"], stop["goedkeuring_nodig_custom_app"]) == ("R2", True)
+    for aid in ("app.start", "app.restart"):
+        assert (acties[aid]["risk_class_custom_app"], acties[aid]["goedkeuring_nodig_custom_app"]) == ("R1", False)
+    assert acties["notification.send"]["risk_class_custom_app"] is None  # geen app als doel
+    regels = {r["id"]: r for r in b["engine_regels"]}
+    assert set(regels) == {"STOP-EENRICHTING", "DOEL-ONHERKENBAAR"}
+    assert regels["STOP-EENRICHTING"]["acties"] == ["app.stop"]
+    assert (regels["STOP-EENRICHTING"]["risk_class"], regels["STOP-EENRICHTING"]["goedkeuring_nodig"]) == ("R2", True)
+    assert regels["DOEL-ONHERKENBAAR"]["code"] == "doel_niet_herkenbaar"
+    onherkenbaar = regels["DOEL-ONHERKENBAAR"]["acties"]
+    assert "app.stop" in onherkenbaar and "app.install" not in onherkenbaar
+    assert all(r["reden"] for r in regels.values())
+    v = stel_voor(stack.admin, "app.stop", app_target("my-house")).json()
+    assert v["risk_class"] == stop["risk_class_custom_app"] and "STOP-EENRICHTING" in v["rule_ids"]
+
+
+def test_doel_zonder_herkenning_is_na_een_stop_niet_herkenbaar() -> None:
+    """S-P2-010, bouwpunt 6c: de standaardherkenning van een :class:`Doel` (doelen zonder app) zegt "na een stop niet
+    herkenbaar", dicht bij twijfel; met die herkenning is ``app.stop`` R2."""
+    from asm_policy import load_policy
+    from asm_policy.engine import classify
+
+    from hub.actions.doel import Doel
+
+    d = Doel("app", "x", "etag", True)
+    assert d.herkend_als.na_stop_herkenbaar is False
+    c = classify(
+        load_policy(),
+        action_id="app.stop",
+        target=app_target("x"),
+        parameters={},
+        actor_type="user",
+        herkend_als=d.herkend_als,
+    )
+    assert c.risk_class == "R2" and "STOP-EENRICHTING" in c.rule_ids
+
+
 # ---------------------------------------------------------------------- weigeringen (statisch beleid)
 @pytest.mark.parametrize(
     ("action_id", "target", "parameters"),
@@ -184,6 +230,29 @@ def test_emby_wordt_nooit_door_het_platform_aangeraakt(
     assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
     assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]]
     assert haal(stack.admin, key)["status"] == "geweigerd"
+
+
+def _catalogus_install(naam: str, catalogus: str) -> dict[str, Any]:
+    params = install_params(naam)
+    params["app_create"].update(catalog_app=catalogus, version="1.0.0", values={})
+    params["manifest"] = {"app_id": naam, "install_reason": "proef met een catalogusapp"}
+    return params
+
+
+def test_een_tweede_emby_installeren_onder_een_andere_naam_wordt_geweigerd(stack: Stack) -> None:
+    """HARDE EIS (S-P2-010, bouwpunt 6g): ``app.install`` met ``catalog_app: "emby"`` onder een andere naam valt onder
+    APP-EMBY, ook voor een beheerder. Tegenproef: een andere catalogusapp onder een eigen naam wordt gewoon voorgesteld
+    (R2, met goedkeuring)."""
+    key, r = _voorstel(stack.admin, "app.install", app_target("mediaspeler"), _catalogus_install("mediaspeler", "emby"))
+    assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert haal(stack.admin, key)["status"] == "geweigerd"
+    r = stel_voor(stack.admin, "app.install", app_target("fotos"), _catalogus_install("fotos", "immich"))
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert r.json()["status"] == "wacht_op_goedkeuring" and r.json()["preview"]["herkend_als"] == "immich"
+    # Alleen de dynamische blokkade van deze opstelling zonder executor; geen statische weigering.
+    assert [b["code"] for b in r.json()["blokkades"]] == ["executor_niet_gekoppeld"], r.text
+    assert schrijfaanroepen(stack.nas) == []
 
 
 @pytest.mark.parametrize(
