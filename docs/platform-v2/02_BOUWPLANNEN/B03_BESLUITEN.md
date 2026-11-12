@@ -23,7 +23,7 @@ veiligste stand ("Zonder besluit" in §3), nooit automatisch het advies.
   B03-039; samengevat rapport, afmelden kan, kinderen nooit) ja; TMDb in een wegwerpcontainer met alleen publieke MovieLens-ID's
   ja; Netflix-4K/DV-masters niet zolang de schijf vol is.
 - **BG-38:** tijdelijke meetdata opgeruimd; testsets on demand maken en daarna weggooien (alleen recept/manifest blijft);
-  Android-systeemimages blijven; gebruiker `transcode` toegevoegd aan de groepen render en kvm (actief na opnieuw inloggen).
+  Android-systeemimages blijven; gebruiker van de bouwmachine toegevoegd aan de groepen render en kvm (actief na opnieuw inloggen).
 - Overige BG-03…BG-31, BG-33, BG-35, BG-36: worden gevraagd als hun fase/golf begint (zie BESLUITEN_VOOR_GEBRUIKER.md).
 
 ### Emby (gebruiker, 2026-11-09)
@@ -141,7 +141,7 @@ Genomen: BG-01, BG-02, BG-32, BG-34, BG-37, BG-38. Open: 32 besluiten.
 | BG-35 | Hardware-decode voor de beeldanalyse | alleen de UHD 770, en pas na D08 | golf 2 | open |
 | BG-36 | Module uit: eigen segmenten wissen of verbergen | wissen (herstelbaar uit de eigen database) | golf 2 | open |
 | BG-37 | Testdata met een beperkende licentie | MovieLens en Pioneer One alleen lokaal; geen Netflix-masters; eenmalige evaluatie op echte historie | golf 0 | genomen |
-| BG-38 | Ontwikkelmachine: opruimen en rechten | tijdelijke meetdata weg; Android-images houden; geen groepsrechten | nu | genomen, anders dan het advies: `transcode` wel in de groepen render en kvm (§1) |
+| BG-38 | Ontwikkelmachine: opruimen en rechten | tijdelijke meetdata weg; Android-images houden; geen groepsrechten | nu | genomen, anders dan het advies: de gebruiker van de bouwmachine wel in de groepen render en kvm (§1) |
 
 ---
 
@@ -458,10 +458,10 @@ evaluatie ja (na B03-039); TMDb in de wegwerpcontainer ja.
 **Raakt.** B03-016, B03-030, B03-032; JLT-10, JLT-11, JLT-15.
 
 #### BG-38 — Ontwikkelmachine: opruimen en rechten
-**Genomen (2026-11-09):** tijdelijke meetdata opgeruimd; testsets on demand maken en daarna weggooien (alleen recept/manifest blijft); Android-systeemimages blijven; gebruiker `transcode` toegevoegd aan de groepen render en kvm (actief na opnieuw inloggen).
+**Genomen (2026-11-09):** tijdelijke meetdata opgeruimd; testsets on demand maken en daarna weggooien (alleen recept/manifest blijft); Android-systeemimages blijven; gebruiker van de bouwmachine toegevoegd aan de groepen render en kvm (actief na opnieuw inloggen).
 **Opties.** Opruimen mag (de veiligheidscontrole weigerde dat in eerdere stappen): `analyse/jf-baseline/cache/` (2,2 GB
 HLS-segmenten), `features/f3-meting/venv/` (1,4 GB) en `modellen/` (383 MB) na de bouwfase, `features/meting-f6/out/fp/`
-(onvolledige eerste run). Houden: de Android-systeemimages (12 GB) voor de emulatortests. Rechten: de gebruiker `transcode`
+(onvolledige eerste run). Houden: de Android-systeemimages (12 GB) voor de emulatortests. Rechten: de gebruiker van de bouwmachine
 in de groepen render (gid 990) en kvm (gid 991), of blijven werken via containers met `--device`. Testsets: on demand maken
 en daarna weggooien (alleen het manifest blijft) of permanent bewaren.
 **Advies.** Tijdelijke meetdata weg; Android-images houden; geen extra groepsrechten (containers werken); testsets on demand.

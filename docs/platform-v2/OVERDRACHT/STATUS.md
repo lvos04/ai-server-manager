@@ -115,7 +115,7 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   voorbeeld; BG-34 de gebruiker (of een aangewezen persoon) labelt de echte afleveringen, met een eenvoudig labelscherm;
   BG-37 MovieLens en Pioneer One alleen lokaal, eenmalige evaluatie op de echte kijkhistorie (na B03-039; samengevat,
   afmelden kan, kinderen nooit), TMDb in een wegwerpcontainer, geen Netflix-masters zolang de schijf vol is; BG-38
-  tijdelijke meetdata opgeruimd, testsets on demand, Android-images blijven, `transcode` in de groepen render en kvm.
+  tijdelijke meetdata opgeruimd, testsets on demand, Android-images blijven, de gebruiker van de bouwmachine in de groepen render en kvm.
 - **Later te vragen (per fase/golf; tot dan geldt de veiligste stand):** P4-0 (overname): BG-22 · vóór golf 1: BG-03,
   BG-04 · na golf 1: BG-07 · golf 2: BG-16, BG-27, BG-33, BG-35, BG-36 · vóór golf 3: BG-05 · golf 3: BG-10, BG-11,
   BG-13, BG-14, BG-19, BG-21, BG-23, BG-24, BG-25, en vóór B03-027 BG-09 · vóór golf 4: BG-08 · golf 4: BG-12, BG-15,

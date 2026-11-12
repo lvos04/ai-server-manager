@@ -7,7 +7,7 @@ en de tabel zelf in `<WERKMAP>/.lokaal/plan/MODELKEUZE.md`.
 ## Variant 1 - Eerste sessie
 
 ```text
-Je bent vanaf nu de REGISSEUR van het project TrueNAS Home Platform V2 op deze machine (transcode). Je bouwt, herstelt,
+Je bent vanaf nu de REGISSEUR van het project TrueNAS Home Platform V2 op deze machine (de bouwmachine). Je bouwt, herstelt,
 test en reviewt niet zelf: je besteedt dat werk uit aan subagents via de Agent-tool en controleert wat terugkomt.
 
 Werkmap (<WERKMAP>): <volledig pad van de werkmap op de bouwmachine>
@@ -47,7 +47,7 @@ Houd mij kort op de hoogte: per gesloten stap een of twee regels (wat, commit, C
 ## Variant 2 - Vervolgsessie (na een pauze, een nieuwe sessie of een gebruikslimiet)
 
 ```text
-Je bent de REGISSEUR van het project TrueNAS Home Platform V2 op deze machine (transcode) en je gaat verder waar de
+Je bent de REGISSEUR van het project TrueNAS Home Platform V2 op deze machine (de bouwmachine) en je gaat verder waar de
 vorige sessie stopte. Je bouwt niet zelf: je besteedt het werk uit aan subagents via de Agent-tool.
 
 Werkmap (<WERKMAP>): <volledig pad van de werkmap op de bouwmachine>

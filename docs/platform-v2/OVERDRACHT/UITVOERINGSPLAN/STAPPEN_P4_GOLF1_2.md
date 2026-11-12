@@ -110,7 +110,7 @@ golf 1", "2.3 Start golf 2"). Bron van de besluiten:
 | BG-32 | Intro Skipper en bestaande segmenten | genomen: alleen testbaseline; bestaande segmenten eenmalig als hint | S-P40-66, S-G2-40 | n.v.t. |
 | BG-34 | Wie labelt echte afleveringen | genomen: de gebruiker of een aangewezen persoon | S-P40-66 | Pioneer One-deel Geblokkeerd tot de labels bevestigd zijn |
 | BG-37 | Testdata met beperkende licentie | genomen: MovieLens en Pioneer One alleen lokaal | S-P40-62, S-P40-66, S-G2-22 | n.v.t. |
-| BG-38 | Rechten op de ontwikkelmachine | genomen: `transcode` in de groepen render en kvm | S-P40-70 | emulator alleen in een container met `--device /dev/kvm` |
+| BG-38 | Rechten op de ontwikkelmachine | genomen: de gebruiker van de bouwmachine in de groepen render en kvm | S-P40-70 | emulator alleen in een container met `--device /dev/kvm` |
 | BG-16 | Kijkgedrag van gezinsleden; fijnere kijklog | open; start golf 2 | S-G2-26 | kijkgedrag van gezinsleden telt nooit mee; fijnere kijklog uit |
 | BG-27 | A310 voor live kijken terwijl MediaGuard encodeert; meten | open; start golf 2 | S-G2-32 | A310 niet voor live kijken; geen meting die MediaGuard raakt |
 | BG-33 | Wie corrigeert tijdcodes; schaduwmodus | open; start golf 2 | S-G2-40 | alleen beheerders; nieuwe segmenten blijven in schaduwmodus |

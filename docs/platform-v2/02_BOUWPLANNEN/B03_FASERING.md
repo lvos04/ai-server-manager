@@ -145,7 +145,7 @@ in golf 2.
 
 - Hooguit **één zware stap tegelijk**: emulator, Gradle, docker-build of een stack met vaste poorten, onder respectievelijk
   `gradle.lock`, `docker-build.lock` en `stack.lock`. Metingen alleen in een exclusief meetslot.
-- Emulators alleen in een container met `--device /dev/kvm` en 4 GiB (de gebruiker `transcode` zit niet in de groep kvm;
+- Emulators alleen in een container met `--device /dev/kvm` en 4 GiB (de gebruiker van de bouwmachine zit niet in de groep kvm;
   zie BG-38).
 - Testsets on demand genereren en daarna opruimen; alleen het sha256-manifest blijft (schijf 89 % vol).
 - De Meteor Lake-iGPU telt als functioneel bewijs en bovengrens, nooit als capaciteit van de A310 of UHD 770.
