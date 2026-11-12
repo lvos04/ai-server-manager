@@ -377,6 +377,62 @@ def test_losse_teksten_in_lijsten_worden_geweigerd_en_niet_bewaard(stack: Stack)
     assert schrijfaanroepen(stack.nas) == []
 
 
+def test_objectvormen_in_catalogusapp_waarden_worden_geweigerd_en_niet_bewaard(stack: Stack) -> None:
+    """S-P2-010, herstelronde 3 (R-VEILIG-7, -8, -9; R-TECH-6, -7): in een object van de waarden van een catalogusapp
+    kwamen ``privileged`` met de waarde 1 of "true", andere schrijfwijzen (``Privileged``, ``hostNetwork``),
+    Docker-/compose-namen (``network_mode``, ``device``, ``security_opt``, ``Custom-Compose-Config``) en een tekst in
+    vlag- of bindvorm (``{"extra_args": "--privileged"}``, ``{"volume": "/:/host"}``) zonder fout door: voorgesteld
+    (R2), goedgekeurd met een preview die "privileged: false" toonde, en uitgevoerd via ``app.create``. Nu 422 met
+    de code per veld, samen en elk apart, ook in een onderdeel van de standaard Custom App; er wordt niets
+    voorgesteld of bewaard. Tegenproef: uit-standen en vrije tekst worden voorgesteld (R2), en een gewone opdracht
+    van de standaard Custom App ook."""
+    admin = stack.admin
+    w = "parameters.app_create.values"
+    vormen: dict[str, tuple[Any, str, str]] = {
+        "a": ({"privileged": 1}, f"{w}.a.privileged", "privileged_verboden"),
+        "b": ({"privileged": "true"}, f"{w}.b.privileged", "privileged_verboden"),
+        "c": ({"network_mode": "host"}, f"{w}.c.network_mode", "catalogus_waarde_verboden"),
+        "d": ({"device": "/dev/sda"}, f"{w}.d.device", "devices_verboden"),
+        "e": ({"Privileged": True}, f"{w}.e.Privileged", "privileged_verboden"),
+        "f": ({"hostNetwork": True}, f"{w}.f.hostNetwork", "host_network_zonder_reden"),
+        "g": ({"Custom-Compose-Config": {"services": {}}}, f"{w}.g.Custom-Compose-Config", "compose_verboden"),
+        "h": ({"security_opt": ["seccomp=unconfined"]}, f"{w}.h.security_opt", "catalogus_waarde_verboden"),
+        "extra_args": ("--privileged", f"{w}.extra_args", "privileged_verboden"),
+        "volume": ("/:/host", f"{w}.volume", "hostpad_verboden"),
+        "mount": ({"type": "bind", "source": "/etc", "target": "/e"}, f"{w}.mount.source", "hostpad_verboden"),
+    }
+    samen = {sleutel: waarde for sleutel, (waarde, _veld, _code) in vormen.items()}
+    r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", samen))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    fouten = {(f["veld"], f["code"]) for f in r.json()["details"]["fouten"]}
+    assert {(veld, code) for _waarde, veld, code in vormen.values()} <= fouten, fouten
+    for sleutel, (waarde, veld, code) in vormen.items():
+        r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", {sleutel: waarde}))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (sleutel, r.text)
+        assert (veld, code) in {(f["veld"], f["code"]) for f in r.json()["details"]["fouten"]}, (sleutel, r.text)
+    # Ook in een onderdeel van de standaard Custom App (de witte lijst geldt alleen bovenaan).
+    ix = install_params("demo", resources={"limits": {"cpus": 2, "memory": 1024}, "privileged": "true"})
+    r = stel_voor(admin, "app.install", app_target("demo"), ix)
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    assert (f"{w}.resources.privileged", "privileged_verboden") in {
+        (f["veld"], f["code"]) for f in r.json()["details"]["fouten"]
+    }, r.text
+    assert _lijst(stack) == [] and schrijfaanroepen(stack.nas) == []
+    goed = {
+        "privileged": False,
+        "network": {"host_network": False, "web_port": {"port_number": 30200}},
+        "additional_envs": [{"name": "PATH", "value": "/usr/bin:/bin"}, {"name": "EXTRA", "value": "--privileged"}],
+        "notes": "privileged: nee. Zie /etc:/x",
+        "opslag": {"source": "/mnt/testpool/media"},
+    }
+    r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", goed))
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    opdracht = install_params("demo", command=["java", "-cp", "/app/lib/*:/app/classes", "nl.Main"])
+    r = stel_voor(admin, "app.install", app_target("demo"), opdracht)
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert schrijfaanroepen(stack.nas) == []
+
+
 def test_bijwerken_of_terugzetten_naar_een_emby_image_wordt_geweigerd(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): ``app.update`` van een bestaande Custom App naar een Emby-image
     maakt er een tweede Emby van. De Hub herkent het doel ook op de image ná de actie: 403 met de Emby-regel, ook

@@ -15,6 +15,18 @@ losse tekst in een lijst (S-P2-010, herstelronde 2): een Docker-socket, een host
 (``"/:/host"``, ``"--mount=type=bind,source=/,..."``), een ongeldige kluisverwijzing en een verboden sleutel als vlag
 (``"--privileged"``, ``"pid=host"``, ``"--cap-add=SYS_ADMIN"``) worden geweigerd (:func:`_losse_tekst`).
 
+Eén tabel (S-P2-010, herstelronde 3): :data:`VERBODEN_SLEUTELS` geldt gelijk voor een sleutel in een object, een
+losse tekst in een lijst en de vlagvorm. Sleutels worden eerst genormaliseerd (:func:`_nk`: kleine letters, alleen
+letters en cijfers, zoals de manifestregels van appstore-en-fork), dus ``Privileged``, ``hostNetwork`` en
+``host-network`` zijn dezelfde sleutel. ``privileged`` en ``host_network`` zijn verboden met elke waarde behalve
+afwezig, ``None`` of ``False``; de Docker-/compose-namen (``network_mode``, ``security_opt``, ``sysctls``, ...) met
+een niet-lege waarde; "compose" in een sleutel en ``services`` altijd; "unconfined" in elke tekst. In de waarden van
+een catalogusapp krijgt ook een tekstwaarde in een object de controle van een losse tekst, behalve vrije tekst
+(de waarde naast ``name`` of ``key`` in een paar, ``notes`` en ``description``), en tellen ``source``, ``src``,
+``hostpath`` en ``path`` met een waarde die met "/" begint als hostpad. Bij de standaard Custom App zijn ``command``
+en ``entrypoint`` de opdracht van het proces ín de container (ix-app-sjabloon: alleen ``set_command`` en
+``set_entrypoint``): daar geldt de vlag- en bindcontrole niet, de Docker-socket- en kluisregels wel.
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -59,6 +71,7 @@ MAX_PARAMETER_DIEPTE = 16
 # die in een object verboden is, wordt herkend in de vormen "sleutel", "sleutel=waarde", "sleutel: waarde",
 # "--sleutel waarde" en "--sleutel" (streepjes tellen als "_", hoofdletters tellen niet).
 LOSSE_SLEUTEL_RE = re.compile(r"-{0,2}([A-Za-z_][A-Za-z0-9_-]*)")
+NIET_ALFANUM_RE = re.compile(r"[^a-z0-9]")
 # Waarden die "uit" betekenen; al het andere (ook een vlag zonder waarde) telt als "aan".
 LOSSE_WAARDE_UIT = frozenset({"", "false", "0", "no", "off", "none", "null", "[]", "{}"})
 # Docker-bindvorm BRON:DOEL[:OPTIES] (bv. "/:/host", "/etc:/etc:ro"): begint een tekst met "/", "." of "~" en staat er
@@ -67,7 +80,16 @@ LOSSE_WAARDE_UIT = frozenset({"", "false", "0", "no", "off", "none", "null", "[]
 BIND_BRON_RE = re.compile(r"(?:^|[\s,=])(?:source|src)\s*=\s*([^,]*)", re.IGNORECASE)
 URL_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://")
 HOSTPAD_BEGIN = ("/", ".", "~")
-COMPOSE_SLEUTELS = ("custom_compose_config", "custom_compose_config_string", "compose")
+# De korte en de lange Docker-optie voor een volume met de waarde er direct achter ("-v/:/host", "--volume/:/host").
+VOLUME_AANEEN_RE = re.compile(r"\s*(?:-v|--volume)(?=[/.~])")
+# Genormaliseerde sleutels (zie _nk) waarvan een tekstwaarde die met "/" begint in de waarden van een catalogusapp
+# een hostpad is (S-P2-010, herstelronde 3).
+HOSTPAD_SLEUTELS = frozenset({"source", "src", "hostpath", "path"})
+# Vrije tekst in de waarden van een catalogusapp (genormaliseerde sleutels): geen vlag- of bindcontrole. Daarnaast is
+# de waarde naast "name" of "key" in een paar vrije tekst (zie _walk).
+VRIJE_TEKST_SLEUTELS = frozenset({"notes", "description"})
+# "host", of de namespace van een andere container (Docker: "container:<naam>", compose: "service:<naam>").
+NAAMRUIMTE_VAN_ANDER = ("container:", "service:")
 HOST_IDS = ("nas-primary",)
 IX_APP = "ix-app"
 RESTART_POLICIES = ("no", "unless-stopped", "on-failure", "always")
@@ -352,34 +374,45 @@ def host_path_problem(path: Any) -> str | None:
     return None
 
 
-def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, Any]]:
-    """(pad, sleutel, waarde) voor elke sleutel in geneste objecten, en (pad, ``None``, element) voor elk element van
-    een lijst: ook een losse tekst in een lijst wordt zo bekeken (S-P2-010, herstelronde 2). Dieper dan
+def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, Any, bool]]:
+    """(pad, sleutel, waarde, paarwaarde) voor elke sleutel in geneste objecten, en (pad, ``None``, element, False)
+    voor elk element van een lijst: ook een losse tekst in een lijst wordt zo bekeken (S-P2-010, herstelronde 2).
+    ``paarwaarde`` is waar voor ``value`` in een naam/waarde-paar (een object met ``value`` naast ``name`` of ``key``,
+    zoals ``envs[].value`` en ``labels[].value``): vrije tekst (herstelronde 3). Dieper dan
     :data:`asm_policy.canonical.MAX_DIEPTE`: :class:`TeDiepGenest` (nooit stil stoppen; S-P2-010, R-VEILIG-1)."""
-    out: list[tuple[str, Any, Any]] = []
+    out: list[tuple[str, Any, Any, bool]] = []
     if depth > MAX_DIEPTE:
         raise TeDiepGenest(f"dieper genest dan {MAX_DIEPTE} niveaus")
     if isinstance(value, Mapping):
+        paar = "value" in value and ("name" in value or "key" in value)
         for k, v in value.items():
             p = f"{path}.{k}" if path else str(k)
-            out.append((p, k, v))
+            out.append((p, k, v, paar and k == "value"))
             out += _walk(v, p, depth + 1)
     elif isinstance(value, list | tuple):
         for i, v in enumerate(value):
             p = f"{path}[{i}]"
-            out.append((p, None, v))
+            out.append((p, None, v, False))
             out += _walk(v, p, depth + 1)
     return out
 
 
+def _nk(sleutel: Any) -> str:
+    """Een sleutel genormaliseerd voor vergelijking: kleine letters, alleen letters en cijfers (``Host-Network``,
+    ``hostNetwork`` en ``host_network`` worden ``hostnetwork``). Zelfde normalisatie als de manifestregels van
+    appstore-en-fork."""
+    return NIET_ALFANUM_RE.sub("", str(sleutel).lower())
+
+
 def _sleutel_en_waarde(tekst: str) -> tuple[str, str | None] | None:
     """``("privileged", "true")`` voor ``"--privileged=true"``, ``("privileged", None)`` voor ``"--privileged"``;
-    ``None`` als de tekst niet met een sleutel begint. Lineair (geen regex met terugzoeken over de waarde)."""
+    ``None`` als de tekst niet met een sleutel begint. De sleutel is genormaliseerd (:func:`_nk`): ``"--cap-add"``
+    geeft ``capadd``. Lineair (geen regex met terugzoeken over de waarde)."""
     t = tekst.strip()
     m = LOSSE_SLEUTEL_RE.match(t)
     if not m:
         return None
-    sleutel, rest = m[1].lower().replace("-", "_"), t[m.end() :]
+    sleutel, rest = _nk(m[1]), t[m.end() :]
     if not rest:
         return sleutel, None
     na = rest.lstrip()
@@ -397,11 +430,15 @@ def _aan(waarde: str | None) -> bool:
 
 def _bind_bronnen(tekst: str) -> list[str]:
     """Hostpaden die een tekst in bind- of volumevorm als bron noemt: de korte en de lange Docker-vorm, ook na een
-    optie (``--volume=/:/host``, ``-v /:/host``). Een URL (``tcp://localhost:8080``) is geen bindvorm."""
+    optie (``--volume=/:/host``, ``-v /:/host``) en met de waarde er direct achter (``-v/:/host``,
+    ``--volume/:/host``). Een URL (``tcp://localhost:8080``) is geen bindvorm."""
     kandidaten = [tekst]
     sw = _sleutel_en_waarde(tekst)
     if sw and sw[1] and not URL_RE.match(tekst):
         kandidaten.append(sw[1])
+    aaneen = VOLUME_AANEEN_RE.match(tekst)
+    if aaneen:
+        kandidaten.append(tekst[aaneen.end() :])
     bronnen: list[str] = []
     for t in (k.lstrip() for k in kandidaten):
         if ":" in t and t.startswith(HOSTPAD_BEGIN):
@@ -410,36 +447,22 @@ def _bind_bronnen(tekst: str) -> list[str]:
     return bronnen
 
 
-def _losse_tekst(tekst: str, p: str, manifest: Mapping[str, Any]) -> list[Fout]:
-    """Een losse tekst in een lijst: dezelfde weigeringen als een sleutel in een object (S-P2-010, herstelronde 2).
-    Een vlag zonder waarde telt als "aan" (dicht bij twijfel). ``pid`` en ``ipc`` zijn in een object alleen met de
-    waarde ``host`` verboden; zonder waarde is die niet te zien, dus ook ``["--pid", "host"]`` (en daarmee ook
-    ``["--pid", "/run/x.pid"]``) wordt geweigerd. ``"--pid=/run/x.pid"`` mag."""
+def _losse_tekst(tekst: str, p: str, manifest: Mapping[str, Any], ix_app: bool = False) -> list[Fout]:
+    """Een losse tekst (een element van een lijst, of bij een catalogusapp een tekstwaarde in een object): dezelfde
+    weigeringen als een sleutel in een object, uit dezelfde tabel (:func:`_sleutel_fout`; S-P2-010, herstelronde 2 en
+    3). Een vlag zonder waarde telt als "aan" (dicht bij twijfel). ``pid`` en ``ipc`` zijn in een object alleen met
+    de waarde ``host`` of de namespace van een andere container verboden; zonder waarde is die niet te zien, dus ook
+    ``["--pid", "host"]`` (en daarmee ook ``["--pid", "/run/x.pid"]``) wordt geweigerd. ``"--pid=/run/x.pid"`` mag.
+    Een tekst met een onzichtbaar opmaakteken (Unicode-categorie Cf: zero-width, bidi, BOM) wordt geweigerd: zo'n
+    teken verbergt een vlag of bindvorm voor deze controle (net als bij een hostpad)."""
+    if any(unicodedata.category(t) == "Cf" for t in tekst):
+        return [_f(p, "stuurteken", "onzichtbare opmaaktekens (Unicode Cf) zijn in deze tekst niet toegestaan")]
     out: list[Fout] = []
     sw = _sleutel_en_waarde(tekst)
     if sw:
-        k, w = sw
-        reason = manifest.get("host_network_reason")
-        if k in COMPOSE_SLEUTELS:
-            out.append(_f(p, "compose_verboden", "compose/YAML-installatie is nooit toegestaan"))
-        elif k == "privileged" and _aan(w):
-            out.append(_f(p, "privileged_verboden", "privileged is nooit toegestaan"))
-        elif k == "host_network" and _aan(w) and not (isinstance(reason, str) and len(reason.strip()) >= 10):
-            out.append(_f(p, "host_network_zonder_reden", "host network alleen met een reden in het manifest"))
-        elif k in ("capabilities", "cap_add") and _aan(w):
-            out.append(_f(p, "capabilities_verboden", "geen extra capabilities"))
-        elif k == "devices" and _aan(w):
-            out.append(_f(p, "devices_verboden", "geen apparaten in v1 (render-node volgt met D08/B03)"))
-        elif (k == "host_pid" and _aan(w)) or (k == "pid" and (w is None or w.strip().lower() == "host")):
-            out.append(_f(p, "host_pid_verboden", "de PID-namespace van de host is nooit toegestaan"))
-        elif (k == "host_ipc" and _aan(w)) or (k == "ipc" and (w is None or w.strip().lower() == "host")):
-            out.append(_f(p, "host_ipc_verboden", "de IPC-namespace van de host is nooit toegestaan"))
-        elif k == "networks" and _aan(w):
-            out.append(_f(p, "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"))
-        elif k == "use_all_gpus" and _aan(w) and manifest.get("gpu") != "intel_render":
-            out.append(_f(p, "gpu_zonder_d08", "GPU alleen met manifest gpu=intel_render en D08"))
-        elif k == "nvidia_gpu_selection" and _aan(w):
-            out.append(_f(p, "gpu_verboden", "NVIDIA-selectie wordt niet aangeboden"))
+        fout = _sleutel_fout(sw[0], sw[1], tekstvorm=True, manifest=manifest, ix_app=ix_app)
+        if fout:
+            out.append(_f(p, *fout))
     for bron in _bind_bronnen(tekst):
         problem = host_path_problem(bron)
         if problem:
@@ -455,54 +478,169 @@ def _extra_capabilities(v: Any) -> bool:
     return not isinstance(v, Mapping) or bool(set(v) - {"add"}) or bool(v.get("add"))
 
 
+def _inhoud(v: Any) -> bool:
+    """Een niet-lege waarde: alles behalve ``None``, ``False``, ``""`` en een leeg object of een lege lijst (dicht
+    bij twijfel: ook ``0`` en ``"false"`` tellen als inhoud)."""
+    if isinstance(v, Mapping | list | tuple):
+        return len(v) > 0
+    return v is not None and v is not False and v != ""
+
+
+def _naamruimte(v: Any) -> bool:
+    """De namespace van de host of van een andere container: de tekst ``host``, ``container:…`` of ``service:…``
+    (ook als element van een lijst). Een object (``network`` bij catalogusapps) en elke andere tekst niet."""
+    if isinstance(v, str):
+        t = v.strip().lower()
+        return t == "host" or t.startswith(NAAMRUIMTE_VAN_ANDER)
+    if isinstance(v, list | tuple):
+        return any(isinstance(e, str) and _naamruimte(e) for e in v)
+    return False
+
+
+# Wanneer een sleutel uit de tabel verboden is. Voor een sleutel in een object telt de waarde zelf; voor de tekstvorm
+# ("sleutel=waarde", "--sleutel waarde", "--sleutel") is de waarde een tekst of ontbreekt ze: zonder waarde telt de
+# vlag als "aan", en een waarde uit LOSSE_WAARDE_UIT ("false", "0", "none", ...) als "uit".
+AAN = "aan"  # object: elke waarde behalve afwezig, None of False
+INHOUD = "inhoud"  # object: een niet-lege waarde (_inhoud)
+NAAMRUIMTE = "naamruimte"  # object en tekst: "host", "container:…" of "service:…" (_naamruimte)
+CAPABILITIES = "capabilities"  # object: alles behalve leeg of {"add": []} (_extra_capabilities)
+
+
+@dataclass(frozen=True)
+class Sleutelregel:
+    wanneer: str
+    code: str
+    fout: str
+
+
+_PID = "de PID-namespace van de host of van een andere container is nooit toegestaan"
+_IPC = "de IPC-namespace van de host of van een andere container is nooit toegestaan"
+_CAPS = "geen extra capabilities"
+_APPARAAT = "geen apparaten in v1 (render-node volgt met D08/B03)"
+_DOCKER = (
+    "Docker-/compose-optie (netwerk of namespace van de host of een andere container, beveiligingsprofiel, sysctls, "
+    "runtime of eigen opdracht) is in deze waarden nooit toegestaan"
+)
+# Docker-/compose-namen die met een niet-lege waarde nooit mogen (genormaliseerd; de namen van FORBIDDEN_VALUE_KEYS in
+# appstore-en-fork, plus de vlagnamen ``--device``, ``--sysctl``). ``command`` en ``entrypoint`` staan apart: die
+# gelden alleen bij een catalogusapp (ALLEEN_CATALOGUS).
+DOCKER_NAMEN = (
+    "pidmode", "ipcmode", "uts", "utsmode", "userns", "usernsmode", "cgroup", "cgroupns", "cgroupnsmode",
+    "cgroupparent", "securityopt", "securityopts", "securityoptions", "securitycontext", "apparmor",
+    "apparmorprofile", "seccomp", "seccompprofile", "sysctl", "sysctls", "devicecgrouprules", "volumesfrom",
+    "runtime", "allowprivilegeescalation", "command", "entrypoint",
+)  # fmt: skip
+ALLEEN_CATALOGUS = frozenset({"command", "entrypoint"})
+# De ene tabel van verboden sleutels (S-P2-010, herstelronde 3): genormaliseerde sleutel -> regel. Compose staat er
+# niet in: "compose" ergens in de genormaliseerde sleutel, of de sleutel "services", is altijd verboden.
+VERBODEN_SLEUTELS: dict[str, Sleutelregel] = {
+    "privileged": Sleutelregel(AAN, "privileged_verboden", "privileged is nooit toegestaan"),
+    "hostnetwork": Sleutelregel(AAN, "host_network_zonder_reden", "host network alleen met een reden in het manifest"),
+    "capabilities": Sleutelregel(CAPABILITIES, "capabilities_verboden", _CAPS),
+    "capadd": Sleutelregel(INHOUD, "capabilities_verboden", _CAPS),
+    "devices": Sleutelregel(INHOUD, "devices_verboden", _APPARAAT),
+    "device": Sleutelregel(INHOUD, "devices_verboden", _APPARAAT),
+    "hostpid": Sleutelregel(AAN, "host_pid_verboden", _PID),
+    "pid": Sleutelregel(NAAMRUIMTE, "host_pid_verboden", _PID),
+    "hostipc": Sleutelregel(AAN, "host_ipc_verboden", _IPC),
+    "ipc": Sleutelregel(NAAMRUIMTE, "host_ipc_verboden", _IPC),
+    "networks": Sleutelregel(INHOUD, "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"),
+    "useallgpus": Sleutelregel(AAN, "gpu_zonder_d08", "GPU alleen met manifest gpu=intel_render en D08"),
+    "nvidiagpuselection": Sleutelregel(INHOUD, "gpu_verboden", "NVIDIA-selectie wordt niet aangeboden"),
+    # ``network`` is bij catalogusapps een gewoon object en ``--network <naam>`` kan een eigen optie van de app zijn:
+    # alleen de waarde "host" of de namespace van een andere container is verboden.
+    "network": Sleutelregel(NAAMRUIMTE, "catalogus_waarde_verboden", _DOCKER),
+    "net": Sleutelregel(NAAMRUIMTE, "catalogus_waarde_verboden", _DOCKER),
+    "networkmode": Sleutelregel(NAAMRUIMTE, "catalogus_waarde_verboden", _DOCKER),
+    **{naam: Sleutelregel(INHOUD, "catalogus_waarde_verboden", _DOCKER) for naam in DOCKER_NAMEN},
+}
+# De fout van deze sleutels staat op het bovenliggende veld (zoals bij de ix-app: ``resources.gpus``).
+OP_OUDER = frozenset({"useallgpus", "nvidiagpuselection"})
+
+
+def _sleutel_fout(
+    nk: str, waarde: Any, *, tekstvorm: bool, manifest: Mapping[str, Any], ix_app: bool
+) -> tuple[str, str] | None:
+    """(code, melding) als de genormaliseerde sleutel ``nk`` met deze waarde verboden is, anders ``None``. Eén regel
+    voor een sleutel in een object (``tekstvorm=False``: ``waarde`` is de waarde zelf) en voor een losse tekst of
+    vlag (``tekstvorm=True``: ``waarde`` is de tekst achter de sleutel, of ``None`` bij een vlag zonder waarde)."""
+    if "compose" in nk or nk == "services":
+        return "compose_verboden", "compose/YAML-installatie is nooit toegestaan"
+    regel = VERBODEN_SLEUTELS.get(nk)
+    if regel is None or (ix_app and nk in ALLEEN_CATALOGUS):
+        return None
+    if tekstvorm:
+        geraakt = waarde is None or (_naamruimte(waarde) if regel.wanneer == NAAMRUIMTE else _aan(waarde))
+    elif regel.wanneer == AAN:
+        geraakt = waarde is not None and waarde is not False
+    elif regel.wanneer == INHOUD:
+        geraakt = _inhoud(waarde)
+    elif regel.wanneer == NAAMRUIMTE:
+        geraakt = _naamruimte(waarde)
+    else:
+        geraakt = _extra_capabilities(waarde)
+    if not geraakt:
+        return None
+    if nk == "hostnetwork":
+        reason = manifest.get("host_network_reason")
+        if isinstance(reason, str) and len(reason.strip()) >= 10:
+            return None
+    if nk == "useallgpus" and manifest.get("gpu") == "intel_render":
+        return None
+    return regel.code, regel.fout
+
+
 def _ouder(p: str) -> str:
     return p.rsplit(".", 1)[0] if "." in p else p
 
 
-def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any]) -> list[Fout]:
+def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app: bool = False) -> list[Fout]:
     """Controles op elk niveau (ook voor catalogusapps met eigen waarden; ADR-0030 besluit 6). Dieper genest dan de
-    scangrens: ``te_diep_genest`` (dicht bij twijfel)."""
+    scangrens: ``te_diep_genest`` (dicht bij twijfel).
+
+    Sleutels gaan door de ene tabel (:func:`_sleutel_fout`), gelijk voor een object, een losse tekst in een lijst en
+    de vlagvorm. De Docker-socket, een ongeldige kluisverwijzing en "unconfined" worden in elke tekst geweigerd, ook
+    in vrije tekst. ``where`` is ``app_create``: de controle van een tekstwaarde in een object en de hostpad-sleutels
+    gelden voor wat onder ``values`` staat (``app_name``, ``catalog_app``, ``train`` en ``version`` hebben een eigen
+    patroon). ``ix_app``: de waarden zijn van de standaard Custom App. Daar is het schema vast (:func:`_ix_values`):
+    een tekstwaarde in een object wordt geen Docker-optie en krijgt de controle van een losse tekst niet, en de
+    teksten direct in ``values.command`` en ``values.entrypoint`` zijn de opdracht van het proces in de container
+    (geen vlag- of bindcontrole)."""
     out: list[Fout] = []
-    reason = manifest.get("host_network_reason")
     try:
         alles = _walk(values, where)
     except TeDiepGenest:
         return [_f(where, "te_diep_genest", f"hooguit {MAX_DIEPTE} niveaus diep genest")]
-    for p, k, v in alles:
-        if k in ("custom_compose_config", "custom_compose_config_string", "compose"):
-            out.append(_f(p, "compose_verboden", "compose/YAML-installatie is nooit toegestaan"))
-        elif k == "privileged" and v is True:
-            out.append(_f(p, "privileged_verboden", "privileged is nooit toegestaan"))
-        elif (
-            k == "host_network"
-            and v not in (None, False)
-            and not (isinstance(reason, str) and len(reason.strip()) >= 10)
-        ):
-            out.append(_f(p, "host_network_zonder_reden", "host network alleen met een reden in het manifest"))
-        elif (k == "capabilities" and _extra_capabilities(v)) or (k == "cap_add" and v):
-            out.append(_f(p, "capabilities_verboden", "geen extra capabilities"))
-        elif k == "devices" and v:
-            out.append(_f(p, "devices_verboden", "geen apparaten in v1 (render-node volgt met D08/B03)"))
-        elif (k == "host_pid" and v not in (None, False)) or (k == "pid" and str(v).strip().lower() == "host"):
-            out.append(_f(p, "host_pid_verboden", "de PID-namespace van de host is nooit toegestaan"))
-        elif (k == "host_ipc" and v not in (None, False)) or (k == "ipc" and str(v).strip().lower() == "host"):
-            out.append(_f(p, "host_ipc_verboden", "de IPC-namespace van de host is nooit toegestaan"))
-        elif k == "networks" and v:
-            out.append(_f(p, "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"))
-        elif k == "use_all_gpus" and v not in (None, False) and manifest.get("gpu") != "intel_render":
-            out.append(_f(_ouder(p), "gpu_zonder_d08", "GPU alleen met manifest gpu=intel_render en D08"))
-        elif k == "nvidia_gpu_selection" and v:
-            out.append(_f(_ouder(p), "gpu_verboden", "NVIDIA-selectie wordt niet aangeboden"))
-        elif isinstance(v, str) and "docker.sock" in v:
+    opdracht = re.compile(re.escape(where) + r"\.values\.(?:command|entrypoint)\[\d+\]") if ix_app else None
+    waarden = (f"{where}.values.", f"{where}.values[")
+    for p, k, v, paarwaarde in alles:
+        nk = None if k is None else _nk(k)
+        catalogus_waarde = not ix_app and p.startswith(waarden)
+        if nk is not None:
+            fout = _sleutel_fout(nk, v, tekstvorm=False, manifest=manifest, ix_app=ix_app)
+            if fout:
+                out.append(_f(_ouder(p) if nk in OP_OUDER else p, *fout))
+            vast_veld = k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path"))
+            catalogus_pad = catalogus_waarde and nk in HOSTPAD_SLEUTELS and isinstance(v, str) and v.startswith("/")
+            if vast_veld or catalogus_pad:
+                problem = host_path_problem(v)
+                if problem:
+                    out.append(_f(p, "hostpad_verboden", problem))
+        if not isinstance(v, str):
+            continue
+        if "docker.sock" in v:
             out.append(_f(p, "docker_socket_verboden", "een Docker-socket mag nooit in een container"))
-        elif k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path")):
-            problem = host_path_problem(v)
-            if problem:
-                out.append(_f(p, "hostpad_verboden", problem))
-        elif isinstance(v, str) and v.startswith("vault://") and not VAULT_REF_RE.fullmatch(v):
+        if "unconfined" in v.lower():
+            out.append(
+                _f(p, "catalogus_waarde_verboden", "een beveiligingsprofiel uitzetten ('unconfined') is verboden")
+            )
+        if v.startswith("vault://") and not VAULT_REF_RE.fullmatch(v):
             out.append(_f(p, "vault_ref_ongeldig", "alleen vault://app/<app_id>/<parameter>"))
-        elif k is None and isinstance(v, str):
-            out += _losse_tekst(v, p, manifest)
+        if nk is None:
+            if opdracht is None or not opdracht.fullmatch(p):
+                out += _losse_tekst(v, p, manifest, ix_app)
+        elif catalogus_waarde and not paarwaarde and nk not in VRIJE_TEKST_SLEUTELS:
+            out += _losse_tekst(v, p, manifest, ix_app)
     return out
 
 
@@ -669,7 +807,7 @@ def validate_install(params: Mapping[str, Any], target: Mapping[str, Any]) -> li
                  {"app_name", "catalog_app", "train", "version", "values"})  # fmt: skip
     if not isinstance(ac, Mapping):
         return out
-    out += _deep_forbidden(ac, w, manifest)
+    out += _deep_forbidden(ac, w, manifest, ix_app=ac.get("catalog_app") == IX_APP)
     if ac.get("custom_app") not in (None, False):
         out.append(_f(f"{w}.custom_app", "compose_verboden", "custom_app=true is een compose-app (Install via YAML)"))
     out += _text(ac.get("app_name"), f"{w}.app_name", max_len=40, pattern=APP_NAME_RE)
@@ -733,4 +871,4 @@ def verwachte_catalogus(params: Mapping[str, Any]) -> str | None:
 
 def vault_refs(value: Any) -> list[str]:
     """Alle ``vault://app/...``-verwijzingen (geheimen die de Hub pas bij verzenden invult, contract §3.1 a)."""
-    return sorted({v for _p, _k, v in _walk(value) if isinstance(v, str) and VAULT_REF_RE.fullmatch(v)})
+    return sorted({v for _p, _k, v, _paar in _walk(value) if isinstance(v, str) and VAULT_REF_RE.fullmatch(v)})

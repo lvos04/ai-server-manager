@@ -1172,7 +1172,10 @@ LOSSE_TEKSTEN_FOUT = [
     pytest.param({"args": ["--cap-add=SYS_ADMIN"]}, "capabilities_verboden", id="cap_add.is"),
     pytest.param({"args": ["--cap-add", "SYS_ADMIN"]}, "capabilities_verboden", id="cap_add.los"),
     pytest.param({"args": ["capabilities: NET_ADMIN"]}, "capabilities_verboden", id="capabilities"),
-    pytest.param({"args": ["--devices=/dev/sda"]}, "devices_verboden", id="devices"),
+    # Herstelronde 3: de echte Docker-optie heet --device (enkelvoud); het meervoud blijft ook geweigerd.
+    pytest.param({"args": ["--device=/dev/sda"]}, "devices_verboden", id="--device=/dev/sda"),
+    pytest.param({"args": ["--device", "/dev/sda"]}, "devices_verboden", id="device.los"),
+    pytest.param({"args": ["--devices=/dev/sda"]}, "devices_verboden", id="devices.meervoud"),
     pytest.param({"args": ["--pid=host"]}, "host_pid_verboden", id="pid.host"),
     pytest.param({"args": ["--pid", "host"]}, "host_pid_verboden", id="pid.los"),
     pytest.param({"args": ["host_pid=true"]}, "host_pid_verboden", id="host_pid"),
@@ -1182,6 +1185,35 @@ LOSSE_TEKSTEN_FOUT = [
     pytest.param({"args": ["networks=gedeeld"]}, "netwerk_verboden", id="networks"),
     pytest.param({"args": ["use_all_gpus=true"]}, "gpu_zonder_d08", id="use_all_gpus"),
     pytest.param({"args": ["nvidia_gpu_selection=0000:01:00.0"]}, "gpu_verboden", id="nvidia"),
+    # Herstelronde 3 (R-VEILIG-8, R-TECH-9): dezelfde tabel van verboden sleutels als in een object, dus ook andere
+    # schrijfwijzen en de Docker-/compose-namen als vlag; een onzichtbaar opmaakteken (Unicode Cf) verbergt niets meer.
+    pytest.param({"args": ["--Host-Network"]}, "host_network_zonder_reden", id="host_network.hoofdletters"),
+    pytest.param({"args": ["hostPID=true"]}, "host_pid_verboden", id="hostPID"),
+    pytest.param({"args": ["--pid=container:emby"]}, "host_pid_verboden", id="pid.container"),
+    pytest.param({"args": ["--network=host"]}, "catalogus_waarde_verboden", id="network.host"),
+    pytest.param({"args": ["--network host"]}, "catalogus_waarde_verboden", id="network.spatie"),
+    pytest.param({"args": ["--network", "host"]}, "catalogus_waarde_verboden", id="network.los"),
+    pytest.param({"args": ["--net=host"]}, "catalogus_waarde_verboden", id="net.host"),
+    pytest.param({"args": ["net: container:emby"]}, "catalogus_waarde_verboden", id="net.container"),
+    pytest.param({"args": ["network_mode=host"]}, "catalogus_waarde_verboden", id="network_mode"),
+    pytest.param({"args": ["--security-opt=seccomp=unconfined"]}, "catalogus_waarde_verboden", id="security_opt"),
+    pytest.param({"args": ["--security-opt", "no-new-privileges=false"]}, "catalogus_waarde_verboden", id="sec.los"),
+    pytest.param({"args": ["--userns=host"]}, "catalogus_waarde_verboden", id="userns"),
+    pytest.param({"args": ["--uts=host"]}, "catalogus_waarde_verboden", id="uts"),
+    pytest.param({"args": ["--cgroupns=host"]}, "catalogus_waarde_verboden", id="cgroupns"),
+    pytest.param({"args": ["--sysctl=net.ipv4.ip_forward=1"]}, "catalogus_waarde_verboden", id="sysctl"),
+    pytest.param({"args": ["--volumes-from=emby"]}, "catalogus_waarde_verboden", id="volumes_from"),
+    pytest.param({"args": ["--runtime=nvidia"]}, "catalogus_waarde_verboden", id="runtime"),
+    pytest.param({"args": ["--entrypoint=/bin/sh"]}, "catalogus_waarde_verboden", id="entrypoint.vlag"),
+    pytest.param({"args": ["apparmor=unconfined"]}, "catalogus_waarde_verboden", id="apparmor"),
+    pytest.param({"args": ["profiel unconfined"]}, "catalogus_waarde_verboden", id="unconfined.tekst"),
+    pytest.param({"args": ["--docker-compose-file=x.yml"]}, "compose_verboden", id="compose.deel_van_naam"),
+    pytest.param({"args": ["services: {}"]}, "compose_verboden", id="compose.services"),
+    pytest.param({"args": ["-v/:/host"]}, "hostpad_verboden", id="args.v_aaneen"),
+    pytest.param({"args": ["--volume/etc:/etc"]}, "hostpad_verboden", id="args.volume_aaneen"),
+    pytest.param({"args": ["\u200b/:/host"]}, "stuurteken", id="cf.bind"),
+    pytest.param({"args": ["--privileged\u200b"]}, "stuurteken", id="cf.vlag"),
+    pytest.param({"args": ["\u2066--pid=host"]}, "stuurteken", id="cf.bidi"),
 ]
 
 
@@ -1204,16 +1236,34 @@ def test_losse_teksten_in_lijsten_op_elke_diepte_geweigerd(waarde: dict[str, Any
     assert code in codes, codes
 
 
-@pytest.mark.parametrize(
-    ("waarde", "code"),
-    [p for p in LOSSE_TEKSTEN_FOUT if p.id in {"sock", "bind.root", "volume.etc", "volume.ix_apps", "privileged.vlag"}],
-)
+IX_LOSSE_TEKSTEN = [
+    p for p in LOSSE_TEKSTEN_FOUT if p.id in {"sock", "bind.root", "volume.etc", "volume.ix_apps", "privileged.vlag"}
+]
+
+
+@pytest.mark.parametrize(("waarde", "code"), IX_LOSSE_TEKSTEN)
 def test_losse_teksten_in_lijsten_ook_bij_de_standaard_custom_app(waarde: dict[str, Any], code: str) -> None:
-    """Ook bij de standaard Custom App (ix-app): in ``command`` (een lijst teksten) gelden dezelfde regels."""
+    """Ook bij de standaard Custom App (ix-app) gelden voor een losse tekst in een lijst dezelfde regels.
+
+    Aangepast in herstelronde 3 (R-TECH-8, besluit BN-2 optie b; P-VEILIG punt 9): tot dan stond de lijst in
+    ``command``. ``command`` en ``entrypoint`` van de ix-app zijn de opdracht van het proces ín de container (het
+    sjabloon geeft ze alleen door als ``command``/``entrypoint`` van de dienst); een vlag of bindtekst daar geeft geen
+    recht en wordt niet meer geweigerd (:func:`test_opdracht_van_de_standaard_custom_app_is_geen_docker_optie`). In
+    elke andere lijst van de ix-app blijft de weigering, en de Docker-socket blijft ook in ``command`` en
+    ``entrypoint`` geweigerd."""
     lijst = next(iter(waarde.values()))
-    params = install_params(command=lijst)
-    codes = [f.code for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)]
-    assert code in codes, codes
+    opslag = install_params()["app_create"]["values"]["storage"][0]
+    for values in ({"storage": [{**opslag, "opties": lijst}]}, {"dns_config": {"options": lijst}}):
+        codes = [
+            f.code for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(**values))
+        ]
+        assert code in codes, (values, codes)
+    for veld in ("command", "entrypoint"):
+        codes = [
+            f.code
+            for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(**{veld: lijst}))
+        ]
+        assert (code in codes) == (code == "docker_socket_verboden"), (veld, codes)
 
 
 def test_losse_teksten_in_lijsten_tegenproef_en_kluisverwijzingen() -> None:
@@ -1225,6 +1275,16 @@ def test_losse_teksten_in_lijsten_tegenproef_en_kluisverwijzingen() -> None:
         "volumes": ["/mnt/testpool/media:/media:ro", "data:/data", "/mnt/testpool/apps/x:/x"],
         "dns": {"nameservers": ["127.0.0.1", "::1"], "search": ["voorbeeld.invalid"]},
         "args": ["--config", "/config/app.yml", "--pid=/run/app.pid", "--privileged=false", "--verbose", "web"],
+        # Herstelronde 3: een eigen optie --network/--net van de app met een gewone waarde, en uitgezette Docker-namen.
+        "meer": [
+            "--network=mainnet",
+            "--net=testnet",
+            "--runtime=",
+            "--device=none",
+            "-v",
+            "data:/data",
+            "-verbose",
+        ],
         "urls": ["https://voorbeeld.invalid/pad", "tcp://localhost:8080"],
         "tijden": ["12:00", "2026-11-12T08:00:00Z"],
         "geheim": ["vault://app/huis/db_wachtwoord"],
@@ -1265,7 +1325,330 @@ def test_losse_teksten_controle_blijft_snel_bij_lange_teksten() -> None:
 
     from asm_policy.params import _losse_tekst
 
-    for tekst in ("a b" + " " * 60000 + "c", "a=" + (" " * 1000 + "x") * 60, " src" + " " * 60000 + "x"):
+    teksten = ("a b" + " " * 60000 + "c", "a=" + (" " * 1000 + "x") * 60, " src" + " " * 60000 + "x")
+    # Herstelronde 3: ook de herkenning van "-v/…" aaneen en de controle op onzichtbare opmaaktekens blijven lineair.
+    for tekst in (*teksten, " " * 60000 + "-v", "-v" * 30000, "x" * 60000 + "\u200b"):
         start = time.perf_counter()
         _losse_tekst(tekst, "p", {})
         assert time.perf_counter() - start < 1.0, len(tekst)
+
+
+# ------------------------------------------------------------------ S-P2-010 herstelronde 3: één tabel van sleutels
+# Herstelronde 2 maakte een lijst strenger dan een object. Nu geldt één genormaliseerde tabel van verboden sleutels
+# (kleine letters, alleen letters en cijfers; zelfde normalisatie als de manifestregels van appstore-en-fork), gelijk
+# voor een sleutel in een object, een losse tekst in een lijst en de vlagvorm.
+OBJECT_SLEUTELS_FOUT = [
+    # R-VEILIG-7 / R-TECH-6: privileged en host-netwerk: elke waarde behalve afwezig, None of False.
+    pytest.param({"privileged": 1}, "privileged_verboden", id="privileged.1"),
+    pytest.param({"privileged": 0}, "privileged_verboden", id="privileged.0"),
+    pytest.param({"privileged": "true"}, "privileged_verboden", id="privileged.tekst_true"),
+    pytest.param({"privileged": "yes"}, "privileged_verboden", id="privileged.tekst_yes"),
+    pytest.param({"privileged": "1"}, "privileged_verboden", id="privileged.tekst_1"),
+    pytest.param({"privileged": "false"}, "privileged_verboden", id="privileged.tekst_false"),
+    pytest.param({"privileged": [True]}, "privileged_verboden", id="privileged.lijst"),
+    pytest.param({"privileged": {"enabled": True}}, "privileged_verboden", id="privileged.object"),
+    pytest.param({"host_network": 1}, "host_network_zonder_reden", id="host_network.1"),
+    pytest.param({"host_network": "true"}, "host_network_zonder_reden", id="host_network.tekst"),
+    # R-VEILIG-8 / R-TECH-6 deel 2: andere schrijfwijzen van dezelfde sleutels.
+    pytest.param({"Privileged": True}, "privileged_verboden", id="Privileged"),
+    pytest.param({"PRIVILEGED": True}, "privileged_verboden", id="PRIVILEGED"),
+    pytest.param({"hostNetwork": True}, "host_network_zonder_reden", id="hostNetwork"),
+    pytest.param({"host-network": True}, "host_network_zonder_reden", id="host-network"),
+    pytest.param({"hostPID": True}, "host_pid_verboden", id="hostPID"),
+    pytest.param({"Host-IPC": 1}, "host_ipc_verboden", id="Host-IPC"),
+    pytest.param({"CapAdd": ["SYS_ADMIN"]}, "capabilities_verboden", id="CapAdd"),
+    pytest.param({"Capabilities": {"add": ["NET_ADMIN"]}}, "capabilities_verboden", id="Capabilities"),
+    pytest.param({"Devices": ["/dev/sda"]}, "devices_verboden", id="Devices"),
+    pytest.param({"device": "/dev/sda"}, "devices_verboden", id="device"),
+    pytest.param({"Networks": ["gedeeld"]}, "netwerk_verboden", id="Networks"),
+    pytest.param({"useAllGpus": True}, "gpu_zonder_d08", id="useAllGpus"),
+    pytest.param({"NvidiaGpuSelection": {"0000:01:00.0": {"use_gpu": True}}}, "gpu_verboden", id="NvidiaGpuSelection"),
+    # Compose: "compose" in de genormaliseerde sleutel, of de sleutel "services".
+    pytest.param({"Custom-Compose-Config": {"services": {}}}, "compose_verboden", id="Custom-Compose-Config"),
+    pytest.param({"customComposeConfigString": "services: {}"}, "compose_verboden", id="customComposeConfigString"),
+    pytest.param({"docker_compose": "services: {}"}, "compose_verboden", id="docker_compose"),
+    pytest.param({"services": {"web": {"image": "x"}}}, "compose_verboden", id="services"),
+    # Docker-/compose-namen met een niet-lege waarde.
+    pytest.param({"network_mode": "host"}, "catalogus_waarde_verboden", id="network_mode.host"),
+    pytest.param({"network_mode": "container:emby"}, "catalogus_waarde_verboden", id="network_mode.container"),
+    pytest.param({"networkMode": "service:emby"}, "catalogus_waarde_verboden", id="networkMode.service"),
+    pytest.param({"net": "host"}, "catalogus_waarde_verboden", id="net.host"),
+    pytest.param({"net": " Host "}, "catalogus_waarde_verboden", id="net.spaties"),
+    pytest.param({"network": "host"}, "catalogus_waarde_verboden", id="network.tekst_host"),
+    pytest.param({"network_mode": ["host"]}, "catalogus_waarde_verboden", id="network_mode.lijst"),
+    pytest.param({"pid": "container:emby"}, "host_pid_verboden", id="pid.container"),
+    pytest.param({"ipc": "service:emby"}, "host_ipc_verboden", id="ipc.service"),
+    pytest.param({"pid_mode": "host"}, "catalogus_waarde_verboden", id="pid_mode"),
+    pytest.param({"ipc_mode": "shareable"}, "catalogus_waarde_verboden", id="ipc_mode"),
+    pytest.param({"uts": "host"}, "catalogus_waarde_verboden", id="uts"),
+    pytest.param({"userns": "host"}, "catalogus_waarde_verboden", id="userns"),
+    pytest.param({"userns_mode": "host"}, "catalogus_waarde_verboden", id="userns_mode"),
+    pytest.param({"cgroup": "host"}, "catalogus_waarde_verboden", id="cgroup"),
+    pytest.param({"cgroupns": "host"}, "catalogus_waarde_verboden", id="cgroupns"),
+    pytest.param({"security_opt": ["no-new-privileges:false"]}, "catalogus_waarde_verboden", id="security_opt"),
+    pytest.param({"seccomp": "profiel.json"}, "catalogus_waarde_verboden", id="seccomp"),
+    pytest.param({"apparmor": "eigen-profiel"}, "catalogus_waarde_verboden", id="apparmor"),
+    pytest.param({"sysctls": {"net.ipv4.ip_forward": "1"}}, "catalogus_waarde_verboden", id="sysctls"),
+    pytest.param({"volumes_from": ["emby"]}, "catalogus_waarde_verboden", id="volumes_from"),
+    pytest.param({"runtime": "nvidia"}, "catalogus_waarde_verboden", id="runtime"),
+    pytest.param({"device_cgroup_rules": ["c 1:3 mr"]}, "catalogus_waarde_verboden", id="device_cgroup_rules"),
+    pytest.param({"allowPrivilegeEscalation": True}, "catalogus_waarde_verboden", id="allowPrivilegeEscalation"),
+    # "unconfined" in een tekst: een beveiligingsprofiel uitzetten.
+    pytest.param({"profiel": "Unconfined"}, "catalogus_waarde_verboden", id="unconfined"),
+    pytest.param({"opties": ["seccomp=unconfined"]}, "catalogus_waarde_verboden", id="unconfined.lijst"),
+]
+# Alleen bij een catalogusapp: een eigen opdracht (bij de standaard Custom App zijn command en entrypoint gewone
+# velden).
+CATALOGUS_OPDRACHT_FOUT = [
+    pytest.param({"command": ["sh", "-c", "id"]}, "catalogus_waarde_verboden", id="command"),
+    pytest.param({"Entrypoint": "/bin/sh"}, "catalogus_waarde_verboden", id="Entrypoint"),
+]
+
+
+@pytest.mark.parametrize(("waarde", "code"), [*OBJECT_SLEUTELS_FOUT, *CATALOGUS_OPDRACHT_FOUT])
+@pytest.mark.parametrize("vorm", ["bovenaan", "genest", "lijst_in_lijst"])
+def test_verboden_sleutels_in_elke_schrijfwijze_en_met_elke_waarde(
+    waarde: dict[str, Any], code: str, vorm: str
+) -> None:
+    """S-P2-010, herstelronde 3 (R-VEILIG-7, R-VEILIG-8, R-TECH-6): in de waarden van een catalogusapp kwamen
+    ``{"privileged": 1}``, ``{"privileged": "true"}``, ``{"Privileged": true}``, ``{"hostNetwork": true}``,
+    ``{"network_mode": "host"}``, ``{"security_opt": [...]}``, ``{"sysctls": {...}}`` en
+    ``{"Custom-Compose-Config": {...}}`` zonder fout door tot ``app.create``, terwijl de preview "privileged: false"
+    toonde. Nu op elke diepte geweigerd, met de code van de sleutel."""
+    codes = _codes(_catalogus(_in_vorm(vorm, waarde)))
+    assert code in codes, codes
+
+
+@pytest.mark.parametrize(("waarde", "code"), OBJECT_SLEUTELS_FOUT)
+@pytest.mark.parametrize("plek", ["storage[0]", "resources", "dns_config"])
+def test_verboden_sleutels_ook_in_een_onderdeel_van_de_standaard_custom_app(
+    waarde: dict[str, Any], code: str, plek: str
+) -> None:
+    """De witte lijst van de ix-app geldt alleen bovenaan; in een onderdeel (een opslagregel, ``resources``) stonden
+    ``{"privileged": 1}`` en ``{"privileged": "true"}`` zonder fout (R-VEILIG-7). Dezelfde tabel geldt nu ook daar."""
+    basis = install_params()["app_create"]["values"]
+    if plek == "storage[0]":
+        values = {"storage": [{**basis["storage"][0], **waarde}]}
+    elif plek == "resources":
+        values = {"resources": {**basis["resources"], **waarde}}
+    else:
+        values = {"dns_config": {"nameservers": [], "extra": waarde}}
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(**values))
+    assert code in [f.code for f in fouten], [f.as_dict() for f in fouten]
+
+
+def test_verboden_sleutels_tegenproef_uit_standen_en_lege_waarden() -> None:
+    """Tegenproef: afwezig, ``None``, ``False`` en lege waarden blijven geldig; host-netwerk mag met een reden in het
+    manifest, een GPU met ``gpu: intel_render``. ``network_mode``/``net``/``network`` zijn alleen verboden met de
+    waarde ``host`` of de namespace van een andere container (``container:…``, ``service:…``): ``network`` is bij
+    catalogusapps een gewoon object en ``bridge`` is de standaard."""
+    values = {
+        "privileged": False,
+        "Privileged": None,
+        "hostNetwork": False,
+        "host_pid": None,
+        "hostIPC": False,
+        "capAdd": [],
+        "Capabilities": {"add": []},
+        "device": "",
+        "Devices": [],
+        "network": {"host_network": False, "web_port": {"port_number": 30200}, "mode": "bridge"},
+        "network_mode": "bridge",
+        "net": None,
+        "pid": "container",
+        "ipc": "private",
+        "pid_mode": "",
+        "security_opt": [],
+        "sysctls": {},
+        "runtime": None,
+        "allowPrivilegeEscalation": False,
+        "command": [],
+        "entrypoint": None,
+        "resources": {"limits": {"cpus": 2}, "gpus": {"useAllGpus": False, "nvidia_gpu_selection": {}}},
+    }
+    assert _codes(_catalogus(values)) == []
+    reden = "mDNS-ontdekking van apparaten op het LAN"
+    assert _codes(_catalogus({"network": {"hostNetwork": 1}}, host_network_reason=reden)) == []
+    assert _codes(_catalogus({"args": ["--hostNetwork"]}, host_network_reason=reden)) == []
+    assert _codes(_catalogus({"gpus": {"UseAllGpus": "true"}}, gpu="intel_render")) == []
+    # network_mode host blijft ook met een reden verboden: de reden hoort bij het veld host_network.
+    assert "catalogus_waarde_verboden" in _codes(_catalogus({"network_mode": "host"}, host_network_reason=reden))
+    # De velden van app_create zelf (naam, catalogusapp, trein) zijn geen waarden: een app die "network" of "services"
+    # heet, wordt daar niet om geweigerd.
+    for naam in ("network", "services", "privileged", "runtime"):
+        doel = {"host_id": HOST, "app_id": naam}
+        assert _codes(_catalogus({"resources": {"limits": {"cpus": 2}}}, naam=naam), target=doel) == [], naam
+    # De standaard Custom App zonder iets extra's blijft geldig (geen onterechte weigering door de tabel).
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params()) == []
+
+
+# R-VEILIG-9 / R-TECH-7: een tekst in vlag- of bindvorm als waarde in een object (alleen bij een catalogusapp).
+OBJECT_TEKSTEN_FOUT = [
+    pytest.param({"extra_args": "--privileged"}, "privileged_verboden", id="extra_args.vlag"),
+    pytest.param({"opties": "pid=host"}, "host_pid_verboden", id="opties.pid"),
+    pytest.param({"extra": "--network host"}, "catalogus_waarde_verboden", id="extra.network"),
+    pytest.param({"extra": "--cap-add=SYS_ADMIN"}, "capabilities_verboden", id="extra.cap_add"),
+    pytest.param({"volume": "/:/host"}, "hostpad_verboden", id="volume.root"),
+    pytest.param({"volume": "/etc:/etc"}, "hostpad_verboden", id="volume.etc"),
+    pytest.param({"volume": "-v/root:/r"}, "hostpad_verboden", id="volume.v_aaneen"),
+    pytest.param({"mount": "type=bind,source=/etc,target=/e"}, "hostpad_verboden", id="mount.lange_vorm"),
+    pytest.param({"mount": {"type": "bind", "source": "/", "target": "/host"}}, "hostpad_verboden", id="mount.source"),
+    pytest.param({"mount": {"Src": "/root"}}, "hostpad_verboden", id="mount.src"),
+    pytest.param({"hostPath": "/etc"}, "hostpad_verboden", id="hostPath"),
+    pytest.param({"host-path": "/var/run"}, "hostpad_verboden", id="host-path"),
+    pytest.param({"data": {"Path": "/etc/passwd"}}, "hostpad_verboden", id="path"),
+    pytest.param({"waarde": "​/:/host"}, "stuurteken", id="cf"),
+    pytest.param({"value": "--privileged"}, "privileged_verboden", id="value_zonder_naam"),
+    pytest.param({"name": "EXTRA", "waarde": "--privileged"}, "privileged_verboden", id="naam_zonder_value"),
+    pytest.param({"name": "EXTRA", "value": ["--privileged"]}, "privileged_verboden", id="paar_met_lijst"),
+    # Alleen de waarde van een paar is vrije tekst; de naam ernaast niet (dicht bij twijfel).
+    pytest.param({"name": "--privileged", "value": "x"}, "privileged_verboden", id="paar_naam_is_geen_vrije_tekst"),
+]
+
+
+@pytest.mark.parametrize(("waarde", "code"), OBJECT_TEKSTEN_FOUT)
+@pytest.mark.parametrize("vorm", ["bovenaan", "genest", "lijst_in_lijst"])
+def test_tekst_in_vlag_of_bindvorm_als_objectwaarde_geweigerd(waarde: dict[str, Any], code: str, vorm: str) -> None:
+    """S-P2-010, herstelronde 3 (R-VEILIG-9, R-TECH-7): ``{"extra_args": "--privileged"}``, ``{"volume": "/:/host"}``
+    en ``{"mount": {"source": "/"}}`` in de waarden van een catalogusapp kwamen zonder fout door, terwijl dezelfde
+    tekst in een lijst geweigerd werd. Nu krijgt een tekstwaarde in een object dezelfde controle als een losse tekst
+    in een lijst, en tellen ``source``, ``src``, ``hostpath`` en ``path`` (genormaliseerd) met een waarde die met "/"
+    begint als hostpad."""
+    codes = _codes(_catalogus(_in_vorm(vorm, waarde)))
+    assert code in codes, codes
+
+
+def test_vrije_tekst_in_catalogusapp_waarden_blijft_toegestaan() -> None:
+    """Tegenproef (R-VEILIG-9, R-TECH-7): vrije tekst is uitgezonderd van de vlag- en bindcontrole: de waarde naast
+    ``name`` of ``key`` in een paar (``envs[].value``, ``additional_envs[].value``, ``labels[].value``), ``notes`` en
+    ``description``. Gewone waarden (tijdzone, URL, een dataset als hostpad, een pad in de container) blijven geldig.
+    De Docker-socket, een ongeldige kluisverwijzing en "unconfined" blijven ook in vrije tekst geweigerd."""
+    values = {
+        "TZ": "Europe/Amsterdam",
+        "additional_envs": [
+            {"name": "PATH", "value": "/usr/local/bin:/usr/bin:/bin"},
+            {"name": "EXTRA", "value": "--privileged"},
+            {"name": "BIND", "value": "/:/host"},
+        ],
+        "envs": [{"name": "JAVA_OPTS", "value": "-cp /app/lib/*:/app/classes"}],
+        "labels": [{"key": "a", "value": "/usr/bin:/bin"}, {"key": "b", "value": "pid=host"}],
+        "notes": "privileged: nee. Zie /etc:/x, -v /:/host en --pid",
+        "app": {"description": "--privileged en /:/host als voorbeeld in de uitleg"},
+        "web": {"url": "https://voorbeeld.invalid/pad", "base_url": "/admin", "poort": "30200"},
+        "opslag": {"source": "/mnt/testpool/media", "hostPath": "/mnt/testpool/apps/huis", "mount_path": "/data"},
+        "geheim": {"name": "DB_PASSWORD", "value": "vault://app/huis/db_wachtwoord"},
+        "resources": {"limits": {"cpus": 2}},
+    }
+    params = _catalogus(values)
+    assert _codes(params) == []
+    assert vault_refs(params) == ["vault://app/huis/db_wachtwoord"]
+    for vrij, code in (
+        (
+            {"additional_envs": [{"name": "DOCKER_HOST", "value": "unix:///var/run/docker.sock"}]},
+            "docker_socket_verboden",
+        ),
+        ({"notes": "mount /run/docker.sock"}, "docker_socket_verboden"),
+        ({"labels": [{"key": "a", "value": "vault://ander/x"}]}, "vault_ref_ongeldig"),
+        ({"notes": "seccomp=unconfined"}, "catalogus_waarde_verboden"),
+        ({"envs": [{"name": "PROFIEL", "value": "unconfined"}]}, "catalogus_waarde_verboden"),
+    ):
+        assert code in _codes(_catalogus(vrij)), vrij
+    # Bij de standaard Custom App is het schema vast: de teksten in zijn objecten worden geen Docker-opties en krijgen
+    # deze controle niet (een portaalpad "/" en een hostnaam die op een sleutel lijkt blijven geldig).
+    ix = install_params(
+        hostname="runtime",
+        notes="--privileged staat uit; zie /etc:/x",
+        portals=[{"name": "web", "scheme": "http", "host": "0.0.0.0", "port": 30555, "path": "/"}],
+        labels=[{"key": "toelichting", "value": "/usr/bin:/bin", "containers": ["demo-app"]}],
+    )
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, ix) == []
+
+
+def test_gewone_waarden_van_een_catalogusapp_blijven_geldig() -> None:
+    """Tegenproef op de vorm die catalogusapps van TrueNAS gebruiken (tijdzone, ``run_as``, ``network`` als object
+    met poorten, opslag met ``ix_volume`` en een dataset als ``host_path``, extra omgevingsvariabelen, labels,
+    limieten): de tabel en de controle van tekstwaarden weigeren daar niets."""
+    values = {
+        "TZ": "Europe/Amsterdam",
+        "app": {"additional_envs": [{"name": "LOG_LEVEL", "value": "info"}], "publish_server_url": ""},
+        "run_as": {"user": 568, "group": 568},
+        "network": {
+            "host_network": False,
+            "web_port": {"bind_mode": "published", "port_number": 30103, "host_ips": []},
+            "dns_opts": [],
+        },
+        "storage": {
+            "config": {"type": "ix_volume", "ix_volume_config": {"acl_enable": False, "dataset_name": "config"}},
+            "media": {
+                "type": "host_path",
+                "host_path_config": {"acl_enable": False, "path": "/mnt/testpool/media"},
+            },
+            "transcodes": {"type": "tmpfs", "tmpfs_config": {"size": 500}},
+            "additional_storage": [
+                {
+                    "type": "host_path",
+                    "read_only": True,
+                    "mount_path": "/media/films",
+                    "host_path_config": {"acl_enable": False, "path": "/mnt/testpool/films"},
+                }
+            ],
+        },
+        "labels": [{"key": "soort", "value": "media", "containers": ["huis"]}],
+        "resources": {
+            "limits": {"cpus": 2, "memory": 4096},
+            "gpus": {"use_all_gpus": False, "nvidia_gpu_selection": {}},
+        },
+    }
+    assert _codes(_catalogus(values)) == []
+
+
+OPDRACHTEN_IX_APP = [
+    pytest.param("command", ["java", "-cp", "/app/lib/*:/app/classes", "nl.Main"], id="java_cp"),
+    pytest.param("command", ["env", "PATH=/usr/bin:/bin", "app"], id="env_path"),
+    pytest.param("command", ["PYTHONPATH=/app:/lib", "python", "-m", "x"], id="pythonpath"),
+    pytest.param("command", ["gunicorn", "--pid", "/tmp/g.pid", "app:app"], id="gunicorn_pid"),
+    pytest.param("command", ["mytool", "--privileged"], id="eigen_vlag_privileged"),
+    pytest.param("command", ["lsblk", "--devices"], id="lsblk_devices"),
+    pytest.param("entrypoint", ["/bin/sh", "-c", "exec /app/run --listen 0.0.0.0:8080"], id="sh_c"),
+]
+
+
+@pytest.mark.parametrize(("veld", "opdracht"), OPDRACHTEN_IX_APP)
+def test_opdracht_van_de_standaard_custom_app_is_geen_docker_optie(veld: str, opdracht: list[str]) -> None:
+    """S-P2-010, herstelronde 3 (R-TECH-8, besluit BN-2 optie b): ``command`` en ``entrypoint`` van de standaard Custom
+    App zijn de opdracht van het proces ín de container. Vastgesteld in het ix-app-sjabloon (truenas/apps,
+    ``ix-dev/stable/ix-app/templates/docker-compose.yaml``, ix-app 1.4.8): de twee velden gaan alleen naar
+    ``set_command`` en ``set_entrypoint`` van de container. Een vlag of een tekst met een dubbele punt daar geeft geen
+    Docker-recht; de rechten van de ix-app bewaakt het vaste schema. Deze zeven gewone opdrachten werden ten onrechte
+    geweigerd."""
+    params = install_params(**{veld: opdracht})
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, params) == []
+
+
+def test_opdracht_van_de_standaard_custom_app_houdt_docker_socket_en_kluisregels() -> None:
+    """De uitzondering voor ``command`` en ``entrypoint`` van de ix-app is smal: de Docker-socket, een ongeldige
+    kluisverwijzing en "unconfined" blijven geweigerd, een geldige kluisverwijzing wordt nog steeds gevonden (Hub en
+    executor geven dan 501), en de uitzondering geldt alleen voor de teksten direct in die twee lijsten: niet voor een
+    catalogusapp, niet voor een andere lijst van de ix-app en niet voor een object of lijst ín de opdracht."""
+    inst = POLICY.acties["app.install"]
+
+    def ix(**values: Any) -> list[str]:
+        return [f.code for f in validate_parameters(POLICY, inst, APP, install_params(**values))]
+
+    for veld in ("command", "entrypoint"):
+        assert "docker_socket_verboden" in ix(**{veld: ["app", "--sock=/var/run/docker.sock"]}), veld
+        assert "vault_ref_ongeldig" in ix(**{veld: ["app", "vault://ander/x"]}), veld
+        assert "catalogus_waarde_verboden" in ix(**{veld: ["app", "--seccomp=unconfined"]}), veld
+        assert vault_refs(install_params(**{veld: ["--token", "vault://app/demo-app/token"]})) == [
+            "vault://app/demo-app/token"
+        ]
+        # Geen teksten maar een lijst of object in de opdracht: het schema weigert, en de controle kijkt er wel in.
+        genest = ix(**{veld: [["--privileged"]]})
+        assert "lijst" in genest and "privileged_verboden" in genest, (veld, genest)
+        # Bij een catalogusapp is een eigen opdracht verboden, en een vlag in zo'n lijst ook.
+        codes = _codes(_catalogus({veld: ["mytool", "--privileged"]}))
+        assert "catalogus_waarde_verboden" in codes and "privileged_verboden" in codes, (veld, codes)
+    # Een andere lijst van de ix-app, en een lijst met dezelfde naam dieper in de waarden: geen uitzondering.
+    opslag = install_params()["app_create"]["values"]["storage"][0]
+    assert "privileged_verboden" in ix(storage=[{**opslag, "command": ["--privileged"]}])
+    assert "hostpad_verboden" in ix(dns_config={"options": ["/:/host"]})
