@@ -8,8 +8,13 @@ tegen het vastgelegde NAS-adres en certificaat. Elke formulier-POST volgt de reg
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 import stat
+import subprocess
+import sys
+import typing
 from collections.abc import Iterator
 from html import unescape
 from pathlib import Path
@@ -41,7 +46,7 @@ from executor.firststart import ensure_secrets
 from executor.naslink import NasLinkStore
 from executor.truenas import display_fingerprint, fetch_fingerprint
 
-NEW_KEY = "tweede-schrijf-key-9876543210wxyz"
+NEW_KEY = "tweede-test-key-xxxxyyyyzzzz"
 SLEUTEL = "/schrijfsleutel"
 BEHEER = "/beheer"
 
@@ -550,3 +555,112 @@ def test_melding_koppelstatus_onleesbaar_noemt_de_herstelweg_die_er_is(
         assert (HERSTEL_DOC in tekst) is not bruikbaar, f"{pad}: verwijzing naar de kop 'Herstel' klopt niet"
     melding = status(c)["koppeling"]["last_error"]["melding"]
     assert (HERSTEL_HIER in melding) is bruikbaar and (HERSTEL_DOC in melding) is not bruikbaar, melding
+
+
+# ------------------------------------------------------------------ V-094: de sleutel staat in geen enkele logregel
+ONBEKEND = "bestaat-niet-0123456789"
+
+
+def test_sleutel_staat_in_geen_enkele_logregel(
+    hub: Hub, nas: FakeTrueNAS, caplog: pytest.LogCaptureFixture, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """V-094: de hele levensloop van de sleutel (geweigerd, instellen, uitvoeren, vervangen, ontkoppelen), met elke
+    logger op INFO (ook httpx, websockets en de fake TrueNAS), de eigen loggers van de executor op DEBUG en de uitvoer
+    op stdout/stderr van het proces. Geen van de gebruikte sleutels staat in een logregel, in de argumenten van een
+    logrecord of in de procesuitvoer.
+
+    Bewust niet op DEBUG voor bibliotheken: websockets logt op DEBUG elk frame, dus ook de aanmelding met de sleutel.
+    De dienst zet die logger nooit op DEBUG (uvicorn configureert alleen zijn eigen loggers, ook bij
+    ``EXECUTOR_LOG_LEVEL=debug``); dat bewaakt de test hierna."""
+    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.DEBUG, logger="executor")
+    c = hub_client(hub)
+    assert post(c, SLEUTEL, {"truenas_sleutel": READ_KEY}).status_code == 200  # stap 1
+    assert code_van(post(c, SLEUTEL, {"truenas_sleutel": READ_KEY})) == "schrijfrechten_ontbreken"
+    assert code_van(post(c, SLEUTEL, {"truenas_sleutel": ONBEKEND})) == "sleutel_geweigerd"
+    r = post(c, SLEUTEL, {"truenas_sleutel": WRITE_KEY})
+    assert r.status_code == 200 and "getest en opgeslagen" in r.text, r.text
+    assert execute(c, hub, restart_request(hub, nas)).status_code == 200  # de executor meldt zich aan met de sleutel
+    c = hub_client(hub)  # nieuwe app-instantie: de pogingenlimiet (5 per kwartier) telt per instantie
+    assert code_van(post(c, BEHEER, {"truenas_sleutel": ONBEKEND, "actie": "ontkoppelen"})) == "sleutel_geweigerd"
+    r = post(c, BEHEER, {"truenas_sleutel": WRITE_KEY, "nieuwe_sleutel": NEW_KEY, "actie": "vervangen"})
+    assert r.status_code == 200 and "De schrijfsleutel is vervangen." in r.text, r.text
+    r = post(c, BEHEER, {"truenas_sleutel": NEW_KEY, "actie": "ontkoppelen"})
+    assert r.status_code == 200 and "Ontkoppeld van de Hub." in r.text, r.text
+    assert nas.logins >= 5
+
+    # Ondergrens (V-003): de pogingen zijn echt gelogd, anders bewijst "staat er niet in" niets.
+    regels = [rec.getMessage() for rec in caplog.records]
+    for code in ("schrijfrechten_ontbreken", "sleutel_geweigerd", "sleutel_ingesteld", "vervangen", "ontkoppeld"):
+        assert any(f"code={code} trace_id=" in regel for regel in regels), code
+    uit, fout = capfd.readouterr()
+    teksten = [caplog.text, uit, fout, *regels, *(repr(rec.args) for rec in caplog.records)]
+    for geheim in (WRITE_KEY, NEW_KEY, READ_KEY, ONBEKEND):
+        for tekst in teksten:
+            assert geheim not in tekst, tekst
+
+
+def test_dienst_zet_websockets_nooit_op_debug(tmp_path: Path) -> None:
+    """Hoort bij de test hierboven: ``python -m executor api`` (``__main__.main``, met elk toegestaan
+    ``EXECUTOR_LOG_LEVEL``) configureert uvicorn en laadt de app zonder dat websockets DEBUG-records maakt (daarin zou
+    het aanmeldframe met de sleutel staan). ``uvicorn.run`` wordt vervangen door alleen configureren en laden; in een
+    apart proces, zodat de logconfiguratie van deze testsessie niet verandert."""
+    niveaus = typing.get_args(Settings.model_fields["log_level"].annotation)
+    assert "debug" in niveaus
+    code = (
+        "import logging, sys, uvicorn\n"
+        "from uvicorn.config import Config\n"
+        "def alleen_laden(app, **kw):\n"
+        "    c = Config(app, **kw)\n"
+        "    c.load()\n"
+        "    print('geladen', any(logging.getLogger(n).isEnabledFor(logging.DEBUG)"
+        " for n in ('websockets', 'websockets.client')))\n"
+        "uvicorn.run = alleen_laden\n"
+        "from executor.__main__ import main\n"
+        "sys.exit(main(['api']))\n"
+    )
+    for niveau in niveaus:
+        env = {**os.environ, "EXECUTOR_DATA_DIR": str(tmp_path / niveau), "EXECUTOR_LOG_LEVEL": niveau}
+        uit = subprocess.run(  # noqa: S603 - vaste argumentlijst (deze Python en de code hierboven), geen shell
+            [sys.executable, "-c", code], capture_output=True, text=True, check=False, timeout=60, env=env
+        )
+        assert uit.returncode == 0 and uit.stdout.strip() == "geladen False", (niveau, uit.stdout, uit.stderr)
+
+
+# ------------------------------------------------------------------ V-093: geen melding uit de URL
+GEKOZEN = {
+    "code": "koppelstatus_onleesbaar",
+    "fout": "zelfgekozen-fout",
+    "melding": "<b>zelfgekozen-melding</b>",
+    "titel": "zelfgekozen-titel",
+    "tekst": "zelfgekozen-tekst",
+    "trace_id": "zelfgekozen-trace",
+    "rol": "alert",
+    "toon": "fout",
+    "pad": "/zelfgekozen-pad",
+}
+
+
+def _zonder_formuliercode(tekst: str) -> str:
+    return re.sub(r'name="csrf" value="[^"]+"', 'name="csrf" value=""', tekst)
+
+
+@pytest.mark.parametrize("sleutel", ["niet_ingesteld", "ingesteld", "gestopt"])
+def test_geen_melding_uit_een_zelfgekozen_queryparameter(hub: Hub, nas: FakeTrueNAS, sleutel: str) -> None:
+    """V-093: GET / met zelfgekozen queryparameters toont geen melding en weerspiegelt niets; de pagina is (op de
+    nieuwe formuliercode na) gelijk aan die zonder queryparameters."""
+    if sleutel != "niet_ingesteld":
+        set_write_key(hub, nas)
+    if sleutel == "gestopt":
+        from executor.journal import Journal
+
+        Journal(hub.settings.replay_db, hub.settings.secrets_dir).stop({"code": "staat_verschilt", "at": "nu"})
+    c = hub_client(hub)
+    schoon = c.get("/")
+    assert schoon.status_code == 200 and code_van(schoon) is None and 'role="alert"' not in schoon.text
+    r = c.get("/", params=GEKOZEN)
+    assert r.status_code == 200 and str(r.request.url.query)  # de parameters zijn echt meegestuurd
+    assert code_van(r) is None and 'role="alert"' not in r.text and 'role="status"' not in r.text
+    assert "zelfgekozen" not in r.text and "zelfgekozen" not in unescape(r.text)
+    assert _zonder_formuliercode(r.text) == _zonder_formuliercode(schoon.text)
+    assert nas.calls == []

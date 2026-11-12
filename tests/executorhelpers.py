@@ -27,7 +27,7 @@ from policyhelpers import POLICY_DIR, approval_for, execution_request
 AUD = "ai-server-manager-executor"
 POLICY = load_policy(POLICY_DIR)
 READ_KEY = "readonly-test-key-0123456789"
-WRITE_KEY = "schrijf-test-key-0123456789abcd"
+WRITE_KEY = "schrijf-test-key-aaaabbbbcccc"
 NAS_HOST = "127.0.0.1"
 UNLINK = "/connector/v1/hub-link/unlink"
 # Toegestane Host voor formulier-POST's (§3.7 punt 4): een naam onder .local.
