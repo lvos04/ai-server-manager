@@ -272,6 +272,37 @@ test("executor koppelen via de eigen statuspagina, echt verstuurd in de browser 
     // De browser stuurde bij beide POST's de echte oorsprong mee, nooit `null` (N-01).
     await expect.poll(() => origins.length).toBe(2);
     expect(new Set(origins)).toEqual(new Set([executorUrl]));
+
+    // Contract 1.3 §3.7 punt 6 via §3.9 (R-VEILIG-5): het sleutelformulier en één beheeractie, echt verstuurd in de
+    // browser tegen de nep-TrueNAS van de teststack. De sleutels komen nooit terug in de pagina.
+    const sleutel = st.executor_sleutel;
+    const nieuw = st.executor_sleutel_nieuw;
+    expect(sleutel && nieuw, "de teststack hoort de schrijfsleutels van de executor te geven").toBeTruthy();
+    await expect(ex.getByRole("heading", { name: "TrueNAS-schrijfsleutel" })).toBeVisible();
+    // Stap 1: alleen de TLS-vingerafdruk van TrueNAS; de sleutel is nog niet verstuurd en niet bewaard.
+    await ex.getByLabel("TrueNAS-API-sleutel met schrijfrechten").fill(sleutel!);
+    await ex.getByRole("button", { name: "Sleutel testen en opslaan" }).click();
+    await expect(ex.locator("body")).toContainText("Controleer de vingerafdruk van TrueNAS");
+    expect(await ex.content()).not.toContain(sleutel!);
+    // Stap 2: dezelfde sleutel nogmaals = bevestigen; live getest tegen precies dat certificaat en opgeslagen.
+    await ex.getByLabel("TrueNAS-API-sleutel met schrijfrechten").fill(sleutel!);
+    await ex.getByRole("button", { name: "Sleutel testen en opslaan" }).click();
+    await expect(ex.locator("body")).toContainText("De schrijfsleutel is getest en opgeslagen.");
+    await expect(ex.getByRole("heading", { name: "Ontkoppelen of sleutel vervangen" })).toBeVisible();
+    await expect(ex.locator("body")).toContainText(`Eindigt op ${sleutel!.slice(-4)}`);
+    expect(await ex.content()).not.toContain(sleutel!);
+    // Beheer: de sleutel vervangen, met de huidige sleutel als bewijs (BN-2 a).
+    await ex.getByLabel("Huidige TrueNAS-API-sleutel met schrijfrechten").fill(sleutel!);
+    await ex.getByLabel("Nieuwe sleutel (alleen bij vervangen)").fill(nieuw!);
+    await ex.getByRole("button", { name: "Sleutel vervangen" }).click();
+    await expect(ex.locator("body")).toContainText("De schrijfsleutel is vervangen.");
+    await expect(ex.locator("body")).toContainText(`Eindigt op ${nieuw!.slice(-4)}`);
+    const pagina = await ex.content();
+    expect(pagina).not.toContain(sleutel!);
+    expect(pagina).not.toContain(nieuw!);
+    // Ook bij deze drie POST's stuurde de browser de echte oorsprong mee.
+    await expect.poll(() => origins.length).toBe(5);
+    expect(new Set(origins)).toEqual(new Set([executorUrl]));
   } finally {
     await ctx.close();
   }

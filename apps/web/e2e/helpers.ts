@@ -30,6 +30,9 @@ export interface StackState {
   oidc_client_secret?: string;
   /** Echte executor (statuspagina + koppelen); alleen in de eigen teststack, niet tegen de image. */
   executor_url?: string;
+  /** Schrijfsleutels van de executor in de nep-TrueNAS (alleen testwaarden), voor het sleutelformulier en het beheer. */
+  executor_sleutel?: string;
+  executor_sleutel_nieuw?: string;
 }
 
 /** Gedeelde gegevens tussen de opzet en de schermtests (ids van een app en een incident). */

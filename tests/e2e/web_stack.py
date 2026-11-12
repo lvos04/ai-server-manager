@@ -11,8 +11,9 @@ Alleen voor ontwikkeling/CI (Sim-getest, geen echte NAS). Start:
 - fakes voor Uptime Kuma, Beszel, Gotify en een OIDC-issuer (Authentik-vorm) op loopback, met hun adressen en
   testsleutels in ``state.json`` (alleen testgeheimen);
 - de periodieke worker-taken (meten, bronnen, gezondheid, alerts, incidenten, meldingen) met korte intervallen;
-- de echte executor (``executor.app``) op 127.0.0.1:``HUB_E2E_EXECUTOR_PORT`` met een eigen lege datamap, zodat de
-  web-E2E het koppelformulier van de statuspagina echt in een browser verstuurt (contract 1.2 §3.9; review N-01).
+- de echte executor (``executor.app``) op 127.0.0.1:``HUB_E2E_EXECUTOR_PORT`` met een eigen lege datamap en de fake
+  TrueNAS als zijn TrueNAS, zodat de web-E2E het koppelformulier, het sleutelformulier en het beheer van de
+  statuspagina echt in een browser verstuurt (contract 1.3 §3.7 punt 6 en §3.9; review N-01, R-VEILIG-5).
 Er worden geen successen gesimuleerd: alle antwoorden komen van de echte API; alleen NAS, bronnen, Gotify, de OIDC-
 issuer en de simulator-dienst zijn simulators.
 
@@ -44,6 +45,10 @@ EXECUTOR_PORT = int(os.environ.get("HUB_E2E_EXECUTOR_PORT", "39403"))
 STATE_DIR = Path(os.environ.get("HUB_E2E_STATE_DIR", str(HERE / ".web-e2e-state")))
 READONLY_KEY = "readonly-test-key-0123456789"
 WRITE_KEY = "write-test-key-0123456789abc"
+# Schrijfsleutels van de executor in de nep-TrueNAS (FULL_ADMIN, schrijven toegestaan): het sleutelformulier en het
+# beheer van de executorpagina in de browser (contract 1.3 §3.7 punt 6 via §3.9; R-VEILIG-5). Alleen testwaarden.
+EXECUTOR_SLEUTEL = "executor-sleutel-aaaabbbbcccc"
+EXECUTOR_SLEUTEL_NIEUW = "executor-sleutel-ddddeeeeffff"
 KUMA_KEY = "uk1_testkey_abcdef"
 GOTIFY_TOKEN = "AppTokenHub123"
 BESZEL_USER = "hub-lezer"
@@ -202,7 +207,14 @@ class _Control(BaseHTTPRequestHandler):
 def _start_nas() -> Any:
     from fakes.fake_truenas import FakeTrueNAS, KeyProfile
 
-    nas = FakeTrueNAS(keys={READONLY_KEY: KeyProfile(), WRITE_KEY: KeyProfile(roles=["FULL_ADMIN"])}).start()
+    nas = FakeTrueNAS(
+        keys={
+            READONLY_KEY: KeyProfile(),
+            WRITE_KEY: KeyProfile(roles=["FULL_ADMIN"]),
+            EXECUTOR_SLEUTEL: KeyProfile(roles=["FULL_ADMIN"], write=True),
+            EXECUTOR_SLEUTEL_NIEUW: KeyProfile(roles=["FULL_ADMIN"], write=True),
+        }
+    ).start()
     log(f"fake TrueNAS op wss://127.0.0.1:{nas.port}/api/current (simulator)")
     _Control.nas = nas
     control = ThreadingHTTPServer(("127.0.0.1", CONTROL_PORT), _Control)
@@ -242,14 +254,22 @@ def _fake_state(f: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _start_executor(data_dir: Path) -> Any:
-    """De echte executor-app (statuspagina + koppelen) met een lege datamap; loopback-Hub alleen met de testvlag."""
+def _start_executor(data_dir: Path, nas_port: int) -> Any:
+    """De echte executor-app (statuspagina, koppelen, schrijfsleutel en beheer) met een lege datamap; loopback-Hub
+    alleen met de testvlag. Zijn TrueNAS is de nep-TrueNAS (adres via de instelling, zoals
+    ``EXECUTOR_TRUENAS_HOST``)."""
     import uvicorn
     from executor.app import create_app as create_executor
     from executor.config import Settings as ExecutorSettings
     from executor.firststart import ensure_secrets as ensure_executor_secrets
 
-    ex_settings = ExecutorSettings(data_dir=data_dir, allow_loopback_hub=True)
+    ex_settings = ExecutorSettings(
+        data_dir=data_dir,
+        allow_loopback_hub=True,
+        truenas_host="127.0.0.1",
+        truenas_port=nas_port,
+        truenas_timeout_seconds=5,
+    )
     ensure_executor_secrets(ex_settings.secrets_dir)
     server = uvicorn.Server(
         uvicorn.Config(
@@ -360,7 +380,7 @@ def main() -> int:
 
         nas, control = _start_nas()
         fakes = _start_fakes()
-        executor = _start_executor(Path(tmp.name) / "executor")
+        executor = _start_executor(Path(tmp.name) / "executor", nas.port)
         (STATE_DIR / "setupcode.txt").parent.mkdir(parents=True, exist_ok=True)
         (STATE_DIR / "setupcode.txt").write_text(res.setup_code)
         _write_state(
@@ -372,6 +392,8 @@ def main() -> int:
                 "write_key": WRITE_KEY,
                 "database": db_name,
                 "executor_url": f"http://127.0.0.1:{EXECUTOR_PORT}",
+                "executor_sleutel": EXECUTOR_SLEUTEL,
+                "executor_sleutel_nieuw": EXECUTOR_SLEUTEL_NIEUW,
                 **_fake_state(fakes),
             }
         )

@@ -4,6 +4,25 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — herstelronde van de executor: schrijfsleutel, beheer en log (S-P2-020; ADR-0030 besluit 13)
+- Beheer (`/beheer`: ontkoppelen, vervangen, vrijgeven) neemt als bewijs alleen de huidige opgeslagen sleutel: eerst
+  een vergelijking in constante tijd met de ontsleutelde sleutel, daarna de live test. Een andere sleutel, ook een
+  geldige schrijfsleutel, geeft `sleutel_niet_huidig` en gaat nergens heen; een onleesbare opslag of `vault.key` geeft
+  `sleutelopslag_onleesbaar`. Een in TrueNAS ingetrokken sleutel vraagt een nieuwe datamap (R-VEILIG-2).
+- Een schrijfsleutel moet de app- én snapshotacties dekken (`FULL_ADMIN`, of `APPS_WRITE` met `SNAPSHOT_WRITE`);
+  anders `schrijfrechten_onvolledig`. De nep-TrueNAS dwingt de rechten per methode af (R-TECH-1).
+- Status en pagina openen de opgeslagen sleutel echt: past `vault.key` er niet bij, dan `sleutelopslag_onleesbaar`,
+  nooit "Gezond" (R-TECH-2). Uitvoeren met een onleesbare sleutelopslag geeft `503 schrijfsleutel_onleesbaar`
+  (R-TECH-3).
+- Een schijf- of rechtenfout bij het opslaan geeft `sleutelopslag_niet_schrijfbaar` (503) in plaats van een kale 500;
+  een wedloop tussen twee tabbladen geeft `sleutel_al_ingesteld` (409) (R-TECH-4, R-TECH-9).
+- `python -m executor api` logt elke afgehandelde poging (code en trace-ID) in de app-log; de verbinding met TrueNAS
+  logt via een eigen logger vast op INFO, zodat websockets-frames met de sleutel nooit in een log komen
+  (R-VEILIG-3, R-VEILIG-4).
+- De web-E2E verstuurt nu ook het sleutelformulier (twee stappen) en "Sleutel vervangen" in Chromium (R-VEILIG-5).
+- Nog open (wacht op een besluit over het Peil-sjabloon): opnieuw koppelen na ontkoppelen met sleutelbewijs
+  (R-VEILIG-1) en een eigen knop "Vrijgeven" (R-TECH-5).
+
 ### Gerepareerd — herstelronde 3 van het policy-pakket: één tabel van verboden sleutels (S-P2-010; ADR-0030)
 - De EX47-controle gebruikt één genormaliseerde tabel van verboden sleutels (kleine letters, alleen letters en
   cijfers), gelijk voor een sleutel in een object, een losse tekst in een lijst en de vlagvorm, in de Hub én de
