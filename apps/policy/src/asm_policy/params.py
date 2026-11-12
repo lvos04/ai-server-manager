@@ -353,11 +353,13 @@ def _app_rollback(params: Mapping[str, Any]) -> list[Fout]:
 def host_path_problem(path: Any) -> str | None:
     """``None`` als het hostpad een dataset onder ``/mnt/<pool>/<dataset>`` is; anders de reden (NL)."""
     if not isinstance(path, str) or not path.startswith("/"):
-        return "het hostpad moet absoluut zijn"
-    if HOSTPAD_STUURTEKEN_RE.search(path) or "//" in path or path != path.rstrip("/") or len(path) > 512:
-        return "ongeldig hostpad"
-    if any(unicodedata.category(t) in HOSTPAD_VERBODEN_CATEGORIEEN for t in path):
-        return "ongeldig hostpad"
+        return "het hostpad moet absoluut zijn: begin met /, bijvoorbeeld /mnt/<pool>/<dataset>"
+    if HOSTPAD_STUURTEKEN_RE.search(path) or any(unicodedata.category(t) in HOSTPAD_VERBODEN_CATEGORIEEN for t in path):
+        return "ongeldig hostpad: tabs, regeleinden en andere onzichtbare tekens zijn niet toegestaan"
+    if "//" in path or path != path.rstrip("/"):
+        return "ongeldig hostpad: geen dubbele / en geen / aan het eind"
+    if len(path) > 512:
+        return "ongeldig hostpad: hooguit 512 tekens"
     parts = path.split("/")[1:]
     if any(p != p.strip() for p in parts):
         return "ongeldig hostpad: een spatie aan het begin of eind van een mapnaam"
@@ -513,13 +515,22 @@ class Sleutelregel:
     fout: str
 
 
+_PRIVILEGED = "privileged (volledige toegang tot de host) is nooit toegestaan"
+_HOST_NETWORK = (
+    "het netwerk van de host (host network) alleen met een reden van minstens 10 tekens in het manifest "
+    "(host_network_reason)"
+)
+_COMPOSE = "compose en YAML zijn nooit een installatieweg; een sleutel met compose of services wordt daarom geweigerd"
 _PID = "de PID-namespace van de host of van een andere container is nooit toegestaan"
 _IPC = "de IPC-namespace van de host of van een andere container is nooit toegestaan"
-_CAPS = "geen extra capabilities"
-_APPARAAT = "geen apparaten in v1 (render-node volgt met D08/B03)"
+_CAPS = "geen extra capabilities: laat dit leeg"
+_APPARAAT = (
+    "apparaten (devices) zijn in deze versie niet toegestaan; de render-node voor de GPU volgt met besluit D08 (B03)"
+)
 _DOCKER = (
-    "Docker-/compose-optie (netwerk of namespace van de host of een andere container, beveiligingsprofiel, sysctls, "
-    "runtime of eigen opdracht) is in deze waarden nooit toegestaan"
+    "deze Docker- of compose-optie is in de waarden van een app nooit toegestaan (netwerk of namespace van de host "
+    "of van een andere container, beveiligings- en rechtenopties, cgroups, sysctls, runtime, volumes van een andere "
+    "container of een eigen opdracht)"
 )
 # Docker-/compose-namen die met een niet-lege waarde nooit mogen (genormaliseerd; de namen van FORBIDDEN_VALUE_KEYS in
 # appstore-en-fork, plus de vlagnamen ``--device``, ``--sysctl``). ``command`` en ``entrypoint`` staan apart: die
@@ -534,8 +545,8 @@ ALLEEN_CATALOGUS = frozenset({"command", "entrypoint"})
 # De ene tabel van verboden sleutels (S-P2-010, herstelronde 3): genormaliseerde sleutel -> regel. Compose staat er
 # niet in: "compose" ergens in de genormaliseerde sleutel, of de sleutel "services", is altijd verboden.
 VERBODEN_SLEUTELS: dict[str, Sleutelregel] = {
-    "privileged": Sleutelregel(AAN, "privileged_verboden", "privileged is nooit toegestaan"),
-    "hostnetwork": Sleutelregel(AAN, "host_network_zonder_reden", "host network alleen met een reden in het manifest"),
+    "privileged": Sleutelregel(AAN, "privileged_verboden", _PRIVILEGED),
+    "hostnetwork": Sleutelregel(AAN, "host_network_zonder_reden", _HOST_NETWORK),
     "capabilities": Sleutelregel(CAPABILITIES, "capabilities_verboden", _CAPS),
     "capadd": Sleutelregel(INHOUD, "capabilities_verboden", _CAPS),
     "devices": Sleutelregel(INHOUD, "devices_verboden", _APPARAAT),
@@ -565,7 +576,7 @@ def _sleutel_fout(
     voor een sleutel in een object (``tekstvorm=False``: ``waarde`` is de waarde zelf) en voor een losse tekst of
     vlag (``tekstvorm=True``: ``waarde`` is de tekst achter de sleutel, of ``None`` bij een vlag zonder waarde)."""
     if "compose" in nk or nk == "services":
-        return "compose_verboden", "compose/YAML-installatie is nooit toegestaan"
+        return "compose_verboden", _COMPOSE
     regel = VERBODEN_SLEUTELS.get(nk)
     if regel is None or (ix_app and nk in ALLEEN_CATALOGUS):
         return None
@@ -652,12 +663,12 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
         out.append(_f(f"{w}.restart_policy", "waarde", "expliciet: no, unless-stopped, on-failure of always"))
     out += _text(values.get("TZ"), f"{w}.TZ", max_len=64) if "TZ" in values else []
     if values.get("privileged") not in (None, False):
-        out.append(_f(f"{w}.privileged", "privileged_verboden", "privileged is nooit toegestaan"))
+        out.append(_f(f"{w}.privileged", "privileged_verboden", _PRIVILEGED))
     caps = values.get("capabilities") or {}
     if not isinstance(caps, Mapping) or set(caps) - {"add"} or (caps.get("add") or []):
-        out.append(_f(f"{w}.capabilities", "capabilities_verboden", "geen extra capabilities"))
+        out.append(_f(f"{w}.capabilities", "capabilities_verboden", _CAPS))
     if values.get("devices"):
-        out.append(_f(f"{w}.devices", "devices_verboden", "geen apparaten in v1 (render-node volgt met D08/B03)"))
+        out.append(_f(f"{w}.devices", "devices_verboden", _APPARAAT))
     if values.get("networks"):
         out.append(_f(f"{w}.networks", "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"))
     if values.get("run_as_custom_user") is True:
@@ -809,7 +820,14 @@ def validate_install(params: Mapping[str, Any], target: Mapping[str, Any]) -> li
         return out
     out += _deep_forbidden(ac, w, manifest, ix_app=ac.get("catalog_app") == IX_APP)
     if ac.get("custom_app") not in (None, False):
-        out.append(_f(f"{w}.custom_app", "compose_verboden", "custom_app=true is een compose-app (Install via YAML)"))
+        out.append(
+            _f(
+                f"{w}.custom_app",
+                "compose_verboden",
+                "custom_app=true is een compose-app (Install via YAML) en is nooit toegestaan; installeer als "
+                "standaard Custom App (ix-app)",
+            )
+        )
     out += _text(ac.get("app_name"), f"{w}.app_name", max_len=40, pattern=APP_NAME_RE)
     if ac.get("app_name") != target.get("app_id"):
         out.append(_f(f"{w}.app_name", "doel_verschilt", "app_name moet gelijk zijn aan target.app_id"))
