@@ -84,6 +84,11 @@ def test_stoppen_van_een_custom_app_is_r2_en_daarna_doet_het_platform_niets_meer
     assert any(s.soort == "handmatig" and s.bron == "TrueNAS-web-UI" for s in db.terugdraaien)
     md = render()
     assert "`app.stop` (minimaal R1)" not in md and md.count("`app.stop` (minimaal R1; Custom App: R2)") == len(stops)
+    # S-P2-010, R-TECH-5: het platform weigert, niet de app ("een gestopte Custom App weigert het platform" zei het
+    # omgekeerde).
+    na_stop = [s for r in RUNBOOKS for f in FASEN for s in r.stappen()[f] if s.custom_app == NA_STOP_GEWEIGERD]
+    assert na_stop and "een gestopte Custom App weigert het platform" not in md
+    assert md.count("; het platform weigert dit bij een gestopte Custom App)") == len(na_stop)
 
 
 def test_validatie_vangt_app_stop_zonder_custom_app_klasse_en_terugzetten_na_een_stop() -> None:

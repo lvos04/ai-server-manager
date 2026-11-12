@@ -69,7 +69,7 @@ Een app start niet of meldt een mislukte schemamigratie na een update.
 **Terugdraaien**
 
 - Voorstel: Maak eerst een snapshot van de data-dataset. — `zfs.snapshot.create` (minimaal R1)
-- Voorstel: Alleen bij een catalogusapp: een versie-terugzet, en alleen als de migratie niets schreef; anders is herstel van de database nodig (R3, via de eigenaar). — `app.rollback` (minimaal R2; een gestopte Custom App weigert het platform)
+- Voorstel: Alleen bij een catalogusapp: een versie-terugzet, en alleen als de migratie niets schreef; anders is herstel van de database nodig (R3, via de eigenaar). — `app.rollback` (minimaal R2; het platform weigert dit bij een gestopte Custom App)
 - Zelf doen: Een gestopte Custom App zet je zelf terug in de TrueNAS-web-UI: het platform ziet bij een gestopte Custom App niet wat erin draait en weigert app.rollback (doel_niet_herkenbaar). — `TrueNAS-web-UI`
 
 **Bewijs verzamelen**
@@ -108,7 +108,7 @@ Een pool of dataset raakt vol, een quota is bereikt, of een pool is niet gezond.
 
 **Terugdraaien**
 
-- Voorstel: Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is. — `app.start` (minimaal R1; een gestopte Custom App weigert het platform)
+- Voorstel: Start een gepauzeerde catalogusapp weer met app.start als er genoeg ruimte is. — `app.start` (minimaal R1; het platform weigert dit bij een gestopte Custom App)
 - Zelf doen: Een gepauzeerde Custom App start je zelf in de TrueNAS-web-UI: het platform ziet bij een gestopte Custom App niet wat erin draait en weigert app.start (doel_niet_herkenbaar). — `TrueNAS-web-UI`
 
 **Bewijs verzamelen**

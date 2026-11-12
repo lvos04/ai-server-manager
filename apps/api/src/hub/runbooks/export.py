@@ -42,7 +42,7 @@ def render() -> str:
                 if s.action_id:
                     klasse = f"minimaal {s.risico}"
                     if s.custom_app == NA_STOP_GEWEIGERD:
-                        klasse += "; een gestopte Custom App weigert het platform"
+                        klasse += "; het platform weigert dit bij een gestopte Custom App"
                     elif s.custom_app is not None:
                         klasse += f"; Custom App: {s.custom_app}"
                     extra = f" — `{s.action_id}` ({klasse})"
