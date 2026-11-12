@@ -1,8 +1,8 @@
 # STARTPROMPT - de opdracht waarmee de gebruiker een regisseursessie start
 
 Twee varianten. De gebruiker plakt er een in het gesprek. `<NIVEAUTABEL>` is in dit bestand met opzet niet ingevuld (geen
-modelnamen in het plan); de ingevulde versie staat buiten de repos in `/home/transcode/truenas-v2/.lokaal/plan/STARTPROMPT_INGEVULD.md`
-en de tabel zelf in `/home/transcode/truenas-v2/.lokaal/plan/MODELKEUZE.md`.
+modelnamen in het plan); de ingevulde versie staat buiten de repos in `<WERKMAP>/.lokaal/plan/STARTPROMPT_INGEVULD.md`
+en de tabel zelf in `<WERKMAP>/.lokaal/plan/MODELKEUZE.md`.
 
 ## Variant 1 - Eerste sessie
 
@@ -10,8 +10,8 @@ en de tabel zelf in `/home/transcode/truenas-v2/.lokaal/plan/MODELKEUZE.md`.
 Je bent vanaf nu de REGISSEUR van het project TrueNAS Home Platform V2 op deze machine (transcode). Je bouwt, herstelt,
 test en reviewt niet zelf: je besteedt dat werk uit aan subagents via de Agent-tool en controleert wat terugkomt.
 
-Werkmap (<WERKMAP>): /home/transcode/truenas-v2
-Planmap (<PLANMAP>): /home/transcode/truenas-v2/.lokaal/plan/uit
+Werkmap (<WERKMAP>): <volledig pad van de werkmap op de bouwmachine>
+Planmap (<PLANMAP>): <WERKMAP>/.lokaal/plan/uit
 
 Doe nu, in deze volgorde:
 1. Lees <PLANMAP>/00_LEES_EERST.md helemaal en volg het letterlijk. Het zegt wat je verder leest en wanneer.
@@ -50,8 +50,8 @@ Houd mij kort op de hoogte: per gesloten stap een of twee regels (wat, commit, C
 Je bent de REGISSEUR van het project TrueNAS Home Platform V2 op deze machine (transcode) en je gaat verder waar de
 vorige sessie stopte. Je bouwt niet zelf: je besteedt het werk uit aan subagents via de Agent-tool.
 
-Werkmap (<WERKMAP>): /home/transcode/truenas-v2
-Planmap (<PLANMAP>): /home/transcode/truenas-v2/.lokaal/plan/uit
+Werkmap (<WERKMAP>): <volledig pad van de werkmap op de bouwmachine>
+Planmap (<PLANMAP>): <WERKMAP>/.lokaal/plan/uit
 
 Doe nu, in deze volgorde:
 1. Lees <PLANMAP>/00_LEES_EERST.md helemaal en volg het letterlijk.

@@ -1,7 +1,7 @@
 # Uitvoeringsplan P2 tot en met P6 - kopie (CONCEPT)
 
 Dit is een kopie van het uitvoeringsplan voor de regisseur, vastgelegd op 2026-11-11 bij de overdracht. Het werkexemplaar
-staat op de bouwmachine in `/home/transcode/truenas-v2/.lokaal/plan/uit` en is leidend; daar staat ook de bijgehouden
+staat op de bouwmachine in `<WERKMAP>/.lokaal/plan/uit` en is leidend; daar staat ook de bijgehouden
 `VOORTGANG.md`. Deze kopie is er om het plan niet kwijt te raken.
 
 **Status (2026-11-11, 12:05): afgemaakt en gecontroleerd.** Elk planbestand is door een eigen subagent afgemaakt en tegen

@@ -73,7 +73,7 @@ Eén Agent-aanroep per taak, `subagent_type` "general-purpose", `run_in_backgrou
 niveau (MODELKEUZE.md). De prompt is letterlijk:
 
 ```text
-Lees /home/transcode/truenas-v2/.lokaal/plan/afmaakopdrachten/<OPDRACHTBESTAND> helemaal en voer de opdracht uit. De
+Lees <WERKMAP>/.lokaal/plan/afmaakopdrachten/<OPDRACHTBESTAND> helemaal en voer de opdracht uit. De
 "AANVULLING VAN DE REGISSEUR" onderaan dat bestand gaat voor waar ze afwijkt van de rest. Start zelf geen subagents.
 ```
 

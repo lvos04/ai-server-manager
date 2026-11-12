@@ -2,7 +2,7 @@
 
 Ronde 3 is op 2026-11-11 om 09:52 AFGEBROKEN op verzoek van de gebruiker (het duurde te lang). Er draait niets meer. Wat
 toen liep is NIET afgemaakt: het staat als half werk (niet gecommit) in de werkmap van de repo, met een reservekopie in
-`/home/transcode/truenas-v2/.lokaal/halfwerk/<repo>.patch` (git diff HEAD) en `<repo>-nieuw.tgz` (nieuwe bestanden).
+`<WERKMAP>/.lokaal/halfwerk/<repo>.patch` (git diff HEAD) en `<repo>-nieuw.tgz` (nieuwe bestanden).
 
 Regel voor de regisseur: half werk NOOIT ongezien weggooien en NOOIT ongezien committen. Per repo met half werk is de eerste
 stap: A-VERKEN beoordeelt wat er staat (git status, git diff, tests draaien), A-BOUW maakt het af, daarna de gewone keten

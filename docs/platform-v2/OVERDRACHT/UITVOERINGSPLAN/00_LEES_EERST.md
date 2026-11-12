@@ -4,7 +4,7 @@ Dit is het hoofdplan. Het is kort met opzet: lees het bij de start van ELKE sess
 is samengevat. Volg het letterlijk. Waar dit bestand en een ander planbestand elkaar tegenspreken, stop je en leg je het
 de gebruiker voor met een keuzemenu.
 
-- `<WERKMAP>` = de map met de elf repos naast elkaar: `/home/transcode/truenas-v2`
+- `<WERKMAP>` = de map met de elf repos naast elkaar (het volledige pad staat alleen op de bouwmachine, buiten de repos)
 - `<PLANMAP>` = de map met dit plan: `<WERKMAP>/.lokaal/plan/uit` (werkexemplaar, BUITEN de repos, en leidend; een kopie
   staat in `ai-server-manager/docs/platform-v2/OVERDRACHT/UITVOERINGSPLAN/`)
 - `<DOCS>` = `<WERKMAP>/ai-server-manager/docs/platform-v2`

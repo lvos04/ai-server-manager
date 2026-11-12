@@ -289,7 +289,7 @@ Controleer de echte stand altijd zelf in git (de oude sessie kan na dit moment n
   kruismeldingen en een droogloop; zie `UITVOERINGSPLAN/LEESMIJ.md`). Besluiten van de gebruiker van 2026-11-11 (Z-04, Z-05,
   C-11, C-12, Z-17, Z-19, Z-20) staan in `UITVOERINGSPLAN/BESLUITEN_EN_BLOKKADES.md` kop 1.5; de vastlegging in de
   besluitendocumenten volgt in stap S-P2-005.
-- Het werkexemplaar met de bijgehouden voortgang staat op de bouwmachine in `/home/transcode/truenas-v2/.lokaal/plan/uit`.
+- Het werkexemplaar met de bijgehouden voortgang staat op de bouwmachine in `<WERKMAP>/.lokaal/plan/uit`.
 
 ## Besluiten van de gebruiker van 2026-11-11 (keuzemenu)
 
