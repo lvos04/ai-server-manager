@@ -4,6 +4,28 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — herstelronde 3 van het policy-pakket: één tabel van verboden sleutels (S-P2-010; ADR-0030)
+- De EX47-controle gebruikt één genormaliseerde tabel van verboden sleutels (kleine letters, alleen letters en
+  cijfers), gelijk voor een sleutel in een object, een losse tekst in een lijst en de vlagvorm, in de Hub én de
+  executor. `privileged` en `host_network` worden geweigerd met elke waarde behalve afwezig, `null` of `false` (ook
+  `1` en `"true"`), ook in een andere schrijfwijze (`Privileged`, `hostNetwork`, `host-network`) en in een onderdeel
+  van de standaard Custom App. "compose" in een sleutel en `services` zijn altijd verboden.
+- Nieuwe weigering `catalogus_waarde_verboden`: Docker-/compose-namen met een niet-lege waarde (`network_mode` en
+  `net` met `host` of `container:…`, `pid_mode`, `ipc_mode`, `uts`, `userns`, `cgroupns`, `security_opt`, `seccomp`,
+  `apparmor`, `sysctls`, `volumes_from`, `runtime`, `device_cgroup_rules`, `allowPrivilegeEscalation`; bij een
+  catalogusapp ook `command` en `entrypoint`), dezelfde namen als vlag (`"--network=host"`, `"--security-opt=…"`),
+  en "unconfined" in een tekst. `device` en `--device` geven `devices_verboden`.
+- In de waarden van een catalogusapp krijgt een tekstwaarde in een object dezelfde controle als een losse tekst in
+  een lijst (`{"extra_args": "--privileged"}`, `{"volume": "/:/host"}`), en tellen `source`, `src`, `hostpath` en
+  `path` met een waarde die met "/" begint als hostpad. Vrije tekst blijft toegestaan: de waarde naast `name` of
+  `key` in een paar (`envs[].value`, `labels[].value`), `notes` en `description`.
+- Een losse tekst met een onzichtbaar opmaakteken (Unicode Cf) wordt geweigerd (`stuurteken`); `"-v/:/host"` en
+  `"--volume/:/host"` worden als bindvorm herkend.
+- Standaard Custom App: `command` en `entrypoint` zijn de opdracht van het proces in de container (zo gebruikt het
+  ix-app-sjabloon ze). De vlag- en bindcontrole geldt daar niet meer, zodat gewone opdrachten zoals
+  `java -cp /app/lib/*:/app/classes` en `gunicorn --pid /tmp/g.pid` niet meer geweigerd worden. De Docker-socket en
+  de kluisregels gelden daar nog wel.
+
 ### Gerepareerd — herstelronde 2 van het policy-pakket: losse teksten in lijsten (S-P2-010; ADR-0030)
 - De EX47-controle bekijkt ook een tekst die los in een lijst staat, op elke diepte. Een Docker-socket, een hostpad
   buiten een dataset in bind- of volumevorm (`{"binds": ["/:/host"]}`), een ongeldige kluisverwijzing en een verboden

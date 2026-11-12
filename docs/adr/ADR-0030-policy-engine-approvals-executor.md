@@ -50,6 +50,42 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    `501 capability_unavailable`, net als in een object. Een hostpad weigert ook elk teken uit de Unicode-categorieën
    Cc, Cf, Zl en Zp en een spatie aan het begin of eind van een mapnaam. Een tekst die geen
    geldige UTF-8 is (een losse surrogaat) is niet canoniek: `422 parameters_ongeldig` (`niet_canoniek`).
+   **Eén tabel van verboden sleutels (S-P2-010, herstelronde 3).** Een sleutel in een object, een losse tekst in een
+   lijst en de vlagvorm gaan door dezelfde tabel (`asm_policy.params`, `VERBODEN_SLEUTELS`). Sleutels worden eerst
+   genormaliseerd: kleine letters, alleen letters en cijfers (zoals de manifestregels van appstore-en-fork), dus
+   `Privileged`, `hostNetwork` en `host-network` zijn dezelfde sleutel als `privileged` en `host_network`. De tabel
+   geldt in de waarden van een catalogusapp en in elk onderdeel van de standaard Custom App:
+   - `privileged`, `host_network` (zonder reden), `host_pid`, `host_ipc` en `use_all_gpus` (zonder
+     `gpu: intel_render`): verboden met elke waarde behalve afwezig, `null` of `false` (dus ook `1`, `0`, `"true"`
+     en `"false"`);
+   - "compose" ergens in de sleutel, of de sleutel `services`: altijd verboden;
+   - `network_mode`, `net` en `network`: verboden met de waarde `host` of de namespace van een andere container
+     (`container:…`, `service:…`); dezelfde waarden bij `pid` en `ipc`;
+   - de Docker-/compose-namen `pid_mode`, `ipc_mode`, `uts`, `userns(_mode)`, `cgroup(ns)`, `cgroup_parent`,
+     `security_opt`, `seccomp`, `apparmor`, `sysctl(s)`, `volumes_from`, `runtime`, `device(s)`,
+     `device_cgroup_rules`, `cap_add` en `allowPrivilegeEscalation`: verboden met een niet-lege waarde, als vlag
+     ook zonder waarde (`"--device"`, `"--security-opt=…"`, `"--userns=host"`); `command` en `entrypoint` alleen bij
+     een catalogusapp (bij de standaard Custom App zijn het gewone velden);
+   - "unconfined" in een tekst: altijd verboden.
+
+   De nieuwe namen geven de code `catalogus_waarde_verboden`; de bestaande sleutels houden hun eigen code. In de
+   tekstvorm (`"sleutel=waarde"`, `"--sleutel waarde"`) is de waarde altijd een tekst: daar telt een vlag zonder
+   waarde als aan en tellen `false`, `0`, `no`, `off`, `none` en `null` als uit (`"--privileged=false"` mag).
+   In de waarden van een catalogusapp krijgt ook een tekstwaarde in een object de controle van een losse tekst
+   (`{"extra_args": "--privileged"}`, `{"volume": "/:/host"}`), en tellen `source`, `src`, `hostpath` en `path`
+   (genormaliseerd) met een waarde die met "/" begint als hostpad. Vrije tekst is daarvan uitgezonderd: de waarde
+   naast `name` of `key` in een paar (`envs[].value`, `additional_envs[].value`, `labels[].value`), `notes` en
+   `description`. De Docker-socket, een ongeldige kluisverwijzing en "unconfined" blijven ook daar geweigerd.
+   Een losse tekst met een onzichtbaar opmaakteken (Unicode-categorie Cf) wordt geweigerd (`stuurteken`), en
+   `"-v/:/host"` en `"--volume/:/host"` (de waarde direct achter de optie) worden als bindvorm herkend.
+   Bij de standaard Custom App zijn `command` en `entrypoint` de opdracht van het proces ín de container: het
+   ix-app-sjabloon (truenas/apps, `ix-dev/stable/ix-app/templates/docker-compose.yaml`, ix-app 1.4.8) geeft ze
+   alleen door aan `set_command` en `set_entrypoint` van de container. Voor de teksten direct in die twee lijsten
+   geldt de vlag- en bindcontrole daarom niet (`["java", "-cp", "/app/lib/*:/app/classes", …]` mag); de
+   Docker-socket, een ongeldige kluisverwijzing en "unconfined" blijven geweigerd en een geldige kluisverwijzing
+   geeft `501`. Een controle op vrije tekst blijft onvolledig (bijvoorbeeld JSON als tekst of een ander streepje
+   dan "-"); voor catalogusapps blijft de echte grens het schema van TrueNAS en het manifest
+   (NIET GEVALIDEERD (echte NAS)).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
