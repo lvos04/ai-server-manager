@@ -260,7 +260,7 @@ def test_onleesbaar_koppelbestand_met_sleutel_biedt_beheer_als_herstel() -> None
         policy=BELEID,
     )
     assert 'action="/beheer"' in html and 'action="/koppelen"' not in html and 'role="alert"' not in html
-    assert "daarna kun je opnieuw koppelen met een koppelcode" in html
+    assert "Koppel daarna opnieuw met een koppelcode" in html
     zonder = onleesbaar_melding()
     assert "geen bruikbare TrueNAS-schrijfsleutel" in zonder["tekst"] and "CUSTOM_APP.md" in zonder["tekst"]
 

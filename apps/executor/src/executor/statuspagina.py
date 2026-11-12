@@ -499,9 +499,9 @@ def onleesbaar_melding(*, sleutel_ingesteld: bool = False) -> dict[str, str]:
         "titel": "De koppelstatus is onleesbaar",
         "tekst": (
             "De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. De executor koppelt niet met "
-            "een koppeltoken. Herstel: vul onder 'Ontkoppelen of sleutel vervangen' de TrueNAS-schrijfsleutel in en "
-            "kies 'Ontkoppelen van de Hub' (dat wist ook de sleutel); daarna kun je opnieuw koppelen met een "
-            "koppelcode en vul je de sleutel opnieuw in. Het bestand:"
+            "een koppeltoken. Herstel: vul onder 'Ontkoppelen of sleutel vervangen' de huidige TrueNAS-API-sleutel "
+            "in, laat 'Nieuwe sleutel' leeg en kies 'Ontkoppelen van de Hub' (dat wist ook de sleutel). Koppel daarna "
+            "opnieuw met een koppelcode en vul de sleutel opnieuw in. Het bestand:"
             if sleutel_ingesteld
             else "De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. De executor koppelt niet "
             "met een koppeltoken, en er is geen bruikbare TrueNAS-schrijfsleutel (niet ingesteld of onleesbaar) "

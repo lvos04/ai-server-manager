@@ -478,3 +478,67 @@ letterlijk; de tests controleren de codes (die zijn gelijk gebleven).
 - **O-S2-010-3 (klein):** de code `catalogus_waarde_verboden` kan ook bij de standaard Custom App (ix-app) komen
   (`_deep_forbidden` toetst "unconfined" en de losse teksten in een lijst ook bij `ix_app`); de codenaam suggereert
   alleen catalogusapps. Een code is API; niet gewijzigd.
+
+## Stap S-P2-020: meldingen van de executorpagina na ontkoppelen (12 november 2026)
+
+Korte ontwerpreview (R-ONTWERP) op `85226f1` van de nieuwe vaste meldingen op de executorpagina: ontkoppelen,
+opnieuw koppelen, sleutelbeheer en de hersteltekst bij een onleesbaar koppelbestand. Alleen teksten hersteld; geen
+gedrag, codes, API, beleid of Peil-bron (`design/ontwerptaal/statuspagina.html` en
+`apps/executor/src/executor/statuspagina.html` zijn niet gewijzigd).
+
+### Werkwijze
+
+De echte dienst (`python -m executor init` en `python -m executor api`) draaide lokaal met een nagebootste TrueNAS
+(`tests/fakes/fake_truenas.py`) en twee nep-Hubs (alleen testwaarden). Chromium (Playwright uit
+`design/ontwerptaal/bouw`) verstuurde de echte formulieren: koppelen, de sleutel in twee stappen, beheer met een
+verkeerde sleutel, ontkoppelen, opnieuw koppelen met een andere Hub, en een koppelformulier uit een oud tabblad. Per
+toestand: schermafdrukken op 320, 360, 390, 768 en 1440 px, licht en donker (50 in totaal, buiten de repo); axe-core
+(WCAG 2.0/2.1/2.2 A en AA) op 320 en 1440 px in beide thema's; horizontale overloop en aanraakdoelen op elke breedte;
+toetsenbord: Tab door de hele pagina, focus zichtbaar en niet bedekt. Let op: de rate-limit (5 pogingen per 15 min per
+bron-IP, §3.7) maakt dat de toestanden in drie aparte runs met een verse datamap zijn gemeten.
+
+### Metingen (na herstel)
+
+| Toestand | axe | Overloop | Aanraakdoelen < 44 px | Toetsenbord |
+|---|---|---|---|---|
+| `sleutel_niet_huidig` (beheer met een verkeerde sleutel) | 0 | geen | geen | 8 stops, focus zichtbaar, niets bedekt |
+| Ontkoppelen gelukt | 0 | geen | geen | 7 stops, idem |
+| Ontkoppeld (bestaande toestand, `ONTKOPPELD_MELDING`) | 0 | geen | geen | 7 stops, idem |
+| Opnieuw gekoppeld zonder sleutel (`OPNIEUW_GEKOPPELD_MELDING`) | 0 | geen | geen | 6 stops, idem |
+| `al_gekoppeld` (formulier uit een oud tabblad) | 0 | geen | geen | 6 stops, idem |
+
+Onbekend en verouderd zijn nergens groen: de status toont "Onbekend" of "Niet gereed" met een icoon en een gestippelde
+rand, nooit alleen kleur. `/api/v1/status` gaf in de toestand ontkoppeld de nieuwe toelichting terug.
+
+### Hersteld (alleen tekst)
+
+- `FORM_MESSAGES["al_gekoppeld"]`: "opnieuw koppelen gaat via de Hub" klopte niet voor de executor. Nu: opnieuw
+  koppelen kan alleen na "Ontkoppelen van de Hub" op deze pagina, met de huidige sleutel als bewijs; dat blok staat er
+  alleen als de sleutel is ingesteld. Test: `test_ontkoppelen_met_bewijs_en_opnieuw_koppelen_mogelijk`.
+- `ONTKOPPELD_MELDING` en de succestekst van ontkoppelen: volgorde Peil §11 (wat er is, gevolg, wat je doet); "het
+  certificaat van TrueNAS"; "tot de executor opnieuw gekoppeld is en de sleutel opnieuw is ingesteld" (beide zijn
+  nodig); "de vingerafdruk uit jouw Hub".
+- `OPNIEUW_GEKOPPELD_MELDING`: het risico benoemd (in de tussentijd kon iedereen op het netwerk koppelen), "Hub-UI"
+  vervangen door "wat jouw Hub toont", en wat te doen bij een andere Hub (nieuwe datamap, zoals CUSTOM_APP.md "Herstel").
+- Vervangen tijdens een stop: waarom de executor gestopt blijft, en het veld bij zijn echte label ("Huidige
+  TrueNAS-API-sleutel met schrijfrechten"). Bij elk vervangen: de oude sleutel bestaat in TrueNAS nog.
+- Sleutel opnieuw instellen: verwijzing naar de status voor of de executor weer uitvoert.
+- `schrijfrechten_onvolledig`: titel "De sleutel heeft niet alle schrijfrechten"; de dubbelzinnige zin herschreven.
+- `sleutel_niet_huidig`: "Heb je die sleutel niet meer?" met de verwijzing naar Herstel.
+- `sleutelopslag_niet_schrijfbaar`: eerlijk dat de wijziging deels opgeslagen kan zijn; eerst de pagina opnieuw laden.
+- `sleutel_al_ingesteld`: "misschien net in een ander tabblad", "Er is niets gewijzigd", pagina opnieuw laden.
+- Status-toelichting "ontkoppeld": waar je opnieuw koppelt (de executorpagina).
+- `onleesbaar_melding` (met sleutel): de veldnaam "huidige TrueNAS-API-sleutel" en "laat 'Nieuwe sleutel' leeg".
+
+### Open (Peil-bron of gedrag; niet gewijzigd)
+
+- Het Peil-sjabloon zegt in de toestand Gekoppeld "Ontkoppelen of opnieuw koppelen gaat via de Hub." Voor de executor
+  klopt dat niet meer (ontkoppelen gaat op de eigen pagina); de vaste melding erboven zegt nu iets anders.
+- In de toestand ontkoppeld toont het sjabloon "Deze dienst is nog niet met de Hub gekoppeld" en de Hub-weg
+  "Instellingen → Diensten → Koppelcode maken"; CUSTOM_APP.md noemt voor de executor "Koppelcode voor de executor
+  maken" op de pagina "Executor installeren en koppelen". De melding erboven corrigeert het eerste, niet het tweede.
+- De hint "Laat leeg als je alleen wilt ontkoppelen." bij "Nieuwe sleutel" noemt vrijgeven niet.
+- Deze drie horen bij de geplande Peil-stap (vaste teksten voor ontkoppeld, een sleutelveld in het koppelformulier en
+  een eigen knop "Vrijgeven").
+- Een tweede melding als de nieuwe Hub een andere vingerafdruk heeft dan vóór de ontkoppeling (R-VEILIG-7) is gedrag:
+  vervolgpunt.

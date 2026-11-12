@@ -155,7 +155,13 @@ FORM_MESSAGES: dict[str, tuple[int, str, str]] = {
     "formulier_te_groot": (413, "Geweigerd", "Het formulier is te groot."),
     "rate_limited": (429, "Te veel pogingen", "Te veel pogingen; probeer het over een kwartier opnieuw."),
     "koppelstatus_onleesbaar": (409, "Koppelen kan niet", ERRORS_NL["koppelstatus_onleesbaar"]),
-    "al_gekoppeld": (409, "Koppelen kan niet", "Deze executor is al eens gekoppeld; opnieuw koppelen gaat via de Hub."),
+    "al_gekoppeld": (
+        409,
+        "Koppelen kan niet",
+        "Deze executor is al eens gekoppeld. Opnieuw koppelen kan alleen na 'Ontkoppelen van de Hub' onder "
+        "'Ontkoppelen of sleutel vervangen'. Dat blok staat er alleen als de TrueNAS-schrijfsleutel is ingesteld; je "
+        "vult dan de huidige sleutel in als bewijs. Er is niets gewijzigd en niets naar de Hub gestuurd.",
+    ),
     "koppelen_bezig": (409, "Koppelen bezig", "Er loopt al een koppelpoging. Laad de pagina over een minuut opnieuw."),
     "validation_error": (422, "Koppelen is mislukt", "Een of meer velden zijn niet goed ingevuld; zie de velden."),
     "sleutel_ontbreekt": (503, "Koppelen is mislukt", "De eigen sleutel ontbreekt; herstart de executor."),
@@ -164,7 +170,8 @@ FORM_MESSAGES: dict[str, tuple[int, str, str]] = {
     "sleutel_al_ingesteld": (
         409,
         "Sleutel instellen kan niet",
-        "Er is al een schrijfsleutel ingesteld. Vervangen kan onder 'Ontkoppelen of sleutel vervangen'.",
+        "Er is al een TrueNAS-schrijfsleutel ingesteld, misschien net in een ander tabblad. Er is niets gewijzigd. "
+        "Laad de pagina opnieuw; vervangen kan onder 'Ontkoppelen of sleutel vervangen'.",
     ),
     "geen_schrijfsleutel": (409, "Dit kan nog niet", "Er is nog geen TrueNAS-schrijfsleutel ingesteld."),
     "sleutelopslag_onleesbaar": (
@@ -224,21 +231,21 @@ FORM_MESSAGES: dict[str, tuple[int, str, str]] = {
     ),
     "schrijfrechten_onvolledig": (
         400,
-        "De sleutel mag niet alles wat de executor doet",
-        "Deze sleutel mag niet zowel apps als snapshots wijzigen. De executor heeft een TrueNAS-API-sleutel nodig met "
-        "de rol FULL_ADMIN, of met APPS_WRITE en SNAPSHOT_WRITE samen. Er is niets gewijzigd.",
+        "De sleutel heeft niet alle schrijfrechten",
+        "Deze sleutel mag niet zowel apps als snapshots wijzigen, en de executor heeft beide nodig. Gebruik een "
+        "TrueNAS-API-sleutel met de rol FULL_ADMIN, of met APPS_WRITE en SNAPSHOT_WRITE samen. Er is niets gewijzigd.",
     ),
     "sleutel_niet_huidig": (
         400,
         "Dit is niet de huidige sleutel",
         "Als bewijs telt alleen de TrueNAS-API-sleutel die nu in de executor is ingesteld (zie 'Huidige sleutel "
-        "eindigt op'). Er is niets gewijzigd en er is niets naar TrueNAS gestuurd.",
+        f"eindigt op'). Er is niets gewijzigd en niets naar TrueNAS gestuurd. Heb je die sleutel niet meer? {HERSTEL}",
     ),
     "sleutelopslag_niet_schrijfbaar": (
         503,
         "De opslag van de executor is niet schrijfbaar",
-        "De executor kon niet schrijven in /appdata/secrets. Controleer de opslag in /appdata en laad deze pagina "
-        "daarna opnieuw; de pagina toont wat er nu is opgeslagen.",
+        "De executor kon niet schrijven in /appdata/secrets; misschien is de wijziging maar deels opgeslagen. Laad "
+        "deze pagina opnieuw: die toont wat er nu is opgeslagen. Controleer daarna de opslag in /appdata.",
     ),
     "journaal_niet_beschikbaar": (
         503,
@@ -251,10 +258,10 @@ ONTKOPPELD_MELDING: dict[str, str] = {
     "toon": "info",
     "rol": "",
     "titel": "Ontkoppeld van de Hub op deze pagina",
-    "tekst": "Een beheerder heeft de executor hier ontkoppeld; daarbij is ook de TrueNAS-schrijfsleutel gewist. Het "
-    "NAS-adres en het certificaat liggen nog vast. Koppel hieronder opnieuw met een koppelcode en de vingerafdruk uit "
-    "de Hub, en vul daarna de TrueNAS-API-sleutel met schrijfrechten opnieuw in. Tot die sleutel opnieuw is ingesteld, "
-    "voert de executor niets uit.",
+    "tekst": "Een beheerder heeft de executor op deze pagina ontkoppeld; daarbij is ook de TrueNAS-schrijfsleutel "
+    "gewist. Het NAS-adres en het certificaat van TrueNAS liggen nog vast. Tot de executor opnieuw gekoppeld is en de "
+    "sleutel opnieuw is ingesteld, voert hij niets uit. Koppel hieronder met een koppelcode en de vingerafdruk uit "
+    "jouw Hub, en vul daarna de TrueNAS-API-sleutel met schrijfrechten opnieuw in.",
 }
 # Bestaande toestand: opnieuw gekoppeld na zo'n ontkoppeling, nog zonder sleutel. In dit venster kan iemand op het LAN
 # de executor aan een eigen Hub hebben gekoppeld (ADR-0030 besluit 13): eerst de Hub controleren, dan pas de sleutel.
@@ -262,9 +269,10 @@ OPNIEUW_GEKOPPELD_MELDING: dict[str, str] = {
     "toon": "info",
     "rol": "",
     "titel": "Opnieuw gekoppeld: controleer eerst de Hub",
-    "tekst": "De executor is na een ontkoppeling opnieuw gekoppeld en heeft nog geen TrueNAS-schrijfsleutel. Vul de "
-    "sleutel alleen in als het adres en de vingerafdruk van de Hub hieronder die van jouw Hub zijn (zie de Hub-UI). Is "
-    f"het een andere Hub, vul de sleutel dan niet in: zonder sleutel voert de executor niets uit. {HERSTEL}",
+    "tekst": "De executor is na een ontkoppeling opnieuw gekoppeld en heeft nog geen TrueNAS-schrijfsleutel; tot dan "
+    "voert hij niets uit. Iedereen op het netwerk kon in de tussentijd koppelen. Vergelijk daarom eerst het adres en "
+    "de vingerafdruk van de Hub hieronder met wat jouw Hub toont, en vul de sleutel alleen in als ze gelijk zijn. "
+    f"Staat er een andere Hub, vul de sleutel dan niet in en begin opnieuw met een nieuwe datamap. {HERSTEL}",
 }
 VELD_BIJ_FOUT = {
     "hub_vingerafdruk_onjuist": "vingerafdruk",
@@ -451,8 +459,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             toelichting = "De koppelstatus is onleesbaar: de executor vertrouwt de Hub niet en voert niets uit."
         elif raw.get("state") == "ontkoppeld":
             toelichting = (
-                "Ontkoppeld op de executorpagina; de TrueNAS-schrijfsleutel is gewist. Koppel opnieuw met een "
-                "koppelcode en vul daarna de sleutel opnieuw in; tot dan voert de executor niets uit."
+                "Ontkoppeld op de executorpagina; de TrueNAS-schrijfsleutel is gewist. Koppel op de executorpagina "
+                "opnieuw met een koppelcode en vul daarna de sleutel opnieuw in; tot dan voert de executor niets uit."
             )
         elif not linked:
             toelichting = (
@@ -1019,7 +1027,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             trace,
             "De schrijfsleutel is getest en opgeslagen.",
             "TrueNAS accepteerde de sleutel op het vastgelegde NAS-adres en certificaat, en hij heeft "
-            "schrijfrechten. De sleutel staat versleuteld in deze dienst en de Hub ziet hem nooit.",
+            "schrijfrechten. De sleutel staat versleuteld in deze dienst en de Hub ziet hem nooit. Controleer de "
+            "status hieronder: daar staat of de executor weer uitvoert.",
             soort=soort,
         )
 
@@ -1158,9 +1167,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "ontkoppeld",
                     trace,
                     "Ontkoppeld van de Hub.",
-                    "De koppeling met de Hub en de schrijfsleutel zijn gewist; het NAS-adres en het certificaat liggen "
-                    "nog vast. Koppel opnieuw met een koppelcode uit de Hub en vul daarna de TrueNAS-API-sleutel met "
-                    "schrijfrechten opnieuw in. Tot dan voert de executor niets uit.",
+                    "De koppeling met de Hub en de schrijfsleutel zijn gewist; het NAS-adres en het certificaat van "
+                    "TrueNAS liggen nog vast. Tot de executor opnieuw gekoppeld is en de sleutel opnieuw is ingesteld, "
+                    "voert hij niets uit. Koppel hieronder met een koppelcode en de vingerafdruk uit jouw Hub, en vul "
+                    "daarna de TrueNAS-API-sleutel met schrijfrechten opnieuw in.",
                     soort=soort,
                 )
             vervangen = False
@@ -1185,14 +1195,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if vervangen and stopped is not None:
             titel, tekst = (
                 "De schrijfsleutel is vervangen.",
-                "De nieuwe sleutel is live getest en versleuteld opgeslagen; de oude sleutel is hier gewist. De "
-                "executor blijft gestopt. Vrijgeven: vul de nieuwe sleutel in als huidige sleutel, laat 'Nieuwe "
-                "sleutel' leeg en kies 'Sleutel vervangen'.",
+                "De nieuwe sleutel is live getest en versleuteld opgeslagen; de oude sleutel is hier gewist (in "
+                "TrueNAS bestaat hij nog). De executor blijft gestopt: een nieuwe sleutel heft de stop niet op. "
+                "Vrijgeven doe je apart: vul de nieuwe sleutel in bij 'Huidige TrueNAS-API-sleutel met "
+                "schrijfrechten', laat 'Nieuwe sleutel' leeg en kies 'Sleutel vervangen'.",
             )
         elif vervangen:
             titel, tekst = (
                 "De schrijfsleutel is vervangen.",
-                "De nieuwe sleutel is live getest en versleuteld opgeslagen; de oude sleutel is hier gewist.",
+                "De nieuwe sleutel is live getest en versleuteld opgeslagen; de oude sleutel is hier gewist (in "
+                "TrueNAS bestaat hij nog).",
             )
         else:
             titel, tekst = (

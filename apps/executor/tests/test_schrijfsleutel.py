@@ -866,6 +866,8 @@ def test_ontkoppelen_met_bewijs_en_opnieuw_koppelen_mogelijk(
     r = andere_hub.koppelen(c)
     assert r.status_code == 409 and code_van(r) == "al_gekoppeld", r.text
     assert len(andere_hub.enrolls) == enrolls
+    # De melding wijst naar de weg die op de executor echt bestaat (R-ONTWERP S-P2-020), niet naar de Hub.
+    assert "alleen na &#39;Ontkoppelen van de Hub&#39;" in r.text
 
 
 def test_na_ontkoppelen_kan_een_andere_hub_hooguit_koppelen_maar_niets_laten_uitvoeren(
@@ -970,7 +972,7 @@ def test_onleesbaar_koppelbestand_herstellen_met_de_sleutel(hub: Hub, nas: FakeT
     pagina = c.get("/").text
     assert "De koppelstatus is onleesbaar" in pagina and "<code>koppelstatus_onleesbaar</code>" in pagina
     assert 'action="/beheer"' in pagina and 'action="/koppelen"' not in pagina
-    assert "vul onder" in pagina and "daarna kun je opnieuw koppelen met een koppelcode" in pagina
+    assert "vul onder" in pagina and "Koppel daarna opnieuw met een koppelcode" in pagina
     r = post(c, BEHEER, {"truenas_sleutel": WRITE_KEY, "actie": "ontkoppelen"})
     assert r.status_code == 200 and "Ontkoppeld van de Hub." in r.text, r.text
     bewaard = sorted(hub.settings.secrets_dir.glob("hub-link.json.onleesbaar-*"))
