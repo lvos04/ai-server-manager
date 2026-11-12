@@ -412,3 +412,69 @@ staat dan de rij "TrueNAS-schrijfsleutel · Onleesbaar". De melding zei dus iets
   "Diensten" er niet is en dat je de koppelcode via `/api/docs` maakt; kop 5 zegt dat `/api/docs` geen
   `X-CSRF-Token` meestuurt, en de kop "Herstel" verwijst (terecht) naar de Hub-pagina "Executor installeren en
   koppelen". Punt 1 is verouderd (V-104).
+
+## Stap S-P2-010: runbookteksten en weigerteksten van het beleid (12 november 2026)
+
+**Rol:** R-ONTWERP (korte review, alleen teksten). **Bereik (besluit van de regisseur):** de gewijzigde runbookteksten
+van deze stap (`apps/api/src/hub/runbooks/catalogus.py`, `apps/api/src/hub/runbooks/export.py` met de toevoeging
+"het platform weigert dit bij een gestopte Custom App", en het daaruit gemaakte `docs/RUNBOOKS.md`; bereik
+`c63b32e..5d2efa9`, o.a. `9779b80`) en de Nederlandse foutteksten (`fout` in `{veld, code, fout}`) die een beheerder
+krijgt bij de weigercodes van `apps/policy/src/asm_policy/params.py` (`catalogus_waarde_verboden`, `compose_verboden`,
+`privileged_verboden`, `hostpad_verboden`, `host_network_zonder_reden`, `capabilities_verboden`, `devices_verboden`).
+Er is in deze stap geen scherm gebouwd of gewijzigd: de weigerteksten komen alleen in het API-antwoord
+(`parameters_ongeldig`, Hub `apps/api/src/hub/actions/service.py` `_fouten_dict`; executor
+`apps/executor/src/executor/uitvoeren.py`); de runbookteksten verschijnen in `docs/RUNBOOKS.md` en ongewijzigd in het
+stappenplan van een incident (`apps/web/src/app/problemen/IncidentDetail.tsx`, `Stappenplan`).
+**Toetsing aan:** Peil 1.1.1 (`docs/platform-v2/ONTWERPTAAL.md` §11 Nederlandse microcopy) en de code (engine-regels
+`DOEL-ONHERKENBAAR` en `STOP-EENRICHTING` in `apps/policy/src/asm_policy/engine.py`, `host_path_problem` en
+`_sleutel_fout` in `params.py`).
+
+> **Eerlijkheid.** Niets gemeten op een draaiende dienst: geen schermafdrukken, geen axe, geen contrast- of
+> toetsenbordmeting (geen scherm in het bereik). De toets is op papier: tekst tegen code. Gedrag, codes, API en
+> `policy/*.yaml` zijn niet gewijzigd; `policy_hash` blijft gelijk.
+
+### Feiten nagelopen
+
+| Tekst | Wat de code doet | Uitkomst |
+|---|---|---|
+| Export: "(minimaal R2; het platform weigert dit bij een gestopte Custom App)" bij `app.rollback` en `app.start` na een stop | `NA_STOP_GEWEIGERD`; engine `DOEL-ONHERKENBAAR`: geen image te zien bij een gestopte Custom App, elke actie geweigerd | klopt |
+| Export: "(minimaal R1; Custom App: R2)" bij `app.stop` | `ALLOWLIST_CUSTOM_APP`, engine `STOP-EENRICHTING` | klopt |
+| `db_migratie_mislukt`, mitigeren: "daarna weigert het platform app.rollback en app.start op die app" | `DOEL_ONHERKENBAAR`: "weigert elke actie op deze app"; `NA_STOP_ACTIES` noemt ook update, restart en uninstall | onvolledig, hersteld (T-10) |
+| `schijf_vol`, mitigeren: "en start de app daarna alleen weer in de TrueNAS-web-UI" | idem | dubbelzinnig (leest als een opdracht), hersteld (T-11) |
+| `hostpad_verboden`: "ongeldig hostpad" (twee keer, zonder reden) | `host_path_problem`: stuurtekens/onzichtbare tekens, `//`, `/` aan het eind, meer dan 512 tekens | geen reden en geen uitweg, hersteld (T-12) |
+| `hostpad_verboden`: "het hostpad moet absoluut zijn" | idem | hersteld met voorbeeldvorm (T-12) |
+| `host_network_zonder_reden`: "host network alleen met een reden in het manifest" | `_sleutel_fout`: `host_network_reason`, minstens 10 tekens | Engels zonder uitleg, veldnaam en grens ontbraken, hersteld (T-13) |
+| `compose_verboden`: "compose/YAML-installatie is nooit toegestaan" | geraakt bij een sleutel met "compose" of de sleutel `services`, ook in de waarden van een catalogusapp | zei niet waarom déze sleutel, hersteld (T-14) |
+| `compose_verboden` bij `custom_app`: "custom_app=true is een compose-app (Install via YAML)" | weigering | zei niet dat het geweigerd is en wat wel kan, hersteld (T-14) |
+| `privileged_verboden`: "privileged is nooit toegestaan" | weigering | klopt; uitleg toegevoegd (T-15) |
+| `catalogus_waarde_verboden` (`_DOCKER`): "Docker-/compose-optie (…) is in deze waarden nooit toegestaan" | geldt voor netwerk/namespace van host of andere container, beveiligings- en rechtenopties, cgroups, userns, sysctls, runtime, `volumes_from`, en bij een catalogusapp `command`/`entrypoint` | zin zonder lidwoord, lijst onvolledig, hersteld (T-16) |
+| `capabilities_verboden` "geen extra capabilities"; `devices_verboden` "geen apparaten in v1 (render-node volgt met D08/B03)" | weigering | uitweg ontbrak / "v1" vaag, hersteld (T-17) |
+| `stuurteken`, `host_pid_verboden`, `host_ipc_verboden`, `netwerk_verboden`, "unconfined" | | klopt, niet gewijzigd |
+
+### Hersteld (alleen tekst; geen gedrag, codes, API of beleid)
+
+| # | Plek | Wordt |
+|---|---|---|
+| T-10 | `catalogus.py`, `db_migratie_mislukt`, mitigeren | "… Bij een Custom App vraagt dit goedkeuring van een beheerder (R2), en daarna weigert het platform elke actie op die app, ook app.rollback en app.start (doel_niet_herkenbaar): …" |
+| T-11 | `catalogus.py`, `schijf_vol`, mitigeren | "… Bij een Custom App vraagt dit goedkeuring van een beheerder (R2), en daarna kun je de app alleen in de TrueNAS-web-UI weer starten." |
+| T-12 | `params.py`, `host_path_problem` | "het hostpad moet absoluut zijn: begin met /, bijvoorbeeld /mnt/<pool>/<dataset>"; "ongeldig hostpad: tabs, regeleinden en andere onzichtbare tekens zijn niet toegestaan"; "ongeldig hostpad: geen dubbele / en geen / aan het eind"; "ongeldig hostpad: hooguit 512 tekens" (dezelfde weigeringen, alleen per reden een eigen tekst) |
+| T-13 | `params.py`, `host_network_zonder_reden` | "het netwerk van de host (host network) alleen met een reden van minstens 10 tekens in het manifest (host_network_reason)" |
+| T-14 | `params.py`, `compose_verboden` | "compose en YAML zijn nooit een installatieweg; een sleutel met compose of services wordt daarom geweigerd"; bij `custom_app`: "… en is nooit toegestaan; installeer als standaard Custom App (ix-app)" |
+| T-15 | `params.py`, `privileged_verboden` | "privileged (volledige toegang tot de host) is nooit toegestaan" |
+| T-16 | `params.py`, `catalogus_waarde_verboden` | "deze Docker- of compose-optie is in de waarden van een app nooit toegestaan (netwerk of namespace van de host of van een andere container, beveiligings- en rechtenopties, cgroups, sysctls, runtime, volumes van een andere container of een eigen opdracht)" |
+| T-17 | `params.py`, `capabilities_verboden`, `devices_verboden` | "geen extra capabilities: laat dit leeg"; "apparaten (devices) zijn in deze versie niet toegestaan; de render-node voor de GPU volgt met besluit D08 (B03)" |
+
+`docs/RUNBOOKS.md` is opnieuw gemaakt met `make runbooks` (nieuwe `runbook_hash`). Geen test controleert deze teksten
+letterlijk; de tests controleren de codes (die zijn gelijk gebleven).
+
+### Open (buiten het bereik van deze review; niet gewijzigd)
+
+- **O-S2-010-1 (klein):** het stappenplan in `apps/web/src/app/problemen/IncidentDetail.tsx` (`Stappenplan`) zegt bij
+  elk voorstel nog "voorstel — uitvoeren volgt in fase P2". Fase P2 loopt; uitvoeren via de executor bestaat, alleen
+  de schermen voor voorstellen en goedkeuren nog niet. Voorstel: dezelfde zin als de executorpagina ("Schermen voor
+  voorstellen en goedkeuren volgen later in fase P2"), in de webstap die die schermen bouwt.
+- **O-S2-010-2 (klein):** `docs/RUNBOOKS.md` heet "Operator-runbooks" en zegt "executor-allowlist"; Peil §11.1 zegt
+  "stappenplan" en "lijst met toegestane acties". Ouder dan deze stap (`export.py`, kop en intro).
+- **O-S2-010-3 (klein):** de code `catalogus_waarde_verboden` kan ook bij de standaard Custom App (ix-app) komen
+  (`_deep_forbidden` toetst "unconfined" en de losse teksten in een lijst ook bij `ix_app`); de codenaam suggereert
+  alleen catalogusapps. Een code is API; niet gewijzigd.
