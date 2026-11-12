@@ -41,6 +41,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from executor.adres import AdresOngeldig, resolve_allowed
 from executor.adres import validate_hub_url as _validate_hub_url
+from executor.statuspagina import HERSTEL
 
 SCHEMA_VERSION = "1.3"
 STATES = ("nooit_gekoppeld", "gekoppeld", "ontkoppeld", "ingetrokken")
@@ -53,14 +54,23 @@ SERVICE_TOKEN_RE = re.compile(r"^svc_[A-Za-z0-9_-]{43}$")
 MAX_USED_TOKENS = 20
 CLOCK_SKEW = 30
 
+# Herstel bij koppelstatus_onleesbaar: het blok met 'Ontkoppelen van de Hub' staat alleen op de executorpagina als er
+# een bruikbare TrueNAS-schrijfsleutel is (statuspagina.py, executor_beheer). Zonder, of als dat niet bekend is,
+# verwijst de melding naar het installatiedocument; die verwijzing klopt altijd (R-ONTWERP-4, S-P2-005).
+_ONLEESBAAR = "De koppelstatus van de executor is onleesbaar. Hij vertrouwt de Hub niet en voert niets uit."
+HERSTEL_MET_SLEUTEL = "Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub)."
+HERSTEL_ZONDER_SLEUTEL = (
+    "Er is geen bruikbare TrueNAS-schrijfsleutel (niet ingesteld of onleesbaar) waarmee je dit op deze pagina kunt "
+    f"herstellen. {HERSTEL}"
+)
+
 # Vaste meldingen bij last_error (contract 1.3 §3.5, open codelijst); de code is voor machines, de tekst voor mensen.
 ERRORS_NL = {
     "hub_onbereikbaar": "De Hub was niet bereikbaar. Controleer het adres en probeer het opnieuw.",
     "hub_weigerde": "De Hub weigerde de koppelcode (onbekend, verlopen of al gebruikt). Maak in de Hub een nieuwe.",
     "hub_incompatibel": "De Hub weigerde het verzoek als ongeldig (versies passen niet bij elkaar); er is niets "
     "opgeslagen.",
-    "koppelstatus_onleesbaar": "De koppelstatus van de executor is onleesbaar. Hij vertrouwt de Hub niet en voert "
-    "niets uit. Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub).",
+    "koppelstatus_onleesbaar": f"{_ONLEESBAAR} {HERSTEL_ZONDER_SLEUTEL}",
     "hub_antwoord_ongeldig": "Het antwoord van de Hub voldeed niet aan het contract; er is niets opgeslagen.",
     "hub_vingerafdruk_onjuist": "De vingerafdruk klopt niet met de sleutels van deze Hub; er is niets opgeslagen.",
     "enroll_endpoint_ontbreekt": "Deze Hub-versie kent aanmelden niet.",
@@ -291,14 +301,30 @@ class HubLinkStore:
             os.close(dfd)
 
 
-def public_status(link: Mapping[str, Any]) -> dict[str, Any]:
-    """Witte lijst (§3.5, een maximum): nooit service_token of pending.secret_sha256."""
+def melding_nl(code: str, *, sleutel_ingesteld: bool = False) -> str | None:
+    """De vaste melding bij ``code``. Bij ``koppelstatus_onleesbaar`` alleen met een bruikbare schrijfsleutel het
+    herstel op deze pagina; anders de verwijzing naar het installatiedocument."""
+    if code == "koppelstatus_onleesbaar" and sleutel_ingesteld:
+        return f"{_ONLEESBAAR} {HERSTEL_MET_SLEUTEL}"
+    return ERRORS_NL.get(code)
+
+
+def public_status(link: Mapping[str, Any], *, sleutel_ingesteld: bool = False) -> dict[str, Any]:
+    """Witte lijst (§3.5, een maximum): nooit service_token of pending.secret_sha256. ``sleutel_ingesteld``: of er een
+    bruikbare TrueNAS-schrijfsleutel is (kiest de herstelweg in de melding, zie :func:`melding_nl`)."""
     out = {k: link.get(k) for k in PUBLIC_FIELDS}
     pins = link.get("pins") or {}
     out["koppelen_bezig"] = link.get("pending") is not None
     out["keyset_fingerprint"] = pins.get("keyset_fingerprint") if link.get("state") == "gekoppeld" else None
     err = link.get("last_error")
-    out["last_error"] = None if not err else {"code": err.get("code"), "melding": ERRORS_NL.get(str(err.get("code")))}
+    out["last_error"] = (
+        None
+        if not err
+        else {
+            "code": err.get("code"),
+            "melding": melding_nl(str(err.get("code")), sleutel_ingesteld=sleutel_ingesteld),
+        }
+    )
     return out
 
 

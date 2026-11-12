@@ -58,6 +58,7 @@ from executor.hublink import (
     b64url_decode,
     confirm,
     enroll_with_pairing_code,
+    melding_nl,
     pending_expired,
     public_status,
     resume_after_restart,
@@ -398,10 +399,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def status() -> dict[str, Any]:
         raw = store.read()
-        link = public_status(raw)
+        nas = naslink.public()
+        link = public_status(raw, sleutel_ingesteld=bool(nas.get("ingesteld")))
         linked = link["state"] == "gekoppeld"
         ready_ok = all(c["status"] == "ok" for c in ready_checks())
-        nas = naslink.public()
         stopped = gestopt()
         kan, waarom = kan_uitvoeren()
         if kan:
@@ -783,6 +784,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         geheim), en de vaste melding van dít verzoek (rol ``alert``, code + trace-ID)."""
         log.info("%s afgehandeld: code=%s trace_id=%s", soort, code, trace)
         status_code, titel, tekst = FORM_MESSAGES[code]
+        if code == "koppelstatus_onleesbaar":
+            # Herstel op deze pagina alleen als het beheerblok er staat (een bruikbare schrijfsleutel); R-ONTWERP-4.
+            tekst = melding_nl(code, sleutel_ingesteld=bool(naslink.public().get("ingesteld"))) or tekst
         melding = {"toon": "fout", "rol": "alert", "titel": titel, "tekst": tekst, "code": code, "trace_id": trace}
         return _page(melding, status_code=status_code, veld=veld)
 

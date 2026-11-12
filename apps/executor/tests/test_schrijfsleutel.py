@@ -11,6 +11,7 @@ import json
 import re
 import stat
 from collections.abc import Iterator
+from html import unescape
 from pathlib import Path
 from typing import Any
 
@@ -516,3 +517,36 @@ def test_onleesbare_sleutelopslag_geen_formulier_en_geen_beheer(hub: Hub, nas: F
     assert "<code>sleutelopslag_onleesbaar</code>" in pagina and "Onleesbaar" in pagina
     assert 'action="/schrijfsleutel"' not in pagina and 'action="/beheer"' not in pagina
     assert naslink_file(hub).read_text() == "{kapot"  # nooit stil overschreven
+
+
+HERSTEL_HIER = "Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub)."
+HERSTEL_DOC = "Zie deploy/truenas/CUSTOM_APP.md, kop 'Herstel'."
+
+
+@pytest.mark.parametrize("sleutel", ["ingesteld", "niet_ingesteld", "opslag_onleesbaar"])
+def test_melding_koppelstatus_onleesbaar_noemt_de_herstelweg_die_er_is(
+    hub: Hub, nas: FakeTrueNAS, sleutel: str
+) -> None:
+    """R-ONTWERP-4 (S-P2-005): het formulierantwoord en ``last_error`` in /api/v1/status bij koppelstatus_onleesbaar
+    noemen 'Ontkoppelen van de Hub' op deze pagina alleen als dat blok er staat (een bruikbare schrijfsleutel); anders
+    verwijzen ze naar de kop 'Herstel' in het installatiedocument."""
+    if sleutel != "niet_ingesteld":
+        set_write_key(hub, nas)
+    c = hub_client(hub)
+    formuliercode = csrf(c)  # van een tabblad van vóór het onleesbaar worden (sleutel- of beheerformulier)
+    assert formuliercode
+    (hub.settings.secrets_dir / "hub-link.json").write_text("{kapot", encoding="utf-8")
+    if sleutel == "opslag_onleesbaar":
+        naslink_file(hub).write_text("{kapot", encoding="utf-8")
+    bruikbaar = sleutel == "ingesteld"
+    for pad in ("/koppelen", SLEUTEL):
+        r = c.post(pad, data={"csrf": formuliercode}, headers={"Origin": str(c.base_url).rstrip("/")})
+        assert r.status_code == 409 and code_van(r) == "koppelstatus_onleesbaar", r.text
+        # Met het beheerblok krijgt het antwoord een nieuwe formuliercode (en cookie); zonder blijft de oude geldig.
+        formuliercode = m.group(1) if (m := re.search(r'name="csrf" value="([^"]+)"', r.text)) else formuliercode
+        tekst = unescape(r.text)
+        assert ('action="/beheer"' in r.text) is bruikbaar
+        assert (HERSTEL_HIER in tekst) is bruikbaar, f"{pad}: herstel op deze pagina terwijl het blok er niet is"
+        assert (HERSTEL_DOC in tekst) is not bruikbaar, f"{pad}: verwijzing naar de kop 'Herstel' klopt niet"
+    melding = status(c)["koppeling"]["last_error"]["melding"]
+    assert (HERSTEL_HIER in melding) is bruikbaar and (HERSTEL_DOC in melding) is not bruikbaar, melding

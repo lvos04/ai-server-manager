@@ -16,6 +16,8 @@ from typing import Any
 
 import pytest
 
+from executor.app import FORM_MESSAGES
+from executor.hublink import public_status
 from executor.statuspagina import TONEN, executor_page, onleesbaar_melding, render, template
 
 DESIGN = Path(__file__).resolve().parents[3] / "design" / "ontwerptaal"
@@ -302,7 +304,10 @@ def _sectie(doc: str, kop: str) -> str:
 def test_herstelverwijzing_wijst_naar_een_bestaande_kop_met_beide_toestanden() -> None:
     """R-ONTWERP-1: bij een onleesbaar koppelbestand zonder schrijfsleutel en bij een onleesbare sleutelopslag
     verwijzen de statuspagina en de README naar een kop in CUSTOM_APP.md. Die kop bestaat en beschrijft beide codes,
-    het herstel met een schrijfsleutel op de statuspagina en de weg zonder (een nieuwe datamap via Host Path)."""
+    het herstel met een schrijfsleutel op de statuspagina en de weg zonder (een nieuwe datamap via Host Path).
+    R-ONTWERP-4: hetzelfde voor de melding bij ``koppelstatus_onleesbaar`` in ``last_error`` en in het
+    formulierantwoord als niet bekend is dat er een bruikbare sleutel is (de standaard)."""
+    onleesbaar = {"state": None, "_onleesbaar": True, "last_error": {"code": "koppelstatus_onleesbaar"}}
     sleutelopslag = executor_page(
         versie="0.1.0",
         link=LINKED,
@@ -316,6 +321,8 @@ def test_herstelverwijzing_wijst_naar_een_bestaande_kop_met_beide_toestanden() -
     teksten = {
         "statuspagina, rij sleutelopslag_onleesbaar": unescape(sleutelopslag),
         "statuspagina, koppelstatus onleesbaar zonder sleutel": onleesbaar_melding()["tekst"],
+        "hublink.py, last_error koppelstatus_onleesbaar": public_status(onleesbaar)["last_error"]["melding"],
+        "app.py, FORM_MESSAGES koppelstatus_onleesbaar": FORM_MESSAGES["koppelstatus_onleesbaar"][2],
         "apps/executor/README.md": (REPO / "apps" / "executor" / "README.md").read_text(encoding="utf-8"),
     }
     doc = HERSTELDOC.read_text(encoding="utf-8")
