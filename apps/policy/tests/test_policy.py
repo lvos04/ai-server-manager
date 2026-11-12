@@ -919,6 +919,10 @@ EX47_BLADEREN = [
     pytest.param({"host_path_config": {"path": "/"}}, "hostpad_verboden", id="hostpad"),
     pytest.param({"custom_compose_config": {"services": {}}}, "compose_verboden", id="compose"),
     pytest.param({"socket": "/var/run/docker.sock"}, "docker_socket_verboden", id="docker_sock"),
+    # Herstelronde 2: ook een losse tekst in een lijst, tot de dieptegrens (de lijst telt als een niveau).
+    pytest.param({"volumes": ["/var/run/docker.sock:/x"]}, "docker_socket_verboden", id="lijst.docker_sock"),
+    pytest.param({"binds": ["/:/host"]}, "hostpad_verboden", id="lijst.hostpad"),
+    pytest.param({"args": ["--privileged"]}, "privileged_verboden", id="lijst.privileged"),
 ]
 
 
@@ -1140,3 +1144,128 @@ def test_dockerfiles_kopieren_precies_alle_policybestanden() -> None:
         assert bronnen == verwacht, (dockerfile, bronnen)
     smoke = (repo / "deploy/smoke.sh").read_text(encoding="utf-8")
     assert "policy_hash" in smoke and "asm-smoke-exec" in smoke
+
+
+# ------------------------------------------------------------------ S-P2-010 herstelronde 2: losse teksten
+# Een tekst die los in een lijst staat, heeft geen sleutel. Wat in een object al geweigerd wordt, wordt daar ook
+# geweigerd: een Docker-socket, een hostpad buiten een dataset in een bind- of volumevorm, een ongeldige
+# kluisverwijzing en de vormen "sleutel", "sleutel=waarde", "sleutel: waarde", "--sleutel waarde" van de sleutels die
+# in een object verboden zijn (privileged, compose, capabilities, devices, host-PID/-IPC, host-netwerk, netwerken, GPU).
+LOSSE_TEKSTEN_FOUT = [
+    pytest.param({"volumes": ["/var/run/docker.sock:/var/run/docker.sock"]}, "docker_socket_verboden", id="sock"),
+    pytest.param({"binds": ["/:/host"]}, "hostpad_verboden", id="bind.root"),
+    pytest.param({"volumes": ["/etc:/etc:ro"]}, "hostpad_verboden", id="volume.etc"),
+    pytest.param({"volumes": ["/mnt/.ix-apps/x:/x"]}, "hostpad_verboden", id="volume.ix_apps"),
+    pytest.param({"volumes": ["/mnt/testpool:/pool"]}, "hostpad_verboden", id="volume.pool"),
+    pytest.param({"volumes": ["./data:/data"]}, "hostpad_verboden", id="volume.relatief"),
+    pytest.param({"volumes": ["~/data:/data"]}, "hostpad_verboden", id="volume.thuismap"),
+    pytest.param({"args": ["-v", "/:/host"]}, "hostpad_verboden", id="args.v_los"),
+    pytest.param({"args": ["--volume=/root:/r"]}, "hostpad_verboden", id="args.volume_is"),
+    pytest.param({"args": ["--mount=type=bind,source=/,target=/host"]}, "hostpad_verboden", id="args.mount"),
+    pytest.param({"args": ["type=bind,src=/etc,dst=/e"]}, "hostpad_verboden", id="args.mount_src"),
+    pytest.param({"args": ["vault://ander/x"]}, "vault_ref_ongeldig", id="kluis"),
+    pytest.param({"args": ["--privileged"]}, "privileged_verboden", id="privileged.vlag"),
+    pytest.param({"args": ["privileged=true"]}, "privileged_verboden", id="privileged.is"),
+    pytest.param({"args": ["Privileged: yes"]}, "privileged_verboden", id="privileged.dubbelepunt"),
+    pytest.param({"args": ["custom_compose_config=services: {}"]}, "compose_verboden", id="compose"),
+    pytest.param({"args": ["--custom-compose-config-string"]}, "compose_verboden", id="compose.vlag"),
+    pytest.param({"args": ["--cap-add=SYS_ADMIN"]}, "capabilities_verboden", id="cap_add.is"),
+    pytest.param({"args": ["--cap-add", "SYS_ADMIN"]}, "capabilities_verboden", id="cap_add.los"),
+    pytest.param({"args": ["capabilities: NET_ADMIN"]}, "capabilities_verboden", id="capabilities"),
+    pytest.param({"args": ["--devices=/dev/sda"]}, "devices_verboden", id="devices"),
+    pytest.param({"args": ["--pid=host"]}, "host_pid_verboden", id="pid.host"),
+    pytest.param({"args": ["--pid", "host"]}, "host_pid_verboden", id="pid.los"),
+    pytest.param({"args": ["host_pid=true"]}, "host_pid_verboden", id="host_pid"),
+    pytest.param({"args": ["ipc: host"]}, "host_ipc_verboden", id="ipc.host"),
+    pytest.param({"args": ["--host-ipc"]}, "host_ipc_verboden", id="host_ipc"),
+    pytest.param({"args": ["--host-network"]}, "host_network_zonder_reden", id="host_network"),
+    pytest.param({"args": ["networks=gedeeld"]}, "netwerk_verboden", id="networks"),
+    pytest.param({"args": ["use_all_gpus=true"]}, "gpu_zonder_d08", id="use_all_gpus"),
+    pytest.param({"args": ["nvidia_gpu_selection=0000:01:00.0"]}, "gpu_verboden", id="nvidia"),
+]
+
+
+def _in_vorm(vorm: str, waarde: dict[str, Any]) -> dict[str, Any]:
+    if vorm == "bovenaan":
+        return waarde
+    if vorm == "genest":
+        return dict(_nest(6, waarde))
+    return {"lijsten": [[{"a": [waarde]}]]}  # lijst in lijst, met objecten ertussen
+
+
+@pytest.mark.parametrize(("waarde", "code"), LOSSE_TEKSTEN_FOUT)
+@pytest.mark.parametrize("vorm", ["bovenaan", "genest", "lijst_in_lijst"])
+def test_losse_teksten_in_lijsten_op_elke_diepte_geweigerd(waarde: dict[str, Any], code: str, vorm: str) -> None:
+    """S-P2-010, herstelronde 2 (besluit van de regisseur, optie a; dicht bij twijfel): ``_walk`` gaf alleen sleutels
+    van objecten terug, dus een tekst die los in een lijst stond werd nooit bekeken. Zo kwamen bijvoorbeeld
+    ``{"volumes": ["/var/run/docker.sock:/var/run/docker.sock"]}`` en ``{"binds": ["/:/host"]}`` in de waarden van
+    een catalogusapp zonder fout door, terwijl dezelfde tekst in een object wel geweigerd werd. Nu op elke diepte."""
+    codes = _codes(_catalogus(_in_vorm(vorm, waarde)))
+    assert code in codes, codes
+
+
+@pytest.mark.parametrize(
+    ("waarde", "code"),
+    [p for p in LOSSE_TEKSTEN_FOUT if p.id in {"sock", "bind.root", "volume.etc", "volume.ix_apps", "privileged.vlag"}],
+)
+def test_losse_teksten_in_lijsten_ook_bij_de_standaard_custom_app(waarde: dict[str, Any], code: str) -> None:
+    """Ook bij de standaard Custom App (ix-app): in ``command`` (een lijst teksten) gelden dezelfde regels."""
+    lijst = next(iter(waarde.values()))
+    params = install_params(command=lijst)
+    codes = [f.code for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)]
+    assert code in codes, codes
+
+
+def test_losse_teksten_in_lijsten_tegenproef_en_kluisverwijzingen() -> None:
+    """Tegenproef: gewone teksten in lijsten blijven geldig (een dataset als bron, een benoemd volume, adressen,
+    gewone opties, ook ``--pid`` met een bestand en een uitgezette vlag). Een geldige kluisverwijzing in een lijst is
+    geen schemafout, maar wordt nu wel gevonden: Hub en executor weigeren de installatie dan met
+    ``capability_unavailable`` (dicht), net als bij een verwijzing in een object."""
+    values = {
+        "volumes": ["/mnt/testpool/media:/media:ro", "data:/data", "/mnt/testpool/apps/x:/x"],
+        "dns": {"nameservers": ["127.0.0.1", "::1"], "search": ["voorbeeld.invalid"]},
+        "args": ["--config", "/config/app.yml", "--pid=/run/app.pid", "--privileged=false", "--verbose", "web"],
+        "urls": ["https://voorbeeld.invalid/pad", "tcp://localhost:8080"],
+        "tijden": ["12:00", "2026-11-12T08:00:00Z"],
+        "geheim": ["vault://app/huis/db_wachtwoord"],
+        "resources": {"limits": {"cpus": 2}},
+    }
+    params = _catalogus(values)
+    assert _codes(params) == []
+    assert vault_refs(params) == ["vault://app/huis/db_wachtwoord"]
+    ix = install_params(command=["--config", "/config/app.yml"], entrypoint=["/app/start.sh"])
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, ix) == []
+    assert vault_refs(install_params(command=["--token", "vault://app/demo-app/token"])) == [
+        "vault://app/demo-app/token"
+    ]
+    # Host-netwerk als vlag mag met een reden in het manifest, GPU als vlag met gpu: intel_render (zoals in een object).
+    assert _codes(_catalogus({"args": ["--host-network"]}, host_network_reason="mDNS-ontdekking op het LAN")) == []
+    assert _codes(_catalogus({"args": ["use_all_gpus=true"]}, gpu="intel_render")) == []
+
+
+def test_losse_teksten_tot_de_dieptegrens_gezien() -> None:
+    """Een losse tekst in een lijst op de diepste toegestane plek wordt gezien; één niveau dieper: ``te_diep_genest``.
+    Ook de doorzoeker zelf weigert een lijst dieper dan zijn grens (nooit stil stoppen)."""
+    from asm_policy.canonical import MAX_DIEPTE
+    from asm_policy.params import MAX_PARAMETER_DIEPTE, _deep_forbidden
+
+    # parameters (0) -> app_create (1) -> values (2) -> _nest -> "b" -> lijst-element
+    diepste = _catalogus(_nest(MAX_PARAMETER_DIEPTE - 4, {"b": ["/:/host"]}))
+    assert "hostpad_verboden" in _codes(diepste)
+    assert _codes(_catalogus(_nest(MAX_PARAMETER_DIEPTE - 3, {"b": ["/:/host"]}))) == ["te_diep_genest"]
+    assert [f.code for f in _deep_forbidden({"b": _nest(MAX_DIEPTE, ["x"])}, "w", {})] == ["te_diep_genest"]
+
+
+def test_losse_teksten_controle_blijft_snel_bij_lange_teksten() -> None:
+    """De controle van een losse tekst is lineair: een tekst van 60 000 tekens met lange reeksen spaties (binnen de
+    grootte die de parameters mogen hebben) kost geen seconden rekentijd in Hub of executor. Een eerdere opzet met een
+    reguliere expressie die over de waarde terugzocht, deed hier enkele seconden over (gemeten 3 s bij 30 000 tekens).
+    Ruime grens: de meting was 0,003 s."""
+    import time
+
+    from asm_policy.params import _losse_tekst
+
+    for tekst in ("a b" + " " * 60000 + "c", "a=" + (" " * 1000 + "x") * 60, " src" + " " * 60000 + "x"):
+        start = time.perf_counter()
+        _losse_tekst(tekst, "p", {})
+        assert time.perf_counter() - start < 1.0, len(tekst)

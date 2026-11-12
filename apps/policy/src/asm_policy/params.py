@@ -10,7 +10,10 @@ Docker-socket, hostpaden buiten ``/mnt/<pool>/<dataset>`` (dus ook ``/``, ``/etc
 network zonder reden, een gedeeld Docker-netwerk, ``latest`` of een tag zonder digest, ``HUB_*``-variabelen en root
 als "custom user". Ook de eigen waarden van een catalogusapp krijgen op elke diepte geen compose, privileged, extra
 capabilities, apparaten, host-PID/-IPC, host network zonder reden, gedeeld netwerk, GPU zonder ``gpu: intel_render``,
-Docker-socket of hostpad buiten een dataset (:func:`_deep_forbidden`; S-P2-010, R-VEILIG-3).
+Docker-socket of hostpad buiten een dataset (:func:`_deep_forbidden`; S-P2-010, R-VEILIG-3). Dat geldt ook voor een
+losse tekst in een lijst (S-P2-010, herstelronde 2): een Docker-socket, een hostpad in bind- of volumevorm
+(``"/:/host"``, ``"--mount=type=bind,source=/,..."``), een ongeldige kluisverwijzing en een verboden sleutel als vlag
+(``"--privileged"``, ``"pid=host"``, ``"--cap-add=SYS_ADMIN"``) worden geweigerd (:func:`_losse_tekst`).
 
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
@@ -52,6 +55,19 @@ HOSTPAD_VERBODEN_CATEGORIEEN = frozenset({"Cc", "Cf", "Zl", "Zp"})
 # ACL-regels zit rond de 10). Dieper: ``te_diep_genest`` (S-P2-010, R-VEILIG-1). De doorzoekers kijken tot
 # MAX_DIEPTE (32), dus minstens zo diep.
 MAX_PARAMETER_DIEPTE = 16
+# Losse teksten in een lijst (S-P2-010, herstelronde 2; dicht bij twijfel). Zo'n tekst heeft geen sleutel; een sleutel
+# die in een object verboden is, wordt herkend in de vormen "sleutel", "sleutel=waarde", "sleutel: waarde",
+# "--sleutel waarde" en "--sleutel" (streepjes tellen als "_", hoofdletters tellen niet).
+LOSSE_SLEUTEL_RE = re.compile(r"-{0,2}([A-Za-z_][A-Za-z0-9_-]*)")
+# Waarden die "uit" betekenen; al het andere (ook een vlag zonder waarde) telt als "aan".
+LOSSE_WAARDE_UIT = frozenset({"", "false", "0", "no", "off", "none", "null", "[]", "{}"})
+# Docker-bindvorm BRON:DOEL[:OPTIES] (bv. "/:/host", "/etc:/etc:ro"): begint een tekst met "/", "." of "~" en staat er
+# een ":" in, dan is alles vóór de eerste ":" een hostpad (dicht bij twijfel: ook "/usr/bin:/bin" telt zo). Een andere
+# bron ("data:/data") is een benoemd volume. Lange vorm: "type=bind,source=/,target=/host" (ook "src=").
+BIND_BRON_RE = re.compile(r"(?:^|[\s,=])(?:source|src)\s*=\s*([^,]*)", re.IGNORECASE)
+URL_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://")
+HOSTPAD_BEGIN = ("/", ".", "~")
+COMPOSE_SLEUTELS = ("custom_compose_config", "custom_compose_config_string", "compose")
 HOST_IDS = ("nas-primary",)
 IX_APP = "ix-app"
 RESTART_POLICIES = ("no", "unless-stopped", "on-failure", "always")
@@ -337,7 +353,8 @@ def host_path_problem(path: Any) -> str | None:
 
 
 def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, Any]]:
-    """(pad, sleutel, waarde) voor elke sleutel in geneste objecten en lijsten. Dieper dan
+    """(pad, sleutel, waarde) voor elke sleutel in geneste objecten, en (pad, ``None``, element) voor elk element van
+    een lijst: ook een losse tekst in een lijst wordt zo bekeken (S-P2-010, herstelronde 2). Dieper dan
     :data:`asm_policy.canonical.MAX_DIEPTE`: :class:`TeDiepGenest` (nooit stil stoppen; S-P2-010, R-VEILIG-1)."""
     out: list[tuple[str, Any, Any]] = []
     if depth > MAX_DIEPTE:
@@ -347,9 +364,87 @@ def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, An
             p = f"{path}.{k}" if path else str(k)
             out.append((p, k, v))
             out += _walk(v, p, depth + 1)
-    elif isinstance(value, list):
+    elif isinstance(value, list | tuple):
         for i, v in enumerate(value):
-            out += _walk(v, f"{path}[{i}]", depth + 1)
+            p = f"{path}[{i}]"
+            out.append((p, None, v))
+            out += _walk(v, p, depth + 1)
+    return out
+
+
+def _sleutel_en_waarde(tekst: str) -> tuple[str, str | None] | None:
+    """``("privileged", "true")`` voor ``"--privileged=true"``, ``("privileged", None)`` voor ``"--privileged"``;
+    ``None`` als de tekst niet met een sleutel begint. Lineair (geen regex met terugzoeken over de waarde)."""
+    t = tekst.strip()
+    m = LOSSE_SLEUTEL_RE.match(t)
+    if not m:
+        return None
+    sleutel, rest = m[1].lower().replace("-", "_"), t[m.end() :]
+    if not rest:
+        return sleutel, None
+    na = rest.lstrip()
+    if na[:1] in ("=", ":"):
+        return sleutel, na[1:].strip()
+    if rest[:1].isspace():
+        return sleutel, na.strip()
+    return None
+
+
+def _aan(waarde: str | None) -> bool:
+    """Een vlag zonder waarde, of een waarde die niet "uit" betekent (dicht bij twijfel)."""
+    return waarde is None or waarde.strip().lower() not in LOSSE_WAARDE_UIT
+
+
+def _bind_bronnen(tekst: str) -> list[str]:
+    """Hostpaden die een tekst in bind- of volumevorm als bron noemt: de korte en de lange Docker-vorm, ook na een
+    optie (``--volume=/:/host``, ``-v /:/host``). Een URL (``tcp://localhost:8080``) is geen bindvorm."""
+    kandidaten = [tekst]
+    sw = _sleutel_en_waarde(tekst)
+    if sw and sw[1] and not URL_RE.match(tekst):
+        kandidaten.append(sw[1])
+    bronnen: list[str] = []
+    for t in (k.lstrip() for k in kandidaten):
+        if ":" in t and t.startswith(HOSTPAD_BEGIN):
+            bronnen.append(t.split(":", 1)[0])
+        bronnen += [b for b in BIND_BRON_RE.findall(t) if b.startswith(HOSTPAD_BEGIN)]
+    return bronnen
+
+
+def _losse_tekst(tekst: str, p: str, manifest: Mapping[str, Any]) -> list[Fout]:
+    """Een losse tekst in een lijst: dezelfde weigeringen als een sleutel in een object (S-P2-010, herstelronde 2).
+    Een vlag zonder waarde telt als "aan" (dicht bij twijfel). ``pid`` en ``ipc`` zijn in een object alleen met de
+    waarde ``host`` verboden; zonder waarde is die niet te zien, dus ook ``["--pid", "host"]`` (en daarmee ook
+    ``["--pid", "/run/x.pid"]``) wordt geweigerd. ``"--pid=/run/x.pid"`` mag."""
+    out: list[Fout] = []
+    sw = _sleutel_en_waarde(tekst)
+    if sw:
+        k, w = sw
+        reason = manifest.get("host_network_reason")
+        if k in COMPOSE_SLEUTELS:
+            out.append(_f(p, "compose_verboden", "compose/YAML-installatie is nooit toegestaan"))
+        elif k == "privileged" and _aan(w):
+            out.append(_f(p, "privileged_verboden", "privileged is nooit toegestaan"))
+        elif k == "host_network" and _aan(w) and not (isinstance(reason, str) and len(reason.strip()) >= 10):
+            out.append(_f(p, "host_network_zonder_reden", "host network alleen met een reden in het manifest"))
+        elif k in ("capabilities", "cap_add") and _aan(w):
+            out.append(_f(p, "capabilities_verboden", "geen extra capabilities"))
+        elif k == "devices" and _aan(w):
+            out.append(_f(p, "devices_verboden", "geen apparaten in v1 (render-node volgt met D08/B03)"))
+        elif (k == "host_pid" and _aan(w)) or (k == "pid" and (w is None or w.strip().lower() == "host")):
+            out.append(_f(p, "host_pid_verboden", "de PID-namespace van de host is nooit toegestaan"))
+        elif (k == "host_ipc" and _aan(w)) or (k == "ipc" and (w is None or w.strip().lower() == "host")):
+            out.append(_f(p, "host_ipc_verboden", "de IPC-namespace van de host is nooit toegestaan"))
+        elif k == "networks" and _aan(w):
+            out.append(_f(p, "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"))
+        elif k == "use_all_gpus" and _aan(w) and manifest.get("gpu") != "intel_render":
+            out.append(_f(p, "gpu_zonder_d08", "GPU alleen met manifest gpu=intel_render en D08"))
+        elif k == "nvidia_gpu_selection" and _aan(w):
+            out.append(_f(p, "gpu_verboden", "NVIDIA-selectie wordt niet aangeboden"))
+    for bron in _bind_bronnen(tekst):
+        problem = host_path_problem(bron)
+        if problem:
+            out.append(_f(p, "hostpad_verboden", problem))
+            break
     return out
 
 
@@ -406,6 +501,8 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any]) -> lis
                 out.append(_f(p, "hostpad_verboden", problem))
         elif isinstance(v, str) and v.startswith("vault://") and not VAULT_REF_RE.fullmatch(v):
             out.append(_f(p, "vault_ref_ongeldig", "alleen vault://app/<app_id>/<parameter>"))
+        elif k is None and isinstance(v, str):
+            out += _losse_tekst(v, p, manifest)
     return out
 
 

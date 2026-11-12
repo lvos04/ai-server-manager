@@ -544,6 +544,36 @@ def test_te_diep_geneste_waarden_weigert_de_executor_zelf(stack: Stack) -> None:
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0
 
 
+def test_losse_teksten_in_lijsten_weigert_de_executor_zelf(stack: Stack) -> None:
+    """S-P2-010, herstelronde 2: een door de Hub ondertekend en goedgekeurd verzoek (R3) met een losse tekst in een
+    lijst (Docker-socket, hostpad "/" in bindvorm, ``--privileged``, ``pid=host``, ongeldige kluisverwijzing) weigert
+    de executor zelf met 422; TrueNAS krijgt niets. Een geldige kluisverwijzing in een lijst (``command`` van de
+    standaard Custom App) wordt nu gevonden: 501 ``vault_verwijzingen`` en niets geïnstalleerd. Vroeger zag de
+    executor geen van beide."""
+    hub, c, nas = stack
+
+    def catalogus(naam: str, values: Any) -> dict[str, Any]:
+        params = install_params(naam)
+        params["app_create"].update(catalog_app="home-assistant", train="community", version="1.2.3", values=values)
+        params["manifest"] = {"app_id": naam, "install_reason": "proef met een catalogusapp"}
+        return proposal("app.install", app_target(naam), params, expected_version=ABSENT)
+
+    for naam, values, code in (
+        ("huis-a", {"volumes": ["/var/run/docker.sock:/var/run/docker.sock"]}, "docker_socket_verboden"),
+        ("huis-b", {"a": {"binds": ["/:/host"]}}, "hostpad_verboden"),
+        ("huis-c", {"args": [["--privileged"]]}, "privileged_verboden"),
+        ("huis-d", {"args": ["pid=host"]}, "host_pid_verboden"),
+        ("huis-e", {"geheim": ["vault://ander/x"]}, "vault_ref_ongeldig"),
+    ):
+        r = execute(c, hub, approved(hub, catalogus(naam, values), risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (naam, r.text)
+        assert code in [f["code"] for f in r.json()["details"]["fouten"]], (naam, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    r = execute(c, hub, approved(hub, install_prop(command=["--token", "vault://app/demo-app/api_token"])))
+    assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    assert r.json()["details"] == {"reden": "vault_verwijzingen"} and nas.created == [] and writes(nas) == []
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en

@@ -336,6 +336,47 @@ def test_catalogusapp_met_extra_rechten_wordt_geweigerd(stack: Stack) -> None:
     assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
 
 
+def test_losse_teksten_in_lijsten_worden_geweigerd_en_niet_bewaard(stack: Stack) -> None:
+    """S-P2-010, herstelronde 2 (dicht bij twijfel): een losse tekst in een lijst werd niet bekeken. Een catalogusapp
+    met ``{"volumes": ["/var/run/docker.sock:/var/run/docker.sock"]}``, ``{"binds": ["/:/host"]}``, ``"--privileged"``
+    of een ongeldige kluisverwijzing in een lijst (ook genest) geeft nu 422 met de eigen code; er wordt niets
+    voorgesteld of bewaard. Een geldige kluisverwijzing in een lijst geeft 501 (``vault_verwijzingen``), net als in een
+    object. Tegenproef: gewone teksten in lijsten (dataset als bron, benoemd volume) worden voorgesteld (R2)."""
+    admin = stack.admin
+    values = {
+        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
+        "app": {"binds": ["/mnt/testpool/media:/media", "/:/host"], "args": [["--privileged", "--pid=host"]]},
+        "geheim": ["vault://ander/x"],
+    }
+    r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    fouten = {(f["veld"], f["code"]) for f in r.json()["details"]["fouten"]}
+    w = "parameters.app_create.values"
+    assert {
+        (f"{w}.volumes[0]", "docker_socket_verboden"),
+        (f"{w}.app.binds[1]", "hostpad_verboden"),
+        (f"{w}.app.args[0][0]", "privileged_verboden"),
+        (f"{w}.app.args[0][1]", "host_pid_verboden"),
+        (f"{w}.geheim[0]", "vault_ref_ongeldig"),
+    } <= fouten, fouten
+    assert not [f for f in fouten if f[0] == f"{w}.app.binds[0]"], fouten  # een dataset als bron mag
+    # De standaard Custom App: een geldige kluisverwijzing in command wordt nu gevonden (501), niets voorgesteld.
+    r = stel_voor(admin, "app.install", app_target("demo"), install_params("demo", command=["vault://app/demo/token"]))
+    assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    assert r.json()["details"] == {"reden": "vault_verwijzingen"}, r.text
+    assert _lijst(stack) == [] and schrijfaanroepen(stack.nas) == []
+    # De boiler als losse tekst in een lijst: 403, en het geweigerde voorstel bewaart geen parameterwaarden.
+    key, r = _voorstel(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", {"a": [["boiler aan"]]}))
+    assert r.status_code == 403 and "boiler_verboden" in [b["code"] for b in r.json()["details"]["blokkades"]]
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(key))
+        assert rij is not None and rij.status == "geweigerd" and rij.parameters == {}
+    goed = {"volumes": ["/mnt/testpool/media:/media:ro", "data:/data"], "args": ["--config", "/config/app.yml"]}
+    r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", goed))
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert schrijfaanroepen(stack.nas) == []
+
+
 def test_bijwerken_of_terugzetten_naar_een_emby_image_wordt_geweigerd(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): ``app.update`` van een bestaande Custom App naar een Emby-image
     maakt er een tweede Emby van. De Hub herkent het doel ook op de image ná de actie: 403 met de Emby-regel, ook
