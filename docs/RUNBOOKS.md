@@ -1,7 +1,7 @@
 # Operator-runbooks (B09-006)
 
 Gegenereerd uit `apps/api/src/hub/runbooks/catalogus.py` (`python -m hub export-runbooks`); niet met de hand
-bewerken. `runbook_hash`: `2025b189ee3df08b83296c4fe953353b9f0ad00e1fcff6652e34d3aafa797f89`.
+bewerken. `runbook_hash`: `8cdd9fc1ca31694230654a3ab27b522bc449a8849f979663cf90c7ff9d0b8bf0`.
 
 Elke stap is getypeerd: **Hub toont** (alleen lezen), **Zelf doen** (in een bestaande UI, nooit een
 terminal) of **Voorstel** (een actie uit de executor-allowlist van contract §8 met minimale risicoklasse; de
@@ -64,7 +64,7 @@ Een app start niet of meldt een mislukte schemamigratie na een update.
 
 **Mitigeren**
 
-- Voorstel: Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit een goedkeuring van een beheerder (R2), en daarna weigert het platform app.rollback en app.start op die app (doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI. — `app.stop` (minimaal R1; Custom App: R2)
+- Voorstel: Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit goedkeuring van een beheerder (R2), en daarna weigert het platform elke actie op die app, ook app.rollback en app.start (doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI. — `app.stop` (minimaal R1; Custom App: R2)
 
 **Terugdraaien**
 
@@ -104,7 +104,7 @@ Een pool of dataset raakt vol, een quota is bereikt, of een pool is niet gezond.
 **Mitigeren**
 
 - Zelf doen: Ruim op via de eigenaar van de data (MediaGuard/MSO); de Hub verwijdert nooit zelf media of datasets.
-- Voorstel: Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit een goedkeuring van een beheerder (R2) en start de app daarna alleen weer in de TrueNAS-web-UI. — `app.stop` (minimaal R1; Custom App: R2)
+- Voorstel: Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit goedkeuring van een beheerder (R2), en daarna kun je de app alleen in de TrueNAS-web-UI weer starten. — `app.stop` (minimaal R1; Custom App: R2)
 
 **Terugdraaien**
 

@@ -152,8 +152,8 @@ RUNBOOKS: tuple[Runbook, ...] = (
         ),
         mitigeren=(
             V(
-                "Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit een goedkeuring van een "
-                "beheerder (R2), en daarna weigert het platform app.rollback en app.start op die app "
+                "Stop de app om verdere schade te voorkomen. Bij een Custom App vraagt dit goedkeuring van een "
+                "beheerder (R2), en daarna weigert het platform elke actie op die app, ook app.rollback en app.start "
                 "(doel_niet_herkenbaar): terugzetten en starten gaan dan alleen in de TrueNAS-web-UI.",
                 "app.stop",
                 "R1",
@@ -200,8 +200,8 @@ RUNBOOKS: tuple[Runbook, ...] = (
         mitigeren=(
             H("Ruim op via de eigenaar van de data (MediaGuard/MSO); de Hub verwijdert nooit zelf media of datasets."),
             V(
-                "Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit een goedkeuring van een "
-                "beheerder (R2) en start de app daarna alleen weer in de TrueNAS-web-UI.",
+                "Pauzeer een niet-kritieke, schrijvende app. Bij een Custom App vraagt dit goedkeuring van een "
+                "beheerder (R2), en daarna kun je de app alleen in de TrueNAS-web-UI weer starten.",
                 "app.stop",
                 "R1",
                 custom_app="R2",
