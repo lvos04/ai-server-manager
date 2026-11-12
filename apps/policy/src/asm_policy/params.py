@@ -8,18 +8,25 @@ afgekapt. Onbekende velden zijn een fout (strikt).
 (``custom_app: true``, ``custom_compose_config(_string)``), ``privileged``, extra capabilities, apparaten, een
 Docker-socket, hostpaden buiten ``/mnt/<pool>/<dataset>`` (dus ook ``/``, ``/etc``, ``/var/run``, ``/root``), host
 network zonder reden, een gedeeld Docker-netwerk, ``latest`` of een tag zonder digest, ``HUB_*``-variabelen en root
-als "custom user".
+als "custom user". Ook de eigen waarden van een catalogusapp krijgen op elke diepte geen compose, privileged, extra
+capabilities, apparaten, host-PID/-IPC, host network zonder reden, gedeeld netwerk, GPU zonder ``gpu: intel_render``,
+Docker-socket of hostpad buiten een dataset (:func:`_deep_forbidden`; S-P2-010, R-VEILIG-3).
+
+Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
+genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
+:data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import re
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from asm_policy.canonical import CanonicalError, canonical_json
+from asm_policy.canonical import MAX_DIEPTE, CanonicalError, TeDiepGenest, canonical_json
 from asm_policy.loader import ActieDef, Policy
 
 APP_NAME_RE = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
@@ -37,8 +44,14 @@ UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 VAULT_REF_RE = re.compile(r"^vault://app/[a-z0-9][a-z0-9_-]{0,63}/[a-z0-9_.-]{1,128}$")
 CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
-# Een hostpad is strenger dan vrije tekst: ook tab en regeleinde zijn daar geen gewone tekens (S-P2-010, 6f).
+# Een hostpad is strenger dan vrije tekst: ook tab en regeleinde zijn daar geen gewone tekens (S-P2-010, 6f), en ook
+# geen Unicode-teken uit Cc (C1, NEL), Cf (bidi-omkering, zero-width, BOM), Zl of Zp (S-P2-010, R-VEILIG-5).
 HOSTPAD_STUURTEKEN_RE = re.compile(r"[\x00-\x1f\x7f]")
+HOSTPAD_VERBODEN_CATEGORIEEN = frozenset({"Cc", "Cf", "Zl", "Zp"})
+# Hooguit zoveel objecten of lijsten diep (``parameters`` zelf is diepte 0; een gewone catalogusapp met opslag en
+# ACL-regels zit rond de 10). Dieper: ``te_diep_genest`` (S-P2-010, R-VEILIG-1). De doorzoekers kijken tot
+# MAX_DIEPTE (32), dus minstens zo diep.
+MAX_PARAMETER_DIEPTE = 16
 HOST_IDS = ("nas-primary",)
 IX_APP = "ix-app"
 RESTART_POLICIES = ("no", "unless-stopped", "on-failure", "always")
@@ -125,6 +138,17 @@ def _intr(v: Any, where: str, lo: int, hi: int) -> list[Fout]:
     return []
 
 
+def te_diep(value: Any, grens: int, depth: int = 0) -> bool:
+    """Waar als ergens in ``value`` een waarde op een diepte groter dan ``grens`` staat (``value`` zelf is diepte 0)."""
+    if depth > grens:
+        return True
+    if isinstance(value, Mapping):
+        return any(te_diep(v, grens, depth + 1) for v in value.values())
+    if isinstance(value, list | tuple):
+        return any(te_diep(v, grens, depth + 1) for v in value)
+    return False
+
+
 def _size(obj: Any, where: str, limit: int) -> list[Fout]:
     try:
         n = len(canonical_json(obj))
@@ -184,6 +208,8 @@ def validate_parameters(policy: Policy, actie: ActieDef, target: Mapping[str, An
     out = _size(params, "parameters", MAX_VALUES_BYTES + 8 * 1024)
     if out:
         return out
+    if te_diep(params, MAX_PARAMETER_DIEPTE):
+        return [_f("parameters", "te_diep_genest", f"hooguit {MAX_PARAMETER_DIEPTE} niveaus diep genest")]
     schema = actie.parameters
     if schema == "leeg":
         return _only(params, "parameters", set())
@@ -292,7 +318,11 @@ def host_path_problem(path: Any) -> str | None:
         return "het hostpad moet absoluut zijn"
     if HOSTPAD_STUURTEKEN_RE.search(path) or "//" in path or path != path.rstrip("/") or len(path) > 512:
         return "ongeldig hostpad"
+    if any(unicodedata.category(t) in HOSTPAD_VERBODEN_CATEGORIEEN for t in path):
+        return "ongeldig hostpad"
     parts = path.split("/")[1:]
+    if any(p != p.strip() for p in parts):
+        return "ongeldig hostpad: een spatie aan het begin of eind van een mapnaam"
     if any(p in ("", ".", "..") for p in parts):
         return "geen . of .. in een hostpad"
     if "docker.sock" in path:
@@ -307,10 +337,11 @@ def host_path_problem(path: Any) -> str | None:
 
 
 def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, Any]]:
-    """(pad, sleutel, waarde) voor elke sleutel in geneste objecten en lijsten."""
+    """(pad, sleutel, waarde) voor elke sleutel in geneste objecten en lijsten. Dieper dan
+    :data:`asm_policy.canonical.MAX_DIEPTE`: :class:`TeDiepGenest` (nooit stil stoppen; S-P2-010, R-VEILIG-1)."""
     out: list[tuple[str, Any, Any]] = []
-    if depth > 16:
-        return out
+    if depth > MAX_DIEPTE:
+        raise TeDiepGenest(f"dieper genest dan {MAX_DIEPTE} niveaus")
     if isinstance(value, Mapping):
         for k, v in value.items():
             p = f"{path}.{k}" if path else str(k)
@@ -322,17 +353,51 @@ def _walk(value: Any, path: str = "", depth: int = 0) -> list[tuple[str, Any, An
     return out
 
 
+def _extra_capabilities(v: Any) -> bool:
+    """Zelfde regel als bij de ix-app: alleen leeg of ``{"add": []}`` mag (dicht bij twijfel)."""
+    if not v:
+        return False
+    return not isinstance(v, Mapping) or bool(set(v) - {"add"}) or bool(v.get("add"))
+
+
+def _ouder(p: str) -> str:
+    return p.rsplit(".", 1)[0] if "." in p else p
+
+
 def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any]) -> list[Fout]:
-    """Controles op elk niveau (ook voor catalogusapps met eigen waarden)."""
+    """Controles op elk niveau (ook voor catalogusapps met eigen waarden; ADR-0030 besluit 6). Dieper genest dan de
+    scangrens: ``te_diep_genest`` (dicht bij twijfel)."""
     out: list[Fout] = []
     reason = manifest.get("host_network_reason")
-    for p, k, v in _walk(values, where):
+    try:
+        alles = _walk(values, where)
+    except TeDiepGenest:
+        return [_f(where, "te_diep_genest", f"hooguit {MAX_DIEPTE} niveaus diep genest")]
+    for p, k, v in alles:
         if k in ("custom_compose_config", "custom_compose_config_string", "compose"):
             out.append(_f(p, "compose_verboden", "compose/YAML-installatie is nooit toegestaan"))
         elif k == "privileged" and v is True:
             out.append(_f(p, "privileged_verboden", "privileged is nooit toegestaan"))
-        elif k == "host_network" and v is True and not (isinstance(reason, str) and len(reason.strip()) >= 10):
+        elif (
+            k == "host_network"
+            and v not in (None, False)
+            and not (isinstance(reason, str) and len(reason.strip()) >= 10)
+        ):
             out.append(_f(p, "host_network_zonder_reden", "host network alleen met een reden in het manifest"))
+        elif (k == "capabilities" and _extra_capabilities(v)) or (k == "cap_add" and v):
+            out.append(_f(p, "capabilities_verboden", "geen extra capabilities"))
+        elif k == "devices" and v:
+            out.append(_f(p, "devices_verboden", "geen apparaten in v1 (render-node volgt met D08/B03)"))
+        elif (k == "host_pid" and v not in (None, False)) or (k == "pid" and str(v).strip().lower() == "host"):
+            out.append(_f(p, "host_pid_verboden", "de PID-namespace van de host is nooit toegestaan"))
+        elif (k == "host_ipc" and v not in (None, False)) or (k == "ipc" and str(v).strip().lower() == "host"):
+            out.append(_f(p, "host_ipc_verboden", "de IPC-namespace van de host is nooit toegestaan"))
+        elif k == "networks" and v:
+            out.append(_f(p, "netwerk_verboden", "apps delen nooit een Docker-netwerk (contract §2)"))
+        elif k == "use_all_gpus" and v not in (None, False) and manifest.get("gpu") != "intel_render":
+            out.append(_f(_ouder(p), "gpu_zonder_d08", "GPU alleen met manifest gpu=intel_render en D08"))
+        elif k == "nvidia_gpu_selection" and v:
+            out.append(_f(_ouder(p), "gpu_verboden", "NVIDIA-selectie wordt niet aangeboden"))
         elif isinstance(v, str) and "docker.sock" in v:
             out.append(_f(p, "docker_socket_verboden", "een Docker-socket mag nooit in een container"))
         elif k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path")):

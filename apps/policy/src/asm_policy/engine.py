@@ -8,7 +8,8 @@ Regels (in deze volgorde, de strengste wint):
 1. ``risk_claim`` van AI/flow wordt **nooit** gelezen (EX18): deze functie krijgt hem niet eens.
 2. Verboden patronen (shell, destructief, beveiligingsbeleid, betaald, rechtstreekse database, netwerk) → R3 en
    geweigerd. Een LLM die "R0" claimt voor ``pool.dataset.delete`` krijgt dus R3 en een weigering.
-3. Boiler in action_id, doel of parameters → R3 en geweigerd (EX27).
+3. Boiler in action_id, doel of parameters → R3 en geweigerd (EX27). Dieper genest dan de scangrens
+   (:data:`asm_policy.canonical.MAX_DIEPTE`) telt als boiler: niet te zien is niet uit te sluiten (dicht bij twijfel).
 4. Gereserveerde acties (MediaGuard tot BG-05/P3-02; my_house/MSO tot P3) → ``capability_unavailable``.
 5. Onbekende action_id (niet in de allowlist) → ``known=False``: Hub en executor geven 403 ``actie_niet_toegestaan``
    en voeren niets uit.
@@ -27,6 +28,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from asm_policy.canonical import MAX_DIEPTE, TeDiepGenest
 from asm_policy.etag import app_images, catalogus_app
 from asm_policy.loader import RISK_RANK, Policy
 
@@ -168,22 +170,24 @@ def herken_app(
 ) -> Herkenning:
     """Herkenning van het doel uit de ruwe readback (``app.query``), voor Hub én executor.
 
-    Bestaat de app (``app``), dan tellen de naam, de catalogusapp en de images die TrueNAS toont. Volledig is de
-    herkenning alleen als er een image te zien is of als de catalogusapp zegt wat er draait; anders niet (dicht bij
-    twijfel). Na een stop blijft alleen een catalogusapp herkenbaar (``na_stop_herkenbaar``). Bestaat de app nog
-    niet (installeren), dan tellen de naam, de image die geïnstalleerd gaat worden en de catalogusapp uit het
-    voorstel (``catalogus``, zie :func:`asm_policy.params.verwachte_catalogus`): een tweede Emby onder een andere naam
-    is ook Emby."""
+    Bestaat de app (``app``), dan tellen de naam, de catalogusapp en de images die TrueNAS toont, én de image(s) ná
+    de actie (``verwachte_images``: de nieuwe image bij ``app.update``, de bewaarde vorige image bij ``app.rollback``):
+    een bestaande app omzetten naar een Emby-image maakt er een tweede Emby van (S-P2-010, R-VEILIG-2). Volledig is
+    de herkenning alleen als er nu een image te zien is of als de catalogusapp zegt wat er draait; een verwachte
+    image maakt haar niet volledig (dicht bij twijfel). Na een stop blijft alleen een catalogusapp herkenbaar
+    (``na_stop_herkenbaar``). Bestaat de app nog niet (installeren), dan tellen de naam, de image die geïnstalleerd
+    gaat worden en de catalogusapp uit het voorstel (``catalogus``, zie :func:`asm_policy.params.verwachte_catalogus`):
+    een tweede Emby onder een andere naam is ook Emby. Een herkenning maakt alleen strenger."""
+    verwacht = [i for i in verwachte_images if i]
+    cat = (catalogus or "").strip().lower() or None
     if app is None:
-        cat = (catalogus or "").strip().lower() or None
-        return Herkenning(
-            recognize_all(policy, name, [i for i in verwachte_images if i], catalogus=cat), True, bool(cat)
-        )
+        return Herkenning(recognize_all(policy, name, verwacht, catalogus=cat), True, bool(cat))
     images = app_images(app)
-    catalogus = catalogus_app(app)
-    return Herkenning(
-        recognize_all(policy, name, images, catalogus=catalogus or None), bool(images or catalogus), bool(catalogus)
-    )
+    eigen = catalogus_app(app)
+    gevonden = recognize_all(policy, name, images + verwacht, catalogus=eigen or None)
+    if cat:
+        gevonden += tuple(a for a in recognize_all(policy, None, catalogus=cat) if a not in gevonden)
+    return Herkenning(gevonden, bool(images or eigen), bool(eigen))
 
 
 def recognize(policy: Policy, name: str | None, images: Iterable[str] = ()) -> str | None:
@@ -193,9 +197,10 @@ def recognize(policy: Policy, name: str | None, images: Iterable[str] = ()) -> s
 
 
 def _strings(value: Any, depth: int = 0) -> Iterable[str]:
-    """Alle sleutels en tekstwaarden (recursief, begrensd) voor de boilercontrole."""
-    if depth > 12:
-        return
+    """Alle sleutels en tekstwaarden (recursief) voor de boilercontrole. Dieper dan
+    :data:`asm_policy.canonical.MAX_DIEPTE`: :class:`TeDiepGenest` (nooit stil stoppen; S-P2-010, R-VEILIG-1)."""
+    if depth > MAX_DIEPTE:
+        raise TeDiepGenest(f"dieper genest dan {MAX_DIEPTE} niveaus")
     if isinstance(value, str):
         yield value
     elif isinstance(value, Mapping):
@@ -208,7 +213,11 @@ def _strings(value: Any, depth: int = 0) -> Iterable[str]:
 
 
 def mentions_boiler(policy: Policy, *values: Any) -> bool:
-    return any(p.search(s) for v in values for s in _strings(v) for p in policy.boiler_patronen)
+    """Noemt een sleutel of tekst de boiler? Te diep genest om alles te zien telt als ja (dicht bij twijfel)."""
+    try:
+        return any(p.search(s) for v in values for s in _strings(v) for p in policy.boiler_patronen)
+    except TeDiepGenest:
+        return True
 
 
 def classify(
@@ -267,7 +276,13 @@ def classify(
     if kritiek and actie.klasse_kritiek:
         klasse = max_class(klasse, actie.klasse_kritiek)
         rules.append(f"KRITIEK:{kritieke[0]}")
-    if aid == "app.stop" and isinstance(herkend_als, Herkenning) and not herkend_als.na_stop_herkenbaar:
+    # Zonder Herkenning is niet bekend of de app na een stop herkenbaar blijft: dan ook R2 (dicht bij twijfel;
+    # S-P2-010, R-VEILIG-4). Alleen een Herkenning die het zegt (een catalogusapp) houdt app.stop op R1.
+    if (
+        aid == "app.stop"
+        and actie.doel == "app"
+        and not (isinstance(herkend_als, Herkenning) and herkend_als.na_stop_herkenbaar)
+    ):
         klasse = max_class(klasse, "R2")
         rules.append(STOP_EENRICHTING)
     for b in policy.beschermd:

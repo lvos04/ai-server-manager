@@ -434,9 +434,10 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_een_catalogusapp_niet() -
     emby = herken_app(POLICY, "mediaserver", _readback("mediaserver", "RUNNING", ["docker.io/emby/embyserver:4.9"]))
     c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=emby)
     assert c.geweigerd and "emby_nooit_door_platform" in [b.code for b in c.blokkades]
-    # Zonder readback (stap 1 in Hub en executor) blijft app.stop R1: de readback maakt het alleen strenger.
+    # Zonder readback (stap 1 in Hub en executor) is niet bekend of de app gestopt herkenbaar blijft: R2 (dicht bij
+    # twijfel; S-P2-010, R-VEILIG-4). Alleen de readback van een catalogusapp brengt het terug naar R1 (hieronder).
     kaal = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user")
-    assert kaal.risk_class == "R1" and not kaal.requires_approval
+    assert kaal.risk_class == "R2" and kaal.requires_approval and "STOP-EENRICHTING" in kaal.rule_ids
     # Executor-kant: een R1-verzoek is te laag; R2 zonder goedkeuring ontbreekt die; met goedkeuring gaat het door.
     prop = proposal("app.stop", {"host_id": HOST, "app_id": "my-house"}, {})
     key = Ed25519PrivateKey.generate()
@@ -641,14 +642,45 @@ def test_ex47_hostmount_buiten_een_dataset(pad: str) -> None:
     assert "hostpad_verboden" in codes or "docker_socket_verboden" in codes, codes
 
 
-@pytest.mark.parametrize("teken", ["\t", "\n", "\r", "\x0b", "\x0c", "\x00", "\x7f"], ids=repr)
+# Unicode-tekens uit de categorieën Cc (ook C1 en NEL), Cf (bidi, zero-width, BOM), Zl en Zp (S-P2-010, R-VEILIG-5 en
+# R-TECH-3): een beheerder ziet ze niet of anders (bidi-omkering), dus ook geen gewone mapnaam.
+HOSTPAD_UNICODE = ["\x85", "\x9b", " ", " ", "‮", "⁦", "​", "‎", "﻿", "؜"]
+
+
+@pytest.mark.parametrize("teken", ["\t", "\n", "\r", "\x0b", "\x0c", "\x00", "\x7f", *HOSTPAD_UNICODE], ids=repr)
 @pytest.mark.parametrize("vorm", ["/mnt/testpool/apps/a{t}b", "/mnt/testpool/apps/demo{t}", "/mnt/testpool/{t}.."])
 def test_ex47_hostpad_met_een_stuurteken_wordt_geweigerd(teken: str, vorm: str) -> None:
     """Een tab of regeleinde in een hostpad (zoals ``'/mnt/testpool/x\\n'``) is geen gewone mapnaam: weigeren, net als
-    elk ander stuurteken (S-P2-010, bouwpunt 6f). Ook via ``host_path`` dieper in de waarden (``_deep_forbidden``)."""
+    elk ander stuurteken (S-P2-010, bouwpunt 6f), en ook elk teken uit de Unicode-categorieën Cc, Cf, Zl en Zp
+    (R-VEILIG-5). Ook via ``host_path`` dieper in de waarden (``_deep_forbidden``)."""
     from asm_policy.params import host_path_problem
 
     pad = vorm.format(t=teken)
+    assert host_path_problem(pad) is not None, repr(pad)
+    inst = POLICY.acties["app.install"]
+    opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": {"path": pad}}]
+    codes = [f.code for f in validate_parameters(POLICY, inst, APP, install_params(storage=opslag))]
+    assert "hostpad_verboden" in codes, (repr(pad), codes)
+
+
+@pytest.mark.parametrize(
+    "pad",
+    [
+        "/mnt/testpool/ x",
+        "/mnt/testpool/x ",
+        "/mnt/ testpool/x",
+        "/mnt/testpool /x",
+        "/mnt/testpool/apps/x\xa0",
+        "/mnt/testpool/　apps",
+        "/mnt/testpool/apps/ ",
+    ],
+    ids=repr,
+)
+def test_ex47_hostpad_met_een_spatie_aan_begin_of_eind_van_een_segment(pad: str) -> None:
+    """S-P2-010, R-VEILIG-5: ``'/mnt/testpool/x '`` en ``'/mnt/testpool/ x'`` lijken op ``/mnt/testpool/x``. Een spatie
+    (ook een harde of brede spatie) aan het begin of eind van een segment wordt geweigerd; ook dieper in de waarden."""
+    from asm_policy.params import host_path_problem
+
     assert host_path_problem(pad) is not None, repr(pad)
     inst = POLICY.acties["app.install"]
     opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": {"path": pad}}]
@@ -662,6 +694,8 @@ def test_ex47_hostpad_zonder_stuurteken_blijft_geldig_en_notities_mogen_regelein
     from asm_policy.params import host_path_problem
 
     assert host_path_problem("/mnt/testpool/apps/demo-app") is None
+    # Een spatie midden in een segment en letters met accenten blijven gewone mapnamen (R-VEILIG-5).
+    assert host_path_problem("/mnt/testpool/mijn map/café") is None
     inst = POLICY.acties["app.install"]
     params = install_params(notes="regel 1\nregel 2", envs=[{"name": "LIJST", "value": "a\tb\nc"}])
     assert validate_parameters(POLICY, inst, APP, params) == []
@@ -682,6 +716,25 @@ def test_canonieke_json() -> None:
     for fout in ({"a": 1.5}, {1: "a"}, {"a": {1, 2}}, {"a": b"x"}):
         with pytest.raises(CanonicalError):
             canonical_json(fout)
+
+
+@pytest.mark.parametrize(
+    "fout",
+    [{"x": "\ud800"}, {"x": ["a", "b\udfff"]}, {"\udc80": 1}, {"a": {"b": "\ud83d"}}],
+    ids=["waarde", "lijst", "sleutel", "genest"],
+)
+def test_canonieke_json_weigert_een_losse_surrogaat(fout: dict[str, Any]) -> None:
+    """S-P2-010, R-VEILIG-6: een losse surrogaat is geen UTF-8. Dat is een ``CanonicalError`` (een nette weigering:
+    ``parameters_ongeldig``/``niet_canoniek``), geen ``UnicodeEncodeError`` die als onverwachte fout een 500 geeft."""
+    with pytest.raises(CanonicalError):
+        canonical_json(fout)
+    with pytest.raises(CanonicalError):
+        canonical_sha256(fout)
+    upd = POLICY.acties["app.update"]
+    fouten = validate_parameters(POLICY, upd, APP, {"image": fout})
+    assert [f.code for f in fouten] == ["niet_canoniek"], [f.as_dict() for f in fouten]
+    # Tegenproef: een echt teken buiten het basisvlak (een paar surrogaten in UTF-16, één teken in Python) mag.
+    assert canonical_json({"x": "\U0001f600"}) == '{"x":"\U0001f600"}'.encode()
 
 
 def test_app_etag_volgt_image_digest_en_staat() -> None:
@@ -831,3 +884,259 @@ def test_ex19_goedkeuring_is_gebonden_aan_elk_veld() -> None:
         prop, policy_hash=POLICY.hash, risk_class="R2", now=NU + timedelta(minutes=5), backup_checkpoint_id="cp-1"
     )
     assert code(toekomst) == "goedkeuring_ongeldig"
+
+
+# ------------------------------------------------------------------ herstel na de review van S-P2-010 (A-HERSTEL)
+def _nest(diepte: int, blad: Any) -> Any:
+    """``blad`` onder ``diepte`` extra objecten: ``_nest(2, x) == {"k1": {"k0": x}}``."""
+    v = blad
+    for i in range(diepte):
+        v = {f"k{i}": v}
+    return v
+
+
+def _catalogus(values: Any, naam: str = "huis", **manifest: Any) -> dict[str, Any]:
+    """``app.install`` van een catalogusapp (geen ix-app) met eigen waarden."""
+    return {
+        "app_create": {
+            "app_name": naam,
+            "catalog_app": "home-assistant",
+            "train": "community",
+            "version": "1.2.3",
+            "values": values,
+        },
+        "manifest": {"app_id": naam, "install_reason": "proef met een catalogusapp", **manifest},
+    }
+
+
+def _codes(params: Any, actie: str = "app.install", target: dict[str, Any] | None = None) -> list[str]:
+    doel = target or {"host_id": HOST, "app_id": "huis"}
+    return [f.code for f in validate_parameters(POLICY, POLICY.acties[actie], doel, params)]
+
+
+EX47_BLADEREN = [
+    pytest.param({"privileged": True}, "privileged_verboden", id="privileged"),
+    pytest.param({"host_path_config": {"path": "/"}}, "hostpad_verboden", id="hostpad"),
+    pytest.param({"custom_compose_config": {"services": {}}}, "compose_verboden", id="compose"),
+    pytest.param({"socket": "/var/run/docker.sock"}, "docker_socket_verboden", id="docker_sock"),
+]
+
+
+@pytest.mark.parametrize(("blad", "code"), EX47_BLADEREN)
+def test_ex47_tot_de_dieptegrens_gezien_en_dieper_geweigerd(blad: dict[str, Any], code: str) -> None:
+    """S-P2-010, R-VEILIG-1 (dicht bij twijfel): EX47 geldt op elke diepte die de parameters mogen hebben, en dieper
+    dan die grens weigert ``validate_parameters`` met ``te_diep_genest``. Er is geen diepte waarop een verboden waarde
+    ongezien doorkomt (vroeger stopte ``_walk`` stil na 16 niveaus)."""
+    from asm_policy.canonical import MAX_DIEPTE
+    from asm_policy.params import MAX_PARAMETER_DIEPTE
+
+    assert MAX_DIEPTE >= MAX_PARAMETER_DIEPTE  # de doorzoekers kijken minstens zo diep als de parameters mogen
+    gezien = 0
+    for diepte in range(0, MAX_DIEPTE):
+        codes = _codes(_catalogus(_nest(diepte, blad)))
+        assert codes, (diepte, "een verboden waarde komt ongezien door")
+        if "te_diep_genest" in codes:
+            break
+        assert code in codes, (diepte, codes)
+        gezien = diepte
+    else:  # pragma: no cover - de grens moet onder de canonieke grens liggen
+        pytest.fail("geen te_diep_genest gevonden")
+    assert gezien >= 10  # gewone catalogusapp-waarden (opslag, ACL-regels) zijn zo diep; die blijven toegestaan
+    assert _codes(_catalogus(_nest(gezien + 1, blad))) == ["te_diep_genest"]
+
+
+def test_te_diep_geneste_parameters_worden_bij_elk_schema_geweigerd() -> None:
+    """De dieptegrens staat vóór het schema: ook ``eigenaar``-acties (vrije parameters) en ``app.update``."""
+    from asm_policy.params import MAX_PARAMETER_DIEPTE
+
+    diep = _nest(MAX_PARAMETER_DIEPTE, "x")  # de tekst zit op diepte MAX + 0 onder het eerste object
+    assert "te_diep_genest" not in _codes({"a": _nest(MAX_PARAMETER_DIEPTE - 2, "x")}, "sso.sessions.revoke", SSO)
+    assert _codes({"a": diep}, "sso.sessions.revoke", SSO) == ["te_diep_genest"]
+    assert _codes({"image": diep}, "app.update", APP) == ["te_diep_genest"]
+    assert _codes({"herstel_van": diep}, "app.rollback", APP) == ["te_diep_genest"]
+
+
+SSO = {"host_id": HOST, "app_id": "home-control-hub", "resource": "hub"}
+
+
+def test_boiler_tot_de_scangrens_gezien_en_dieper_dicht() -> None:
+    """S-P2-010, R-VEILIG-1 (EX27): de boilercontrole ziet alle sleutels en teksten tot de grens van de canonieke JSON
+    (vroeger stopte ze stil na 12 niveaus), en weigert dieper genest dan die grens (dicht bij twijfel), ook zonder het
+    woord boiler. Ook bij een ``eigenaar``-actie."""
+    from asm_policy.canonical import MAX_DIEPTE
+    from asm_policy.engine import mentions_boiler
+
+    for diepte in (1, 12, 14, 16, MAX_DIEPTE - 4):
+        for blad in ({"schakel": "boiler aan"}, {"water_heater": True}):
+            params = _catalogus(_nest(diepte, blad))
+            c = classify(POLICY, action_id="app.install", target=APP, parameters=params, actor_type="user")
+            assert c.geweigerd and "boiler_verboden" in [b.code for b in c.blokkades], (diepte, blad)
+            sso = classify(
+                POLICY, action_id="sso.sessions.revoke", target=SSO, parameters=_nest(diepte, blad), actor_type="user"
+            )
+            assert "boiler_verboden" in [b.code for b in sso.blokkades], (diepte, blad)
+    # Tot en met de grens zonder het woord: niets. Dieper dan de grens: dicht, ook zonder het woord.
+    assert not mentions_boiler(POLICY, _nest(MAX_DIEPTE - 1, "lamp aan"))
+    assert mentions_boiler(POLICY, _nest(MAX_DIEPTE + 1, "lamp aan"))
+    assert mentions_boiler(POLICY, [_nest(MAX_DIEPTE + 5, {"a": 1})])
+    c = classify(POLICY, action_id="app.restart", target=APP, parameters=_nest(MAX_DIEPTE + 1, "x"), actor_type="user")
+    assert c.geweigerd and c.risk_class == "R3"
+
+
+def test_ex47_doorzoeker_weigert_dieper_dan_zijn_grens() -> None:
+    """``_deep_forbidden`` stopt niet meer stil: dieper dan de scangrens is een fout ``te_diep_genest``."""
+    from asm_policy.canonical import MAX_DIEPTE
+    from asm_policy.params import _deep_forbidden
+
+    assert _deep_forbidden(_nest(MAX_DIEPTE - 1, {"a": "x"}), "w", {}) == []
+    fouten = _deep_forbidden(_nest(MAX_DIEPTE + 3, {"a": "x"}), "w", {})
+    assert [f.code for f in fouten] == ["te_diep_genest"]
+    lijst = _deep_forbidden({"l": [[[[_nest(MAX_DIEPTE, "x")]]]]}, "w", {})
+    assert [f.code for f in lijst] == ["te_diep_genest"]
+
+
+def test_executor_weigert_een_ondertekend_verzoek_met_te_diepe_parameters() -> None:
+    """Ook een ondertekend en goedgekeurd verzoek (R3) met te diep geneste waarden weigert ``check_decision`` zelf;
+    met de boiler diep genest is het een statische weigering."""
+    from asm_policy.params import MAX_PARAMETER_DIEPTE
+
+    key = Ed25519PrivateKey.generate()
+    for blad, code in (({"privileged": True}, "parameters_ongeldig"), ({"x": "boiler aan"}, "actie_geweigerd")):
+        params = _catalogus(_nest(MAX_PARAMETER_DIEPTE, blad))
+        prop = proposal("app.install", {"host_id": HOST, "app_id": "huis"}, params, expected_version=ABSENT)
+        approval = approval_for(prop, policy_hash=POLICY.hash, risk_class="R3", now=NU)
+        req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R3", approval=approval, now=NU)
+        assert _envelope(req, key) is None  # de handtekening klopt: de weigering komt uit het besluit
+        _a, _c, w = check_decision(POLICY, req, now=NU, herkend_als=None, uitvoerder="executor")
+        assert w is not None and w.code == code, (blad, w)
+        if code == "parameters_ongeldig":
+            assert "te_diep_genest" in [f["code"] for f in w.details["fouten"]]
+
+
+def test_herkenning_ook_op_de_image_na_de_actie() -> None:
+    """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): ``app.update`` kan een bestaande app een andere image geven. De
+    herkenning telt naast de huidige images ook de image ná de actie (``verwachte_images``): een Custom App omzetten
+    naar een Emby-image is een tweede Emby en valt onder APP-EMBY. Herkenning maakt alleen strenger: wat er nu
+    draait blijft tellen, en of de herkenning volledig is hangt alleen af van wat er nu te zien is."""
+    huidig = _readback("my-house", "RUNNING", ["ghcr.io/lvos04/my_house:0.1.0"])
+    emby = {"image": {"repository": "emby/embyserver", "tag": f"4.8.10.0@{DIGEST}"}}
+    h = herken_app(POLICY, "my-house", huidig, ["emby/embyserver"])
+    assert set(h.apps) == {"my_house", "emby"} and h.volledig and not h.na_stop_herkenbaar
+    for actor in ("user", "ai"):
+        c = classify(POLICY, action_id="app.update", target=APP, parameters=emby, actor_type=actor, herkend_als=h)
+        assert c.geweigerd and "emby_nooit_door_platform" in [b.code for b in c.blokkades], actor
+    # Ook naar de image van de mediaserver of MediaGuard: hun regels gelden dan.
+    for repo, code in (
+        ("ghcr.io/lvos04/mediaguard", "mediaguard_upgradebewijs_ontbreekt"),
+        ("jellyfin/jellyfin", "mediaserver_migratie_vraagt_rapport"),
+    ):
+        hm = herken_app(POLICY, "my-house", huidig, [repo])
+        c = classify(POLICY, action_id="app.update", target=APP, parameters={}, actor_type="user", herkend_als=hm)
+        assert code in [b.code for b in c.blokkades], (repo, hm.apps)
+    # Tegenproef: bijwerken binnen dezelfde repository blijft R2 met goedkeuring, zonder weigering.
+    zelfde = herken_app(POLICY, "my-house", huidig, ["ghcr.io/lvos04/my_house"])
+    assert zelfde.apps == ("my_house",)
+    c = classify(POLICY, action_id="app.update", target=APP, parameters={}, actor_type="user", herkend_als=zelfde)
+    assert not c.geweigerd and c.risk_class == "R2" and c.requires_approval
+    # Een lege verwachte image (catalogusversie) verandert niets.
+    assert herken_app(POLICY, "my-house", huidig, [""]).apps == ("my_house",)
+    # Gestopt: een verwachte image maakt de herkenning niet volledig (wat er nu draait blijft onbekend).
+    gestopt = herken_app(POLICY, "my-house", _readback("my-house", "STOPPED", []), ["ghcr.io/lvos04/my_house"])
+    assert not gestopt.volledig
+    c = classify(POLICY, action_id="app.update", target=APP, parameters={}, actor_type="user", herkend_als=gestopt)
+    assert "doel_niet_herkenbaar" in [b.code for b in c.blokkades]
+
+
+CATALOGUS_EXTRA_RECHTEN = [
+    pytest.param({"capabilities": {"add": ["SYS_ADMIN"]}}, "capabilities_verboden", id="capabilities.add"),
+    pytest.param({"capabilities": {"drop": ["ALL"], "add": []}}, "capabilities_verboden", id="capabilities.anders"),
+    pytest.param({"capabilities": ["NET_ADMIN"]}, "capabilities_verboden", id="capabilities.lijst"),
+    pytest.param({"cap_add": ["SYS_ADMIN"]}, "capabilities_verboden", id="cap_add"),
+    pytest.param({"devices": [{"host_device": "/dev/sda"}]}, "devices_verboden", id="devices"),
+    pytest.param({"devices": ["/dev/dri"]}, "devices_verboden", id="devices.lijst"),
+    pytest.param({"host_pid": True}, "host_pid_verboden", id="host_pid"),
+    pytest.param({"pid": "host"}, "host_pid_verboden", id="pid_host"),
+    pytest.param({"host_ipc": True}, "host_ipc_verboden", id="host_ipc"),
+    pytest.param({"ipc": "host"}, "host_ipc_verboden", id="ipc_host"),
+    pytest.param({"host_network": True}, "host_network_zonder_reden", id="host_network"),
+    pytest.param({"networks": ["gedeeld"]}, "netwerk_verboden", id="networks"),
+    pytest.param({"networks": [{"name": "gedeeld"}]}, "netwerk_verboden", id="networks.object"),
+    pytest.param({"gpus": {"use_all_gpus": True}}, "gpu_zonder_d08", id="gpus.use_all"),
+    pytest.param({"use_all_gpus": True}, "gpu_zonder_d08", id="use_all_gpus"),
+    pytest.param({"gpus": {"nvidia_gpu_selection": {"0000:01:00.0": {"use_gpu": True}}}}, "gpu_verboden", id="nvidia"),
+]
+
+
+@pytest.mark.parametrize(("waarde", "code"), CATALOGUS_EXTRA_RECHTEN)
+@pytest.mark.parametrize("diepte", [0, 3], ids=["bovenaan", "genest"])
+def test_catalogusapp_extra_rechten_op_elke_diepte_geweigerd(waarde: dict[str, Any], code: str, diepte: int) -> None:
+    """S-P2-010, R-VEILIG-3 (ADR-0030 besluit 6): ook de eigen waarden van een catalogusapp krijgen geen extra
+    capabilities, apparaten, host-PID/-IPC, host-netwerk zonder reden, gedeeld Docker-netwerk of GPU zonder
+    ``gpu: intel_render`` in het manifest; op elke diepte, dicht bij twijfel. Vroeger keurde de catalogusapp-tak dit
+    goed (alleen de ix-app-tak controleerde het)."""
+    codes = _codes(_catalogus(_nest(diepte, {"resources": {"limits": {"cpus": 2}}, **waarde})))
+    assert code in codes, codes
+
+
+def test_catalogusapp_zonder_extra_rechten_blijft_geldig() -> None:
+    """Tegenproef: lege waarden, uit-standen en GPU met ``gpu: intel_render`` (en host-netwerk met reden) mogen."""
+    values = {
+        "capabilities": {"add": []},
+        "devices": [],
+        "networks": [],
+        "host_pid": False,
+        "host_ipc": False,
+        "pid": "container",
+        "network": {"host_network": False, "web_port": {"port_number": 30200}},
+        "resources": {"limits": {"cpus": 2}, "gpus": {"use_all_gpus": False, "nvidia_gpu_selection": {}}},
+    }
+    assert _codes(_catalogus(values)) == []
+    gpu = _catalogus({"resources": {"gpus": {"use_all_gpus": True}}}, gpu="intel_render")
+    assert _codes(gpu) == []
+    host = _catalogus(
+        {"network": {"host_network": True}}, host_network_reason="mDNS-ontdekking van apparaten op het LAN"
+    )
+    assert _codes(host) == []
+    # De ix-app-tak meldt een extra recht niet dubbel (zelfde veld, zelfde code).
+    fouten = validate_parameters(
+        POLICY, POLICY.acties["app.install"], APP, install_params(capabilities={"add": ["SYS_ADMIN"]})
+    )
+    assert [f.code for f in fouten].count("capabilities_verboden") == 1
+
+
+@pytest.mark.parametrize("herkend_als", [None, (), "my_house", ("web",), ("jellyfin",)], ids=repr)
+def test_stoppen_zonder_herkenning_is_r2(herkend_als: Any) -> None:
+    """S-P2-010, R-VEILIG-4 en R-TECH-4 (dicht bij twijfel): zonder :class:`Herkenning` weet ``classify`` niet of de
+    app na een stop herkenbaar blijft. Dan is ``app.stop`` op een app R2 (``STOP-EENRICHTING``), net als bij een
+    Custom App; alleen een Herkenning die zegt dat de app herkenbaar blijft (een catalogusapp) geeft R1."""
+    from asm_policy.engine import Herkenning
+
+    c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=herkend_als)
+    assert c.risk_class == "R2" and c.requires_approval and "STOP-EENRICHTING" in c.rule_ids
+    jf = Herkenning(("jellyfin",), True, True)
+    c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=jf)
+    assert c.risk_class == "R1" and not c.requires_approval and "STOP-EENRICHTING" not in c.rule_ids
+    # Alleen app.stop: starten en herstarten zonder herkenning blijven R1.
+    for aid in ("app.start", "app.restart"):
+        c = classify(POLICY, action_id=aid, target=APP, parameters={}, actor_type="user", herkend_als=herkend_als)
+        assert c.risk_class == "R1", aid
+
+
+def test_dockerfiles_kopieren_precies_alle_policybestanden() -> None:
+    """S-P2-010, R-TECH-2: de ``policy_hash`` telt elke ``policy/*.yaml``. Beide Dockerfiles kopiëren de bestanden bij
+    naam; een vierde yaml (of een ontbrekende) zou de hash in de image anders maken dan in de repo. De rooktest
+    (``deploy/smoke.sh``) vergelijkt daarnaast de hash van beide images met die van ``policy/``."""
+    repo = POLICY_DIR.parent
+    verwacht = [f"policy/{p.name}" for p in sorted(POLICY_DIR.glob("*.yaml"))]
+    assert len(verwacht) >= 3
+    for dockerfile in ("deploy/allinone/Dockerfile", "deploy/executor/Dockerfile"):
+        regels = [
+            r.split()
+            for r in (repo / dockerfile).read_text(encoding="utf-8").splitlines()
+            if r.startswith("COPY") and "/usr/local/share/asm/policy" in r
+        ]
+        assert len(regels) == 1, dockerfile
+        bronnen = [d for d in regels[0][1:-1] if not d.startswith("--")]
+        assert bronnen == verwacht, (dockerfile, bronnen)
+    smoke = (repo / "deploy/smoke.sh").read_text(encoding="utf-8")
+    assert "policy_hash" in smoke and "asm-smoke-exec" in smoke
