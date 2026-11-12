@@ -4,6 +4,12 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — herstelronde 2 van het policy-pakket: losse teksten in lijsten (S-P2-010; ADR-0030)
+- De EX47-controle bekijkt ook een tekst die los in een lijst staat, op elke diepte. Een Docker-socket, een hostpad
+  buiten een dataset in bind- of volumevorm (`{"binds": ["/:/host"]}`), een ongeldige kluisverwijzing en een verboden
+  sleutel als vlag (`"--privileged"`, `"pid=host"`) geven `422 parameters_ongeldig`, in de Hub én de executor. Een
+  geldige kluisverwijzing in een lijst wordt nu gevonden en geeft `501 capability_unavailable`.
+
 ### Gerepareerd — herstel na de review van het policy-pakket (S-P2-010; ADR-0030)
 - Diep geneste parameters glippen niet meer langs de boiler- en EX47-controle: parameters zijn hooguit 16 niveaus
   diep (`te_diep_genest`), en de doorzoekers kijken tot 32 niveaus en weigeren dieper in plaats van stil te stoppen.

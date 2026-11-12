@@ -42,8 +42,13 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    Docker-socket, hostpaden buiten `/mnt/<pool>/<dataset>`, `latest` of een tag zonder digest. Een catalogusapp vraagt
    een exacte versie en een `install_reason`. Ook de eigen waarden van een catalogusapp krijgen op elke diepte geen
    compose, privileged, host-netwerk zonder reden, host-PID/-IPC, extra capabilities, devices, gedeeld netwerk, GPU
-   zonder `gpu: intel_render` in het manifest of Docker-socket (S-P2-010). Een hostpad weigert ook elk teken uit de
-   Unicode-categorieën Cc, Cf, Zl en Zp en een spatie aan het begin of eind van een mapnaam. Een tekst die geen
+   zonder `gpu: intel_render` in het manifest of Docker-socket (S-P2-010). Dat geldt ook voor een losse tekst in een
+   lijst (S-P2-010, herstelronde 2; dicht bij twijfel): een Docker-socket, een hostpad buiten een dataset in bind- of
+   volumevorm (`"/:/host"`, `"--volume=/etc:/etc"`, `"type=bind,source=/,..."`), een ongeldige kluisverwijzing en een
+   verboden sleutel als vlag (`"--privileged"`, `"pid=host"`, `"--cap-add=SYS_ADMIN"`; een vlag zonder waarde telt
+   als aan, ook `"--pid"`). Een geldige kluisverwijzing in een lijst wordt gevonden en geeft
+   `501 capability_unavailable`, net als in een object. Een hostpad weigert ook elk teken uit de Unicode-categorieën
+   Cc, Cf, Zl en Zp en een spatie aan het begin of eind van een mapnaam. Een tekst die geen
    geldige UTF-8 is (een losse surrogaat) is niet canoniek: `422 parameters_ongeldig` (`niet_canoniek`).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
