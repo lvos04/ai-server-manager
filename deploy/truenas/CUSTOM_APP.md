@@ -141,9 +141,11 @@ nodig: de executor koppelt nooit met een `HUB_ENROLLMENT_TOKEN`, alleen met een 
 
 **TrueNAS-sleutel met schrijfrechten (eenmalig, op dezelfde pagina):**
 
-1. Maak in TrueNAS een **aparte gebruiker voor de executor** met een rol die apps en snapshots mag wijzigen, en
-   daarvoor een **API-key** (Credentials → API Keys; menunamen verschillen per versie). Gebruik **niet** de
-   alleen-lezen-key van de Hub: die weigert de executor (`schrijfrechten_ontbreken`).
+1. Maak in TrueNAS een **aparte gebruiker voor de executor** met een rol die apps én snapshots mag wijzigen
+   (`FULL_ADMIN`, of `APPS_WRITE` samen met `SNAPSHOT_WRITE`; rolnamen NIET GEVALIDEERD op een echte NAS), en daarvoor
+   een **API-key** (Credentials → API Keys; menunamen verschillen per versie). Gebruik **niet** de alleen-lezen-key van
+   de Hub: die weigert de executor (`schrijfrechten_ontbreken`). Een key die alleen apps of alleen snapshots mag
+   wijzigen, weigert hij ook (`schrijfrechten_onvolledig`).
 2. Open de statuspagina via het **IP-adres van de NAS** en plak de sleutel. De executor toont eerst alleen het
    **NAS-adres** en de **SHA-256-vingerafdruk van het TrueNAS-certificaat**; de sleutel is dan nog niet verstuurd.
    Vergelijk de vingerafdruk teken voor teken met wat je browser toont bij het slotje van de TrueNAS-web-UI.
@@ -156,6 +158,9 @@ nodig: de executor koppelt nooit met een `HUB_ENROLLMENT_TOKEN`, alleen met een 
 Adres en certificaat liggen daarna vast. **Sleutel vervangen**, **Ontkoppelen van de Hub** en het **vrijgeven** van een
 gestopte executor (na een afwijking) doe je op dezelfde pagina onder "Ontkoppelen of sleutel vervangen", telkens met de
 huidige sleutel. Vrijgeven = de huidige sleutel invullen, "Nieuwe sleutel" leeg laten en "Sleutel vervangen" kiezen.
+Alleen de sleutel die nu in de executor staat telt als bewijs; een andere key, ook een geldige, weigert hij
+(`sleutel_niet_huidig`). Bewaar die key dus veilig. Trek je hem in TrueNAS in voordat je hem op deze pagina hebt
+vervangen, dan kan beheer hier niet meer: volg dan **Nieuwe datamap** onder "Herstel".
 
 Vanaf dat moment voert de executor alleen uit wat de Hub ondertekend aanlevert en wat op de vaste lijst in de image
 staat (apps starten/stoppen/herstarten, installeren, bijwerken, terugzetten, verwijderen zonder data, snapshots). Hij
@@ -230,7 +235,9 @@ executor niets uit en zet hij het bestand nooit zelf terug (fail-closed).
 | `sleutelopslag_onleesbaar` | `/appdata/secrets/naslink.json` | de opgeslagen TrueNAS-koppeling: NAS-adres, certificaat en schrijfsleutel |
 
 Onleesbaar is: kapotte of onvolledige inhoud, een andere hoofdversie, een symlink, een andere eigenaar dan de executor
-zelf (gebruiker 568), of rechten voor groep of anderen (alleen `0600` is goed).
+zelf (gebruiker 568), of rechten voor groep of anderen (alleen `0600` is goed). Bij `sleutelopslag_onleesbaar` ook: een
+`/appdata/secrets/vault.key` die de opgeslagen sleutel niet opent (bijvoorbeeld omdat `vault.key` weg was en de executor
+bij de start een nieuwe maakte).
 
 **Eerst: stop en start de app** (Apps → `ai-server-manager-executor`). Is de eigenaar van de map `/appdata/secrets`
 veranderd, dan maakt de executor bij de start die map en de bestanden erin weer van gebruiker 568 en is de melding weg.
@@ -256,6 +263,14 @@ executor koppelt niet met een koppeltoken, dus op de statuspagina kan het niet. 
 statuspagina toont dan geen sleutelformulier en geen blok **Ontkoppelen of sleutel vervangen**, en de executor
 overschrijft de onleesbare opslag nooit. Ook met de sleutel bij de hand kan het dus niet op de statuspagina. Volg
 **Nieuwe datamap**.
+
+**Huidige sleutel in TrueNAS ingetrokken (of zonder rechten).** Beheer op de statuspagina vraagt de sleutel die nu in de
+executor staat, live getest bij TrueNAS; TrueNAS weigert hem dan (`sleutel_geweigerd`, `schrijfrechten_ontbreken` of
+`schrijfrechten_onvolledig`). Een andere key telt niet als bewijs. Volg **Nieuwe datamap** en stel daarna de nieuwe key
+in.
+
+**Opslag niet schrijfbaar (`sleutelopslag_niet_schrijfbaar`).** De executor kon niet schrijven in `/appdata/secrets`
+(schijf vol, rechten). Los de opslag op (zie "Eerst: stop en start de app" hierboven) en laad de pagina opnieuw.
 
 **Nieuwe datamap** (alles in de TrueNAS-web-UI, geen terminal):
 

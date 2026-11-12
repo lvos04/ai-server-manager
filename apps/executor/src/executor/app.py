@@ -5,9 +5,10 @@ Koppelen kan alleen op de statuspagina, met een koppelcode (30 min) en de Hub-vi
 gekoppeld is en het koppelbestand leesbaar is. Daarna vult de beheerder op dezelfde pagina de TrueNAS-API-sleutel met
 schrijfrechten in (``/schrijfsleutel``, in twee stappen: eerst de TLS-vingerafdruk van TrueNAS tonen en laten
 bevestigen, dan pas de sleutel live testen en versleuteld opslaan). Ontkoppelen, de sleutel vervangen en een gestopte
-executor vrijgeven kan alleen met een live geverifieerde schrijfsleutel tegen het vastgelegde NAS-adres en certificaat
-(``/beheer``). **Elke** formulier-POST doorloopt eerst de herkomstcontrole (exacte ``Origin`` met het schema van het
-verzoek, ``Sec-Fetch-Site``, ``Host``-beperking tegen DNS-rebinding, formuliertoken) en telt daarna als poging.
+executor vrijgeven kan alleen met de huidige opgeslagen schrijfsleutel, die daarna live wordt geverifieerd tegen het
+vastgelegde NAS-adres en certificaat (``/beheer``). **Elke** formulier-POST doorloopt eerst de herkomstcontrole
+(exacte ``Origin`` met het schema van het verzoek, ``Sec-Fetch-Site``, ``Host``-beperking tegen DNS-rebinding,
+formuliertoken) en telt daarna als poging.
 
 Uitvoeren (``/api/v1/execute``): alleen met een dienst-JWT van de Hub én een ``ExecutionRequest`` dat de executor zelf
 opnieuw controleert (handtekening met de gepinde policy-sleutel, geldigheid, nonce, allowlist, parameterschema,
@@ -68,7 +69,7 @@ from executor.hublink import (
     verify_hub_authorization,
 )
 from executor.journal import Journal, JournalUnavailable
-from executor.naslink import MAX_KEY_LEN, NasLinkOnleesbaar, NasLinkStore
+from executor.naslink import MAX_KEY_LEN, NasLinkConflict, NasLinkOnleesbaar, NasLinkStore
 from executor.replay import ReplayCache, ReplayUnavailable
 from executor.statuspagina import executor_page, onleesbaar_melding, vingerafdruk_melding
 from executor.truenas import NasFout, display_fingerprint, fetch_fingerprint, verify_key
@@ -219,6 +220,24 @@ FORM_MESSAGES: dict[str, tuple[int, str, str]] = {
         "De sleutel heeft geen schrijfrechten",
         "Deze sleutel is alleen-lezen. De executor heeft een TrueNAS-API-sleutel met schrijfrechten nodig. Er is "
         "niets gewijzigd.",
+    ),
+    "schrijfrechten_onvolledig": (
+        400,
+        "De sleutel mag niet alles wat de executor doet",
+        "Deze sleutel mag niet zowel apps als snapshots wijzigen. De executor heeft een TrueNAS-API-sleutel nodig met "
+        "de rol FULL_ADMIN, of met APPS_WRITE en SNAPSHOT_WRITE samen. Er is niets gewijzigd.",
+    ),
+    "sleutel_niet_huidig": (
+        400,
+        "Dit is niet de huidige sleutel",
+        "Als bewijs telt alleen de TrueNAS-API-sleutel die nu in de executor is ingesteld (zie 'Huidige sleutel "
+        "eindigt op'). Er is niets gewijzigd en er is niets naar TrueNAS gestuurd.",
+    ),
+    "sleutelopslag_niet_schrijfbaar": (
+        503,
+        "De opslag van de executor is niet schrijfbaar",
+        "De executor kon niet schrijven in /appdata/secrets. Controleer de opslag in /appdata en laad deze pagina "
+        "daarna opnieuw; de pagina toont wat er nu is opgeslagen.",
     ),
     "journaal_niet_beschikbaar": (
         503,
@@ -969,22 +988,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 naslink.set_pending(host, port, fingerprint)
                 log.info("%s afgehandeld: code=vingerafdruk_getoond trace_id=%s", soort, trace)
                 return _page(vingerafdruk_melding(display_fingerprint(fingerprint), rol="status"))
-            # Stap 2: bevestigd. Live test tegen precies het getoonde certificaat; pas daarna opslaan.
+            # Stap 2: bevestigd. Live test tegen precies het getoonde certificaat; pas daarna opslaan. De methodenlijst
+            # wordt hier niet gebruikt: core.get_methods is alleen een controle dat de sleutel hem mag aanroepen.
             fingerprint = str(wacht.get("fingerprint") or "")
             roles, _methods = await run_in_threadpool(
                 verify_key, host, port, fingerprint, api_key, timeout=settings.truenas_timeout_seconds
             )
-            naslink.save_key(host, port, fingerprint, api_key, roles)
+            naslink.save_key(host, port, fingerprint, api_key, roles, nieuw=True)
         except NasFout as exc:
             if exc.code == "certificaat_gewijzigd":
                 # Het certificaat is sinds stap 1 veranderd: de bevestiging geldt niet meer; opnieuw beginnen.
-                with contextlib.suppress(NasLinkOnleesbaar):
+                with contextlib.suppress(NasLinkOnleesbaar, OSError):
                     naslink.clear_pending()
             return _sleutelfout(
-                exc.code, trace, soort, veld=exc.code in ("sleutel_geweigerd", "schrijfrechten_ontbreken")
+                exc.code,
+                trace,
+                soort,
+                veld=exc.code in ("sleutel_geweigerd", "schrijfrechten_ontbreken", "schrijfrechten_onvolledig"),
             )
+        except NasLinkConflict:
+            # Wedloop: in een ander tabblad is de sleutel net ingesteld (R-TECH-9). Niets overschreven.
+            return _afgehandeld("sleutel_al_ingesteld", trace, soort=soort)
         except NasLinkOnleesbaar:
             return _afgehandeld("sleutelopslag_onleesbaar", trace, soort=soort)
+        except OSError:
+            # Schijf- of rechtenfout in /appdata/secrets: vaste melding, nooit een kale 500 (R-TECH-4, V-041).
+            return _afgehandeld("sleutelopslag_niet_schrijfbaar", trace, soort=soort)
         return _gelukt(
             "sleutel_ingesteld",
             trace,
@@ -997,8 +1026,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/beheer", response_class=HTMLResponse, include_in_schema=False)
     async def manage(request: Request) -> HTMLResponse:
         """Ontkoppelen van de Hub, de sleutel vervangen of een gestopte executor vrijgeven. Bewijs van TrueNAS-beheer:
-        een schrijfsleutel die **nu** live wordt geverifieerd tegen het vastgelegde NAS-adres en certificaat. Een
-        ander adres of certificaat kan hier niet worden opgegeven (§3.9)."""
+        alleen de **huidige** opgeslagen sleutel. Eerst een vergelijking in constante tijd met de ontsleutelde sleutel
+        (onleesbare opslag of ``vault.key`` = weigeren; er gaat dan niets naar TrueNAS), daarna de live test tegen het
+        vastgelegde NAS-adres en certificaat (BN-2 a, S-P2-020). Een ander adres of certificaat kan hier niet worden
+        opgegeven (§3.9). Is de huidige sleutel in TrueNAS ingetrokken, dan kan het hier niet meer: herinstallatie met
+        een nieuwe datamap."""
         trace, soort = str(uuid.uuid4()), "beheerpoging"
         form = await _formulier(request, trace, soort)
         if isinstance(form, HTMLResponse):
@@ -1022,7 +1054,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if actie == "vervangen" and not nieuw and stopped is None:
             return _afgehandeld("nieuwe_sleutel_ontbreekt", trace, soort=soort)
         try:
-            # Het bewijs: live tegen het vastgelegde adres en certificaat, nooit tegen iets uit dit formulier.
+            # Het bewijs is alleen de huidige sleutel (constante tijd), vóór er iets naar TrueNAS gaat.
+            huidig = naslink.is_huidige_sleutel(bewijs)
+        except NasLinkOnleesbaar:
+            return _afgehandeld("sleutelopslag_onleesbaar", trace, soort=soort)
+        if not huidig:
+            return _afgehandeld("sleutel_niet_huidig", trace, soort=soort)
+        try:
+            # Daarna live tegen het vastgelegde adres en certificaat, nooit tegen iets uit dit formulier.
             await run_in_threadpool(
                 verify_key, host, port, fingerprint, bewijs, timeout=settings.truenas_timeout_seconds
             )
@@ -1051,6 +1090,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return _afgehandeld("sleutelopslag_onleesbaar", trace, soort=soort)
         except JournalUnavailable:
             return _afgehandeld("journaal_niet_beschikbaar", trace, soort=soort)
+        except OSError:
+            # Schijf- of rechtenfout bij opslaan of ontkoppelen: vaste melding, nooit een kale 500 (R-TECH-4, V-041).
+            return _afgehandeld("sleutelopslag_niet_schrijfbaar", trace, soort=soort)
         if vervangen and vrijgegeven:
             titel, tekst = (
                 "De schrijfsleutel is vervangen en de executor is vrijgegeven.",

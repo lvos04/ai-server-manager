@@ -12,6 +12,12 @@ Regels (contract 1.3 §3.9 en §8, ADR-0030):
   De synchrone websockets-client leest en schrijft vanuit twee threads tegelijk op hetzelfde TLS-object; onder
   belasting liep de handdruk daardoor af en toe vast (gemeten tegen de fake: enkele op de 1600 verbindingen, met de
   asyncio-client nul). Voor de aanroeper blijft de client synchroon. Nooit via een proxy uit de omgeving.
+- De verbinding logt via een **eigen logger die vast op INFO staat** (:data:`WS_LOGGER`). websockets logt op DEBUG elk
+  frame, ook ``auth.login_with_api_key`` met (het einde van) de sleutel en waarden van ``app.create``; zo komt dat
+  nooit in een log, ook niet als de root-logger op DEBUG staat (R-VEILIG-4, S-P2-020).
+- Een sleutel telt alleen als schrijfsleutel als zijn rollen de app- **én** snapshotacties van de allowlist dekken:
+  ``FULL_ADMIN``, of ``APPS_WRITE`` samen met ``SNAPSHOT_WRITE`` (R-TECH-1, S-P2-020). De rolnamen komen uit de publieke
+  API-beschrijving: NIET GEVALIDEERD (echte NAS).
 
 Alleen tegen de in-repo fake getest: NIET GEVALIDEERD (echte NAS).
 """
@@ -25,6 +31,7 @@ import hmac
 import ipaddress
 import itertools
 import json
+import logging
 import socket
 import ssl
 import threading
@@ -56,8 +63,14 @@ READ_METHODS: frozenset[str] = frozenset(
         "zfs.snapshot.query",
     }
 )
-# Rollen waarmee een sleutel als "met schrijfrechten" telt (§3.9). Alleen-lezen (READONLY_ADMIN, *_READ) telt niet.
+# Rollen met schrijfrechten (§3.9). Alleen-lezen (READONLY_ADMIN, *_READ) telt niet. Voor de executor moet een sleutel
+# de hele allowlist dekken (app.* én snapshots): FULL_ADMIN, of APPS_WRITE samen met SNAPSHOT_WRITE. Rolnamen:
+# NIET GEVALIDEERD (echte NAS).
 WRITE_ROLES: frozenset[str] = frozenset({"FULL_ADMIN", "APPS_WRITE", "SNAPSHOT_WRITE"})
+ALLOWLIST_ROLES: frozenset[str] = frozenset({"APPS_WRITE", "SNAPSHOT_WRITE"})
+# Eigen logger voor de websocket-verbinding, vast op INFO: geen DEBUG-frames (met de sleutel) in een log.
+WS_LOGGER = logging.getLogger("executor.truenas.websockets")
+WS_LOGGER.setLevel(logging.INFO)
 
 
 class NasFout(Exception):
@@ -109,6 +122,11 @@ def fetch_fingerprint(host: str, port: int, *, timeout: float = 5.0) -> str:
 
 def has_write_role(roles: list[str]) -> bool:
     return any(r in WRITE_ROLES for r in roles)
+
+
+def covers_allowlist(roles: list[str]) -> bool:
+    """Of de rollen de app- én snapshotacties van de allowlist dekken (R-TECH-1)."""
+    return "FULL_ADMIN" in roles or set(roles) >= ALLOWLIST_ROLES
 
 
 class NasClient:
@@ -180,6 +198,7 @@ class NasClient:
             proxy=None,  # LAN-verbinding; nooit via een proxy uit de omgeving
             user_agent_header="ai-server-manager-executor",
             ping_interval=None,
+            logger=WS_LOGGER,  # vast op INFO: nooit DEBUG-frames met de sleutel (R-VEILIG-4)
         )
         # De vingerafdruk wordt hier, op de thread van de loop, gelezen en vergeleken: vóór er iets geheims gaat.
         sslobj = ws.transport.get_extra_info("ssl_object")
@@ -297,10 +316,17 @@ def verify_key(
     host: str, port: int, fingerprint: str, api_key: str, *, timeout: float = 15.0
 ) -> tuple[list[str], frozenset[str]]:
     """Live verifiëren (§3.9): verbinding met de vastgelegde vingerafdruk → ``auth.login_with_api_key`` → rolcontrole →
-    ``core.get_methods``. Geeft (rollen, methoden); ``schrijfrechten_ontbreken`` bij een alleen-lezen-sleutel."""
+    ``core.get_methods``. Geeft (rollen, methoden); ``schrijfrechten_ontbreken`` bij een alleen-lezen-sleutel en
+    ``schrijfrechten_onvolledig`` als de rollen niet de app- én snapshotacties dekken (R-TECH-1).
+
+    ``core.get_methods`` is hier alleen een controle dat de sleutel die methode mag aanroepen (faalt de aanroep, dan
+    wordt de sleutel geweigerd); de aanroepers gebruiken de lijst niet. Bij elke uitvoering vraagt de executor de
+    methoden opnieuw op (R-TECH-7, ADR-0030 besluit 13 en 15)."""
     with NasClient(host, port, fingerprint, timeout=timeout) as nas:
         nas.login(api_key)
         roles = nas.roles()
         if not has_write_role(roles):
             raise NasFout("schrijfrechten_ontbreken")
+        if not covers_allowlist(roles):
+            raise NasFout("schrijfrechten_onvolledig")
         return roles, nas.methods()

@@ -1064,7 +1064,9 @@ def test_onleesbare_sleutelopslag_voert_niets_uit(stack: Stack) -> None:
     assert st["schrijfsleutel"] == {"ingesteld": False, "onleesbaar": True, "laatste4": None, "ingesteld_op": None}
     assert st["uitvoeren"] == {"mogelijk": False, "reden": "sleutelopslag_onleesbaar"}
     r = execute(c, hub, signed(hub, prop, risk_class="R1"))
-    assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    # ADR-0030 besluit 13 en docs/EXECUTION_REQUEST.md: onleesbare sleutelopslag = 503 schrijfsleutel_onleesbaar, nooit
+    # "niet ingesteld" (R-TECH-3, S-P2-020).
+    assert r.status_code == 503 and r.json()["code"] == "schrijfsleutel_onleesbaar", r.text
     assert writes(nas) == [] and nas.logins == 0
     pagina = c.get("/").text
     assert "sleutelopslag_onleesbaar" in pagina and 'name="truenas_sleutel"' not in pagina

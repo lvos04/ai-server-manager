@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import fcntl
+import hmac
 import json
 import os
 import secrets
@@ -36,6 +37,12 @@ MAX_KEY_LEN = 512
 
 class NasLinkOnleesbaar(Exception):
     """``naslink.json`` of ``vault.key`` is onleesbaar: niets uitvoeren, niets overschrijven."""
+
+
+class NasLinkConflict(NasLinkOnleesbaar):
+    """Logische weigering bij een wedloop (de sleutel is net elders ingesteld, of adres en certificaat liggen al vast).
+    Erft van :class:`NasLinkOnleesbaar`, zodat elke aanroeper die alleen die vangt dicht blijft; het sleutelformulier
+    vangt deze eerst en meldt ``sleutel_al_ingesteld`` (R-TECH-9, S-P2-020)."""
 
 
 def now_iso(now: datetime | None = None) -> str:
@@ -176,11 +183,24 @@ class NasLinkStore:
             return None
         return p
 
+    def is_huidige_sleutel(self, kandidaat: str) -> bool:
+        """Of ``kandidaat`` precies de opgeslagen sleutel is (vergelijking in constante tijd). Dit is het bewijs voor
+        beheer (BN-2 a, S-P2-020): alleen de huidige sleutel telt. :class:`NasLinkOnleesbaar` als er geen sleutel is of
+        als de opslag of ``vault.key`` hem niet (meer) kan openen."""
+        return hmac.compare_digest(self.api_key().encode(), kandidaat.encode())
+
     def public(self) -> dict[str, Any]:
-        """Wat de statuspagina en ``/api/v1/status`` mogen tonen: nooit de sleutel."""
+        """Wat de statuspagina en ``/api/v1/status`` mogen tonen: nooit de sleutel. Een opgeslagen sleutel telt pas als
+        ingesteld als hij ook echt te openen is met ``vault.key`` (R-TECH-2, S-P2-020); anders is de opslag
+        onleesbaar."""
         data = self.read()
         if data.get("_onleesbaar"):
             return {"ingesteld": False, "onleesbaar": True}
+        if data.get("key") is not None:
+            try:
+                self.vault.open(data["key"])
+            except NasLinkOnleesbaar:
+                return {"ingesteld": False, "onleesbaar": True}
         return {
             "ingesteld": data.get("key") is not None,
             "onleesbaar": False,
@@ -196,23 +216,28 @@ class NasLinkStore:
     def set_pending(self, host: str, port: int, fingerprint: str) -> None:
         with self.update() as data:
             if data.get("key") is not None:
-                raise NasLinkOnleesbaar("al ingesteld")
+                raise NasLinkConflict("al ingesteld")
             data["pending"] = {"host": host, "port": port, "fingerprint": fingerprint, "started_at": now_iso()}
 
     def clear_pending(self) -> None:
         with self.update() as data:
             data["pending"] = None
 
-    def save_key(self, host: str, port: int, fingerprint: str, api_key: str, roles: list[str]) -> None:
-        """Sleutel (opnieuw) vastleggen. Adres en vingerafdruk liggen na de eerste keer vast en veranderen hier niet."""
+    def save_key(
+        self, host: str, port: int, fingerprint: str, api_key: str, roles: list[str], *, nieuw: bool = False
+    ) -> None:
+        """Sleutel (opnieuw) vastleggen. Adres en vingerafdruk liggen na de eerste keer vast en veranderen hier niet.
+        ``nieuw``: alleen als er nog geen sleutel is (het sleutelformulier); anders :class:`NasLinkConflict`."""
         box = self.vault.seal(api_key.encode())
         with self.update() as data:
+            if nieuw and data.get("key") is not None:
+                raise NasLinkConflict("al ingesteld")
             if data.get("key") is not None and (data["host"], data["port"], data["fingerprint"]) != (
                 host,
                 port,
                 fingerprint,
             ):
-                raise NasLinkOnleesbaar("adres of certificaat ligt al vast")
+                raise NasLinkConflict("adres of certificaat ligt al vast")
             data.update(
                 host=host,
                 port=port,

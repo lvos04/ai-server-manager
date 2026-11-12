@@ -52,9 +52,15 @@ sleutel nooit.
 1. **Stap 1 — vingerafdruk.** Na het versturen haalt de executor alleen het TLS-certificaat van TrueNAS op en toont de
    SHA-256-vingerafdruk. De sleutel is dan nog niet verstuurd en niet bewaard.
 2. **Stap 2 — bevestigen.** Vul de sleutel nogmaals in (binnen 15 minuten). De executor verbindt met precies dat
-   certificaat, meldt aan met `auth.login_with_api_key`, controleert de rol (`FULL_ADMIN`, `APPS_WRITE` of
-   `SNAPSHOT_WRITE`) en slaat de sleutel versleuteld op (AES-256-GCM met `vault.key`) in
-   `/appdata/secrets/naslink.json` (0600). Daarna zie je alleen de laatste 4 tekens.
+   certificaat, meldt aan met `auth.login_with_api_key`, controleert de rollen (`auth.me`) en roept `core.get_methods`
+   aan, en slaat de sleutel versleuteld op (AES-256-GCM met `vault.key`) in `/appdata/secrets/naslink.json` (0600).
+   Daarna zie je alleen de laatste 4 tekens.
+
+**Rollen.** De sleutel moet de app- én snapshotacties van de allowlist dekken: `FULL_ADMIN`, of `APPS_WRITE` samen met
+`SNAPSHOT_WRITE`. Een alleen-lezen-sleutel geeft `schrijfrechten_ontbreken`; alleen `APPS_WRITE` of alleen
+`SNAPSHOT_WRITE` geeft `schrijfrechten_onvolledig`. De rolnamen zijn NIET GEVALIDEERD (echte NAS). `core.get_methods` is
+hier alleen een controle dat de sleutel die methode mag aanroepen; de lijst wordt niet gebruikt (bij elke uitvoering
+vraagt de executor de methoden opnieuw op, zie "Uitvoeren").
 
 Het **NAS-adres** is `EXECUTOR_TRUENAS_HOST` (optioneel) of, als dat leeg is, het IP-adres waarop je de executorpagina
 opent (de executor draait op de NAS zelf); poort `EXECUTOR_TRUENAS_PORT` (standaard 443). Open je de pagina via een naam
@@ -62,14 +68,26 @@ of via loopback, dan is het adres onbekend (`nas_adres_onbekend`). Adres en cert
 adres of certificaat wordt geweigerd en de sleutel wordt er dan niet naartoe gestuurd.
 
 **Beheer** (blok "Ontkoppelen of sleutel vervangen", zodra er een sleutel ligt) vraagt altijd de huidige sleutel als
-bewijs; de executor test hem live tegen het vastgelegde adres en certificaat voordat er iets verandert:
+bewijs. De executor vergelijkt het bewijs eerst in constante tijd met de opgeslagen (ontsleutelde) sleutel; een andere
+sleutel, ook een andere geldige schrijfsleutel, geeft `sleutel_niet_huidig` en gaat nergens heen. Daarna test hij de
+sleutel live tegen het vastgelegde adres en certificaat, en pas dan verandert er iets. Is de huidige sleutel in TrueNAS
+ingetrokken, dan kan beheer niet meer op deze pagina: installeer de executor opnieuw met een nieuwe datamap
+(`deploy/truenas/CUSTOM_APP.md`, kop "Herstel").
 
 - *Sleutel vervangen*: nieuwe sleutel invullen; ook die wordt eerst live getest.
 - *Vrijgeven na een afwijking*: huidige sleutel invullen, "Nieuwe sleutel" leeg laten en "Sleutel vervangen" kiezen.
 - *Ontkoppelen van de Hub*: de Hub wordt niet meer vertrouwd; NAS-adres, certificaat en sleutel blijven bewaard en het
   koppelformulier komt terug. Dit is ook het herstel bij een onleesbaar koppelbestand.
 
-Voor alle drie de formulieren gelden de regels van §3.7 (herkomst, `Host`, formuliercode, pogingenlimiet).
+Voor alle drie de formulieren gelden de regels van §3.7 (herkomst, `Host`, formuliercode, pogingenlimiet). Een schijf-
+of rechtenfout in `/appdata/secrets` geeft `sleutelopslag_niet_schrijfbaar` (503) met een vaste melding; een sleutel die
+net in een ander tabblad is ingesteld geeft `sleutel_al_ingesteld` (409). Kan `vault.key` de opgeslagen sleutel niet
+openen (bijvoorbeeld na verlies), dan tonen status en pagina `sleutelopslag_onleesbaar` en voert de executor niets uit.
+
+**Log.** `python -m executor api` geeft de logger `executor` een eigen handler op INFO (stdout, de app-log): elke
+afgehandelde poging geeft één regel met code en trace-ID, zonder geheimen. De verbinding met TrueNAS logt via een eigen
+logger die vast op INFO staat, zodat de frames van websockets (op DEBUG staat daar de sleutel in) nooit in een log
+komen.
 
 ## Uitvoeren (contract 1.3 §8)
 

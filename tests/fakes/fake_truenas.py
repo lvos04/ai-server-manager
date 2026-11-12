@@ -10,7 +10,12 @@ Elke aanroep wordt gelogd; aanroepen van niet-leesmethoden komen in ``mutations`
 blijft).
 
 Schrijven (voor de executor, fase P2): alleen een sleutel met ``KeyProfile(write=True)`` mag schrijfmethoden aanroepen;
-elke andere sleutel krijgt ``EACCES``. App-methoden zijn jobs (een job-id als antwoord, uitkomst via
+elke andere sleutel krijgt ``EACCES``. Ook dan gelden rechten per methode volgens de rollen (R-TECH-1, S-P2-020):
+``FULL_ADMIN`` mag alles, ``APPS_WRITE`` de app-methoden (en ``app.config``), ``SNAPSHOT_WRITE`` de snapshotmethoden
+(maken en klonen); de rest alleen ``FULL_ADMIN``. Die indeling is een aanname uit de publieke rolnamen: NIET
+GEVALIDEERD (echte NAS). De websocket-server logt via een eigen logger vast op INFO, zodat een test met de root-logger
+op DEBUG geen frames met de sleutel van de fake in de log krijgt (R-VEILIG-4). App-methoden zijn jobs (een job-id als
+antwoord, uitkomst via
 ``core.get_jobs``); de wijziging staat direct in de testdata. Testknoppen: ``fail`` (methode → foutmelding),
 ``silent_noop`` (job "geslaagd" zonder wijziging), ``digest_override`` (repository → andere digest dan gevraagd),
 ``hidden`` (methoden die deze "versie" niet aanbiedt) en ``job_polls`` (aantal keer RUNNING vóór de eindstaat).
@@ -28,6 +33,7 @@ import datetime as dt
 import hashlib
 import ipaddress
 import json
+import logging
 import ssl
 import tempfile
 import threading
@@ -99,6 +105,26 @@ JOB_METHODS = {
     "app.upgrade",
     "app.rollback",
 }
+# Rechten per methode voor een schrijfprofiel (aanname uit de rolnamen; NIET GEVALIDEERD (echte NAS)).
+APP_WRITE_METHODS = JOB_METHODS | CONFIG_METHODS
+SNAPSHOT_WRITE_METHODS = {"pool.snapshot.create", "zfs.snapshot.create", "pool.snapshot.clone", "zfs.snapshot.clone"}
+# Eigen logger van de websocket-server, vast op INFO (nooit DEBUG-frames met de sleutel).
+WS_LOGGER = logging.getLogger("fakes.fake_truenas.websockets")
+WS_LOGGER.setLevel(logging.INFO)
+
+
+def mag_schrijven(profile: KeyProfile, method: str) -> bool:
+    """Of dit profiel deze schrijf- of configuratiemethode mag aanroepen (rollen per methode, R-TECH-1)."""
+    if not profile.write:
+        return False
+    roles = set(profile.roles)
+    if "FULL_ADMIN" in roles:
+        return True
+    if method in APP_WRITE_METHODS:
+        return "APPS_WRITE" in roles
+    if method in SNAPSHOT_WRITE_METHODS:
+        return "SNAPSHOT_WRITE" in roles
+    return False
 
 
 class FakeCallError(Exception):
@@ -569,7 +595,12 @@ class FakeTrueNAS:
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ctx.load_cert_chain(str(self._cert), str(self._key))
         self._server = await serve(
-            self._handler, "127.0.0.1", self.port, ssl=ctx, process_request=self._process_request
+            self._handler,
+            "127.0.0.1",
+            self.port,
+            ssl=ctx,
+            process_request=self._process_request,
+            logger=WS_LOGGER,
         )
         self.port = self._server.sockets[0].getsockname()[1] if self._server.sockets else self.port
 
@@ -683,7 +714,9 @@ class FakeTrueNAS:
                     continue
                 if method in CONFIG_METHODS and not profile.write:
                     self.mutations.append("app.config(geheimen)")
-                if method in profile.deny or (method in WRITE_METHODS | CONFIG_METHODS and not profile.write):
+                if method in profile.deny or (
+                    method in WRITE_METHODS | CONFIG_METHODS and not mag_schrijven(profile, method)
+                ):
                     await self._reply(
                         ws,
                         mid,

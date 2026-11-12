@@ -424,7 +424,15 @@ class Uitvoerder:
         if actie is None:  # pragma: no cover - check_decision geeft dan altijd een weigering
             return fout(403, "actie_niet_toegestaan", "Deze actie staat niet op de allowlist.")
         link = self.naslink.read()
-        if link.get("_onleesbaar") or link.get("key") is None:
+        if link.get("_onleesbaar"):
+            # Onleesbare sleutelopslag (rechten, eigenaar, symlink, schema): dezelfde code als een sleutel die niet te
+            # openen is (ADR-0030 besluit 13, docs/EXECUTION_REQUEST.md), nooit "niet ingesteld" (R-TECH-3).
+            return fout(
+                503,
+                "schrijfsleutel_onleesbaar",
+                "De opgeslagen schrijfsleutel is onleesbaar; er is niets uitgevoerd.",
+            )
+        if link.get("key") is None:
             return fout(
                 501,
                 "capability_unavailable",

@@ -3,11 +3,32 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from executor.config import get_settings
+
+
+def log_config() -> dict[str, Any]:
+    """Logconfiguratie voor ``uvicorn.run``: die van uvicorn, plus een eigen handler voor de logger ``executor`` op INFO
+    (stdout, los van root; ``propagate`` uit). Zo komt de regel per afgehandelde poging (code + trace-ID, contract 1.3
+    §3.7/§3.9) in de app-log; uvicorn configureert alleen zijn eigen loggers (R-VEILIG-3, S-P2-020). Root en
+    websockets blijven ongemoeid (nooit DEBUG); de TrueNAS-verbinding heeft een eigen logger vast op INFO."""
+    from uvicorn.config import LOGGING_CONFIG
+
+    cfg = copy.deepcopy(LOGGING_CONFIG)
+    cfg["formatters"]["executor"] = {"format": "%(levelname)s:     %(name)s: %(message)s"}
+    cfg["handlers"]["executor"] = {
+        "class": "logging.StreamHandler",
+        "formatter": "executor",
+        "stream": "ext://sys.stdout",
+        "level": "INFO",
+    }
+    cfg["loggers"]["executor"] = {"handlers": ["executor"], "level": "INFO", "propagate": False}
+    return cfg
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             host=s.host,
             port=s.port,
             log_level=s.log_level,
+            log_config=log_config(),
             access_log=False,
             server_header=False,
             # Nooit X-Forwarded-* vertrouwen (§3.7: bron-IP = adres van de TCP-verbinding, schema = de verbinding).
