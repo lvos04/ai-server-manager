@@ -336,6 +336,25 @@ def test_herstelverwijzing_wijst_naar_een_bestaande_kop_met_beide_toestanden() -
                 assert woord in sectie, f"{waar}: kop '{kop}' in CUSTOM_APP.md noemt '{woord}' niet"
 
 
+ONBOARDING = REPO / "apps" / "web" / "src" / "app" / "onboarding"
+
+
+def test_installatiedocument_verwijst_voor_de_koppelcode_naar_het_hub_scherm() -> None:
+    """R-ONTWERP-5: stap 3 van CUSTOM_APP.md ("Koppelen met de Hub") stuurt de beheerder voor de koppelcode naar de
+    bestaande Hub-pagina, net als de kop 'Herstel', en niet naar /api/docs (die stuurt geen X-CSRF-Token mee, kop 5).
+    De genoemde knop, pagina en link bestaan in de Hub-UI."""
+    stap3 = _sectie(HERSTELDOC.read_text(encoding="utf-8"), "3. Formulier 2 — executor (`ai-server-manager-executor`)")
+    vlak = " ".join(stap3.split())
+    assert "/api/docs" not in vlak, "stap 3 verwijst voor de koppelcode nog naar /api/docs"
+    for tekst, bestand in (
+        ("Koppelcode voor de executor maken", ONBOARDING / "executor" / "ExecutorKoppelen.tsx"),
+        ("Executor installeren en koppelen", ONBOARDING / "executor" / "page.tsx"),
+        ("Uitleg executor", ONBOARDING / "OnboardingScreen.tsx"),
+    ):
+        assert tekst in vlak, f"stap 3 noemt '{tekst}' niet"
+        assert tekst in bestand.read_text(encoding="utf-8"), f"'{tekst}' staat niet in {bestand.name}"
+
+
 def test_niet_gekoppeld_heeft_eigen_toon_en_formulier_met_verplichte_velden() -> None:
     html = executor_page(versie="0.1.0", link={"state": "nooit_gekoppeld"}, ready_checks=READY, csrf="abc", now=NOW)
     assert 'pil-niet-gekoppeld"><svg aria-hidden="true"><use href="#i-niet-gekoppeld"/></svg>Niet gekoppeld' in html

@@ -131,11 +131,9 @@ nodig: de executor koppelt nooit met een `HUB_ENROLLMENT_TOKEN`, alleen met een 
 
 **Koppelen met de Hub (eenmalig):**
 
-1. Maak in de Hub een **koppelcode voor `ai-server-manager-executor`** (30 minuten geldig). De Hub toont daarbij de
-   **Hub-vingerafdruk** (`XXXX-XXXX-XXXX-XXXX`). Zolang het scherm "Diensten" in de Hub-UI er nog niet is (dat wacht
-   op de ontwerpstap, contract §13), maak je de code via de API-documentatie van de Hub (`/api/docs`,
-   `POST /api/v1/services/pairing-codes` met `{"app_id": "ai-server-manager-executor"}`) terwijl je als beheerder bent
-   ingelogd.
+1. Maak in de Hub een **koppelcode voor `ai-server-manager-executor`** (30 minuten geldig) op de pagina **Executor
+   installeren en koppelen** (Onboarding → *Uitleg executor*) met **Koppelcode voor de executor maken** (alleen een
+   beheerder). De Hub toont daarbij de **Hub-vingerafdruk** (`XXXX-XXXX-XXXX-XXXX`).
 2. Open de statuspagina van de executor en vul **Hub-adres** (`http://<NAS-adres>:<hostpoort van de Hub>`),
    **koppelcode** en **Hub-vingerafdruk** in → **Koppelen**. De executor controleert de vingerafdruk zelf; klopt die
    niet, dan slaat hij niets op.
