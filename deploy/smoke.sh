@@ -29,6 +29,20 @@ expect() {  # expect <omschrijving> <tekst> <patroon>  (geen grep -q in pipes: p
   if ! printf '%s' "$2" | grep -F -- "$3" >/dev/null; then echo "FOUT: $1: '$3' niet gevonden in: $2" >&2; exit 1; fi
   echo "ok: $1"
 }
+# Beleid (ADR-0030 besluit 2; S-P2-010, R-TECH-2): de Hub-image, de executor-image en policy/ in de repo geven dezelfde
+# policy_hash. Verschillen Hub en executor, dan weigert de executor alles (policy_hash_verschilt); verschilt een image
+# van de repo, dan draait er ander beleid dan wat in de repo staat (bv. een vierde yaml die de Dockerfile niet kopieert).
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HASH_PY='from asm_policy import load_policy; print(load_policy().hash)'
+hub_hash="$(docker exec -u 568 asm-smoke-hub python -c "$HASH_PY")"
+exec_hash="$(docker exec -u 568 asm-smoke-exec python -c "$HASH_PY")"
+repo_hash="$(docker run --rm --network none -v "$REPO_DIR/policy:/repo-policy:ro" "$EXEC_IMAGE" python -c \
+  'from pathlib import Path; from asm_policy import policy_hash; print(policy_hash(Path("/repo-policy")))')"
+echo "policy_hash: hub $hub_hash, executor $exec_hash, repo $repo_hash"
+[[ "$hub_hash" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FOUT: geen geldige policy_hash in de Hub-image" >&2; exit 1; }
+test "$hub_hash" = "$exec_hash" || { echo "FOUT: policy_hash van de Hub- en de executor-image verschilt" >&2; exit 1; }
+test "$hub_hash" = "$repo_hash" || { echo "FOUT: policy_hash van de images verschilt van policy/ in de repo" >&2; exit 1; }
+echo "ok: policy_hash gelijk in de Hub-image, de executor-image en policy/ in de repo"
 expect "hub healthz" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/healthz)" '"status":"ok"'
 expect "hub readyz" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/readyz)" '"status":"ready"'
 expect "setup vereist" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/setup/status)" '"setup_vereist":true'
