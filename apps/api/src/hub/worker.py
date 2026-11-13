@@ -13,6 +13,7 @@ from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
 from hub import logsink
@@ -23,6 +24,7 @@ from hub.config import Settings
 from hub.events.envelope import emit
 from hub.inventory.store import latest_run, prune_runs, save_run
 from hub.keys import KeyRing
+from hub.logfilter import db_error_text
 from hub.models import (
     EnrollmentGrant,
     IdempotencyRecord,
@@ -208,7 +210,10 @@ def run_once(
                 job.status = "done" if result.get("status") not in ("failed",) else "failed"
             except Exception as exc:
                 db.rollback()
-                log.exception("job %s mislukt", job.id)
+                if isinstance(exc, DBAPIError):  # KLEIN-33: zonder de DETAIL-regel van PostgreSQL
+                    log.error("job %s mislukt: %s", job.id, db_error_text(exc))
+                else:
+                    log.exception("job %s mislukt", job.id)
                 result = {"status": "failed", "reason_code": "exception", "fout": type(exc).__name__}
                 job = db.get(Job, job.id) or job
                 job.status = "failed"
@@ -240,6 +245,10 @@ def main(settings: Settings) -> int:
         try:
             for j in run_once(factory, settings, vault, keyring=keyring):
                 log.info("job %s (%s): %s %s", j["id"], j["kind"], j.get("status"), j.get("reason_code") or "")
+        except DBAPIError as exc:  # KLEIN-33: zonder de DETAIL-regel van PostgreSQL
+            log.error(
+                "worker-ronde mislukt: %s; volgende ronde over %.0f s", db_error_text(exc), settings.worker_poll_seconds
+            )
         except Exception:
             log.exception("worker-ronde mislukt; volgende ronde over %.0f s", settings.worker_poll_seconds)
         stop.wait(settings.worker_poll_seconds)

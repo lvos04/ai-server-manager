@@ -26,6 +26,7 @@ from typing import Any
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from hub.logfilter import DbDetailFilter
 from hub.models import EnrollmentGrant, LogEntry, ServiceToken, VaultSecret, WebSession
 from hub.redact import SecretMatcher, redact_log_text, redact_log_value
 from hub.timeutil import utcnow
@@ -244,6 +245,7 @@ def install(
     factory: sessionmaker[Session], bron: str, vault_loader: Any = None, level: str = "warning"
 ) -> DbLogHandler:
     handler = DbLogHandler(factory, bron, vault_loader, level=getattr(logging, level.upper(), logging.WARNING))
+    handler.addFilter(DbDetailFilter())  # KLEIN-33: vangnet tegen de DETAIL-regel van PostgreSQL
     logging.getLogger("hub").addHandler(handler)
     return handler
 

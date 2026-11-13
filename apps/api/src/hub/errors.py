@@ -9,7 +9,10 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from hub.logfilter import db_error_text
 
 log = logging.getLogger("hub.errors")
 
@@ -75,7 +78,11 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
-        log.exception("onverwachte fout (trace_id=%s)", trace_id_of(request))
+        if isinstance(exc, DBAPIError):
+            # KLEIN-33: geen str(exc)/traceback; daarin staat de DETAIL-regel van PostgreSQL (sleutelwaarde of rij)
+            log.error("onverwachte fout (trace_id=%s): %s", trace_id_of(request), db_error_text(exc))
+        else:
+            log.exception("onverwachte fout (trace_id=%s)", trace_id_of(request))
         return JSONResponse(
             error_body(request, "internal_error", "Interne fout; de details staan in de app-log onder deze trace_id."),
             status_code=500,

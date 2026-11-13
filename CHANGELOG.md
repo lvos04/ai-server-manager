@@ -21,6 +21,7 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   (R-VEILIG-3, R-VEILIG-4).
 - De web-E2E verstuurt nu ook het sleutelformulier (twee stappen) en "Sleutel vervangen" in Chromium (R-VEILIG-5).
 - Een databasefout zet geen parameterwaarden meer in de fout of de app-log (`hide_parameters=True`; KLEIN-25, V-094).
+- Een onverwachte databasefout zet de DETAIL-regel van PostgreSQL (sleutelwaarde of hele rij) niet meer in de app-log: de algemene foutafhandeling van API en worker logt alleen soort, sqlstate, constraint en tabel, en een logfilter haalt DETAIL ook elders weg (KLEIN-33).
 - Nog open (wacht op een besluit over het Peil-sjabloon): opnieuw koppelen na ontkoppelen met sleutelbewijs
   (R-VEILIG-1) en een eigen knop "Vrijgeven" (R-TECH-5).
 

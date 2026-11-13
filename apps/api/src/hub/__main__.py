@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from hub.config import get_settings
+from hub.logfilter import install_log_filter, uvicorn_log_config
 
 
 def _logging(level: str) -> None:
@@ -18,6 +19,7 @@ def _logging(level: str) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         stream=sys.stdout,
     )
+    install_log_filter()  # KLEIN-33: vangnet tegen de DETAIL-regel van PostgreSQL
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -46,6 +48,7 @@ def cmd_api(args: argparse.Namespace) -> int:
         proxy_headers=True,
         forwarded_allow_ips=s.forwarded_allow_ips,
         log_level=s.log_level,
+        log_config=uvicorn_log_config(),
         access_log=False,
         server_header=False,
     )
