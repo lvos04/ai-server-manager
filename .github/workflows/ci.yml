@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      ASF_COMMIT: 7b3159d168b1e8b575e220068bb3df50ed0203ad
+      ASF_COMMIT: 77ea6296011aae7fcbe7c6a757b404ff762aebb2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
