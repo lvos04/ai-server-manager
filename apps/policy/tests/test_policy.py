@@ -1303,6 +1303,32 @@ def test_losse_teksten_in_lijsten_tegenproef_en_kluisverwijzingen() -> None:
     assert _codes(_catalogus({"args": ["use_all_gpus=true"]}, gpu="intel_render")) == []
 
 
+HOST_NETWORK_VORMEN = [
+    pytest.param({"network": {"host_network": True}}, id="object"),
+    pytest.param({"args": ["--host-network"]}, id="vlag"),
+]
+
+
+@pytest.mark.parametrize("values", HOST_NETWORK_VORMEN)
+@pytest.mark.parametrize(
+    "reden",
+    [
+        pytest.param(" ", id="spatie"),
+        pytest.param("kort", id="kort"),
+        pytest.param("  negentien  ", id="9_tekens_met_spaties"),
+    ],
+)
+def test_host_network_reden_te_kort(values: dict[str, Any], reden: str) -> None:
+    """S-P2-010 (mutant MJ): een lege of te korte reden (minder dan 10 tekens na strip) telt niet als reden."""
+    assert "host_network_zonder_reden" in _codes(_catalogus(values, host_network_reason=reden))
+
+
+@pytest.mark.parametrize("values", HOST_NETWORK_VORMEN)
+def test_host_network_reden_van_tien_tekens_mag(values: dict[str, Any]) -> None:
+    """Grensgeval: precies 10 tekens na strip is genoeg."""
+    assert _codes(_catalogus(values, host_network_reason="  tien_teken  ")) == []
+
+
 def test_losse_teksten_tot_de_dieptegrens_gezien() -> None:
     """Een losse tekst in een lijst op de diepste toegestane plek wordt gezien; één niveau dieper: ``te_diep_genest``.
     Ook de doorzoeker zelf weigert een lijst dieper dan zijn grens (nooit stil stoppen)."""
