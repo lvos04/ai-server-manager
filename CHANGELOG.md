@@ -20,6 +20,7 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   logt via een eigen logger vast op INFO, zodat websockets-frames met de sleutel nooit in een log komen
   (R-VEILIG-3, R-VEILIG-4).
 - De web-E2E verstuurt nu ook het sleutelformulier (twee stappen) en "Sleutel vervangen" in Chromium (R-VEILIG-5).
+- Een databasefout zet geen parameterwaarden meer in de fout of de app-log (`hide_parameters=True`; KLEIN-25, V-094).
 - Nog open (wacht op een besluit over het Peil-sjabloon): opnieuw koppelen na ontkoppelen met sleutelbewijs
   (R-VEILIG-1) en een eigen knop "Vrijgeven" (R-TECH-5).
 

@@ -52,7 +52,7 @@ def current_revision(db: Session) -> str | None:
 def pending_migrations(url: str) -> bool:
     from sqlalchemy import create_engine
 
-    engine = create_engine(url)
+    engine = create_engine(url, hide_parameters=True)  # geen parameterwaarden in fout of log (V-094)
     try:
         with engine.connect() as conn:
             cur = MigrationContext.configure(conn).get_current_revision()
