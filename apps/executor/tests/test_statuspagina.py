@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from executor.app import FORM_MESSAGES
-from executor.hublink import public_status
+from executor.hublink import ERRORS_NL, public_status
 from executor.statuspagina import TONEN, executor_page, onleesbaar_melding, render, template
 
 DESIGN = Path(__file__).resolve().parents[3] / "design" / "ontwerptaal"
@@ -334,6 +334,24 @@ def test_herstelverwijzing_wijst_naar_een_bestaande_kop_met_beide_toestanden() -
             sectie = _sectie(doc, kop)
             for woord in ("koppelstatus_onleesbaar", "sleutelopslag_onleesbaar", "Ontkoppelen van de Hub", "Host Path"):
                 assert woord in sectie, f"{waar}: kop '{kop}' in CUSTOM_APP.md noemt '{woord}' niet"
+
+
+def test_melding_ingetrokken_door_hub_noemt_de_weg_op_de_executorpagina() -> None:
+    """KLEIN-60 (A-16, vervolgpunt R-ONTWERP S-P2-020): na een intrekking door de Hub gaat opnieuw koppelen bij de
+    executor niet "via de Hub" maar via 'Ontkoppelen van de Hub' op deze pagina, met de huidige TrueNAS-schrijfsleutel
+    als bewijs (contract §3.9, uitzondering op §3.7). Zonder sleutel verwijst de melding naar een bestaande kop."""
+    tekst = public_status({"state": "ingetrokken", "last_error": {"code": "ingetrokken_door_hub"}})["last_error"][
+        "melding"
+    ]
+    assert tekst == ERRORS_NL["ingetrokken_door_hub"]
+    assert "gaat via de Hub" not in tekst and "via de Hub." not in tekst
+    for woord in ("ingetrokken", "Ontkoppelen van de Hub", "TrueNAS-schrijfsleutel"):
+        assert woord in tekst, f"melding noemt '{woord}' niet"
+    koppen = KOPVERWIJZING.findall(tekst)
+    assert koppen, "geen verwijzing naar een kop in deploy/truenas/CUSTOM_APP.md voor het geval zonder sleutel"
+    doc = HERSTELDOC.read_text(encoding="utf-8")
+    for kop in koppen:
+        assert "Nieuwe datamap" in _sectie(doc, kop), f"kop '{kop}' beschrijft geen nieuwe datamap"
 
 
 ONBOARDING = REPO / "apps" / "web" / "src" / "app" / "onboarding"

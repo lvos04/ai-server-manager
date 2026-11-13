@@ -78,7 +78,10 @@ ERRORS_NL = {
     "enroll_endpoint_ontbreekt": "Deze Hub-versie kent aanmelden niet.",
     "rate_limited": "Te veel pogingen; wacht even en probeer het dan opnieuw.",
     "koppelen_onderbroken": "Het koppelen is onderbroken door een herstart. Voer de koppelcode opnieuw in.",
-    "ingetrokken_door_hub": "De Hub heeft deze koppeling ingetrokken; opnieuw koppelen gaat via de Hub.",
+    # Bij de executor niet "via de Hub": ontkoppelen en opnieuw koppelen gaan op deze pagina (§3.9, KLEIN-60).
+    "ingetrokken_door_hub": "De Hub heeft deze koppeling ingetrokken; de executor voert niets uit. Opnieuw koppelen "
+    "kan alleen na 'Ontkoppelen van de Hub' op deze pagina, met de huidige TrueNAS-schrijfsleutel als bewijs. Dat blok "
+    f"staat er alleen als de sleutel is ingesteld. Is er geen sleutel? {HERSTEL}",
     "sleutelrotatie_niet_toegepast": "De Hub meldt een sleutelrotatie die deze versie nog niet kan toepassen; "
     "opnieuw koppelen via de Hub.",
 }

@@ -16,6 +16,7 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
+from html import unescape
 from pathlib import Path
 from typing import Any
 
@@ -278,7 +279,7 @@ def test_koppelen_na_eerste_koppeling_geweigerd_ook_met_geldige_formuliercode(
     link_file = ex_settings.secrets_dir / "hub-link.json"
     linked = json.loads(link_file.read_text())
     # Ook na intrekken (first_linked_at blijft staan) geen formulier en geen herkoppelen via de statuspagina.
-    from executor.hublink import HubLinkStore
+    from executor.hublink import ERRORS_NL, HubLinkStore
 
     with HubLinkStore(ex_settings.secrets_dir).update() as link:
         link.update(
@@ -287,7 +288,10 @@ def test_koppelen_na_eerste_koppeling_geweigerd_ook_met_geldige_formuliercode(
             last_error={"code": "ingetrokken_door_hub", "at": "x"},
         )
     page = late.get("/")
-    assert 'name="csrf"' not in page.text and "gaat via de Hub" in page.text
+    assert 'name="csrf"' not in page.text
+    # De melding wijst de weg van de executor (§3.9): Ontkoppelen van de Hub op deze pagina, met de schrijfsleutel.
+    melding = ERRORS_NL["ingetrokken_door_hub"]
+    assert melding in unescape(page.text) and "Ontkoppelen van de Hub" in melding and "gaat via de Hub" not in melding
     r = late.post("/koppelen", data=form, headers={"Origin": BASE})  # met de nog geldige formuliercode
     assert r.status_code == 409 and "al eens gekoppeld" in r.text
     after_revoke = json.loads(link_file.read_text())

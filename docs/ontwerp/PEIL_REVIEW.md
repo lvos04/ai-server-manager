@@ -408,10 +408,12 @@ staat dan de rij "TrueNAS-schrijfsleutel · Onleesbaar". De melding zei dus iets
   alleen "Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub)". Die tekst verschijnt bij
   een formulierverzoek dat de executor met deze code weigert, en in `last_error` van de koppelstatus. Zonder bruikbare
   sleutel klopt hij niet; voorstel: dezelfde tweedeling als `onleesbaar_melding`.
+  **Opgelost in `cfab0af`** (aantekening KLEIN-60, 13 november 2026).
 - **O-S2-005-6 (klein):** `deploy/truenas/CUSTOM_APP.md`, stap 3, "Koppelen met de Hub", punt 1 zegt nog dat het scherm
   "Diensten" er niet is en dat je de koppelcode via `/api/docs` maakt; kop 5 zegt dat `/api/docs` geen
   `X-CSRF-Token` meestuurt, en de kop "Herstel" verwijst (terecht) naar de Hub-pagina "Executor installeren en
   koppelen". Punt 1 is verouderd (V-104).
+  **Opgelost in `33e5cd1`** (aantekening KLEIN-60, 13 november 2026).
 
 ## Stap S-P2-010: runbookteksten en weigerteksten van het beleid (12 november 2026)
 
@@ -475,6 +477,8 @@ letterlijk; de tests controleren de codes (die zijn gelijk gebleven).
   voorstellen en goedkeuren volgen later in fase P2"), in de webstap die die schermen bouwt.
 - **O-S2-010-2 (klein):** `docs/RUNBOOKS.md` heet "Operator-runbooks" en zegt "executor-allowlist"; Peil §11.1 zegt
   "stappenplan" en "lijst met toegestane acties". Ouder dan deze stap (`export.py`, kop en intro).
+  **Opgelost in KLEIN-60** (13 november 2026): kop "Stappenplannen" en "lijst met toegestane acties" in `export.py`;
+  `docs/RUNBOOKS.md` opnieuw gemaakt met `make runbooks`.
 - **O-S2-010-3 (klein):** de code `catalogus_waarde_verboden` kan ook bij de standaard Custom App (ix-app) komen
   (`_deep_forbidden` toetst "unconfined" en de losse teksten in een lijst ook bij `ix_app`); de codenaam suggereert
   alleen catalogusapps. Een code is API; niet gewijzigd.

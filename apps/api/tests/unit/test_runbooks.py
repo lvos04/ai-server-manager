@@ -157,3 +157,13 @@ def test_runbooks_md_actueel() -> None:
 
     out = Path(__file__).resolve().parents[4] / "docs" / "RUNBOOKS.md"
     assert export(out, check=True) == 0, "draai `make runbooks`"
+
+
+def test_runbooks_md_gebruikt_de_woorden_van_peil() -> None:
+    """KLEIN-60 (A-20, O-S2-010-2): kop en intro van ``docs/RUNBOOKS.md`` volgen Peil §11.1: "stappenplan" (niet:
+    runbook) en "lijst met toegestane acties" (niet: allowlist)."""
+    from hub.runbooks.export import render
+
+    kop = render().split("\n## ", 1)[0]
+    assert "Operator-runbooks" not in kop and "allowlist" not in kop
+    assert kop.startswith("# Stappenplannen") and "lijst met toegestane acties" in kop

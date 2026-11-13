@@ -1,12 +1,12 @@
-# Operator-runbooks (B09-006)
+# Stappenplannen (B09-006)
 
 Gegenereerd uit `apps/api/src/hub/runbooks/catalogus.py` (`python -m hub export-runbooks`); niet met de hand
 bewerken. `runbook_hash`: `8cdd9fc1ca31694230654a3ab27b522bc449a8849f979663cf90c7ff9d0b8bf0`.
 
 Elke stap is getypeerd: **Hub toont** (alleen lezen), **Zelf doen** (in een bestaande UI, nooit een
-terminal) of **Voorstel** (een actie uit de executor-allowlist van contract §8 met minimale risicoklasse; de
-Hub voert niets zelf uit — uitvoering via policy-engine, goedkeuring en executor volgt in P2). Veilige modus:
-faalt een incident telkens opnieuw, dan stelt de Hub geen herstart meer voor.
+terminal) of **Voorstel** (een actie uit de lijst met toegestane acties van de executor, contract §8, met
+minimale risicoklasse; de Hub voert niets zelf uit — uitvoering via policy-engine, goedkeuring en executor
+volgt in P2). Veilige modus: faalt een incident telkens opnieuw, dan stelt de Hub geen herstart meer voor.
 
 ## Dienst offline of crasht (`service_offline`)
 

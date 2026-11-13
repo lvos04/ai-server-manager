@@ -20,15 +20,15 @@ SOORT = {"lezen": "Hub toont", "handmatig": "Zelf doen", "voorstel": "Voorstel"}
 
 def render() -> str:
     lines = [
-        "# Operator-runbooks (B09-006)",
+        "# Stappenplannen (B09-006)",
         "",
         "Gegenereerd uit `apps/api/src/hub/runbooks/catalogus.py` (`python -m hub export-runbooks`); niet met de hand",
         f"bewerken. `runbook_hash`: `{runbook_hash()}`.",
         "",
         "Elke stap is getypeerd: **Hub toont** (alleen lezen), **Zelf doen** (in een bestaande UI, nooit een",
-        "terminal) of **Voorstel** (een actie uit de executor-allowlist van contract §8 met minimale risicoklasse; de",
-        "Hub voert niets zelf uit — uitvoering via policy-engine, goedkeuring en executor volgt in P2). Veilige modus:",
-        "faalt een incident telkens opnieuw, dan stelt de Hub geen herstart meer voor.",
+        "terminal) of **Voorstel** (een actie uit de lijst met toegestane acties van de executor, contract §8, met",
+        "minimale risicoklasse; de Hub voert niets zelf uit — uitvoering via policy-engine, goedkeuring en executor",
+        "volgt in P2). Veilige modus: faalt een incident telkens opnieuw, dan stelt de Hub geen herstart meer voor.",
         "",
     ]
     for r in RUNBOOKS:
