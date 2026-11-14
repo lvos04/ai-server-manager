@@ -102,8 +102,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    andere schrijfwijze) die niet leeg is (alleen afwezig, `null` of `{}` is leeg) geeft `opslag_verboden`. Geen
    geldige payload stuurt zo'n config mee (appstore-en-fork vertaalt per regel alleen de config van het eigen type).
    Een witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps
-   (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten. `policy/*.yaml` en de `policy_hash` veranderen hierdoor
-   niet. NIET GEVALIDEERD (echte NAS).
+   (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten; A3 en A6 besluit de latere aanvulling KLEIN-78 hieronder.
+   `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet. NIET GEVALIDEERD (echte NAS).
    **Opslag: datasetnaam van een ixVolume en SMB-wachtwoord (aanvulling 2026-11-14, KLEIN-78; KLEIN-75 A3 en A6;
    besluit van de regisseur, dicht bij twijfel).** TrueNAS maakt het dataset van een ixVolume aan als
    `<docker-dataset>/app_mounts/<app>/<dataset_name>` en controleert de naam nergens als pad (middleware ece9d19,
