@@ -44,6 +44,13 @@ van type cifs en elke niet-lege ``cifs_config``, ook in een andere schrijfwijze 
 kluisverwijzingen invult (herstel R-VEILIG-1; ADR-0030 besluit 6 en 28). Afgeleid uit de bron; NIET GEVALIDEERD
 (echte NAS).
 
+Opslag (KLEIN-80; KLEIN-75 A2): bij de standaard Custom App geldt een witte lijst per opslagregel en per type-config,
+precies het formulier van ix-app 1.4.8 (:data:`IX_OPSLAGREGEL_VELDEN`, :data:`IX_OPSLAG_CONFIG_VELDEN`); elke andere
+sleutel, ook ``create_host_path``, ``propagation``, ``auto_permissions`` en tmpfs ``exec``/``mode``/``uid``/``gid``,
+geeft ``onbekend_veld``. ``read_only`` is true of false, ``tmpfs_config.size`` een geheel getal van minstens 1. Een
+nieuw veld in een latere ix-app-versie wordt geweigerd tot de lijst is bijgewerkt. Catalogusapps vallen hier niet
+onder (S-P2-050). Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -640,6 +647,49 @@ _SMB_VERBODEN = (
     "SMB-opslag (type cifs of cifs_config) is bij een catalogusapp nog niet toegestaan: het wachtwoord kan nog niet "
     "als kluisverwijzing worden ingevuld en zou in klare tekst in de mountopties en de opgeslagen waarden komen"
 )
+# Witte lijst per opslagregel en per type-config van de standaard Custom App (KLEIN-80; KLEIN-75 A2, besluit van de
+# regisseur, dicht bij twijfel): precies de velden die het formulier van ix-app 1.4.8 toont (truenas/apps f142a16,
+# ``ix-dev/stable/ix-app/questions.yaml``, ``storage[]``). De middleware van TrueNAS laat onbekende sleutels door
+# (``extra='allow'``) en de bibliotheek (library 2.3.18) gebruikt er een aantal die het formulier niet toont:
+# ``create_host_path`` (maakt een hostpad aan), ``propagation`` (mount-propagatie), ``auto_permissions`` (rechten
+# zetten) en ``exec``/``mode``/``uid``/``gid`` van tmpfs. De policy beoordeelt die niet en geen geldige payload gebruikt
+# ze (appstore-en-fork, ``IxStorage``), dus ze vallen buiten de lijst. Elke andere sleutel (exacte naam, zoals TrueNAS
+# hem leest) geeft ``onbekend_veld``. Velden op de lijst houden hun eigen regel: ``acl`` geeft ``acl_verboden``,
+# ``path`` gaat door de hostpadregel, ``dataset_name`` door de naamregel, en een niet-lege ``cifs_config`` of
+# ``nfs_config`` (type cifs/nfs is verboden) is ``opslag_verboden``. Gevolg (bewust): een nieuw veld in een latere
+# ix-app-versie wordt geweigerd tot deze lijst is bijgewerkt. Gedrag van TrueNAS: afgeleid uit de bron (truenas/apps
+# f142a16, middleware ece9d19); NIET GEVALIDEERD (echte NAS).
+IX_OPSLAGREGEL_VELDEN = frozenset(
+    {"type", "read_only", "mount_path", "host_path_config", "ix_volume_config", "cifs_config", "nfs_config",
+     "tmpfs_config"}
+)  # fmt: skip
+IX_OPSLAG_CONFIG_VELDEN = {
+    "host_path_config": frozenset({"acl_enable", "acl", "path"}),
+    "ix_volume_config": frozenset({"acl_enable", "dataset_name", "acl_entries"}),
+    "tmpfs_config": frozenset({"size"}),
+}
+
+
+def _ix_opslag_witte_lijst(st: Mapping[str, Any], sw: str, eigen: str | None) -> list[Fout]:
+    """De witte lijst van één opslagregel van de standaard Custom App (KLEIN-80; zie :data:`IX_OPSLAGREGEL_VELDEN`):
+    onbekende sleutels op de regel en in elke type-config die een object is (``onbekend_veld``); de config van het
+    eigen type is een object (``type``); ``read_only`` is true of false (``type``); ``tmpfs_config.size`` is een
+    geheel getal van minstens 1 MiB (``bereik``; bibliotheek en appstore-en-fork weigeren minder)."""
+    out = _only(st, sw, set(IX_OPSLAGREGEL_VELDEN))
+    if "read_only" in st:
+        out += _bool(st["read_only"], f"{sw}.read_only")
+    for k, velden in IX_OPSLAG_CONFIG_VELDEN.items():
+        cfg = st.get(k)
+        if isinstance(cfg, Mapping):
+            out += _only(cfg, f"{sw}.{k}", set(velden))
+        elif k == eigen and cfg is not None:
+            out.append(_f(f"{sw}.{k}", "type", "verwacht een object"))
+    tmpfs = st.get("tmpfs_config")
+    if isinstance(tmpfs, Mapping) and "size" in tmpfs:
+        size = tmpfs["size"]
+        if type(size) is not int or size < 1:
+            out.append(_f(f"{sw}.tmpfs_config.size", "bereik", "geheel getal van minstens 1 (MiB)"))
+    return out
 
 
 def _ix_volume_naam(v: Any, where: str) -> list[Fout]:
@@ -845,6 +895,7 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
                     _f(f"{sw}.mount_path", "mount_verboden", "absoluut pad in de container, niet / of een systeempad")
                 )
             eigen = EIGEN_OPSLAG_CONFIG.get(typ) if isinstance(typ, str) else None
+            out += _ix_opslag_witte_lijst(st, sw, eigen)
             # Een config van een ander type, met inhoud, wordt geweigerd (KLEIN-76, R-VEILIG-1; dicht bij twijfel):
             # TrueNAS laat hem door en normaliseert een aanwezige ix_volume_config (dataset) of host_path_config.acl
             # (ACL) ook bij een ander type. Leeg is alleen afwezig, null of {}. Gedrag van TrueNAS: afgeleid uit de

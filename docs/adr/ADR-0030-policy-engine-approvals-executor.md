@@ -102,7 +102,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    andere schrijfwijze) die niet leeg is (alleen afwezig, `null` of `{}` is leeg) geeft `opslag_verboden`. Geen
    geldige payload stuurt zo'n config mee (appstore-en-fork vertaalt per regel alleen de config van het eigen type).
    Een witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps
-   (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten; A3 en A6 besluit de latere aanvulling KLEIN-78 hieronder.
+   (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten; A3 en A6 besluit de latere aanvulling KLEIN-78 hieronder,
+   A2 de latere aanvulling KLEIN-80.
    `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet. NIET GEVALIDEERD (echte NAS).
    **Opslag: datasetnaam van een ixVolume en SMB-wachtwoord (aanvulling 2026-11-14, KLEIN-78; KLEIN-75 A3 en A6;
    besluit van de regisseur, dicht bij twijfel).** TrueNAS maakt het dataset van een ixVolume aan als
@@ -119,7 +120,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    elke andere waarde gaf de code `geheim_in_klare_tekst`. Die wachtwoordregel is op dezelfde dag vervangen door de
    herstelregel hieronder. Een ongeldige `vault://`-tekst houdt `vault_ref_ongeldig`. Andere wachtwoordvelden van
    catalogusapps vallen hier niet onder (KLEIN-75 A6 optie a is niet gekozen). Witte lijst per opslagregel, ACL op een
-   ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven open. `policy/*.yaml` en de `policy_hash` veranderen niet.
+   ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven open (A2 besluit de latere aanvulling KLEIN-80 hieronder).
+   `policy/*.yaml` en de `policy_hash` veranderen niet.
    NIET GEVALIDEERD (echte NAS).
    **Opslag: SMB bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-78 herstel R-VEILIG-1; KLEIN-75 A6 optie
    b, besluit van de regisseur, dicht bij twijfel).** De wachtwoordregel hierboven was te omzeilen: TrueNAS bouwt de
@@ -137,6 +139,25 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    het SMB-wachtwoordveld het geheim van een andere app naar een zelfgekozen SMB-server sturen), en (2) komma-injectie
    in de CIFS-mountopties ook buiten wachtwoorden (bv. `username: "gast,uid=0"`) dichtzetten met een witte lijst per
    catalogusapp. `policy/*.yaml` en de `policy_hash` veranderen niet. NIET GEVALIDEERD (echte NAS).
+   **Opslag: witte lijst per opslagregel van de standaard Custom App (aanvulling 2026-11-14, KLEIN-80; KLEIN-75 A2;
+   besluit van de regisseur, dicht bij twijfel).** De middleware van TrueNAS laat onbekende sleutels door
+   (`extra='allow'`) en de bibliotheek (library 2.3.18) gebruikt er een aantal die het formulier niet toont. Daarom
+   geldt bij de standaard Custom App (ix-app) een witte lijst, precies de velden van het formulier van ix-app 1.4.8
+   (truenas/apps f142a16, `ix-dev/stable/ix-app/questions.yaml`): een opslagregel kent alleen `type`, `read_only`,
+   `mount_path`, `host_path_config`, `ix_volume_config`, `cifs_config`, `nfs_config` en `tmpfs_config`;
+   `host_path_config` alleen `acl_enable`, `acl` en `path`; `ix_volume_config` alleen `acl_enable`, `dataset_name` en
+   `acl_entries`; `tmpfs_config` alleen `size`. Elke andere sleutel (exacte naam), ook in een lege config van een ander
+   type, geeft de bestaande code `onbekend_veld`. Apart beoordeeld en geweigerd, omdat de policy ze niet beoordeelt en
+   geen geldige payload ze gebruikt (appstore-en-fork, `IxStorage`): `create_host_path` (maakt een hostpad aan),
+   `propagation` (mount-propagatie), `auto_permissions` (rechten zetten) en `exec`, `mode`, `uid` en `gid` van tmpfs, met
+   elke waarde. `properties` houdt daarnaast `zfs_eigenschappen_verboden`. Velden op de lijst houden hun eigen regel:
+   `acl` blijft `acl_verboden`, een niet-lege `cifs_config`/`nfs_config` blijft `opslag_verboden`; `acl_enable` en
+   `acl_entries` van een ixVolume staan op de lijst omdat het formulier ze toont, ACL op een ixVolume (KLEIN-75 A4) is
+   hiermee niet besloten. De config van het eigen type is een object (anders `type`), `read_only` is true of false
+   (anders `type`) en `tmpfs_config.size` is een geheel getal van minstens 1 MiB (anders `bereik`; een bovengrens is
+   niet besloten). Gevolg (bewust): een nieuw veld in een latere ix-app-versie wordt geweigerd tot de lijst is
+   bijgewerkt. Catalogusapps vallen hier niet onder (S-P2-050). `policy/*.yaml` en de `policy_hash` veranderen niet;
+   restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -375,6 +396,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   geen verschil. Aanvulling 2026-11-14 (KLEIN-78): hetzelfde restrisico geldt voor de naamregel van
   `ix_volume_config.dataset_name` (`patroon`) en, na het herstel van R-VEILIG-1, voor `opslag_verboden` voor SMB-opslag
   (type cifs, `cifs_config`) bij een catalogusapp (in plaats van `geheim_in_klare_tekst` voor `cifs_config.password`).
+  Aanvulling 2026-11-14 (KLEIN-80): ook de witte lijst per opslagregel van de standaard Custom App (`onbekend_veld`,
+  `type` en `bereik` in een opslagregel) werkt in de executor pas na een nieuw gebouwd en uitgerold executor-image.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie

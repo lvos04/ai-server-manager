@@ -1735,11 +1735,15 @@ def test_mountpoint_is_overal_een_hostpad(pad: str) -> None:
 
 def test_mountpoint_tegenproef_dataset_en_geen_pad() -> None:
     """Tegenproef: een ``mountpoint`` op een dataset onder /mnt/<pool>/<dataset> of zonder "/" (zoals bij de andere
-    hostpad-sleutels) is geen fout; zonder ``properties`` blijft een ixVolume geldig."""
+    hostpad-sleutels) is geen hostpadfout; zonder ``properties`` blijft een ixVolume geldig. Sinds de witte lijst per
+    opslagregel (KLEIN-80, KLEIN-75 A2) is ``mountpoint`` op een opslagregel van de standaard Custom App wel een
+    onbekend veld: dat is daar de enige fout."""
     opslag = install_params()["app_create"]["values"]["storage"][0]
     for waarde in ("/mnt/testpool/apps/demo-app", "legacy"):
         params = install_params(storage=[{**opslag, "mountpoint": waarde}])
-        assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, params) == [], waarde
+        assert [(f.veld, f.code) for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)] == [
+            ("parameters.app_create.values.storage[0].mountpoint", "onbekend_veld")
+        ], waarde
         assert _codes(_catalogus({"opslag": {"mountpoint": waarde}})) == [], waarde
     zonder = {
         "type": "ix_volume",
@@ -2132,3 +2136,143 @@ def test_geldige_catalogusopslag_en_kluisverwijzing_blijven_geldig() -> None:
         ix = [c for _v, c in _paren(install_params(storage=[_smb(extra)]), APP)]
         assert "opslag_verboden" in ix and "geheim_in_klare_tekst" not in ix, ix
     assert "geheim_in_klare_tekst" not in _codes(_catalogus({"storage": {"smb": _smb({"password": "x"})}}))
+
+
+# KLEIN-80 (KLEIN-75 A2; besluit van de regisseur, dicht bij twijfel): bij de standaard Custom App een witte lijst per
+# opslagregel en per type-config, afgeleid uit het formulier van ix-app 1.4.8 (truenas/apps f142a16,
+# ``ix-dev/stable/ix-app/questions.yaml``). De middleware van TrueNAS laat onbekende sleutels door
+# (``extra='allow'``) en de bibliotheek (library 2.3.18) gebruikt er een aantal: ``create_host_path``,
+# ``propagation``, ``auto_permissions``, ``tmpfs_config.exec``/``mode``/``uid``/``gid``. Elke sleutel buiten de lijst
+# geeft ``onbekend_veld``. Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+ST0 = "parameters.app_create.values.storage[0]"
+REGEL_ONBEKEND = [
+    pytest.param("host_path", "foo", 1, id="hostpad.foo"),
+    pytest.param("ix_volume", "volume_config", {}, id="ixvolume.volume_config_leeg"),
+    pytest.param("ix_volume", "volume_config", {"volume_name": "x", "nocopy": True}, id="ixvolume.volume_config"),
+    pytest.param("tmpfs", "nocopy", True, id="tmpfs.nocopy"),
+    pytest.param("host_path", "propagation", "rshared", id="hostpad.propagation_op_de_regel"),
+    pytest.param("host_path", "Read-Only", True, id="hostpad.andere_schrijfwijze_read_only"),
+    pytest.param("ix_volume", "Mount_Path", "/x", id="ixvolume.andere_schrijfwijze_mount_path"),
+    pytest.param("tmpfs", "Host-Path-Config", None, id="tmpfs.andere_schrijfwijze_config_null"),
+    pytest.param("host_path", "_add_docker_socket", True, id="hostpad.intern_sjabloonveld"),
+]
+
+
+def _regel(typ: str) -> dict[str, Any]:
+    """Een geldige opslagregel van type ``typ`` (bij host_path met het eigen pad)."""
+    regel = copy.deepcopy(OPSLAGTYPEN[typ])
+    if typ == "host_path":
+        regel["host_path_config"] = {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}
+    return regel
+
+
+def _ix_paren(regel: dict[str, Any]) -> list[tuple[str, str]]:
+    return [(f.veld, f.code) for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP,
+                                                          install_params(storage=[regel]))]  # fmt: skip
+
+
+@pytest.mark.parametrize(("typ", "sleutel", "waarde"), REGEL_ONBEKEND)
+def test_onbekende_sleutel_in_een_opslagregel_van_de_standaard_custom_app_geweigerd(
+    typ: str, sleutel: str, waarde: Any
+) -> None:
+    """A2: een opslagregel van de standaard Custom App kent alleen ``type``, ``read_only``, ``mount_path`` en de
+    type-configs van het formulier (``host_path_config``, ``ix_volume_config``, ``cifs_config``, ``nfs_config``,
+    ``tmpfs_config``). Elke andere sleutel, ook een andere schrijfwijze, een lege ``volume_config`` of een intern
+    sjabloonveld, geeft ``onbekend_veld``. Vroeger ging zo'n sleutel ongezien door naar TrueNAS."""
+    paren = _ix_paren({**_regel(typ), sleutel: waarde})
+    assert (f"{ST0}.{sleutel}", "onbekend_veld") in paren, paren
+
+
+# De gevaarlijke velden uit de bibliotheek (KLEIN-75 A2): niet in het formulier en niet door de policy beoordeeld, en
+# geen geldige payload gebruikt ze. Ook de onschuldige waarde (``create_host_path: false``, ``propagation:
+# rprivate``, ``exec: false``) wordt geweigerd: de sleutel staat niet op de lijst.
+CONFIG_ONBEKEND = [
+    pytest.param("host_path", "host_path_config", "create_host_path", True, id="hostpad.create_host_path"),
+    pytest.param("host_path", "host_path_config", "create_host_path", False, id="hostpad.create_host_path_false"),
+    pytest.param("host_path", "host_path_config", "propagation", "rshared", id="hostpad.propagation"),
+    pytest.param("host_path", "host_path_config", "propagation", "rprivate", id="hostpad.propagation_standaard"),
+    pytest.param("host_path", "host_path_config", "auto_permissions", True, id="hostpad.auto_permissions"),
+    pytest.param("host_path", "host_path_config", "Path", "/etc", id="hostpad.andere_schrijfwijze_path"),
+    pytest.param("ix_volume", "ix_volume_config", "create_host_path", True, id="ixvolume.create_host_path"),
+    pytest.param("ix_volume", "ix_volume_config", "propagation", "shared", id="ixvolume.propagation"),
+    pytest.param("ix_volume", "ix_volume_config", "auto_permissions", True, id="ixvolume.auto_permissions"),
+    pytest.param("ix_volume", "ix_volume_config", "properties", {}, id="ixvolume.properties"),
+    pytest.param("ix_volume", "ix_volume_config", "foo", "x", id="ixvolume.foo"),
+    pytest.param("tmpfs", "tmpfs_config", "exec", True, id="tmpfs.exec"),
+    pytest.param("tmpfs", "tmpfs_config", "exec", False, id="tmpfs.exec_false"),
+    pytest.param("tmpfs", "tmpfs_config", "mode", "1777", id="tmpfs.mode"),
+    pytest.param("tmpfs", "tmpfs_config", "uid", 0, id="tmpfs.uid"),
+    pytest.param("tmpfs", "tmpfs_config", "gid", 0, id="tmpfs.gid"),
+    pytest.param("tmpfs", "tmpfs_config", "Size", 100, id="tmpfs.andere_schrijfwijze_size"),
+]
+
+
+@pytest.mark.parametrize(("typ", "cfg", "sleutel", "waarde"), CONFIG_ONBEKEND)
+def test_onbekende_sleutel_in_een_type_config_van_de_standaard_custom_app_geweigerd(
+    typ: str, cfg: str, sleutel: str, waarde: Any
+) -> None:
+    """A2: ``host_path_config`` kent alleen ``acl_enable``, ``acl`` en ``path``; ``ix_volume_config`` alleen
+    ``acl_enable``, ``dataset_name`` en ``acl_entries``; ``tmpfs_config`` alleen ``size`` (formulier ix-app 1.4.8).
+    ``create_host_path``, ``propagation``, ``auto_permissions`` en ``exec``/``mode``/``uid``/``gid`` van tmpfs geven
+    ``onbekend_veld``, met elke waarde; ``properties`` houdt daarnaast ``zfs_eigenschappen_verboden``."""
+    regel = _regel(typ)
+    regel[cfg] = {**regel[cfg], sleutel: waarde}
+    paren = _ix_paren(regel)
+    assert (f"{ST0}.{cfg}.{sleutel}", "onbekend_veld") in paren, paren
+    if sleutel == "properties":
+        assert (f"{ST0}.{cfg}.{sleutel}", "zfs_eigenschappen_verboden") in paren, paren
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+def test_onbekende_sleutel_in_een_lege_vreemde_config_geweigerd(typ: str) -> None:
+    """A2: ook een config van een ander type dan de regel krijgt de witte lijst van haar eigen soort (een vreemde
+    config met inhoud was al ``opslag_verboden``)."""
+    vreemd = {"host_path": "tmpfs_config", "ix_volume": "host_path_config", "tmpfs": "ix_volume_config"}[typ]
+    paren = _ix_paren({**_regel(typ), vreemd: {"create_host_path": True}})
+    assert (f"{ST0}.{vreemd}.create_host_path", "onbekend_veld") in paren, paren
+
+
+@pytest.mark.parametrize(
+    ("typ", "cfg", "waarde"),
+    [
+        pytest.param("tmpfs", "tmpfs_config", "x", id="tmpfs.tekst"),
+        pytest.param("tmpfs", "tmpfs_config", [], id="tmpfs.lege_lijst"),
+        pytest.param("tmpfs", "tmpfs_config", 500, id="tmpfs.getal"),
+        pytest.param("ix_volume", "ix_volume_config", "config", id="ixvolume.tekst"),
+        pytest.param("host_path", "host_path_config", "/mnt/testpool/apps/demo-app", id="hostpad.tekst"),
+    ],
+)
+def test_eigen_type_config_is_een_object(typ: str, cfg: str, waarde: Any) -> None:
+    """A2: de config van het eigen type is in het formulier een object (``type: dict``); een tekst, lijst of getal
+    geeft ``type``. Ook een veilige naam als tekst in ``ix_volume_config`` (de middleware neemt die als naam)."""
+    paren = _ix_paren({**_regel(typ), cfg: waarde})
+    assert (f"{ST0}.{cfg}", "type") in paren, paren
+
+
+@pytest.mark.parametrize("waarde", ["ja", "true", 1, 0, None, [], {}])
+def test_read_only_is_true_of_false(waarde: Any) -> None:
+    """A2: ``read_only`` is in het formulier een boolean; elke andere waarde geeft ``type``."""
+    for typ in OPSLAGTYPEN:
+        paren = _ix_paren({**_regel(typ), "read_only": waarde})
+        assert (f"{ST0}.read_only", "type") in paren, (typ, paren)
+
+
+@pytest.mark.parametrize("size", [0, -1, "500", True, False, None, [500]])
+def test_tmpfs_size_is_een_geheel_getal_van_minstens_1(size: Any) -> None:
+    """A2: ``tmpfs_config.size`` (MiB) is in het formulier een geheel getal; de bibliotheek weigert 0 en minder, en
+    appstore-en-fork vraagt minstens 1. Anders ``bereik``. Een bovengrens is niet besloten."""
+    paren = _ix_paren({**_regel("tmpfs"), "tmpfs_config": {"size": size}})
+    assert (f"{ST0}.tmpfs_config.size", "bereik") in paren, paren
+
+
+def test_witte_lijst_laat_de_formuliervelden_door() -> None:
+    """A2, tegenproef: elk veld uit de witte lijst met een geldige waarde blijft geldig, ook ``read_only: true``, een
+    tmpfs van 1 MiB en een grote tmpfs, en lege type-configs (afwezig, ``null`` of ``{}``) naast de eigen config."""
+    inst = POLICY.acties["app.install"]
+    regels = [
+        {**_regel("host_path"), "read_only": True, "cifs_config": None, "nfs_config": {}},
+        {**_regel("ix_volume"), "read_only": False, "host_path_config": {}, "tmpfs_config": None},
+        {**_regel("tmpfs"), "tmpfs_config": {"size": 1}},
+        {**_regel("tmpfs"), "mount_path": "/groot", "tmpfs_config": {"size": 64 * 1024}},
+    ]
+    assert validate_parameters(POLICY, inst, APP, install_params(storage=regels)) == []

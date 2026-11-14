@@ -755,6 +755,35 @@ def test_smb_opslag_van_een_catalogusapp_weigert_de_executor_zelf(stack: Stack) 
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0
 
 
+def test_onbekende_opslagsleutel_van_de_standaard_custom_app_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-80 (KLEIN-75 A2): een ondertekend en goedgekeurd verzoek (R3) voor de standaard Custom App met een
+    opslagsleutel buiten de witte lijst (``create_host_path``, ``propagation``, ``auto_permissions``, tmpfs ``exec``,
+    ``uid``, ``mode``, een onbekende sleutel op de regel) weigert de executor zelf met 422 (``onbekend_veld``);
+    TrueNAS krijgt niets. Tegenproef: de opslagregels die appstore-en-fork maakt, worden uitgevoerd."""
+    hub, c, nas = stack
+    hostpad = {"type": "host_path", "read_only": False, "mount_path": "/data"}
+    hostpad["host_path_config"] = {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}
+    ixvol = {"type": "ix_volume", "read_only": False, "mount_path": "/config"}
+    ixvol["ix_volume_config"] = {"acl_enable": False, "dataset_name": "config"}
+    tmpfs = {"type": "tmpfs", "read_only": False, "mount_path": "/cache", "tmpfs_config": {"size": 256}}
+    for i, regel in enumerate(
+        (
+            {**hostpad, "host_path_config": {**hostpad["host_path_config"], "create_host_path": True}},
+            {**hostpad, "host_path_config": {**hostpad["host_path_config"], "propagation": "rshared"}},
+            {**ixvol, "ix_volume_config": {**ixvol["ix_volume_config"], "auto_permissions": True}},
+            {**tmpfs, "tmpfs_config": {"size": 256, "exec": True, "uid": 0, "mode": "1777"}},
+            {**tmpfs, "nocopy": True},
+        )
+    ):
+        r = execute(c, hub, approved(hub, install_prop(f"demo-wl-{i}", storage=[regel]), risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (i, r.text)
+        assert "onbekend_veld" in {f["code"] for f in r.json()["details"]["fouten"]}, (i, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    r = execute(c, hub, approved(hub, install_prop("demo-wl-goed", storage=[hostpad, ixvol, tmpfs])))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == [hostpad, ixvol, tmpfs]
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en
