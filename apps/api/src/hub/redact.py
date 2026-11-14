@@ -95,13 +95,13 @@ def _entropy(text: str) -> float:
 
 
 def _maybe_secret(m: re.Match[str]) -> str:
-    """Lange reeks met cijfers, hoofd- en kleine letters, weinig scheidingstekens en hoge entropie → vermoedelijk geheim
-    (een bestandsnaam of identifier met veel ``_``/``-`` blijft staan)."""
+    """Lange reeks met cijfers, hoofd- en kleine letters en hoge entropie → vermoedelijk geheim. Het aantal ``_``/``-``
+    telt bewust niet mee (KLEIN-89, V-094): een willekeurig base64url-token heeft soms veel scheidingstekens, en een
+    geheim in de log weegt zwaarder dan een leesbare bestandsnaam of identifier (die wordt dan ook ``[geheim?]``)."""
     s = m.group(0)
     core = s.rstrip("=")
-    seps = sum(1 for ch in core if ch in "_-")
     mixed = any(c.isdigit() for c in core) and any(c.isupper() for c in core) and any(c.islower() for c in core)
-    if mixed and seps <= len(core) // 8 and _entropy(core) >= 4.0:
+    if mixed and _entropy(core) >= 4.0:
         return "[geheim?]"
     return s
 

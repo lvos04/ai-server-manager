@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import random
 import secrets
 from datetime import UTC, datetime
 from typing import Any
@@ -41,7 +43,8 @@ def ev(
         ("image x@sha256:" + "a" * 64, [], ["sha256:" + "a" * 64]),
         ("hex " + "0123456789abcdef" * 3, ["0123456789abcdef" * 3], ["[hex]"]),
         ("status code: 500 reason_code=auth_failed", [], ["code: 500", "reason_code=auth_failed"]),
-        ("bestand TrueNAS_V2_Uitvoering_en_Afvinken_2026.xlsx", [], ["TrueNAS_V2_Uitvoering_en_Afvinken_2026.xlsx"]),
+        # KLEIN-89: bewust strenger; een naam met veel '_'/'-' en hoge entropie wordt ook geschoond (V-094).
+        ("bestand TrueNAS_V2_Uitvoering_en_Afvinken_2026.xlsx", ["Uitvoering_en_Afvinken"], ["bestand [geheim?].xlsx"]),
     ],
 )
 def test_strenge_schoning(text: str, absent: list[str], present: list[str]) -> None:
@@ -58,6 +61,19 @@ def test_willekeurig_token_en_bekend_geheim() -> None:
     m = SecretMatcher([SecretMatcher.fingerprint("kort-maar-bekend!")])
     assert redact_log_text("gotify key kort-maar-bekend! lekt", m) == "gotify key *** lekt"
     assert "kort" not in str(m.fingerprints)  # alleen vingerafdrukken in het geheugen
+
+
+def test_vaste_set_tokens_met_veel_scheidingstekens() -> None:
+    """KLEIN-89: dezelfde vorm als de willekeurige test, maar deterministisch (vaste seed). Op de oude regel bleef een
+    token met meer dan len//8 keer '_'/'-' staan (~0,18 %); nu wordt elk token geredigeerd (V-094)."""
+    rng = random.Random(89)
+    toks = ["Zz9" + base64.urlsafe_b64encode(rng.randbytes(32)).rstrip(b"=").decode() for _ in range(20000)]
+    veel_sep = [t for t in toks if sum(c in "_-" for c in t) > len(t) // 8]
+    assert len(veel_sep) >= 30  # de set bevat echt de vorm die eerder doorglipte
+    assert max(sum(c in "_-" for c in t) for t in veel_sep) >= 8
+    lek = [t for t in toks if t in redact_log_text(f"token {t} einde")]
+    assert lek == []
+    assert redact_log_text("x Zz9Dc-b4NTd_iuh_eHtJH-yTBGdjAPr_0A2IP16ctT-10Y y") == "x [geheim?] y"
 
 
 def test_velden_en_grenzen() -> None:
