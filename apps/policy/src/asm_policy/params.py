@@ -58,6 +58,11 @@ zijn. In ``ix_volume_config`` geeft een niet-lege ``acl_entries`` of een ``acl_e
 ``acl_verboden`` en staat elke ``dataset_name`` hooguit één keer in een installatie (anders ``dubbel``). Afgeleid uit
 de bron; NIET GEVALIDEERD (echte NAS).
 
+Opslag (KLEIN-81; dicht bij twijfel): bij de standaard Custom App geldt een verboden containerpad
+(:data:`CONTAINER_FORBIDDEN_MOUNTS`) ook voor alles eronder, per padsegment (``/proc/sys``, ``/dev/shm``,
+``/sys/fs/cgroup``: ``mount_verboden``; ``/process``, ``/devices``: geldig). ``/`` telt alleen exact; hoofdletters
+tellen mee (``/PROC`` is een ander pad). NIET GEVALIDEERD (echte NAS).
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -711,7 +716,7 @@ def _ix_opslag_witte_lijst(st: Mapping[str, Any], sw: str, eigen: str | None) ->
 CONTAINERPAD_RE = re.compile(r"/[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*")
 _MOUNT_VERBODEN = (
     "absoluut pad in de container: / gevolgd door delen van letters, cijfers en . _ @ + -, gescheiden door één /; "
-    "geen . of .. als deel, geen / aan het eind, niet / of een systeempad"
+    "geen . of .. als deel, geen / aan het eind, niet / en niet een systeempad of een pad daaronder"
 )
 # ACL op een ixVolume van de standaard Custom App (KLEIN-80, herstel R-VEILIG-2; KLEIN-75 A4 optie a, besluit van de
 # regisseur, dicht bij twijfel). TrueNAS zet een ACL zodra ``acl_entries`` niet leeg is, ook met ``acl_enable: false``
@@ -727,13 +732,24 @@ _DATASET_DUBBEL = "deze dataset_name staat er dubbel in: elk ixVolume hooguit é
 
 
 def _mount_path_problem(mount: Any) -> bool:
-    """Waar als ``mount`` geen strikt containerpad is of genormaliseerd een verboden containerpad (zie
-    :data:`CONTAINERPAD_RE`)."""
+    """Waar als ``mount`` geen strikt containerpad is of genormaliseerd een verboden containerpad is of eronder ligt
+    (zie :data:`CONTAINERPAD_RE` en :func:`_onder_verboden_containerpad`)."""
     if not isinstance(mount, str) or not CONTAINERPAD_RE.fullmatch(mount):
         return True
     if any(deel in (".", "..") for deel in mount.split("/")[1:]):
         return True
-    return posixpath.normpath(mount) in CONTAINER_FORBIDDEN_MOUNTS
+    return _onder_verboden_containerpad(posixpath.normpath(mount))
+
+
+def _onder_verboden_containerpad(pad: str) -> bool:
+    """Waar als ``pad`` een verboden containerpad is of eronder ligt, per padsegment (KLEIN-81; besluit van de
+    regisseur, dicht bij twijfel): ``/proc/sys``, ``/dev/shm`` en ``/sys/fs/cgroup`` vallen onder ``/proc``, ``/dev``
+    en ``/sys``; ``/process`` en ``/devices`` niet. ``/`` telt alleen exact (alles ligt eronder). Hoofdletters tellen
+    mee: Linux is hoofdlettergevoelig, ``/PROC`` is een ander pad dan ``/proc``. ``pad`` is al genormaliseerd."""
+    return any(
+        pad == verboden or (verboden != "/" and pad.startswith(f"{verboden}/"))
+        for verboden in CONTAINER_FORBIDDEN_MOUNTS
+    )
 
 
 def _ix_volume_acl(cfg: Mapping[str, Any], where: str) -> list[Fout]:

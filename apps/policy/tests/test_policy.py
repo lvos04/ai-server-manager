@@ -17,7 +17,13 @@ from asm_policy.canonical import CanonicalError, canonical_json, canonical_sha25
 from asm_policy.engine import classify, herken_app, recognize, recognize_all
 from asm_policy.etag import ABSENT, app_etag
 from asm_policy.loader import is_read_only
-from asm_policy.params import expected_image, validate_parameters, validate_target, vault_refs
+from asm_policy.params import (
+    CONTAINER_FORBIDDEN_MOUNTS,
+    expected_image,
+    validate_parameters,
+    validate_target,
+    vault_refs,
+)
 from asm_policy.verify import check_decision, check_envelope
 
 POLICY = load_policy(POLICY_DIR)
@@ -2344,6 +2350,51 @@ def test_mount_paden_uit_de_manifesten_blijven_geldig(typ: str) -> None:
     """R-VEILIG-1, tegenproef: elk koppelpad uit de manifesten en de tests blijft bij elk opslagtype geldig."""
     for mount in MOUNT_PATH_GELDIG:
         assert _ix_paren({**_regel(typ), "mount_path": mount}) == [], (typ, mount)
+
+
+# KLEIN-81 (vervolgpunt van de herreview van KLEIN-80; besluit van de regisseur, dicht bij twijfel): een verboden
+# containerpad geldt ook voor alles eronder, per padsegment. ``/proc/sys``, ``/dev/shm`` en ``/sys/fs/cgroup`` gaven
+# vroeger geen fout, omdat alleen exact werd vergeleken. ``/`` zelf blijft exact (alles ligt eronder). Hoofdletters
+# blijven exact: Linux is hoofdlettergevoelig, ``/PROC`` is een ander pad dan ``/proc``. Geldt waar de lijst al gold:
+# bij de standaard Custom App. NIET GEVALIDEERD (echte NAS).
+MOUNT_PATH_ONDER_VERBODEN = [
+    "/proc/sys", "/proc/sys/kernel", "/proc/1", "/sys/fs/cgroup", "/sys/kernel", "/dev/shm", "/dev/mqueue",
+    "/dev/pts", "/var/run/docker.sock/x", "/run/docker.sock/x",
+]  # fmt: skip
+# Tegenproef: alleen een echt padsegment telt (geen tekstprefix), hoofdletters tellen mee, en een bovenliggend pad valt
+# er niet onder. (Elke tekst met ``docker.sock`` blijft los daarvan ``docker_socket_verboden``.)
+MOUNT_PATH_NAAST_VERBODEN = [
+    "/process", "/procfs/sys", "/proc_data", "/devices/shm", "/dev2/shm", "/sysadmin", "/systeem/fs", "/PROC",
+    "/PROC/sys", "/Proc/sys", "/DEV/shm", "/Sys/fs/cgroup", "/var/run", "/run", "/var/run/docker", "/var/lib/proc",
+    "/data/dev/shm",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+@pytest.mark.parametrize("mount", MOUNT_PATH_ONDER_VERBODEN)
+def test_mount_path_onder_een_verboden_containerpad_geweigerd(typ: str, mount: str) -> None:
+    """KLEIN-81: een koppelpad onder ``/proc``, ``/sys``, ``/dev`` of de Docker-socket geeft bij elk opslagtype
+    ``mount_verboden``; vroeger gaven ``/proc/sys``, ``/dev/shm`` en ``/sys/fs/cgroup`` geen fout."""
+    paren = _ix_paren({**_regel(typ), "mount_path": mount})
+    assert (f"{ST0}.mount_path", "mount_verboden") in paren, paren
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+def test_mount_path_naast_een_verboden_containerpad_blijft_geldig(typ: str) -> None:
+    """KLEIN-81, tegenproef: ``/process``, ``/devices/shm``, ``/PROC/sys`` (hoofdletters) of ``/var/run`` liggen niet
+    onder een verboden containerpad en blijven bij elk opslagtype geldig."""
+    for mount in MOUNT_PATH_NAAST_VERBODEN:
+        assert _ix_paren({**_regel(typ), "mount_path": mount}) == [], (typ, mount)
+
+
+def test_geen_geldig_koppelpad_ligt_onder_een_verboden_containerpad() -> None:
+    """KLEIN-81, tegenproef: geen enkel geldig koppelpad uit de manifesten en de tests ligt onder (of is) een verboden
+    containerpad, op segmentniveau; ``/`` telt daarbij alleen exact."""
+    for mount in MOUNT_PATH_GELDIG + MOUNT_PATH_NAAST_VERBODEN:
+        for verboden in CONTAINER_FORBIDDEN_MOUNTS:
+            assert mount != verboden, (mount, verboden)
+            if verboden != "/":
+                assert not mount.startswith(verboden + "/"), (mount, verboden)
 
 
 # KLEIN-80, herstel R-VEILIG-2 (besluit van de regisseur: KLEIN-75 A4 optie a, dicht bij twijfel). TrueNAS zet een ACL

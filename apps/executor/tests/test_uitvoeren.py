@@ -826,6 +826,32 @@ def test_mount_path_met_opties_en_acl_op_een_ixvolume_weigert_de_executor_zelf(s
     assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig
 
 
+def test_mount_path_onder_een_verboden_containerpad_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-81: een ondertekend en goedgekeurd verzoek (R3) voor de standaard Custom App met een ``mount_path`` onder
+    een verboden containerpad (``/proc/sys``, ``/dev/shm``, ``/sys/fs/cgroup``), bij elk opslagtype, weigert de
+    executor zelf met 422 (``mount_verboden``); TrueNAS krijgt niets. Vroeger gingen deze verzoeken door tot
+    ``app.create``. Tegenproef: paden die alleen als tekst beginnen met een verboden pad (``/process``,
+    ``/devices/shm``) of andere hoofdletters hebben (``/PROC/sys``) worden uitgevoerd."""
+    hub, c, nas = stack
+    tmpfs = {"type": "tmpfs", "read_only": False, "mount_path": "/cache", "tmpfs_config": {"size": 256}}
+    hostpad = {"type": "host_path", "read_only": False, "mount_path": "/data"}
+    hostpad["host_path_config"] = {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}
+    ixvol = {"type": "ix_volume", "read_only": False, "mount_path": "/config"}
+    ixvol["ix_volume_config"] = {"acl_enable": False, "dataset_name": "config"}
+    gevallen = [{**regel, "mount_path": m} for m in ("/proc/sys", "/dev/shm", "/sys/fs/cgroup")
+                for regel in (tmpfs, hostpad, ixvol)]  # fmt: skip
+    for i, regel in enumerate(gevallen):
+        r = execute(c, hub, approved(hub, install_prop(f"demo-onder-{i}", storage=[regel]), risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (i, r.text)
+        assert "mount_verboden" in {f["code"] for f in r.json()["details"]["fouten"]}, (i, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    geldig = [{**tmpfs, "mount_path": m} for m in ("/process", "/devices/shm", "/PROC/sys", "/var/run")]
+    geldig += [{**hostpad, "mount_path": "/Sys/fs/cgroup"}, {**ixvol, "mount_path": "/proc_data"}]
+    r = execute(c, hub, approved(hub, install_prop("demo-onder-goed", storage=geldig)))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en

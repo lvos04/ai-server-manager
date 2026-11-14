@@ -188,6 +188,18 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    `acl_entries` en geen dubbele `dataset_name`. Catalogusapps vallen hier niet onder (S-P2-050). `policy/*.yaml` en
    de `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". Afgeleid
    uit de bron; NIET GEVALIDEERD (echte NAS).
+   **Opslag: ook onder een verboden containerpad (aanvulling 2026-11-14, KLEIN-81; vervolgpunt van de herreview van
+   KLEIN-80; besluit van de regisseur, dicht bij twijfel).** De vergelijking met de verboden containerpaden (`/`,
+   `/proc`, `/sys`, `/dev`, `/var/run/docker.sock`, `/run/docker.sock`) was exact: `/proc/sys`, `/dev/shm` en
+   `/sys/fs/cgroup` gaven geen fout. Nu geldt een verboden containerpad ook voor alles eronder, per padsegment, op het
+   genormaliseerde pad: `/proc/sys`, `/dev/shm` en `/sys/fs/cgroup` geven `mount_verboden`; `/process`, `/devices` en
+   `/procfs/sys` niet (geen eigen segment). `/` telt alleen exact, want elk pad ligt eronder. Hoofdletters tellen mee:
+   Linux is hoofdlettergevoelig, dus `/PROC` en `/PROC/sys` zijn andere paden dan `/proc` en blijven geldig. Geldt
+   waar de lijst al gold: alleen `mount_path` van de standaard Custom App (catalogusapps: S-P2-050). Geen geldig
+   koppelpad ligt onder een verboden containerpad: de 11 koppelpaden uit de manifesten van de elf repos en de
+   koppelpaden van de 9 opnieuw vertaalde payloads van appstore-en-fork blijven geldig. `policy/*.yaml` en de
+   `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". NIET
+   GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -430,7 +442,9 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   `type` en `bereik` in een opslagregel) werkt in de executor pas na een nieuw gebouwd en uitgerold executor-image.
   Aanvulling 2026-11-14 (KLEIN-80 herstel R-VEILIG-1 en R-VEILIG-2): hetzelfde geldt voor `mount_verboden` voor een
   koppelpad dat geen strikt containerpad is, `acl_verboden` voor een ACL op een ixVolume en `dubbel` voor een
-  herhaalde `dataset_name`.
+  herhaalde `dataset_name`. Aanvulling 2026-11-14 (KLEIN-81): hetzelfde geldt voor `mount_verboden` voor een
+  koppelpad onder een verboden containerpad (`/proc/sys`, `/dev/shm`, `/sys/fs/cgroup`); een oude executor laat die
+  nog door.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
