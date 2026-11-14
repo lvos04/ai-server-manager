@@ -335,7 +335,11 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   engine, niet in de yaml. Een Hub en een executor met verschillende engineversies maar dezelfde yaml zien dat
   verschil niet. Een engineversie naast de `policy_hash` vraagt een veld in `ExecutionRequest.policy_decision`
   (contract §8: precies `risk_class`, `rule_ids`, `policy_hash`) of bij het koppelen: contractvraag, niet gebouwd
-  (S-P2-010, bouwpunt 6d; open voor S-P2-030).
+  (S-P2-010, bouwpunt 6d; open voor S-P2-030). Aanvulling 2026-11-14 (KLEIN-77): ook de opslagregels van KLEIN-76
+  in `apps/policy/src/asm_policy/params.py` (`zfs_eigenschappen_verboden`, `acl_verboden` en de hostpadregel voor
+  `host_path_config` in elke opslagregel, `opslag_verboden` voor een config van een ander type) vallen buiten de
+  `policy_hash` en werken in de executor pas na een nieuw gebouwd en uitgerold executor-image; een oude executor merkt
+  geen verschil.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie

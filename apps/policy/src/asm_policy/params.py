@@ -34,7 +34,8 @@ aanwezig ``host_path_config.acl`` ook met ``acl_enable: false`` een ACL (``acl_v
 de hostpadregel, in een opslagregel van elk type (R-VEILIG-1: TrueNAS normaliseert ``host_path_config`` ook in een
 regel van type ix_volume of tmpfs); ``host_path_config.path`` gaat dan ook door de hostpadregel. Een config van een
 ander type dan de regel (bv. ``host_path_config`` of ``tmpfs_config`` bij ix_volume) die niet leeg is (afwezig,
-``null`` of ``{}``), is ``opslag_verboden``.
+``null`` of ``{}``), is ``opslag_verboden``. Het gedrag van TrueNAS in deze alinea is afgeleid uit de bron
+(truenas/apps f142a16, middleware ece9d19); NIET GEVALIDEERD (echte NAS).
 
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
@@ -581,6 +582,7 @@ OP_OUDER = frozenset({"useallgpus", "nvidiagpuselection"})
 # ZFS-eigenschappen van een ixVolume (KLEIN-76; KLEIN-75 A5): de middleware van TrueNAS neemt
 # ``ix_volume_config.properties`` mee bij het aanmaken van het dataset, ook ``mountpoint``. Elke aanwezigheid is
 # verboden, bij de standaard Custom App en in de waarden van een catalogusapp (genormaliseerde sleutels).
+# Gedrag van TrueNAS: afgeleid uit de bron (truenas/apps f142a16, middleware ece9d19); NIET GEVALIDEERD (echte NAS).
 IX_VOLUME_CONFIG = "ixvolumeconfig"
 ZFS_EIGENSCHAPPEN = "properties"
 _ZFS_EIGENSCHAPPEN = (
@@ -700,7 +702,9 @@ def _host_path_config(waarde: Any, where: str, *, pad_verplicht: bool) -> list[F
     """``host_path_config`` van een opslagregel van de standaard Custom App, bij elk type (KLEIN-76, R-VEILIG-1): een
     aanwezig ``acl``-blok of ``acl_enable`` anders dan false is een ACL (``acl_verboden``; TrueNAS normaliseert het
     ``acl``-blok ook bij ``acl_enable: false`` en in een regel van een ander type), en elk pad (``path`` en
-    ``acl.path``) gaat door :func:`host_path_problem`. ``pad_verplicht``: bij type host_path moet ``path`` er zijn."""
+    ``acl.path``) gaat door :func:`host_path_problem`. ``pad_verplicht``: bij type host_path moet ``path`` er zijn.
+    Gedrag van TrueNAS: afgeleid uit de bron (truenas/apps f142a16, middleware ece9d19); NIET GEVALIDEERD
+    (echte NAS)."""
     out: list[Fout] = []
     cfg = waarde or {}
     is_object = isinstance(cfg, Mapping)
@@ -784,7 +788,8 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
             eigen = EIGEN_OPSLAG_CONFIG.get(typ) if isinstance(typ, str) else None
             # Een config van een ander type, met inhoud, wordt geweigerd (KLEIN-76, R-VEILIG-1; dicht bij twijfel):
             # TrueNAS laat hem door en normaliseert een aanwezige ix_volume_config (dataset) of host_path_config.acl
-            # (ACL) ook bij een ander type. Leeg is alleen afwezig, null of {}.
+            # (ACL) ook bij een ander type. Leeg is alleen afwezig, null of {}. Gedrag van TrueNAS: afgeleid uit de
+            # bron (truenas/apps f142a16, middleware ece9d19); NIET GEVALIDEERD (echte NAS).
             out += [
                 _f(f"{sw}.{k}", "opslag_verboden", _VREEMDE_CONFIG)
                 for k, v in st.items()
