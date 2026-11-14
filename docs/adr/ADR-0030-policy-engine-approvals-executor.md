@@ -213,6 +213,17 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    paden: de 11 koppelpaden uit de manifesten van de elf repos en de koppelpaden in de tests blijven geldig.
    `policy/*.yaml` en de `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de
    `policy_hash`". NIET GEVALIDEERD (echte NAS).
+   **Opslag: `/var/run/secrets` (aanvulling 2026-11-14, KLEIN-90; vervolgpunt van R-VEILIG bij KLEIN-88; besluit van
+   de regisseur, zelfde lijn als de Docker-socket, waar `/var/run/docker.sock` en `/run/docker.sock` allebei in de
+   lijst staan).** De lijst van verboden containerpaden is aangevuld met `/var/run/secrets`; verder niets. Dit
+   vervangt de zin "`/var/run/secrets` staat er niet in" van KLEIN-88 hierboven. In gangbare images is `/var/run` een
+   symlink naar `/run`, zodat een koppeling op `/var/run/secrets` op `/run/secrets` uitkwam. De vergelijking per
+   padsegment van KLEIN-81 geldt ook hier: `/var/run/secrets/x` geeft `mount_verboden`; `/var/run`,
+   `/var/run/secretsx` en `/VAR/run/secrets` blijven geldig. Andere symlinks in een image blijven buiten beeld (de
+   policy toetst de padtekst). Geldt alleen voor `mount_path` van de standaard Custom App. Geen geldig koppelpad ligt
+   op of onder dit pad: de 11 koppelpaden uit de manifesten, de koppelpaden van appstore-en-fork en die in de tests
+   blijven geldig. `policy/*.yaml` en de `policy_hash` veranderen niet; restrisico executor-image: zie
+   "Engine-regels buiten de `policy_hash`". NIET GEVALIDEERD (echte NAS).
    **Opslag: NFS bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-83; KLEIN-75 A7; besluit van de
    regisseur, dicht bij twijfel, zelfde lijn als SMB).** NFS bij een catalogusapp werd alleen toevallig geweigerd: een
    exportpad met `/` gaf `hostpad_verboden` (misleidend: het is een pad op de NFS-server, niet op de NAS), en een
@@ -511,6 +522,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   koppelpad onder een verboden containerpad (`/proc/sys`, `/dev/shm`, `/sys/fs/cgroup`); een oude executor laat die
   nog door. Aanvulling 2026-11-14 (KLEIN-88): hetzelfde geldt voor `mount_verboden` voor een koppelpad op of onder
   `/etc/hosts`, `/etc/hostname`, `/etc/resolv.conf` of `/run/secrets`; een oude executor laat die nog door.
+  Aanvulling 2026-11-14 (KLEIN-90): hetzelfde geldt voor `mount_verboden` voor een koppelpad op of onder
+  `/var/run/secrets`; een oude executor laat dat nog door.
   Aanvulling 2026-11-14 (KLEIN-83): hetzelfde geldt voor `opslag_verboden` voor NFS-opslag (type nfs,
   `nfs_config`) bij een catalogusapp; een oude executor laat een exportpad zonder `/` nog door.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst

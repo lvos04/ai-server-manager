@@ -911,6 +911,32 @@ def test_mount_path_op_een_dockerbestand_of_run_secrets_weigert_de_executor_zelf
     assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig
 
 
+def test_mount_path_op_of_onder_var_run_secrets_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-90: een ondertekend en goedgekeurd verzoek (R3) voor de standaard Custom App met een ``mount_path`` op of
+    onder ``/var/run/secrets`` (in gangbare images via de symlink ``/var/run`` naar ``/run`` gelijk aan
+    ``/run/secrets``), bij elk opslagtype, weigert de executor zelf met 422 (``mount_verboden``); TrueNAS krijgt niets.
+    Vóór KLEIN-90 ging dit verzoek door tot ``app.create``. Tegenproef: ``/var/run`` zelf, een pad dat alleen als tekst
+    zo begint (``/var/run/secretsx``) en andere hoofdletters worden uitgevoerd."""
+    hub, c, nas = stack
+    tmpfs = {"type": "tmpfs", "read_only": False, "mount_path": "/cache", "tmpfs_config": {"size": 256}}
+    hostpad = {"type": "host_path", "read_only": False, "mount_path": "/data"}
+    hostpad["host_path_config"] = {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}
+    ixvol = {"type": "ix_volume", "read_only": False, "mount_path": "/config"}
+    ixvol["ix_volume_config"] = {"acl_enable": False, "dataset_name": "config"}
+    paden = ("/var/run/secrets", "/var/run/secrets/x")
+    gevallen = [{**regel, "mount_path": m} for m in paden for regel in (tmpfs, hostpad, ixvol)]
+    for i, regel in enumerate(gevallen):
+        r = execute(c, hub, approved(hub, install_prop(f"demo-varrun-{i}", storage=[regel]), risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (i, r.text)
+        assert "mount_verboden" in {f["code"] for f in r.json()["details"]["fouten"]}, (i, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    geldig = [{**tmpfs, "mount_path": m} for m in ("/var/run", "/var/run/secretsx", "/VAR/run/secrets")]
+    geldig += [{**hostpad, "mount_path": "/var/run/secret"}, {**ixvol, "mount_path": "/var/Run/secrets"}]
+    r = execute(c, hub, approved(hub, install_prop("demo-varrun-goed", storage=geldig)))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en
