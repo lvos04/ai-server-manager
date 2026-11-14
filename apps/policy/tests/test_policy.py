@@ -1678,3 +1678,106 @@ def test_opdracht_van_de_standaard_custom_app_houdt_docker_socket_en_kluisregels
     opslag = install_params()["app_create"]["values"]["storage"][0]
     assert "privileged_verboden" in ix(storage=[{**opslag, "command": ["--privileged"]}])
     assert "hostpad_verboden" in ix(dns_config={"options": ["/:/host"]})
+
+
+# KLEIN-76 (KLEIN-75 A5 en A1; besluit van de gebruiker 2026-11-14 "Nu herstellen"). De middleware van TrueNAS laat
+# onbekende sleutels door (``extra='allow'``) en neemt ``ix_volume_config.properties`` mee bij het aanmaken van het
+# dataset (ook ``mountpoint``); ``host_path_config.acl`` wordt ook bij ``acl_enable: false`` genormaliseerd. Afgeleid
+# uit de bron; NIET GEVALIDEERD (echte NAS).
+IX_VOLUME_PROPERTIES = [
+    pytest.param({"mountpoint": "/etc"}, id="mountpoint_etc"),
+    pytest.param({"compression": "lz4"}, id="gewone_eigenschap"),
+    pytest.param({}, id="leeg"),
+    pytest.param(None, id="null"),
+]
+
+
+def _ix_volume(properties: Any, sleutel: str = "properties") -> dict[str, Any]:
+    return {"type": "ix_volume", "mount_path": "/config",
+            "ix_volume_config": {"acl_enable": False, "dataset_name": "config", sleutel: properties}}  # fmt: skip
+
+
+@pytest.mark.parametrize("properties", IX_VOLUME_PROPERTIES)
+def test_zfs_eigenschappen_van_een_ixvolume_worden_altijd_geweigerd(properties: Any) -> None:
+    """A5: ``ix_volume_config.properties`` gaat bij TrueNAS ongecontroleerd naar het aanmaken van een ZFS-dataset
+    (``mountpoint`` kan dan een systeemmap zijn). Elke aanwezigheid wordt geweigerd met een eigen code, bij de
+    standaard Custom App en in de waarden van een catalogusapp, ook in een andere schrijfwijze van de sleutel."""
+    ix = validate_parameters(
+        POLICY, POLICY.acties["app.install"], APP, install_params(storage=[_ix_volume(properties)])
+    )
+    assert "zfs_eigenschappen_verboden" in [f.code for f in ix], [f.as_dict() for f in ix]
+    assert "parameters.app_create.values.storage[0].ix_volume_config.properties" in [f.veld for f in ix]
+    for sleutel in ("properties", "Properties"):
+        cat = _codes(_catalogus({"storage": {"config": _ix_volume(properties, sleutel)}}))
+        assert "zfs_eigenschappen_verboden" in cat, (sleutel, cat)
+
+
+MOUNTPOINT_FOUT = ["/etc", "/", "/mnt/.ix-apps/x", "/root", "/mnt/testpool/../etc"]
+
+
+@pytest.mark.parametrize("pad", MOUNTPOINT_FOUT)
+def test_mountpoint_is_overal_een_hostpad(pad: str) -> None:
+    """A5: een tekst met "/" onder de sleutel ``mountpoint`` (ook ``mountPoint``) is overal een hostpad: bij de
+    standaard Custom App (ook buiten ``properties``) en in de waarden van een catalogusapp."""
+    in_properties = install_params(storage=[_ix_volume({"mountpoint": pad})])
+    ix = validate_parameters(POLICY, POLICY.acties["app.install"], APP, in_properties)
+    assert ("parameters.app_create.values.storage[0].ix_volume_config.properties.mountpoint", "hostpad_verboden") in [
+        (f.veld, f.code) for f in ix
+    ], [f.as_dict() for f in ix]
+    opslag = install_params()["app_create"]["values"]["storage"][0]
+    los = validate_parameters(
+        POLICY, POLICY.acties["app.install"], APP, install_params(storage=[{**opslag, "mountPoint": pad}])
+    )
+    assert "hostpad_verboden" in [f.code for f in los], [f.as_dict() for f in los]
+    assert "hostpad_verboden" in _codes(_catalogus({"opslag": {"mountpoint": pad}}))
+    assert "hostpad_verboden" in _codes(_catalogus({"opslag": {"zfs": {"mountPoint": pad}}}))
+
+
+def test_mountpoint_tegenproef_dataset_en_geen_pad() -> None:
+    """Tegenproef: een ``mountpoint`` op een dataset onder /mnt/<pool>/<dataset> of zonder "/" (zoals bij de andere
+    hostpad-sleutels) is geen fout; zonder ``properties`` blijft een ixVolume geldig."""
+    opslag = install_params()["app_create"]["values"]["storage"][0]
+    for waarde in ("/mnt/testpool/apps/demo-app", "legacy"):
+        params = install_params(storage=[{**opslag, "mountpoint": waarde}])
+        assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, params) == [], waarde
+        assert _codes(_catalogus({"opslag": {"mountpoint": waarde}})) == [], waarde
+    zonder = {
+        "type": "ix_volume",
+        "mount_path": "/config",
+        "ix_volume_config": {"acl_enable": False, "dataset_name": "config"},
+    }
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=[zonder])) == []
+
+
+ACL_BLOKKEN = [
+    pytest.param({"path": "/etc", "entries": [{"id_type": "USER", "id": 0, "access": "FULL_CONTROL"}]}, id="etc"),
+    pytest.param({"path": "/mnt/testpool/apps/demo-app", "entries": []}, id="dataset"),
+    pytest.param({}, id="leeg"),
+    pytest.param(None, id="null"),
+]
+
+
+@pytest.mark.parametrize("acl", ACL_BLOKKEN)
+def test_acl_blok_bij_de_standaard_custom_app_ook_met_acl_enable_false_geweigerd(acl: Any) -> None:
+    """A1: TrueNAS normaliseert ``host_path_config.acl`` ook als ``acl_enable`` false is en zou dan een ACL zetten op
+    ``acl.path``. Bij de standaard Custom App is een aanwezig ``acl``-blok dezelfde weigering als ``acl_enable: true``
+    (``acl_verboden``), en ``acl.path`` gaat ook door de hostpadregel."""
+    cfg = {"path": "/mnt/testpool/apps/demo-app", "acl_enable": False, "acl": acl}
+    opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": cfg}]
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=opslag))
+    paren = [(f.veld, f.code) for f in fouten]
+    w = "parameters.app_create.values.storage[0].host_path_config"
+    assert (w, "acl_verboden") in paren, paren
+    if isinstance(acl, dict) and acl.get("path") == "/etc":
+        assert (f"{w}.acl.path", "hostpad_verboden") in paren, paren
+
+
+def test_acl_path_buiten_een_dataset_ook_zonder_acl_enable() -> None:
+    """A1: ``acl.path`` gaat bij de standaard Custom App door de hostpadregel, ook als het geen tekst met "/" is."""
+    for pad in ("/etc", "etc", "/mnt/.ix-apps/x", 5):
+        cfg = {"path": "/mnt/testpool/apps/demo-app", "acl": {"path": pad}}
+        opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": cfg}]
+        fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=opslag))
+        assert ("parameters.app_create.values.storage[0].host_path_config.acl.path", "hostpad_verboden") in [
+            (f.veld, f.code) for f in fouten
+        ], (pad, [f.as_dict() for f in fouten])

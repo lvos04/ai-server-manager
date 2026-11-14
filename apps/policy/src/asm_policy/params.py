@@ -27,6 +27,12 @@ een catalogusapp krijgt ook een tekstwaarde in een object de controle van een lo
 en ``entrypoint`` de opdracht van het proces ín de container (ix-app-sjabloon: alleen ``set_command`` en
 ``set_entrypoint``): daar geldt de vlag- en bindcontrole niet, de Docker-socket- en kluisregels wel.
 
+Opslag (KLEIN-76; KLEIN-75 A5 en A1): ``ix_volume_config.properties`` (ZFS-eigenschappen van het dataset dat TrueNAS
+aanmaakt) is bij elke app en met elke waarde verboden (``zfs_eigenschappen_verboden``), en ``mountpoint`` met een
+waarde die met "/" begint is overal een hostpad, ook bij de standaard Custom App. Bij de standaard Custom App is een
+aanwezig ``host_path_config.acl`` ook met ``acl_enable: false`` een ACL (``acl_verboden``) en gaat ``acl.path`` door
+de hostpadregel.
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -83,8 +89,10 @@ HOSTPAD_BEGIN = ("/", ".", "~")
 # De korte en de lange Docker-optie voor een volume met de waarde er direct achter ("-v/:/host", "--volume/:/host").
 VOLUME_AANEEN_RE = re.compile(r"\s*(?:-v|--volume)(?=[/.~])")
 # Genormaliseerde sleutels (zie _nk) waarvan een tekstwaarde die met "/" begint in de waarden van een catalogusapp
-# een hostpad is (S-P2-010, herstelronde 3).
-HOSTPAD_SLEUTELS = frozenset({"source", "src", "hostpath", "path"})
+# een hostpad is (S-P2-010, herstelronde 3). ``mountpoint`` (KLEIN-76) geldt ook bij de standaard Custom App
+# (HOSTPAD_SLEUTELS_OVERAL): bij TrueNAS is dat het mountpunt van een ZFS-dataset.
+HOSTPAD_SLEUTELS = frozenset({"source", "src", "hostpath", "path", "mountpoint"})
+HOSTPAD_SLEUTELS_OVERAL = frozenset({"mountpoint"})
 # Vrije tekst in de waarden van een catalogusapp (genormaliseerde sleutels): geen vlag- of bindcontrole. Daarnaast is
 # de waarde naast "name" of "key" in een paar vrije tekst (zie _walk).
 VRIJE_TEKST_SLEUTELS = frozenset({"notes", "description"})
@@ -567,6 +575,15 @@ VERBODEN_SLEUTELS: dict[str, Sleutelregel] = {
 }
 # De fout van deze sleutels staat op het bovenliggende veld (zoals bij de ix-app: ``resources.gpus``).
 OP_OUDER = frozenset({"useallgpus", "nvidiagpuselection"})
+# ZFS-eigenschappen van een ixVolume (KLEIN-76; KLEIN-75 A5): de middleware van TrueNAS neemt
+# ``ix_volume_config.properties`` mee bij het aanmaken van het dataset, ook ``mountpoint``. Elke aanwezigheid is
+# verboden, bij de standaard Custom App en in de waarden van een catalogusapp (genormaliseerde sleutels).
+IX_VOLUME_CONFIG = "ixvolumeconfig"
+ZFS_EIGENSCHAPPEN = "properties"
+_ZFS_EIGENSCHAPPEN = (
+    "ZFS-eigenschappen (properties) van een ixVolume zet het platform niet: TrueNAS maakt het dataset met de "
+    "standaardinstellingen aan; laat properties weg"
+)
 
 
 def _sleutel_fout(
@@ -626,14 +643,24 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app
     waarden = (f"{where}.values.", f"{where}.values[")
     for p, k, v, paarwaarde in alles:
         nk = None if k is None else _nk(k)
-        catalogus_waarde = not ix_app and p.startswith(waarden)
+        in_waarden = p.startswith(waarden)
+        catalogus_waarde = not ix_app and in_waarden
         if nk is not None:
             fout = _sleutel_fout(nk, v, tekstvorm=False, manifest=manifest, ix_app=ix_app)
             if fout:
                 out.append(_f(_ouder(p) if nk in OP_OUDER else p, *fout))
+            if nk == IX_VOLUME_CONFIG and isinstance(v, Mapping):
+                out += [
+                    _f(f"{p}.{e}", "zfs_eigenschappen_verboden", _ZFS_EIGENSCHAPPEN)
+                    for e in v
+                    if _nk(e) == ZFS_EIGENSCHAPPEN
+                ]
             vast_veld = k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path"))
-            catalogus_pad = catalogus_waarde and nk in HOSTPAD_SLEUTELS and isinstance(v, str) and v.startswith("/")
-            if vast_veld or catalogus_pad:
+            pad_sleutel = (nk in HOSTPAD_SLEUTELS_OVERAL and in_waarden) or (
+                catalogus_waarde and nk in HOSTPAD_SLEUTELS
+            )
+            hostpad_waarde = pad_sleutel and isinstance(v, str) and v.startswith("/")
+            if vast_veld or hostpad_waarde:
                 problem = host_path_problem(v)
                 if problem:
                     out.append(_f(p, "hostpad_verboden", problem))
@@ -720,11 +747,18 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
                 )
             if typ == "host_path":
                 cfg = st.get("host_path_config") or {}
-                if not isinstance(cfg, Mapping) or cfg.get("acl_enable") not in (None, False):
+                # Een aanwezig acl-blok telt als ACL, ook met acl_enable false: TrueNAS normaliseert het dan toch
+                # (KLEIN-76; KLEIN-75 A1).
+                if not isinstance(cfg, Mapping) or cfg.get("acl_enable") not in (None, False) or "acl" in cfg:
                     out.append(_f(f"{sw}.host_path_config", "acl_verboden", "ACL's zet het platform niet"))
                 problem = host_path_problem(cfg.get("path") if isinstance(cfg, Mapping) else None)
                 if problem:
                     out.append(_f(f"{sw}.host_path_config.path", "hostpad_verboden", problem))
+                acl = cfg.get("acl") if isinstance(cfg, Mapping) else None
+                if isinstance(acl, Mapping) and "path" in acl:
+                    problem = host_path_problem(acl["path"])
+                    if problem:
+                        out.append(_f(f"{sw}.host_path_config.acl.path", "hostpad_verboden", problem))
     ports = values.get("ports") or []
     if not isinstance(ports, list) or len(ports) > 20:
         out.append(_f(f"{w}.ports", "lijst", "hooguit 20 poorten"))

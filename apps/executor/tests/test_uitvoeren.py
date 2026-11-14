@@ -616,6 +616,37 @@ def test_objectvormen_in_catalogusapp_waarden_weigert_de_executor_zelf(stack: St
     assert nas.created[0]["values"]["command"] == ["java", "-cp", "/app/lib/*:/app/classes", "nl.Main"]
 
 
+def test_zfs_eigenschappen_en_acl_blok_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-76 (KLEIN-75 A5 en A1): een ondertekend en goedgekeurd verzoek (R3) met ``ix_volume_config.properties``
+    (``mountpoint`` /etc), of bij de standaard Custom App met een ``acl``-blok naast ``acl_enable: false``, weigert de
+    executor zelf met 422; TrueNAS krijgt niets. Vroeger ging dit door tot ``app.create``."""
+    hub, c, nas = stack
+    ixvol = {
+        "type": "ix_volume",
+        "mount_path": "/config",
+        "ix_volume_config": {"acl_enable": False, "dataset_name": "config", "properties": {"mountpoint": "/etc"}},
+    }
+    acl = {
+        "type": "host_path",
+        "mount_path": "/data",
+        "host_path_config": {"path": "/mnt/testpool/apps/demo-app", "acl_enable": False, "acl": {"path": "/etc"}},
+    }
+    cat = install_params("huis-z")
+    cat["app_create"].update(
+        catalog_app="home-assistant", train="community", version="1.2.3", values={"storage": {"config": ixvol}}
+    )
+    cat["manifest"] = {"app_id": "huis-z", "install_reason": "proef met een catalogusapp"}
+    for prop, codes in (
+        (install_prop("demo-ix", storage=[ixvol]), {"zfs_eigenschappen_verboden", "hostpad_verboden"}),
+        (install_prop("demo-acl", storage=[acl]), {"acl_verboden", "hostpad_verboden"}),
+        (proposal("app.install", app_target("huis-z"), cat, expected_version=ABSENT), {"zfs_eigenschappen_verboden"}),
+    ):
+        r = execute(c, hub, approved(hub, prop, risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+        assert codes <= {f["code"] for f in r.json()["details"]["fouten"]}, r.text
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0  # fmt: skip
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en

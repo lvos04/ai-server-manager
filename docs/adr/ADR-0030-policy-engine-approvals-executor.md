@@ -86,6 +86,18 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    geeft `501`. Een controle op vrije tekst blijft onvolledig (bijvoorbeeld JSON als tekst of een ander streepje
    dan "-"); voor catalogusapps blijft de echte grens het schema van TrueNAS en het manifest
    (NIET GEVALIDEERD (echte NAS)).
+   **Opslag: ZFS-eigenschappen, mountpoint en ACL (aanvulling 2026-11-14, KLEIN-76; besluit van de gebruiker "Nu
+   herstellen", dicht bij twijfel).** De middleware van TrueNAS laat onbekende sleutels door en neemt
+   `ix_volume_config.properties` mee bij het aanmaken van het dataset van een ixVolume (ook `mountpoint`); een
+   `host_path_config.acl` wordt ook bij `acl_enable: false` verwerkt (afgeleid uit de bron, KLEIN-75 A5 en A1).
+   Daarom: `ix_volume_config.properties` is bij elke app (standaard Custom App en catalogusapp) en met elke waarde
+   geweigerd, ook `{}` en `null`, met de nieuwe code `zfs_eigenschappen_verboden`; `mountpoint` (genormaliseerd) met
+   een waarde die met "/" begint is overal een hostpad (`hostpad_verboden` buiten `/mnt/<pool>/<dataset>`), ook bij de
+   standaard Custom App. Bij de standaard Custom App is een aanwezig `host_path_config.acl` (ook leeg of `null`)
+   dezelfde weigering als `acl_enable: true` (`acl_verboden`), en `acl.path` gaat ook door de hostpadregel. Een
+   witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps (KLEIN-75 A2,
+   A3, A4, A6, A7) zijn hier niet besloten. `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet.
+   NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
