@@ -2276,3 +2276,146 @@ def test_witte_lijst_laat_de_formuliervelden_door() -> None:
         {**_regel("tmpfs"), "mount_path": "/groot", "tmpfs_config": {"size": 64 * 1024}},
     ]
     assert validate_parameters(POLICY, inst, APP, install_params(storage=regels)) == []
+
+
+# KLEIN-80, herstel R-VEILIG-1 (besluit van de regisseur, dicht bij twijfel): de bibliotheek (truenas/apps f142a16,
+# library 2.3.18, ``Tmpfs.render``) geeft een tmpfs weer als tekst ``"<mount_path>:<opties>"``. Met ":" of "," in
+# ``mount_path`` waren zo toch tmpfs-opties (``exec``, ``suid``, ``dev``, ``mode``, ``uid``, ``gid``) te zetten, en een
+# "."-deel ontliep de lijst van verboden containerpaden (de middleware maakt van ``/proc/.`` met normpath ``/proc``).
+# Bij de standaard Custom App is ``mount_path`` daarom alleen een strikt containerpad: "/" gevolgd door delen van
+# letters, cijfers en ``. _ @ + -``, gescheiden door één "/", geen "."- of ".."-deel en geen "/" aan het eind; het
+# genormaliseerde pad mag geen verboden containerpad zijn. Anders ``mount_verboden``. NIET GEVALIDEERD (echte NAS).
+MOUNT_PATH_ONGELDIG = [
+    pytest.param("/cache:exec,mode=1777,=", id="dubbelepunt_opties"),
+    pytest.param("/cache:exec,suid,dev,mode=4777,uid=0,gid=0,=", id="dubbelepunt_root_opties"),
+    pytest.param("/cache,exec", id="komma"),
+    pytest.param("/proc:=", id="proc_dubbelepunt"),
+    pytest.param("/sys:=", id="sys_dubbelepunt"),
+    pytest.param("/dev:exec,dev,mode=0777,=", id="dev_dubbelepunt"),
+    pytest.param("/data:rw,z", id="hostpad_dubbelepunt"),
+    pytest.param("/proc/.", id="proc_punt_aan_het_eind"),
+    pytest.param("/./proc", id="punt_proc"),
+    pytest.param("/sys/.", id="sys_punt"),
+    pytest.param("/dev/.", id="dev_punt"),
+    pytest.param("/a/./b", id="punt_in_het_midden"),
+    pytest.param("/a/../proc", id="puntpunt"),
+    pytest.param("/..", id="alleen_puntpunt"),
+    pytest.param("//proc", id="dubbele_schuine_streep_begin"),
+    pytest.param("/a//b", id="dubbele_schuine_streep"),
+    pytest.param("/data/", id="schuine_streep_aan_het_eind"),
+    pytest.param("/da ta", id="spatie"),
+    pytest.param("/data=x", id="isteken"),
+    pytest.param("/data\x00", id="nul"),
+    pytest.param("/data\n", id="nieuwe_regel"),
+    pytest.param("/dаta", id="cyrillische_a"),
+    pytest.param("data", id="relatief"),
+    pytest.param("/", id="wortel"),
+    pytest.param("/proc", id="proc"),
+    pytest.param("/var/run/docker.sock", id="docker_socket"),
+    pytest.param("", id="leeg"),
+    pytest.param(None, id="null"),
+    pytest.param(["/data"], id="lijst"),
+]
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+@pytest.mark.parametrize("mount", MOUNT_PATH_ONGELDIG)
+def test_mount_path_is_een_strikt_containerpad(typ: str, mount: Any) -> None:
+    """R-VEILIG-1: bij de standaard Custom App is ``mount_path`` alleen een strikt containerpad. Met ":" of "," (de
+    bibliotheek plakt de tmpfs-opties erachter), "=", een spatie, een stuurteken, een "."- of ".."-deel, een dubbele of
+    afsluitende "/" of een verboden containerpad (ook genormaliseerd, zoals ``/proc/.``) geeft elk opslagtype
+    ``mount_verboden``. Vroeger gaven ``/cache:exec,mode=1777,=``, ``/cache,exec``, ``/proc:=``, ``/proc/.`` en
+    ``/./proc`` geen fout."""
+    paren = _ix_paren({**_regel(typ), "mount_path": mount})
+    assert (f"{ST0}.mount_path", "mount_verboden") in paren, paren
+
+
+# Alle mount-waarden uit de manifesten van de elf repos (grep op "mount:" in deploy/manifest, 2026-11-14) en de
+# mount-waarden uit de tests; appstore-en-fork vertaalt ``mount`` letterlijk naar ``mount_path``.
+MOUNT_PATH_GELDIG = [
+    "/app/data", "/appdata", "/beszel_data", "/cache", "/certs", "/config", "/data", "/media", "/templates",
+    "/var/lib/beszel-agent", "/var/lib/postgresql", "/media/films", "/groot", "/data_1", "/x-y", "/a.b", "/a@b+c",
+    "/procfs", "/devices", "/system", "/dev2/x",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+def test_mount_paden_uit_de_manifesten_blijven_geldig(typ: str) -> None:
+    """R-VEILIG-1, tegenproef: elk koppelpad uit de manifesten en de tests blijft bij elk opslagtype geldig."""
+    for mount in MOUNT_PATH_GELDIG:
+        assert _ix_paren({**_regel(typ), "mount_path": mount}) == [], (typ, mount)
+
+
+# KLEIN-80, herstel R-VEILIG-2 (besluit van de regisseur: KLEIN-75 A4 optie a, dicht bij twijfel). TrueNAS zet een ACL
+# op het ixVolume zodra ``ix_volume_config.acl_entries`` niet leeg is, ook met ``acl_enable: false``
+# (middleware ece9d19, ``normalize_ix_volume``: ``acl_dict = value.get('acl_entries', {})`` ... ``if acl_dict:``). Bij
+# een ``dataset_name`` die al eerder in dezelfde installatie staat, stopt ``normalize_ix_volume`` vóórdat het pad wordt
+# vervangen, en houdt ``acl_entries`` het eigen ``path``; met ``options.force`` slaat ``validate_acl_entries`` de
+# controle over en zet ``filesystem.add_to_acl`` een recursieve ACL op elk pad onder /mnt. Daarom geeft bij de
+# standaard Custom App een niet-lege ``acl_entries`` (leeg is alleen afwezig, ``null`` of ``{}``) of een ``acl_enable``
+# anders dan false ``acl_verboden``, en mag elke ``dataset_name`` hooguit één keer per installatie voorkomen
+# (bestaande code ``dubbel``). Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+ACL_FORCE = {"path": "/mnt/testpool/andere-app", "entries": [{"id_type": "USER", "id": 568, "access": "MODIFY"}],
+             "options": {"force": True}}  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "cfg",
+    [
+        pytest.param({"acl_enable": False, "acl_entries": ACL_FORCE}, id="acl_entries_force_acl_enable_false"),
+        pytest.param({"acl_entries": ACL_FORCE}, id="acl_entries_force_zonder_acl_enable"),
+        pytest.param({"acl_entries": {"entries": ACL_FORCE["entries"]}}, id="acl_entries_zonder_path"),
+        pytest.param({"acl_enable": False, "acl_entries": {"path": "", "entries": []}}, id="acl_entries_formulier"),
+        pytest.param({"acl_enable": False, "acl_entries": []}, id="acl_entries_lijst"),
+        pytest.param({"acl_enable": False, "acl_entries": "x"}, id="acl_entries_tekst"),
+        pytest.param({"acl_enable": True}, id="acl_enable_true"),
+        pytest.param({"acl_enable": True, "acl_entries": ACL_FORCE}, id="acl_enable_true_met_acl_entries"),
+        pytest.param({"acl_enable": "false"}, id="acl_enable_tekst"),
+        pytest.param({"acl_enable": 0}, id="acl_enable_nul"),
+    ],
+)
+def test_acl_op_een_ixvolume_bij_de_standaard_custom_app_geweigerd(cfg: dict[str, Any]) -> None:
+    """R-VEILIG-2 (A4 optie a): ``ix_volume_config`` met een niet-lege ``acl_entries`` (ook met ``acl_enable: false``
+    of zonder ``path``) of een ``acl_enable`` anders dan false geeft ``acl_verboden``, zoals bij ``host_path_config``.
+    Via het platform komt er geen ACL op een ixVolume."""
+    regel = _regel("ix_volume")
+    regel["ix_volume_config"] = {"dataset_name": "config", **cfg}
+    paren = _ix_paren(regel)
+    assert (f"{ST0}.ix_volume_config", "acl_verboden") in paren, paren
+
+
+def test_dataset_name_hooguit_een_keer_per_installatie() -> None:
+    """R-VEILIG-2: twee ix_volume-regels met dezelfde ``dataset_name`` geven ``dubbel`` op de tweede; draagt die ook
+    ``acl_entries`` met een eigen ``path`` en ``options.force`` (de aanval uit de review), dan daarnaast
+    ``acl_verboden``. Ook zonder ACL is een tweede regel met dezelfde naam ``dubbel``."""
+    st1 = "parameters.app_create.values.storage[1]"
+    eerste = {"type": "ix_volume", "read_only": False, "mount_path": "/config",
+              "ix_volume_config": {"acl_enable": False, "dataset_name": "config"}}  # fmt: skip
+    tweede = {"type": "ix_volume", "read_only": False, "mount_path": "/config2",
+              "ix_volume_config": {"acl_enable": True, "dataset_name": "config", "acl_entries": ACL_FORCE}}  # fmt: skip
+    inst = POLICY.acties["app.install"]
+    paren = [(f.veld, f.code) for f in validate_parameters(POLICY, inst, APP, install_params(storage=[eerste, tweede]))]
+    assert (f"{st1}.ix_volume_config.dataset_name", "dubbel") in paren, paren
+    assert (f"{st1}.ix_volume_config", "acl_verboden") in paren, paren
+    schoon = {**tweede, "ix_volume_config": {"acl_enable": False, "dataset_name": "config"}}
+    paren = [(f.veld, f.code) for f in validate_parameters(POLICY, inst, APP, install_params(storage=[eerste, schoon]))]
+    assert paren == [(f"{st1}.ix_volume_config.dataset_name", "dubbel")], paren
+
+
+def test_ixvolume_zonder_acl_en_met_eigen_namen_blijft_geldig() -> None:
+    """R-VEILIG-2, tegenproef: de ix_volume-regels van appstore-en-fork (``acl_enable: false``, geen
+    ``acl_entries``), ook zonder ``acl_enable`` en met een lege ``acl_entries`` (``null`` of ``{}``), met elk een eigen
+    ``dataset_name``, blijven geldig."""
+    regels = [
+        {"type": "ix_volume", "read_only": False, "mount_path": f"/{naam}",
+         "ix_volume_config": {"dataset_name": naam, **extra}}
+        for naam, extra in (
+            ("appdata", {"acl_enable": False}),
+            ("config", {"acl_enable": False}),
+            ("data_1", {}),
+            ("x-y", {"acl_enable": None}),
+            ("a", {"acl_enable": False, "acl_entries": None}),
+            ("b", {"acl_enable": False, "acl_entries": {}}),
+        )
+    ]  # fmt: skip
+    assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=regels)) == []

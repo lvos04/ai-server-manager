@@ -51,6 +51,13 @@ geeft ``onbekend_veld``. ``read_only`` is true of false, ``tmpfs_config.size`` e
 nieuw veld in een latere ix-app-versie wordt geweigerd tot de lijst is bijgewerkt. Catalogusapps vallen hier niet
 onder (S-P2-050). Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
 
+Opslag (KLEIN-80, herstel R-VEILIG-1 en R-VEILIG-2; KLEIN-75 A4 optie a): bij de standaard Custom App is
+``mount_path`` alleen een strikt containerpad (:data:`CONTAINERPAD_RE`, geen "."- of ".."-deel, genormaliseerd geen
+verboden containerpad; anders ``mount_verboden``), zodat de tmpfs-opties niet via ":" of "," in ``mount_path`` te zetten
+zijn. In ``ix_volume_config`` geeft een niet-lege ``acl_entries`` of een ``acl_enable`` anders dan false
+``acl_verboden`` en staat elke ``dataset_name`` hooguit één keer in een installatie (anders ``dubbel``). Afgeleid uit
+de bron; NIET GEVALIDEERD (echte NAS).
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -59,6 +66,7 @@ genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilerco
 from __future__ import annotations
 
 import ipaddress
+import posixpath
 import re
 import unicodedata
 from collections.abc import Mapping
@@ -692,6 +700,52 @@ def _ix_opslag_witte_lijst(st: Mapping[str, Any], sw: str, eigen: str | None) ->
     return out
 
 
+# Koppelpad in de container van de standaard Custom App (KLEIN-80, herstel R-VEILIG-1; besluit van de regisseur, dicht
+# bij twijfel). De bibliotheek geeft een tmpfs weer als tekst ``"<mount_path>:<opties>"`` (truenas/apps f142a16,
+# library 2.3.18, ``Tmpfs.render``) en niemand controleert ``mount_path`` op ":" of ",": zo waren de tmpfs-opties
+# (``exec``, ``suid``, ``dev``, ``mode``, ``uid``, ``gid``) toch te zetten. De middleware normaliseert het pad
+# (``pydantic_utils._validate_absolute_path``: ``os.path.normpath``), dus ``/proc/.`` werd ``/proc``. Daarom alleen
+# een strikt containerpad: "/" gevolgd door delen van letters, cijfers en ``. _ @ + -`` (ASCII), gescheiden door één
+# "/", geen "."- of ".."-deel, geen "/" aan het eind; het genormaliseerde pad is geen verboden containerpad
+# (:data:`CONTAINER_FORBIDDEN_MOUNTS`). Anders ``mount_verboden``. NIET GEVALIDEERD (echte NAS).
+CONTAINERPAD_RE = re.compile(r"/[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*")
+_MOUNT_VERBODEN = (
+    "absoluut pad in de container: / gevolgd door delen van letters, cijfers en . _ @ + -, gescheiden door één /; "
+    "geen . of .. als deel, geen / aan het eind, niet / of een systeempad"
+)
+# ACL op een ixVolume van de standaard Custom App (KLEIN-80, herstel R-VEILIG-2; KLEIN-75 A4 optie a, besluit van de
+# regisseur, dicht bij twijfel). TrueNAS zet een ACL zodra ``acl_entries`` niet leeg is, ook met ``acl_enable: false``
+# (middleware ece9d19, ``normalize_ix_volume``: ``if acl_dict:``). Bij een ``dataset_name`` die eerder in dezelfde
+# installatie staat, stopt ``normalize_ix_volume`` vóórdat het pad door het eigen ixVolume wordt vervangen; dan houdt
+# ``acl_entries`` zijn eigen ``path``, slaat ``validate_acl_entries`` bij ``options.force`` de controle over en zet
+# ``filesystem.add_to_acl`` een recursieve ACL op elk pad onder /mnt. Daarom: een niet-lege ``acl_entries`` (leeg is
+# alleen afwezig, ``null`` of ``{}``) of een ``acl_enable`` anders dan false is ``acl_verboden``, en elke
+# ``dataset_name`` staat hooguit één keer in een installatie (anders de bestaande code ``dubbel``). Gevolg (bewust):
+# via het platform geen ACL op een ixVolume; geen geldige payload gebruikt dat (appstore-en-fork, ``IxVolumeConfig``:
+# alleen ``acl_enable: false`` en ``dataset_name``). Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+_DATASET_DUBBEL = "deze dataset_name staat er dubbel in: elk ixVolume hooguit één keer per installatie"
+
+
+def _mount_path_problem(mount: Any) -> bool:
+    """Waar als ``mount`` geen strikt containerpad is of genormaliseerd een verboden containerpad (zie
+    :data:`CONTAINERPAD_RE`)."""
+    if not isinstance(mount, str) or not CONTAINERPAD_RE.fullmatch(mount):
+        return True
+    if any(deel in (".", "..") for deel in mount.split("/")[1:]):
+        return True
+    return posixpath.normpath(mount) in CONTAINER_FORBIDDEN_MOUNTS
+
+
+def _ix_volume_acl(cfg: Mapping[str, Any], where: str) -> list[Fout]:
+    """``acl_verboden`` voor een niet-lege ``acl_entries`` of een ``acl_enable`` anders dan false in een
+    ``ix_volume_config`` van de standaard Custom App (KLEIN-80, herstel R-VEILIG-2)."""
+    acl_enable = cfg.get("acl_enable")
+    acl_entries = cfg.get("acl_entries")
+    if not (acl_enable is None or acl_enable is False) or not (acl_entries is None or acl_entries == {}):
+        return [_f(where, "acl_verboden", "ACL's zet het platform niet, ook niet op een ixVolume")]
+    return []
+
+
 def _ix_volume_naam(v: Any, where: str) -> list[Fout]:
     """Een veilige naam voor het dataset van een ixVolume (KLEIN-78; zie :data:`IX_VOLUME_NAAM_RE`)."""
     if not isinstance(v, str):
@@ -876,6 +930,7 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
     if not isinstance(storage, list) or len(storage) > 20:
         out.append(_f(f"{w}.storage", "lijst", "hooguit 20 opslagregels"))
     else:
+        datasets: set[str] = set()
         for i, st in enumerate(storage):
             sw = f"{w}.storage[{i}]"
             if not isinstance(st, Mapping):
@@ -884,18 +939,18 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
             typ = st.get("type")
             if typ not in ("host_path", "ix_volume", "tmpfs"):
                 out.append(_f(f"{sw}.type", "opslag_verboden", "alleen host_path, ix_volume of tmpfs"))
-            mount = st.get("mount_path")
-            if (
-                not isinstance(mount, str)
-                or not mount.startswith("/")
-                or mount.rstrip("/") in ("", *CONTAINER_FORBIDDEN_MOUNTS)
-                or ".." in mount
-            ):
-                out.append(
-                    _f(f"{sw}.mount_path", "mount_verboden", "absoluut pad in de container, niet / of een systeempad")
-                )
+            if _mount_path_problem(st.get("mount_path")):
+                out.append(_f(f"{sw}.mount_path", "mount_verboden", _MOUNT_VERBODEN))
             eigen = EIGEN_OPSLAG_CONFIG.get(typ) if isinstance(typ, str) else None
             out += _ix_opslag_witte_lijst(st, sw, eigen)
+            ixcfg = st.get("ix_volume_config")
+            if isinstance(ixcfg, Mapping):
+                out += _ix_volume_acl(ixcfg, f"{sw}.ix_volume_config")
+                naam = ixcfg.get("dataset_name")
+                if isinstance(naam, str):
+                    if naam in datasets:
+                        out.append(_f(f"{sw}.ix_volume_config.dataset_name", "dubbel", _DATASET_DUBBEL))
+                    datasets.add(naam)
             # Een config van een ander type, met inhoud, wordt geweigerd (KLEIN-76, R-VEILIG-1; dicht bij twijfel):
             # TrueNAS laat hem door en normaliseert een aanwezige ix_volume_config (dataset) of host_path_config.acl
             # (ACL) ook bij een ander type. Leeg is alleen afwezig, null of {}. Gedrag van TrueNAS: afgeleid uit de

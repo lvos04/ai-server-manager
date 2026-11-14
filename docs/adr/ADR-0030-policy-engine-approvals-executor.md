@@ -103,7 +103,7 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    geldige payload stuurt zo'n config mee (appstore-en-fork vertaalt per regel alleen de config van het eigen type).
    Een witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps
    (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten; A3 en A6 besluit de latere aanvulling KLEIN-78 hieronder,
-   A2 de latere aanvulling KLEIN-80.
+   A2 de latere aanvulling KLEIN-80, A4 het herstel van KLEIN-80.
    `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet. NIET GEVALIDEERD (echte NAS).
    **Opslag: datasetnaam van een ixVolume en SMB-wachtwoord (aanvulling 2026-11-14, KLEIN-78; KLEIN-75 A3 en A6;
    besluit van de regisseur, dicht bij twijfel).** TrueNAS maakt het dataset van een ixVolume aan als
@@ -120,7 +120,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    elke andere waarde gaf de code `geheim_in_klare_tekst`. Die wachtwoordregel is op dezelfde dag vervangen door de
    herstelregel hieronder. Een ongeldige `vault://`-tekst houdt `vault_ref_ongeldig`. Andere wachtwoordvelden van
    catalogusapps vallen hier niet onder (KLEIN-75 A6 optie a is niet gekozen). Witte lijst per opslagregel, ACL op een
-   ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven open (A2 besluit de latere aanvulling KLEIN-80 hieronder).
+   ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven open (A2 besluit de latere aanvulling KLEIN-80 hieronder,
+   A4 het herstel van KLEIN-80).
    `policy/*.yaml` en de `policy_hash` veranderen niet.
    NIET GEVALIDEERD (echte NAS).
    **Opslag: SMB bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-78 herstel R-VEILIG-1; KLEIN-75 A6 optie
@@ -150,14 +151,43 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    type, geeft de bestaande code `onbekend_veld`. Apart beoordeeld en geweigerd, omdat de policy ze niet beoordeelt en
    geen geldige payload ze gebruikt (appstore-en-fork, `IxStorage`): `create_host_path` (maakt een hostpad aan),
    `propagation` (mount-propagatie), `auto_permissions` (rechten zetten) en `exec`, `mode`, `uid` en `gid` van tmpfs, met
-   elke waarde. `properties` houdt daarnaast `zfs_eigenschappen_verboden`. Velden op de lijst houden hun eigen regel:
+   elke waarde (als sleutel; via `mount_path` waren die tmpfs-opties tot het herstel hieronder nog wel te zetten, nu
+   niet meer). `properties` houdt daarnaast `zfs_eigenschappen_verboden`. Velden op de lijst houden hun eigen regel:
    `acl` blijft `acl_verboden`, een niet-lege `cifs_config`/`nfs_config` blijft `opslag_verboden`; `acl_enable` en
    `acl_entries` van een ixVolume staan op de lijst omdat het formulier ze toont, ACL op een ixVolume (KLEIN-75 A4) is
-   hiermee niet besloten. De config van het eigen type is een object (anders `type`), `read_only` is true of false
-   (anders `type`) en `tmpfs_config.size` is een geheel getal van minstens 1 MiB (anders `bereik`; een bovengrens is
-   niet besloten). Gevolg (bewust): een nieuw veld in een latere ix-app-versie wordt geweigerd tot de lijst is
-   bijgewerkt. Catalogusapps vallen hier niet onder (S-P2-050). `policy/*.yaml` en de `policy_hash` veranderen niet;
+   hiermee niet besloten (A4 besluit het herstel hieronder). De config van het eigen type is een object (anders
+   `type`), `read_only` is true of false (anders `type`) en `tmpfs_config.size` is een geheel getal van minstens 1 MiB
+   (anders `bereik`; een bovengrens is niet besloten). Gevolg (bewust): een nieuw veld in een latere ix-app-versie
+   wordt geweigerd tot de lijst is bijgewerkt. Catalogusapps vallen hier niet onder (S-P2-050). `policy/*.yaml` en de
+   `policy_hash` veranderen niet;
    restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". NIET GEVALIDEERD (echte NAS).
+   **Opslag: strikt koppelpad en geen ACL op een ixVolume (aanvulling 2026-11-14, KLEIN-80 herstel R-VEILIG-1 en
+   R-VEILIG-2; KLEIN-75 A4 optie a; besluit van de regisseur, dicht bij twijfel).** Twee velden op de witte lijst
+   droegen de gevaarlijke inhoud alsnog. (1) De bibliotheek geeft een tmpfs weer als tekst `"<mount_path>:<opties>"`
+   (truenas/apps f142a16, library 2.3.18, `Tmpfs.render`) en niemand controleerde `mount_path` op `:` of `,`; met
+   bijvoorbeeld `/cache:exec,suid,dev,mode=4777,uid=0,gid=0,=` waren zo de tmpfs-opties toch te zetten, en een `.`-deel
+   (`/proc/.`, `/./proc`) ontliep de lijst van verboden containerpaden (de middleware maakt er met `normpath` `/proc`
+   van). Daarom is `mount_path` bij de standaard Custom App alleen een strikt containerpad: `/` gevolgd door delen van
+   ASCII-letters, cijfers en `.`, `_`, `@`, `+`, `-`, gescheiden door één `/`, zonder `.`- of `..`-deel en zonder `/`
+   aan het eind; het genormaliseerde pad is geen verboden containerpad (`/`, `/proc`, `/sys`, `/dev`, de
+   Docker-socket). Anders de bestaande code `mount_verboden`. Alle koppelpaden uit de manifesten van de elf repos
+   (`/app/data`, `/appdata`, `/beszel_data`, `/cache`, `/certs`, `/config`, `/data`, `/media`, `/templates`,
+   `/var/lib/beszel-agent`, `/var/lib/postgresql`) blijven geldig. (2) TrueNAS zet een ACL op een ixVolume zodra
+   `ix_volume_config.acl_entries` niet leeg is, ook met `acl_enable: false` (middleware ece9d19,
+   `normalize_ix_volume`: `if acl_dict:`), en bij een `dataset_name` die eerder in dezelfde installatie staat stopt
+   `normalize_ix_volume` vóórdat het pad door het eigen ixVolume wordt vervangen: dan houdt `acl_entries` zijn eigen
+   `path`, slaat `validate_acl_entries` bij `options.force` de controle over en zet `filesystem.add_to_acl` een
+   recursieve ACL op elk pad onder `/mnt`, ook de data van andere apps. Het uitgangspunt van KLEIN-75 A4 ("pad door de
+   middleware bepaald") klopt dan niet. Daarom geeft bij de standaard Custom App een niet-lege `acl_entries` (leeg is
+   alleen afwezig, `null` of `{}`) of een `acl_enable` anders dan false in `ix_volume_config` `acl_verboden`, zoals bij
+   `host_path_config`, en mag elke `dataset_name` hooguit één keer per installatie voorkomen (anders de bestaande code
+   `dubbel`, die `_ix_values` al gebruikt voor een dubbele variabele: dezelfde betekenis; `opslag_verboden` of
+   `patroon` zou een verboden opslagsoort of een ongeldige naam suggereren). Gevolg (bewust): via het platform komt er
+   geen ACL op een ixVolume. Geen geldige payload gebruikt dat: appstore-en-fork kent in `IxVolumeConfig` alleen
+   `acl_enable: false` en `dataset_name`, en de 9 opnieuw vertaalde payloads van de manifesten bevatten geen
+   `acl_entries` en geen dubbele `dataset_name`. Catalogusapps vallen hier niet onder (S-P2-050). `policy/*.yaml` en
+   de `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". Afgeleid
+   uit de bron; NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -398,6 +428,9 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   (type cifs, `cifs_config`) bij een catalogusapp (in plaats van `geheim_in_klare_tekst` voor `cifs_config.password`).
   Aanvulling 2026-11-14 (KLEIN-80): ook de witte lijst per opslagregel van de standaard Custom App (`onbekend_veld`,
   `type` en `bereik` in een opslagregel) werkt in de executor pas na een nieuw gebouwd en uitgerold executor-image.
+  Aanvulling 2026-11-14 (KLEIN-80 herstel R-VEILIG-1 en R-VEILIG-2): hetzelfde geldt voor `mount_verboden` voor een
+  koppelpad dat geen strikt containerpad is, `acl_verboden` voor een ACL op een ixVolume en `dubbel` voor een
+  herhaalde `dataset_name`.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie

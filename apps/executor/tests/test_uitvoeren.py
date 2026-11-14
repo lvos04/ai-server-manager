@@ -784,6 +784,48 @@ def test_onbekende_opslagsleutel_van_de_standaard_custom_app_weigert_de_executor
     assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == [hostpad, ixvol, tmpfs]
 
 
+def test_mount_path_met_opties_en_acl_op_een_ixvolume_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-80, herstel R-VEILIG-1 en R-VEILIG-2: een ondertekend en goedgekeurd verzoek (R3) voor de standaard Custom
+    App met een ``mount_path`` dat geen strikt containerpad is (tmpfs-opties na ":" of ",", of een "."-deel voor een
+    verboden containerpad; ``mount_verboden``), met twee ix_volume-regels met dezelfde ``dataset_name`` waarvan één
+    ``acl_entries`` met een eigen ``path`` en ``options.force`` draagt (``dubbel`` en ``acl_verboden``), of met een
+    niet-lege ``acl_entries`` naast ``acl_enable: false`` (``acl_verboden``), weigert de executor zelf met 422;
+    TrueNAS krijgt niets. Vroeger gingen deze verzoeken door tot ``app.create``. Tegenproef: alle koppelpaden uit de
+    manifesten en de ix_volume-regels van appstore-en-fork worden uitgevoerd."""
+    hub, c, nas = stack
+    tmpfs = {"type": "tmpfs", "read_only": False, "mount_path": "/cache", "tmpfs_config": {"size": 256}}
+    hostpad = {"type": "host_path", "read_only": False, "mount_path": "/data"}
+    hostpad["host_path_config"] = {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}
+    acl = {"path": "/mnt/testpool/andere-app", "entries": [{"id_type": "USER", "id": 568, "access": "MODIFY"}]}
+    acl["options"] = {"force": True}
+
+    def ixvol(mount: str, naam: str, **extra: Any) -> dict[str, Any]:
+        cfg = {"acl_enable": False, "dataset_name": naam, **extra}
+        return {"type": "ix_volume", "read_only": False, "mount_path": mount, "ix_volume_config": cfg}
+
+    gevallen: list[tuple[list[dict[str, Any]], set[str]]] = [
+        ([{**tmpfs, "mount_path": m}], {"mount_verboden"})
+        for m in ("/cache:exec,mode=1777,=", "/cache,exec", "/proc:=", "/proc/.", "/./proc")
+    ]
+    gevallen += [
+        ([{**hostpad, "mount_path": "/./proc"}], {"mount_verboden"}),
+        ([ixvol("/config", "config"), ixvol("/config2", "config", acl_enable=True, acl_entries=acl)],
+         {"dubbel", "acl_verboden"}),
+        ([ixvol("/config", "config", acl_entries=acl)], {"acl_verboden"}),
+    ]  # fmt: skip
+    for i, (opslag, codes) in enumerate(gevallen):
+        r = execute(c, hub, approved(hub, install_prop(f"demo-mp-{i}", storage=opslag), risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (i, r.text)
+        assert codes <= {f["code"] for f in r.json()["details"]["fouten"]}, (i, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    mounts = ("/app/data", "/appdata", "/beszel_data", "/cache", "/certs", "/config", "/data", "/media", "/templates",
+              "/var/lib/beszel-agent", "/var/lib/postgresql")  # fmt: skip
+    geldig = [{**tmpfs, "mount_path": m} for m in mounts] + [ixvol("/x", "appdata"), ixvol("/y", "config"), hostpad]
+    r = execute(c, hub, approved(hub, install_prop("demo-mp-goed", storage=geldig)))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en
