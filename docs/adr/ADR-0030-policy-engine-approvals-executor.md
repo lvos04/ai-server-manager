@@ -254,7 +254,10 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    Zonder overtreding verandert er niets (geen waarschuwing, geen veld, geen logregel). De Hub doet geen hercontrole:
    hij ziet de bewaarde waarden nooit. `policy/*.yaml` en de `policy_hash` veranderen niet. Sim-getest (nep-TrueNAS);
    of de waarden die een echte TrueNAS in `app.config` teruggeeft vanzelf meldingen geven, is NIET GEVALIDEERD (echte
-   NAS).
+   NAS). Aanvulling 2026-11-14 (KLEIN-86; bevinding R-EERLIJK-2 van de controle van KLEIN-85): de hercontrole zit in de
+   executor en werkt op de NAS pas na een nieuw gebouwd en uitgerold executor-image (zoals bij KLEIN-80, KLEIN-81 en
+   KLEIN-83; zie "Engine-regels buiten de `policy_hash`"); een oude executor zet terug zonder hercontrole en meldt
+   niets. Code, tests, `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet.
 9. **`resource_etag`.** Een hash over naam, staat, catalogusapp, trein, versie, `custom_app`, images en digests uit
    `app.query` + `app.image.query`. Hub en executor rekenen hem met dezelfde functie uit hun eigen readback. De
    app-configuratie telt niet mee (geheimen; de alleen-lezen-key van de Hub leest hem niet).
