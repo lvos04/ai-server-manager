@@ -31,7 +31,10 @@ Opslag (KLEIN-76; KLEIN-75 A5 en A1): ``ix_volume_config.properties`` (ZFS-eigen
 aanmaakt) is bij elke app en met elke waarde verboden (``zfs_eigenschappen_verboden``), en ``mountpoint`` met een
 waarde die met "/" begint is overal een hostpad, ook bij de standaard Custom App. Bij de standaard Custom App is een
 aanwezig ``host_path_config.acl`` ook met ``acl_enable: false`` een ACL (``acl_verboden``) en gaat ``acl.path`` door
-de hostpadregel.
+de hostpadregel, in een opslagregel van elk type (R-VEILIG-1: TrueNAS normaliseert ``host_path_config`` ook in een
+regel van type ix_volume of tmpfs); ``host_path_config.path`` gaat dan ook door de hostpadregel. Een config van een
+ander type dan de regel (bv. ``host_path_config`` of ``tmpfs_config`` bij ix_volume) die niet leeg is (afwezig,
+``null`` of ``{}``), is ``opslag_verboden``.
 
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
@@ -584,6 +587,17 @@ _ZFS_EIGENSCHAPPEN = (
     "ZFS-eigenschappen (properties) van een ixVolume zet het platform niet: TrueNAS maakt het dataset met de "
     "standaardinstellingen aan; laat properties weg"
 )
+# Opslagregels van de standaard Custom App (KLEIN-76, R-VEILIG-1): per type hoort er één config bij. De genormaliseerde
+# namen van alle type-configs van de ix-app-bibliotheek (ook van de types die de policy niet toelaat).
+HOST_PATH_CONFIG = "hostpathconfig"
+OPSLAG_CONFIGS = frozenset(
+    {HOST_PATH_CONFIG, IX_VOLUME_CONFIG, "tmpfsconfig", "nfsconfig", "cifsconfig", "volumeconfig"}
+)
+EIGEN_OPSLAG_CONFIG = {"host_path": "host_path_config", "ix_volume": "ix_volume_config", "tmpfs": "tmpfs_config"}
+_VREEMDE_CONFIG = (
+    "deze config hoort niet bij het type van de opslagregel (host_path_config bij host_path, ix_volume_config bij "
+    "ix_volume, tmpfs_config bij tmpfs): laat haar weg"
+)
 
 
 def _sleutel_fout(
@@ -682,6 +696,28 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app
     return out
 
 
+def _host_path_config(waarde: Any, where: str, *, pad_verplicht: bool) -> list[Fout]:
+    """``host_path_config`` van een opslagregel van de standaard Custom App, bij elk type (KLEIN-76, R-VEILIG-1): een
+    aanwezig ``acl``-blok of ``acl_enable`` anders dan false is een ACL (``acl_verboden``; TrueNAS normaliseert het
+    ``acl``-blok ook bij ``acl_enable: false`` en in een regel van een ander type), en elk pad (``path`` en
+    ``acl.path``) gaat door :func:`host_path_problem`. ``pad_verplicht``: bij type host_path moet ``path`` er zijn."""
+    out: list[Fout] = []
+    cfg = waarde or {}
+    is_object = isinstance(cfg, Mapping)
+    if not is_object or cfg.get("acl_enable") not in (None, False) or "acl" in cfg:
+        out.append(_f(where, "acl_verboden", "ACL's zet het platform niet"))
+    if pad_verplicht or (is_object and "path" in cfg):
+        problem = host_path_problem(cfg.get("path") if is_object else None)
+        if problem:
+            out.append(_f(f"{where}.path", "hostpad_verboden", problem))
+    acl = cfg.get("acl") if is_object else None
+    if isinstance(acl, Mapping) and "path" in acl:
+        problem = host_path_problem(acl["path"])
+        if problem:
+            out.append(_f(f"{where}.acl.path", "hostpad_verboden", problem))
+    return out
+
+
 def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[Fout]:
     w = "parameters.app_create.values"
     out = _only(values, w, set(IX_VALUES_KEYS), {"image", "restart_policy", "TZ"})
@@ -745,20 +781,22 @@ def _ix_values(values: Mapping[str, Any], manifest: Mapping[str, Any]) -> list[F
                 out.append(
                     _f(f"{sw}.mount_path", "mount_verboden", "absoluut pad in de container, niet / of een systeempad")
                 )
-            if typ == "host_path":
-                cfg = st.get("host_path_config") or {}
-                # Een aanwezig acl-blok telt als ACL, ook met acl_enable false: TrueNAS normaliseert het dan toch
-                # (KLEIN-76; KLEIN-75 A1).
-                if not isinstance(cfg, Mapping) or cfg.get("acl_enable") not in (None, False) or "acl" in cfg:
-                    out.append(_f(f"{sw}.host_path_config", "acl_verboden", "ACL's zet het platform niet"))
-                problem = host_path_problem(cfg.get("path") if isinstance(cfg, Mapping) else None)
-                if problem:
-                    out.append(_f(f"{sw}.host_path_config.path", "hostpad_verboden", problem))
-                acl = cfg.get("acl") if isinstance(cfg, Mapping) else None
-                if isinstance(acl, Mapping) and "path" in acl:
-                    problem = host_path_problem(acl["path"])
-                    if problem:
-                        out.append(_f(f"{sw}.host_path_config.acl.path", "hostpad_verboden", problem))
+            eigen = EIGEN_OPSLAG_CONFIG.get(typ) if isinstance(typ, str) else None
+            # Een config van een ander type, met inhoud, wordt geweigerd (KLEIN-76, R-VEILIG-1; dicht bij twijfel):
+            # TrueNAS laat hem door en normaliseert een aanwezige ix_volume_config (dataset) of host_path_config.acl
+            # (ACL) ook bij een ander type. Leeg is alleen afwezig, null of {}.
+            out += [
+                _f(f"{sw}.{k}", "opslag_verboden", _VREEMDE_CONFIG)
+                for k, v in st.items()
+                if _nk(k) in OPSLAG_CONFIGS and k != eigen and v is not None and v != {}
+            ]
+            # host_path_config bij elk type, ook in een andere schrijfwijze (KLEIN-76, R-VEILIG-1).
+            hostpad_cfgs = [k for k in st if _nk(k) == HOST_PATH_CONFIG]
+            if typ == "host_path" and "host_path_config" not in st:
+                hostpad_cfgs.append("host_path_config")
+            for k in hostpad_cfgs:
+                verplicht = typ == "host_path" and k == "host_path_config"
+                out += _host_path_config(st.get(k), f"{sw}.{k}", pad_verplicht=verplicht)
     ports = values.get("ports") or []
     if not isinstance(ports, list) or len(ports) > 20:
         out.append(_f(f"{w}.ports", "lijst", "hooguit 20 poorten"))

@@ -1755,15 +1755,34 @@ ACL_BLOKKEN = [
     pytest.param({}, id="leeg"),
     pytest.param(None, id="null"),
 ]
+# R-VEILIG-1 (KLEIN-76): TrueNAS normaliseert een meegestuurd ``host_path_config`` (en het ``acl``-blok daarin) ook in
+# een opslagregel van een ander type. De regel van elk toegestaan type, zonder ``host_path_config``.
+OPSLAGTYPEN = {
+    "host_path": {"type": "host_path", "mount_path": "/data"},
+    "ix_volume": {
+        "type": "ix_volume",
+        "mount_path": "/config",
+        "ix_volume_config": {"acl_enable": False, "dataset_name": "config"},
+    },
+    "tmpfs": {"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 100}},
+}
 
 
+def _met_host_path_config(typ: str, cfg: Any) -> dict[str, Any]:
+    """Een opslagregel van type ``typ`` met ``host_path_config``; bij host_path komt het eigen pad erbij."""
+    if typ == "host_path" and isinstance(cfg, dict):
+        cfg = {"path": "/mnt/testpool/apps/demo-app", **cfg}
+    return {**OPSLAGTYPEN[typ], "host_path_config": cfg}
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
 @pytest.mark.parametrize("acl", ACL_BLOKKEN)
-def test_acl_blok_bij_de_standaard_custom_app_ook_met_acl_enable_false_geweigerd(acl: Any) -> None:
+def test_acl_blok_bij_de_standaard_custom_app_ook_met_acl_enable_false_geweigerd(typ: str, acl: Any) -> None:
     """A1: TrueNAS normaliseert ``host_path_config.acl`` ook als ``acl_enable`` false is en zou dan een ACL zetten op
     ``acl.path``. Bij de standaard Custom App is een aanwezig ``acl``-blok dezelfde weigering als ``acl_enable: true``
-    (``acl_verboden``), en ``acl.path`` gaat ook door de hostpadregel."""
-    cfg = {"path": "/mnt/testpool/apps/demo-app", "acl_enable": False, "acl": acl}
-    opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": cfg}]
+    (``acl_verboden``), en ``acl.path`` gaat ook door de hostpadregel. R-VEILIG-1: dat geldt in een opslagregel van
+    elk type (host_path, ix_volume, tmpfs), ook zonder ``host_path_config.path``."""
+    opslag = [_met_host_path_config(typ, {"acl_enable": False, "acl": acl})]
     fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=opslag))
     paren = [(f.veld, f.code) for f in fouten]
     w = "parameters.app_create.values.storage[0].host_path_config"
@@ -1772,12 +1791,134 @@ def test_acl_blok_bij_de_standaard_custom_app_ook_met_acl_enable_false_geweigerd
         assert (f"{w}.acl.path", "hostpad_verboden") in paren, paren
 
 
-def test_acl_path_buiten_een_dataset_ook_zonder_acl_enable() -> None:
-    """A1: ``acl.path`` gaat bij de standaard Custom App door de hostpadregel, ook als het geen tekst met "/" is."""
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+@pytest.mark.parametrize(
+    "cfg",
+    [
+        pytest.param({"acl_enable": True}, id="acl_enable_true"),
+        pytest.param({"acl_enable": "ja"}, id="acl_enable_tekst"),
+        pytest.param(
+            {"acl_enable": True, "acl": {"path": "/root", "entries": [{"id_type": "USER", "id": 0}]}},
+            id="acl_enable_true_met_acl",
+        ),
+        pytest.param(
+            {"acl": {"path": "/etc", "entries": [{"id_type": "USER", "id": 0}], "options": {"force": True}}},
+            id="force_zonder_acl_enable",
+        ),
+    ],
+)
+def test_acl_in_elk_opslagtype_ook_met_acl_enable_true_en_zonder_path(typ: str, cfg: dict[str, Any]) -> None:
+    """R-VEILIG-1: ``acl_enable`` anders dan false of een ``acl``-blok in ``host_path_config`` geeft ``acl_verboden``
+    in een opslagregel van elk type, ook zonder ``host_path_config.path``; ``acl.path`` buiten een dataset geeft
+    daarnaast ``hostpad_verboden``. Vroeger zag de policy ``host_path_config`` alleen bij type host_path."""
+    regel = {**OPSLAGTYPEN[typ], "host_path_config": cfg}
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=[regel]))
+    paren = [(f.veld, f.code) for f in fouten]
+    w = "parameters.app_create.values.storage[0].host_path_config"
+    assert (w, "acl_verboden") in paren, paren
+    if "acl" in cfg:
+        assert (f"{w}.acl.path", "hostpad_verboden") in paren, paren
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+def test_acl_path_buiten_een_dataset_ook_zonder_acl_enable(typ: str) -> None:
+    """A1: ``acl.path`` gaat bij de standaard Custom App door de hostpadregel, ook als het geen tekst met "/" is.
+    R-VEILIG-1: in een opslagregel van elk type."""
     for pad in ("/etc", "etc", "/mnt/.ix-apps/x", 5):
-        cfg = {"path": "/mnt/testpool/apps/demo-app", "acl": {"path": pad}}
-        opslag = [{"type": "host_path", "mount_path": "/data", "host_path_config": cfg}]
+        opslag = [_met_host_path_config(typ, {"acl": {"path": pad}})]
         fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=opslag))
         assert ("parameters.app_create.values.storage[0].host_path_config.acl.path", "hostpad_verboden") in [
             (f.veld, f.code) for f in fouten
         ], (pad, [f.as_dict() for f in fouten])
+
+
+# R-VEILIG-1 (KLEIN-76; besluit van de regisseur, dicht bij twijfel): een type-config die niet bij het type van de
+# opslagregel hoort, met inhoud, wordt geweigerd (``opslag_verboden``). TrueNAS normaliseert hem anders toch: een
+# ``ix_volume_config`` (``normalize/ix_volume``) maakt een dataset aan, een ``host_path_config.acl`` zet een ACL.
+VREEMDE_CONFIGS = [
+    pytest.param("ix_volume", "host_path_config", {"path": "/mnt/testpool/apps/demo-app"}, id="ixvolume.hostpad"),
+    pytest.param("ix_volume", "host_path_config", {"create_host_path": True}, id="ixvolume.create_host_path"),
+    pytest.param("ix_volume", "tmpfs_config", {"size": 100}, id="ixvolume.tmpfs"),
+    pytest.param("tmpfs", "ix_volume_config", {"acl_enable": False, "dataset_name": "x"}, id="tmpfs.ixvolume"),
+    pytest.param("tmpfs", "ix_volume_config", {"acl_enable": False}, id="tmpfs.ixvolume_standaard"),
+    pytest.param("tmpfs", "host_path_config", {"acl_enable": False}, id="tmpfs.hostpad_standaard"),
+    pytest.param("host_path", "ix_volume_config", {"dataset_name": "x"}, id="hostpad.ixvolume"),
+    pytest.param("host_path", "tmpfs_config", {"size": 1, "exec": True}, id="hostpad.tmpfs"),
+    pytest.param("host_path", "nfs_config", {"server": "server.test", "path": "/export"}, id="hostpad.nfs"),
+    pytest.param("ix_volume", "cifs_config", {"server": "server.test", "path": "x"}, id="ixvolume.cifs"),
+    pytest.param("ix_volume", "volume_config", {"volume_name": "x"}, id="ixvolume.volume"),
+    pytest.param("ix_volume", "Host-Path-Config", {"acl_enable": False}, id="ixvolume.andere_schrijfwijze"),
+    pytest.param("ix_volume", "tmpfs_config", [], id="ixvolume.lege_lijst_is_geen_object"),
+    pytest.param("ix_volume", "tmpfs_config", "x", id="ixvolume.tekst"),
+]
+
+
+@pytest.mark.parametrize(("typ", "sleutel", "cfg"), VREEMDE_CONFIGS)
+def test_config_van_een_ander_type_met_inhoud_wordt_geweigerd(typ: str, sleutel: str, cfg: Any) -> None:
+    """R-VEILIG-1: een type-config die niet bij het type van de regel hoort en niet leeg is (alleen afwezig, ``null``
+    of ``{}`` is leeg; ook alleen de standaardwaarde ``acl_enable: false`` telt als inhoud, want geen geldige payload
+    stuurt een vreemde config mee) geeft ``opslag_verboden`` op die config, ook in een andere schrijfwijze."""
+    regel = {**OPSLAGTYPEN[typ], sleutel: cfg}
+    if typ == "host_path":
+        regel["host_path_config"] = {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=[regel]))
+    paren = [(f.veld, f.code) for f in fouten]
+    assert (f"parameters.app_create.values.storage[0].{sleutel}", "opslag_verboden") in paren, paren
+
+
+@pytest.mark.parametrize(
+    "regel",
+    [
+        pytest.param({}, id="zonder_host_path_config"),
+        pytest.param({"host_path_config": None}, id="null"),
+        pytest.param({"host_path_config": {}}, id="leeg"),
+        pytest.param({"host_path_config": {"acl_enable": False}}, id="zonder_path"),
+    ],
+)
+def test_host_path_zonder_pad_blijft_geweigerd(regel: dict[str, Any]) -> None:
+    """Regressieproef bij het herstel van R-VEILIG-1 (de controle van ``host_path_config`` is verplaatst): een regel
+    van type host_path zonder ``host_path_config.path`` geeft ``hostpad_verboden`` op dat pad, zoals vóór KLEIN-76."""
+    opslag = [{**OPSLAGTYPEN["host_path"], **regel}]
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=opslag))
+    assert ("parameters.app_create.values.storage[0].host_path_config.path", "hostpad_verboden") in [
+        (f.veld, f.code) for f in fouten
+    ], [f.as_dict() for f in fouten]
+
+
+@pytest.mark.parametrize("typ", ["ix_volume", "tmpfs"])
+def test_pad_in_een_vreemde_host_path_config_gaat_door_de_hostpadregel(typ: str) -> None:
+    """R-VEILIG-1: elk pad in ``host_path_config`` (``path`` en ``acl.path``) gaat door de hostpadregel, ook in een
+    opslagregel van een ander type en ook in een andere schrijfwijze van de sleutel."""
+    for sleutel in ("host_path_config", "Host_Path_Config"):
+        regel = {**OPSLAGTYPEN[typ], sleutel: {"path": "/etc", "acl": {"path": "/root"}}}
+        fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=[regel]))
+        paren = [(f.veld, f.code) for f in fouten]
+        w = f"parameters.app_create.values.storage[0].{sleutel}"
+        assert (f"{w}.path", "hostpad_verboden") in paren, (sleutel, paren)
+        assert (f"{w}.acl.path", "hostpad_verboden") in paren, (sleutel, paren)
+        assert (w, "acl_verboden") in paren and (w, "opslag_verboden") in paren, (sleutel, paren)
+
+
+def test_geldige_opslagvormen_blijven_geldig() -> None:
+    """Tegenproef (R-VEILIG-1): precies de opslagregels die appstore-en-fork voor de standaard Custom App maakt
+    (``apps/api/src/appstore/manifest/translate.py``, ``_custom_app_values``: per regel alleen de config van het eigen
+    type, ``exclude_none``; ``tests/unit/test_manifest_translate.py``), de vorm van ``install_params`` en een lege of
+    ``null`` config van een ander type blijven geldig."""
+    appstore = [
+        {"type": "host_path", "read_only": False, "mount_path": "/config",
+         "host_path_config": {"acl_enable": False, "path": "/mnt/testpool/apps/demo-app"}},
+        {"type": "host_path", "read_only": True, "mount_path": "/media",
+         "host_path_config": {"acl_enable": False, "path": "/mnt/testpool/media"}},
+        {"type": "ix_volume", "read_only": False, "mount_path": "/appdata",
+         "ix_volume_config": {"acl_enable": False, "dataset_name": "appdata"}},
+        {"type": "tmpfs", "read_only": False, "mount_path": "/cache", "tmpfs_config": {"size": 256}},
+    ]  # fmt: skip
+    inst = POLICY.acties["app.install"]
+    assert validate_parameters(POLICY, inst, APP, install_params(storage=appstore)) == []
+    assert validate_parameters(POLICY, inst, APP, install_params()) == []
+    leeg = [
+        {**OPSLAGTYPEN["ix_volume"], "host_path_config": None, "tmpfs_config": {}},
+        {**OPSLAGTYPEN["tmpfs"], "host_path_config": {}, "ix_volume_config": None},
+        {**appstore[0], "ix_volume_config": None, "tmpfs_config": {}},
+    ]
+    assert validate_parameters(POLICY, inst, APP, install_params(storage=leeg)) == []

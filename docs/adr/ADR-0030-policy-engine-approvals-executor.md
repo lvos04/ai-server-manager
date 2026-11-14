@@ -94,10 +94,16 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    geweigerd, ook `{}` en `null`, met de nieuwe code `zfs_eigenschappen_verboden`; `mountpoint` (genormaliseerd) met
    een waarde die met "/" begint is overal een hostpad (`hostpad_verboden` buiten `/mnt/<pool>/<dataset>`), ook bij de
    standaard Custom App. Bij de standaard Custom App is een aanwezig `host_path_config.acl` (ook leeg of `null`)
-   dezelfde weigering als `acl_enable: true` (`acl_verboden`), en `acl.path` gaat ook door de hostpadregel. Een
-   witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps (KLEIN-75 A2,
-   A3, A4, A6, A7) zijn hier niet besloten. `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet.
-   NIET GEVALIDEERD (echte NAS).
+   dezelfde weigering als `acl_enable: true` (`acl_verboden`), en `acl.path` gaat ook door de hostpadregel. Dat geldt
+   in een opslagregel van elk type (R-VEILIG-1, 2026-11-14: TrueNAS normaliseert een meegestuurde `host_path_config`
+   ook in een regel van type `ix_volume` of `tmpfs`); `host_path_config.path` gaat dan ook door de hostpadregel.
+   Daarnaast (besluit van de regisseur, dicht bij twijfel): een config van een ander type dan de regel
+   (`host_path_config`, `ix_volume_config`, `tmpfs_config`, `nfs_config`, `cifs_config`, `volume_config`, ook in een
+   andere schrijfwijze) die niet leeg is (alleen afwezig, `null` of `{}` is leeg) geeft `opslag_verboden`. Geen
+   geldige payload stuurt zo'n config mee (appstore-en-fork vertaalt per regel alleen de config van het eigen type).
+   Een witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps
+   (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten. `policy/*.yaml` en de `policy_hash` veranderen hierdoor
+   niet. NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor

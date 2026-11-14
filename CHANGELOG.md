@@ -43,7 +43,7 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   `key` in een paar (`envs[].value`, `labels[].value`), `notes` en `description`.
 - Een losse tekst met een onzichtbaar opmaakteken (Unicode Cf) wordt geweigerd (`stuurteken`); `"-v/:/host"` en
   `"--volume/:/host"` worden als bindvorm herkend.
-- Opslag (KLEIN-76): `ix_volume_config.properties` wordt bij elke app geweigerd (nieuwe code `zfs_eigenschappen_verboden`), `mountpoint` met "/" is overal een hostpad, en bij de standaard Custom App geeft een `host_path_config.acl`-blok ook met `acl_enable: false` `acl_verboden` en gaat `acl.path` door de hostpadregel (ADR-0030 besluit 6).
+- Opslag (KLEIN-76): `ix_volume_config.properties` wordt bij elke app geweigerd (nieuwe code `zfs_eigenschappen_verboden`), `mountpoint` met "/" is overal een hostpad, en bij de standaard Custom App geeft een `host_path_config.acl`-blok ook met `acl_enable: false` `acl_verboden` en gaat `acl.path` door de hostpadregel, in een opslagregel van elk type (R-VEILIG-1); een niet-lege config van een ander type dan de regel geeft `opslag_verboden` (ADR-0030 besluit 6).
 - Standaard Custom App: `command` en `entrypoint` zijn de opdracht van het proces in de container (zo gebruikt het
   ix-app-sjabloon ze). De vlag- en bindcontrole geldt daar niet meer, zodat gewone opdrachten zoals
   `java -cp /app/lib/*:/app/classes` en `gunicorn --pid /tmp/g.pid` niet meer geweigerd worden. De Docker-socket en

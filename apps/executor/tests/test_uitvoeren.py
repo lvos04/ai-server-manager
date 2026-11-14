@@ -647,6 +647,33 @@ def test_zfs_eigenschappen_en_acl_blok_weigert_de_executor_zelf(stack: Stack) ->
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0  # fmt: skip
 
 
+def test_acl_blok_in_een_opslagregel_van_een_ander_type_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-76, R-VEILIG-1: een ondertekend en goedgekeurd verzoek (R3) met ``host_path_config.acl`` in een
+    opslagregel van type ix_volume of tmpfs weigert de executor zelf met 422 (``acl_verboden``, en
+    ``hostpad_verboden`` op ``acl.path``); ook een ``ix_volume_config`` in een tmpfs-regel (``opslag_verboden``).
+    TrueNAS krijgt niets. Vroeger ging dit door tot ``app.create``. Tegenproef: de opslagregels die appstore-en-fork
+    maakt, met een lege config van een ander type ernaast, worden uitgevoerd."""
+    hub, c, nas = stack
+    acl = {"path": "/etc", "entries": [{"id_type": "USER", "id": 0, "access": "FULL_CONTROL"}]}
+    acl["options"] = {"force": True}
+    ixvol = {"type": "ix_volume", "mount_path": "/config"}
+    ixvol["ix_volume_config"] = {"acl_enable": False, "dataset_name": "c"}
+    tmpfs = {"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 100}}
+    for naam, regel, codes in (
+        ("demo-acl-ix", {**ixvol, "host_path_config": {"acl": acl}}, {"acl_verboden", "hostpad_verboden"}),
+        ("demo-acl-tmpfs", {**tmpfs, "host_path_config": {"acl_enable": True, "acl": acl}}, {"acl_verboden"}),
+        ("demo-vreemd", {**tmpfs, "ix_volume_config": {"acl_enable": False, "dataset_name": "x"}}, {"opslag_verboden"}),
+    ):
+        r = execute(c, hub, approved(hub, install_prop(naam, storage=[regel]), risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (naam, r.text)
+        assert codes <= {f["code"] for f in r.json()["details"]["fouten"]}, (naam, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    geldig = install_params()["app_create"]["values"]["storage"] + [{**ixvol, "host_path_config": None}, tmpfs]
+    r = execute(c, hub, approved(hub, install_prop("demo-geldig", storage=geldig)))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig  # fmt: skip
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en
