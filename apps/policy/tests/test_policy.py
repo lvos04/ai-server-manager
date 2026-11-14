@@ -2144,6 +2144,112 @@ def test_geldige_catalogusopslag_en_kluisverwijzing_blijven_geldig() -> None:
     assert "geheim_in_klare_tekst" not in _codes(_catalogus({"storage": {"smb": _smb({"password": "x"})}}))
 
 
+# KLEIN-83 (KLEIN-75 A7; besluit van de regisseur, dicht bij twijfel, zelfde lijn als SMB): bij een catalogusapp geeft
+# NFS-opslag (elke opslagregel van type nfs en elke niet-lege ``nfs_config``, ook in een andere schrijfwijze, in een
+# lijst en op elke diepte) bewust ``opslag_verboden``, in plaats van toevallig ``hostpad_verboden`` op het exportpad
+# (``nfs_config.path`` is een pad op de NFS-server, niet op de NAS). TrueNAS bouwt de mountopties uit ``nfs_config``
+# (``addr=<server>`` en elke tekst uit ``options``; truenas/apps f142a16, library 2.3.18, ``NfsVolume``). Weer open bij
+# S-P2-050 met een witte lijst per catalogusapp. Alleen nep-testwaarden.
+NFS_VORMEN = [
+    pytest.param({"path": "/export/media"}, id="exportpad_met_slash"),
+    pytest.param({"path": "export/media"}, id="exportpad_zonder_slash"),
+    pytest.param({"path": "/"}, id="exportpad_wortel"),
+    pytest.param({}, id="zonder_path"),
+    pytest.param({"path": "/export", "options": ["nolock"]}, id="met_options"),
+    pytest.param({"path": "/export", "options": ["vers=4,addr=andere.test"]}, id="options_met_komma"),
+    pytest.param({"server": "server.test,nolock", "path": "export"}, id="server_met_komma"),
+]
+NFS_SCHRIJFWIJZEN = [("type", "nfs", "nfs_config"), ("Type", "NFS", "Nfs-Config"), ("TYPE", "Nfs", "nfsConfig")]
+
+
+def _nfs(extra: dict[str, Any], typ_sleutel: str = "type", typ: str = "nfs", nfs: str = "nfs_config") -> dict:
+    return {typ_sleutel: typ, "mount_path": "/media", nfs: {"server": "server.test", **extra}}
+
+
+@pytest.mark.parametrize("extra", NFS_VORMEN)
+def test_nfs_opslag_van_een_catalogusapp_wordt_geweigerd(extra: dict[str, Any]) -> None:
+    """A7: NFS-opslag in de waarden van een catalogusapp geeft ``opslag_verboden`` op het type en op ``nfs_config``,
+    met elk exportpad (ook zonder "/", wat eerder geen fout gaf), in elke schrijfwijze en in een lijst van
+    opslagregels. Het exportpad krijgt niet meer de misleidende ``hostpad_verboden``."""
+    w = "parameters.app_create.values.storage"
+    for typ_sleutel, typ, nfs in NFS_SCHRIJFWIJZEN:
+        paren = _paren(_catalogus({"storage": {"media": _nfs(extra, typ_sleutel, typ, nfs)}}))
+        assert (f"{w}.media.{typ_sleutel}", "opslag_verboden") in paren, (typ_sleutel, paren)
+        assert (f"{w}.media.{nfs}", "opslag_verboden") in paren, (nfs, paren)
+        assert (f"{w}.media.{nfs}.path", "hostpad_verboden") not in paren, (nfs, paren)
+    ixvol = {"type": "ix_volume", "mount_path": "/config", "ix_volume_config": {"dataset_name": "config"}}
+    paren = _paren(_catalogus({"storage": {"additional_storage": [ixvol, _nfs(extra)]}}))
+    assert (f"{w}.additional_storage[1].type", "opslag_verboden") in paren, paren
+    assert (f"{w}.additional_storage[1].nfs_config", "opslag_verboden") in paren, paren
+    assert "hostpad_verboden" not in [c for _v, c in paren], paren
+    assert not [v for v, _c in paren if v.startswith(f"{w}.additional_storage[0]")], paren
+
+
+NFS_PLEKKEN = [
+    pytest.param({"media": {"type": "nfs", "mount_path": "/media"}}, ".media.type", id="type_zonder_config"),
+    pytest.param({"media": {"type": " nfs ", "mount_path": "/media"}}, ".media.type", id="type_met_spaties"),
+    pytest.param(
+        {"c": {"type": "ix_volume", "ix_volume_config": _IXVOL_CONFIG, "nfs_config": {"server": "s.test"}}},
+        ".c.nfs_config",
+        id="config_in_regel_van_ander_type",
+    ),
+    pytest.param(
+        {"media": {"type": "nfs", "nfs_config": [{"server": "s.test", "path": "x"}]}},
+        ".media.nfs_config",
+        id="config_als_lijst",
+    ),
+    pytest.param({"c": {"type": "ix_volume", "nfs_config": "s.test:/export"}}, ".c.nfs_config", id="config_als_tekst"),
+    pytest.param({"c": {"type": "ix_volume", "nfs_config": 0}}, ".c.nfs_config", id="config_als_getal"),
+    pytest.param({"a": {"b": [{"c": {"NFS_CONFIG": {"server": "s.test"}}}]}}, ".a.b[0].c.NFS_CONFIG", id="diep_genest"),
+    pytest.param([{"type": "nfs", "nfs_config": {"server": "s.test"}}], "[0].nfs_config", id="lijst_als_waarde"),
+    pytest.param([{"type": "nfs", "nfs_config": {"server": "s.test"}}], "[0].type", id="lijst_als_waarde_type"),
+]
+
+
+@pytest.mark.parametrize(("values", "veld"), NFS_PLEKKEN)
+def test_nfs_opslag_van_een_catalogusapp_op_elke_plek_geweigerd(values: Any, veld: str) -> None:
+    """A7, dicht bij twijfel: type nfs zonder config, een ``nfs_config`` in een regel van een ander type, als lijst,
+    tekst of getal, en diep genest geven ook ``opslag_verboden``."""
+    paren = _paren(_catalogus({"storage": values}))
+    assert (f"parameters.app_create.values.storage{veld}", "opslag_verboden") in paren, paren
+
+
+def test_geldige_catalogusopslag_zonder_nfs_blijft_geldig_en_hostpadregel_blijft() -> None:
+    """A7, tegenproef: een lege ``nfs_config`` (afwezig, ``null`` of ``{}``) naast een ander opslagtype geeft geen
+    fout; een pad met "/" buiten een ``nfs_config`` (ook onder een sleutel die er alleen op lijkt) blijft
+    ``hostpad_verboden``; ``cifs_config.path`` is niet geraakt. Bij de standaard Custom App blijft NFS-opslag
+    ``opslag_verboden`` zoals het was (geen ``hostpad_verboden`` op het exportpad)."""
+    ixvol = {"type": "ix_volume", "mount_path": "/config", "ix_volume_config": {"acl_enable": False}}
+    ixvol["ix_volume_config"]["dataset_name"] = "c"
+    tmpfs = {"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 100}}
+    for leeg in ({}, {"nfs_config": None}, {"nfs_config": {}}, {"Nfs-Config": None}):
+        assert _codes(_catalogus({"storage": {"config": {**ixvol, **leeg}, "cache": {**tmpfs, **leeg}}})) == [], leeg
+    assert _codes(_catalogus({"storage": {"config": ixvol}, "app": {"type": "nfs-client"}})) == []
+    w = "parameters.app_create.values"
+    for values, veld in (
+        ({"storage": {"m": {"type": "host_path", "path": "/etc"}}}, "storage.m.path"),
+        ({"storage": {"m": {"nfs_configs": {"path": "/etc"}}}}, "storage.m.nfs_configs.path"),
+        ({"storage": {"m": {"nfs": {"path": "/etc"}}}}, "storage.m.nfs.path"),
+    ):
+        paren = _paren(_catalogus(values))
+        assert (f"{w}.{veld}", "hostpad_verboden") in paren, paren
+        assert "opslag_verboden" not in [c for _v, c in paren], paren
+    paren = _paren(_catalogus({"storage": {"m": {"type": "nfs", "nfs_config": [{"path": "/etc"}]}}}))
+    assert (f"{w}.storage.m.nfs_config[0].path", "hostpad_verboden") in paren, paren
+    naast = {"media": _nfs({"path": "/export"}), "m": {"type": "host_path", "path": "/etc"}}
+    paren = _paren(_catalogus({"storage": naast}))
+    assert (f"{w}.storage.m.path", "hostpad_verboden") in paren, paren
+    assert (f"{w}.storage.media.nfs_config.path", "hostpad_verboden") not in paren, paren
+    paren = _paren(_catalogus({"storage": {"smb": _smb({"path": "/share"})}}))
+    assert (f"{w}.storage.smb.cifs_config.path", "hostpad_verboden") in paren, paren
+    regel = {"type": "nfs", "mount_path": "/media", "nfs_config": {"server": "server.test", "path": "/export"}}
+    ix = _paren(install_params(storage=[regel]), APP)
+    assert ix == [
+        (f"{w}.storage[0].type", "opslag_verboden"),
+        (f"{w}.storage[0].nfs_config", "opslag_verboden"),
+    ], ix
+
+
 # KLEIN-80 (KLEIN-75 A2; besluit van de regisseur, dicht bij twijfel): bij de standaard Custom App een witte lijst per
 # opslagregel en per type-config, afgeleid uit het formulier van ix-app 1.4.8 (truenas/apps f142a16,
 # ``ix-dev/stable/ix-app/questions.yaml``). De middleware van TrueNAS laat onbekende sleutels door

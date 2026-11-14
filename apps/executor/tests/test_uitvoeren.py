@@ -755,6 +755,38 @@ def test_smb_opslag_van_een_catalogusapp_weigert_de_executor_zelf(stack: Stack) 
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0
 
 
+def test_nfs_opslag_van_een_catalogusapp_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-83 (KLEIN-75 A7; besluit van de regisseur, zelfde lijn als SMB): een ondertekend en goedgekeurd verzoek
+    (R3) voor een catalogusapp met NFS-opslag weigert de executor zelf met 422 (``opslag_verboden``, niet de
+    misleidende ``hostpad_verboden`` op het exportpad), ook met een exportpad zonder "/" (dat ging eerder door tot
+    TrueNAS), in een andere schrijfwijze en in een lijst van opslagregels. TrueNAS krijgt niets: geen app.create en
+    geen enkele schrijfaanroep."""
+    hub, c, nas = stack
+    vormen = [
+        {"server": "server.test", "path": "/export/media"},
+        {"server": "server.test", "path": "export/media"},
+        {"server": "server.test,nolock", "path": "export", "options": ["vers=4"]},
+    ]
+    for i, cfg in enumerate(vormen):
+        for j, values in enumerate(
+            (
+                {"storage": {"media": {"type": "nfs", "mount_path": "/media", "nfs_config": cfg}}},
+                {"storage": {"media": {"Type": "NFS", "mount_path": "/media", "Nfs-Config": cfg}}},
+                {"storage": {"additional_storage": [{"type": "nfs", "mount_path": "/media", "nfs_config": cfg}]}},
+            )
+        ):
+            naam = f"huis-nfs-{i}-{j}"
+            params = install_params(naam)
+            params["app_create"].update(catalog_app="home-assistant", train="community", version="1.2.3", values=values)
+            params["manifest"] = {"app_id": naam, "install_reason": "proef met een catalogusapp"}
+            prop = proposal("app.install", app_target(naam), params, expected_version=ABSENT)
+            r = execute(c, hub, approved(hub, prop, risk_class="R3"))
+            assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (cfg, j, r.text)
+            codes = {f["code"] for f in r.json()["details"]["fouten"]}
+            assert "opslag_verboden" in codes and "hostpad_verboden" not in codes, (cfg, j, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+
+
 def test_onbekende_opslagsleutel_van_de_standaard_custom_app_weigert_de_executor_zelf(stack: Stack) -> None:
     """KLEIN-80 (KLEIN-75 A2): een ondertekend en goedgekeurd verzoek (R3) voor de standaard Custom App met een
     opslagsleutel buiten de witte lijst (``create_host_path``, ``propagation``, ``auto_permissions``, tmpfs ``exec``,

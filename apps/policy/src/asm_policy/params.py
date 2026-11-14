@@ -63,6 +63,11 @@ Opslag (KLEIN-81; dicht bij twijfel): bij de standaard Custom App geldt een verb
 ``/sys/fs/cgroup``: ``mount_verboden``; ``/process``, ``/devices``: geldig). ``/`` telt alleen exact; hoofdletters
 tellen mee (``/PROC`` is een ander pad). NIET GEVALIDEERD (echte NAS).
 
+Opslag (KLEIN-83; KLEIN-75 A7, dicht bij twijfel): in de waarden van een catalogusapp is NFS-opslag bewust geweigerd
+(``opslag_verboden``): elke opslagregel van type nfs en elke niet-lege ``nfs_config``, ook in een andere schrijfwijze
+en in een lijst, tot S-P2-050 (witte lijst per catalogusapp; ADR-0030 besluit 6). Het exportpad (``path`` direct in
+zo'n ``nfs_config``) krijgt daarom niet meer ``hostpad_verboden``. Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -660,6 +665,22 @@ _SMB_VERBODEN = (
     "SMB-opslag (type cifs of cifs_config) is bij een catalogusapp nog niet toegestaan: het wachtwoord kan nog niet "
     "als kluisverwijzing worden ingevuld en zou in klare tekst in de mountopties en de opgeslagen waarden komen"
 )
+# NFS-opslag in de waarden van een catalogusapp (KLEIN-83; KLEIN-75 A7, besluit van de regisseur, dicht bij twijfel,
+# zelfde lijn als SMB). TrueNAS bouwt de mountopties van het volume uit ``nfs_config``: ``addr=<server>`` en elke tekst
+# uit ``options`` (truenas/apps f142a16, library 2.3.18, ``NfsVolume``); welke NFS-server en -opties een catalogusapp
+# mag gebruiken, is niet besloten. Daarom is elke opslagregel van type nfs en elke niet-lege ``nfs_config``
+# (genormaliseerde sleutel en typewaarde; leeg is alleen afwezig, ``null`` of ``{}``) bewust geweigerd met
+# ``opslag_verboden``, tot S-P2-050 (witte lijst per catalogusapp). Het exportpad (``path`` direct in zo'n niet-lege
+# ``nfs_config``) is een pad op de NFS-server, niet op de NAS: het krijgt daarom niet ook de misleidende
+# ``hostpad_verboden`` (dat is geen verzwakking: zonder ``opslag_verboden`` op die ``nfs_config`` geldt de hostpadregel
+# gewoon). Bij de standaard Custom App was nfs al ``opslag_verboden`` (:func:`_ix_values`); dat blijft zo.
+NFS_CONFIG = "nfsconfig"
+NFS = "nfs"
+EXPORTPAD = "path"
+_NFS_VERBODEN = (
+    "NFS-opslag (type nfs of nfs_config) is bij een catalogusapp nog niet toegestaan: welke NFS-server en "
+    "mountopties een catalogusapp mag gebruiken, is nog niet vastgelegd"
+)
 # Witte lijst per opslagregel en per type-config van de standaard Custom App (KLEIN-80; KLEIN-75 A2, besluit van de
 # regisseur, dicht bij twijfel): precies de velden die het formulier van ix-app 1.4.8 toont (truenas/apps f142a16,
 # ``ix-dev/stable/ix-app/questions.yaml``, ``storage[]``). De middleware van TrueNAS laat onbekende sleutels door
@@ -826,6 +847,7 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app
         return [_f(where, "te_diep_genest", f"hooguit {MAX_DIEPTE} niveaus diep genest")]
     opdracht = re.compile(re.escape(where) + r"\.values\.(?:command|entrypoint)\[\d+\]") if ix_app else None
     waarden = (f"{where}.values.", f"{where}.values[")
+    exportpaden: set[str] = set()  # pad van ``path`` direct in een geweigerde nfs_config (KLEIN-83)
     for p, k, v, paarwaarde in alles:
         nk = None if k is None else _nk(k)
         in_waarden = p.startswith(waarden)
@@ -850,9 +872,16 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app
                 or (nk == OPSLAGTYPE and isinstance(v, str) and _nk(v) == CIFS)
             ):
                 out.append(_f(p, "opslag_verboden", _SMB_VERBODEN))
+            if catalogus_waarde and (
+                (nk == NFS_CONFIG and v is not None and v != {})
+                or (nk == OPSLAGTYPE and isinstance(v, str) and _nk(v) == NFS)
+            ):
+                out.append(_f(p, "opslag_verboden", _NFS_VERBODEN))
+                if nk == NFS_CONFIG and isinstance(v, Mapping):
+                    exportpaden.update(f"{p}.{e}" for e in v if _nk(e) == EXPORTPAD)
             vast_veld = k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path"))
             pad_sleutel = (nk in HOSTPAD_SLEUTELS_OVERAL and in_waarden) or (
-                catalogus_waarde and nk in HOSTPAD_SLEUTELS
+                catalogus_waarde and nk in HOSTPAD_SLEUTELS and not (nk == EXPORTPAD and p in exportpaden)
             )
             hostpad_waarde = pad_sleutel and isinstance(v, str) and v.startswith("/")
             if vast_veld or hostpad_waarde:

@@ -103,7 +103,7 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    geldige payload stuurt zo'n config mee (appstore-en-fork vertaalt per regel alleen de config van het eigen type).
    Een witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps
    (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten; A3 en A6 besluit de latere aanvulling KLEIN-78 hieronder,
-   A2 de latere aanvulling KLEIN-80, A4 het herstel van KLEIN-80.
+   A2 de latere aanvulling KLEIN-80, A4 het herstel van KLEIN-80, A7 (NFS) de latere aanvulling KLEIN-83.
    `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet. NIET GEVALIDEERD (echte NAS).
    **Opslag: datasetnaam van een ixVolume en SMB-wachtwoord (aanvulling 2026-11-14, KLEIN-78; KLEIN-75 A3 en A6;
    besluit van de regisseur, dicht bij twijfel).** TrueNAS maakt het dataset van een ixVolume aan als
@@ -121,7 +121,7 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    herstelregel hieronder. Een ongeldige `vault://`-tekst houdt `vault_ref_ongeldig`. Andere wachtwoordvelden van
    catalogusapps vallen hier niet onder (KLEIN-75 A6 optie a is niet gekozen). Witte lijst per opslagregel, ACL op een
    ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven open (A2 besluit de latere aanvulling KLEIN-80 hieronder,
-   A4 het herstel van KLEIN-80).
+   A4 het herstel van KLEIN-80, A7 voor NFS de aanvulling KLEIN-83).
    `policy/*.yaml` en de `policy_hash` veranderen niet.
    NIET GEVALIDEERD (echte NAS).
    **Opslag: SMB bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-78 herstel R-VEILIG-1; KLEIN-75 A6 optie
@@ -200,6 +200,27 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    koppelpaden van de 9 opnieuw vertaalde payloads van appstore-en-fork blijven geldig. `policy/*.yaml` en de
    `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". NIET
    GEVALIDEERD (echte NAS).
+   **Opslag: NFS bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-83; KLEIN-75 A7; besluit van de
+   regisseur, dicht bij twijfel, zelfde lijn als SMB).** NFS bij een catalogusapp werd alleen toevallig geweigerd: een
+   exportpad met `/` gaf `hostpad_verboden` (misleidend: het is een pad op de NFS-server, niet op de NAS), en een
+   exportpad zonder `/`, een `nfs_config` zonder pad, type `nfs` zonder config, een andere schrijfwijze of een
+   `nfs_config` in een regel van een ander type ging erdoor tot TrueNAS. TrueNAS bouwt de mountopties uit `nfs_config`
+   (`addr=<server>` en elke tekst uit `options`; truenas/apps f142a16, library 2.3.18, `NfsVolume`), en welke
+   NFS-server en -opties een catalogusapp mag gebruiken is niet besloten. Daarom geeft in de waarden van een
+   catalogusapp elke opslagregel van type `nfs` en elke niet-lege `nfs_config` (genormaliseerde sleutel en typewaarde,
+   ook in een lijst en op elke diepte; leeg is alleen afwezig, `null` of `{}`) bewust de bestaande code
+   `opslag_verboden`. Het exportpad (`path` direct in zo'n `nfs_config`) krijgt niet meer ook `hostpad_verboden`; dat
+   is geen verzwakking, want die uitzondering geldt alleen naast `opslag_verboden` op die `nfs_config`, en elk ander
+   pad houdt de hostpadregel. `cifs_config.path` is niet geraakt. Bij de standaard Custom App was nfs al
+   `opslag_verboden` (alleen `host_path`, `ix_volume` en `tmpfs`; een niet-lege `nfs_config` is een config van een
+   ander type); dat blijft zo en is niet tegenstrijdig met de witte lijst van KLEIN-80 (`nfs_config` staat daar als
+   sleutel op, alleen leeg). Geen geldige payload gebruikt nfs: appstore-en-fork kent alleen `host_path`, `ix_volume`
+   en `tmpfs`, de 9 opnieuw vertaalde payloads van de manifesten bevatten geen nfs, en in de catalogus van TrueNAS
+   (truenas/apps f142a16, 500 `questions.yaml`) is nfs alleen een keuze van de variabele `type` (493 keer) en nergens
+   de standaardwaarde. Deze weigering moet weer open bij S-P2-050, met een witte lijst per catalogusapp (welke
+   NFS-servers, exportpaden en mountopties; ook komma-injectie in `server` en `options`, zoals bij SMB). `policy/*.yaml`
+   en de `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`".
+   Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -444,7 +465,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   koppelpad dat geen strikt containerpad is, `acl_verboden` voor een ACL op een ixVolume en `dubbel` voor een
   herhaalde `dataset_name`. Aanvulling 2026-11-14 (KLEIN-81): hetzelfde geldt voor `mount_verboden` voor een
   koppelpad onder een verboden containerpad (`/proc/sys`, `/dev/shm`, `/sys/fs/cgroup`); een oude executor laat die
-  nog door.
+  nog door. Aanvulling 2026-11-14 (KLEIN-83): hetzelfde geldt voor `opslag_verboden` voor NFS-opslag (type nfs,
+  `nfs_config`) bij een catalogusapp; een oude executor laat een exportpad zonder `/` nog door.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
