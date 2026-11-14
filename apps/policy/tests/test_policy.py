@@ -1922,3 +1922,150 @@ def test_geldige_opslagvormen_blijven_geldig() -> None:
         {**appstore[0], "ix_volume_config": None, "tmpfs_config": {}},
     ]
     assert validate_parameters(POLICY, inst, APP, install_params(storage=leeg)) == []
+
+
+# KLEIN-78 (KLEIN-75 A3; besluit van de regisseur, dicht bij twijfel). TrueNAS maakt het dataset van een ixVolume aan
+# als ``<docker-dataset>/app_mounts/<app>/<dataset_name>`` (``os.path.join``) en controleert de naam nergens als pad:
+# een naam met "/" aan het begin of met ".." komt buiten de eigen boom van de app. Toegestaan zijn alleen de tekens
+# die ZFS in een datasetnaam toestaat (letters, cijfers, - _ . : en spatie), in delen gescheiden door "/". Afgeleid
+# uit de bron (middleware ece9d19, OpenZFS zfs_namecheck.c); NIET GEVALIDEERD (echte NAS).
+DATASETNAAM_FOUT = [
+    pytest.param("/etc", id="absoluut"),
+    pytest.param("/", id="alleen_slash"),
+    pytest.param("../../x", id="omhoog"),
+    pytest.param("..", id="ouder"),
+    pytest.param(".", id="zelf"),
+    pytest.param("a/../b", id="omhoog_midden"),
+    pytest.param("a/./b", id="zelf_midden"),
+    pytest.param("a..b", id="twee_punten_in_een_naam"),
+    pytest.param("a//b", id="leeg_deel"),
+    pytest.param("a/", id="slash_aan_het_eind"),
+    pytest.param("", id="leeg"),
+    pytest.param("data#", id="bladwijzerteken"),
+    pytest.param("data@snap", id="snapshotteken"),
+    pytest.param("data%x", id="procent"),
+    pytest.param("data\nx", id="regeleinde"),
+    pytest.param("data\tx", id="tab"),
+    pytest.param("dätä", id="geen_ascii"),
+    pytest.param("data​x", id="zero_width"),
+    pytest.param("x" * 201, id="te_lang"),
+]
+
+
+def _ix_volume_regel(sleutel: str, naam: Any) -> dict[str, Any]:
+    return {"type": "ix_volume", "mount_path": "/config", "ix_volume_config": {"acl_enable": False, sleutel: naam}}
+
+
+@pytest.mark.parametrize("naam", DATASETNAAM_FOUT)
+def test_datasetnaam_van_een_ixvolume_moet_veilig_zijn(naam: str) -> None:
+    """A3: een ``ix_volume_config.dataset_name`` die geen veilige ZFS-naam is, wordt geweigerd (``patroon``), bij de
+    standaard Custom App en in de waarden van een catalogusapp, ook in een andere schrijfwijze van de sleutel en in
+    een lijst."""
+    w = "parameters.app_create.values.storage[0].ix_volume_config.dataset_name"
+    ix = validate_parameters(
+        POLICY, POLICY.acties["app.install"], APP, install_params(storage=[_ix_volume_regel("dataset_name", naam)])
+    )
+    assert (w, "patroon") in [(f.veld, f.code) for f in ix], [f.as_dict() for f in ix]
+    for sleutel in ("dataset_name", "Dataset-Name"):
+        cat = validate_parameters(
+            POLICY, POLICY.acties["app.install"], {"host_id": HOST, "app_id": "huis"},
+            _catalogus({"storage": {"config": _ix_volume_regel(sleutel, naam)}}),
+        )  # fmt: skip
+        veld = f"parameters.app_create.values.storage.config.ix_volume_config.{sleutel}"
+        assert (veld, "patroon") in [(f.veld, f.code) for f in cat], (sleutel, [f.as_dict() for f in cat])
+    lijst = _codes(_catalogus({"storage": {"additional_storage": [_ix_volume_regel("dataset_name", naam)]}}))
+    assert "patroon" in lijst, lijst
+
+
+@pytest.mark.parametrize("naam", [None, 5, ["config"], {"naam": "config"}, True])
+def test_datasetnaam_die_geen_tekst_is_wordt_geweigerd(naam: Any) -> None:
+    """A3: een aanwezige ``dataset_name`` moet tekst zijn (``type``); TrueNAS zou er anders een pad van maken."""
+    ix = validate_parameters(
+        POLICY, POLICY.acties["app.install"], APP, install_params(storage=[_ix_volume_regel("dataset_name", naam)])
+    )
+    w = "parameters.app_create.values.storage[0].ix_volume_config.dataset_name"
+    assert (w, "type") in [(f.veld, f.code) for f in ix], [f.as_dict() for f in ix]
+    assert "type" in _codes(_catalogus({"storage": {"config": _ix_volume_regel("dataset_name", naam)}}))
+
+
+@pytest.mark.parametrize("naam", ["/etc", "../x", "data#"])
+def test_ixvolume_als_tekst_krijgt_dezelfde_naamregel(naam: str) -> None:
+    """A3, dicht bij twijfel: de middleware van TrueNAS (``normalize_ix_volume``) neemt ook een ``ix_volume_config``
+    die een tekst is als datasetnaam. Die tekst krijgt dezelfde naamregel."""
+    veld = "parameters.app_create.values.storage.config.ix_volume_config"
+    cat = validate_parameters(
+        POLICY, POLICY.acties["app.install"], {"host_id": HOST, "app_id": "huis"},
+        _catalogus({"storage": {"config": {"type": "ix_volume", "ix_volume_config": naam}}}),
+    )  # fmt: skip
+    assert (veld, "patroon") in [(f.veld, f.code) for f in cat], [f.as_dict() for f in cat]
+
+
+# Tegenproef A3: de vorm van appstore-en-fork (``Name``: ``^[a-z][a-z0-9_-]{0,62}$``), een greep uit de standaardnamen
+# van de catalogusapps van TrueNAS (truenas/apps f142a16, ``questions.yaml``) en de randen van de ZFS-tekenset.
+DATASETNAAM_GOED = [
+    "config", "appdata", "c", "x", "storage_entry", "postgres_data", "encode-cache", "data1", "search-index",
+    "a.b", "x:y", "met spatie", "ouder/kind", "A-Z_0.9:x", ".verborgen", "x" * 200,
+]  # fmt: skip
+
+
+def test_geldige_datasetnamen_blijven_geldig() -> None:
+    """A3, tegenproef: gewone datasetnamen blijven geldig bij de standaard Custom App en bij een catalogusapp."""
+    inst = POLICY.acties["app.install"]
+    for naam in DATASETNAAM_GOED:
+        regel = _ix_volume_regel("dataset_name", naam)
+        assert validate_parameters(POLICY, inst, APP, install_params(storage=[regel])) == [], naam
+        assert _codes(_catalogus({"storage": {"config": regel}})) == [], naam
+        assert _codes(_catalogus({"storage": {"config": {"type": "ix_volume", "ix_volume_config": naam}}})) == [], naam
+
+
+# KLEIN-78 (KLEIN-75 A6; ADR-0030 besluit 28, besluit van de regisseur): bij een catalogusapp gaat
+# ``cifs_config.password`` als ``password=…`` in de mountopties van het SMB-volume (truenas/apps f142a16). Een
+# wachtwoord in klare tekst wordt geweigerd; alleen een kluisverwijzing ``vault://app/<app_id>/<parameter>`` mag
+# (het invullen daarvan bestaat nog niet: Hub en executor geven dan 501).
+SMB_WACHTWOORD_FOUT = [
+    pytest.param("nep-wachtwoord-test", id="klare_tekst"),
+    pytest.param("", id="leeg"),
+    pytest.param(None, id="null"),
+    pytest.param(1234, id="getal"),
+    pytest.param({"waarde": "x"}, id="object"),
+    pytest.param("app/huis/smb", id="verwijzing_zonder_schema"),
+    pytest.param("vault:/app/huis/smb", id="bijna_kluisverwijzing"),
+    pytest.param("vaultwachtwoord", id="begint_met_vault"),
+]
+
+
+def _smb(sleutel: str = "password", wachtwoord: Any = "nep-wachtwoord-test", cifs: str = "cifs_config") -> dict:
+    return {"type": "cifs", "mount_path": "/smb",
+            cifs: {"server": "server.test", "path": "share", "username": "gast", sleutel: wachtwoord}}  # fmt: skip
+
+
+@pytest.mark.parametrize("wachtwoord", SMB_WACHTWOORD_FOUT)
+def test_smb_wachtwoord_van_een_catalogusapp_alleen_als_kluisverwijzing(wachtwoord: Any) -> None:
+    """A6: ``cifs_config.password`` dat geen geldige kluisverwijzing is, geeft ``geheim_in_klare_tekst``, ook in een
+    andere schrijfwijze van de sleutels en in een lijst van opslagregels."""
+    doel = {"host_id": HOST, "app_id": "huis"}
+    for cifs, sleutel in (("cifs_config", "password"), ("Cifs-Config", "PassWord")):
+        params = _catalogus({"storage": {"smb": _smb(sleutel, wachtwoord, cifs)}})
+        fouten = validate_parameters(POLICY, POLICY.acties["app.install"], doel, params)
+        veld = f"parameters.app_create.values.storage.smb.{cifs}.{sleutel}"
+        assert (veld, "geheim_in_klare_tekst") in [(f.veld, f.code) for f in fouten], [f.as_dict() for f in fouten]
+    lijst = _codes(_catalogus({"storage": {"additional_storage": [_smb(wachtwoord=wachtwoord)]}}))
+    assert "geheim_in_klare_tekst" in lijst, lijst
+
+
+def test_smb_wachtwoord_als_kluisverwijzing_blijft_toegestaan() -> None:
+    """A6, tegenproef: een geldige kluisverwijzing mag (de Hub en de executor vinden hem en geven 501), SMB-opslag
+    zonder ``password`` krijgt deze code niet, en een ongeldige kluisverwijzing houdt haar eigen code
+    (``vault_ref_ongeldig``). Bij de standaard Custom App blijft SMB-opslag zelf verboden (``opslag_verboden``)."""
+    ref = "vault://app/huis/smb_wachtwoord"
+    goed = _catalogus({"storage": {"smb": _smb(wachtwoord=ref)}})
+    assert _codes(goed) == [] and vault_refs(goed) == [ref]
+    zonder = _smb()
+    del zonder["cifs_config"]["password"]
+    assert _codes(_catalogus({"storage": {"smb": zonder}})) == []
+    ongeldig = _codes(_catalogus({"storage": {"smb": _smb(wachtwoord="vault://ander/x")}}))
+    assert "vault_ref_ongeldig" in ongeldig and "geheim_in_klare_tekst" not in ongeldig, ongeldig
+    # Een wachtwoord buiten cifs_config valt niet onder deze regel (KLEIN-75 A6 optie a is niet gekozen).
+    assert _codes(_catalogus({"app": {"password": "nep-wachtwoord-test"}})) == []
+    ix = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=[_smb()]))
+    assert "opslag_verboden" in [f.code for f in ix] and "geheim_in_klare_tekst" not in [f.code for f in ix]

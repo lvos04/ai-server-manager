@@ -674,6 +674,45 @@ def test_acl_blok_in_een_opslagregel_van_een_ander_type_weigert_de_executor_zelf
     assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == geldig  # fmt: skip
 
 
+def test_smb_wachtwoord_en_datasetnaam_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-78 (KLEIN-75 A6 en A3): een ondertekend en goedgekeurd verzoek (R3) met bij een catalogusapp een
+    ``cifs_config.password`` in klare tekst (``geheim_in_klare_tekst``), of met een ``ix_volume_config.dataset_name``
+    die geen veilige ZFS-naam is (``patroon``; ook bij de standaard Custom App), weigert de executor zelf met 422;
+    TrueNAS krijgt niets. Tegenproef: een kluisverwijzing als wachtwoord geeft eerlijk 501, en een gewone datasetnaam
+    wordt uitgevoerd."""
+    hub, c, nas = stack
+
+    def catalogus(naam: str, values: Any) -> dict[str, Any]:
+        params = install_params(naam)
+        params["app_create"].update(catalog_app="home-assistant", train="community", version="1.2.3", values=values)
+        params["manifest"] = {"app_id": naam, "install_reason": "proef met een catalogusapp"}
+        return proposal("app.install", app_target(naam), params, expected_version=ABSENT)
+
+    def smb(wachtwoord: str) -> dict[str, Any]:
+        cifs = {"server": "server.test", "path": "share", "username": "gast", "password": wachtwoord}
+        return {"storage": {"smb": {"type": "cifs", "mount_path": "/smb", "cifs_config": cifs}}}
+
+    def ixvol(naam: str) -> dict[str, Any]:
+        cfg = {"acl_enable": False, "dataset_name": naam}
+        return {"type": "ix_volume", "mount_path": "/config", "ix_volume_config": cfg}
+
+    for prop, code in (
+        (catalogus("huis-smb", smb("nep-wachtwoord-test")), "geheim_in_klare_tekst"),
+        (catalogus("huis-ds", {"storage": {"config": ixvol("../../x")}}), "patroon"),
+        (install_prop("demo-ds", storage=[ixvol("/etc")]), "patroon"),
+    ):
+        r = execute(c, hub, approved(hub, prop, risk_class="R3"))
+        assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+        assert code in {f["code"] for f in r.json()["details"]["fouten"]}, r.text
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    r = execute(c, hub, approved(hub, catalogus("huis-kluis", smb("vault://app/huis-kluis/smb")), risk_class="R3"))
+    assert r.status_code == 501 and r.json()["details"] == {"reden": "vault_verwijzingen"}, r.text
+    assert nas.created == [] and writes(nas) == []
+    r = execute(c, hub, approved(hub, install_prop("demo-ds-goed", storage=[ixvol("config")])))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == [ixvol("config")]
+
+
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-2 en R-TECH-1 (HARDE EIS): een bestaande Custom App omzetten naar een Emby-image maakt er een
     tweede Emby van. De executor herkent het doel ook op de image ná de actie en weigert een ondertekend en

@@ -37,6 +37,12 @@ ander type dan de regel (bv. ``host_path_config`` of ``tmpfs_config`` bij ix_vol
 ``null`` of ``{}``), is ``opslag_verboden``. Het gedrag van TrueNAS in deze alinea is afgeleid uit de bron
 (truenas/apps f142a16, middleware ece9d19); NIET GEVALIDEERD (echte NAS).
 
+Opslag (KLEIN-78; KLEIN-75 A3 en A6): ``ix_volume_config.dataset_name`` (ook een ``ix_volume_config`` die een tekst
+is) moet bij elke app een veilige ZFS-naam zijn (:data:`IX_VOLUME_NAAM_RE`; anders ``patroon``, of ``type`` als het
+geen tekst is). In de waarden van een catalogusapp is ``cifs_config.password`` alleen als geldige kluisverwijzing
+toegestaan; elke andere waarde is ``geheim_in_klare_tekst`` (ADR-0030 besluit 28). Afgeleid uit de bron; NIET
+GEVALIDEERD (echte NAS).
+
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
 :data:`asm_policy.canonical.MAX_DIEPTE` (minstens zo diep) en weigeren dieper in plaats van stil te stoppen.
@@ -600,6 +606,42 @@ _VREEMDE_CONFIG = (
     "deze config hoort niet bij het type van de opslagregel (host_path_config bij host_path, ix_volume_config bij "
     "ix_volume, tmpfs_config bij tmpfs): laat haar weg"
 )
+# Naam van het dataset van een ixVolume (KLEIN-78; KLEIN-75 A3). TrueNAS maakt het dataset aan als
+# ``<docker-dataset>/app_mounts/<app>/<dataset_name>`` (middleware ece9d19, ``plugins/apps/schema_action_context.py``,
+# ``update_volumes``: ``os.path.join``) en controleert de naam nergens als pad (``normalize_ix_volume``): met "/" aan
+# het begin of met ".." komt het buiten de eigen boom van de app. Toegestaan zijn alleen de tekens die ZFS in een
+# datasetnaam toestaat (middleware ``plugins/zfs_/validation_utils.py``, ``validate_dataset_name`` ->
+# ``truenas_pylibzfs.name_is_valid``; OpenZFS zfs-2.3.9 ``module/zcommon/zfs_namecheck.c``, ``valid_char`` en
+# ``entity_namecheck``: letters, cijfers, - _ . : en spatie; "%" weigert ``zfs_validate_name`` bij het aanmaken),
+# in delen gescheiden door "/": geen "/" aan het begin of eind, geen leeg deel, geen "." als deel en nergens "..".
+# Hooguit 200 tekens (middleware ``ZFS_MAX_DATASET_NAME_LEN``). Geldt bij elke app, ook voor een ``ix_volume_config``
+# die een tekst is (die neemt de middleware als naam). Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+DATASETNAAM = "datasetname"
+IX_VOLUME_NAAM_RE = re.compile(r"^[A-Za-z0-9_.: -]+(/[A-Za-z0-9_.: -]+)*$")
+MAX_IX_VOLUME_NAAM = 200
+_IX_VOLUME_NAAM = (
+    "ongeldige datasetnaam: alleen letters, cijfers, - _ . : en spatie, in delen gescheiden door /; geen / aan het "
+    "begin of eind, geen leeg deel, geen . als deel en nergens .. (hooguit 200 tekens)"
+)
+# Wachtwoord van SMB-opslag in de waarden van een catalogusapp (KLEIN-78; KLEIN-75 A6; ADR-0030 besluit 28): TrueNAS
+# zet ``cifs_config.password`` als ``password=…`` in de mountopties van het volume (truenas/apps f142a16, library
+# 2.3.18). Alleen een geldige kluisverwijzing mag; elke andere waarde (ook leeg of ``null``) is een geheim in klare
+# tekst. Een ongeldige ``vault://``-tekst houdt haar eigen code (``vault_ref_ongeldig``).
+CIFS_CONFIG = "cifsconfig"
+WACHTWOORD = "password"
+_GEHEIM_IN_KLARE_TEKST = (
+    "een wachtwoord voor SMB-opslag mag niet in klare tekst in de waarden staan; gebruik een kluisverwijzing "
+    "vault://app/<app_id>/<parameter> (het invullen daarvan bestaat nog niet: de installatie stopt dan met 501)"
+)
+
+
+def _ix_volume_naam(v: Any, where: str) -> list[Fout]:
+    """Een veilige naam voor het dataset van een ixVolume (KLEIN-78; zie :data:`IX_VOLUME_NAAM_RE`)."""
+    if not isinstance(v, str):
+        return [_f(where, "type", "verwacht tekst")]
+    if len(v) > MAX_IX_VOLUME_NAAM or not IX_VOLUME_NAAM_RE.fullmatch(v) or ".." in v or "." in v.split("/"):
+        return [_f(where, "patroon", _IX_VOLUME_NAAM)]
+    return []
 
 
 def _sleutel_fout(
@@ -670,6 +712,18 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app
                     _f(f"{p}.{e}", "zfs_eigenschappen_verboden", _ZFS_EIGENSCHAPPEN)
                     for e in v
                     if _nk(e) == ZFS_EIGENSCHAPPEN
+                ]
+                for e, naam in v.items():
+                    if _nk(e) == DATASETNAAM:
+                        out += _ix_volume_naam(naam, f"{p}.{e}")
+            elif nk == IX_VOLUME_CONFIG and isinstance(v, str):
+                out += _ix_volume_naam(v, p)
+            if nk == CIFS_CONFIG and catalogus_waarde and isinstance(v, Mapping):
+                out += [
+                    _f(f"{p}.{e}", "geheim_in_klare_tekst", _GEHEIM_IN_KLARE_TEKST)
+                    for e, ww in v.items()
+                    if _nk(e) == WACHTWOORD
+                    and not (isinstance(ww, str) and (VAULT_REF_RE.fullmatch(ww) or ww.startswith("vault://")))
                 ]
             vast_veld = k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path"))
             pad_sleutel = (nk in HOSTPAD_SLEUTELS_OVERAL and in_waarden) or (

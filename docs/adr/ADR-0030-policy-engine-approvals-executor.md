@@ -104,6 +104,22 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    Een witte lijst binnen een opslagregel, `dataset_name`, ACL op een ixVolume en cifs/nfs bij catalogusapps
    (KLEIN-75 A2, A3, A4, A6, A7) zijn hier niet besloten. `policy/*.yaml` en de `policy_hash` veranderen hierdoor
    niet. NIET GEVALIDEERD (echte NAS).
+   **Opslag: datasetnaam van een ixVolume en SMB-wachtwoord (aanvulling 2026-11-14, KLEIN-78; KLEIN-75 A3 en A6;
+   besluit van de regisseur, dicht bij twijfel).** TrueNAS maakt het dataset van een ixVolume aan als
+   `<docker-dataset>/app_mounts/<app>/<dataset_name>` en controleert de naam nergens als pad (middleware ece9d19,
+   `update_volumes` en `normalize_ix_volume`). Daarom moet `ix_volume_config.dataset_name` (genormaliseerde sleutel;
+   ook een `ix_volume_config` die zelf een tekst is) bij elke app een veilige naam zijn: alleen de tekens die ZFS in
+   een datasetnaam toestaat (middleware `validate_dataset_name` -> `truenas_pylibzfs.name_is_valid`; OpenZFS
+   `zfs_namecheck.c`: letters, cijfers, `-`, `_`, `.`, `:` en spatie), in delen gescheiden door `/`, zonder `/` aan het
+   begin of eind, zonder leeg deel, zonder `.` als deel, nergens `..`, hooguit 200 tekens. Anders de bestaande code
+   `patroon` (of `type` als het geen tekst is). Van de 194 standaardnamen in de catalogusapps van TrueNAS
+   (truenas/apps f142a16) valt alleen `data#` hierbuiten; die weigert ZFS zelf ook (`#` is het teken van een
+   bladwijzer). In de waarden van een catalogusapp is `cifs_config.password` (genormaliseerde sleutels) alleen als
+   geldige kluisverwijzing `vault://app/<app_id>/<parameter>` toegestaan (besluit 28; die geeft eerlijk `501`); elke
+   andere waarde, ook leeg of `null`, geeft de nieuwe code `geheim_in_klare_tekst`. Een ongeldige `vault://`-tekst
+   houdt `vault_ref_ongeldig`. Andere wachtwoordvelden van catalogusapps vallen hier niet onder (KLEIN-75 A6 optie a
+   is niet gekozen). Witte lijst per opslagregel, ACL op een ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven
+   open. `policy/*.yaml` en de `policy_hash` veranderen niet. NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -339,7 +355,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   in `apps/policy/src/asm_policy/params.py` (`zfs_eigenschappen_verboden`, `acl_verboden` en de hostpadregel voor
   `host_path_config` in elke opslagregel, `opslag_verboden` voor een config van een ander type) vallen buiten de
   `policy_hash` en werken in de executor pas na een nieuw gebouwd en uitgerold executor-image; een oude executor merkt
-  geen verschil.
+  geen verschil. Aanvulling 2026-11-14 (KLEIN-78): hetzelfde restrisico geldt voor de naamregel van
+  `ix_volume_config.dataset_name` (`patroon`) en `geheim_in_klare_tekst` voor `cifs_config.password`.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
