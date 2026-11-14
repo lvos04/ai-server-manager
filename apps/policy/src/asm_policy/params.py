@@ -63,6 +63,11 @@ Opslag (KLEIN-81; dicht bij twijfel): bij de standaard Custom App geldt een verb
 ``/sys/fs/cgroup``: ``mount_verboden``; ``/process``, ``/devices``: geldig). ``/`` telt alleen exact; hoofdletters
 tellen mee (``/PROC`` is een ander pad). NIET GEVALIDEERD (echte NAS).
 
+Opslag (KLEIN-88; dicht bij twijfel): ook ``/etc/hosts``, ``/etc/hostname``, ``/etc/resolv.conf`` (bestanden die Docker
+zelf in elke container beheert) en ``/run/secrets`` zijn verboden containerpaden, met alles eronder
+(``/run/secrets/x``: ``mount_verboden``); ``/etc``, ``/run``, ``/etc/hostsx`` en ``/run/secretsx`` blijven geldig.
+NIET GEVALIDEERD (echte NAS).
+
 Opslag (KLEIN-83; KLEIN-75 A7, dicht bij twijfel): in de waarden van een catalogusapp is NFS-opslag bewust geweigerd
 (``opslag_verboden``): elke opslagregel van type nfs en elke niet-lege ``nfs_config``, ook in een andere schrijfwijze
 en in een lijst, tot S-P2-050 (witte lijst per catalogusapp; ADR-0030 besluit 6). Het exportpad (``path`` direct in
@@ -169,7 +174,22 @@ IX_VALUES_KEYS = frozenset(
         "resources",
     }
 )
-CONTAINER_FORBIDDEN_MOUNTS = ("/", "/proc", "/sys", "/dev", "/var/run/docker.sock", "/run/docker.sock")
+# Verboden containerpaden voor ``mount_path`` van de standaard Custom App, per padsegment ook alles eronder (KLEIN-81;
+# zie :func:`_onder_verboden_containerpad`). Sinds KLEIN-88 (besluit van de regisseur, dicht bij twijfel) ook de
+# bestanden die Docker zelf in elke container beheert (``/etc/hosts``, ``/etc/hostname``, ``/etc/resolv.conf``) en
+# ``/run/secrets``; ``/etc`` en ``/run`` zelf blijven geldig. NIET GEVALIDEERD (echte NAS).
+CONTAINER_FORBIDDEN_MOUNTS = (
+    "/",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/var/run/docker.sock",
+    "/run/docker.sock",
+    "/etc/hosts",
+    "/etc/hostname",
+    "/etc/resolv.conf",
+    "/run/secrets",
+)
 
 
 @dataclass(frozen=True)

@@ -200,6 +200,19 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    koppelpaden van de 9 opnieuw vertaalde payloads van appstore-en-fork blijven geldig. `policy/*.yaml` en de
    `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". NIET
    GEVALIDEERD (echte NAS).
+   **Opslag: door Docker beheerde bestanden en `/run/secrets` (aanvulling 2026-11-14, KLEIN-88; vervolgpunt van
+   R-VEILIG bij KLEIN-81; besluit van de regisseur, dicht bij twijfel).** De lijst van verboden containerpaden is
+   aangevuld met `/etc/hosts`, `/etc/hostname` en `/etc/resolv.conf` (bestanden die Docker zelf in elke container
+   beheert) en `/run/secrets`; alleen deze vier. De vergelijking per padsegment van KLEIN-81 geldt ook hier:
+   `/run/secrets/x` en `/etc/hosts/x` geven `mount_verboden`; `/etc`, `/run`, `/etc/hostsx`, `/run/secretsx` en
+   `/ETC/hosts` blijven geldig (`/etc` en `/run` waren en blijven geldig). Er was geen gat naar de host aangetoond;
+   doel is dat een koppeling deze door Docker beheerde bestanden en de geheimenmap in de container niet vervangt.
+   `/var/run/secrets` staat er niet in (besluit: alleen deze vier paden); de policy toetst de padtekst, niet
+   symlinks in de image (zoals `/var/run` naar `/run`). Geldt waar de lijst al gold: alleen
+   `mount_path` van de standaard Custom App (catalogusapps: S-P2-050). Geen geldig koppelpad ligt op of onder deze
+   paden: de 11 koppelpaden uit de manifesten van de elf repos en de koppelpaden in de tests blijven geldig.
+   `policy/*.yaml` en de `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de
+   `policy_hash`". NIET GEVALIDEERD (echte NAS).
    **Opslag: NFS bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-83; KLEIN-75 A7; besluit van de
    regisseur, dicht bij twijfel, zelfde lijn als SMB).** NFS bij een catalogusapp werd alleen toevallig geweigerd: een
    exportpad met `/` gaf `hostpad_verboden` (misleidend: het is een pad op de NFS-server, niet op de NAS), en een
@@ -496,7 +509,9 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   koppelpad dat geen strikt containerpad is, `acl_verboden` voor een ACL op een ixVolume en `dubbel` voor een
   herhaalde `dataset_name`. Aanvulling 2026-11-14 (KLEIN-81): hetzelfde geldt voor `mount_verboden` voor een
   koppelpad onder een verboden containerpad (`/proc/sys`, `/dev/shm`, `/sys/fs/cgroup`); een oude executor laat die
-  nog door. Aanvulling 2026-11-14 (KLEIN-83): hetzelfde geldt voor `opslag_verboden` voor NFS-opslag (type nfs,
+  nog door. Aanvulling 2026-11-14 (KLEIN-88): hetzelfde geldt voor `mount_verboden` voor een koppelpad op of onder
+  `/etc/hosts`, `/etc/hostname`, `/etc/resolv.conf` of `/run/secrets`; een oude executor laat die nog door.
+  Aanvulling 2026-11-14 (KLEIN-83): hetzelfde geldt voor `opslag_verboden` voor NFS-opslag (type nfs,
   `nfs_config`) bij een catalogusapp; een oude executor laat een exportpad zonder `/` nog door.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).

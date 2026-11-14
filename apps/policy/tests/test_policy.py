@@ -2493,10 +2493,46 @@ def test_mount_path_naast_een_verboden_containerpad_blijft_geldig(typ: str) -> N
         assert _ix_paren({**_regel(typ), "mount_path": mount}) == [], (typ, mount)
 
 
+# KLEIN-88 (vervolgpunt van R-VEILIG bij KLEIN-81; besluit van de regisseur, dicht bij twijfel): de bestanden die
+# Docker zelf in elke container beheert (``/etc/hosts``, ``/etc/hostname``, ``/etc/resolv.conf``) en ``/run/secrets``
+# staan in de lijst van verboden containerpaden; per padsegment, dus ook alles eronder (``/run/secrets/x``). Alleen
+# deze vier paden; ``/etc`` en ``/run`` zelf blijven geldig, zoals vóór KLEIN-88. Geldt waar de lijst al gold: bij de
+# standaard Custom App. NIET GEVALIDEERD (echte NAS).
+MOUNT_PATH_DOCKERBESTAND = [
+    "/etc/hosts", "/etc/hostname", "/etc/resolv.conf", "/run/secrets", "/run/secrets/x", "/run/secrets/db_password",
+    "/run/secrets/a/b", "/etc/hosts/x",
+]  # fmt: skip
+# Tegenproef: alleen een echt padsegment telt (geen tekstprefix), hoofdletters tellen mee, en ``/etc`` en ``/run``
+# zelf (bovenliggend) blijven geldig.
+MOUNT_PATH_NAAST_DOCKERBESTAND = [
+    "/etc", "/etc/hostsx", "/etc/hosts.allow", "/etc/hostnamex", "/etc/resolv.confx", "/etc/resolv", "/etc/ssl",
+    "/run/secretsx", "/run/secrets_x", "/run/secret", "/ETC/hosts", "/Run/secrets", "/data/run/secrets",
+    "/config/etc/hosts",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+@pytest.mark.parametrize("mount", MOUNT_PATH_DOCKERBESTAND)
+def test_mount_path_op_een_dockerbestand_of_onder_run_secrets_geweigerd(typ: str, mount: str) -> None:
+    """KLEIN-88: een koppelpad op ``/etc/hosts``, ``/etc/hostname``, ``/etc/resolv.conf`` of ``/run/secrets``, of
+    eronder, geeft bij elk opslagtype ``mount_verboden``; vóór KLEIN-88 waren ze geldig."""
+    paren = _ix_paren({**_regel(typ), "mount_path": mount})
+    assert (f"{ST0}.mount_path", "mount_verboden") in paren, paren
+
+
+@pytest.mark.parametrize("typ", list(OPSLAGTYPEN))
+def test_mount_path_naast_een_dockerbestand_blijft_geldig(typ: str) -> None:
+    """KLEIN-88, tegenproef: ``/etc``, ``/etc/hostsx``, ``/run/secretsx``, ``/ETC/hosts`` (hoofdletters) en een pad
+    dat ``/run/secrets`` alleen als deel bevat (``/data/run/secrets``) blijven bij elk opslagtype geldig."""
+    for mount in MOUNT_PATH_NAAST_DOCKERBESTAND:
+        assert _ix_paren({**_regel(typ), "mount_path": mount}) == [], (typ, mount)
+
+
 def test_geen_geldig_koppelpad_ligt_onder_een_verboden_containerpad() -> None:
     """KLEIN-81, tegenproef: geen enkel geldig koppelpad uit de manifesten en de tests ligt onder (of is) een verboden
-    containerpad, op segmentniveau; ``/`` telt daarbij alleen exact."""
-    for mount in MOUNT_PATH_GELDIG + MOUNT_PATH_NAAST_VERBODEN:
+    containerpad, op segmentniveau; ``/`` telt daarbij alleen exact. Sinds KLEIN-88 ook niet onder ``/etc/hosts``,
+    ``/etc/hostname``, ``/etc/resolv.conf`` of ``/run/secrets``."""
+    for mount in MOUNT_PATH_GELDIG + MOUNT_PATH_NAAST_VERBODEN + MOUNT_PATH_NAAST_DOCKERBESTAND:
         for verboden in CONTAINER_FORBIDDEN_MOUNTS:
             assert mount != verboden, (mount, verboden)
             if verboden != "/":
