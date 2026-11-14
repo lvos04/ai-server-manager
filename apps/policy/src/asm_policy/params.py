@@ -39,9 +39,10 @@ ander type dan de regel (bv. ``host_path_config`` of ``tmpfs_config`` bij ix_vol
 
 Opslag (KLEIN-78; KLEIN-75 A3 en A6): ``ix_volume_config.dataset_name`` (ook een ``ix_volume_config`` die een tekst
 is) moet bij elke app een veilige ZFS-naam zijn (:data:`IX_VOLUME_NAAM_RE`; anders ``patroon``, of ``type`` als het
-geen tekst is). In de waarden van een catalogusapp is ``cifs_config.password`` alleen als geldige kluisverwijzing
-toegestaan; elke andere waarde is ``geheim_in_klare_tekst`` (ADR-0030 besluit 28). Afgeleid uit de bron; NIET
-GEVALIDEERD (echte NAS).
+geen tekst is). In de waarden van een catalogusapp is SMB-opslag geweigerd (``opslag_verboden``): elke opslagregel
+van type cifs en elke niet-lege ``cifs_config``, ook in een andere schrijfwijze en in een lijst, tot de executor
+kluisverwijzingen invult (herstel R-VEILIG-1; ADR-0030 besluit 6 en 28). Afgeleid uit de bron; NIET GEVALIDEERD
+(echte NAS).
 
 Diepte (S-P2-010, R-VEILIG-1; dicht bij twijfel): parameters zijn hooguit :data:`MAX_PARAMETER_DIEPTE` niveaus diep
 genest, anders ``te_diep_genest``. De doorzoekers (:func:`_walk`, en de boilercontrole in de engine) kijken tot
@@ -623,15 +624,21 @@ _IX_VOLUME_NAAM = (
     "ongeldige datasetnaam: alleen letters, cijfers, - _ . : en spatie, in delen gescheiden door /; geen / aan het "
     "begin of eind, geen leeg deel, geen . als deel en nergens .. (hooguit 200 tekens)"
 )
-# Wachtwoord van SMB-opslag in de waarden van een catalogusapp (KLEIN-78; KLEIN-75 A6; ADR-0030 besluit 28): TrueNAS
-# zet ``cifs_config.password`` als ``password=…`` in de mountopties van het volume (truenas/apps f142a16, library
-# 2.3.18). Alleen een geldige kluisverwijzing mag; elke andere waarde (ook leeg of ``null``) is een geheim in klare
-# tekst. Een ongeldige ``vault://``-tekst houdt haar eigen code (``vault_ref_ongeldig``).
+# SMB-opslag in de waarden van een catalogusapp (KLEIN-78, herstel R-VEILIG-1; KLEIN-75 A6 optie b, besluit van de
+# regisseur, dicht bij twijfel). TrueNAS bouwt de mountopties van het volume uit ``cifs_config``: ``user=``,
+# ``password=``, ``domain=`` en elke tekst uit ``options``, met komma's aan elkaar (truenas/apps f142a16, library
+# 2.3.18, ``CifsVolume``). Een wachtwoord kan zo ook via ``options`` (``pass=``, ``password2=``, ``credentials=``) of
+# een komma in ``username``/``domain`` in klare tekst mee, en eigen waarden van een catalogusapp wist de Hub nog niet
+# (ADR-0030 besluit 28). Daarom is elke opslagregel van type cifs en elke niet-lege ``cifs_config`` (genormaliseerde
+# sleutel en typewaarde; leeg is alleen afwezig, ``null`` of ``{}``, zoals bij de standaard Custom App) geweigerd met
+# ``opslag_verboden``, tot de executor kluisverwijzingen invult (S-P2-050/070; dan moet deze weigering weer open).
+# Bij de standaard Custom App was cifs al ``opslag_verboden`` (:func:`_ix_values`).
 CIFS_CONFIG = "cifsconfig"
-WACHTWOORD = "password"
-_GEHEIM_IN_KLARE_TEKST = (
-    "een wachtwoord voor SMB-opslag mag niet in klare tekst in de waarden staan; gebruik een kluisverwijzing "
-    "vault://app/<app_id>/<parameter> (het invullen daarvan bestaat nog niet: de installatie stopt dan met 501)"
+OPSLAGTYPE = "type"
+CIFS = "cifs"
+_SMB_VERBODEN = (
+    "SMB-opslag (type cifs of cifs_config) is bij een catalogusapp nog niet toegestaan: het wachtwoord kan nog niet "
+    "als kluisverwijzing worden ingevuld en zou in klare tekst in de mountopties en de opgeslagen waarden komen"
 )
 
 
@@ -718,13 +725,11 @@ def _deep_forbidden(values: Any, where: str, manifest: Mapping[str, Any], ix_app
                         out += _ix_volume_naam(naam, f"{p}.{e}")
             elif nk == IX_VOLUME_CONFIG and isinstance(v, str):
                 out += _ix_volume_naam(v, p)
-            if nk == CIFS_CONFIG and catalogus_waarde and isinstance(v, Mapping):
-                out += [
-                    _f(f"{p}.{e}", "geheim_in_klare_tekst", _GEHEIM_IN_KLARE_TEKST)
-                    for e, ww in v.items()
-                    if _nk(e) == WACHTWOORD
-                    and not (isinstance(ww, str) and (VAULT_REF_RE.fullmatch(ww) or ww.startswith("vault://")))
-                ]
+            if catalogus_waarde and (
+                (nk == CIFS_CONFIG and v is not None and v != {})
+                or (nk == OPSLAGTYPE and isinstance(v, str) and _nk(v) == CIFS)
+            ):
+                out.append(_f(p, "opslag_verboden", _SMB_VERBODEN))
             vast_veld = k in ("host_path", "path") and p.endswith(("host_path_config.path", ".host_path"))
             pad_sleutel = (nk in HOSTPAD_SLEUTELS_OVERAL and in_waarden) or (
                 catalogus_waarde and nk in HOSTPAD_SLEUTELS

@@ -114,12 +114,29 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    begin of eind, zonder leeg deel, zonder `.` als deel, nergens `..`, hooguit 200 tekens. Anders de bestaande code
    `patroon` (of `type` als het geen tekst is). Van de 194 standaardnamen in de catalogusapps van TrueNAS
    (truenas/apps f142a16) valt alleen `data#` hierbuiten; die weigert ZFS zelf ook (`#` is het teken van een
-   bladwijzer). In de waarden van een catalogusapp is `cifs_config.password` (genormaliseerde sleutels) alleen als
-   geldige kluisverwijzing `vault://app/<app_id>/<parameter>` toegestaan (besluit 28; die geeft eerlijk `501`); elke
-   andere waarde, ook leeg of `null`, geeft de nieuwe code `geheim_in_klare_tekst`. Een ongeldige `vault://`-tekst
-   houdt `vault_ref_ongeldig`. Andere wachtwoordvelden van catalogusapps vallen hier niet onder (KLEIN-75 A6 optie a
-   is niet gekozen). Witte lijst per opslagregel, ACL op een ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven
-   open. `policy/*.yaml` en de `policy_hash` veranderen niet. NIET GEVALIDEERD (echte NAS).
+   bladwijzer). In de waarden van een catalogusapp was `cifs_config.password` (genormaliseerde sleutels) eerst alleen
+   als geldige kluisverwijzing `vault://app/<app_id>/<parameter>` toegestaan (besluit 28; die geeft eerlijk `501`);
+   elke andere waarde gaf de code `geheim_in_klare_tekst`. Die wachtwoordregel is op dezelfde dag vervangen door de
+   herstelregel hieronder. Een ongeldige `vault://`-tekst houdt `vault_ref_ongeldig`. Andere wachtwoordvelden van
+   catalogusapps vallen hier niet onder (KLEIN-75 A6 optie a is niet gekozen). Witte lijst per opslagregel, ACL op een
+   ixVolume en NFS/SMB-paden (KLEIN-75 A2, A4, A7) blijven open. `policy/*.yaml` en de `policy_hash` veranderen niet.
+   NIET GEVALIDEERD (echte NAS).
+   **Opslag: SMB bij catalogusapps geweigerd (aanvulling 2026-11-14, KLEIN-78 herstel R-VEILIG-1; KLEIN-75 A6 optie
+   b, besluit van de regisseur, dicht bij twijfel).** De wachtwoordregel hierboven was te omzeilen: TrueNAS bouwt de
+   mountopties van een SMB-volume uit `cifs_config` (`user=`, `password=`, `domain=` en elke tekst uit `options`, met
+   komma's aan elkaar; truenas/apps f142a16, library 2.3.18, `CifsVolume`), dus het wachtwoord ging ook via `options`
+   (`pass=`, `password=`, `password2=`, `credentials=`) of via een komma in `username` of `domain` in klare tekst mee.
+   Daarom geeft in de waarden van een catalogusapp elke opslagregel van type `cifs` en elke niet-lege `cifs_config`
+   (genormaliseerde sleutel en typewaarde, ook in een lijst en op elke diepte; leeg is alleen afwezig, `null` of `{}`)
+   de bestaande code `opslag_verboden`, met of zonder wachtwoord en ook met een kluisverwijzing. Eén code: dezelfde
+   als voor cifs bij de standaard Custom App, en juist voor elke vorm (ook zonder wachtwoord of met een
+   kluisverwijzing, waar `geheim_in_klare_tekst` niet zou kloppen). De code `geheim_in_klare_tekst` vervalt. Geen
+   geldige payload gebruikt cifs (appstore-en-fork kent alleen `host_path`, `ix_volume` en `tmpfs`). Deze weigering
+   moet weer open bij S-P2-050/S-P2-070, als de executor kluisverwijzingen invult; daar horen ook bij: (1) de
+   `<app_id>` in een kluisverwijzing binden aan `target.app_id` en `.` en `..` als `<parameter>` weigeren (anders kan
+   het SMB-wachtwoordveld het geheim van een andere app naar een zelfgekozen SMB-server sturen), en (2) komma-injectie
+   in de CIFS-mountopties ook buiten wachtwoorden (bv. `username: "gast,uid=0"`) dichtzetten met een witte lijst per
+   catalogusapp. `policy/*.yaml` en de `policy_hash` veranderen niet. NIET GEVALIDEERD (echte NAS).
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
@@ -356,7 +373,8 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   `host_path_config` in elke opslagregel, `opslag_verboden` voor een config van een ander type) vallen buiten de
   `policy_hash` en werken in de executor pas na een nieuw gebouwd en uitgerold executor-image; een oude executor merkt
   geen verschil. Aanvulling 2026-11-14 (KLEIN-78): hetzelfde restrisico geldt voor de naamregel van
-  `ix_volume_config.dataset_name` (`patroon`) en `geheim_in_klare_tekst` voor `cifs_config.password`.
+  `ix_volume_config.dataset_name` (`patroon`) en, na het herstel van R-VEILIG-1, voor `opslag_verboden` voor SMB-opslag
+  (type cifs, `cifs_config`) bij een catalogusapp (in plaats van `geheim_in_klare_tekst` voor `cifs_config.password`).
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie

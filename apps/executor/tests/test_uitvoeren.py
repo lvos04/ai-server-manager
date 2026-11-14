@@ -675,11 +675,11 @@ def test_acl_blok_in_een_opslagregel_van_een_ander_type_weigert_de_executor_zelf
 
 
 def test_smb_wachtwoord_en_datasetnaam_weigert_de_executor_zelf(stack: Stack) -> None:
-    """KLEIN-78 (KLEIN-75 A6 en A3): een ondertekend en goedgekeurd verzoek (R3) met bij een catalogusapp een
-    ``cifs_config.password`` in klare tekst (``geheim_in_klare_tekst``), of met een ``ix_volume_config.dataset_name``
-    die geen veilige ZFS-naam is (``patroon``; ook bij de standaard Custom App), weigert de executor zelf met 422;
-    TrueNAS krijgt niets. Tegenproef: een kluisverwijzing als wachtwoord geeft eerlijk 501, en een gewone datasetnaam
-    wordt uitgevoerd."""
+    """KLEIN-78 (KLEIN-75 A6 en A3): een ondertekend en goedgekeurd verzoek (R3) met bij een catalogusapp SMB-opslag
+    (``opslag_verboden``, ook met een kluisverwijzing als wachtwoord; herstel R-VEILIG-1), of met een
+    ``ix_volume_config.dataset_name`` die geen veilige ZFS-naam is (``patroon``; ook bij de standaard Custom App),
+    weigert de executor zelf met 422; TrueNAS krijgt niets. Tegenproef: een kluisverwijzing buiten SMB-opslag geeft
+    eerlijk 501, en een gewone datasetnaam wordt uitgevoerd."""
     hub, c, nas = stack
 
     def catalogus(naam: str, values: Any) -> dict[str, Any]:
@@ -697,7 +697,8 @@ def test_smb_wachtwoord_en_datasetnaam_weigert_de_executor_zelf(stack: Stack) ->
         return {"type": "ix_volume", "mount_path": "/config", "ix_volume_config": cfg}
 
     for prop, code in (
-        (catalogus("huis-smb", smb("nep-wachtwoord-test")), "geheim_in_klare_tekst"),
+        (catalogus("huis-smb", smb("nep-wachtwoord-test")), "opslag_verboden"),
+        (catalogus("huis-smb-kluis", smb("vault://app/huis-smb-kluis/smb")), "opslag_verboden"),
         (catalogus("huis-ds", {"storage": {"config": ixvol("../../x")}}), "patroon"),
         (install_prop("demo-ds", storage=[ixvol("/etc")]), "patroon"),
     ):
@@ -705,12 +706,53 @@ def test_smb_wachtwoord_en_datasetnaam_weigert_de_executor_zelf(stack: Stack) ->
         assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
         assert code in {f["code"] for f in r.json()["details"]["fouten"]}, r.text
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0
-    r = execute(c, hub, approved(hub, catalogus("huis-kluis", smb("vault://app/huis-kluis/smb")), risk_class="R3"))
+    kluis = {"app": {"wachtwoord": "vault://app/huis-kluis/x"}, "storage": {"config": ixvol("config")}}
+    r = execute(c, hub, approved(hub, catalogus("huis-kluis", kluis), risk_class="R3"))
     assert r.status_code == 501 and r.json()["details"] == {"reden": "vault_verwijzingen"}, r.text
     assert nas.created == [] and writes(nas) == []
     r = execute(c, hub, approved(hub, install_prop("demo-ds-goed", storage=[ixvol("config")])))
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
     assert writes(nas) == ["app.create"] and nas.created[0]["values"]["storage"] == [ixvol("config")]
+
+
+def test_smb_opslag_van_een_catalogusapp_weigert_de_executor_zelf(stack: Stack) -> None:
+    """KLEIN-78, herstel R-VEILIG-1 (besluit van de regisseur: KLEIN-75 A6 optie b): een ondertekend en goedgekeurd
+    verzoek (R3) voor een catalogusapp met SMB-opslag weigert de executor zelf met 422 (``opslag_verboden``), ook als
+    het wachtwoord via ``cifs_config.options`` (pass=, password=, password2=, PASS=, credentials=) of via een komma in
+    ``username`` of ``domain`` meegaat, in een andere schrijfwijze en in een lijst van opslagregels. TrueNAS krijgt
+    niets: geen app.create en geen enkele schrijfaanroep. Alleen nep-testwaarden."""
+    hub, c, nas = stack
+    ref = "vault://app/huis/smb"
+    vormen = [
+        {"options": ["pass=nep-wachtwoord-test"]},
+        {"options": ["password=nep-wachtwoord-test"]},
+        {"options": ["password2=nep-wachtwoord-test"]},
+        {"options": ["PASS=nep-wachtwoord-test"]},
+        {"options": ["credentials=/x"]},
+        {"password": ref, "options": ["pass=nep-wachtwoord-test"]},
+        {"username": "gast,pass=nep-wachtwoord-test"},
+        {"domain": "WG,pass=nep-wachtwoord-test"},
+        {"password": "nep-wachtwoord-test"},
+        {"password": ref},
+    ]
+    for i, extra in enumerate(vormen):
+        cfg = {"server": "server.test", "path": "share", "username": "gast", **extra}
+        for j, values in enumerate(
+            (
+                {"storage": {"smb": {"type": "cifs", "mount_path": "/smb", "cifs_config": cfg}}},
+                {"storage": {"smb": {"Type": "CIFS", "mount_path": "/smb", "Cifs-Config": cfg}}},
+                {"storage": {"additional_storage": [{"type": "cifs", "mount_path": "/smb", "cifs_config": cfg}]}},
+            )
+        ):
+            naam = f"huis-smb-{i}-{j}"
+            params = install_params(naam)
+            params["app_create"].update(catalog_app="home-assistant", train="community", version="1.2.3", values=values)
+            params["manifest"] = {"app_id": naam, "install_reason": "proef met een catalogusapp"}
+            prop = proposal("app.install", app_target(naam), params, expected_version=ABSENT)
+            r = execute(c, hub, approved(hub, prop, risk_class="R3"))
+            assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", (extra, j, r.text)
+            assert "opslag_verboden" in {f["code"] for f in r.json()["details"]["fouten"]}, (extra, j, r.text)
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
 
 
 def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) -> None:

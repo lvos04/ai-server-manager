@@ -2018,54 +2018,117 @@ def test_geldige_datasetnamen_blijven_geldig() -> None:
         assert _codes(_catalogus({"storage": {"config": {"type": "ix_volume", "ix_volume_config": naam}}})) == [], naam
 
 
-# KLEIN-78 (KLEIN-75 A6; ADR-0030 besluit 28, besluit van de regisseur): bij een catalogusapp gaat
-# ``cifs_config.password`` als ``password=…`` in de mountopties van het SMB-volume (truenas/apps f142a16). Een
-# wachtwoord in klare tekst wordt geweigerd; alleen een kluisverwijzing ``vault://app/<app_id>/<parameter>`` mag
-# (het invullen daarvan bestaat nog niet: Hub en executor geven dan 501).
-SMB_WACHTWOORD_FOUT = [
-    pytest.param("nep-wachtwoord-test", id="klare_tekst"),
-    pytest.param("", id="leeg"),
-    pytest.param(None, id="null"),
-    pytest.param(1234, id="getal"),
-    pytest.param({"waarde": "x"}, id="object"),
-    pytest.param("app/huis/smb", id="verwijzing_zonder_schema"),
-    pytest.param("vault:/app/huis/smb", id="bijna_kluisverwijzing"),
-    pytest.param("vaultwachtwoord", id="begint_met_vault"),
+# KLEIN-78, herstel R-VEILIG-1 (besluit van de regisseur: KLEIN-75 A6 optie b, dicht bij twijfel). TrueNAS bouwt de
+# mountopties van een SMB-volume uit ``cifs_config``: ``user=<username>``, ``password=<password>``, ``domain=<domain>``
+# en elke tekst uit ``options``, met komma's aan elkaar (truenas/apps f142a16, library 2.3.18, ``CifsVolume``). Een
+# wachtwoord kan zo ook via ``options`` ("pass=", "password2=", "credentials=") of een komma in ``username`` of
+# ``domain`` in klare tekst mee. Daarom geeft bij een catalogusapp elke opslagregel van type cifs en elke niet-lege
+# ``cifs_config`` (ook in een andere schrijfwijze en in een lijst) ``opslag_verboden``, tot de executor
+# kluisverwijzingen invult (S-P2-050/070). Dit vervangt de wachtwoordregel van 10d24a0 (``geheim_in_klare_tekst``):
+# elke waarde die die regel weigerde, staat hieronder nog als geval. Alleen nep-testwaarden.
+SMB_REF = "vault://app/huis/smb_wachtwoord"
+SMB_VORMEN = [
+    pytest.param({"password": "nep-wachtwoord-test"}, id="password_klare_tekst"),
+    pytest.param({"password": ""}, id="password_leeg"),
+    pytest.param({"password": None}, id="password_null"),
+    pytest.param({"password": 1234}, id="password_getal"),
+    pytest.param({"password": {"waarde": "x"}}, id="password_object"),
+    pytest.param({"password": "app/huis/smb"}, id="password_verwijzing_zonder_schema"),
+    pytest.param({"password": "vault:/app/huis/smb"}, id="password_bijna_kluisverwijzing"),
+    pytest.param({"password": "vaultwachtwoord"}, id="password_begint_met_vault"),
+    pytest.param({"password": SMB_REF}, id="password_kluisverwijzing"),
+    pytest.param({}, id="zonder_password"),
+    pytest.param({"options": ["pass=nep-wachtwoord-test"]}, id="options_pass"),
+    pytest.param({"options": ["password=nep-wachtwoord-test"]}, id="options_password"),
+    pytest.param({"options": ["password2=nep-wachtwoord-test"]}, id="options_password2"),
+    pytest.param({"options": ["PASS=nep-wachtwoord-test"]}, id="options_PASS"),
+    pytest.param({"options": ["credentials=/x"]}, id="options_credentials"),
+    pytest.param(
+        {"password": SMB_REF, "options": ["pass=nep-wachtwoord-test"]}, id="options_pass_naast_kluisverwijzing"
+    ),
+    pytest.param({"password": SMB_REF, "options": ["password2=nep-wachtwoord-test"]}, id="options_password2_naast_ref"),
+    pytest.param({"username": "gast,pass=nep-wachtwoord-test"}, id="username_met_pass"),
+    pytest.param({"domain": "WG,pass=nep-wachtwoord-test"}, id="domain_met_pass"),
+]
+# Schrijfwijzen van de sleutel ``type``, de typewaarde en de sleutel ``cifs_config``.
+SMB_SCHRIJFWIJZEN = [("type", "cifs", "cifs_config"), ("Type", "CIFS", "Cifs-Config"), ("TYPE", "Cifs", "cifsConfig")]
+
+
+def _smb(extra: dict[str, Any], typ_sleutel: str = "type", typ: str = "cifs", cifs: str = "cifs_config") -> dict:
+    cfg = {"server": "server.test", "path": "share", "username": "gast", **extra}
+    return {typ_sleutel: typ, "mount_path": "/smb", cifs: cfg}
+
+
+def _paren(params: Any, target: dict[str, Any] | None = None) -> list[tuple[str, str]]:
+    doel = target or {"host_id": HOST, "app_id": "huis"}
+    return [(f.veld, f.code) for f in validate_parameters(POLICY, POLICY.acties["app.install"], doel, params)]
+
+
+@pytest.mark.parametrize("extra", SMB_VORMEN)
+def test_smb_opslag_van_een_catalogusapp_wordt_geweigerd(extra: dict[str, Any]) -> None:
+    """R-VEILIG-1: SMB-opslag in de waarden van een catalogusapp geeft ``opslag_verboden`` op het type en op
+    ``cifs_config``, met of zonder wachtwoord, ook met een kluisverwijzing, in elke schrijfwijze en in een lijst van
+    opslagregels."""
+    w = "parameters.app_create.values.storage"
+    for typ_sleutel, typ, cifs in SMB_SCHRIJFWIJZEN:
+        paren = _paren(_catalogus({"storage": {"smb": _smb(extra, typ_sleutel, typ, cifs)}}))
+        assert (f"{w}.smb.{typ_sleutel}", "opslag_verboden") in paren, (typ_sleutel, paren)
+        assert (f"{w}.smb.{cifs}", "opslag_verboden") in paren, (cifs, paren)
+    ixvol = {"type": "ix_volume", "mount_path": "/config", "ix_volume_config": {"dataset_name": "config"}}
+    paren = _paren(_catalogus({"storage": {"additional_storage": [ixvol, _smb(extra)]}}))
+    assert (f"{w}.additional_storage[1].type", "opslag_verboden") in paren, paren
+    assert (f"{w}.additional_storage[1].cifs_config", "opslag_verboden") in paren, paren
+    assert not [v for v, _c in paren if v.startswith(f"{w}.additional_storage[0]")], paren
+
+
+_IXVOL_CONFIG = {"dataset_name": "config"}
+SMB_PLEKKEN = [
+    pytest.param({"smb": {"type": "cifs", "mount_path": "/smb"}}, ".smb.type", id="type_zonder_config"),
+    pytest.param({"smb": {"type": " cifs ", "mount_path": "/smb"}}, ".smb.type", id="type_met_spaties"),
+    pytest.param(
+        {"c": {"type": "ix_volume", "ix_volume_config": _IXVOL_CONFIG, "cifs_config": {"server": "s.test"}}},
+        ".c.cifs_config",
+        id="config_in_regel_van_ander_type",
+    ),
+    pytest.param(
+        {"smb": {"type": "cifs", "cifs_config": [{"password": "x"}]}}, ".smb.cifs_config", id="config_als_lijst"
+    ),
+    pytest.param(
+        {"c": {"type": "ix_volume", "cifs_config": "//s.test/share"}}, ".c.cifs_config", id="config_als_tekst"
+    ),
+    pytest.param({"a": {"b": [{"c": {"CIFS_CONFIG": {"password": "x"}}}]}}, ".a.b[0].c.CIFS_CONFIG", id="diep_genest"),
+    pytest.param([{"type": "cifs", "cifs_config": {"server": "s.test"}}], "[0].cifs_config", id="lijst_als_waarde"),
 ]
 
 
-def _smb(sleutel: str = "password", wachtwoord: Any = "nep-wachtwoord-test", cifs: str = "cifs_config") -> dict:
-    return {"type": "cifs", "mount_path": "/smb",
-            cifs: {"server": "server.test", "path": "share", "username": "gast", sleutel: wachtwoord}}  # fmt: skip
+@pytest.mark.parametrize(("values", "veld"), SMB_PLEKKEN)
+def test_smb_opslag_van_een_catalogusapp_op_elke_plek_geweigerd(values: Any, veld: str) -> None:
+    """R-VEILIG-1, dicht bij twijfel: type cifs zonder config, een ``cifs_config`` in een regel van een ander type, als
+    lijst of tekst, en diep genest geven ook ``opslag_verboden``."""
+    paren = _paren(_catalogus({"storage": values}))
+    assert (f"parameters.app_create.values.storage{veld}", "opslag_verboden") in paren, paren
 
 
-@pytest.mark.parametrize("wachtwoord", SMB_WACHTWOORD_FOUT)
-def test_smb_wachtwoord_van_een_catalogusapp_alleen_als_kluisverwijzing(wachtwoord: Any) -> None:
-    """A6: ``cifs_config.password`` dat geen geldige kluisverwijzing is, geeft ``geheim_in_klare_tekst``, ook in een
-    andere schrijfwijze van de sleutels en in een lijst van opslagregels."""
-    doel = {"host_id": HOST, "app_id": "huis"}
-    for cifs, sleutel in (("cifs_config", "password"), ("Cifs-Config", "PassWord")):
-        params = _catalogus({"storage": {"smb": _smb(sleutel, wachtwoord, cifs)}})
-        fouten = validate_parameters(POLICY, POLICY.acties["app.install"], doel, params)
-        veld = f"parameters.app_create.values.storage.smb.{cifs}.{sleutel}"
-        assert (veld, "geheim_in_klare_tekst") in [(f.veld, f.code) for f in fouten], [f.as_dict() for f in fouten]
-    lijst = _codes(_catalogus({"storage": {"additional_storage": [_smb(wachtwoord=wachtwoord)]}}))
-    assert "geheim_in_klare_tekst" in lijst, lijst
-
-
-def test_smb_wachtwoord_als_kluisverwijzing_blijft_toegestaan() -> None:
-    """A6, tegenproef: een geldige kluisverwijzing mag (de Hub en de executor vinden hem en geven 501), SMB-opslag
-    zonder ``password`` krijgt deze code niet, en een ongeldige kluisverwijzing houdt haar eigen code
-    (``vault_ref_ongeldig``). Bij de standaard Custom App blijft SMB-opslag zelf verboden (``opslag_verboden``)."""
-    ref = "vault://app/huis/smb_wachtwoord"
-    goed = _catalogus({"storage": {"smb": _smb(wachtwoord=ref)}})
-    assert _codes(goed) == [] and vault_refs(goed) == [ref]
-    zonder = _smb()
-    del zonder["cifs_config"]["password"]
-    assert _codes(_catalogus({"storage": {"smb": zonder}})) == []
-    ongeldig = _codes(_catalogus({"storage": {"smb": _smb(wachtwoord="vault://ander/x")}}))
-    assert "vault_ref_ongeldig" in ongeldig and "geheim_in_klare_tekst" not in ongeldig, ongeldig
-    # Een wachtwoord buiten cifs_config valt niet onder deze regel (KLEIN-75 A6 optie a is niet gekozen).
+def test_geldige_catalogusopslag_en_kluisverwijzing_blijven_geldig() -> None:
+    """R-VEILIG-1, tegenproef: een lege ``cifs_config`` (afwezig, ``null`` of ``{}``, zoals bij de standaard Custom App)
+    naast een ander opslagtype geeft geen fout; een kluisverwijzing buiten SMB-opslag mag nog (Hub en executor geven
+    eerlijk 501), een wachtwoord buiten ``cifs_config`` valt niet onder deze regel (KLEIN-75 A6 optie a is niet
+    gekozen) en een ongeldige kluisverwijzing houdt haar eigen code. Bij de standaard Custom App blijft SMB-opslag
+    ``opslag_verboden``; de code ``geheim_in_klare_tekst`` bestaat niet meer."""
+    ixvol = {
+        "type": "ix_volume",
+        "mount_path": "/config",
+        "ix_volume_config": {"acl_enable": False, "dataset_name": "config"},
+    }
+    tmpfs = {"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 100}}
+    for leeg in ({}, {"cifs_config": None}, {"cifs_config": {}}, {"Cifs-Config": None}):
+        assert _codes(_catalogus({"storage": {"config": {**ixvol, **leeg}, "cache": {**tmpfs, **leeg}}})) == [], leeg
+    goed = _catalogus({"storage": {"config": ixvol}, "app": {"wachtwoord": SMB_REF}})
+    assert _codes(goed) == [] and vault_refs(goed) == [SMB_REF]
     assert _codes(_catalogus({"app": {"password": "nep-wachtwoord-test"}})) == []
-    ix = validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=[_smb()]))
-    assert "opslag_verboden" in [f.code for f in ix] and "geheim_in_klare_tekst" not in [f.code for f in ix]
+    ongeldig = _codes(_catalogus({"storage": {"smb": _smb({"password": "vault://ander/x"})}}))
+    assert "vault_ref_ongeldig" in ongeldig and "opslag_verboden" in ongeldig, ongeldig
+    for extra in ({"password": "nep-wachtwoord-test"}, {"options": ["pass=nep-wachtwoord-test"]}):
+        ix = [c for _v, c in _paren(install_params(storage=[_smb(extra)]), APP)]
+        assert "opslag_verboden" in ix and "geheim_in_klare_tekst" not in ix, ix
+    assert "geheim_in_klare_tekst" not in _codes(_catalogus({"storage": {"smb": _smb({"password": "x"})}}))
