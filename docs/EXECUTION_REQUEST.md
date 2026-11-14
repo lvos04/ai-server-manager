@@ -108,7 +108,7 @@ Daarna voert de uitvoerder uit, leest terug en vergelijkt met de verwachte toest
 
 | Uitkomst | Antwoord |
 |---|---|
-| toestand is zoals verwacht | `200` met `status: "uitgevoerd"`, `methode`, `before_hash`, `after_hash`, `resource_etag`, `readback`, `waarschuwingen`, `policy_hash` |
+| toestand is zoals verwacht | `200` met `status: "uitgevoerd"`, `methode`, `before_hash`, `after_hash`, `resource_etag`, `readback`, `waarschuwingen`, `policy_hash`; bij `app.rollback` met `herstel_van` en bewaarde waarden buiten het huidige beleid ook de waarschuwing `herstelwaarden_buiten_beleid` en `hercontrole` (`overtredingen`, `codes`; alleen gemeld, het terugzetten gaat door; KLEIN-85) |
 | TrueNAS weigert de aanroep en het doel is onveranderd | `502 uitvoering_mislukt` (`details.reden`); de executor blijft werken |
 | toestand wijkt af, of de uitkomst is onbekend (time-out, verbroken verbinding, journaal weg na de aanroep) | `409 afwijking` (`details.reden`, `details.afwijkingen`, `details.gestopt`); de executor stopt |
 

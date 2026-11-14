@@ -157,7 +157,7 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    `acl_entries` van een ixVolume staan op de lijst omdat het formulier ze toont, ACL op een ixVolume (KLEIN-75 A4) is
    hiermee niet besloten (A4 besluit het herstel hieronder). De config van het eigen type is een object (anders
    `type`), `read_only` is true of false (anders `type`) en `tmpfs_config.size` is een geheel getal van minstens 1 MiB
-   (anders `bereik`; een bovengrens is niet besloten). Gevolg (bewust): een nieuw veld in een latere ix-app-versie
+   (anders `bereik`; een bovengrens is niet besloten; zie de aanvulling KLEIN-85 hieronder). Gevolg (bewust): een nieuw veld in een latere ix-app-versie
    wordt geweigerd tot de lijst is bijgewerkt. Catalogusapps vallen hier niet onder (S-P2-050). `policy/*.yaml` en de
    `policy_hash` veranderen niet;
    restrisico executor-image: zie "Engine-regels buiten de `policy_hash`". NIET GEVALIDEERD (echte NAS).
@@ -230,12 +230,31 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    `opslag_verboden` op die padtekst, dus wat geweigerd wordt verandert niet (geen veiligheidsgevolg); alleen de
    lijst met meldingen kan korter zijn. Juist is daarom: elk ander pad met een andere padtekst houdt de hostpadregel.
    Code, tests, `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet.
+   **Opslag: geen bovengrens voor `tmpfs_config.size` (aanvulling 2026-11-14, KLEIN-85; besluit van de gebruiker
+   2026-11-14).** Dat `tmpfs_config.size` bij de standaard Custom App alleen een ondergrens heeft (een geheel getal van
+   minstens 1 MiB, anders `bereik`) en geen bovengrens, is een bewuste keuze, geen open punt. Code, tests,
+   `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet.
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
    (`app.config`), en hij bewaart ze versleuteld in zijn eigen opslag bij het `request_id` van de update;
    `app.rollback` verwijst met `herstel_van` naar dat `request_id`. De Hub ziet de app-configuratie nooit.
    Catalogusapp: `app.rollback` naar een eerder geïnstalleerde versie.
+   **Hercontrole bij terugzetten, alleen melden (aanvulling 2026-11-14, KLEIN-85; vervolgpunt van R-VEILIG bij
+   KLEIN-80; besluit van de gebruiker 2026-11-14).** De bewaarde vorige waarden gingen zonder nieuwe parametercontrole
+   naar `app.update`. Nu haalt de executor ze vóór het terugzetten door dezelfde `validate_parameters` als een
+   installatie van de standaard Custom App (`app.install`, schema `app_install`); alleen de fouten in de waarden zelf
+   tellen (en grootte of diepte). Het install-manifest kent de executor niet, dus de uitzonderingen daaruit (digest
+   buiten de tag, `host_network_reason`, GPU) tellen hier niet mee en kunnen een melding geven. Een overtreding wordt
+   alleen vastgelegd: één logregel (logger `executor.uitvoeren`, met `request_id`, `herstel_van`, aantal en codes),
+   de waarschuwing `herstelwaarden_buiten_beleid` en het veld `hercontrole` (`overtredingen`, `codes`) in het antwoord
+   (de Hub bewaart `waarschuwingen` in het resultaat van het verzoek), en de codes in `detail` van het journaal; nooit
+   een waarde of geheim. Het terugzetten gaat altijd door met precies dezelfde waarden en dezelfde aanroep naar TrueNAS,
+   ook als de hercontrole zelf faalt (code `hercontrole_niet_mogelijk`): bestaande apps blijven altijd terug te zetten.
+   Zonder overtreding verandert er niets (geen waarschuwing, geen veld, geen logregel). De Hub doet geen hercontrole:
+   hij ziet de bewaarde waarden nooit. `policy/*.yaml` en de `policy_hash` veranderen niet. Sim-getest (nep-TrueNAS);
+   of de waarden die een echte TrueNAS in `app.config` teruggeeft vanzelf meldingen geven, is NIET GEVALIDEERD (echte
+   NAS).
 9. **`resource_etag`.** Een hash over naam, staat, catalogusapp, trein, versie, `custom_app`, images en digests uit
    `app.query` + `app.image.query`. Hub en executor rekenen hem met dezelfde functie uit hun eigen readback. De
    app-configuratie telt niet mee (geheimen; de alleen-lezen-key van de Hub leest hem niet).

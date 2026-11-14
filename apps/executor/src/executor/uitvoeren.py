@@ -22,6 +22,7 @@ Nooit ``custom_compose_config``, nooit een methode buiten het beleid, nooit data
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
@@ -35,13 +36,17 @@ from asm_policy.canonical import canonical_sha256
 from asm_policy.engine import herken_app, recognize_all
 from asm_policy.execreq import iso
 from asm_policy.loader import ActieDef, Policy
-from asm_policy.params import IX_APP, expected_image, vault_refs, verwachte_catalogus
+from asm_policy.params import IX_APP, expected_image, validate_parameters, vault_refs, verwachte_catalogus
 from asm_policy.verify import Weigering, check_decision, check_envelope
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from executor.journal import Journal, JournalUnavailable
 from executor.naslink import NasLinkOnleesbaar, NasLinkStore
 from executor.truenas import NasClient, NasFout
+
+log = logging.getLogger("executor.uitvoeren")
+HERCONTROLE_WAARSCHUWING = "herstelwaarden_buiten_beleid"
+_HERCONTROLE_VELDEN = "parameters.app_create.values"
 
 NAS_MELDINGEN = {
     "truenas_onbereikbaar": (503, "TrueNAS is niet bereikbaar; er is niets uitgevoerd."),
@@ -77,6 +82,37 @@ def _weiger(w: Weigering) -> Uitkomst:
 def _nas_fout(exc: NasFout) -> Uitkomst:
     status, melding = NAS_MELDINGEN.get(exc.code, (502, "TrueNAS gaf een fout; er is niets uitgevoerd."))
     return fout(status, exc.code, melding)
+
+
+def hercontrole_herstelwaarden(policy: Policy, naam: str, waarden: Mapping[str, Any]) -> list[str]:
+    """Hercontrole van bewaarde vorige waarden bij ``app.rollback`` met ``herstel_van`` (KLEIN-85; besluit van de
+    gebruiker 2026-11-14: alleen melden). De waarden gaan door dezelfde ``validate_parameters`` als een installatie
+    van de standaard Custom App; alleen de fouten in de waarden zelf tellen (en grootte of diepte). Het install-manifest
+    kent de executor niet, dus de uitzonderingen daaruit (digest buiten de tag, ``host_network_reason``, GPU) tellen
+    hier niet mee. Geeft de gesorteerde codes (één per fout, dubbelen mogelijk), nooit een waarde."""
+    actie = policy.acties.get("app.install")
+    if actie is None:  # pragma: no cover - het beleid heeft altijd app.install
+        return ["hercontrole_niet_mogelijk"]
+    params = {
+        "app_create": {
+            "app_name": naam,
+            "custom_app": False,
+            "catalog_app": IX_APP,
+            "train": "stable",
+            "version": "1.0.0",
+            "values": dict(waarden),
+        },
+        "manifest": {"app_id": naam},
+    }
+    try:
+        fouten = validate_parameters(policy, actie, {"app_id": naam}, params)
+    except Exception:  # de hercontrole mag het terugzetten nooit tegenhouden (HARDE EIS)
+        return ["hercontrole_niet_mogelijk"]
+    return sorted(
+        f.code
+        for f in fouten
+        if f.veld == "parameters" or f.veld == _HERCONTROLE_VELDEN or f.veld.startswith(f"{_HERCONTROLE_VELDEN}.")
+    )
 
 
 def strip_ix(values: Mapping[str, Any]) -> dict[str, Any]:
@@ -544,6 +580,7 @@ class Uitvoerder:
             methode, geweigerd = self._plan(actie, prop, doel, methods)
             if geweigerd is not None:
                 return geweigerd
+            hercontrole: dict[str, Any] | None = None
             if actie.action_id == "app.rollback" and "herstel_van" in prop["parameters"]:
                 if bewaard is None or bewaard[0] != doel.naam:
                     return fout(
@@ -551,6 +588,10 @@ class Uitvoerder:
                         "herstelpunt_onbekend",
                         "De executor heeft geen vorige waarden van deze app bij die wijziging; er is niets teruggezet.",
                     )
+                # Hercontrole (KLEIN-85): alleen melden; het terugzetten gaat altijd door met dezelfde waarden.
+                codes = hercontrole_herstelwaarden(policy, doel.naam, bewaard[1])
+                if codes:
+                    hercontrole = {"overtredingen": len(codes), "codes": sorted(set(codes))}
                 oud = bewaard[1].get("image") if isinstance(bewaard[1].get("image"), dict) else None
                 if oud:
                     versie, _s, in_tag = str(oud.get("tag") or "").partition("@")
@@ -572,8 +613,18 @@ class Uitvoerder:
                 methode=methode,
                 before_hash=doel.hash,
             )
+            if hercontrole is not None:
+                log.warning(
+                    "%s: terugzetten gaat door met de bewaarde waarden (alleen gemeld): request_id=%s herstel_van=%s "
+                    "overtredingen=%d codes=%s",
+                    HERCONTROLE_WAARSCHUWING,
+                    request_id,
+                    prop["parameters"]["herstel_van"],
+                    hercontrole["overtredingen"],
+                    ",".join(hercontrole["codes"]),
+                )
             return self._uitvoeren_en_teruglezen(
-                nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image
+                nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, hercontrole
             )
         finally:
             nas.close()
@@ -615,6 +666,7 @@ class Uitvoerder:
         request_id: str,
         nonce: str,
         verwachte_image: Mapping[str, Any] | None,
+        hercontrole: Mapping[str, Any] | None = None,
     ) -> Uitkomst:
         mislukt: NasFout | None = None
         try:
@@ -623,7 +675,7 @@ class Uitvoerder:
             mislukt = exc
         try:
             return self._teruglezen(
-                nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, mislukt
+                nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, mislukt, hercontrole
             )
         except JournalUnavailable:
             # Na de aanroep bij TrueNAS kan "er is niets uitgevoerd" niet meer worden beloofd.
@@ -656,6 +708,7 @@ class Uitvoerder:
         nonce: str,
         verwachte_image: Mapping[str, Any] | None,
         mislukt: NasFout | None,
+        hercontrole: Mapping[str, Any] | None = None,
     ) -> Uitkomst:
         try:
             if mislukt is not None:
@@ -684,7 +737,19 @@ class Uitvoerder:
             )
         if afw:
             return self._stop(request_id, nonce, actie, methode, doel, na, str(afw[0]["code"]), afw)
-        self.journal.finish(nonce, status="uitgevoerd", after_hash=na.hash)
+        extra: dict[str, Any] = {}
+        if hercontrole is not None:
+            # Alleen melden (KLEIN-85): codes en aantal, nooit een waarde; zonder overtreding verandert er niets.
+            waarsch = [*waarsch, HERCONTROLE_WAARSCHUWING]
+            extra["hercontrole"] = dict(hercontrole)
+            self.journal.finish(
+                nonce,
+                status="uitgevoerd",
+                after_hash=na.hash,
+                detail=f"{HERCONTROLE_WAARSCHUWING}: {','.join(hercontrole['codes'])}",
+            )
+        else:
+            self.journal.finish(nonce, status="uitgevoerd", after_hash=na.hash)
         return Uitkomst(
             200,
             {
@@ -701,5 +766,6 @@ class Uitvoerder:
                 "waarschuwingen": waarsch,
                 "policy_hash": self.policy.hash,
                 "uitgevoerd_op": iso(datetime.now(UTC)),
+                **extra,
             },
         )

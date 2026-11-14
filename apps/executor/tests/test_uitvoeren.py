@@ -1025,11 +1025,96 @@ def test_bijwerken_en_terugzetten_met_de_bewaarde_vorige_waarden(stack: Stack) -
     assert naam == "demo-app" and opties == {"values": vorige}
     assert writes(nas) == ["app.create", "app.update", "app.update"]
     assert "app.update(custom_compose)" not in nas.mutations
+    # KLEIN-85: waarden die het huidige beleid toelaat geven bij de hercontrole geen melding; antwoord ongewijzigd.
+    assert r.json()["waarschuwingen"] == [] and "hercontrole" not in r.json()
 
     # De vorige waarden staan alleen versleuteld in het journaal van de executor (ook niet in het WAL-bestand).
     ruw = b"".join(p.read_bytes() for p in hub.settings.replay_db.parent.glob(hub.settings.replay_db.name + "*"))
     assert b"SQLite format 3" in ruw
     assert b"PROEF_INSTELLING" not in ruw and b"waarde-alleen-in-de-kluis-417" not in ruw
+
+
+def test_terugzetten_met_waarden_buiten_het_huidige_beleid_gaat_door_met_een_melding(
+    stack: Stack, caplog: pytest.LogCaptureFixture
+) -> None:
+    """KLEIN-85 (besluit van de gebruiker 2026-11-14: hercontrole, alleen melden). Bewaarde vorige waarden die het
+    huidige beleid niet meer toelaat (ZFS-eigenschappen en een ACL op een ixVolume) gaan bij het terugzetten door
+    dezelfde ``validate_parameters``. Het terugzetten gaat door met precies dezelfde waarden en dezelfde aanroep naar
+    TrueNAS; de overtreding staat als waarschuwing en ``hercontrole`` (alleen codes en aantal) in het antwoord, in het
+    journaal en in één logregel, nooit met een waarde."""
+    hub, c, nas = stack
+    geheim = "waarde-alleen-in-de-kluis-858"
+    assert execute(c, hub, approved(hub, install_prop(envs=[{"name": "PROEF", "value": geheim}]))).status_code == 200
+    vorige = copy.deepcopy(nas.created[0]["values"])
+    vorige["storage"].append(
+        {
+            "type": "ix_volume",
+            "mount_path": "/cache",
+            "ix_volume_config": {
+                "dataset_name": "proefcache",
+                "acl_enable": False,
+                "acl_entries": {"path": "/mnt/testpool/andere-app", "entries": [], "options": {"force": True}},
+                "properties": {"mountpoint": "/mnt/testpool/elders"},
+            },
+        }
+    )
+    herstel_van = str(uuid.uuid4())
+    Journal(hub.settings.replay_db, hub.settings.secrets_dir).save_values(herstel_van, "demo-app", vorige)
+    terug = app_prop(nas, "app.rollback", "demo-app", {"herstel_van": herstel_van})
+    req = approved(hub, terug)
+    with caplog.at_level("INFO", logger="executor"):
+        r = execute(c, hub, req)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert r.json()["methode"] == "app.update"
+    # Precies dezelfde aanroep als zonder hercontrole: app.update met de bewaarde waarden, ongewijzigd.
+    assert writes(nas) == ["app.create", "app.update"] and nas.updated[-1] == ("demo-app", {"values": vorige})
+    uit = r.json()
+    assert "herstelwaarden_buiten_beleid" in uit["waarschuwingen"]
+    controle = uit["hercontrole"]
+    assert set(controle) == {"overtredingen", "codes"} and controle["overtredingen"] >= 2
+    assert {"acl_verboden", "zfs_eigenschappen_verboden"} <= set(controle["codes"])
+    assert controle["codes"] == sorted(set(controle["codes"]))
+    # Nooit een waarde of geheim in de melding, de logregel of het journaal.
+    meldingen = [rec.getMessage() for rec in caplog.records if "herstelwaarden_buiten_beleid" in rec.getMessage()]
+    rij = journaal(c, hub, req["approval"]["request_id"])["uitvoeringen"][0]
+    assert len(meldingen) == 1 and "acl_verboden" in meldingen[0] and "acl_verboden" in str(rij["detail"])
+    for tekst in (str(controle), str(uit["waarschuwingen"]), meldingen[0], str(rij["detail"])):
+        for waarde in (geheim, "/mnt/testpool", "proefcache", "/cache", "mountpoint", REPO):
+            assert waarde not in tekst, (waarde, tekst)
+
+
+def test_terugzetten_zonder_overtreding_geeft_geen_melding(stack: Stack, caplog: pytest.LogCaptureFixture) -> None:
+    """KLEIN-85: bewaarde waarden die het huidige beleid toelaat: geen waarschuwing, geen ``hercontrole``-veld, geen
+    logregel en geen aantekening in het journaal; het antwoord is zoals vóór de hercontrole."""
+    hub, c, nas = stack
+    assert execute(c, hub, approved(hub, install_prop())).status_code == 200
+    vorige = copy.deepcopy(nas.created[0]["values"])
+    herstel_van = str(uuid.uuid4())
+    Journal(hub.settings.replay_db, hub.settings.secrets_dir).save_values(herstel_van, "demo-app", vorige)
+    req = approved(hub, app_prop(nas, "app.rollback", "demo-app", {"herstel_van": herstel_van}))
+    with caplog.at_level("INFO", logger="executor"):
+        r = execute(c, hub, req)
+    assert r.status_code == 200 and r.json()["waarschuwingen"] == [] and "hercontrole" not in r.json(), r.text
+    assert nas.updated[-1] == ("demo-app", {"values": vorige})
+    assert not [rec for rec in caplog.records if "herstelwaarden_buiten_beleid" in rec.getMessage()]
+    assert journaal(c, hub, req["approval"]["request_id"])["uitvoeringen"][0]["detail"] in (None, "")
+
+
+def test_terugzetten_gaat_door_als_de_hercontrole_zelf_faalt(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
+    """KLEIN-85, HARDE EIS: een fout in de hercontrole zelf houdt het terugzetten nooit tegen; alleen een melding."""
+    hub, c, nas = stack
+    assert execute(c, hub, approved(hub, install_prop())).status_code == 200
+    vorige = copy.deepcopy(nas.created[0]["values"])
+    herstel_van = str(uuid.uuid4())
+    Journal(hub.settings.replay_db, hub.settings.secrets_dir).save_values(herstel_van, "demo-app", vorige)
+
+    def kapot(*_a: Any, **_k: Any) -> list[Any]:
+        raise RuntimeError("proef")
+
+    monkeypatch.setattr("executor.uitvoeren.validate_parameters", kapot)
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.rollback", "demo-app", {"herstel_van": herstel_van})))
+    assert r.status_code == 200 and nas.updated[-1] == ("demo-app", {"values": vorige}), r.text
+    assert r.json()["hercontrole"] == {"overtredingen": 1, "codes": ["hercontrole_niet_mogelijk"]}
 
 
 def test_terugzetten_zonder_bekend_herstelpunt(stack: Stack) -> None:
