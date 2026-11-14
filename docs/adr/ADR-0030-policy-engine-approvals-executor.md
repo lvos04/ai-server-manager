@@ -221,6 +221,15 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
    NFS-servers, exportpaden en mountopties; ook komma-injectie in `server` en `options`, zoals bij SMB). `policy/*.yaml`
    en de `policy_hash` veranderen niet; restrisico executor-image: zie "Engine-regels buiten de `policy_hash`".
    Afgeleid uit de bron; NIET GEVALIDEERD (echte NAS).
+   Verduidelijking 2026-11-14 (KLEIN-84; bevinding R-EERLIJK-1 van de controle van KLEIN-83): de zin "elk ander pad
+   houdt de hostpadregel" hierboven is te sterk. De uitzondering wordt vastgelegd op de padtekst van het exportpad
+   (de keten van sleutels, met punten aan elkaar gezet), niet op het object zelf. Heeft een sleutel een punt in de
+   naam (bijvoorbeeld een sleutel `m.nfs_config` naast een sleutel `m` met daarin een `nfs_config`), dan kan een ander
+   pad dezelfde padtekst krijgen als een exportpad; afhankelijk van de volgorde van de sleutels valt de melding
+   `hostpad_verboden` voor dat andere pad dan weg. Het verzoek wordt in dat geval altijd ook geweigerd met
+   `opslag_verboden` op die padtekst, dus wat geweigerd wordt verandert niet (geen veiligheidsgevolg); alleen de
+   lijst met meldingen kan korter zijn. Juist is daarom: elk ander pad met een andere padtekst houdt de hostpadregel.
+   Code, tests, `policy/*.yaml` en de `policy_hash` veranderen hierdoor niet.
 7. **`app.uninstall` is container-only.** `app.delete` met `remove_ix_volumes: false` en `remove_images: false`;
    datasets en data blijven. Er is geen actie die data verwijdert.
 8. **Terugzetten.** Custom App: `app.update` met de vorige waarden. Die waarden leest alleen de executor
