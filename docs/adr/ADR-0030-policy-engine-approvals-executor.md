@@ -502,6 +502,13 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     `ai-server-manager:actie_afwijking:<doel>`, elke keer een melding); sluit bij een latere geslaagde en gecontroleerde
     actie op hetzelfde doel. Onbekende uitkomst → waarschuwing per verzoek (`actie.uitkomst_onbekend`); sluit als de
     uitkomst is opgehelderd. Een nette weigering of een mislukte aanroep staat alleen in het auditspoor.
+    Aanvulling 2026-11-15 (S-P2-040): het event `action.run.failed` neemt `reden` en `gestopt` over uit het antwoord
+    van de executor (`409 afwijking`, `502 uitvoering_mislukt`) of, bij ophelderen, uit het journaal (`detail` en de
+    stopstand van `GET /api/v1/executions/{request_id}`). Zo staat in het incident `actie.afwijking` ook waarom
+    (bv. `journaal_niet_beschikbaar`, `uitkomst_onbekend`, `staat_verschilt`) en dat de executor gestopt is. `gestopt`
+    komt alleen mee als de executor het zelf als ja/nee meldt; de Hub leidt het nooit af. Een onbekende jobstatus na de
+    schrijfaanroep (`job_status_onbekend` in de executor) komt bij de Hub binnen als `reden` `uitkomst_onbekend`: de
+    executor geeft die code door (S-P2-030), de Hub neemt over wat de executor zegt.
 27. **Adres van de executor.** Uit de eigen inventaris (`app.query` + het NAS-adres van D03), met controle van de
     image-repository; nooit uit de `base_url` die een dienst zelf opgeeft. Niet gekoppeld of adres onbekend → er wordt
     niets ondertekend.
@@ -518,7 +525,26 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     — voor `app.update`/`app.rollback` — een gesimuleerd herstelpunt (`blokkades.verified_checkpoint`); de
     beoordeling, de policy, de handtekening en de executor zijn de echte code.
 
+30. **Vervaltijd: de goedkeuring, niet de preview (S-P2-040, besluit regisseur BN-040-A optie A).** De stap
+    S-P2-040 noemt "preview hooguit 15 minuten geldig". Zo gelezen en zo gebouwd: de 15 minuten gelden voor de
+    goedkeuring (`execreq.MAX_APPROVAL_SECONDS`, `Approval.expires_at`; besluit 10). Een voorstel blijft geldig tot
+    `geldig_tot` (`expires_in_seconds`, standaard 3600, 60 tot 86400 seconden), maar de preview heeft geen eigen
+    vervaltijd nodig: bij goedkeuren en vlak vóór uitvoeren rekent de Hub de preview opnieuw uit uit een verse
+    readback, en elke afwijking geeft `409 preview_gewijzigd` (bij goedkeuren) of laat de goedkeuring vervallen (bij
+    uitvoeren). Er wordt dus nooit uitgevoerd op een preview die ouder is dan de goedkeuring van hooguit 15 minuten.
+    Geen gedragswijziging.
+31. **Onbekend `action_id` geeft `403`, niet `422` (S-P2-040).** De staptekst van S-P2-040 noemt `422` voor een
+    onbekend `action_id` of een doel buiten bereik. Gebouwd en gereviewd in S-P2-005 en S-P2-010: een onbekend
+    `action_id` geeft `403 actie_niet_toegestaan`, een verboden patroon `403 actie_geweigerd`, een gereserveerde actie
+    `501`; alleen een parameter of doel buiten het schema geeft `422 parameters_ongeldig`. Contract §8 zegt alleen
+    "geweigerd". Dat blijft zo (besluit regisseur, S-P2-040); in alle gevallen wordt er niets uitgevoerd.
+
 ## Open punten
+
+- **Hub stuurt op `ready_for_install` en `conflicts.status` van de appstore-preview (R-VEILIG-11 uit S-P2-520).**
+  De Hub roept de preview van appstore-en-fork nu nergens aan. Doorgeschoven naar de stappen waarin die aanroep
+  ontstaat (S-P2-050 en S-P2-080; besluit regisseur BN-040-B optie B, S-P2-040): daar stuurt de Hub op
+  `ready_for_install` en `conflicts.status`, niet op `preview_hash` alleen.
 
 - **Schermen in de Hub-UI.** De API is er; het goedkeuringsscherm (preview, hashes, goedkeuren/afwijzen, uitvoeren,
   noodstop) is nog niet gebouwd. Tot dan is het voor een gebruiker niet te bedienen: elke wijzigende aanroep vraagt

@@ -4,6 +4,19 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: reden en stop van de executor in event en incident (S-P2-040; ADR-0030 besluit 26, 30 en 31)
+- Antwoordt de executor na de schrijfaanroep `409 afwijking` (bv. `journaal_niet_beschikbaar` of
+  `uitkomst_onbekend` na een onbekende jobstatus), dan neemt het event `action.run.failed` nu `reden` én `gestopt`
+  over; het incident `actie.afwijking` toont ze. Hetzelfde bij ophelderen (`reconcile`) van een journaalrij die
+  achteraf `afwijking` of `mislukt` blijkt: tot nu toe ging daar geen `reden` en geen `gestopt` mee in het event.
+  `gestopt` komt alleen mee als de executor het zelf meldt.
+- Tests in `tests/e2e/test_acties.py`: executor-409 bij een weggevallen journaal en bij een onbekende jobstatus;
+  ophelderen van een journaalrij die achteraf `afwijking` (`staat_verschilt`, `uitkomst_onbekend`) of `mislukt` is;
+  de vaste veldenset van elk actieantwoord (V-046: geen parameterwaarden en geen nonce).
+- ADR-0030: besluit 30 (de 15 minuten gelden voor de goedkeuring; de preview wordt bij goedkeuren en uitvoeren
+  opnieuw berekend), besluit 31 (onbekend `action_id` blijft `403`) en een open punt voor R-VEILIG-11
+  (`ready_for_install`/`conflicts.status`, doorgeschoven naar S-P2-050/S-P2-080).
+
 ### Gerepareerd — executor: geen valse stop door statusopvragen (S-P2-030 herstelronde 2; ADR-0030 besluit 14)
 - Een onaangemelde statusopvraag (`GET /api/v1/status` of de executorpagina) tijdens het begin van een uitvoering kon
   de executor ten onrechte op gestopt zetten (`uitkomst_onbekend`), terwijl de actie slaagde. Nu worden de lopende

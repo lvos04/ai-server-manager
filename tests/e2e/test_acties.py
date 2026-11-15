@@ -29,7 +29,7 @@ from actiehelpers import (
     voer_uit,
 )
 from conftest import idem, login_as, make_user
-from executorhelpers import write_nas
+from executorhelpers import WRITE_KEY, write_nas
 from fakes.fake_truenas import FakeTrueNAS
 from policyhelpers import DIGEST, DIGEST_B, install_params
 
@@ -1152,6 +1152,259 @@ def test_executor_onbereikbaar_uitkomst_onbekend_en_ophelderen(stack: Stack, per
     periodic_run("incidenten_bijwerken")
     open_ = [i for i in admin.get("/api/v1/incidents").json()["items"] if i["soort"] == "actie.uitkomst_onbekend"]
     assert all(i["status"] == "opgelost" for i in open_), open_
+
+
+def _events(app: Any, event_type: str) -> list[dict[str, Any]]:
+    """De payloads van de eigen outbox-events van één soort, oudste eerst."""
+    from sqlalchemy import select
+
+    from hub.models import OutboxEvent
+
+    with app.state.sessionmaker() as db:
+        rows = db.scalars(select(OutboxEvent).where(OutboxEvent.event_type == event_type).order_by(OutboxEvent.seq))
+        return [dict(e.payload) for e in rows]
+
+
+def _incidenten(admin: Any, soort: str) -> list[dict[str, Any]]:
+    return [i for i in admin.get("/api/v1/incidents").json()["items"] if i["soort"] == soort]
+
+
+def _journaal_weg(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Het journaal van de executor valt weg ná de schrijfaanroep (vastleggen van het einde en van de stop)."""
+    from executor.journal import Journal, JournalUnavailable
+
+    def weg(self: Journal, *a: Any, **k: Any) -> None:
+        raise JournalUnavailable("OperationalError")
+
+    monkeypatch.setattr(Journal, "finish", weg)
+    monkeypatch.setattr(Journal, "stop", weg)
+
+
+def _jobstatus_weg(nas: FakeTrueNAS) -> None:
+    """TrueNAS neemt de job aan, maar de jobstatus is daarna niet op te vragen (executor: ``job_status_onbekend``)."""
+    nas.keys[WRITE_KEY].deny.add("core.get_jobs")
+
+
+@pytest.mark.parametrize(
+    ("oorzaak", "reden"),
+    [
+        ("journaal_niet_beschikbaar", "journaal_niet_beschikbaar"),
+        # De executor meldt een onbekende jobstatus na de schrijfaanroep als ``uitkomst_onbekend`` (uitvoeren.py,
+        # ONBEKENDE_UITKOMST); de Hub geeft door wat de executor zegt.
+        ("job_status_onbekend", "uitkomst_onbekend"),
+    ],
+)
+def test_executor_stopt_na_de_schrijfaanroep_reden_en_gestopt_in_antwoord_event_en_incident(
+    stack: Stack, periodic_run: Any, monkeypatch: pytest.MonkeyPatch, oorzaak: str, reden: str
+) -> None:
+    """S-P2-030: na de schrijfaanroep antwoordt de executor 409 ``afwijking`` met ``reden`` en ``gestopt: true``. De Hub
+    geeft die twee door aan het actieantwoord, het event ``action.run.failed`` en het incident ``actie.afwijking``."""
+    admin, nas = stack.admin, stack.nas
+    if oorzaak == "journaal_niet_beschikbaar":
+        _journaal_weg(monkeypatch)
+    else:
+        _jobstatus_weg(nas)
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    r = voer_uit(admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
+    assert r.json()["details"]["reden"] == reden and r.json()["details"]["gestopt"] is True, r.text
+    nu = haal(admin, v)
+    assert nu["status"] == "afwijking", nu
+    assert nu["resultaat"]["reden"] == reden and nu["resultaat"]["gestopt"] is True, nu
+    assert schrijfaanroepen(nas) == ["app.redeploy"]
+    ev = [e for e in _events(stack.app, "action.run.failed") if e["request_id"] == v["request_id"]]
+    assert len(ev) == 1 and ev[0]["uitkomst"] == "afwijking", ev
+    assert ev[0]["reden"] == reden and ev[0]["gestopt"] is True, ev
+    periodic_run("incidenten_bijwerken")
+    afw = _incidenten(admin, "actie.afwijking")
+    assert len(afw) == 1 and afw[0]["ernst"] == "kritiek", afw
+    assert afw[0]["details"]["reden"] == reden and afw[0]["details"]["gestopt"] is True, afw
+
+
+def _antwoord_valt_weg(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    """Het antwoord van de executor op ``/execute`` komt niet aan (de executor heeft wel gewerkt), en het journaal is
+    op dat moment ook niet bereikbaar. Met ``stand["journaal_weg"] = False`` antwoordt het journaal weer."""
+    from hub import servicecalls
+
+    echte = servicecalls.call
+    stand = {"journaal_weg": True}
+
+    def call(base: str, method: str, path: str, **kw: Any) -> Any:
+        if path == "/api/v1/execute":
+            echte(base, method, path, **kw)
+            raise servicecalls.ServiceCallError("read_timeout")
+        if path.startswith("/api/v1/executions/") and stand["journaal_weg"]:
+            raise servicecalls.ServiceCallError("connect_error")
+        return echte(base, method, path, **kw)
+
+    monkeypatch.setattr(servicecalls, "call", call)
+    return stand
+
+
+@pytest.mark.parametrize("journaal", ["staat_verschilt", "uitkomst_onbekend", "mislukt"])
+def test_journaalrij_die_achteraf_afwijking_of_mislukt_is_neemt_ophelderen_over(
+    stack: Stack, periodic_run: Any, monkeypatch: pytest.MonkeyPatch, journaal: str
+) -> None:
+    """De Hub kreeg geen antwoord (uitkomst onbekend); het journaal van de executor zegt achteraf ``afwijking``
+    (``staat_verschilt`` of ``uitkomst_onbekend``) of ``mislukt``. Ophelderen (``reconcile``) neemt dat over, met
+    ``reden`` en ``gestopt`` in het antwoord, het event en het incident; er wordt niets herhaald."""
+    admin, nas = stack.admin, stack.nas
+    if journaal == "staat_verschilt":
+        nas.silent_noop.add("app.stop")  # TrueNAS meldt succes, maar de app draait nog
+        v = stel_voor(admin, "app.stop", app_target("my-house")).json()
+        assert keur_goed(admin, v).status_code == 200
+        methode = "app.stop"
+    else:
+        if journaal == "uitkomst_onbekend":
+            _jobstatus_weg(nas)
+        else:
+            nas.fail["app.redeploy"] = "proef: redeploy mislukt"
+        v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+        methode = "app.redeploy"
+    stand = _antwoord_valt_weg(monkeypatch)
+    r = voer_uit(admin, v)
+    assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
+    assert haal(admin, v)["status"] == "onbekend" and schrijfaanroepen(nas) == [methode]
+    periodic_run("incidenten_bijwerken")
+    assert _incidenten(admin, "actie.uitkomst_onbekend"), "geen incident voor de onbekende uitkomst"
+
+    stand["journaal_weg"] = False
+    r = admin.post(f"/api/v1/actions/{v['request_id']}/reconcile", headers=idem())
+    nu = haal(admin, v)
+    ev = [e for e in _events(stack.app, "action.run.failed") if e["request_id"] == v["request_id"]]
+    assert ev[0]["uitkomst"] == "onbekend", ev
+    if journaal == "mislukt":
+        assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
+        assert r.json()["details"]["reden"] == "job_mislukt [FAILED]", r.text
+        assert nu["status"] == "mislukt" and nu["resultaat"]["gestopt"] is False, nu
+        assert ev[-1]["uitkomst"] == "mislukt" and ev[-1]["reden"] == "job_mislukt [FAILED]", ev
+    else:
+        assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
+        assert r.json()["details"]["reden"] == journaal and r.json()["details"]["gestopt"] is True, r.text
+        assert nu["status"] == "afwijking" and nu["resultaat"]["gestopt"] is True, nu
+        assert nu["resultaat"]["reden"] == journaal and nu["resultaat"]["bron"] == "journaal_executor", nu
+        assert ev[-1]["uitkomst"] == "afwijking", ev
+        assert ev[-1]["reden"] == journaal and ev[-1]["gestopt"] is True, ev
+    assert len(ev) == 2 and schrijfaanroepen(nas) == [methode]  # niets herhaald
+    periodic_run("incidenten_bijwerken")
+    assert all(i["status"] == "opgelost" for i in _incidenten(admin, "actie.uitkomst_onbekend"))
+    afw = _incidenten(admin, "actie.afwijking")
+    if journaal == "mislukt":
+        assert afw == [], afw  # mislukt met onveranderd doel is geen incident (alleen audit)
+    else:
+        assert len(afw) == 1 and afw[0]["ernst"] == "kritiek", afw
+        assert afw[0]["details"]["reden"] == journaal and afw[0]["details"]["gestopt"] is True, afw
+    # Daarna weer ophelderen kan niet: de uitkomst is bekend.
+    r = admin.post(f"/api/v1/actions/{v['request_id']}/reconcile", headers=idem())
+    assert r.status_code == 409 and r.json()["code"] == "status_past_niet", r.text
+
+
+# ---------------------------------------------------------------------- V-046: vaste veldenset van het actieantwoord
+WEERGAVE_VELDEN = {
+    "request_id",
+    "status",
+    "action_id",
+    "target",
+    "parameters_sha256",
+    "reason",
+    "actor",
+    "evidence_ids",
+    "risk_class",
+    "risk_claim",
+    "risk_claim_genegeerd",
+    "rule_ids",
+    "goedkeuring_nodig",
+    "policy_hash",
+    "uitvoerder",
+    "resource_etag",
+    "preview_hash",
+    "preview",
+    "blokkades",
+    "goedkeuring",
+    "resultaat",
+    "aangemaakt_op",
+    "bijgewerkt_op",
+    "geldig_tot",
+    "gestart_op",
+    "uitgevoerd_op",
+}
+GOEDKEURING_VELDEN = {
+    "approval_id",
+    "approved_by",
+    "approved_at",
+    "expires_at",
+    "preview_hash",
+    "resource_etag",
+    "policy_hash",
+    "risk_class",
+    "backup_checkpoint_id",
+    "gebruikt_op",
+    "vervallen_op",
+    "vervallen_reden",
+}
+PREVIEW_VELDEN = {
+    "schema",
+    "action_id",
+    "omschrijving",
+    "target",
+    "parameters_sha256",
+    "uitvoerder",
+    "risk_class",
+    "rule_ids",
+    "goedkeuring_nodig",
+    "requires_backup",
+    "opslagmutatie",
+    "herkend_als",
+    "kritiek",
+    "policy_hash",
+    "resource_etag",
+    "huidig",
+    "wijziging",
+    "dataretentie",
+    "terugdraaien",
+}
+RESULTAAT_UITGEVOERD = {
+    "status",
+    "methode",
+    "before_hash",
+    "after_hash",
+    "resource_etag",
+    "readback",
+    "waarschuwingen",
+    "policy_hash",
+    "uitgevoerd_op",
+}
+
+
+def test_actieantwoord_heeft_precies_de_vaste_velden(stack: Stack) -> None:
+    """V-046: elk actieantwoord (voorstel, goedkeuring, uitvoering, opvragen, lijst) heeft precies deze velden; geen
+    parameterwaarden, geen eenmalige nonce en geen uitvoeringsnonce. Een nieuw veld vraagt een bewuste keuze hier."""
+    from sqlalchemy import select
+
+    from hub.models import Approval
+
+    admin = stack.admin
+    v = stel_voor(admin, "app.stop", app_target("my-house")).json()
+    assert set(v) == WEERGAVE_VELDEN and set(v["preview"]) == PREVIEW_VELDEN and v["goedkeuring"] is None, v
+    g = keur_goed(admin, v)
+    assert g.status_code == 200, g.text
+    assert set(g.json()) == WEERGAVE_VELDEN and set(g.json()["goedkeuring"]) == GOEDKEURING_VELDEN, g.text
+    r = voer_uit(admin, v)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert set(r.json()["resultaat"]) == RESULTAAT_UITGEVOERD, r.text
+    lijst = admin.get("/api/v1/actions").json()["items"]
+    antwoorden = [v, g.json(), r.json(), haal(admin, v), *lijst]
+    for a in antwoorden:
+        assert set(a) == WEERGAVE_VELDEN, sorted(set(a) ^ WEERGAVE_VELDEN)
+        assert a["goedkeuring"] is None or set(a["goedkeuring"]) == GOEDKEURING_VELDEN, a["goedkeuring"]
+        assert a["preview"] is None or set(a["preview"]) == PREVIEW_VELDEN, a["preview"]
+    rij = _rij(stack.app, v["request_id"])
+    with stack.app.state.sessionmaker() as db:
+        ap = db.scalars(select(Approval).where(Approval.request_id == uuid.UUID(v["request_id"]))).one()
+    geheim = [str(ap.one_time_nonce), str(rij.execution_nonce)]
+    assert rij.execution_nonce is not None
+    teksten = [g.text, r.text, admin.get(f"/api/v1/actions/{v['request_id']}").text, admin.get("/api/v1/actions").text]
+    assert not any(n in t for n in geheim for t in teksten)
 
 
 def test_truenas_weigert_de_schrijfactie_mislukt_zonder_afwijking(stack: Stack) -> None:

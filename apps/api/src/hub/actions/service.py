@@ -784,6 +784,16 @@ def _event(db: Session, req: ActionRequest, uitkomst: str, extra: dict[str, Any]
     )
 
 
+def _stopgegevens(reden: Any, gestopt: Any) -> dict[str, Any]:
+    """``reden`` en ``gestopt`` uit een executorantwoord of uit het journaal, voor het event ``action.run.failed`` (en
+    daarmee voor het incident). Alleen een korte code en een echte ja/nee: ``gestopt`` komt alleen mee als de executor
+    het zelf zegt, nooit afgeleid (S-P2-030; S-P2-040)."""
+    uit: dict[str, Any] = {"reden": reden[:128] if isinstance(reden, str) and reden else None}
+    if isinstance(gestopt, bool):
+        uit["gestopt"] = gestopt
+    return uit
+
+
 def _sluit(
     db: Session,
     req: ActionRequest,
@@ -947,7 +957,14 @@ def _antwoord(
         _sluit(db, req, "uitgevoerd", {"status": "uitgevoerd", **gegevens}, actor=actor)
         return 200, weergave(db, req)
     if uitkomst == "afwijking":
-        _sluit(db, req, "afwijking", {"code": "afwijking", "reden": gegevens.get("detail"), **gegevens}, actor=actor)
+        _sluit(
+            db,
+            req,
+            "afwijking",
+            {"code": "afwijking", "reden": gegevens.get("detail"), **gegevens},
+            actor=actor,
+            extra=_stopgegevens(gegevens.get("detail"), gegevens.get("gestopt")),
+        )
         raise Bewaard(
             409,
             "afwijking",
@@ -955,7 +972,14 @@ def _antwoord(
             "een incident gemaakt en er wordt niets herhaald.",
             {"request_id": str(req.id), "reden": gegevens.get("detail"), "gestopt": gegevens.get("gestopt")},
         )
-    _sluit(db, req, "mislukt", {"code": "uitvoering_mislukt", "reden": gegevens.get("detail"), **gegevens}, actor=actor)
+    _sluit(
+        db,
+        req,
+        "mislukt",
+        {"code": "uitvoering_mislukt", "reden": gegevens.get("detail"), **gegevens},
+        actor=actor,
+        extra=_stopgegevens(gegevens.get("detail"), gegevens.get("gestopt")),
+    )
     raise Bewaard(
         502,
         "uitvoering_mislukt",
@@ -1261,7 +1285,14 @@ def _verwerk(db: Session, req: ActionRequest, res: servicecalls.CallResult, acto
         return 200, weergave(db, req)
     if res.status == 409 and code == "afwijking":
         resultaat = {"code": "afwijking", "message": body.get("message"), **details}
-        _sluit(db, req, "afwijking", resultaat, actor=actor, extra={"reden": details.get("reden")})
+        _sluit(
+            db,
+            req,
+            "afwijking",
+            resultaat,
+            actor=actor,
+            extra=_stopgegevens(details.get("reden"), details.get("gestopt")),
+        )
         raise Bewaard(
             409,
             "afwijking",
@@ -1270,7 +1301,14 @@ def _verwerk(db: Session, req: ActionRequest, res: servicecalls.CallResult, acto
             {"request_id": str(req.id), **details},
         )
     if res.status == 502 and code == "uitvoering_mislukt":
-        _sluit(db, req, "mislukt", {"code": code, "message": body.get("message"), **details}, actor=actor)
+        _sluit(
+            db,
+            req,
+            "mislukt",
+            {"code": code, "message": body.get("message"), **details},
+            actor=actor,
+            extra=_stopgegevens(details.get("reden"), details.get("gestopt")),
+        )
         raise Bewaard(
             502,
             "uitvoering_mislukt",
