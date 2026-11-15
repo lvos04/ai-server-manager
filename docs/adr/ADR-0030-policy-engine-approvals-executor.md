@@ -381,6 +381,23 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     actie op `afwijking`. Geen automatische herhaling. Weigert TrueNAS de aanroep en is het doel aantoonbaar
     onveranderd, dan is het `uitvoering_mislukt` zonder stop. Een onleesbaar journaal telt als gestopt: vóór de
     aanroep `journaal_niet_beschikbaar` (er is niets uitgevoerd), erna `afwijking`.
+    Aanvulling 2026-11-15 (S-P2-030, herstel R-TECH-1, R-VEILIG-1 en R-VEILIG-2): "TrueNAS weigert de aanroep" betekent
+    alleen een foutantwoord op de schrijfaanroep zelf (geen job) of een job die `FAILED`/`ABORTED` meldt. Heeft TrueNAS
+    de aanroep aangenomen (er is een job-id) en faalt daarna het opvragen van de jobstatus, dan is de uitkomst
+    onbekend (`job_status_onbekend` → `afwijking`, stop); ook elke andere onverwachte fout of elk onverwacht antwoord
+    ná de schrijfaanroep is een onbekende uitkomst. De stop is duurzaam: de stop en het einde van de journaalrij staan
+    in één transactie (de stop eerst); lukt vastleggen niet, dan houdt de executor de stop in het geheugen tot het
+    journaal weer werkt (en voert tot dan niets uit); viel het journaal ná de aanroep weg, dan staat de stop daarna
+    vast als `uitkomst_onbekend` (het antwoord noemt `journaal_niet_beschikbaar`). Bij het starten en vóór elke uitvoering telt een journaalrij
+    `gestart` zonder einde (het proces viel weg ná de aanroep) als onbekende uitkomst (de rij krijgt `afwijking` met
+    `uitkomst_onbekend`, de executor stopt), en een `afwijking` van na de laatste vrijgave zonder vastgelegde stop
+    geeft alsnog de stop. De vrijgave (bestaande weg, zie hierboven) legt vast tot welke journaalrij is vrijgegeven
+    (`vrijgegeven_tot`). Gevolg bij de eerste start met deze versie: een `afwijking` uit een eerder journaal die al
+    was vrijgegeven, heeft nog geen grens en geeft één keer opnieuw een stop; vrijgeven heft die op. Een stop raakt
+    nooit een app: alleen de executor weigert verdere acties. Eén proces per datamap: een rij `gestart` die niet van
+    een lopende uitvoering in dit proces is, telt als onafgemaakt. Het journaal (`detail`) bewaart van een fout van
+    TrueNAS alleen de stabiele code en de foutnaam of jobstatus, nooit de vrije fouttekst (R-VEILIG-4); te diep
+    geneste JSON geeft `422 validation_error` (R-VEILIG-3).
 15. **Methoden per TrueNAS-versie.** De executor vraagt `core.get_methods` op en kiest de eerste methode uit
     `acties.yaml` die bestaat (bv. `pool.snapshot.create`, anders `zfs.snapshot.create`). Bestaat er geen, dan
     `capability_unavailable`; nooit gesimuleerd succes. Welke versie welke naam kent is niet op een echte NAS

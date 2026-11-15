@@ -4,6 +4,24 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — executor: onbekende uitkomst na de schrijfaanroep en een duurzame stop (S-P2-030 herstel; ADR-0030 besluit 14)
+- Faalt het opvragen van de jobstatus nadat TrueNAS de schrijfaanroep heeft aangenomen (er is een job), dan is de
+  uitkomst onbekend: `409 afwijking` met `uitkomst_onbekend` en de executor stopt (`job_status_onbekend`), in plaats
+  van `502` met "TrueNAS heeft de actie niet uitgevoerd". `502 uitvoering_mislukt` blijft alleen voor een aanroep die
+  TrueNAS zelf weigert of een job die `FAILED`/`ABORTED` meldt (R-TECH-1).
+- De stop is duurzaam: stop en einde van de journaalrij in één transactie; lukt vastleggen niet, dan blijft de stop in
+  het geheugen tot het journaal weer werkt. Bij het starten en vóór elke uitvoering telt een rij `gestart` zonder
+  einde (proces weggevallen na de schrijfaanroep) of een `afwijking` zonder vrijgave als stop. Elke onverwachte fout
+  ná de schrijfaanroep is een onbekende uitkomst (stop), geen `500` (R-VEILIG-1, R-VEILIG-2). Een stop raakt nooit een
+  app; vrijgeven blijft "Sleutel vervangen" met een leeg veld "Nieuwe sleutel". Een al vrijgegeven `afwijking` uit
+  een eerder journaal geeft bij de eerste start met deze versie één keer opnieuw een stop.
+- Te diep geneste JSON op `/api/v1/execute` geeft `422 validation_error` in plaats van `500` (R-VEILIG-3).
+- Het journaal (ook `GET /api/v1/executions/{request_id}`) bewaart van een fout van TrueNAS alleen de code en de
+  foutnaam of jobstatus (bv. `job_mislukt [FAILED]`), nooit de vrije fouttekst; die kan waarden uit de aanroep
+  bevatten (R-VEILIG-4).
+- Tests: `apps/executor/tests/test_stop_duurzaam.py` (de proeven van de review als vaste tests) en een aangepaste
+  test in `apps/executor/tests/test_uitvoeren.py` (een fout bij het opvragen van de jobstatus geeft nooit meer `502`).
+
 ### Toegevoegd — executor: na een schrijfaanroep nooit "er is niets uitgevoerd" (S-P2-030; ADR-0030)
 - Tests leggen vast dat een fout ná de schrijfaanroep naar TrueNAS (ook een geweigerde `app.update` nadat
   `app.config` lukte) nooit `503` met "er is niets uitgevoerd" geeft, maar `502 uitvoering_mislukt` of `409 afwijking`

@@ -109,12 +109,28 @@ Daarna voert de uitvoerder uit, leest terug en vergelijkt met de verwachte toest
 | Uitkomst | Antwoord |
 |---|---|
 | toestand is zoals verwacht | `200` met `status: "uitgevoerd"`, `methode`, `before_hash`, `after_hash`, `resource_etag`, `readback`, `waarschuwingen`, `policy_hash`; bij `app.rollback` met `herstel_van` en bewaarde waarden buiten het huidige beleid ook de waarschuwing `herstelwaarden_buiten_beleid` en `hercontrole` (`overtredingen`, `codes`; alleen gemeld, het terugzetten gaat door; KLEIN-85) |
-| TrueNAS weigert de aanroep en het doel is onveranderd | `502 uitvoering_mislukt` (`details.reden`); de executor blijft werken |
-| toestand wijkt af, of de uitkomst is onbekend (time-out, verbroken verbinding, journaal weg na de aanroep) | `409 afwijking` (`details.reden`, `details.afwijkingen`, `details.gestopt`); de executor stopt |
+| TrueNAS weigert de aanroep zelf (foutantwoord op de aanroep, geen job) of meldt de job als `FAILED`/`ABORTED`, en het doel is onveranderd | `502 uitvoering_mislukt` (`details.reden`); de executor blijft werken |
+| toestand wijkt af, of de uitkomst is onbekend: time-out, verbroken verbinding, de jobstatus is niet op te vragen nadat TrueNAS de aanroep aannam (`job_status_onbekend`; de job kan nog slagen), een onverwachte fout of een onverwacht antwoord ná de aanroep, journaal weg na de aanroep | `409 afwijking` (`details.reden`, `details.afwijkingen`, `details.gestopt`); de executor stopt |
 
 Na een afwijking weigert de executor alles met `executor_gestopt` tot een beheerder hem op de executorpagina
 vrijgeeft met de TrueNAS-schrijfsleutel. De Hub legt een incident vast; er is geen automatische herhaling.
 
+De stop is duurzaam (S-P2-030, herstel R-VEILIG-1 en R-VEILIG-2):
+
+- de stop en het einde van de journaalrij (`afwijking`) worden in één transactie vastgelegd, de stop eerst;
+- lukt dat vastleggen niet (bv. een volle schijf), dan houdt de executor de stop in het geheugen en legt hem vast
+  zodra het journaal weer werkt; tot dan voert hij niets uit;
+- bij het starten en vóór elke uitvoering telt een journaalrij `gestart` zonder einde (het proces viel weg ná de
+  aanroep) als onbekende uitkomst: de rij krijgt `afwijking` met `uitkomst_onbekend` en de executor stopt. Ook een
+  `afwijking` van na de laatste vrijgave zonder vastgelegde stop geeft alsnog de stop;
+- een stop raakt nooit een app: alleen de executor weigert verdere acties. Vrijgeven blijft de bestaande weg ("Sleutel
+  vervangen" met de huidige sleutel en een leeg veld "Nieuwe sleutel"); daarmee tellen de rijen tot dat moment niet
+  meer als stop.
+
+Te diep geneste JSON in de body geeft `422 validation_error`, net als andere ongeldige JSON.
+
 `GET /api/v1/executions/{request_id}` (dienst-JWT van de Hub) geeft `{request_id, uitvoeringen, gestopt}` uit het
 journaal. Elke uitvoering heeft `action_id`, `target`, `methode`, `status` (`gestart`, `uitgevoerd`, `mislukt` of
-`afwijking`), `before_hash` en `after_hash`. Een onbekend verzoek geeft een lege lijst.
+`afwijking`), `before_hash`, `after_hash` en `detail`. `detail` bevat alleen een stabiele code met de foutnaam van
+TrueNAS of de jobstatus (bv. `truenas_geen_toegang [EACCES]`, `job_mislukt [FAILED]`, `uitkomst_onbekend`), nooit de
+vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbekend verzoek geeft een lege lijst.
