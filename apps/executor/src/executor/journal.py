@@ -19,7 +19,13 @@ De stop is duurzaam (S-P2-030, R-VEILIG-1 en R-VEILIG-2; ADR-0030 besluit 14):
 - :meth:`Journal.stopped` telt ook als gestopt: een rij ``gestart`` zonder einde die door geen lopende uitvoering van
   dit proces wordt vastgehouden (het proces viel weg na de schrijfaanroep: uitkomst onbekend), en een rij
   ``afwijking`` van na de laatste vrijgave. Zo'n rij krijgt dan alsnog een stop (en een rij ``gestart`` het einde
-  ``afwijking`` met ``uitkomst_onbekend``). Dit gebeurt bij het starten en vóór elke uitvoering.
+  ``afwijking`` met ``uitkomst_onbekend``). Dit gebeurt alleen bij het starten, vóór elke uitvoering en bij het
+  vrijgeven, in één schrijftransactie waarin ook de lopende uitvoeringen worden gelezen (ná ``BEGIN IMMEDIATE``; anders
+  kan een uitvoering die net begint als weggevallen tellen, R-VEILIG-H1). Een statusopvraag (``vastleggen=False``)
+  leest alleen: de vastgelegde stop of die in het geheugen, nooit een schrijftransactie;
+- faalt het journaal vóór de schrijfaanroep (er is aantoonbaar niets naar TrueNAS gestuurd), dan wacht het einde
+  ``mislukt`` van die rij in het geheugen en wordt het vastgelegd zodra het journaal weer werkt; zo'n rij geeft geen
+  stop (R-VEILIG-H2).
 
 Een stop raakt nooit een app: alleen de executor weigert verdere acties tot de vrijgave op de executorpagina.
 """
@@ -76,6 +82,8 @@ class Journal:
         self._sleutel = os.path.abspath(path)
         # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
         self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
+        # Een einde dat niet kon worden vastgelegd (vóór de schrijfaanroep): nonce -> (status, hash, detail).
+        self._einde_in_geheugen: dict[str, tuple[str, str | None, str]] = {}
 
     @contextlib.contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -140,12 +148,11 @@ class Journal:
             return {n for pad, n in _LOPEND if pad == self._sleutel}
 
     def bezet(self) -> bool:
-        """Of een andere instantie in dit proces nu een uitvoering op dit journaal heeft lopen."""
-        lopend = self._lopende_nonces()
-        if not lopend:
-            return False
+        """Of een andere instantie in dit proces nu een uitvoering op dit journaal heeft lopen. Eerst de rijen, dan de
+        lopende nonces: een rij die er staat, is vóór zijn invoegen als lopend gemarkeerd."""
         with self._connect() as conn:
             rows = conn.execute("SELECT nonce FROM journal WHERE status = 'gestart'").fetchall()
+        lopend = self._lopende_nonces() if rows else set()
         return any(r[0] in lopend for r in rows)
 
     def begin(
@@ -247,15 +254,33 @@ class Journal:
                 (after_hash, detail[:1000], int(time.time()), nonce),
             )
 
-    def stopped(self) -> dict[str, Any] | None:
-        """De stop, of ``None``. Legt in dezelfde transactie vast wat als gestopt telt maar nog niet vastlag: een stop
-        uit het geheugen, een onafgemaakte rij ``gestart`` (uitkomst onbekend) en een ``afwijking`` van na de laatste
-        vrijgave (zie de kop van dit bestand)."""
+    def stopped(self, *, vastleggen: bool = True) -> dict[str, Any] | None:
+        """De stop, of ``None``.
+
+        ``vastleggen=False`` (statusopvragen): alleen lezen, de vastgelegde stop of die in het geheugen; geen
+        schrijftransactie (R-VEILIG-H1). Standaard (bij het starten, vóór elke uitvoering en bij het vrijgeven): in één
+        transactie ook vastleggen wat als gestopt telt maar nog niet vastlag: een einde of stop uit het geheugen, een
+        onafgemaakte rij ``gestart`` (uitkomst onbekend) en een ``afwijking`` van na de laatste vrijgave (zie de kop van
+        dit bestand)."""
+        if not vastleggen:
+            geheugen_stop = self._stop_in_geheugen
+            with self._connect() as conn:
+                vast = self._lees_stop(conn)
+            if vast is None and geheugen_stop is not None:
+                return dict(geheugen_stop[0])
+            return vast
         geheugen = self._stop_in_geheugen
-        lopend = self._lopende_nonces()
+        einden = dict(self._einde_in_geheugen)
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
+                # Een einde vóór de schrijfaanroep dat nog niet vastlag (R-VEILIG-H2): eerst, dan telt de rij niet.
+                for n, (status, after_hash, detail) in einden.items():
+                    conn.execute(
+                        "UPDATE journal SET status = ?, after_hash = ?, detail = ?, finished_at = ?"
+                        " WHERE nonce = ? AND status = 'gestart'",
+                        (status, after_hash, detail[:1000], int(time.time()), n),
+                    )
                 stop = self._lees_stop(conn)
                 if geheugen is not None:
                     reden, nonce, after_hash, detail = geheugen
@@ -264,13 +289,14 @@ class Journal:
                         stop = reden
                     elif nonce is not None:
                         self._zet_stop(conn, stop, nonce, after_hash, detail)
-                wees = [
-                    (str(r[0]), str(r[1]), str(r[2]))
-                    for r in conn.execute(
-                        "SELECT nonce, request_id, action_id FROM journal WHERE status = 'gestart' ORDER BY rowid"
-                    ).fetchall()
-                    if r[0] not in lopend
-                ]
+                gestart = conn.execute(
+                    "SELECT nonce, request_id, action_id FROM journal WHERE status = 'gestart' ORDER BY rowid"
+                ).fetchall()
+                # Binnen de transactie (na BEGIN IMMEDIATE en na het lezen van de rijen): een rij die hier staat is
+                # vóór zijn invoegen als lopend gemarkeerd, en een nieuwe rij kan niet worden ingevoegd zolang deze
+                # transactie loopt. Zo telt een uitvoering die net begint nooit als weggevallen (R-VEILIG-H1).
+                lopend = self._lopende_nonces()
+                wees = [(str(r[0]), str(r[1]), str(r[2])) for r in gestart if r[0] not in lopend]
                 if wees:
                     nonce, request_id, action_id = wees[0]
                     reden = stop or {
@@ -307,6 +333,8 @@ class Journal:
                 raise
         if geheugen is not None and self._stop_in_geheugen is geheugen:
             self._stop_in_geheugen = None
+        for n in einden:
+            self._einde_in_geheugen.pop(n, None)
         return stop
 
     def stop(
@@ -321,6 +349,11 @@ class Journal:
             except BaseException:
                 conn.execute("ROLLBACK")
                 raise
+
+    def einde_in_geheugen(self, nonce: str, *, status: str, after_hash: str | None, detail: str = "") -> None:
+        """Het einde van een rij kon niet worden vastgelegd terwijl er aantoonbaar niets naar TrueNAS is gestuurd: houd
+        het vast tot :meth:`stopped` het kan vastleggen; de rij telt dan niet als onafgemaakt (R-VEILIG-H2)."""
+        self._einde_in_geheugen[nonce] = (status, after_hash, detail)
 
     def stop_in_geheugen(
         self, reason: dict[str, Any], *, nonce: str | None = None, after_hash: str | None = None, detail: str = ""

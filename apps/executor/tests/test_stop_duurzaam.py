@@ -468,6 +468,162 @@ def test_lopende_uitvoering_van_een_andere_instantie_is_geen_onafgemaakte_rij(tm
     assert journaal(hub).stopped() is None and [s for s, _d in rijen(hub)] == ["uitgevoerd", "uitgevoerd"]
 
 
+# ------------------------------------------------------------------ R-VEILIG-H1: geen valse stop door statusopvragen
+def test_controle_tijdens_het_begin_van_een_uitvoering_geeft_geen_valse_stop(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Proef N1 van de herreview, met vaste volgorde: draad A (de controle die een stop vastlegt) leest de lopende
+    uitvoeringen, en pas daarna begint draad B een gewone uitvoering. De rij van B mag nooit als weggevallen tellen: B
+    geeft 200 en de executor is daarna niet gestopt (R-VEILIG-H1). A wacht hooguit 1 s op het begin van B."""
+    hub, _c, nas = stack
+    u = uitvoerder(hub)
+    j = u.journal
+    a_heeft_gelezen, b_is_begonnen = threading.Event(), threading.Event()
+    echt_lopend, echt_begin = Journal._lopende_nonces, Journal.begin
+
+    def lopend(self: Journal) -> set[str]:
+        uit = echt_lopend(self)
+        if threading.current_thread().name == "A-controle" and not a_heeft_gelezen.is_set():
+            a_heeft_gelezen.set()
+            b_is_begonnen.wait(1)
+        return uit
+
+    def begin(self: Journal, **k: Any) -> None:
+        echt_begin(self, **k)
+        b_is_begonnen.set()
+
+    monkeypatch.setattr(Journal, "_lopende_nonces", lopend)
+    monkeypatch.setattr(Journal, "begin", begin)
+    uitkomst: dict[str, Any] = {}
+    # Er moet een rij zijn voordat A leest: een eerdere, afgemaakte uitvoering.
+    assert u.run(herstart(hub, nas), [hub.policy_key.public_key()]).status == 200
+    b_is_begonnen.clear()
+    ta = threading.Thread(target=lambda: uitkomst.__setitem__("a", j.stopped()), name="A-controle")
+    ta.start()
+    assert a_heeft_gelezen.wait(5)
+    b = u.run(herstart(hub, nas), [hub.policy_key.public_key()])
+    ta.join(10)
+    monkeypatch.undo()
+    assert b.status == 200 and b.body["status"] == "uitgevoerd", b.body
+    assert uitkomst["a"] is None
+    assert journaal(hub).stopped() is None and rijen(hub) == [("uitgevoerd", ""), ("uitgevoerd", "")]
+    assert u.run(herstart(hub, nas), [hub.policy_key.public_key()]).status == 200
+
+
+def test_statusopvraag_leest_alleen_en_legt_geen_stop_vast(
+    tmp_path: Path, nas: FakeTrueNAS, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """De onaangemelde statusroutes (GET /api/v1/status, GET /) en het journaal voor de Hub openen geen
+    schrijftransactie: ook terwijl een ander de schrijfvergrendeling van het journaal houdt, antwoorden ze meteen en
+    zonder "journaal niet beschikbaar", en een onafgemaakte rij blijft door een statusopvraag onaangeroerd. De stop
+    wordt pas vóór de volgende uitvoering vastgesteld (R-VEILIG-H1)."""
+    hub = nas_hub(tmp_path / "appdata", nas)
+    set_write_key(hub, nas)
+    keys = [hub.policy_key.public_key()]
+
+    def weg(self: Uitvoerder, *a: Any, **k: Any) -> Any:
+        raise ProcesWeg()
+
+    monkeypatch.setattr(Uitvoerder, "_teruglezen", weg)
+    req = herstart(hub, nas)
+    with pytest.raises(ProcesWeg):
+        uitvoerder(hub).run(req, keys)
+    monkeypatch.undo()
+    c = hub_client(hub)
+    with contextlib.closing(sqlite3.connect(hub.settings.replay_db, timeout=0.1)) as slot:
+        slot.execute("BEGIN IMMEDIATE")  # een ander houdt de schrijfvergrendeling
+        try:
+            for pad in ("/api/v1/status", "/"):
+                r = c.get(pad)
+                assert r.status_code == 200, r.text[:200]
+                assert "journaal_niet_beschikbaar" not in r.text
+            st = c.get("/api/v1/status").json()
+            assert st["gestopt"] is None, st
+            rid = req["proposal"]["idempotency_key"]
+            jr = c.get(f"/api/v1/executions/{rid}", headers=auth(hub.jwt()))
+            assert jr.status_code == 200 and jr.json()["uitvoeringen"][0]["status"] == "gestart", jr.text
+        finally:
+            slot.execute("ROLLBACK")
+    assert rijen(hub) == [("gestart", "")]
+    with contextlib.closing(sqlite3.connect(hub.settings.replay_db)) as db:
+        assert db.execute("SELECT count(*) FROM state WHERE key = 'gestopt'").fetchone()[0] == 0
+    # Vóór de volgende uitvoering wordt de onafgemaakte rij wel een stop.
+    r = execute(c, hub, herstart(hub, nas))
+    assert gestopt_gemeld(r) and r.json()["details"]["reden"] == "uitkomst_onbekend", r.text
+    assert c.get("/api/v1/status").json()["gestopt"]["reden"] == "uitkomst_onbekend"
+
+
+def test_veel_statusopvragen_tijdens_uitvoeringen_geven_nooit_een_valse_stop(stack: Stack) -> None:
+    """Proef N2 van de herreview als vaste lus: acht draden vragen onaangemeld de status op en twee de pagina,
+    terwijl de Hub veertig herstarts na elkaar aanbiedt. Elke herstart slaagt en de executor stopt nooit."""
+    hub, c, nas = stack
+    stop = threading.Event()
+    opvragen = {"n": 0}
+    slot = threading.Lock()
+
+    def vloed(pad: str) -> None:
+        cl = TestClient(c.app, base_url=BASE)
+        while not stop.is_set():
+            cl.get(pad)
+            with slot:
+                opvragen["n"] += 1
+
+    draden = [threading.Thread(target=vloed, args=("/api/v1/status",), daemon=True) for _ in range(8)]
+    draden += [threading.Thread(target=vloed, args=("/",), daemon=True) for _ in range(2)]
+    for d in draden:
+        d.start()
+    uit: list[tuple[int, str]] = []
+    try:
+        for _ in range(40):
+            r = execute(c, hub, herstart(hub, nas))
+            uit.append((r.status_code, str(r.json().get("status") or r.json().get("code"))))
+            if r.status_code != 200:
+                break
+    finally:
+        stop.set()
+        for d in draden:
+            d.join(10)
+    assert uit == [(200, "uitgevoerd")] * 40, uit[-3:]
+    assert opvragen["n"] > 0
+    assert journaal(hub).stopped() is None and writes(nas).count("app.redeploy") == 40
+    assert {s for s, _d in rijen(hub)} == {"uitgevoerd"}
+
+
+# ------------------------------------------------------------------ R-VEILIG-H2: journaalfout vóór de schrijfaanroep
+def test_journaalfout_voor_de_schrijfaanroep_sluit_de_rij_als_mislukt_zonder_stop(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Proef N7 van de herreview: bij ``app.update`` valt het journaal weg vóór de schrijfaanroep (bewaren van de
+    vorige waarden en het einde van de rij falen). Er is aantoonbaar niets naar TrueNAS gestuurd: 503 "er is niets
+    uitgevoerd". Zodra het journaal terug is, krijgt de rij het einde ``mislukt`` en is er geen stop."""
+    hub, c, nas = stack
+    assert execute(c, hub, approved(hub, install_prop())).status_code == 200
+    echt_save, echt_finish = Journal.save_values, Journal.finish
+    kapot = {"aan": True}
+
+    def save(self: Journal, *a: Any, **k: Any) -> Any:
+        if kapot["aan"]:
+            raise JournalUnavailable("OperationalError")
+        return echt_save(self, *a, **k)
+
+    def finish(self: Journal, *a: Any, **k: Any) -> Any:
+        if kapot["aan"]:
+            raise JournalUnavailable("OperationalError")
+        return echt_finish(self, *a, **k)
+
+    monkeypatch.setattr(Journal, "save_values", save)
+    monkeypatch.setattr(Journal, "finish", finish)
+    prop = app_prop(nas, "app.update", "demo-app", {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}})
+    r = execute(c, hub, approved(hub, prop))
+    assert r.status_code == 503 and r.json()["code"] == "journaal_niet_beschikbaar", r.text
+    assert "niets uitgevoerd" in r.json()["message"] and writes(nas) == ["app.create"]
+    kapot["aan"] = False
+    r = execute(c, hub, herstart(hub, nas))
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    assert rijen(hub) == [("uitgevoerd", ""), ("mislukt", "JournalUnavailable"), ("uitgevoerd", "")]
+    assert journaal(hub).stopped() is None and c.get("/api/v1/status").json()["gestopt"] is None
+
+
 # ------------------------------------------------------------------ R-VEILIG-3: diep geneste JSON
 def test_diep_geneste_json_geeft_422_en_de_executor_blijft_werken(stack: Stack) -> None:
     hub, c, nas = stack

@@ -417,9 +417,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
 
     def gestopt() -> dict[str, Any] | None:
-        """De toestand "gestopt na een afwijking"; een onleesbaar journaal telt als gestopt (fail-closed)."""
+        """De toestand "gestopt na een afwijking"; een onleesbaar journaal telt als gestopt (fail-closed). Alleen lezen:
+        een statusopvraag (ook onaangemeld) opent nooit een schrijftransactie en legt geen stop vast; een onafgemaakte
+        uitvoering wordt bij het starten en vóór een uitvoering vastgesteld (R-VEILIG-H1, S-P2-030)."""
         try:
-            return journal.stopped()
+            return journal.stopped(vastleggen=False)
         except JournalUnavailable:
             return {"code": "journaal_niet_beschikbaar"}
 
@@ -771,7 +773,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return _err("validation_error", "request_id moet een UUID zijn.", 422)
         try:
             rows = journal.entries(rid)
-            stopped = journal.stopped()
+            stopped = journal.stopped(vastleggen=False)  # alleen lezen, zoals de status
         except JournalUnavailable:
             return _err("journaal_niet_beschikbaar", "Het journaal van de executor is niet beschikbaar.", 503)
         out = []

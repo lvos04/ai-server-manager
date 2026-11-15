@@ -25,7 +25,6 @@ Nooit ``custom_compose_config``, nooit een methode buiten het beleid, nooit data
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import threading
 import time
@@ -722,9 +721,14 @@ class Uitvoerder:
         except Exception as exc:
             if not nas.schrijfaanroep_verstuurd:
                 # Vóór de schrijfaanroep (bv. het journaal of vault.key bij het bewaren van de vorige waarden): er is
-                # niets uitgevoerd. De rij krijgt een einde, zodat hij niet als onafgemaakte uitvoering telt.
-                with contextlib.suppress(JournalUnavailable):
+                # aantoonbaar niets naar TrueNAS gestuurd. De rij krijgt het einde "mislukt", zodat hij niet als
+                # onafgemaakte uitvoering telt; werkt het journaal nu niet, dan zodra het terug is (R-VEILIG-H2).
+                try:
                     self.journal.finish(nonce, status="mislukt", after_hash=doel.hash, detail=type(exc).__name__)
+                except JournalUnavailable:
+                    self.journal.einde_in_geheugen(
+                        nonce, status="mislukt", after_hash=doel.hash, detail=type(exc).__name__
+                    )
                 raise
             # Ná de schrijfaanroep is elke onverwachte fout een onbekende uitkomst (R-VEILIG-2).
             log.warning("uitkomst onbekend na de schrijfaanroep: request_id=%s fout=%s", request_id, type(exc).__name__)
