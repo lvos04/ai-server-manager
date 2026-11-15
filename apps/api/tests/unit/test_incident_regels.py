@@ -257,3 +257,29 @@ def test_acties_afwijking_en_onbekende_uitkomst() -> None:
         ev("mediaguard", "action.run.failed", {**basis, "uitkomst": "afwijking"}, ("action_target", doel))
     )
     assert vreemd is None or vreemd.soort != "actie.afwijking"
+
+
+def test_actie_afwijking_noemt_de_stop_alleen_als_de_executor_hem_meldt() -> None:
+    """S-P2-040 (R-TECH, vervolgpunt van R-VEILIG): titel en samenvatting van ``actie.afwijking`` zeggen "executor
+    gestopt" alleen als het event ``gestopt`` echt true heeft. Na ophelderen kan de executor al zijn vrijgegeven
+    (``false``), of hij meldde niets; een andere waarde dan ja/nee telt als niets."""
+    doel = "app:my-house"
+    basis = {"request_id": "0d6b7c0e-6f2f-4f65-9a52-0d2f0d3f8a11", "action_id": "app.restart", "doel": doel}
+
+    def afwijking(**meer: Any) -> Any:
+        payload = {**basis, "uitkomst": "afwijking", "reden": "staat_verschilt", **meer}
+        return classify(ev(APP_ID, "action.run.failed", payload, ("action_target", doel), stroom="outbox"))
+
+    gestopt = afwijking(gestopt=True)
+    assert gestopt and gestopt.titel == f"Afwijking na app.restart op {doel}: executor gestopt", gestopt
+    assert "voert niets meer uit tot een beheerder hem" in gestopt.samenvatting
+    for meer, tekst in (
+        ({"gestopt": False}, "meldde dat hij niet (meer) gestopt is"),
+        ({}, "Of de executor gestopt is, meldde hij niet"),
+        ({"gestopt": "ja"}, "Of de executor gestopt is, meldde hij niet"),
+        ({"gestopt": 1}, "Of de executor gestopt is, meldde hij niet"),
+    ):
+        s = afwijking(**meer)
+        assert s and s.titel == f"Afwijking na app.restart op {doel}", (meer, s)
+        assert "gestopt" not in s.titel and tekst in s.samenvatting, (meer, s.samenvatting)
+        assert (s.soort, s.ernst, s.vingerafdruk) == ("actie.afwijking", "kritiek", gestopt.vingerafdruk), s

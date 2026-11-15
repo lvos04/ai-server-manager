@@ -4,6 +4,24 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: preview, bewijs en witte lijst bij acties (S-P2-040 herstel; ADR-0030 besluit 32)
+- De preview van `app.install` toont elk gezet veld van `app_create.values` met zijn waarde (hostname, DNS, run_as,
+  tty, stdin, labels, healthcheck en de rest; van `envs` alleen de namen, een geheim als `***`), ook de eigen waarden
+  van een catalogusapp. Een voorstel met `command` of `entrypoint` geeft `501 capability_unavailable`
+  (`eigen_opdracht`) tot er een installatiescherm is; een open voorstel van daarvoor wordt bij goedkeuren geweigerd.
+  Na afloop verdwijnen `labels` en `notes` ook uit de bewaarde preview (R-VEILIG-1).
+- `uitgevoerd` alleen met volledig bewijs van de executor (`methode`, `before_hash`, `after_hash`, `uitgevoerd_op`,
+  `policy_hash` gelijk aan het eigen beleid), ook bij ophelderen via het journaal; anders `502 uitkomst_onbekend` en
+  het incident `actie.afwijking` blijft open (R-VEILIG-2).
+- Resultaat, audit, event en foutantwoord nemen van de executor alleen velden uit een vaste lijst over, met vaste vorm
+  en grootte; eigen velden van de Hub zijn niet te overschrijven, `reden` is altijd een code (anders
+  `onbekende_reden`; een NUL-teken gaf eerder HTTP 500) en `gestopt` alleen een echte ja/nee (R-VEILIG-3).
+- `PUT /api/v1/actions/noodstop` zet de stand ook bij een herhaalde `Idempotency-Key` echt en geeft de werkelijke
+  stand terug (R-VEILIG-4). De titel van `actie.afwijking` zegt "executor gestopt" alleen als de executor dat meldt.
+- Tests: `tests/e2e/test_acties.py` (onder meer het event van `502 uitvoering_mislukt` en `gestopt` false bij
+  ophelderen, R-TECH-1 en R-TECH-2), `apps/api/tests/integration/test_acties.py` (een bewakingstest per veld van de
+  standaard Custom App) en `apps/api/tests/unit/test_incident_regels.py`.
+
 ### Gerepareerd — Hub: reden en stop van de executor in event en incident (S-P2-040; ADR-0030 besluit 26, 30 en 31)
 - Antwoordt de executor na de schrijfaanroep `409 afwijking` (bv. `journaal_niet_beschikbaar` of
   `uitkomst_onbekend` na een onbekende jobstatus), dan neemt het event `action.run.failed` nu `reden` én `gestopt`

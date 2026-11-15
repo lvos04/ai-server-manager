@@ -143,23 +143,25 @@ def get_noodstop(db: DB, _: Viewer) -> dict[str, Any]:
 
 @router.put("/actions/noodstop", summary="Noodstop in- of uitschakelen (alleen beheerder)")
 def put_noodstop(body: NoodstopIn, request: Request, db: DB, principal: Admin, idem: Idem) -> JSONResponse:
-    def werk() -> tuple[int, dict[str, Any]]:
-        staat = blok_mod.zet_noodstop(
-            db, actief=body.actief, reden=(body.reden or "").strip() or None, door=principal.name
-        )
-        audit.record(
-            db,
-            actor_type="user",
-            actor_id=principal.name,
-            action="action.emergency_stop.enabled" if body.actief else "action.emergency_stop.disabled",
-            target_type="hub_setting",
-            target_id=blok_mod.NOODSTOP_KEY,
-            details={"reden": staat["reden"]},
-            trace_id=trace_id_of(request),
-        )
-        return 200, staat
-
-    return _afhandelen(request, idem, werk)
+    # Een PUT is van zichzelf herhaalbaar: ook een herhaling met dezelfde Idempotency-Key zet de stand echt en geeft de
+    # werkelijke stand terug, nooit het bewaarde antwoord van toen (S-P2-040, R-VEILIG-4; ADR-0030 besluit 32). Een
+    # sleutel die al voor een ander verzoek is gebruikt, blijft 422 (``Idempotency.replay``).
+    herhaling = idem.replay() is not None
+    staat = blok_mod.zet_noodstop(db, actief=body.actief, reden=(body.reden or "").strip() or None, door=principal.name)
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=principal.name,
+        action="action.emergency_stop.enabled" if body.actief else "action.emergency_stop.disabled",
+        target_type="hub_setting",
+        target_id=blok_mod.NOODSTOP_KEY,
+        details={"reden": staat["reden"]},
+        trace_id=trace_id_of(request),
+    )
+    if herhaling:
+        db.commit()
+        return JSONResponse(staat, status_code=200)
+    return idem.save(200, staat)
 
 
 # ------------------------------------------------------------------ voorstellen

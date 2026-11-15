@@ -10,7 +10,10 @@ Vaste regels in dit bestand:
 - Verandert een gebonden veld tussen goedkeuring en uitvoering, dan vervalt de goedkeuring (EX19).
 - De eenmalige nonce van een goedkeuring wordt atomair verbruikt vóór verzending (EX20); er is geen tweede poging.
 - Een storing of onduidelijk antwoord is nooit een succes: de status wordt ``onbekend`` tot het journaal van de
-  executor uitsluitsel geeft. De Hub herhaalt een uitvoering nooit vanzelf.
+  executor uitsluitsel geeft. De Hub herhaalt een uitvoering nooit vanzelf. "Uitgevoerd" telt alleen met volledig
+  bewijs in de juiste vorm (:func:`_bewijs_uitgevoerd`; S-P2-040, R-VEILIG-2).
+- Van een antwoord of journaalregel van de executor neemt de Hub alleen velden uit een vaste lijst over, elk met een
+  vaste vorm en lengte; zijn eigen velden zet hij zelf (:func:`_van_executor`; S-P2-040, R-VEILIG-3).
 - Parameterwaarden komen niet in de audit, de events of de API-antwoorden (alleen hun SHA-256 en de preview). Na
   afloop van een voorstel wist de Hub ook de waarden van omgevingsvariabelen uit zijn eigen database
   (:func:`_wis_waarden`).
@@ -21,6 +24,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
+import re
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta
@@ -38,7 +43,7 @@ from hub import audit, servicecalls
 from hub.actions import blokkades as blok_mod
 from hub.actions.beleid import get_policy
 from hub.actions.doel import Doel, DoelOnbekend, lees_doel
-from hub.actions.preview import SCHEMA, bouw
+from hub.actions.preview import SCHEMA, bouw, eigen_opdracht
 from hub.config import Settings
 from hub.deps import Principal
 from hub.errors import HubError
@@ -46,6 +51,7 @@ from hub.events.envelope import emit
 from hub.keys import KeyRing
 from hub.models import ActionRequest, Approval, Notification, NotificationChannel, Service
 from hub.monitoring.alerts import ERNST_RANK
+from hub.redact import redact_log_text
 from hub.registry import EXECUTOR_APP_ID, service_base_url
 from hub.security import Role
 from hub.timeutil import iso, utcnow
@@ -178,7 +184,9 @@ def _wis_waarden(req: ActionRequest) -> None:
     ``entrypoint``, ``labels`` en ``notes`` niet meer nodig: hij voert nooit iets opnieuw uit. Ze verdwijnen dan uit
     ``parameters``, zodat de database van de Hub (en zijn back-up) ze niet voor altijd in klare tekst bewaart; de namen
     van de variabelen blijven en ``vrije_tekst_gewist`` noemt de gewiste velden. ``parameters_sha256`` in de preview en
-    de audit blijft gelijk (ADR-0030 besluit 28)."""
+    de audit blijft gelijk (ADR-0030 besluit 28). Sinds S-P2-040 (R-VEILIG-1) toont de preview ``labels`` en ``notes``
+    mét waarde; na afloop verdwijnt die waarde ook uit de bewaarde preview (``{"waarde_gewist": true}``). De
+    ``preview_hash`` blijft de hash van de preview die is voorgesteld en goedgekeurd (ADR-0030 besluit 32)."""
     params = req.parameters if isinstance(req.parameters, dict) else {}
     ac = params.get("app_create")
     values = ac.get("values") if isinstance(ac, dict) else None
@@ -200,6 +208,14 @@ def _wis_waarden(req: ActionRequest) -> None:
     if vrij:
         nv["vrije_tekst_gewist"] = sorted(set(vrij) | set(nv.get("vrije_tekst_gewist") or []))
     req.parameters = nieuw
+    getoond = (req.preview or {}).get("wijziging") if isinstance(req.preview, dict) else None
+    waarden = getoond.get("waarden") if isinstance(getoond, dict) else None
+    if isinstance(waarden, dict) and any(k in waarden for k in vrij):
+        preview = copy.deepcopy(req.preview)
+        for k in vrij:
+            if k in preview["wijziging"]["waarden"]:
+                preview["wijziging"]["waarden"][k] = {"waarde_gewist": True}
+        req.preview = preview
 
 
 # ------------------------------------------------------------------ tijdgebonden overgangen
@@ -257,6 +273,12 @@ def veeg(db: Session, now: datetime | None = None) -> None:
 
 
 # ------------------------------------------------------------------ voorstellen
+EIGEN_OPDRACHT_NL = (
+    "Een eigen opdracht (command of entrypoint) bij een installatie kan de Hub nog niet veilig tonen; er is niets "
+    "voorgesteld of goedgekeurd. Dat kan pas met het installatiescherm (ADR-0030 besluit 32)."
+)
+
+
 def _fouten_dict(fouten: list[Any]) -> dict[str, Any]:
     return {"fouten": [f.as_dict() for f in fouten[:20]]}
 
@@ -470,6 +492,11 @@ def stel_voor(
             "voorgesteld.",
             {"reden": "vault_verwijzingen"},
         )
+    opdracht = eigen_opdracht(aid, parameters)
+    if opdracht:
+        raise HubError(
+            501, "capability_unavailable", EIGEN_OPDRACHT_NL, {"reden": "eigen_opdracht", "velden": opdracht}
+        )
     # Stap 2: het doel zelf uitlezen en opnieuw classificeren met wat er werkelijk staat (kritiek, beschermd).
     doel = _lees(db, vault, settings, policy, actie, target, parameters)
     cls = classify(
@@ -554,9 +581,16 @@ def _herbereken(
 ) -> tuple[ActieDef, Classification, Doel, dict[str, Any], str]:
     """Alles opnieuw, met het beleid en de NAS van nu. Past het voorstel niet meer, dan is het geweigerd."""
 
-    def stop(message: str, cls: Classification | None, details: dict[str, Any]) -> NoReturn:
+    def stop(
+        message: str,
+        cls: Classification | None,
+        details: dict[str, Any],
+        *,
+        status: int = 403,
+        code: str = "actie_geweigerd",
+    ) -> NoReturn:
         req.status, req.bijgewerkt_op = "geweigerd", now
-        req.resultaat = {"code": "actie_geweigerd", "message": message}
+        req.resultaat = {"code": code, "message": message}
         _wis_waarden(req)
         if cls is not None:
             req.blokkades = [b.as_dict() for b in cls.blokkades]
@@ -573,9 +607,9 @@ def _herbereken(
             action="action.proposal.refused",
             target_type="action_request",
             target_id=str(req.id),
-            details={"action_id": req.action_id, "code": "actie_geweigerd", "bij": "herberekening"},
+            details={"action_id": req.action_id, "code": code, "bij": "herberekening"},
         )
-        raise Bewaard(403, "actie_geweigerd", message, {"request_id": str(req.id), **details})
+        raise Bewaard(status, code, message, {"request_id": str(req.id), **details})
 
     actie = policy.actie(req.action_id)
     kaal = classify(
@@ -587,6 +621,11 @@ def _herbereken(
     fouten += [] if fouten else validate_parameters(policy, actie, req.target, req.parameters)
     if fouten:
         stop("Doel of parameters voldoen niet (meer) aan het schema van het beleid.", None, _fouten_dict(fouten))
+    opdracht = eigen_opdracht(req.action_id, req.parameters)
+    if opdracht:
+        # Een open voorstel van vóór S-P2-040: de preview toonde die opdracht niet (R-VEILIG-1, optie C).
+        details = {"reden": "eigen_opdracht", "velden": opdracht}
+        stop(EIGEN_OPDRACHT_NL, None, details, status=501, code="capability_unavailable")
     doel = _lees(db, vault, settings, policy, actie, req.target, req.parameters)
     cls = classify(
         policy,
@@ -774,24 +813,158 @@ def _event(db: Session, req: ActionRequest, uitkomst: str, extra: dict[str, Any]
         "action_target",
         (req.doel_sleutel or req.action_id)[:128],
         {
+            **(extra or {}),
+            # De eigen velden van de Hub komen na ``extra``: niets uit een executorantwoord overschrijft ze.
             "uitkomst": uitkomst,
             "request_id": str(req.id),
             "action_id": req.action_id,
             "doel": req.doel_sleutel,
             "risk_class": req.risk_class,
-            **(extra or {}),
         },
     )
 
 
+# ------------------------------------------------------------------ wat de Hub van de executor overneemt
+# Een antwoord of journaalregel van de executor komt over gewoon HTTP (HTTPS volgt met B10/B13) en is dus invoer van
+# buiten. De Hub neemt alleen velden uit een vaste lijst over, elk met een vaste vorm en lengte; zijn eigen velden
+# (code, request_id, doel, uitkomst, action_id, risk_class) zet hij zelf (S-P2-040, R-VEILIG-3; ADR-0030 besluit 32).
+# Een reden is altijd een code met een vast tekenpatroon, zoals de executor ze geeft (``staat_verschilt``,
+# ``job_mislukt [FAILED]``, ``OperationalError``), anders ``onbekende_reden``: zo komen vrije tekst, stuurtekens en een
+# NUL-teken nergens in resultaat, audit, event of foutantwoord.
+REDEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}(?: \[[A-Z][A-Z0-9_]{0,39}\])?")
+ONBEKENDE_REDEN = "onbekende_reden"
+CODE_RE = re.compile(r"[a-z][a-z0-9_]{0,63}")
+METHODE_RE = re.compile(r"[a-z][a-z0-9_]{0,31}(?:\.[a-z][a-z0-9_]{0,31}){1,3}")
+HASH_RE = re.compile(r"sha256:[0-9a-f]{64}")
+ETAG_RE = re.compile(r"sha256:[0-9a-f]{64}|(?:dataset|snapshot):[A-Za-z0-9_.:/@-]{1,280}")
+UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+KLASSE_RE = re.compile(r"R[0-3]")
+STUURTEKEN_RE = re.compile(r"[\x00-\x1f\x7f]")
+MAX_STRUCTUUR = 8 * 1024  # tekens JSON voor readback, afwijkingen, fouten en blokkades
+MAX_DIEPTE = 8
+MAX_LIJST = 20
+MAX_MELDING = 500
+BEWIJS_ONVOLLEDIG = "executor_bewijs_onvolledig"
+
+
+def _reden(waarde: Any) -> str | None:
+    if waarde is None or waarde == "":
+        return None
+    return waarde if isinstance(waarde, str) and REDEN_RE.fullmatch(waarde) else ONBEKENDE_REDEN
+
+
+def _vorm(waarde: Any, patroon: re.Pattern[str]) -> str | None:
+    return waarde if isinstance(waarde, str) and patroon.fullmatch(waarde) else None
+
+
+def _reeks(waarde: Any, patroon: re.Pattern[str]) -> list[str] | None:
+    if not isinstance(waarde, list) or len(waarde) > MAX_LIJST:
+        return None
+    return waarde if all(isinstance(w, str) and patroon.fullmatch(w) for w in waarde) else None
+
+
+def _tijd(waarde: Any) -> str | None:
+    return waarde if isinstance(waarde, str) and execreq.parse_ts(waarde) is not None else None
+
+
+def _tijdstip(waarde: Any) -> int | None:
+    """Een tijdstip uit het journaal (seconden sinds 1970)."""
+    return waarde if isinstance(waarde, int) and not isinstance(waarde, bool) and waarde >= 0 else None
+
+
+def _schoon(waarde: Any, diepte: int = 0) -> bool:
+    if diepte > MAX_DIEPTE:
+        return False
+    if isinstance(waarde, str):
+        return not STUURTEKEN_RE.search(waarde)
+    if waarde is None or isinstance(waarde, bool | int):
+        return True
+    if isinstance(waarde, float):
+        return math.isfinite(waarde)
+    if isinstance(waarde, list):
+        return all(_schoon(w, diepte + 1) for w in waarde)
+    if isinstance(waarde, dict):
+        return all(isinstance(k, str) and _schoon(k) and _schoon(w, diepte + 1) for k, w in waarde.items())
+    return False
+
+
+def _structuur(waarde: Any, soort: type) -> Any:
+    """Een object of lijst (readback, afwijkingen, fouten, blokkades): alleen JSON-typen, geen stuurtekens, niet te diep
+    en hooguit :data:`MAX_STRUCTUUR` tekens; anders ``None``."""
+    if not isinstance(waarde, soort) or not _schoon(waarde):
+        return None
+    return waarde if len(json.dumps(waarde, ensure_ascii=False)) <= MAX_STRUCTUUR else None
+
+
+def _melding(waarde: Any) -> str | None:
+    """De Nederlandse melding van de executor: hooguit :data:`MAX_MELDING` tekens, zonder stuurtekens en streng
+    geschoond (``redact_log_text``); anders ``None``."""
+    if not isinstance(waarde, str) or not waarde or len(waarde) > MAX_MELDING or STUURTEKEN_RE.search(waarde):
+        return None
+    return redact_log_text(waarde, max_len=MAX_MELDING)
+
+
+# Per veld de vorm die de Hub overneemt; een veld dat niet in deze tabel staat, neemt hij nooit over.
+EXECUTOR_VELDEN: dict[str, Any] = {
+    "reden": _reden,
+    "afwijkingen": lambda w: _structuur(w, list),
+    "fouten": lambda w: _structuur(w, list),
+    "blokkades": lambda w: _structuur(w, list),
+    "methode": lambda w: _vorm(w, METHODE_RE),
+    "methoden": lambda w: _reeks(w, METHODE_RE),
+    "before_hash": lambda w: _vorm(w, HASH_RE),
+    "after_hash": lambda w: _vorm(w, HASH_RE),
+    "gewijzigd": lambda w: _reeks(w, CODE_RE),
+    "eigen_risk_class": lambda w: _vorm(w, KLASSE_RE),
+    "sinds": _tijd,
+    "request_id": lambda w: _vorm(w, UUID_RE),
+}
+AFWIJKING_VELDEN = ("reden", "afwijkingen", "methode", "before_hash", "after_hash")
+MISLUKT_VELDEN = ("reden", "methode", "before_hash", "after_hash")
+# Details van een weigering (executor of ``asm_policy.verify``); ``request_id`` is hier het verzoek waardoor de
+# executor stopte (``executor_gestopt``), genest onder ``executor`` en dus nooit in plaats van het eigen request_id.
+WEIGERING_VELDEN = ("reden", "fouten", "blokkades", "gewijzigd", "eigen_risk_class", "methoden", "sinds", "request_id")
+
+
+def _van_executor(bron: Mapping[str, Any], velden: tuple[str, ...], *, alleen_aanwezig: bool = False) -> dict[str, Any]:
+    """De velden uit ``velden`` in hun vaste vorm (``None`` als de vorm niet klopt), plus ``gestopt`` als echte ja/nee.
+    Met ``alleen_aanwezig`` alleen de velden die in ``bron`` staan."""
+    uit = {k: EXECUTOR_VELDEN[k](bron.get(k)) for k in velden if not alleen_aanwezig or k in bron}
+    if isinstance(bron.get("gestopt"), bool):
+        uit["gestopt"] = bron["gestopt"]
+    return uit
+
+
 def _stopgegevens(reden: Any, gestopt: Any) -> dict[str, Any]:
     """``reden`` en ``gestopt`` uit een executorantwoord of uit het journaal, voor het event ``action.run.failed`` (en
-    daarmee voor het incident). Alleen een korte code en een echte ja/nee: ``gestopt`` komt alleen mee als de executor
-    het zelf zegt, nooit afgeleid (S-P2-030; S-P2-040)."""
-    uit: dict[str, Any] = {"reden": reden[:128] if isinstance(reden, str) and reden else None}
+    daarmee voor het incident). Alleen een code en een echte ja/nee: ``gestopt`` komt alleen mee als de executor het
+    zelf zegt, nooit afgeleid (S-P2-030; S-P2-040)."""
+    uit: dict[str, Any] = {"reden": _reden(reden)}
     if isinstance(gestopt, bool):
         uit["gestopt"] = gestopt
     return uit
+
+
+def _bewijs_uitgevoerd(body: Mapping[str, Any], policy_hash: str) -> dict[str, Any] | None:
+    """Het resultaat van een geslaagde uitvoering, of ``None`` als het bewijs niet volledig is (S-P2-040, R-VEILIG-2):
+    ``methode``, ``before_hash``, ``after_hash``, ``uitgevoerd_op`` en ``policy_hash`` (gelijk aan het eigen beleid)
+    moeten er in de juiste vorm zijn. Zonder dat is "uitgevoerd" een onduidelijk antwoord, nooit een succes."""
+    bewijs = {
+        "methode": _vorm(body.get("methode"), METHODE_RE),
+        "before_hash": _vorm(body.get("before_hash"), HASH_RE),
+        "after_hash": _vorm(body.get("after_hash"), HASH_RE),
+        "policy_hash": policy_hash if body.get("policy_hash") == policy_hash else None,
+        "uitgevoerd_op": _tijd(body.get("uitgevoerd_op")),
+    }
+    if any(w is None for w in bewijs.values()):
+        return None
+    return {
+        "status": "uitgevoerd",
+        **bewijs,
+        "resource_etag": _vorm(body.get("resource_etag"), ETAG_RE),
+        "readback": _structuur(body.get("readback"), dict),
+        "waarschuwingen": _reeks(body.get("waarschuwingen"), CODE_RE),
+    }
 
 
 def _sluit(
@@ -913,6 +1086,11 @@ def _journaal(db: Session, settings: Settings, keyring: KeyRing, req: ActionRequ
 
     Uitkomst: ``uitgevoerd`` | ``mislukt`` | ``afwijking`` | ``geen`` (bereikbaar, maar niets gestart) | ``open``
     (gestart, nog geen einde) | ``onbereikbaar``.
+
+    Dezelfde vaste vormen als bij een antwoord (S-P2-040, R-VEILIG-2 en -3): een rij van een ander verzoek of een andere
+    actie telt als ``open``, en een rij ``uitgevoerd`` telt alleen met ``methode``, ``before_hash``, ``after_hash`` en
+    een einde in de juiste vorm; anders ook ``open`` (de uitkomst blijft onbekend). Het journaal heeft geen
+    ``policy_hash``: de executor controleert die zelf vóór hij iets uitvoert.
     """
     try:
         svc, base = _executor(db, settings)
@@ -932,21 +1110,29 @@ def _journaal(db: Session, settings: Settings, keyring: KeyRing, req: ActionRequ
     rows = res.body.get("uitvoeringen") if res.status == 200 and isinstance(res.body, dict) else None
     if not isinstance(rows, list):
         return "onbereikbaar", {"reden": f"http_{res.status}"}
+    gestopt = (res.body or {}).get("gestopt")
+    stop = {"gestopt": gestopt} if isinstance(gestopt, bool) else {}
     if not rows:
-        return "geen", {"gestopt": bool((res.body or {}).get("gestopt"))}
+        return "geen", stop
     laatste = rows[-1] if isinstance(rows[-1], dict) else {}
     gegevens = {
         "bron": "journaal_executor",
-        "methode": laatste.get("methode"),
-        "before_hash": laatste.get("before_hash"),
-        "after_hash": laatste.get("after_hash"),
-        "detail": laatste.get("detail") or None,
-        "gestart_op": laatste.get("started_at"),
-        "klaar_op": laatste.get("finished_at"),
-        "gestopt": bool((res.body or {}).get("gestopt")),
+        "methode": _vorm(laatste.get("methode"), METHODE_RE),
+        "before_hash": _vorm(laatste.get("before_hash"), HASH_RE),
+        "after_hash": _vorm(laatste.get("after_hash"), HASH_RE),
+        "detail": _reden(laatste.get("detail")),
+        "gestart_op": _tijdstip(laatste.get("started_at")),
+        "klaar_op": _tijdstip(laatste.get("finished_at")),
+        **stop,
     }
-    status = str(laatste.get("status") or "")
-    return (status if status in ("uitgevoerd", "mislukt", "afwijking") else "open"), gegevens
+    status = laatste.get("status")
+    eigen = laatste.get("request_id") == str(req.id) and laatste.get("action_id") == req.action_id
+    if not eigen or status not in ("uitgevoerd", "mislukt", "afwijking"):
+        return "open", gegevens
+    bewijs = (gegevens["methode"], gegevens["before_hash"], gegevens["after_hash"], gegevens["klaar_op"])
+    if status == "uitgevoerd" and None in bewijs:
+        return "open", gegevens
+    return str(status), gegevens
 
 
 def _antwoord(
@@ -956,39 +1142,29 @@ def _antwoord(
     if uitkomst == "uitgevoerd":
         _sluit(db, req, "uitgevoerd", {"status": "uitgevoerd", **gegevens}, actor=actor)
         return 200, weergave(db, req)
+    stop = _stopgegevens(gegevens.get("detail"), gegevens.get("gestopt"))
     if uitkomst == "afwijking":
-        _sluit(
-            db,
-            req,
-            "afwijking",
-            {"code": "afwijking", "reden": gegevens.get("detail"), **gegevens},
-            actor=actor,
-            extra=_stopgegevens(gegevens.get("detail"), gegevens.get("gestopt")),
-        )
+        _sluit(db, req, "afwijking", {**gegevens, "code": "afwijking", "reden": stop["reden"]}, actor=actor, extra=stop)
         raise Bewaard(
             409,
             "afwijking",
             "De toestand na de uitvoering wijkt af van de verwachting of is onbekend. De executor is gestopt; er is "
             "een incident gemaakt en er wordt niets herhaald.",
-            {"request_id": str(req.id), "reden": gegevens.get("detail"), "gestopt": gegevens.get("gestopt")},
+            {**stop, "request_id": str(req.id)},
         )
     _sluit(
-        db,
-        req,
-        "mislukt",
-        {"code": "uitvoering_mislukt", "reden": gegevens.get("detail"), **gegevens},
-        actor=actor,
-        extra=_stopgegevens(gegevens.get("detail"), gegevens.get("gestopt")),
+        db, req, "mislukt", {**gegevens, "code": "uitvoering_mislukt", "reden": stop["reden"]}, actor=actor, extra=stop
     )
     raise Bewaard(
         502,
         "uitvoering_mislukt",
         "TrueNAS heeft de actie niet uitgevoerd; de toestand van het doel is onveranderd.",
-        {"request_id": str(req.id), "reden": gegevens.get("detail")},
+        {"request_id": str(req.id), "reden": stop["reden"]},
     )
 
 
 def _onbekend(db: Session, req: ActionRequest, reden: str, actor: str) -> NoReturn:
+    reden = _reden(reden) or ONBEKENDE_REDEN
     _sluit(db, req, "onbekend", {"code": "uitkomst_onbekend", "reden": reden}, actor=actor, extra={"reden": reden})
     raise Bewaard(
         502,
@@ -1262,76 +1438,68 @@ def voer_uit(
         if uitkomst in ("uitgevoerd", "mislukt", "afwijking"):
             return _antwoord(db, req, uitkomst, gegevens, principal.name)
         _onbekend(db, req, f"executor_{exc.reason}", principal.name)
-    return _verwerk(db, req, res, principal.name)
+    return _verwerk(db, req, res, principal.name, policy.hash)
 
 
-def _verwerk(db: Session, req: ActionRequest, res: servicecalls.CallResult, actor: str) -> tuple[int, dict[str, Any]]:
+def _verwerk(
+    db: Session, req: ActionRequest, res: servicecalls.CallResult, actor: str, policy_hash: str
+) -> tuple[int, dict[str, Any]]:
+    """Het antwoord van de executor vastleggen. Alleen velden uit de vaste lijst (:func:`_van_executor`); de eigen
+    velden van de Hub (``code``, ``request_id``, …) komen altijd ná die velden en zijn dus niet te overschrijven."""
     body = res.body if isinstance(res.body, dict) else {}
-    code = str(body.get("code") or "")
+    code = body.get("code")
     ruw = body.get("details")
     details: dict[str, Any] = ruw if isinstance(ruw, dict) else {}
+    melding = _melding(body.get("message"))
     if res.status == 200 and body.get("status") == "uitgevoerd":
-        velden = (
-            "methode",
-            "before_hash",
-            "after_hash",
-            "resource_etag",
-            "readback",
-            "waarschuwingen",
-            "policy_hash",
-            "uitgevoerd_op",
-        )
-        _sluit(db, req, "uitgevoerd", {"status": "uitgevoerd", **{k: body.get(k) for k in velden}}, actor=actor)
+        resultaat = _bewijs_uitgevoerd(body, policy_hash)
+        if resultaat is None:
+            # R-VEILIG-2: "uitgevoerd" zonder volledig bewijs is een onduidelijk antwoord, nooit een succes.
+            _onbekend(db, req, BEWIJS_ONVOLLEDIG, actor)
+        _sluit(db, req, "uitgevoerd", resultaat, actor=actor)
         return 200, weergave(db, req)
     if res.status == 409 and code == "afwijking":
-        resultaat = {"code": "afwijking", "message": body.get("message"), **details}
-        _sluit(
-            db,
-            req,
-            "afwijking",
-            resultaat,
-            actor=actor,
-            extra=_stopgegevens(details.get("reden"), details.get("gestopt")),
-        )
+        velden = _van_executor(details, AFWIJKING_VELDEN)
+        stop = _stopgegevens(velden["reden"], velden.get("gestopt"))
+        _sluit(db, req, "afwijking", {**velden, "code": "afwijking", "message": melding}, actor=actor, extra=stop)
         raise Bewaard(
             409,
             "afwijking",
             "De toestand na de uitvoering wijkt af van de verwachting of is onbekend. De executor is gestopt; er is "
             "een incident gemaakt en er wordt niets herhaald.",
-            {"request_id": str(req.id), **details},
+            {**velden, "request_id": str(req.id)},
         )
     if res.status == 502 and code == "uitvoering_mislukt":
+        velden = _van_executor(details, MISLUKT_VELDEN)
+        stop = _stopgegevens(velden["reden"], velden.get("gestopt"))
         _sluit(
-            db,
-            req,
-            "mislukt",
-            {"code": code, "message": body.get("message"), **details},
-            actor=actor,
-            extra=_stopgegevens(details.get("reden"), details.get("gestopt")),
+            db, req, "mislukt", {**velden, "code": "uitvoering_mislukt", "message": melding}, actor=actor, extra=stop
         )
         raise Bewaard(
             502,
             "uitvoering_mislukt",
             "TrueNAS heeft de actie niet uitgevoerd; de toestand van het doel is onveranderd.",
-            {"request_id": str(req.id), **details},
+            {**velden, "request_id": str(req.id)},
         )
-    if code and res.status != 500:
+    if isinstance(code, str) and CODE_RE.fullmatch(code) and res.status != 500:
         # Een gestructureerde weigering van de executor: hij heeft niets uitgevoerd.
+        schoon = _van_executor(details, WEIGERING_VELDEN, alleen_aanwezig=True)
         _sluit(
             db,
             req,
             "mislukt",
-            {"code": code, "message": body.get("message"), "details": details, "http_status": res.status},
+            {"code": code, "message": melding, "details": schoon, "http_status": res.status},
             actor=actor,
         )
         raise Bewaard(
             501 if res.status == 501 else 409,
             "capability_unavailable" if res.status == 501 else "uitvoering_geweigerd",
-            str(body.get("message"))
+            (melding or "Deze functie bestaat in de executor nog niet; er is niets uitgevoerd.")
             if res.status == 501
             else "De executor heeft de actie geweigerd; er is niets uitgevoerd.",
-            {"request_id": str(req.id), "executor": {"code": code, "message": body.get("message"), "details": details}},
+            {"request_id": str(req.id), "executor": {"code": code, "message": melding, "details": schoon}},
         )
+    # Ook een code buiten het vaste patroon (vrije tekst, stuurtekens): geen bruikbaar antwoord.
     _onbekend(db, req, f"executor_http_{res.status}", actor)
 
 

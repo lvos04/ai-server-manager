@@ -7,6 +7,12 @@ goedkeuring (EX19).
 
 Geheimen: waarden van omgevingsvariabelen staan nooit in de preview (alleen de namen); verwijzingen naar de kluis
 (``vault://…``) worden als verwijzing getoond, nooit ingevuld.
+
+Installeren (S-P2-040, R-VEILIG-1; ADR-0030 besluit 32): ``wijziging.waarden`` toont elk gezet veld van
+``app_create.values`` mét zijn waarde, zodat een beheerder niets ongezien goedkeurt. Uitzonderingen: van ``envs``
+alleen de namen, en een geheim (waarde onder een geheim-achtige sleutel, of naast een geheim-achtige naam in een paar
+``name``/``key`` + ``value``) als ``***``. ``command`` en ``entrypoint`` komen hier niet: die weigert de Hub al bij het
+voorstel (:func:`eigen_opdracht`, besluit regisseur optie C) tot een installatiescherm ze veilig kan tonen.
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ from asm_policy.loader import ActieDef
 from asm_policy.params import IX_APP, expected_image, vault_refs
 
 from hub.actions.doel import Doel
+from hub.redact import LOG_SECRET_KEY_RE, REDACTED, redact_text
 
 SCHEMA = "asm-preview/1"
 DATA_BLIJFT = "Datasets en data blijven staan; de Hub en de executor verwijderen nooit data."
@@ -28,6 +35,100 @@ DATA_BLIJFT = "Datasets en data blijven staan; de Hub en de executor verwijderen
 
 def _lijst(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+# Hoe elk veld van de standaard Custom App (``asm_policy.params.IX_VALUES_KEYS``) in ``wijziging.waarden`` staat
+# (S-P2-040, R-VEILIG-1). Een bewakingstest eist een regel voor elk veld dat het beleid toelaat: een nieuw veld zonder
+# regel maakt hem rood (``apps/api/tests/integration/test_acties.py``).
+WAARDE = "waarde"  # met zijn waarde (een geheim daarin als ***)
+NAMEN = "namen"  # alleen de namen; de waarden kunnen geheimen zijn (ADR-0030 besluit 28)
+GEWEIGERD = "geweigerd"  # de Hub weigert een voorstel met dit veld (501 capability_unavailable, eigen_opdracht)
+IX_PREVIEWREGELS: dict[str, str] = {
+    "notes": WAARDE,
+    "image": WAARDE,
+    "hostname": WAARDE,
+    "entrypoint": GEWEIGERD,
+    "command": GEWEIGERD,
+    "TZ": WAARDE,
+    "envs": NAMEN,
+    "restart_policy": WAARDE,
+    "max_retry_count": WAARDE,
+    "disable_builtin_healthcheck": WAARDE,
+    "tty": WAARDE,
+    "stdin": WAARDE,
+    "devices": WAARDE,
+    "privileged": WAARDE,
+    "capabilities": WAARDE,
+    "run_as_custom_user": WAARDE,
+    "run_as": WAARDE,
+    "host_network": WAARDE,
+    "ports": WAARDE,
+    "networks": WAARDE,
+    "dns_config": WAARDE,
+    "portals": WAARDE,
+    "storage": WAARDE,
+    "labels": WAARDE,
+    "resources": WAARDE,
+}
+EIGEN_OPDRACHT = tuple(sorted(k for k, regel in IX_PREVIEWREGELS.items() if regel == GEWEIGERD))
+GEHEIM_DIEPTE = 24  # dieper dan de dieptegrens van het beleid (MAX_PARAMETER_DIEPTE): daar komt het nooit
+
+
+def eigen_opdracht(action_id: str, parameters: Mapping[str, Any]) -> list[str]:
+    """De velden ``command`` en ``entrypoint`` die in de waarden van een installatie staan (elke waarde, ook leeg).
+
+    Besluit regisseur (S-P2-040, R-VEILIG-1 optie C): de Hub weigert zo'n voorstel met ``501 capability_unavailable``
+    (``details.reden`` = ``eigen_opdracht``) tot er een installatiescherm is dat de opdracht veilig kan tonen; ook een
+    open voorstel van vóór dat besluit wordt bij goedkeuren of uitvoeren geweigerd."""
+    if action_id != "app.install":
+        return []
+    ac = parameters.get("app_create") if isinstance(parameters, Mapping) else None
+    values = ac.get("values") if isinstance(ac, Mapping) else None
+    if not isinstance(values, Mapping):
+        return []
+    return [k for k in EIGEN_OPDRACHT if k in values]
+
+
+def _geheime_naam(naam: Any) -> bool:
+    return isinstance(naam, str) and bool(LOG_SECRET_KEY_RE.search(naam))
+
+
+def _toon(waarde: Any, diepte: int = 0) -> Any:
+    """Een waarde zoals de beheerder hem in de preview ziet: alles, behalve een geheim (``***``). Een geheim is de
+    waarde onder een geheim-achtige sleutel (``hub.redact``), of de ``value`` naast een geheim-achtige ``name`` of
+    ``key`` (zoals in een lijst omgevingsvariabelen van een catalogusapp)."""
+    if diepte > GEHEIM_DIEPTE:
+        return REDACTED
+    if isinstance(waarde, Mapping):
+        paar_geheim = _geheime_naam(waarde.get("name")) or _geheime_naam(waarde.get("key"))
+        uit: dict[str, Any] = {}
+        for k, w in waarde.items():
+            geheim = _geheime_naam(k) or (paar_geheim and k == "value")
+            uit[str(k)] = (
+                REDACTED if geheim and w not in (None, "") and not isinstance(w, bool) else _toon(w, diepte + 1)
+            )
+        return uit
+    if isinstance(waarde, list):
+        return [_toon(w, diepte + 1) for w in waarde]
+    if isinstance(waarde, str):
+        return redact_text(waarde)
+    return waarde
+
+
+def _waarden(standaard: bool, values: Mapping[str, Any]) -> dict[str, Any]:
+    """Elk gezet veld van ``app_create.values`` (R-VEILIG-1). Bij de standaard Custom App volgens
+    :data:`IX_PREVIEWREGELS` (een onbekend veld laat het beleid niet toe; mocht het er toch zijn, dan met waarde); bij
+    een catalogusapp de eigen waarden zoals ze zijn, met geheimen als ``***``."""
+    uit: dict[str, Any] = {}
+    for k, w in values.items():
+        regel = IX_PREVIEWREGELS.get(k, WAARDE) if standaard else WAARDE
+        if regel == NAMEN:
+            uit[k] = [str(e.get("name")) for e in _lijst(w) if isinstance(e, Mapping) and e.get("name")]
+        elif regel == GEWEIGERD:
+            uit[k] = {"geweigerd": "eigen_opdracht"}  # komt niet voor: het voorstel wordt al geweigerd
+        else:
+            uit[str(k)] = _toon(w)
+    return uit
 
 
 def _install(target: Mapping[str, Any], parameters: Mapping[str, Any]) -> dict[str, Any]:
@@ -86,6 +187,7 @@ def _install(target: Mapping[str, Any], parameters: Mapping[str, Any]) -> dict[s
         },
         "reden_catalogusapp": manifest.get("install_reason"),
         "controles_na_installatie": _lijst(manifest.get("post_install_checks")),
+        "waarden": _waarden(standaard, values),
     }
 
 

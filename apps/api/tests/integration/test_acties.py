@@ -427,9 +427,12 @@ def test_objectvormen_in_catalogusapp_waarden_worden_geweigerd_en_niet_bewaard(s
     }
     r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", goed))
     assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    # Een eigen opdracht van de standaard Custom App doorstaat het beleid, maar de Hub weigert hem tot een
+    # installatiescherm hem veilig kan tonen (S-P2-040, R-VEILIG-1, besluit regisseur optie C; ADR-0030 besluit 32).
     opdracht = install_params("demo", command=["java", "-cp", "/app/lib/*:/app/classes", "nl.Main"])
     r = stel_voor(admin, "app.install", app_target("demo"), opdracht)
-    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    assert r.json()["details"] == {"reden": "eigen_opdracht", "velden": ["command"]}, r.text
     assert schrijfaanroepen(stack.nas) == []
 
 
@@ -702,3 +705,148 @@ def test_open_goedkeuring_gaat_altijd_voor_ook_in_dezelfde_seconde(stack: Stack)
         for _ in range(3):
             assert huidige_goedkeuring(db, req).id == open_.id
         db.rollback()
+
+
+# ---------------------------------------------------------------------- S-P2-040 herstel: preview en noodstop
+# Per veld van het formulier van de standaard Custom App (``IX_VALUES_KEYS``) een waarde die het beleid toelaat, anders
+# dan de standaardwaarde van ``install_params`` (R-VEILIG-1). Een nieuw veld zonder proefwaarde maakt de test rood.
+IX_PROEFWAARDEN: dict[str, Any] = {
+    "notes": "notitie bij de app",
+    "image": {"repository": "ghcr.io/voorbeeld/demo-app", "tag": f"1.2.3@{DIGEST}", "pull_policy": "always"},
+    "hostname": "proef-hostnaam",
+    "entrypoint": ["/bin/start"],
+    "command": ["--modus", "proef"],
+    "TZ": "Europe/Amsterdam",
+    "envs": [{"name": "PROEF_MODUS", "value": "waarde-blijft-verborgen-731"}],
+    "restart_policy": "on-failure",
+    "max_retry_count": 3,
+    "disable_builtin_healthcheck": True,
+    "tty": True,
+    "stdin": True,
+    "devices": [],
+    "privileged": False,
+    "capabilities": {"add": []},
+    "run_as_custom_user": True,
+    "run_as": {"user": 568, "group": 568},
+    "host_network": False,
+    "ports": [{"bind_mode": "published", "port_number": 30556, "container_port": 9090, "protocol": "udp"}],
+    "networks": [],
+    "dns_config": {"nameservers": ["127.0.0.1"], "searches": ["proef.invalid"], "options": []},
+    "portals": [{"name": "Web", "scheme": "http", "port": 30556, "path": "/start"}],
+    "storage": [{"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 256}}],
+    "labels": [{"key": "proef.label", "value": "proefwaarde-label", "containers": ["demo-app"]}],
+    "resources": {"limits": {"cpus": 1, "memory": 512}},
+}
+
+
+def test_elk_veld_van_de_standaard_custom_app_heeft_een_previewregel() -> None:
+    """Bewaking (S-P2-040, R-VEILIG-1): elk veld dat het beleid in de waarden van de standaard Custom App toelaat, heeft
+    een vaste regel voor de preview. Komt er in ``IX_VALUES_KEYS`` een veld bij zonder regel (of zonder proefwaarde
+    hieronder), dan is deze test rood: een veld dat naar TrueNAS gaat maar niet in de preview staat, keurt een beheerder
+    ongezien goed."""
+    from asm_policy.params import IX_VALUES_KEYS
+
+    from hub.actions.preview import IX_PREVIEWREGELS
+
+    assert set(IX_PREVIEWREGELS) == set(IX_VALUES_KEYS)
+    assert set(IX_PROEFWAARDEN) == set(IX_VALUES_KEYS)
+    assert set(IX_PREVIEWREGELS.values()) <= {"waarde", "namen", "geweigerd"}
+    # Besluit regisseur (optie C): alleen command en entrypoint worden geweigerd; alleen bij envs blijft de waarde weg.
+    assert {k for k, regel in IX_PREVIEWREGELS.items() if regel == "geweigerd"} == {"command", "entrypoint"}
+    assert {k for k, regel in IX_PREVIEWREGELS.items() if regel == "namen"} == {"envs"}
+
+
+def test_preview_van_een_installatie_toont_elk_gezet_veld(stack: Stack) -> None:
+    """S-P2-040, R-VEILIG-1 (blokkerend): per toegelaten veld van de standaard Custom App een voorstel; het veld staat
+    met zijn waarde in ``preview.wijziging.waarden`` (bij ``envs`` alleen de namen; ADR-0030 besluit 28). ``command``
+    en ``entrypoint`` weigert de Hub met ``501 capability_unavailable`` (besluit regisseur, optie C): niets
+    voorgesteld."""
+    from asm_policy.params import IX_VALUES_KEYS
+
+    admin = stack.admin
+    for sleutel in sorted(IX_VALUES_KEYS):
+        waarde = IX_PROEFWAARDEN[sleutel]
+        extra = {sleutel: waarde}
+        if sleutel == "run_as_custom_user":
+            extra["run_as"] = IX_PROEFWAARDEN["run_as"]  # het beleid eist dan een gewone uid/gid
+        key, r = _voorstel(admin, "app.install", app_target("demo-app"), install_params("demo-app", **extra))
+        if sleutel in ("command", "entrypoint"):
+            assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", (sleutel, r.text)
+            assert r.json()["details"] == {"reden": "eigen_opdracht", "velden": [sleutel]}, (sleutel, r.text)
+            assert admin.get(f"/api/v1/actions/{key}").status_code == 404  # niets voorgesteld of bewaard
+            continue
+        assert r.status_code == 201, (sleutel, r.text)
+        waarden = r.json()["preview"]["wijziging"]["waarden"]
+        if sleutel == "envs":
+            assert waarden["envs"] == ["PROEF_MODUS"], waarden
+            assert "waarde-blijft-verborgen-731" not in r.text
+        else:
+            assert waarden[sleutel] == waarde, (sleutel, waarden)
+        assert waarden == haal(admin, key)["preview"]["wijziging"]["waarden"]
+    assert schrijfaanroepen(stack.nas) == []
+
+
+def test_preview_van_een_catalogusapp_toont_de_eigen_waarden(stack: Stack) -> None:
+    """S-P2-040, R-VEILIG-1: ook de eigen waarden van een catalogusapp staan in de preview, met hun waarde. Alleen een
+    geheim (een waarde onder een geheim-achtige sleutel, of naast een geheim-achtige naam in een paar name/value) staat
+    er als ``***``, zoals overal in de API-uitvoer van de Hub (``hub.redact``)."""
+    values = {
+        "app": {"tz": "Europe/Amsterdam", "web_port": 30200, "beheerwachtwoord": "proefgeheim-catalogus-812"},
+        "additional_envs": [
+            {"name": "GEHEIME_SLEUTEL", "value": "proefgeheim-env-813"},
+            {"name": "MODUS", "value": "zichtbaar"},
+        ],
+        "notes": "notitie bij de catalogusapp",
+    }
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    waarden = r.json()["preview"]["wijziging"]["waarden"]
+    assert waarden == {
+        "app": {"tz": "Europe/Amsterdam", "web_port": 30200, "beheerwachtwoord": "***"},
+        "additional_envs": [{"name": "GEHEIME_SLEUTEL", "value": "***"}, {"name": "MODUS", "value": "zichtbaar"}],
+        "notes": "notitie bij de catalogusapp",
+    }, waarden
+    assert "proefgeheim" not in r.text and "proefgeheim" not in stack.admin.get("/api/v1/actions").text
+
+
+def test_open_voorstel_met_eigen_opdracht_van_voor_het_herstel_wordt_geweigerd(stack: Stack) -> None:
+    """S-P2-040, R-VEILIG-1 (optie C): een voorstel dat vóór dit herstel met ``command`` is gemaakt, toonde die opdracht
+    niet in de preview. Goedkeuren kan dan niet meer: ``501 capability_unavailable``, status ``geweigerd``, en de vrije
+    tekst staat daarna niet meer in de database van de Hub (ADR-0030 besluit 28)."""
+    admin = stack.admin
+    r = stel_voor(admin, "app.install", app_target("demo"), install_params("demo"))
+    assert r.status_code == 201 and r.json()["status"] == "wacht_op_goedkeuring", r.text
+    v = r.json()
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(v["request_id"]))
+        params = copy.deepcopy(rij.parameters)
+        params["app_create"]["values"]["command"] = ["--wachtwoord", "oud-geheim-cmd-904"]
+        rij.parameters = params
+        db.commit()
+    r = keur_goed(admin, v)
+    assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
+    assert r.json()["details"]["reden"] == "eigen_opdracht" and r.json()["details"]["velden"] == ["command"], r.text
+    nu = haal(admin, v)
+    assert nu["status"] == "geweigerd" and nu["goedkeuring"] is None, nu
+    with stack.app.state.sessionmaker() as db:
+        values = db.get(ActionRequest, uuid.UUID(v["request_id"])).parameters["app_create"]["values"]
+    assert "command" not in values and values["vrije_tekst_gewist"] == ["command"], values
+    assert schrijfaanroepen(stack.nas) == []
+
+
+def test_herhaalde_noodstop_met_dezelfde_sleutel_zet_de_stand_echt(stack: Stack) -> None:
+    """S-P2-040, R-VEILIG-4: aan, uit, en dan hetzelfde aan-verzoek nog eens (zelfde Idempotency-Key): de noodstop
+    staat daarna echt aan, en het antwoord zegt dat ook. Dezelfde sleutel voor een ander verzoek blijft 422."""
+    admin = stack.admin
+    aan = idem()
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "onderhoud"}, headers=aan)
+    assert r.status_code == 200 and r.json()["actief"] is True, r.text
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": False}, headers=idem())
+    assert r.status_code == 200 and r.json()["actief"] is False, r.text
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "onderhoud"}, headers=aan)
+    assert r.status_code == 200 and r.json()["actief"] is True, r.text
+    assert admin.get("/api/v1/actions/noodstop").json()["actief"] is True
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": False}, headers=aan)
+    assert r.status_code == 422 and r.json()["code"] == "idempotency_key_reused", r.text
+    assert admin.get("/api/v1/actions/noodstop").json()["actief"] is True
+    assert audit_acties(stack.app).count("action.emergency_stop.enabled") == 2

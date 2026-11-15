@@ -34,6 +34,11 @@ op het moment van de preview:
 
 De app-configuratie telt bewust niet mee: die kan geheimen bevatten en de Hub leest hem nooit.
 
+Bij `app.install` toont de preview van de Hub elk gezet veld van `app_create.values` met zijn waarde (van `envs`
+alleen de namen, een geheim als `***`). Een voorstel met `command` of `entrypoint` in die waarden weigert de Hub met
+`501 capability_unavailable` (`details.reden` = `eigen_opdracht`) tot een installatiescherm ze veilig kan tonen
+(ADR-0030 besluit 32).
+
 ## Approval
 
 ```json
@@ -135,6 +140,13 @@ De stop is duurzaam (S-P2-030, herstel R-VEILIG-1 en R-VEILIG-2):
   meer als stop.
 
 Te diep geneste JSON in de body geeft `422 validation_error`, net als andere ongeldige JSON.
+
+Wat de Hub van dit antwoord overneemt (ADR-0030 besluit 32): `uitgevoerd` alleen met `methode`, `before_hash`,
+`after_hash`, `uitgevoerd_op` en een `policy_hash` gelijk aan die van de Hub, in de juiste vorm; anders is de uitkomst
+voor de Hub onbekend (`502 uitkomst_onbekend`, `reden` `executor_bewijs_onvolledig`). Verder alleen velden uit een vaste
+lijst, elk met een vaste vorm en grootte; `details.reden` alleen als code (`[A-Za-z][A-Za-z0-9_]*`, eventueel met
+` [FOUTNAAM]`), anders `onbekende_reden`; `details.gestopt` alleen als ja/nee. Een weigering met een code buiten
+`[a-z][a-z0-9_]*` telt als een onbruikbaar antwoord.
 
 `GET /api/v1/executions/{request_id}` (dienst-JWT van de Hub) geeft `{request_id, uitvoeringen, gestopt}` uit het
 journaal. Elke uitvoering heeft `action_id`, `target`, `methode`, `status` (`gestart`, `uitgevoerd`, `mislukt` of

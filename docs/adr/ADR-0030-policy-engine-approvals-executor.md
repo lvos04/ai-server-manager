@@ -538,8 +538,54 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     `action_id` geeft `403 actie_niet_toegestaan`, een verboden patroon `403 actie_geweigerd`, een gereserveerde actie
     `501`; alleen een parameter of doel buiten het schema geeft `422 parameters_ongeldig`. Contract §8 zegt alleen
     "geweigerd". Dat blijft zo (besluit regisseur, S-P2-040); in alle gevallen wordt er niets uitgevoerd.
+32. **Herstel na de review van S-P2-040 (aanvulling 2026-11-15; besluiten regisseur).** Alles Sim-getest; NIET
+    GEVALIDEERD (echte NAS).
+    - *Preview van een installatie toont elk gezet veld (R-VEILIG-1).* `wijziging.waarden` toont elk veld van
+      `app_create.values` mét zijn waarde, volgens een vaste regel per veld van de standaard Custom App
+      (`IX_PREVIEWREGELS` in `apps/api/src/hub/actions/preview.py`; een bewakingstest eist een regel voor elk veld
+      van `IX_VALUES_KEYS`). Van `envs` alleen de namen (besluit 28). Een geheim (een waarde onder een
+      geheim-achtige sleutel, of de `value` naast een geheim-achtige `name` of `key`) staat er als `***`, zoals
+      overal in de API-uitvoer (`hub.redact`). Ook de eigen waarden van een catalogusapp staan er zo in. `labels` en
+      `notes` staan er met waarde in zolang het voorstel open is; na afloop wist de Hub ze ook uit de bewaarde
+      preview (`{"waarde_gewist": true}`), zoals uit de parameters (besluit 28); de `preview_hash` blijft de hash
+      van wat is voorgesteld en goedgekeurd. Restpunt: een antwoord met die waarden bewaart de idempotentie-opslag
+      hooguit een dag (de worker ruimt het daarna op).
+    - *Eigen opdracht: optie C.* Een voorstel met `command` of `entrypoint` in de waarden van een installatie weigert
+      de Hub met `501 capability_unavailable` (`details.reden` = `eigen_opdracht`, `details.velden`); er wordt niets
+      voorgesteld of bewaard. Een open voorstel van vóór dit herstel met zo'n opdracht wordt bij goedkeuren of
+      uitvoeren geweigerd (status `geweigerd`, vrije tekst gewist). Het beleid (`asm_policy`, `policy_hash`) is niet
+      gewijzigd. Vervolgpunt: zie de open punten.
+    - *"Uitgevoerd" alleen met bewijs (R-VEILIG-2).* De Hub legt `uitgevoerd` alleen vast als het antwoord
+      `methode`, `before_hash`, `after_hash`, `uitgevoerd_op` en `policy_hash` (gelijk aan het eigen beleid) in de
+      juiste vorm heeft. Anders is het een onduidelijk antwoord: `502 uitkomst_onbekend` (`reden`
+      `executor_bewijs_onvolledig`), status `onbekend`, een incident `actie.uitkomst_onbekend`, en een open incident
+      `actie.afwijking` blijft open. Bij ophelderen telt een journaalrij `uitgevoerd` alleen als hij van dit verzoek
+      en deze actie is en `methode`, `before_hash`, `after_hash` en een einde in de juiste vorm heeft; anders blijft
+      de uitkomst onbekend. Het journaal heeft geen `policy_hash`: de executor controleert die zelf vóór hij iets
+      uitvoert.
+    - *Witte lijst voor het antwoord van de executor (R-VEILIG-3).* Resultaat, audit, event en foutantwoord nemen van
+      de executor alleen velden uit een vaste lijst over, elk met een vaste vorm en grootte (`_van_executor` in
+      `service.py`): `reden`, `afwijkingen`, `methode`, `before_hash`, `after_hash` en `gestopt`, bij een weigering
+      `reden`, `fouten`, `blokkades`, `gewijzigd`, `eigen_risk_class`, `methoden`, `sinds` en `request_id` (genest
+      onder `executor`). De eigen velden van de Hub (`code`, `request_id`, `doel`, `uitkomst`, `action_id`,
+      `risk_class`) zet de Hub zelf; ze zijn niet te overschrijven. `reden` is altijd een code met een vast
+      tekenpatroon (zoals `staat_verschilt` of `job_mislukt [FAILED]`), anders `onbekende_reden`; `gestopt` gaat
+      alleen mee als echte ja/nee. Een object of lijst mag hooguit 8192 tekens JSON zijn en geen stuurtekens bevatten
+      (anders `null`); de melding hooguit 500 tekens (anders `null`). Een weigering met een code buiten het vaste patroon is
+      geen bruikbaar antwoord: uitkomst onbekend. Zo komen vrije tekst, een NUL-teken (eerder HTTP 500) en een
+      reusachtig antwoord nergens meer terecht.
+    - *Noodstop (R-VEILIG-4).* `PUT /api/v1/actions/noodstop` zet de stand altijd echt, ook bij een herhaling met
+      dezelfde `Idempotency-Key`, en geeft de werkelijke stand terug (geen bewaard antwoord van toen). Dezelfde
+      sleutel voor een ander verzoek blijft `422 idempotency_key_reused`.
+    - *Incident (R-TECH).* De titel van `actie.afwijking` zegt "executor gestopt" alleen als het event `gestopt` echt
+      `true` heeft; bij `false` of zonder `gestopt` zegt de samenvatting dat ook.
 
 ## Open punten
+
+- **Eigen opdracht bij een installatie (S-P2-040, besluit regisseur optie C; besluit 32).** De Hub weigert `command`
+  en `entrypoint` tot er een installatiescherm is dat ze veilig kan tonen (UI-stappen S-P2-170 en S-P2-180). Daar
+  opnieuw besluiten hoe: de inhoud tonen (en na afloop wissen) of alleen "gezet", lengte en SHA-256. Tot dan kan een
+  installatie met een eigen opdracht niet via de Hub.
 
 - **Hub stuurt op `ready_for_install` en `conflicts.status` van de appstore-preview (R-VEILIG-11 uit S-P2-520).**
   De Hub roept de preview van appstore-en-fork nu nergens aan. Doorgeschoven naar de stappen waarin die aanroep

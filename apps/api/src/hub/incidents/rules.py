@@ -306,21 +306,32 @@ def _hub(ev: EventIn) -> Signaal | None:
                 samenvatting="De toestand na de uitvoering klopt met de verwachting (readback door de executor).",
             )
         if uitkomst == "afwijking":
+            # "executor gestopt" alleen als de executor dat zelf meldde (``gestopt`` is echt true; S-P2-040). Na
+            # ophelderen kan de executor al zijn vrijgegeven (false), of hij meldde niets.
+            gestopt = p.get("gestopt")
+            titel = f"Afwijking na {actie} op {doel}"
+            if gestopt is True:
+                titel += ": executor gestopt"
+                vervolg = (
+                    "De executor voert niets meer uit tot een beheerder hem op de statuspagina van de executor "
+                    "vrijgeeft."
+                )
+            elif gestopt is False:
+                vervolg = "De executor meldde dat hij niet (meer) gestopt is."
+            else:
+                vervolg = "Of de executor gestopt is, meldde hij niet; zijn statuspagina toont de stand."
             return Signaal(
                 "probleem",
                 "actie.afwijking",
                 f"{APP_ID}:actie_afwijking:{doel}",
-                f"Afwijking na {actie} op {doel}: executor gestopt",
+                titel,
                 "kritiek",
                 "hub:acties",
                 "action_target",
                 eid,
                 doel,
                 meldt_elke_keer=True,
-                samenvatting=(
-                    "De toestand na de uitvoering wijkt af van de verwachting of is onbekend. De executor voert niets "
-                    "meer uit tot een beheerder hem op de statuspagina van de executor vrijgeeft."
-                ),
+                samenvatting=f"De toestand na de uitvoering wijkt af van de verwachting of is onbekend. {vervolg}",
                 details=_safe_details(ev, ("request_id", "action_id", "doel", "risk_class", "reden", "gestopt")),
             )
         if uitkomst == "onbekend":
