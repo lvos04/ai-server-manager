@@ -344,6 +344,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if settings.secrets_dir.exists():
+            # Bij het starten: een onafgemaakte uitvoering (rij "gestart" zonder einde, het proces viel weg na de
+            # schrijfaanroep) of een afwijking zonder vrijgave zet de executor op gestopt (R-VEILIG-1/-2, S-P2-030).
+            # Een onleesbaar journaal telt elders al als gestopt.
+            with contextlib.suppress(JournalUnavailable):
+                if (bij_start := journal.stopped()) is not None:
+                    log.warning("executor gestopt bij het starten: code=%s", bij_start.get("code"))
             resume_after_restart(store)
             link = store.read()
             if link.get("state") == "gekoppeld" and not link.get("confirmed_at"):
@@ -712,7 +718,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return _finish(claims, *missing)
         try:
             body = json.loads(await request.body())
-        except ValueError:
+        except (ValueError, RecursionError):  # ook te diep geneste JSON: 422, nooit een 500 (R-VEILIG-3, S-P2-030)
             body = None
         if not isinstance(body, dict):
             return _finish(

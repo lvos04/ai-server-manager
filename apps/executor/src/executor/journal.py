@@ -5,10 +5,23 @@
 - ``journal``: per uitvoering de before/after-hash, de methode en de uitkomst.
 - ``app_values``: de vorige waarden van een Custom App (uit ``app.config``), **versleuteld** met ``vault.key``, zodat
   ``app.rollback`` ze kan terugzetten. De Hub ziet ze nooit.
-- ``state``: de toestand "gestopt" na een afwijking; blijft staan over een herstart.
+- ``state``: de toestand "gestopt" na een afwijking; blijft staan over een herstart. Daarnaast ``vrijgegeven_tot``: de
+  hoogste journaalrij op het moment van de laatste vrijgave.
 
 Vastleggen en vergelijken gebeuren in één transactie (``BEGIN IMMEDIATE``). Is de opslag niet bruikbaar, dan
 ``JournalUnavailable``: de executor voert dan niets uit (fail-closed).
+
+De stop is duurzaam (S-P2-030, R-VEILIG-1 en R-VEILIG-2; ADR-0030 besluit 14):
+
+- de stop en het einde van de journaalrij staan in **één** transactie (de stop eerst);
+- lukt dat vastleggen niet, dan houdt dit object de stop **in het geheugen** en legt hem vast zodra het journaal weer
+  werkt;
+- :meth:`Journal.stopped` telt ook als gestopt: een rij ``gestart`` zonder einde die door geen lopende uitvoering van
+  dit proces wordt vastgehouden (het proces viel weg na de schrijfaanroep: uitkomst onbekend), en een rij
+  ``afwijking`` van na de laatste vrijgave. Zo'n rij krijgt dan alsnog een stop (en een rij ``gestart`` het einde
+  ``afwijking`` met ``uitkomst_onbekend``). Dit gebeurt bij het starten en vóór elke uitvoering.
+
+Een stop raakt nooit een app: alleen de executor weigert verdere acties tot de vrijgave op de executorpagina.
 """
 
 from __future__ import annotations
@@ -17,8 +30,10 @@ import contextlib
 import json
 import os
 import sqlite3
+import threading
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,10 +58,24 @@ class JournalUnavailable(Exception):
     """Het journaal is niet bruikbaar: niets uitvoeren."""
 
 
+# Uitvoeringen die nu in dit proces lopen, per journaalbestand: (pad, nonce). Een rij ``gestart`` daarvan is geen
+# onafgemaakte uitvoering. Een rij ``gestart`` die hier niet in staat, is van een proces dat wegviel (één proces per
+# datamap: ``python -m executor api`` start één uvicorn-proces).
+_LOPEND: set[tuple[str, str]] = set()
+_LOPEND_SLOT = threading.Lock()
+
+
+def _nu_iso() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 class Journal:
     def __init__(self, path: Path, secrets_dir: Path) -> None:
         self.path = path
         self.vault = Vault(secrets_dir)
+        self._sleutel = os.path.abspath(path)
+        # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
+        self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
 
     @contextlib.contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -94,6 +123,31 @@ class Journal:
         )
 
     # ------------------------------------------------------------------ journaal
+    @contextlib.contextmanager
+    def lopend(self, nonce: str) -> Iterator[None]:
+        """Markeer de uitvoering met deze nonce als lopend in dit proces (vóór :meth:`begin`, tot na het einde)."""
+        sleutel = (self._sleutel, nonce)
+        with _LOPEND_SLOT:
+            _LOPEND.add(sleutel)
+        try:
+            yield
+        finally:
+            with _LOPEND_SLOT:
+                _LOPEND.discard(sleutel)
+
+    def _lopende_nonces(self) -> set[str]:
+        with _LOPEND_SLOT:
+            return {n for pad, n in _LOPEND if pad == self._sleutel}
+
+    def bezet(self) -> bool:
+        """Of een andere instantie in dit proces nu een uitvoering op dit journaal heeft lopen."""
+        lopend = self._lopende_nonces()
+        if not lopend:
+            return False
+        with self._connect() as conn:
+            rows = conn.execute("SELECT nonce FROM journal WHERE status = 'gestart'").fetchall()
+        return any(r[0] in lopend for r in rows)
+
     def begin(
         self, *, request_id: str, nonce: str, action_id: str, target: dict[str, Any], methode: str, before_hash: str
     ) -> None:
@@ -168,9 +222,9 @@ class Journal:
         return str(row[0]), values if isinstance(values, dict) else {}
 
     # ------------------------------------------------------------------ gestopt na een afwijking
-    def stopped(self) -> dict[str, Any] | None:
-        with self._connect() as conn:
-            row = conn.execute("SELECT value FROM state WHERE key = 'gestopt'").fetchone()
+    @staticmethod
+    def _lees_stop(conn: sqlite3.Connection) -> dict[str, Any] | None:
+        row = conn.execute("SELECT value FROM state WHERE key = 'gestopt'").fetchone()
         if row is None:
             return None
         try:
@@ -179,12 +233,116 @@ class Journal:
             return {"code": "onbekend"}
         return value if isinstance(value, dict) else {"code": "onbekend"}
 
-    def stop(self, reason: dict[str, Any]) -> None:
-        with self._connect() as conn:
+    @staticmethod
+    def _zet_stop(
+        conn: sqlite3.Connection, reason: dict[str, Any], nonce: str | None, after_hash: str | None, detail: str
+    ) -> None:
+        """Binnen een lopende transactie: eerst de stop, dan het einde van de rij (``afwijking``)."""
+        conn.execute(
+            "INSERT OR REPLACE INTO state (key, value) VALUES ('gestopt', ?)", (json.dumps(reason, sort_keys=True),)
+        )
+        if nonce is not None:
             conn.execute(
-                "INSERT OR REPLACE INTO state (key, value) VALUES ('gestopt', ?)", (json.dumps(reason, sort_keys=True),)
+                "UPDATE journal SET status = 'afwijking', after_hash = ?, detail = ?, finished_at = ? WHERE nonce = ?",
+                (after_hash, detail[:1000], int(time.time()), nonce),
             )
 
-    def release(self) -> bool:
+    def stopped(self) -> dict[str, Any] | None:
+        """De stop, of ``None``. Legt in dezelfde transactie vast wat als gestopt telt maar nog niet vastlag: een stop
+        uit het geheugen, een onafgemaakte rij ``gestart`` (uitkomst onbekend) en een ``afwijking`` van na de laatste
+        vrijgave (zie de kop van dit bestand)."""
+        geheugen = self._stop_in_geheugen
+        lopend = self._lopende_nonces()
         with self._connect() as conn:
-            return conn.execute("DELETE FROM state WHERE key = 'gestopt'").rowcount > 0
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                stop = self._lees_stop(conn)
+                if geheugen is not None:
+                    reden, nonce, after_hash, detail = geheugen
+                    if stop is None:
+                        self._zet_stop(conn, reden, nonce, after_hash, detail)
+                        stop = reden
+                    elif nonce is not None:
+                        self._zet_stop(conn, stop, nonce, after_hash, detail)
+                wees = [
+                    (str(r[0]), str(r[1]), str(r[2]))
+                    for r in conn.execute(
+                        "SELECT nonce, request_id, action_id FROM journal WHERE status = 'gestart' ORDER BY rowid"
+                    ).fetchall()
+                    if r[0] not in lopend
+                ]
+                if wees:
+                    nonce, request_id, action_id = wees[0]
+                    reden = stop or {
+                        "code": "uitkomst_onbekend",
+                        "request_id": request_id,
+                        "action_id": action_id,
+                        "at": _nu_iso(),
+                    }
+                    for n, _r, _a in wees:
+                        self._zet_stop(conn, reden, n, None, "uitkomst_onbekend")
+                    stop = reden
+                if stop is None:
+                    grens_rij = conn.execute("SELECT value FROM state WHERE key = 'vrijgegeven_tot'").fetchone()
+                    try:
+                        grens = int(grens_rij[0]) if grens_rij is not None else 0
+                    except ValueError:
+                        grens = 0
+                    afw = conn.execute(
+                        "SELECT request_id, action_id, detail FROM journal WHERE status = 'afwijking' AND rowid > ?"
+                        " ORDER BY rowid LIMIT 1",
+                        (grens,),
+                    ).fetchone()
+                    if afw is not None:
+                        stop = {
+                            "code": str(afw[2] or "afwijking"),
+                            "request_id": str(afw[0]),
+                            "action_id": str(afw[1]),
+                            "at": _nu_iso(),
+                        }
+                        self._zet_stop(conn, stop, None, None, "")
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        if geheugen is not None and self._stop_in_geheugen is geheugen:
+            self._stop_in_geheugen = None
+        return stop
+
+    def stop(
+        self, reason: dict[str, Any], *, nonce: str | None = None, after_hash: str | None = None, detail: str = ""
+    ) -> None:
+        """Stop vastleggen; met ``nonce`` in dezelfde transactie ook het einde van die rij (``afwijking``)."""
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                self._zet_stop(conn, reason, nonce, after_hash, detail)
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+
+    def stop_in_geheugen(
+        self, reason: dict[str, Any], *, nonce: str | None = None, after_hash: str | None = None, detail: str = ""
+    ) -> None:
+        """De stop kon niet worden vastgelegd: houd hem vast tot :meth:`stopped` hem kan vastleggen (R-VEILIG-1)."""
+        self._stop_in_geheugen = (dict(reason), nonce, after_hash, detail)
+
+    def release(self) -> bool:
+        """Vrijgeven: de stop weg en de grens ``vrijgegeven_tot`` op de hoogste journaalrij, in één transactie."""
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                weg = conn.execute("DELETE FROM state WHERE key = 'gestopt'").rowcount > 0
+                if weg:
+                    grens = conn.execute("SELECT COALESCE(MAX(rowid), 0) FROM journal").fetchone()[0]
+                    conn.execute(
+                        "INSERT OR REPLACE INTO state (key, value) VALUES ('vrijgegeven_tot', ?)", (str(int(grens)),)
+                    )
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        if weg:
+            self._stop_in_geheugen = None
+        return weg

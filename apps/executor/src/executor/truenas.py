@@ -32,6 +32,7 @@ import ipaddress
 import itertools
 import json
 import logging
+import re
 import socket
 import ssl
 import threading
@@ -73,13 +74,21 @@ WS_LOGGER = logging.getLogger("executor.truenas.websockets")
 WS_LOGGER.setLevel(logging.INFO)
 
 
-class NasFout(Exception):
-    """Fout met een stabiele code. ``detail`` is tekst van TrueNAS (nooit een geheim) en gaat alleen het journaal in."""
+# Vorm van een foutnaam van TrueNAS (``EACCES``, ``EFAULT``, ``ENOTAUTHENTICATED``) of een jobstatus (``FAILED``).
+_FOUTNAAM = re.compile(r"[A-Z][A-Z0-9_]{0,39}")
 
-    def __init__(self, code: str, detail: str = "") -> None:
-        super().__init__(f"{code}: {detail}" if detail else code)
+
+class NasFout(Exception):
+    """Fout met een stabiele code. ``errname`` is de foutnaam van TrueNAS (bv. ``EACCES``) of de eindstatus van een job
+    (``FAILED``, ``ABORTED``), alleen als die de vorm van een foutnaam heeft. ``detail`` is vrije tekst van TrueNAS: die
+    kan waarden uit de aanroep bevatten (bv. een omgevingsvariabele in een validatiefout) en gaat daarom nooit het
+    journaal, een antwoord of een logregel in; ook ``str(fout)`` is alleen de code (R-VEILIG-4, S-P2-030)."""
+
+    def __init__(self, code: str, detail: str = "", *, errname: str = "") -> None:
+        super().__init__(code)
         self.code = code
         self.detail = detail[:500]
+        self.errname = errname if _FOUTNAAM.fullmatch(errname or "") else ""
 
 
 def _context() -> ssl.SSLContext:
@@ -143,6 +152,9 @@ class NasClient:
         self.allowed = READ_METHODS | allowed
         self.timeout = timeout
         self._ids = itertools.count(1)
+        # Wordt waar zodra een methode buiten de leesmethoden wordt verstuurd: vanaf dan kan "er is niets uitgevoerd"
+        # niet meer worden beloofd (S-P2-030, R-VEILIG-2).
+        self.schrijfaanroep_verstuurd = False
         self._ws: ClientConnection | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
@@ -259,6 +271,8 @@ class NasClient:
         mid = next(self._ids)
         limit = timeout or self.timeout
         payload = json.dumps({"jsonrpc": "2.0", "id": mid, "method": method, "params": list(params)})
+        if method not in READ_METHODS:
+            self.schrijfaanroep_verstuurd = True
         try:
             msg = self._run(self._exchange(ws, payload, mid, limit), limit + RUN_GRACE_SECONDS)
         except TimeoutError:
@@ -273,7 +287,7 @@ class NasClient:
             naam = str(data.get("errname") or "")
             reden = str(data.get("reason") or (err.get("message") if isinstance(err, dict) else "") or "")
             code = "truenas_geen_toegang" if naam in ("EACCES", "EPERM", "ENOTAUTHENTICATED") else "truenas_fout"
-            raise NasFout(code, f"{method}: [{naam}] {reden}" if naam else f"{method}: {reden}")
+            raise NasFout(code, f"{method}: [{naam}] {reden}" if naam else f"{method}: {reden}", errname=naam)
         return msg.get("result")
 
     def login(self, api_key: str) -> None:
@@ -294,19 +308,31 @@ class NasClient:
 
     def job(self, method: str, *params: Any, timeout: float, poll: float = 1.0) -> Any:
         """Job-methode starten en wachten op het einde (``core.get_jobs``). ``job_mislukt`` bij FAILED/ABORTED,
-        ``job_timeout`` als de job na ``timeout`` seconden nog loopt (de uitkomst is dan onbekend)."""
+        ``job_timeout`` als de job na ``timeout`` seconden nog loopt (de uitkomst is dan onbekend).
+
+        Een fout van de aanroep zelf (TrueNAS weigert, geen job-id) blijft de gewone code. Heeft TrueNAS de aanroep
+        aangenomen (er is een job-id) en faalt daarna het opvragen van de jobstatus (een fout van ``core.get_jobs``, of
+        een antwoord dat geen lijst met jobs is), dan is de uitkomst onbekend: ``job_status_onbekend``, nooit de code
+        van een geweigerde aanroep (S-P2-030, R-TECH-1; ADR-0030 besluit 14)."""
         job_id = self.call(method, *params)
         if not isinstance(job_id, int) or isinstance(job_id, bool):
             return job_id  # geen job: het resultaat zelf
         deadline = time.monotonic() + timeout
         while True:
-            rows = self.call("core.get_jobs", [["id", "=", job_id]])
-            job = next((j for j in rows or [] if isinstance(j, dict) and j.get("id") == job_id), None)
-            state = str(job.get("state") or "") if job else ""
+            try:
+                rows = self.call("core.get_jobs", [["id", "=", job_id]])
+                if rows is not None and not isinstance(rows, list):
+                    raise TypeError(type(rows).__name__)
+                job = next((j for j in rows or [] if isinstance(j, dict) and j.get("id") == job_id), None)
+                state = str(job.get("state") or "") if job else ""
+            except NasFout as exc:
+                raise NasFout("job_status_onbekend", f"{method}: {exc.code}", errname=exc.errname) from None
+            except Exception as exc:  # een onverwacht antwoord op core.get_jobs: de uitkomst is onbekend
+                raise NasFout("job_status_onbekend", f"{method}: {type(exc).__name__}") from None
             if state == "SUCCESS" and job is not None:
                 return job.get("result")
             if state in ("FAILED", "ABORTED"):
-                raise NasFout("job_mislukt", f"{method}: {(job or {}).get('error') or state}")
+                raise NasFout("job_mislukt", f"{method}: {(job or {}).get('error') or state}", errname=state)
             if time.monotonic() >= deadline:
                 raise NasFout("job_timeout", method)
             time.sleep(poll)

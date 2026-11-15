@@ -14,7 +14,10 @@ uitgevoerd):
 7. nonce van de goedkeuring (EX20), ETag van het doel (EX19), pools gezond bij een opslagmutatie (EX11);
 8. methode kiezen die deze TrueNAS-versie kent (anders ``capability_unavailable``);
 9. uitvoeren → readback → vergelijken met de verwachting. **Afwijking → de executor stopt** en meldt ``afwijking``;
-   de Hub legt een incident vast.
+   de Hub legt een incident vast. Ná de schrijfaanroep is elke fout die niet aantoonbaar een weigering van TrueNAS is
+   een onbekende uitkomst (ook een fout bij het opvragen van de jobstatus, een onverwachte uitzondering of een
+   journaal dat wegvalt): stop. De stop is duurzaam (``executor.journal``): stop en einde van de rij in één
+   transactie, anders in het geheugen, en een onafgemaakte rij telt bij het starten en vóór elke uitvoering als stop.
 
 Nooit ``custom_compose_config``, nooit een methode buiten het beleid, nooit data verwijderen
 (``app.delete`` met ``remove_ix_volumes: false``).
@@ -22,6 +25,7 @@ Nooit ``custom_compose_config``, nooit een methode buiten het beleid, nooit data
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 import time
@@ -82,6 +86,16 @@ def _weiger(w: Weigering) -> Uitkomst:
 def _nas_fout(exc: NasFout) -> Uitkomst:
     status, melding = NAS_MELDINGEN.get(exc.code, (502, "TrueNAS gaf een fout; er is niets uitgevoerd."))
     return fout(status, exc.code, melding)
+
+
+# Na de schrijfaanroep: deze codes betekenen dat de uitkomst onbekend is (geen aantoonbare weigering van TrueNAS).
+ONBEKENDE_UITKOMST = frozenset({"job_timeout", "job_status_onbekend", "truenas_timeout", "truenas_onbereikbaar"})
+
+
+def journaal_detail(exc: NasFout) -> str:
+    """Wat het journaal over een fout van TrueNAS bewaart: alleen de stabiele code en de foutnaam (``errname`` of de
+    jobstatus), nooit de vrije fouttekst; die kan waarden uit de aanroep bevatten (S-P2-030, R-VEILIG-4)."""
+    return f"{exc.code} [{exc.errname}]" if exc.errname else exc.code
 
 
 def hercontrole_herstelwaarden(policy: Policy, naam: str, waarden: Mapping[str, Any]) -> list[str]:
@@ -432,10 +446,19 @@ class Uitvoerder:
         policy = self.policy
         prop, approval, nonce = request["proposal"], request.get("approval"), str(request["nonce"])
         request_id = str(approval["request_id"]) if isinstance(approval, Mapping) else str(prop["idempotency_key"])
+        if self.journal.bezet():
+            # Een andere instantie in dit proces voert op dit journaal nog een actie uit (de nonce blijft bruikbaar).
+            return fout(
+                409,
+                "executor_bezet",
+                "De executor voert al een actie uit; er is niets uitgevoerd. Probeer het zo opnieuw.",
+            )
         if not self.journal.claim_request_nonce(nonce):
             return fout(
                 409, "nonce_al_gebruikt", "Dit uitvoeringsverzoek is al eens aangeboden; er is niets uitgevoerd."
             )
+        # Ook een onafgemaakte uitvoering (rij "gestart" zonder einde) of een afwijking zonder vrijgave telt als stop
+        # (Journal.stopped, R-VEILIG-1 en R-VEILIG-2).
         if (gestopt := self.journal.stopped()) is not None:
             return fout(
                 409,
@@ -605,27 +628,29 @@ class Uitvoerder:
                 str(approval["one_time_nonce"]), str(approval["approval_id"])
             ):
                 return fout(409, "goedkeuring_al_gebruikt", "Deze goedkeuring is al eens gebruikt; keur opnieuw goed.")
-            self.journal.begin(
-                request_id=request_id,
-                nonce=nonce,
-                action_id=actie.action_id,
-                target=dict(prop["target"]),
-                methode=methode,
-                before_hash=doel.hash,
-            )
-            if hercontrole is not None:
-                log.warning(
-                    "%s: terugzetten gaat door met de bewaarde waarden (alleen gemeld): request_id=%s herstel_van=%s "
-                    "overtredingen=%d codes=%s",
-                    HERCONTROLE_WAARSCHUWING,
-                    request_id,
-                    prop["parameters"]["herstel_van"],
-                    hercontrole["overtredingen"],
-                    ",".join(hercontrole["codes"]),
+            # Lopend vanaf vóór de rij "gestart" tot na het einde ervan: zolang telt de rij niet als onafgemaakt.
+            with self.journal.lopend(nonce):
+                self.journal.begin(
+                    request_id=request_id,
+                    nonce=nonce,
+                    action_id=actie.action_id,
+                    target=dict(prop["target"]),
+                    methode=methode,
+                    before_hash=doel.hash,
                 )
-            return self._uitvoeren_en_teruglezen(
-                nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, hercontrole
-            )
+                if hercontrole is not None:
+                    log.warning(
+                        "%s: terugzetten gaat door met de bewaarde waarden (alleen gemeld): request_id=%s "
+                        "herstel_van=%s overtredingen=%d codes=%s",
+                        HERCONTROLE_WAARSCHUWING,
+                        request_id,
+                        prop["parameters"]["herstel_van"],
+                        hercontrole["overtredingen"],
+                        ",".join(hercontrole["codes"]),
+                    )
+                return self._uitvoeren_en_teruglezen(
+                    nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, hercontrole
+                )
         finally:
             nas.close()
 
@@ -633,16 +658,37 @@ class Uitvoerder:
         self, request_id: str, nonce: str, actie: ActieDef, methode: str, doel: Doel, na: Doel | None, code: str,
         afwijkingen: list[dict[str, Any]],
     ) -> Uitkomst:  # fmt: skip
+        """Stop na een afwijking of onbekende uitkomst. Stop en einde van de rij in één transactie (de stop eerst);
+        lukt dat niet, dan blijft de stop in het geheugen tot het journaal weer werkt (R-VEILIG-1). Nooit een
+        uitzondering: ná de schrijfaanroep is dit altijd het antwoord."""
         after = na.hash if na else None
-        self.journal.finish(nonce, status="afwijking", after_hash=after, detail=code)
-        self.journal.stop(
-            {"code": code, "request_id": request_id, "action_id": actie.action_id, "at": iso(datetime.now(UTC))}
-        )
+        # Een journaal dat wegviel ná de aanroep: de uitkomst is niet vastgelegd, dus onbekend. De stop krijgt die code
+        # (de statuspagina toont dan de vrijgave-uitleg; "journaal_niet_beschikbaar" betekent daar "nu onleesbaar").
+        stopcode = "uitkomst_onbekend" if code == "journaal_niet_beschikbaar" else code
+        reden = {
+            "code": stopcode,
+            "request_id": request_id,
+            "action_id": actie.action_id,
+            "at": iso(datetime.now(UTC)),
+        }
+        try:
+            self.journal.stop(reden, nonce=nonce, after_hash=after, detail=code)
+        except JournalUnavailable:
+            self.journal.stop_in_geheugen(reden, nonce=nonce, after_hash=after, detail=code)
+        if code == "journaal_niet_beschikbaar":
+            melding = (
+                "De actie is naar TrueNAS gestuurd, maar het journaal van de executor is niet beschikbaar: de uitkomst "
+                "is niet vastgelegd. De executor is gestopt en voert niets meer uit tot een beheerder hem vrijgeeft."
+            )
+        else:
+            melding = (
+                "De toestand na de uitvoering wijkt af van de verwachting of is onbekend. De executor is gestopt en "
+                "voert niets meer uit tot een beheerder hem vrijgeeft."
+            )
         return fout(
             409,
             "afwijking",
-            "De toestand na de uitvoering wijkt af van de verwachting of is onbekend. De executor is gestopt en voert "
-            "niets meer uit tot een beheerder hem vrijgeeft.",
+            melding,
             {
                 "reden": code,
                 "afwijkingen": afwijkingen,
@@ -673,28 +719,27 @@ class Uitvoerder:
             self._voer_uit(nas, methode, actie, prop, doel, request_id)
         except NasFout as exc:
             mislukt = exc
+        except Exception as exc:
+            if not nas.schrijfaanroep_verstuurd:
+                # Vóór de schrijfaanroep (bv. het journaal of vault.key bij het bewaren van de vorige waarden): er is
+                # niets uitgevoerd. De rij krijgt een einde, zodat hij niet als onafgemaakte uitvoering telt.
+                with contextlib.suppress(JournalUnavailable):
+                    self.journal.finish(nonce, status="mislukt", after_hash=doel.hash, detail=type(exc).__name__)
+                raise
+            # Ná de schrijfaanroep is elke onverwachte fout een onbekende uitkomst (R-VEILIG-2).
+            log.warning("uitkomst onbekend na de schrijfaanroep: request_id=%s fout=%s", request_id, type(exc).__name__)
+            return self._stop(request_id, nonce, actie, methode, doel, None, "uitkomst_onbekend", [])
         try:
             return self._teruglezen(
                 nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, mislukt, hercontrole
             )
         except JournalUnavailable:
-            # Na de aanroep bij TrueNAS kan "er is niets uitgevoerd" niet meer worden beloofd.
-            return fout(
-                409,
-                "afwijking",
-                "De actie is naar TrueNAS gestuurd, maar het journaal van de executor is niet beschikbaar: de uitkomst "
-                "is niet vastgelegd. De executor voert niets meer uit tot het journaal weer werkt.",
-                {
-                    "reden": "journaal_niet_beschikbaar",
-                    "afwijkingen": [],
-                    "request_id": request_id,
-                    "action_id": actie.action_id,
-                    "methode": methode,
-                    "before_hash": doel.hash,
-                    "after_hash": None,
-                    "gestopt": False,
-                },
-            )
+            # Na de aanroep bij TrueNAS kan "er is niets uitgevoerd" niet meer worden beloofd: stop (in het geheugen
+            # zolang het journaal niet werkt).
+            return self._stop(request_id, nonce, actie, methode, doel, None, "journaal_niet_beschikbaar", [])
+        except Exception as exc:
+            log.warning("uitkomst onbekend na de schrijfaanroep: request_id=%s fout=%s", request_id, type(exc).__name__)
+            return self._stop(request_id, nonce, actie, methode, doel, None, "uitkomst_onbekend", [])
 
     def _teruglezen(
         self,
@@ -717,12 +762,14 @@ class Uitvoerder:
                 waarsch: list[str] = []
             else:
                 na, afw, waarsch = self._settle(nas, methods, actie, prop, verwachte_image)
-        except NasFout:
+        except Exception:  # NasFout of een onverwacht antwoord bij het teruglezen: uitkomst onbekend
             return self._stop(request_id, nonce, actie, methode, doel, None, "uitkomst_onbekend", [])
         if mislukt is not None:
-            if mislukt.code in ("job_timeout", "truenas_timeout", "truenas_onbereikbaar") or na.hash != doel.hash:
+            # 502 alleen als TrueNAS de aanroep zelf weigerde of de job FAILED/ABORTED meldde, en het doel aantoonbaar
+            # onveranderd is (R-TECH-1).
+            if mislukt.code in ONBEKENDE_UITKOMST or na.hash != doel.hash:
                 return self._stop(request_id, nonce, actie, methode, doel, na, "uitkomst_onbekend", [])
-            self.journal.finish(nonce, status="mislukt", after_hash=na.hash, detail=f"{mislukt.code}: {mislukt.detail}")
+            self.journal.finish(nonce, status="mislukt", after_hash=na.hash, detail=journaal_detail(mislukt))
             return fout(
                 502,
                 "uitvoering_mislukt",

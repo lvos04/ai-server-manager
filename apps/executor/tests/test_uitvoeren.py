@@ -1360,7 +1360,9 @@ def test_mislukte_job_zonder_wijziging_is_geen_afwijking(stack: Stack) -> None:
     assert d["reden"] == "job_mislukt" and d["before_hash"] == d["after_hash"]
     assert c.get("/api/v1/status").json()["gestopt"] is None
     rij = journaal(c, hub, prop["idempotency_key"])["uitvoeringen"][0]
-    assert rij["status"] == "mislukt" and "image pull mislukt" in rij["detail"]
+    # Alleen de stabiele code en de jobstatus, nooit de vrije fouttekst van TrueNAS (R-VEILIG-4, S-P2-030).
+    assert rij["status"] == "mislukt" and rij["detail"] == "job_mislukt [FAILED]"
+    assert "image pull mislukt" not in str(journaal(c, hub, prop["idempotency_key"]))
     # Niet gestopt: de volgende actie loopt gewoon.
     del nas.fail["app.redeploy"]
     assert execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")).status_code == 200
@@ -1414,6 +1416,7 @@ def test_alleen_lezen_sleutel_kan_niets_uitvoeren(tmp_path: Path, nas: FakeTrueN
 
 # ------------------------------------------------------------------ na een schrijfaanroep nooit "niets uitgevoerd"
 NIETS_UITGEVOERD = "niets uitgevoerd"
+NIET_UITGEVOERD = "niet uitgevoerd"
 
 
 def test_geweigerde_app_update_na_het_lezen_van_de_config_geeft_nooit_503(stack: Stack) -> None:
@@ -1445,29 +1448,34 @@ def test_fout_na_de_schrijfaanroep_belooft_nooit_dat_er_niets_is_uitgevoerd(
     stack: Stack, monkeypatch: pytest.MonkeyPatch, code: str, toegepast: bool
 ) -> None:
     """Elke foutcode die vóór het schrijven "er is niets uitgevoerd" geeft (``NAS_MELDINGEN``, waaronder alle 503's),
-    komt hier pas NA de schrijfaanroep: TrueNAS heeft ``app.stop`` ontvangen (en wel of niet toegepast). Het antwoord
-    is dan nooit 503 en nooit "niets uitgevoerd": 409 ``afwijking`` (executor gestopt) als de uitkomst onbekend is of
-    de toestand veranderde, anders 502 ``uitvoering_mislukt``."""
+    komt hier pas NA de schrijfaanroep: TrueNAS heeft ``app.stop`` aangenomen (er is een job; wel of niet toegepast)
+    en daarna faalt het opvragen van de jobstatus. De uitkomst is dan onbekend: altijd 409 ``afwijking`` met
+    ``uitkomst_onbekend`` en de executor gestopt; nooit 503, nooit 502 en nooit "niets uitgevoerd" of "niet
+    uitgevoerd" (S-P2-030, R-TECH-1; ADR-0030 besluit 14). 502 blijft alleen voor een aanroep die TrueNAS zelf weigert
+    of een job die FAILED/ABORTED meldt (``test_geweigerde_app_update_na_het_lezen_van_de_config_geeft_nooit_503``,
+    ``test_mislukte_job_zonder_wijziging_is_geen_afwijking``)."""
     hub, c, nas = stack
     if not toegepast:
         nas.silent_noop.add("app.stop")
-    echte_job = NasClient.job
+    echte_call = NasClient.call
 
-    def job_dan_fout(self: NasClient, method: str, *params: Any, timeout: float, poll: float = 1.0) -> Any:
-        echte_job(self, method, *params, timeout=timeout, poll=poll)
-        raise NasFout(code, method)
+    def peilen_faalt(self: NasClient, method: str, *params: Any, timeout: float | None = None) -> Any:
+        if method == "core.get_jobs":
+            raise NasFout(code, method)
+        return echte_call(self, method, *params, timeout=timeout)
 
-    monkeypatch.setattr(NasClient, "job", job_dan_fout)
-    r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
-    assert r.status_code != 503 and NIETS_UITGEVOERD not in r.json()["message"], r.text
-    assert "app.stop" in writes(nas)
-    if toegepast or code in ("truenas_onbereikbaar", "truenas_timeout"):
-        assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
-        assert r.json()["details"]["reden"] == "uitkomst_onbekend" and r.json()["details"]["gestopt"] is True
-    else:
-        assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
-        d = r.json()["details"]
-        assert d["reden"] == code and d["before_hash"] == d["after_hash"]
+    monkeypatch.setattr(NasClient, "call", peilen_faalt)
+    req = approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2")
+    r = execute(c, hub, req)
+    melding = r.json()["message"]
+    assert r.status_code != 503 and NIETS_UITGEVOERD not in melding and NIET_UITGEVOERD not in melding, r.text
+    assert "app.stop" in writes(nas) and nas.jobs, "TrueNAS heeft de aanroep aangenomen (er is een job)"
+    assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
+    assert r.json()["details"]["reden"] == "uitkomst_onbekend" and r.json()["details"]["gestopt"] is True
+    assert journaal(c, hub, req["approval"]["request_id"])["uitvoeringen"][0]["status"] == "afwijking"
+    monkeypatch.undo()
+    volgende = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "media-source-optimizer"), risk_class="R1"))
+    assert volgende.status_code == 409 and volgende.json()["code"] == "executor_gestopt", volgende.text
 
 
 def test_ander_certificaat_dan_vastgelegd_de_sleutel_wordt_niet_verstuurd(tmp_path: Path, nas: FakeTrueNAS) -> None:
