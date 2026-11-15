@@ -122,7 +122,14 @@ De stop is duurzaam (S-P2-030, herstel R-VEILIG-1 en R-VEILIG-2):
   zodra het journaal weer werkt; tot dan voert hij niets uit;
 - bij het starten en vóór elke uitvoering telt een journaalrij `gestart` zonder einde (het proces viel weg ná de
   aanroep) als onbekende uitkomst: de rij krijgt `afwijking` met `uitkomst_onbekend` en de executor stopt. Ook een
-  `afwijking` van na de laatste vrijgave zonder vastgelegde stop geeft alsnog de stop;
+  `afwijking` van na de laatste vrijgave zonder vastgelegde stop geeft alsnog de stop. Een uitvoering die op dat
+  moment in dit proces loopt, telt nooit als weggevallen (de lopende uitvoeringen worden binnen dezelfde
+  schrijftransactie gelezen);
+- de statusopvragen (`GET /api/v1/status`, de executorpagina `GET /` en `GET /api/v1/executions/{request_id}`) lezen
+  alleen: ze tonen de vastgelegde stop of de stop in het geheugen en leggen zelf nooit een stop vast;
+- valt het journaal weg vóór de schrijfaanroep (er is aantoonbaar niets naar TrueNAS gestuurd; antwoord `503
+  journaal_niet_beschikbaar`), dan krijgt de rij het einde `mislukt` zodra het journaal weer werkt; dat geeft geen
+  stop;
 - een stop raakt nooit een app: alleen de executor weigert verdere acties. Vrijgeven blijft de bestaande weg ("Sleutel
   vervangen" met de huidige sleutel en een leeg veld "Nieuwe sleutel"); daarmee tellen de rijen tot dat moment niet
   meer als stop.

@@ -4,6 +4,14 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — executor: geen valse stop door statusopvragen (S-P2-030 herstelronde 2; ADR-0030 besluit 14)
+- Een onaangemelde statusopvraag (`GET /api/v1/status` of de executorpagina) tijdens het begin van een uitvoering kon
+  de executor ten onrechte op gestopt zetten (`uitkomst_onbekend`), terwijl de actie slaagde. Nu worden de lopende
+  uitvoeringen binnen de schrijftransactie gelezen, en de statusopvragen lezen alleen: ze leggen nooit een stop vast
+  (R-VEILIG-H1).
+- Valt het journaal weg vóór de schrijfaanroep, dan krijgt de rij het einde `mislukt` zodra het journaal terug is, in
+  plaats van later een stop met "uitkomst onbekend" (R-VEILIG-H2).
+
 ### Gerepareerd — executor: onbekende uitkomst na de schrijfaanroep en een duurzame stop (S-P2-030 herstel; ADR-0030 besluit 14)
 - Faalt het opvragen van de jobstatus nadat TrueNAS de schrijfaanroep heeft aangenomen (er is een job), dan is de
   uitkomst onbekend: `409 afwijking` met `uitkomst_onbekend` en de executor stopt (`job_status_onbekend`), in plaats

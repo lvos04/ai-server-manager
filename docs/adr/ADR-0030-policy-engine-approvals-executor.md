@@ -398,6 +398,14 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     een lopende uitvoering in dit proces is, telt als onafgemaakt. Het journaal (`detail`) bewaart van een fout van
     TrueNAS alleen de stabiele code en de foutnaam of jobstatus, nooit de vrije fouttekst (R-VEILIG-4); te diep
     geneste JSON geeft `422 validation_error` (R-VEILIG-3).
+    Aanvulling 2026-11-15 (S-P2-030, herstelronde 2, R-VEILIG-H1 en R-VEILIG-H2): de lopende uitvoeringen worden binnen
+    de schrijftransactie gelezen die een onafgemaakte rij als stop vastlegt (na `BEGIN IMMEDIATE`); een uitvoering die
+    net begint, telt zo nooit als weggevallen. Die vaststelling gebeurt alleen bij het starten, vóór een uitvoering en
+    bij het vrijgeven. De statusopvragen (`GET /api/v1/status`, `GET /`, `GET /api/v1/executions/{request_id}`) lezen
+    alleen (geen schrijftransactie): een onaangemelde opvraag kan de executor dus niet stilleggen. Valt het journaal
+    weg vóór de schrijfaanroep, dan is er aantoonbaar niets naar TrueNAS gestuurd: de rij krijgt het einde `mislukt`
+    zodra het journaal weer werkt, zonder stop (zolang het proces blijft draaien; na een herstart in die tussentijd telt
+    de rij als onafgemaakt en volgt een stop, dicht bij twijfel).
 15. **Methoden per TrueNAS-versie.** De executor vraagt `core.get_methods` op en kiest de eerste methode uit
     `acties.yaml` die bestaat (bv. `pool.snapshot.create`, anders `zfs.snapshot.create`). Bestaat er geen, dan
     `capability_unavailable`; nooit gesimuleerd succes. Welke versie welke naam kent is niet op een echte NAS
