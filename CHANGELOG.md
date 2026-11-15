@@ -4,6 +4,13 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — executor: na een schrijfaanroep nooit "er is niets uitgevoerd" (S-P2-030; ADR-0030)
+- Tests leggen vast dat een fout ná de schrijfaanroep naar TrueNAS (ook een geweigerde `app.update` nadat
+  `app.config` lukte) nooit `503` met "er is niets uitgevoerd" geeft, maar `502 uitvoering_mislukt` of `409 afwijking`
+  (`apps/executor/tests/test_uitvoeren.py`). ADR-0030 "Open punten": stand van de open punten uit de ruwe lijst
+  (sleutelrotatie van de policy-sleutel in de executor nog open) en het besluit over de engine-regels buiten de
+  `policy_hash` (geen contractveld; executor-image op digest, vervangen bij de uitrol in P6).
+
 ### Gerepareerd — herstelronde van de executor: schrijfsleutel, beheer en log (S-P2-020; ADR-0030 besluit 13)
 - Beheer (`/beheer`: ontkoppelen, vervangen, vrijgeven) neemt als bewijs alleen de huidige opgeslagen sleutel: eerst
   een vergelijking in constante tijd met de ontsleutelde sleutel, daarna de live test. Een andere sleutel, ook een

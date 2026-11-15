@@ -39,7 +39,8 @@ from policyhelpers import DIGEST, DIGEST_B, HOST, approval_for, execution_reques
 
 from executor.journal import Journal
 from executor.naslink import NasLinkStore
-from executor.uitvoeren import Uitvoerder, pools_gezond
+from executor.truenas import NasClient, NasFout
+from executor.uitvoeren import NAS_MELDINGEN, Uitvoerder, pools_gezond
 
 REPO = "ghcr.io/voorbeeld/demo-app"
 Stack = tuple[Hub, TestClient, FakeTrueNAS]
@@ -1409,6 +1410,64 @@ def test_alleen_lezen_sleutel_kan_niets_uitvoeren(tmp_path: Path, nas: FakeTrueN
     assert r.json()["details"]["reden"] == "truenas_geen_toegang"
     app = nas.app("my-house")
     assert app is not None and app["state"] == "RUNNING"
+
+
+# ------------------------------------------------------------------ na een schrijfaanroep nooit "niets uitgevoerd"
+NIETS_UITGEVOERD = "niets uitgevoerd"
+
+
+def test_geweigerde_app_update_na_het_lezen_van_de_config_geeft_nooit_503(stack: Stack) -> None:
+    """app.config lukt, app.update wordt door TrueNAS geweigerd (EACCES). De schrijfaanroep heeft TrueNAS bereikt:
+    het antwoord is dan nooit 503 met "er is niets uitgevoerd" (dat belooft alleen een fout vóór het schrijven), maar
+    502 ``uitvoering_mislukt`` met de before/after-hash uit de eigen readback (S-P2-030)."""
+    hub, c, nas = stack
+    assert execute(c, hub, approved(hub, install_prop())).status_code == 200
+    nas.keys[WRITE_KEY].deny.add("app.update")
+    prop = app_prop(nas, "app.update", "demo-app", {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}})
+    req = approved(hub, prop)
+    r = execute(c, hub, req)
+    assert r.status_code != 503 and NIETS_UITGEVOERD not in r.json()["message"], r.text
+    assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
+    d = r.json()["details"]
+    assert d["reden"] == "truenas_geen_toegang" and d["methode"] == "app.update"
+    assert d["before_hash"] == d["after_hash"]
+    # Beide aanroepen hebben TrueNAS bereikt; de fake heeft de geweigerde update niet toegepast.
+    aanroepen = [m for m, _p in nas.calls]
+    assert "app.config" in aanroepen and "app.update" in aanroepen
+    assert writes(nas) == ["app.create", "app.update"] and nas.updated == []
+    rij = journaal(c, hub, req["approval"]["request_id"])["uitvoeringen"][0]
+    assert rij["status"] == "mislukt" and "truenas_geen_toegang" in rij["detail"]
+
+
+@pytest.mark.parametrize("toegepast", [True, False], ids=["toegepast", "niet_toegepast"])
+@pytest.mark.parametrize("code", sorted(NAS_MELDINGEN))
+def test_fout_na_de_schrijfaanroep_belooft_nooit_dat_er_niets_is_uitgevoerd(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, code: str, toegepast: bool
+) -> None:
+    """Elke foutcode die vóór het schrijven "er is niets uitgevoerd" geeft (``NAS_MELDINGEN``, waaronder alle 503's),
+    komt hier pas NA de schrijfaanroep: TrueNAS heeft ``app.stop`` ontvangen (en wel of niet toegepast). Het antwoord
+    is dan nooit 503 en nooit "niets uitgevoerd": 409 ``afwijking`` (executor gestopt) als de uitkomst onbekend is of
+    de toestand veranderde, anders 502 ``uitvoering_mislukt``."""
+    hub, c, nas = stack
+    if not toegepast:
+        nas.silent_noop.add("app.stop")
+    echte_job = NasClient.job
+
+    def job_dan_fout(self: NasClient, method: str, *params: Any, timeout: float, poll: float = 1.0) -> Any:
+        echte_job(self, method, *params, timeout=timeout, poll=poll)
+        raise NasFout(code, method)
+
+    monkeypatch.setattr(NasClient, "job", job_dan_fout)
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
+    assert r.status_code != 503 and NIETS_UITGEVOERD not in r.json()["message"], r.text
+    assert "app.stop" in writes(nas)
+    if toegepast or code in ("truenas_onbereikbaar", "truenas_timeout"):
+        assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
+        assert r.json()["details"]["reden"] == "uitkomst_onbekend" and r.json()["details"]["gestopt"] is True
+    else:
+        assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
+        d = r.json()["details"]
+        assert d["reden"] == code and d["before_hash"] == d["after_hash"]
 
 
 def test_ander_certificaat_dan_vastgelegd_de_sleutel_wordt_niet_verstuurd(tmp_path: Path, nas: FakeTrueNAS) -> None:

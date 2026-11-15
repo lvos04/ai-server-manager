@@ -526,6 +526,21 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   `/var/run/secrets`; een oude executor laat dat nog door.
   Aanvulling 2026-11-14 (KLEIN-83): hetzelfde geldt voor `opslag_verboden` voor NFS-opslag (type nfs,
   `nfs_config`) bij een catalogusapp; een oude executor laat een exportpad zonder `/` nog door.
+  Besluit 2026-11-15 (S-P2-030, bouwpunt 6d, optie A): geen engineversie en geen nieuw contractveld; dit open punt
+  blijft staan. Tot een contractronde is de maatregel: het executor-image wordt op een digest vastgezet (manifest
+  `deploy/manifest/ai-server-manager-executor.manifest.yaml`: `digest_pending_release`, de release-CI vult de digest
+  in) en bij de uitrol op de NAS (P6) vervangen. Een executor met een ouder image ziet nieuwe engine-regels tot die
+  vervanging niet.
+- **Open punten uit de ruwe lijst, stand na S-P2-030 (bouwpunt 7).** Gebouwd: de eenmalige nonce van een
+  `ExecutionRequest` staat in dezelfde `executor.sqlite3` in de eigen datamap als de `jti`-replaycache (tabel
+  `request_nonces` in `apps/executor/src/executor/journal.py`; `ReplayCache` in `apps/executor/src/executor/replay.py`,
+  contract §4.6); `notification.send` wordt door de executor geweigerd (`actie_niet_toegestaan`) en loopt via de
+  Gotify-adapter van de Hub (besluit 17). Open: **sleutelrotatie van de policy-sleutel in de executor.**
+  `KeyRotationPoller.poll` in `apps/executor/src/executor/hublink.py` past een gemelde rotatie niet toe en zet
+  `sleutelrotatie_niet_toegepast` (test `apps/executor/tests/test_hublink.py::test_sleutelrotaties_pollen_lege_lijst_en_niet_lege_lijst`);
+  de executor blijft dan bij de gepinde sleutels en weigert verzoeken met een nieuwe sleutel. Geen stap in het
+  uitvoeringsplan bouwt het toepassen in de executor nog uitdrukkelijk; S-P2-210 (beveiligingsreview van P2) toetst "sleutelrotatie niet toegepast" als
+  aanvalsweg. Niet gebouwd in S-P2-030.
 - **Eigen waarden van een catalogusapp.** Bij een catalogusapp (geen ix-app) kunnen de waarden andere vrije tekst
   bevatten dan de vier ix-app-velden; die wist de Hub na afloop nog niet (S-P2-050/S-P2-070, kluisverwijzingen).
 - **Geen sleutel-ID in `ExecutionRequest`.** De executor probeert elke sleutel uit de gepinde set; bij sleutelrotatie
