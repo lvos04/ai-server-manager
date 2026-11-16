@@ -4,6 +4,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: omgevingsvariabelen in andere vormen alleen met naam in de preview (S-P2-040 herstelronde 3)
+- Onder `environment`/`env`/`envs` van een catalogusapp, als `NAAM=waarde`, als `Name`/`Value` of als paar direct onder `values` staat alleen de naam in de preview; tests voor labels met een geheime `key` en niet-tekstgeheimen (R-VEILIG-8; ADR-0030 besluit 32).
+
 ### Gerepareerd — Hub: geheimen in de preview van een catalogusapp en herhaalde noodstop (S-P2-040 herstelronde 2)
 - Een geheim-achtige sleutel direct onder de waarden van een catalogusapp staat in de preview als `***`; van elk paar
   `name` + `value` (zoals `additional_envs`) staat alleen de naam erin, de waarde als `***` (R-VEILIG-5 en -6;

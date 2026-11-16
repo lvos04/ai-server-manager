@@ -13,8 +13,10 @@ Installeren (S-P2-040, R-VEILIG-1; ADR-0030 besluit 32): ``wijziging.waarden`` t
 alleen de namen, en een geheim (waarde onder een geheim-achtige sleutel, ook direct onder ``values``, of naast een
 geheim-achtige ``key`` in een paar ``key`` + ``value``) als ``***``. Van elk paar ``name`` + ``value`` (zoals de
 omgevingsvariabelen van een catalogusapp) staat alleen de naam erin; de waarde is altijd ``***`` (ADR-0030 besluit 28;
-S-P2-040 herstelronde 2, R-VEILIG-5 en -6). ``command`` en ``entrypoint`` komen hier niet: die weigert de Hub al bij het
-voorstel (:func:`eigen_opdracht`, besluit regisseur optie C) tot een installatiescherm ze veilig kan tonen.
+S-P2-040 herstelronde 2, R-VEILIG-5 en -6), ook met hoofdletters (``Name``/``Value``) en direct onder ``values``;
+onder een sleutel ``environment``, ``env`` of ``envs`` alleen de namen (herstelronde 3). ``command`` en
+``entrypoint`` komen hier niet: die weigert de Hub al bij het voorstel (:func:`eigen_opdracht`, besluit regisseur
+optie C) tot een installatiescherm ze veilig kan tonen.
 """
 
 from __future__ import annotations
@@ -100,19 +102,58 @@ def _verborgen(waarde: Any) -> bool:
     return waarde not in (None, "") and not isinstance(waarde, bool)
 
 
+def _is_sleutel(k: Any, naam: str) -> bool:
+    return isinstance(k, str) and k.lower() == naam
+
+
+def _alleen_naam(waarde: Any, diepte: int) -> Any:
+    """Een omgevingsvariabele als element van een lijst onder ``environment``/``env``/``envs``: een tekst
+    ``NAAM=waarde`` als ``NAAM``, een paar ``name`` + ``value`` met de waarde als ``***``, al het andere (behalve leeg
+    en ja/nee) als ``***``."""
+    if isinstance(waarde, str):
+        return waarde.split("=", 1)[0]
+    if isinstance(waarde, Mapping):
+        return _omgeving(waarde, diepte + 1)
+    return REDACTED if _verborgen(waarde) else waarde
+
+
+def _omgeving(waarde: Any, diepte: int) -> Any:
+    """De waarde onder een sleutel ``environment``, ``env`` of ``envs`` (ook met hoofdletters): alleen de namen
+    (S-P2-040 herstelronde 3, besluit regisseur; ADR-0030 besluit 28). Een object houdt zijn sleutels (de namen) met
+    elke waarde als ``***``; een paar ``name`` + ``value`` volgt de paarregel; in een lijst elk element als
+    :func:`_alleen_naam`. Leeg en ja/nee blijven zichtbaar, zoals bij een paar."""
+    if isinstance(waarde, Mapping):
+        if any(_is_sleutel(k, "name") for k in waarde):
+            return _toon(waarde, diepte + 1)
+        return {str(k): REDACTED if _verborgen(w) else w for k, w in waarde.items()}
+    if isinstance(waarde, list):
+        return [_alleen_naam(w, diepte + 1) for w in waarde]
+    return _alleen_naam(waarde, diepte)
+
+
+OMGEVING_SLEUTELS = ("environment", "env", "envs")
+
+
 def _toon(waarde: Any, diepte: int = 0) -> Any:
     """Een waarde zoals de beheerder hem in de preview ziet: alles, behalve een geheim (``***``). Een geheim is de
     waarde onder een geheim-achtige sleutel (``hub.redact``), de ``value`` naast een geheim-achtige ``key``, en elke
-    ``value`` in een paar ``name`` + ``value``: dat is de vorm van een omgevingsvariabele (zoals ``additional_envs`` van
-    een catalogusapp), en daarvan staat alleen de naam in een preview (ADR-0030 besluit 28)."""
+    ``value`` in een paar ``name`` + ``value`` (ook met hoofdletters, zoals ``Name``/``Value``): dat is de vorm van een
+    omgevingsvariabele (zoals ``additional_envs`` van een catalogusapp), en daarvan staat alleen de naam in een preview
+    (ADR-0030 besluit 28). Onder een sleutel ``environment``, ``env`` of ``envs`` staan alleen de namen
+    (:func:`_omgeving`; S-P2-040 herstelronde 3)."""
     if diepte > GEHEIM_DIEPTE:
         return REDACTED
     if isinstance(waarde, Mapping):
-        paar_geheim = ("name" in waarde) or _geheime_naam(waarde.get("key"))
+        paar_geheim = any(_is_sleutel(k, "name") for k in waarde) or _geheime_naam(waarde.get("key"))
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
-            geheim = _geheime_naam(k) or (paar_geheim and k == "value")
-            uit[str(k)] = REDACTED if geheim and _verborgen(w) else _toon(w, diepte + 1)
+            geheim = _geheime_naam(k) or (paar_geheim and _is_sleutel(k, "value"))
+            if geheim and _verborgen(w):
+                uit[str(k)] = REDACTED
+            elif isinstance(k, str) and k.lower() in OMGEVING_SLEUTELS:
+                uit[str(k)] = _omgeving(w, diepte + 1)
+            else:
+                uit[str(k)] = _toon(w, diepte + 1)
         return uit
     if isinstance(waarde, list):
         return [_toon(w, diepte + 1) for w in waarde]
@@ -125,9 +166,14 @@ def _waarden(standaard: bool, values: Mapping[str, Any]) -> dict[str, Any]:
     """Elk gezet veld van ``app_create.values`` (R-VEILIG-1). Bij de standaard Custom App volgens
     :data:`IX_PREVIEWREGELS` (een onbekend veld laat het beleid niet toe; mocht het er toch zijn, dan met waarde); bij
     een catalogusapp de eigen waarden zoals ze zijn, met geheimen als ``***``."""
+    if not standaard:
+        # Alles via _toon, ook bovenaan: een geheim-achtige sleutel (R-VEILIG-5), een paar name/value direct onder
+        # values en een sleutel environment/env/envs (S-P2-040 herstelronde 3).
+        toon = _toon(values)
+        return toon if isinstance(toon, dict) else {}
     uit: dict[str, Any] = {}
     for k, w in values.items():
-        regel = IX_PREVIEWREGELS.get(k, WAARDE) if standaard else WAARDE
+        regel = IX_PREVIEWREGELS.get(k, WAARDE)
         if regel == NAMEN:
             uit[k] = [str(e.get("name")) for e in _lijst(w) if isinstance(e, Mapping) and e.get("name")]
         elif regel == GEWEIGERD:

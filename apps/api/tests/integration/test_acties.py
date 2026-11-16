@@ -879,6 +879,113 @@ def test_omgevingsvariabelen_van_een_catalogusapp_alleen_met_naam_in_de_preview(
         assert rij is not None and "proefgeheim" not in str(rij.preview)
 
 
+def test_geheim_in_een_label_of_een_niet_tekstwaarde_staat_er_als_sterretjes(stack: Stack) -> None:
+    """S-P2-040, herstelronde 3 (R-VEILIG-8; ADR-0030 besluit 32): (a) de ``value`` van een label met een geheim-achtige
+    ``key`` staat er als ``***``, bij de standaard Custom App en bij een catalogusapp; (b) de ``value`` van een paar
+    name/value is ook ``***`` als het een getal, een lijst of een object is; (c) een geheim-achtige sleutel direct
+    onder ``values`` met een getal of een object ook; (d) leeg en ja/nee blijven zichtbaar, en een gewoon label ook."""
+    admin = stack.admin
+    ix = install_params(
+        "demo-lab",
+        labels=[
+            {"key": "x.token", "value": "proefgeheim-lab-921", "containers": []},
+            {"key": "proef.wachtwoord", "value": "proefgeheim-lab-922", "containers": []},
+            {"key": "x.info", "value": "zichtbaar-lab-923", "containers": []},
+        ],
+    )
+    r = stel_voor(admin, "app.install", app_target("demo-lab"), ix)
+    assert r.status_code == 201, r.text
+    assert r.json()["preview"]["wijziging"]["waarden"]["labels"] == [
+        {"key": "x.token", "value": "***", "containers": []},
+        {"key": "proef.wachtwoord", "value": "***", "containers": []},
+        {"key": "x.info", "value": "zichtbaar-lab-923", "containers": []},
+    ], r.text
+    assert "proefgeheim" not in r.text
+    values = {
+        "app": {
+            "labels": [{"key": "x.token", "value": "proefgeheim-lab-924"}, {"key": "x.info", "value": "zichtbaar"}],
+            "additional_envs": [
+                {"name": "A", "value": 1234},
+                {"name": "B", "value": ["proefgeheim-lijst-925"]},
+                {"name": "C", "value": {"x": "proefgeheim-object-926"}},
+                {"name": "D", "value": ""},
+                {"name": "E", "value": True},
+            ],
+        },
+        "api_token": 123456,
+        "client_secret": {"a": "proefgeheim-object-927"},
+        "admin_token": True,
+        "password": "",
+    }
+    r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    assert r.json()["preview"]["wijziging"]["waarden"] == {
+        "app": {
+            "labels": [{"key": "x.token", "value": "***"}, {"key": "x.info", "value": "zichtbaar"}],
+            "additional_envs": [
+                {"name": "A", "value": "***"},
+                {"name": "B", "value": "***"},
+                {"name": "C", "value": "***"},
+                {"name": "D", "value": ""},
+                {"name": "E", "value": True},
+            ],
+        },
+        "api_token": "***",
+        "client_secret": "***",
+        "admin_token": True,
+        "password": "",
+    }, r.text
+    assert "proefgeheim" not in r.text
+    assert "proefgeheim" not in admin.get("/api/v1/actions").text
+
+
+@pytest.mark.parametrize(
+    ("values", "verwacht"),
+    [
+        pytest.param(
+            {"app": {"environment": {"DB_HOST": "proefgeheim-env-931", "LEEG": "", "AAN": True}}},
+            {"app": {"environment": {"DB_HOST": "***", "LEEG": "", "AAN": True}}},
+            id="object",
+        ),
+        pytest.param(
+            {"app": {"Env": {"MODUS": 7, "LIJST": ["proefgeheim-env-932"]}}},
+            {"app": {"Env": {"MODUS": "***", "LIJST": "***"}}},
+            id="object_hoofdletter_sleutel",
+        ),
+        pytest.param(
+            {"app": {"environment": ["DB_HOST=proefgeheim-env-933", "MODUS=proefgeheim-env-934", "ALLEEN"]}},
+            {"app": {"environment": ["DB_HOST", "MODUS", "ALLEEN"]}},
+            id="tekstlijst",
+        ),
+        pytest.param(
+            {"app": {"envs": ["X=proefgeheim-env-935", {"name": "Y", "value": "proefgeheim-env-936"}, 42]}},
+            {"app": {"envs": ["X", {"name": "Y", "value": "***"}, "***"]}},
+            id="gemengde_lijst",
+        ),
+        pytest.param(
+            {"name": "X", "value": "proefgeheim-env-937"},
+            {"name": "X", "value": "***"},
+            id="paar_direct_onder_values",
+        ),
+        pytest.param(
+            {"app": {"extra": [{"Name": "ENCRYPTION_KEY", "Value": "proefgeheim-env-938"}, {"NAME": "B", "VALUE": 5}]}},
+            {"app": {"extra": [{"Name": "ENCRYPTION_KEY", "Value": "***"}, {"NAME": "B", "VALUE": "***"}]}},
+            id="paar_met_hoofdletters",
+        ),
+    ],
+)
+def test_omgevingsvariabelen_in_andere_vormen_alleen_met_naam(stack: Stack, values: Any, verwacht: Any) -> None:
+    """S-P2-040, herstelronde 3 (besluit regisseur; ADR-0030 besluit 28 en 32): van een omgevingsvariabele van een
+    catalogusapp staat alleen de naam in de preview, ook als hij geen paar ``name`` + ``value`` in kleine letters is:
+    waarden onder een sleutel ``environment``, ``env`` of ``envs`` (object of lijst; ``NAAM=waarde`` als alleen
+    ``NAAM``), een paar direct onder ``values`` en een paar met hoofdletters (``Name``/``Value``). Leeg en ja/nee
+    blijven zichtbaar, zoals bij een paar."""
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    assert r.json()["preview"]["wijziging"]["waarden"] == verwacht, r.text
+    assert "proefgeheim" not in r.text and "proefgeheim" not in stack.admin.get("/api/v1/actions").text
+
+
 def test_open_voorstel_met_eigen_opdracht_van_voor_het_herstel_wordt_geweigerd(stack: Stack) -> None:
     """S-P2-040, R-VEILIG-1 (optie C): een voorstel dat vóór dit herstel met ``command`` is gemaakt, toonde die opdracht
     niet in de preview. Goedkeuren kan dan niet meer: ``501 capability_unavailable``, status ``geweigerd``, en de vrije

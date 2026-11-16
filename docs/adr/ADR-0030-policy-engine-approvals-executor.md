@@ -587,6 +587,12 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       (c) Noodstop: een herhaling met dezelfde `Idempotency-Key` zet alleen de veilige kant opnieuw. Een herhaald
       aan-verzoek zet de noodstop echt aan; een herhaald uit-verzoek wijzigt niets (geen audit) en geeft de werkelijke
       stand terug, zodat het een noodstop die een ander daarna zette niet opheft. Beleid en `policy_hash` ongewijzigd.
+    - *Aanvulling 2026-11-16 (herstelronde 3; R-VEILIG-8 en besluit regisseur).* Bij een catalogusapp staan van een
+      omgevingsvariabele ook in andere vormen alleen de namen in de preview: onder een sleutel `environment`, `env` of
+      `envs` (ook met hoofdletters) een object met elke waarde als `***` en in een lijst een tekst `NAAM=waarde` als
+      `NAAM`; een paar `name` + `value` ook met hoofdletters (`Name`/`Value`) en direct onder `values`. Leeg en ja/nee
+      blijven zichtbaar. Tests eisen nu ook `***` voor een label met een geheim-achtige `key` en voor een geheim dat
+      een getal, lijst of object is. Beleid en `policy_hash` ongewijzigd.
 
 ## Open punten
 
