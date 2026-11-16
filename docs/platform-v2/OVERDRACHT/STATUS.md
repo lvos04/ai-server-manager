@@ -360,3 +360,21 @@ BG-besluit, dus ze staan niet in `02_BOUWPLANNEN/B03_BESLUITEN.md`. Menu's, opti
   App-formulier"; punt (a) noemt alleen catalogusapps). Daarvoor is een uitzondering in het contract nodig, in een eigen
   contractronde in deze repo met de kopieën in alle repos; het contract is bij dit vastleggen niet gewijzigd. De
   executor vult zulke verwijzingen nog niet in (ADR-0030 besluit 28: eerlijk `501 capability_unavailable`).
+
+## Start van P3 terwijl Gate P2 nog open is (2026-11-16)
+
+Vastgelegd door de regisseur op 2026-11-16, zoals `UITVOERINGSPLAN/STAPPEN_P3.md` kop "2.1 Gate ervoor (P2 naar P3)"
+vraagt ("mogen wel starten zodra de regisseur dat vastlegt in STATUS.md").
+
+- **Gate P2: NOG NIET gehaald.** Stap S-P2-910 (de gate-controle van A-GATE, `UITVOERINGSPLAN/STAPPEN_P2.md`) staat
+  open. Deze kop is dus geen afvinking van Gate P2; die komt pas met S-P2-910.
+- **Wat wel start (vanaf 2026-11-16):** alleen de P3-stappen die alleen lezen of alleen de eigen app raken (geen
+  schrijven via de Hub, geen executor), volgens de lijst onder kop 2.1 van `STAPPEN_P3.md`.
+- **Wat niet start:**
+  - S-P3-110, S-P3-120 en S-P3-130 (schrijven via de Hub): pas na Gate P2, met "Risk policy + privileged executor
+    tested" in de simulator aangetoond.
+  - S-P3-010 (ai-server-manager) en S-P3-300 (home-control-hub; wacht op het ADR van S-P3-010): niet zolang de baan
+    `ai-server-manager` van P2 loopt. In één repo werken nooit twee schrijvers tegelijk.
+- **Nulmeting S-P3-000:** afgevinkt op 2026-11-16. Het dossier staat lokaal op de bouwmachine en hoort niet in de repo.
+- **Contract:** blijft 1.3 tijdens P3 (V-018), met één uitzondering: de geplande contractronde van C-12. Die komt vóór
+  de P3-schrijvers in appstore-en-fork. Een contractwijziging is nooit een losse stap van A-BOUW.
