@@ -4,6 +4,14 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: geheimen in de preview van een catalogusapp en herhaalde noodstop (S-P2-040 herstelronde 2)
+- Een geheim-achtige sleutel direct onder de waarden van een catalogusapp staat in de preview als `***`; van elk paar
+  `name` + `value` (zoals `additional_envs`) staat alleen de naam erin, de waarde als `***` (R-VEILIG-5 en -6;
+  ADR-0030 besluit 28 en 32).
+- Een herhaald uit-verzoek op `PUT /api/v1/actions/noodstop` met dezelfde `Idempotency-Key` wijzigt niets en geeft de
+  werkelijke stand terug; een herhaald aan-verzoek zet de noodstop nog steeds echt aan (R-VEILIG-7).
+- Tests in `apps/api/tests/integration/test_acties.py`.
+
 ### Gerepareerd — Hub: preview, bewijs en witte lijst bij acties (S-P2-040 herstel; ADR-0030 besluit 32)
 - De preview van `app.install` toont elk gezet veld van `app_create.values` met zijn waarde (hostname, DNS, run_as,
   tty, stdin, labels, healthcheck en de rest; van `envs` alleen de namen, een geheim als `***`), ook de eigen waarden

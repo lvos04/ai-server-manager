@@ -579,6 +579,14 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       sleutel voor een ander verzoek blijft `422 idempotency_key_reused`.
     - *Incident (R-TECH).* De titel van `actie.afwijking` zegt "executor gestopt" alleen als het event `gestopt` echt
       `true` heeft; bij `false` of zonder `gestopt` zegt de samenvatting dat ook.
+    - *Aanvulling 2026-11-16 (herstelronde 2; R-VEILIG-5, -6 en -7; besluiten regisseur).* (a) Ook een geheim-achtige
+      sleutel direct onder `values` van een catalogusapp staat er als `***`, niet alleen een geneste. (b) Van elk paar
+      `name` + `value` in de waarden (zoals `additional_envs` van een catalogusapp) staat alleen de naam erin; de
+      waarde is altijd `***`, ook bij een naam die niet op een geheim lijkt (besluit 28). Een paar `key` + `value`
+      (zoals `labels`) houdt de regel hierboven. Er blijft dan ook na afloop niets van achter in de bewaarde preview.
+      (c) Noodstop: een herhaling met dezelfde `Idempotency-Key` zet alleen de veilige kant opnieuw. Een herhaald
+      aan-verzoek zet de noodstop echt aan; een herhaald uit-verzoek wijzigt niets (geen audit) en geeft de werkelijke
+      stand terug, zodat het een noodstop die een ander daarna zette niet opheft. Beleid en `policy_hash` ongewijzigd.
 
 ## Open punten
 

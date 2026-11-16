@@ -10,8 +10,10 @@ Geheimen: waarden van omgevingsvariabelen staan nooit in de preview (alleen de n
 
 Installeren (S-P2-040, R-VEILIG-1; ADR-0030 besluit 32): ``wijziging.waarden`` toont elk gezet veld van
 ``app_create.values`` mét zijn waarde, zodat een beheerder niets ongezien goedkeurt. Uitzonderingen: van ``envs``
-alleen de namen, en een geheim (waarde onder een geheim-achtige sleutel, of naast een geheim-achtige naam in een paar
-``name``/``key`` + ``value``) als ``***``. ``command`` en ``entrypoint`` komen hier niet: die weigert de Hub al bij het
+alleen de namen, en een geheim (waarde onder een geheim-achtige sleutel, ook direct onder ``values``, of naast een
+geheim-achtige ``key`` in een paar ``key`` + ``value``) als ``***``. Van elk paar ``name`` + ``value`` (zoals de
+omgevingsvariabelen van een catalogusapp) staat alleen de naam erin; de waarde is altijd ``***`` (ADR-0030 besluit 28;
+S-P2-040 herstelronde 2, R-VEILIG-5 en -6). ``command`` en ``entrypoint`` komen hier niet: die weigert de Hub al bij het
 voorstel (:func:`eigen_opdracht`, besluit regisseur optie C) tot een installatiescherm ze veilig kan tonen.
 """
 
@@ -93,20 +95,24 @@ def _geheime_naam(naam: Any) -> bool:
     return isinstance(naam, str) and bool(LOG_SECRET_KEY_RE.search(naam))
 
 
+def _verborgen(waarde: Any) -> bool:
+    """Een waarde die als ``***`` verschijnt als hij geheim is: alles behalve leeg en ja/nee."""
+    return waarde not in (None, "") and not isinstance(waarde, bool)
+
+
 def _toon(waarde: Any, diepte: int = 0) -> Any:
     """Een waarde zoals de beheerder hem in de preview ziet: alles, behalve een geheim (``***``). Een geheim is de
-    waarde onder een geheim-achtige sleutel (``hub.redact``), of de ``value`` naast een geheim-achtige ``name`` of
-    ``key`` (zoals in een lijst omgevingsvariabelen van een catalogusapp)."""
+    waarde onder een geheim-achtige sleutel (``hub.redact``), de ``value`` naast een geheim-achtige ``key``, en elke
+    ``value`` in een paar ``name`` + ``value``: dat is de vorm van een omgevingsvariabele (zoals ``additional_envs`` van
+    een catalogusapp), en daarvan staat alleen de naam in een preview (ADR-0030 besluit 28)."""
     if diepte > GEHEIM_DIEPTE:
         return REDACTED
     if isinstance(waarde, Mapping):
-        paar_geheim = _geheime_naam(waarde.get("name")) or _geheime_naam(waarde.get("key"))
+        paar_geheim = ("name" in waarde) or _geheime_naam(waarde.get("key"))
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
             geheim = _geheime_naam(k) or (paar_geheim and k == "value")
-            uit[str(k)] = (
-                REDACTED if geheim and w not in (None, "") and not isinstance(w, bool) else _toon(w, diepte + 1)
-            )
+            uit[str(k)] = REDACTED if geheim and _verborgen(w) else _toon(w, diepte + 1)
         return uit
     if isinstance(waarde, list):
         return [_toon(w, diepte + 1) for w in waarde]
@@ -126,6 +132,8 @@ def _waarden(standaard: bool, values: Mapping[str, Any]) -> dict[str, Any]:
             uit[k] = [str(e.get("name")) for e in _lijst(w) if isinstance(e, Mapping) and e.get("name")]
         elif regel == GEWEIGERD:
             uit[k] = {"geweigerd": "eigen_opdracht"}  # komt niet voor: het voorstel wordt al geweigerd
+        elif _geheime_naam(k) and _verborgen(w):
+            uit[str(k)] = REDACTED  # ook een geheim-achtige sleutel direct onder values (R-VEILIG-5)
         else:
             uit[str(k)] = _toon(w)
     return uit

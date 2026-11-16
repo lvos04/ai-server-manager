@@ -788,8 +788,8 @@ def test_preview_van_een_installatie_toont_elk_gezet_veld(stack: Stack) -> None:
 
 def test_preview_van_een_catalogusapp_toont_de_eigen_waarden(stack: Stack) -> None:
     """S-P2-040, R-VEILIG-1: ook de eigen waarden van een catalogusapp staan in de preview, met hun waarde. Alleen een
-    geheim (een waarde onder een geheim-achtige sleutel, of naast een geheim-achtige naam in een paar name/value) staat
-    er als ``***``, zoals overal in de API-uitvoer van de Hub (``hub.redact``)."""
+    geheim (een waarde onder een geheim-achtige sleutel) staat er als ``***``, zoals overal in de API-uitvoer van de Hub
+    (``hub.redact``). Van een paar name/value staat alleen de naam erin (herstelronde 2, R-VEILIG-6; besluit 28)."""
     values = {
         "app": {"tz": "Europe/Amsterdam", "web_port": 30200, "beheerwachtwoord": "proefgeheim-catalogus-812"},
         "additional_envs": [
@@ -803,10 +803,80 @@ def test_preview_van_een_catalogusapp_toont_de_eigen_waarden(stack: Stack) -> No
     waarden = r.json()["preview"]["wijziging"]["waarden"]
     assert waarden == {
         "app": {"tz": "Europe/Amsterdam", "web_port": 30200, "beheerwachtwoord": "***"},
-        "additional_envs": [{"name": "GEHEIME_SLEUTEL", "value": "***"}, {"name": "MODUS", "value": "zichtbaar"}],
+        "additional_envs": [{"name": "GEHEIME_SLEUTEL", "value": "***"}, {"name": "MODUS", "value": "***"}],
         "notes": "notitie bij de catalogusapp",
     }, waarden
     assert "proefgeheim" not in r.text and "proefgeheim" not in stack.admin.get("/api/v1/actions").text
+
+
+def _kijkers_tekst(stack: Stack, kijker: Any, rid: str) -> str:
+    """Wat een kijker (rol viewer) en een beheerder van een voorstel kunnen lezen: het voorstel en de lijst."""
+    return "\n".join(
+        c.get(pad).text for c in (kijker, stack.admin) for pad in (f"/api/v1/actions/{rid}", "/api/v1/actions")
+    )
+
+
+def test_geheime_sleutel_direct_onder_de_waarden_van_een_catalogusapp_staat_er_als_sterretjes(stack: Stack) -> None:
+    """S-P2-040, herstelronde 2 (R-VEILIG-5; ADR-0030 besluit 32): een waarde onder een geheim-achtige sleutel staat er
+    als ``***``, ook als die sleutel direct onder ``values`` van een catalogusapp staat; in het antwoord op het
+    voorstel, voor een kijker en ook nadat het voorstel is afgewezen."""
+    make_user(stack.admin, "kijker5", "viewer")
+    kijker = login_as(stack.app, "kijker5")
+    values = {
+        "admin_password": "proefgeheim-top-901",
+        "api_token": "proefgeheim-top-902",
+        "app": {"tz": "Europe/Amsterdam", "admin_password": "proefgeheim-genest-903"},
+    }
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    assert r.json()["preview"]["wijziging"]["waarden"] == {
+        "admin_password": "***",
+        "api_token": "***",
+        "app": {"tz": "Europe/Amsterdam", "admin_password": "***"},
+    }, r.text
+    rid = r.json()["request_id"]
+    assert "proefgeheim" not in r.text and "proefgeheim" not in _kijkers_tekst(stack, kijker, rid)
+    assert stack.admin.post(f"/api/v1/actions/{rid}/reject", json={"reden": "nee"}, headers=idem()).status_code == 200
+    assert "proefgeheim" not in _kijkers_tekst(stack, kijker, rid)
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(rid))
+        assert rij is not None and "proefgeheim" not in str(rij.preview)
+
+
+def test_omgevingsvariabelen_van_een_catalogusapp_alleen_met_naam_in_de_preview(stack: Stack) -> None:
+    """S-P2-040, herstelronde 2 (R-VEILIG-6; ADR-0030 besluit 28): van een paar name/value in de waarden van een
+    catalogusapp staat alleen de naam in de preview; de waarde is verborgen (``***``), ook bij een naam die niet op een
+    geheim lijkt. In het antwoord, voor een kijker en na afwijzen; ook niet in de bewaarde preview."""
+    make_user(stack.admin, "kijker6", "viewer")
+    kijker = login_as(stack.app, "kijker6")
+    values = {
+        "home_assistant": {
+            "additional_envs": [
+                {"name": "ENCRYPTION_KEY", "value": "proefgeheim-env-911"},
+                {"name": "DB_PWD", "value": "proefgeheim-env-912"},
+                {"name": "POSTGRES_PASSWORD", "value": "proefgeheim-env-913"},
+            ]
+        }
+    }
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    assert r.json()["preview"]["wijziging"]["waarden"] == {
+        "home_assistant": {
+            "additional_envs": [
+                {"name": "ENCRYPTION_KEY", "value": "***"},
+                {"name": "DB_PWD", "value": "***"},
+                {"name": "POSTGRES_PASSWORD", "value": "***"},
+            ]
+        }
+    }, r.text
+    rid = r.json()["request_id"]
+    assert "proefgeheim" not in r.text and "proefgeheim" not in _kijkers_tekst(stack, kijker, rid)
+    assert "ENCRYPTION_KEY" in _kijkers_tekst(stack, kijker, rid)
+    assert stack.admin.post(f"/api/v1/actions/{rid}/reject", json={"reden": "nee"}, headers=idem()).status_code == 200
+    assert "proefgeheim" not in _kijkers_tekst(stack, kijker, rid)
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(rid))
+        assert rij is not None and "proefgeheim" not in str(rij.preview)
 
 
 def test_open_voorstel_met_eigen_opdracht_van_voor_het_herstel_wordt_geweigerd(stack: Stack) -> None:
@@ -850,3 +920,27 @@ def test_herhaalde_noodstop_met_dezelfde_sleutel_zet_de_stand_echt(stack: Stack)
     assert r.status_code == 422 and r.json()["code"] == "idempotency_key_reused", r.text
     assert admin.get("/api/v1/actions/noodstop").json()["actief"] is True
     assert audit_acties(stack.app).count("action.emergency_stop.enabled") == 2
+
+
+def test_herhaald_oud_uit_verzoek_heft_een_later_gezette_noodstop_niet_op(stack: Stack) -> None:
+    """S-P2-040, herstelronde 2 (R-VEILIG-7): beheerder A zet de noodstop uit (sleutel K1), daarna zet beheerder B hem
+    aan. Komt A's uit-verzoek met K1 nog eens binnen (herhaling van de client), dan wijzigt dat niets: de noodstop
+    blijft aan en het antwoord geeft de werkelijke stand. Er komt geen nieuwe audit van uitzetten bij."""
+    admin = stack.admin
+    make_user(admin, "beheerder2", "admin")
+    b = login_as(stack.app, "beheerder2")
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "eerste"}, headers=idem())
+    assert r.status_code == 200, r.text
+    k1 = idem()
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": False}, headers=k1)
+    assert r.status_code == 200 and r.json()["actief"] is False, r.text
+    r = b.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "nieuw incident"}, headers=idem())
+    assert r.status_code == 200 and r.json()["actief"] is True, r.text
+    uit_voor = audit_acties(stack.app).count("action.emergency_stop.disabled")
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": False}, headers=k1)
+    assert r.status_code == 200, r.text
+    assert r.json()["actief"] is True and r.json()["reden"] == "nieuw incident" and r.json()["door"] == "beheerder2"
+    assert admin.get("/api/v1/actions/noodstop").json() == r.json()
+    assert audit_acties(stack.app).count("action.emergency_stop.disabled") == uit_voor
+    r = admin.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "x"}, headers=k1)
+    assert r.status_code == 422 and r.json()["code"] == "idempotency_key_reused", r.text

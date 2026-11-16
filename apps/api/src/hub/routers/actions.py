@@ -143,10 +143,14 @@ def get_noodstop(db: DB, _: Viewer) -> dict[str, Any]:
 
 @router.put("/actions/noodstop", summary="Noodstop in- of uitschakelen (alleen beheerder)")
 def put_noodstop(body: NoodstopIn, request: Request, db: DB, principal: Admin, idem: Idem) -> JSONResponse:
-    # Een PUT is van zichzelf herhaalbaar: ook een herhaling met dezelfde Idempotency-Key zet de stand echt en geeft de
-    # werkelijke stand terug, nooit het bewaarde antwoord van toen (S-P2-040, R-VEILIG-4; ADR-0030 besluit 32). Een
-    # sleutel die al voor een ander verzoek is gebruikt, blijft 422 (``Idempotency.replay``).
+    # Een herhaling met dezelfde Idempotency-Key geeft altijd de werkelijke stand terug, nooit het bewaarde antwoord van
+    # toen (S-P2-040, R-VEILIG-4; ADR-0030 besluit 32). Alleen de veilige kant wordt opnieuw gezet: een herhaald
+    # aan-verzoek zet de noodstop echt aan; een herhaald uit-verzoek wijzigt niets, zodat het een noodstop die een ander
+    # daarna heeft gezet niet opheft (herstelronde 2, R-VEILIG-7). Een sleutel die al voor een ander verzoek is
+    # gebruikt, blijft 422 (``Idempotency.replay``).
     herhaling = idem.replay() is not None
+    if herhaling and not body.actief:
+        return JSONResponse(blok_mod.noodstop(db), status_code=200)
     staat = blok_mod.zet_noodstop(db, actief=body.actief, reden=(body.reden or "").strip() or None, door=principal.name)
     audit.record(
         db,
