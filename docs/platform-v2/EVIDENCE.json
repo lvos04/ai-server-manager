@@ -445,9 +445,9 @@
     "validatie": "Unit-getest",
     "bewijs": "apps/api/tests/unit/test_contract_pin.py (sha256 van PLATFORM_CONTRACTEN.md en CONTRACT_1.3_CONFORMITEIT.md gepind op bron-commit 02b119c); commit 200bc21, 113ff15; GitHub Actions ci run 42781617804 (commit 113ff15: python, web met Playwright-E2E en Peil-review, excel, images met rooktest groen)",
     "blokkade": "",
-    "opmerking": "Bronrepo: geen kopie nodig; een nieuwe contracttekst vraagt een nieuwe pin en nieuwe kopieën via de orkestratie.",
+    "opmerking": "Bronrepo: geen kopie nodig; een nieuwe contracttekst vraagt een nieuwe pin en nieuwe kopieën via de orkestratie. Aanvulling C-12 (S-P2-C12, ADR-0031, commit 3658f84; blijft contracts 1.3): nieuwe pin in apps/api/tests/unit/test_contract_pin.py (sha256 PLATFORM_CONTRACTEN.md 3e12ae56…, CONTRACT_1.3_CONFORMITEIT.md a9c5c63b…); het veld bewijs noemt nog de pin op 02b119c. De kopieën in de tien andere repos volgen per repo (deel B).",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-10"
+    "bijgewerkt": "2026-11-17"
   },
   {
     "id": "C1.3-ALG-05",
