@@ -86,3 +86,5 @@ def test_redactie() -> None:
     assert out["lijst"][0]["token"] == "***" and out["vlag_token"] is True
     assert redact_text("Authorization: Bearer abcdefghijklmnop") == "Authorization: Bearer ***"
     assert redact_text("https://user:pw@host/x") == "https://user:***@host/x"
+    # S-P2-040 herstelronde 5 (R-VEILIG-15): ook een URL met alleen een wachtwoord (gangbaar bij Redis).
+    assert redact_text("redis://:pw-geheim@redis:6379/0") == "redis://:***@redis:6379/0"

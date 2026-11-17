@@ -17,15 +17,19 @@ Eén principe (S-P2-040 herstelronde 4, besluit regisseur; ADR-0030 besluit 32):
 ``wijziging`` van elke actie door één toonfunctie (:func:`_toon`); er staat geen rauw veld in. Die toont alles,
 behalve:
 
-- de waarde onder een geheim-achtige sleutel (``hub.redact``): ``***``;
+- de waarde onder een geheim-achtige sleutel: ``***`` (:func:`_geheime_naam`: ``hub.redact`` op de naam zoals hij is
+  en genormaliseerd, een naam die op ``key`` eindigt (niet de kale ``key``), met ``pwd``, of met ``auth`` als los deel);
 - in een paar (een object met ``name`` of ``key`` én ``value``, elke schrijfwijze, genormaliseerd zoals ``_nk`` in het
   beleid): de ``value`` als ``***`` bij een ``name`` (een omgevingsvariabele, ADR-0030 besluit 28) of bij een
   geheim-achtige ``key``;
-- onder een sleutel met een omgevingsbetekenis (genormaliseerd bevat hij ``env``, of het Nederlandse ``omgeving``):
-  alleen namen (:func:`_omgeving`);
+- onder een sleutel met een omgevingsbetekenis (een heel deel van de sleutel is een omgevingswoord, zoals ``env``,
+  ``envs``, ``environment`` of ``omgeving``; :func:`_is_omgeving`): alleen namen die kort en niet willekeurig zijn
+  (:func:`_omgeving`, :func:`_namen`);
 - elke andere tekst, ook een sleutel, gaat door ``redact_text`` (URL met wachtwoord, ``Bearer``).
 
-Leeg (``None``, ``""``) en ja/nee blijven altijd zichtbaar.
+Leeg (``None``, ``""``) en ja/nee blijven altijd zichtbaar. Ook ``huidig`` (de readback van de NAS) gaat door
+:func:`_toon`; alleen ``target`` en ``resource_etag`` blijven bewust rauw (S-P2-040 herstelronde 5; de reden staat bij
+de bewakingstest in ``apps/api/tests/unit/test_preview_toon.py``).
 """
 
 from __future__ import annotations
@@ -41,7 +45,7 @@ from asm_policy.loader import ActieDef
 from asm_policy.params import IX_APP, NIET_ALFANUM_RE, expected_image, vault_refs
 
 from hub.actions.doel import Doel
-from hub.redact import LOG_SECRET_KEY_RE, REDACTED, redact_text
+from hub.redact import LOG_SECRET_KEY_RE, REDACTED, _entropy, redact_text
 
 SCHEMA = "asm-preview/1"
 DATA_BLIJFT = "Datasets en data blijven staan; de Hub en de executor verwijderen nooit data."
@@ -103,8 +107,29 @@ def eigen_opdracht(action_id: str, parameters: Mapping[str, Any]) -> list[str]:
     return [k for k in EIGEN_OPDRACHT if k in values]
 
 
+DEEL_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")  # de delen van een sleutel (``_ . -`` en camelCase)
+
+
+def _delen(sleutel: Any) -> list[str]:
+    """De delen van een sleutel in kleine letters, gescheiden door elk teken dat geen letter of cijfer is en door een
+    hoofdletterovergang: ``additionalEnvs`` en ``ADDITIONAL_ENVS`` geven ``["additional", "envs"]``."""
+    return [d.lower() for d in DEEL_RE.findall(str(sleutel))]
+
+
 def _geheime_naam(naam: Any) -> bool:
-    return isinstance(naam, str) and bool(LOG_SECRET_KEY_RE.search(naam))
+    """Een geheim-achtige sleutelnaam (S-P2-040 herstelronde 5, R-VEILIG-14; besluit regisseur): ``hub.redact`` op de
+    naam zoals hij is én genormaliseerd (``api.key`` wordt ``apikey``), een naam die genormaliseerd op ``key`` eindigt
+    (``encryption_key``, ``license.key``; de kale ``key`` niet: dat is de naam van een labelpaar), een naam met ``pwd``
+    of met ``auth`` als los deel."""
+    if not isinstance(naam, str):
+        return False
+    nk = _nk(naam)
+    return (
+        bool(LOG_SECRET_KEY_RE.search(naam) or LOG_SECRET_KEY_RE.search(nk))
+        or (nk.endswith("key") and nk != "key")
+        or "pwd" in nk
+        or "auth" in _delen(naam)
+    )
 
 
 def _verborgen(waarde: Any) -> bool:
@@ -123,16 +148,44 @@ def _nk(sleutel: Any) -> str:
     return NIET_ALFANUM_RE.sub("", str(sleutel).lower())
 
 
-OMGEVING_DELEN = ("env", "omgeving")  # een sleutel met een omgevingsbetekenis bevat (genormaliseerd) een van deze
+# Een sleutel met een omgevingsbetekenis heeft een heel deel (:func:`_delen`) dat een van deze woorden is, of een
+# samenstelling met vars/variables (S-P2-040 herstelronde 5, R-VEILIG-16): openvpn, envoy en venv tellen niet.
+OMGEVING_WOORDEN = frozenset({"env", "envs", "environment", "environments", "omgeving"})
+OMGEVING_SAMENGESTELD_RE = re.compile(r"(?:env|environment|omgevings?)(?:vars?|variables?|variabelen?)")
 PAAR_NAMEN = ("name", "key")  # de naam van een paar; met beide telt name (de waarde is dan altijd geheim)
 PAAR_WAARDE = "value"
 NAAM_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")  # een variabelenaam (volledig)
 SCHEIDING_RE = re.compile(r"[=:]")
+KORT = 64  # een naam onder een omgevingssleutel is hooguit zo lang (R-VEILIG-17)
+ENTROPIE_DREMPEL = 4.0  # dezelfde drempel als ``hub.redact._maybe_secret``
+HEX_RE = re.compile(r"[0-9A-Fa-f]{16,}")
 
 
 def _is_omgeving(sleutel: Any) -> bool:
-    nk = _nk(sleutel)
-    return any(deel in nk for deel in OMGEVING_DELEN)
+    return any(d in OMGEVING_WOORDEN or OMGEVING_SAMENGESTELD_RE.fullmatch(d) for d in _delen(sleutel))
+
+
+def _willekeurig(woord: str) -> bool:
+    """Een woord dat op een geheim lijkt (R-VEILIG-17; besluit regisseur: de entropietoets van
+    ``hub.redact._maybe_secret`` of gelijkwaardig). Strenger dan ``_maybe_secret``, omdat een kort woord de drempel van
+    4,0 nooit haalt: met een cijfer én (hoofd- en kleine letters, of een entropie van minstens 4,0, of een hexreeks van
+    minstens 16 tekens). Een woord zonder cijfer (``production``, ``DB_HOST``) is niet willekeurig."""
+    if not any(c.isdigit() for c in woord):
+        return False
+    gemengd = any(c.isupper() for c in woord) and any(c.islower() for c in woord)
+    return gemengd or _entropy(woord) >= ENTROPIE_DREMPEL or bool(HEX_RE.fullmatch(woord))
+
+
+def _naam(regel: str) -> str:
+    """Eén regel in een omgevingscontext: de naam vóór het eerste ``=`` of ``:`` (zonder scheiding: de hele regel) als
+    die op een variabelenaam lijkt (:data:`NAAM_RE`), kort is (:data:`KORT`) en niet willekeurig
+    (:func:`_willekeurig`); anders ``***``. Ook de naam vóór een scheiding wordt zo getoetst, dus een '='-staart (de
+    opvulling van base64) helpt een geheim niet. Een lege regel blijft leeg."""
+    if not regel.strip():
+        return ""
+    naam = SCHEIDING_RE.split(regel, maxsplit=1)[0].strip()
+    goed = NAAM_RE.fullmatch(naam) and len(naam) <= KORT and not _willekeurig(naam)
+    return naam if goed else REDACTED
 
 
 def _paarsoort(waarde: Mapping[str, Any]) -> str | None:
@@ -145,13 +198,16 @@ def _paarsoort(waarde: Mapping[str, Any]) -> str | None:
 
 
 def _namen(tekst: str) -> str:
-    """Tekst in een omgevingscontext, per regel: de naam vóór het eerste ``=`` of ``:`` (zonder scheiding: de hele
-    regel) als die op een variabelenaam lijkt (:data:`NAAM_RE`), anders ``***``. Een lege regel blijft leeg."""
-    uit = []
-    for regel in tekst.splitlines():
-        naam = SCHEIDING_RE.split(regel, maxsplit=1)[0].strip()
-        uit.append("" if not regel.strip() else naam if NAAM_RE.fullmatch(naam) else REDACTED)
-    return "\n".join(uit)
+    """Tekst in een omgevingscontext, per regel als :func:`_naam`."""
+    return "\n".join(_naam(regel) for regel in tekst.splitlines())
+
+
+def _omgevingssleutel(sleutel: Any) -> str:
+    """Een sleutel van een omgevingsobject volgt de naamregel (R-VEILIG-17): ``NAAM=geheim`` wordt ``NAAM``, een
+    willekeurige sleutel ``***``; een sleutel die al een naam is, blijft zoals hij is (ook met spaties)."""
+    tekst = str(sleutel)
+    naam = _namen(tekst)
+    return tekst if naam == tekst.strip() else naam
 
 
 def _zet(uit: dict[str, Any], sleutel: Any, waarde: Any) -> None:
@@ -168,7 +224,8 @@ def _omgeving(waarde: Any, diepte: int) -> Any:
     """De waarde onder een sleutel met een omgevingsbetekenis: alleen namen (S-P2-040 herstelronde 4, besluit
     regisseur; ADR-0030 besluit 28). Een tekst per regel als :func:`_namen`; een object toont zijn sleutels met elke
     waarde als ``***``, en bij een paar daarnaast de naam; een lijst elk element zo (een getal of een geneste lijst als
-    ``***``). Leeg en ja/nee blijven zichtbaar."""
+    ``***``). De sleutels van een object volgen de naamregel (:func:`_omgevingssleutel`). Leeg en ja/nee blijven
+    zichtbaar."""
     if diepte > GEHEIM_DIEPTE:
         return REDACTED
     if isinstance(waarde, str):
@@ -180,7 +237,7 @@ def _omgeving(waarde: Any, diepte: int) -> Any:
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
             naam = soort is not None and _nk(k) == soort and isinstance(w, str)
-            _zet(uit, k, _namen(w) if naam else _verberg(w))
+            _zet(uit, _omgevingssleutel(k), _namen(w) if naam else _verberg(w))
         return uit
     return _verberg(waarde)
 
@@ -390,7 +447,7 @@ def bouw(
         "kritiek": cls.kritiek,
         "policy_hash": policy.hash,
         "resource_etag": doel.etag,
-        "huidig": doel.staat,
+        "huidig": _toon(doel.staat),
         "wijziging": _toon(_wijziging(actie, target, parameters, doel)),
         "dataretentie": DATA_BLIJFT,
         "terugdraaien": _terugdraaien(actie.action_id, doel),

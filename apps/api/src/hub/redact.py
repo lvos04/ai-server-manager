@@ -26,7 +26,8 @@ SECRET_KEY_RE = re.compile(
 )
 REDACTED = "***"
 _BEARER_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
-_URL_CRED_RE = re.compile(r"(?i)(\w+://)([^:/@\s]+):([^@\s]+)@")
+# Ook een lege gebruikersnaam (``redis://:wachtwoord@host``; S-P2-040 herstelronde 5, R-VEILIG-15).
+_URL_CRED_RE = re.compile(r"(?i)(\w+://)([^:/@\s]*):([^@\s]+)@")
 
 
 def redact_text(text: str) -> str:

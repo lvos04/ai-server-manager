@@ -610,6 +610,27 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       naam zonder scheiding (zoals `env: production`) blijft dus zichtbaar. De vorm van de preview verandert alleen
       waar een geheim stond; een open voorstel met zo'n vorm krijgt bij goedkeuren een nieuwe `preview_hash` (409 en
       een nieuwe diff, besluit 9). Beleid en `policy_hash` ongewijzigd.
+    - *Aanvulling 2026-11-17 (herstelronde 5; R-VEILIG-14 t/m 17 en W3; besluit regisseur): hetzelfde principe,
+      scherper.* (1) Een sleutelnaam is ook geheim-achtig als `hub.redact` hem genormaliseerd herkent (`api.key` wordt
+      `apikey`), als hij genormaliseerd op `key` eindigt (`encryption_key`, `license.key`, `access-key`), als hij `pwd`
+      bevat of als `auth` een los deel is; de kale `key` (de naam van een labelpaar) niet. (2) `redact_text` herkent
+      ook een URL met een lege gebruikersnaam (`redis://:wachtwoord@host`); dat geldt ook voor audit en events. (3) Een
+      omgevingscontext is er alleen als een heel deel van de sleutel (gescheiden door `_ . -` of een
+      hoofdletterovergang) `env`, `envs`, `environment(s)` of `omgeving` is, of een samenstelling daarvan met
+      `vars`/`variables`/`variabelen` (`envvars`, `omgevingsvariabelen`); onder `openvpn`, `envoy` of `venv` blijven
+      poort, server en hostpad zichtbaar. (4) In een omgevingscontext staat per regel een naam (vóór `=` of `:`, of de
+      hele regel) alleen als hij op een variabelenaam lijkt, hooguit 64 tekens is en niet willekeurig: willekeurig is
+      een woord met een cijfer én hoofd- en kleine letters, of met een cijfer en een entropie van minstens 4,0 (de
+      drempel van `_maybe_secret`), of een hexreeks van minstens 16 tekens; anders `***`. Een '='-staart (base64) helpt
+      dus niet, en een regel zonder naam is `***`. De sleutels van een omgevingsobject volgen dezelfde regel
+      (`NAAM=geheim` als sleutel wordt `NAAM`). (5) Ook `huidig` (de readback van de NAS) gaat door de toonfunctie;
+      alleen `target` en `resource_etag` blijven bewust rauw (met de reden in de bewakingstest, die nu de hele preview
+      doorzoekt en rood wordt bij een nieuw veld). **Restvorm die bewust blijft:** onder een omgevingssleutel een geheim
+      dat op een naam lijkt: zonder cijfer (`geheimwoord`, `GeheimWoord`), of met een cijfer maar in één kast en met
+      lage entropie (`wachtwoord2024`); een sleutel die `env` zonder scheiding in een ander woord plakt
+      (`additionalenvs`, `dotenv`) is geen omgevingscontext (een paar `name`/`value` blijft daar wel verborgen); een
+      geheim in de vrije tekst van een gewoon veld (`notes`, een labelwaarde) zonder URL-wachtwoord of `Bearer`; de
+      vrije tekst `target.resource` van een eigenaarsactie. Beleid en `policy_hash` ongewijzigd.
 
 ## Open punten
 

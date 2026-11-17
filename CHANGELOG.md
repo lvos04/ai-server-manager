@@ -4,6 +4,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: scherpere toonregels voor de preview (S-P2-040 herstelronde 5)
+- Geheim-achtige namen ook genormaliseerd en op `key`/`pwd`/`auth`, URL met alleen een wachtwoord, omgevingscontext alleen bij een heel deel `env`, onder een omgevingssleutel alleen korte niet-willekeurige namen, ook `huidig` door de toonfunctie (R-VEILIG-14 t/m 17; ADR-0030 besluit 32).
+
 ### Gerepareerd — Hub: elk veld van de preview door één toonfunctie (S-P2-040 herstelronde 4)
 - Geen rauw veld meer in `preview.wijziging` (ook `resources`); onder elke sleutel met `env` (genormaliseerd) alleen namen, paren `key`/`name`/`value` in elke schrijfwijze, overige tekst en sleutels via `redact_text`; bewakingstest per veld (R-VEILIG-9 t/m 13; ADR-0030 besluit 32).
 

@@ -1082,6 +1082,103 @@ def test_omgevingscontext_en_paren_volgens_een_regel(stack: Stack, values: Any, 
     assert "proefgeheim" not in r.text and "proefgeheim" not in _kijkers_tekst(stack, kijker, r.json()["request_id"])
 
 
+H1_NAMEN = ["api.key", "Api.Key", "x.api.key", "access-key", "access.key", "encryption_key", "license.key", "db_pwd",
+            "auth"]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("values", "verwacht", "geheimen"),
+    [
+        # H1 (R-VEILIG-14): geheim-achtige sleutelnamen met punt of streep, op key, pwd en auth.
+        pytest.param(
+            {
+                "app": {
+                    **{n: f"proefgeheim-h1-{i}" for i, n in enumerate(H1_NAMEN)},
+                    "labels": [{"key": "api.key", "value": "proefgeheim-h1-lab"}],
+                }
+            },
+            {"app": {**dict.fromkeys(H1_NAMEN, "***"), "labels": [{"key": "api.key", "value": "***"}]}},
+            ["proefgeheim"],
+            id="h1_sleutelnamen",
+        ),
+        # H2 (R-VEILIG-17): een losse waarde onder een omgevingssleutel alleen als hij kort en niet willekeurig is.
+        pytest.param(
+            {
+                "app": {
+                    "environment": ["GeheimH4woord2x", "Z2VoZWltLWg0LWI2NC14eXo=", "production"],
+                    "env": "Xk9fQ2mZ7pL4wR8tH4",
+                    "envs": "Z2VoZWltLWg0LWI2NC14eQ==",
+                    "env_vars": "DB_PASSWORD\nGeheimH4regel2",
+                    "Environment": {"DB_HOST=proefgeheim-h2k": ""},
+                }
+            },
+            {
+                "app": {
+                    "environment": ["***", "***", "production"],
+                    "env": "***",
+                    "envs": "***",
+                    "env_vars": "DB_PASSWORD\n***",
+                    "Environment": {"DB_HOST": ""},
+                }
+            },
+            ["GeheimH4woord2x", "Z2VoZWltLWg0LWI2NC14", "Xk9fQ2mZ7pL4wR8tH4", "GeheimH4regel2", "proefgeheim"],
+            id="h2_restvorm_onder_een_omgevingssleutel",
+        ),
+        # H3 (R-VEILIG-15): een URL met alleen een wachtwoord.
+        pytest.param(
+            {
+                "app": {
+                    "redis_url": "redis://:proefgeheim-h3a@redis:6379/0",
+                    "labels": [{"key": "x.info", "value": "redis://:proefgeheim-h3b@redis:6379"}],
+                }
+            },
+            {
+                "app": {
+                    "redis_url": "redis://:***@redis:6379/0",
+                    "labels": [{"key": "x.info", "value": "redis://:***@redis:6379"}],
+                }
+            },
+            ["proefgeheim"],
+            id="h3_url_met_alleen_een_wachtwoord",
+        ),
+        # H4 (R-VEILIG-16): env als deel van een ander woord is geen omgevingscontext; alles blijft zichtbaar.
+        pytest.param(
+            {
+                "openvpn": {"port": 1194, "server": "vpn.voorbeeld.invalid"},
+                "envoy": {"listen_port": 8443},
+                "venv": {"host_path": "/mnt/testpool/apps/venv"},
+            },
+            {
+                "openvpn": {"port": 1194, "server": "vpn.voorbeeld.invalid"},
+                "envoy": {"listen_port": 8443},
+                "venv": {"host_path": "/mnt/testpool/apps/venv"},
+            },
+            ["***"],
+            id="h4_env_in_een_ander_woord",
+        ),
+    ],
+)
+def test_vormen_van_herreview_4_volgens_het_principe(
+    stack: Stack, values: Any, verwacht: Any, geheimen: list[str]
+) -> None:
+    """S-P2-040, herstelronde 5 (R-VEILIG-14 t/m 17; besluit regisseur; ADR-0030 besluit 32): de vormen H1-H4 van
+    herreview 4 via de API. Geheim-achtige namen ook genormaliseerd en op ``key``/``pwd``/``auth``; een URL met alleen
+    een wachtwoord; onder een omgevingssleutel (alleen als heel deel van de naam) een losse waarde alleen als hij kort
+    en niet willekeurig is. Bij H4 staat er nergens ``***``: de beheerder ziet poort, server en hostpad."""
+    make_user(stack.admin, "kijker8", "viewer")
+    kijker = login_as(stack.app, "kijker8")
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    waarden = r.json()["preview"]["wijziging"]["waarden"]
+    assert waarden == verwacht, r.text
+    tekst = _kijkers_tekst(stack, kijker, r.json()["request_id"])
+    for geheim in geheimen:
+        if geheim == "***":
+            assert geheim not in str(waarden), waarden
+        else:
+            assert geheim not in r.text and geheim not in tekst, geheim
+
+
 def test_geen_rauw_veld_in_de_wijziging_van_een_installatie(stack: Stack) -> None:
     """S-P2-040, herstelronde 4 (R-VEILIG-13; besluit regisseur punt 1): ook ``resources`` en de andere velden van een
     installatie (herstartbeleid, poorten, opslag, namen van omgevingsvariabelen, redenen en controles uit het manifest)

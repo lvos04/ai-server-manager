@@ -46,7 +46,8 @@ class Geval:
 
 
 def _doel(naam: str = _g(1), **staat: Any) -> Doel:
-    return Doel(soort="app", naam=naam, etag="etag-proef", bestaat=True, staat=dict(staat))
+    """Een doel met in zijn staat (``preview.huidig``, de readback van de NAS) altijd een geheim."""
+    return Doel(soort="app", naam=naam, etag="etag-proef", bestaat=True, staat={"naam": naam, **staat})
 
 
 def _values() -> dict[str, Any]:
@@ -185,6 +186,43 @@ def test_elk_veld_van_wijziging_gaat_door_de_toonfunctie(g: Geval) -> None:
     assert getoond == preview._toon(ruw)
 
 
+# Velden van de preview die bewust niet door de toonfunctie gaan, met de reden (S-P2-040 herstelronde 5, W3 van
+# R-VEILIG herreview 4; besluit regisseur). Elk ander veld wordt hieronder op een geplant geheim doorzocht.
+BEWUST_RAUW = {
+    "target": "Het doel zoals de beheerder het goedkeurt (host, app, dataset of snapshot). Het beleid toetst het vóór "
+    "de preview op een vast patroon (één host, APP_NAME_RE, DATASET_RE, SNAP_NAME_RE); maskeren zou verbergen wat er "
+    "wordt goedgekeurd.",
+    "resource_etag": "De ETag van de gelezen staat (een SHA-256, of 'dataset:'/'snapshot:' plus de naam uit target). "
+    "De goedkeuring is eraan gebonden; een gewijzigde tekst zou die binding breken.",
+}
+PREVIEW_VELDEN = {
+    "schema", "action_id", "omschrijving", "target", "parameters_sha256", "uitvoerder", "risk_class", "rule_ids",
+    "goedkeuring_nodig", "requires_backup", "opslagmutatie", "herkend_als", "kritiek", "policy_hash", "resource_etag",
+    "huidig", "wijziging", "dataretentie", "terugdraaien",
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("g", GEVALLEN, ids=[g.naam for g in GEVALLEN])
+def test_de_hele_preview_bevat_geen_geheim_buiten_de_bewust_rauwe_velden(g: Geval) -> None:
+    """Bewaking (S-P2-040 herstelronde 5, W3; besluit regisseur): de HELE preview, ook ``huidig`` (de readback van de
+    NAS), wordt doorzocht. Alleen de velden in :data:`BEWUST_RAUW` blijven rauw, elk met een reden. Komt er een veld
+    bij (ook een rauw veld naast ``wijziging``), dan is deze test rood tot het door de toonfunctie gaat of met een
+    reden in :data:`BEWUST_RAUW` staat."""
+    actie = POLICY.actie(g.action_id)
+    assert actie is not None, g.action_id
+    cls = classify(POLICY, action_id=g.action_id, target={"host_id": HOST}, parameters={}, actor_type="user")
+    getoond, _hash = preview.bouw(POLICY, actie, cls, g.target, g.parameters, g.doel)
+    assert set(getoond) == PREVIEW_VELDEN, (
+        set(getoond) ^ PREVIEW_VELDEN,
+        "een nieuw veld gaat door de toonfunctie, of staat met een reden in BEWUST_RAUW",
+    )
+    assert set(BEWUST_RAUW) <= PREVIEW_VELDEN and all(BEWUST_RAUW.values())
+    assert MERK in json.dumps(g.doel.staat), "geen geheim geplant in de staat van het doel"
+    assert getoond["huidig"] == preview._toon(g.doel.staat)
+    rest = {k: v for k, v in getoond.items() if k not in BEWUST_RAUW}
+    assert MERK not in json.dumps(rest), [k for k, v in rest.items() if MERK in json.dumps(v)]
+
+
 @pytest.mark.parametrize(
     ("tekst", "verwacht"),
     [
@@ -215,7 +253,8 @@ def test_tekst_in_een_omgevingscontext_toont_alleen_namen(tekst: str, verwacht: 
 @pytest.mark.parametrize(
     "sleutel",
     ["env", "Env", "ENVS", "environment", "additional_envs", "Additional-Envs", "additionalEnvs", "env_vars",
-     "environment_variables", "EXTRA_ENV", "omgevingsvariabelen"],
+     "environment_variables", "EXTRA_ENV", "omgevingsvariabelen", "environments", "omgeving", "EnvVars", "envvars",
+     "ENV.VARS", "app-env", "environmentVariables"],
 )  # fmt: skip
 def test_elke_omgevingssleutel_toont_alleen_namen(sleutel: str) -> None:
     """Besluit regisseur punt 3 (R-VEILIG-12): elke sleutel waarvan de genormaliseerde naam ``env`` bevat (en het
@@ -282,3 +321,96 @@ def test_overige_vrije_tekst_en_sleutels_gaan_door_redact_text() -> None:
         "https://beheer:***@h/x": 1,
         "https://beheer:***@h/x (2)": 2,
     }
+
+
+# ---------------------------------------------------------------------- S-P2-040 herstelronde 5 (R-VEILIG-14 t/m 17)
+@pytest.mark.parametrize(
+    "naam",
+    ["api.key", "Api.Key", "x.api.key", "access-key", "access.key", "encryption_key", "license.key", "db_pwd", "auth",
+     "client-secret", "client.secret", "private-key", "x-api-key", "apiKey", "apikey", "AccessKey", "masterKey",
+     "signing.key", "dbpwd", "basic_auth", "Auth", "auth.user"],
+)  # fmt: skip
+def test_geheime_sleutelnamen_ook_genormaliseerd(naam: str) -> None:
+    """R-VEILIG-14 (H1; besluit regisseur): een geheim-achtige sleutelnaam telt ook genormaliseerd (``_nk``, zonder punt
+    of streep), net als een naam die op ``key`` eindigt, een naam met ``pwd`` en ``auth`` als los deel van de naam. Als
+    sleutel en als ``key`` van een paar (label)."""
+    assert preview._toon({"app": {naam: f"{MERK}-130"}}) == {"app": {naam: "***"}}
+    assert preview._toon({"labels": [{"key": naam, "value": f"{MERK}-131"}]}) == {
+        "labels": [{"key": naam, "value": "***"}]
+    }
+
+
+@pytest.mark.parametrize("naam", ["key", "Key", "KEY", "author", "authority", "keyboard", "port", "ndots"])
+def test_de_kale_key_en_gewone_namen_blijven_zichtbaar(naam: str) -> None:
+    """R-VEILIG-14, tegenproef: de kale ``key`` (de naam van een labelpaar) en namen waarin ``auth`` alleen deel van
+    een ander woord is, tellen niet als geheim."""
+    assert preview._toon({"app": {naam: "zichtbaar"}}) == {"app": {naam: "zichtbaar"}}
+    assert preview._toon({"labels": [{"key": naam, "value": "zichtbaar"}]}) == {
+        "labels": [{"key": naam, "value": "zichtbaar"}]
+    }
+
+
+def test_url_met_alleen_een_wachtwoord() -> None:
+    """R-VEILIG-15 (H3): ``redact_text`` herkent ook een URL met een lege gebruikersnaam (``redis://:geheim@host``),
+    in een gewone waarde en in een labelwaarde; met gebruiker blijft het zoals het was."""
+    assert preview._toon(
+        {
+            "redis_url": f"redis://:{MERK}-140@redis:6379/0",
+            "labels": [{"key": "x.info", "value": f"redis://:{MERK}-141@redis:6379"}],
+            "met_gebruiker": f"redis://default:{MERK}-142@redis:6379/0",
+        }
+    ) == {
+        "redis_url": "redis://:***@redis:6379/0",
+        "labels": [{"key": "x.info", "value": "redis://:***@redis:6379"}],
+        "met_gebruiker": "redis://default:***@redis:6379/0",
+    }
+
+
+@pytest.mark.parametrize(
+    "sleutel", ["openvpn", "OpenVPN", "envoy", "Envoy", "envoy_proxy", "venv", "VENV", "my.venv", "openvpn-config"]
+)
+def test_env_als_deel_van_een_ander_woord_is_geen_omgevingscontext(sleutel: str) -> None:
+    """R-VEILIG-16 (H4; besluit regisseur): alleen een HEEL deel van de sleutel (gescheiden door ``_ . -`` of een
+    hoofdletterovergang) telt als omgevingswoord. Onder ``openvpn``, ``envoy`` of ``venv`` blijven poort, server en
+    hostpad zichtbaar."""
+    waarde = {"port": 1194, "server": "vpn.voorbeeld.invalid", "host_path": "/mnt/testpool/apps/venv", "aan": True}
+    assert preview._toon({"app": {sleutel: waarde}}) == {"app": {sleutel: waarde}}
+
+
+@pytest.mark.parametrize(
+    ("tekst", "verwacht"),
+    [
+        ("GeheimH4woord2x", "***"),  # hoofd- en kleine letters met een cijfer: willekeurig
+        ("Xk9fQ2mZ7pL4wR8tH4", "***"),
+        ("Z2VoZWltLWg0LWI2NC14eXo=", "***"),  # de '='-staart van base64 is geen scheiding
+        ("Z2VoZWltLWg0LWI2NC14eQ==", "***"),
+        ("DB_PASSWORD\nGeheimH4regel2", "DB_PASSWORD\n***"),  # per regel
+        ("d41d8cd98f00b204e9800998ecf8427e", "***"),  # hexreeks
+        ("k3j5h2g8f9d7s6a1x0", "***"),  # cijfers en letters met hoge entropie
+        ("A" * 65, "***"),  # niet kort
+        ("Xk9fQ2mZ7pL4wR8tH4=1", "***"),  # ook de naam vóór '=' moet op een naam lijken
+        ("production", "production"),
+        ("DB_HOST=", "DB_HOST"),
+        ("DB_HOST:", "DB_HOST"),
+        ("MYSQL_ROOT_PASSWORD", "MYSQL_ROOT_PASSWORD"),
+        ("SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE", "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE"),
+        ("HTTP2_PORT", "HTTP2_PORT"),
+        ("A" * 64, "A" * 64),
+    ],
+)
+def test_een_losse_waarde_onder_een_omgevingssleutel_alleen_als_hij_kort_en_niet_willekeurig_is(
+    tekst: str, verwacht: str
+) -> None:
+    """R-VEILIG-17 (H2; besluit regisseur): onder een omgevingssleutel staat een naam alleen als hij kort is (hooguit
+    64 tekens) en niet willekeurig (de entropietoets van ``hub.redact._maybe_secret`` of strenger), per regel; anders
+    ``***``. Een '='-staart (base64-opvulling) telt niet als scheiding."""
+    assert preview._toon({"environment": tekst}) == {"environment": verwacht}
+    assert preview._toon({"env": [tekst]}) == {"env": [verwacht]}
+
+
+def test_sleutels_in_een_omgevingsobject_volgen_de_naamregel() -> None:
+    """R-VEILIG-17 (besluit regisseur): een sleutel van een omgevingsobject gaat ook door de naamregel: ``NAAM=geheim``
+    als sleutel toont alleen ``NAAM``, een willekeurige sleutel ``***``; een gewone sleutel blijft zoals hij is."""
+    assert preview._toon(
+        {"environment": {f"DB_HOST={MERK}-150": "", "Xk9fQ2mZ7pL4wR8tH4": "", "Name ": "x", "LEEG": ""}}
+    ) == {"environment": {"DB_HOST": "", "***": "", "Name ": "***", "LEEG": ""}}
