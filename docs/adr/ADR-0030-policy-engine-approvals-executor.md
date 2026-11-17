@@ -656,6 +656,12 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
 
 ## Open punten
 
+- **Ontwerp voor de volledige appketen (S-P2-050 deelstap A).**
+  [ADR-0032](ADR-0032-vertrouwde-appplannen-en-kluisdoorgifte.md) legt bronvertrouwen, vaste app-identiteit,
+  planorkestratie, C-12, opslag/preview, symlinkgrens, migratieveilig terugzetten en de deelketens B–G ter review
+  vast. Zijn test-/mutatiematrix is nog te bouwen; zijn contractmeldingen zijn open. Het ontwerp heft de huidige
+  capabilityweigeringen en beschermregels niet op en vervangt de meldregel bij historische herstelwaarden niet.
+
 - **Eigen opdracht bij een installatie (S-P2-040, besluit regisseur optie C; besluit 32).** De Hub weigert `command`
   en `entrypoint` tot er een installatiescherm is dat ze veilig kan tonen (UI-stappen S-P2-170 en S-P2-180). Daar
   opnieuw besluiten hoe: de inhoud tonen (en na afloop wissen) of alleen "gezet", lengte en SHA-256. Tot dan kan een

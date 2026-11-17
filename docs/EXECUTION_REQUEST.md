@@ -4,6 +4,13 @@ Formaat van de berichten tussen de Hub en een uitvoerder (de executor of een eig
 `apps/policy/src/asm_policy` (`execreq`, `verify`, `canonical`, `etag`); de Hub en de executor gebruiken hetzelfde
 pakket. Besluiten: ADR-0030.
 
+Ontwerp voor catalogus-/plan-/doelbinding en afzonderlijke kluisdoorgifte:
+[ADR-0032](adr/ADR-0032-vertrouwde-appplannen-en-kluisdoorgifte.md), besluiten 1–4 en open meldingen M1–M4.
+Dit is nog geen transportcontract: het voegt geen veld aan deze envelope toe. Geheime waarden komen nooit in
+de ondertekende envelope, verzoekhash, idempotentie-opslag of het journaal; zij worden niet vóór ondertekening
+in parameters opgelost. Tot het afzonderlijke transport en de binding zijn vastgesteld en gebouwd, blijft de
+betrokken kluiscapability `501 capability_unavailable`.
+
 ## ActionProposal
 
 ```json
