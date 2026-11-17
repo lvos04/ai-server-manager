@@ -427,7 +427,10 @@ invulde, geldt vanaf E:
 
 De acceptatie van E toont dit aan (T4, tokenmarkering); zonder dat bewijs geen vrijgave van E.
 
-OIDC-`client_secret`-overdracht blijft een eigen ADR in 070.
+OIDC-`client_secret`-overdracht blijft afzonderlijk in
+[ADR-0033](ADR-0033-oidc-clientgeheim-naar-de-hubkluis.md) (070, ontwerp): een door Authentik gemaakte
+credential voor de Hub, geen appgeheim of enrollment-token op dit ophaalkanaal. De eigen `auth`-ruimte
+blijft gescheiden van de app-opslag van besluit 2; de open OIDC-contractmeldingen sluiten M2 hier niet.
 
 **Alternatieven en reden.** Geheim vóór ondertekenen in `parameters` zetten, de vault delen, een algemeen
 `get_secret(ref)` aanbieden of plaintext via het gewone HTTP-kanaal sturen is verworpen: de eerste twee lekken
