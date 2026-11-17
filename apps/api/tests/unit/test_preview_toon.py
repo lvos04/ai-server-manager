@@ -414,3 +414,120 @@ def test_sleutels_in_een_omgevingsobject_volgen_de_naamregel() -> None:
     assert preview._toon(
         {"environment": {f"DB_HOST={MERK}-150": "", "Xk9fQ2mZ7pL4wR8tH4": "", "Name ": "x", "LEEG": ""}}
     ) == {"environment": {"DB_HOST": "", "***": "", "Name ": "***", "LEEG": ""}}
+
+
+# ---------------------------------------------------------------------- S-P2-040 herstelronde 6 (R-VEILIG-18 t/m 20)
+@pytest.mark.parametrize(
+    "sleutel",
+    ["additionalenvs", "app.additionalenvs", "extraenv", "EXTRAENV", "appenv", "app.appenv", "environ",
+     "os.environ", "Environ", "dotenv", "DOTENV", "appenvironment", "extraenvironments"],
+)  # fmt: skip
+def test_een_deel_dat_op_een_omgevingswoord_eindigt_is_een_omgevingscontext(sleutel: str) -> None:
+    """R-VEILIG-18 (J1; besluit regisseur): een deel van de sleutel dat EINDIGT op ``env``, ``envs``, ``environment`` of
+    ``environments`` (``additionalenvs``, ``extraenv``, ``appenv``), en ``environ`` en ``dotenv``, is ook een
+    omgevingscontext: alleen namen. ``venv``, ``openvpn`` en ``envoy`` niet (zie
+    :func:`test_env_als_deel_van_een_ander_woord_is_geen_omgevingscontext`)."""
+    assert preview._toon({"app": {sleutel: {"DB_HOST": f"{MERK}-160", "LEEG": "", "AAN": True}}}) == {
+        "app": {sleutel: {"DB_HOST": "***", "LEEG": "", "AAN": True}}
+    }
+    assert preview._toon({"app": {sleutel: [f"DB_HOST={MERK}-161", {"name": "X", "value": f"{MERK}-162"}]}}) == {
+        "app": {sleutel: ["DB_HOST", {"name": "X", "value": "***"}]}
+    }
+    assert preview._toon({"app": {sleutel: f"DB_HOST={MERK}-163\nAPP_MODE=prod"}}) == {
+        "app": {sleutel: "DB_HOST\nAPP_MODE"}
+    }
+
+
+@pytest.mark.parametrize(
+    "naam",
+    ["encryption_keys", "ssh_keys", "license_keys", "sshKeys", "api.keys", "SIGNING-KEYS", "oauth", "OAUTH",
+     "oauth_client", "jwt", "JWT_SIGNING", "otp", "otp_code", "mnemonic", "wallet_mnemonic", "salt", "salt_rounds",
+     "dbsalt", "seed", "seed_phrase", "walletseed"],
+)  # fmt: skip
+def test_meervoud_op_keys_en_andere_geheime_namen(naam: str) -> None:
+    """R-VEILIG-19 (J2; besluit regisseur): een genormaliseerde naam die op ``keys`` eindigt (niet de kale ``keys``) en
+    ``oauth``, ``jwt``, ``otp``, ``mnemonic``, ``salt`` en ``seed`` (als los deel of aan het eind van de genormaliseerde
+    naam) zijn geheim-achtig. Als sleutel en als ``key`` van een paar (label)."""
+    assert preview._toon({"app": {naam: f"{MERK}-170"}}) == {"app": {naam: "***"}}
+    assert preview._toon({"labels": [{"key": naam, "value": f"{MERK}-171"}]}) == {
+        "labels": [{"key": naam, "value": "***"}]
+    }
+
+
+@pytest.mark.parametrize("naam", ["keys", "Keys", "KEYS", "pin", "PIN", "hotplug", "speed", "seeds", "keyspace"])
+def test_de_kale_keys_pin_en_gewone_namen_blijven_zichtbaar(naam: str) -> None:
+    """R-VEILIG-19, tegenproef (besluit regisseur): de kale ``keys`` en ``pin`` tellen niet als geheim-achtig, net als
+    een naam waarin ``otp`` of ``seed`` alleen midden in een ander woord staat."""
+    assert preview._toon({"app": {naam: "zichtbaar"}}) == {"app": {naam: "zichtbaar"}}
+    assert preview._toon({"labels": [{"key": naam, "value": "zichtbaar"}]}) == {
+        "labels": [{"key": naam, "value": "zichtbaar"}]
+    }
+
+
+def test_onder_een_geheime_naam_blijft_de_vorm_staan() -> None:
+    """R-VEILIG-20 (J3; besluit regisseur): onder een geheim-achtige naam blijven sleutels, ja/nee, leeg en ``None``
+    zichtbaar; alleen tekst- en getalbladen worden ``***``. Zo ziet de beheerder dat ``basic_auth`` uit staat."""
+    assert preview._toon({"app": {"basic_auth": {"enabled": False}}}) == {"app": {"basic_auth": {"enabled": False}}}
+    assert preview._toon({"app": {"auth": {"enabled": True, "port": 8443}}}) == {
+        "app": {"auth": {"enabled": True, "port": "***"}}
+    }
+    assert preview._toon(
+        {"client_secret": {"a": f"{MERK}-180", "leeg": "", "niets": None, "lijst": [f"{MERK}-181", 3, 1.5, False]}}
+    ) == {"client_secret": {"a": "***", "leeg": "", "niets": None, "lijst": ["***", "***", "***", False]}}
+    assert preview._toon({"api_tokens": [{"naam": f"{MERK}-182", "aan": True}]}) == {
+        "api_tokens": [{"naam": "***", "aan": True}]
+    }
+
+
+@pytest.mark.parametrize(
+    ("naam", "pad"),
+    [("tls.key", "/mnt/testpool/certs/app.key"), ("ssl_key", "/etc/ssl/private/app.key"),
+     ("client_secret_file", "/run/secrets/client_secret"), ("env_file", "/mnt/testpool/apps/app.env"),
+     ("env_files", ["/mnt/testpool/apps/a.env", "/mnt/testpool/apps/b.env"])],
+)  # fmt: skip
+def test_een_absoluut_pad_onder_een_geheime_naam_of_omgevingssleutel_blijft_zichtbaar(naam: str, pad: Any) -> None:
+    """R-VEILIG-20 (besluit regisseur): een absoluut pad (begint met ``/``) verwijst naar een bestand en is zelf geen
+    geheim; het blijft zichtbaar onder een geheim-achtige naam en onder een omgevingssleutel (``env_file``)."""
+    assert preview._toon({"app": {naam: pad}}) == {"app": {naam: pad}}
+
+
+@pytest.mark.parametrize("naam", ["public_key", "publickey", "PublicKey", "public.keys", "PUBLIC_KEY"])
+def test_namen_die_met_public_beginnen_zijn_niet_geheim_achtig(naam: str) -> None:
+    """R-VEILIG-20 (besluit regisseur): een naam die genormaliseerd met ``public`` begint, telt niet als geheim-achtig;
+    ``redact_text`` werkt er wel op."""
+    sleutel = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 beheer"
+    assert preview._toon({"app": {naam: sleutel}}) == {"app": {naam: sleutel}}
+    assert preview._toon({"app": {naam: f"https://beheer:{MERK}-190@h/x"}}) == {"app": {naam: "https://beheer:***@h/x"}}
+    assert preview._toon({"labels": [{"key": naam, "value": sleutel}]}) == {"labels": [{"key": naam, "value": sleutel}]}
+
+
+@pytest.mark.parametrize(
+    "waarde",
+    ["/Xk9fQ2mZ7pL4wR8tH4", "/mnt/d41d8cd98f00b204e9800998ecf8427e/app.key", f"/x\nDB={MERK}-200", f"/a={MERK}-201",
+     f"/a {MERK}-202", f"/a:{MERK}-203", f"relatief/{MERK}-204", "/"],
+)  # fmt: skip
+def test_wat_niet_op_een_pad_lijkt_blijft_verborgen(waarde: str) -> None:
+    """R-VEILIG-20, tegenproef (invulling van het besluit): als pad telt alleen één regel die met ``/`` begint, zonder
+    witruimte, ``=`` of ``:``, met minstens één teken na de ``/`` en zonder een willekeurig deel (dezelfde toets als in
+    een omgevingscontext; een base64-geheim kan met ``/`` beginnen). Anders blijft het ``***`` onder een geheime
+    naam."""
+    assert preview._toon({"app": {"encryption_key": waarde}}) == {"app": {"encryption_key": "***"}}
+
+
+def test_sleutels_onder_een_geheime_naam_en_paren() -> None:
+    """R-VEILIG-20 (invulling van het besluit): een sleutel onder een geheim-achtige naam blijft zichtbaar, behalve als
+    hij zelf op een geheim lijkt (willekeurig, of ``NAAM=waarde``: dan alleen de naam, zoals in een omgevingsobject).
+    Een label met een geheime ``key`` en een pad als ``value`` toont het pad; de ``value`` van een omgevingsvariabele
+    (paar met ``name``) blijft altijd ``***`` (ADR-0030 besluit 28)."""
+    assert preview._toon({"tokens": {"Xk9fQ2mZ7pL4wR8tH4": "beheer", f"DB={MERK}-210": "x", "enabled": True}}) == {
+        "tokens": {"***": "***", "DB": "***", "enabled": True}
+    }
+    assert preview._toon({"labels": [{"key": "tls.key", "value": "/mnt/testpool/certs/app.key"}]}) == {
+        "labels": [{"key": "tls.key", "value": "/mnt/testpool/certs/app.key"}]
+    }
+    assert preview._toon({"app": {"additional_envs": [{"name": "CERT", "value": "/mnt/testpool/certs/app.key"}]}}) == {
+        "app": {"additional_envs": [{"name": "CERT", "value": "***"}]}
+    }
+    assert preview._toon(
+        {"app": {"extra": [{"name": "CERT", "value": "/mnt/testpool/certs/app.key"}, {"Name": "X", "Value": {"a": 1}}]}}
+    ) == {"app": {"extra": [{"name": "CERT", "value": "***"}, {"Name": "X", "Value": "***"}]}}

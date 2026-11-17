@@ -631,6 +631,28 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       (`additionalenvs`, `dotenv`) is geen omgevingscontext (een paar `name`/`value` blijft daar wel verborgen); een
       geheim in de vrije tekst van een gewoon veld (`notes`, een labelwaarde) zonder URL-wachtwoord of `Bearer`; de
       vrije tekst `target.resource` van een eigenaarsactie. Beleid en `policy_hash` ongewijzigd.
+    - *Aanvulling 2026-11-17 (herstelronde 6; R-VEILIG-18 t/m 20; besluit regisseur).* (1) Een omgevingscontext is er
+      ook als een deel van de sleutel EINDIGT op `env`, `envs`, `environment` of `environments` (`additionalenvs`,
+      `extraenv`, `appenv`), of op `environ` (`environ`, `os.environ`), dus ook `dotenv`; een deel `venv` uitdrukkelijk
+      niet, en `openvpn` en `envoy` eindigen niet op `env`. Dit vervangt de restvorm "`additionalenvs`, `dotenv` is geen
+      omgevingscontext" hierboven. Een deel als `pyvenv`, `virtualenv` of `devenv` eindigt op `env` en telt dus wel
+      (dan alleen namen). (2) Ook geheim-achtig: een genormaliseerde naam die op `keys` eindigt (`ssh_keys`,
+      `encryption_keys`; niet de kale `keys`) en een naam met `oauth`, `jwt`, `otp`, `mnemonic`, `salt` of `seed` als
+      los deel of aan het eind van de genormaliseerde naam (`dbsalt`, `walletseed`); `pin` niet (te veel valse
+      treffers). (3) Onder een geheim-achtige naam blijft de vorm staan: sleutels, ja/nee, leeg en `null` zijn
+      zichtbaar, alleen tekst- en getalbladen worden `***` (`basic_auth: {enabled: false}` blijft zo; bij
+      `auth: {enabled: true, port: 8443}` wordt de poort `***`). Uitzonderingen: een absoluut pad blijft zichtbaar, ook
+      onder een omgevingssleutel (`tls.key`, `env_file`); een naam die genormaliseerd met `public` begint
+      (`public_key`, `publickey`) is niet geheim-achtig (`redact_text` werkt er wel op). Invulling door de Hub, strenger
+      dan alleen "begint met `/`": een pad is één regel zonder witruimte, `=` of `:`, met minstens één teken na de `/`
+      en zonder willekeurig deel (dezelfde toets als in een omgevingscontext), omdat een base64-geheim ook met `/` kan
+      beginnen. Een sleutel onder een geheim-achtige naam die zelf op een geheim lijkt (met `=` of `:`, of
+      willekeurig) volgt de naamregel van een omgevingsobject. De `value` van een omgevingsvariabele (paar met `name`)
+      blijft altijd `***` (besluit 28), ook een pad. **Restvorm die bewust blijft (naast de restvorm hierboven):** onder
+      een geheim-achtige naam een geheim dat met `/` begint en waarvan geen deel willekeurig is (zoals
+      `/geheimwoord`), een sleutel onder een geheim-achtige naam die op een gewone naam lijkt, en een naam die met
+      `public` begint maar ook een geheimwoord bevat (`public_password`: alleen `redact_text`). Beleid en
+      `policy_hash` ongewijzigd.
 
 ## Open punten
 

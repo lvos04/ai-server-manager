@@ -4,6 +4,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: toonregels van de preview bijgesteld (S-P2-040 herstelronde 6)
+- Omgevingscontext ook bij een deel dat op `env`/`envs`/`environment(s)` eindigt en bij `environ`/`dotenv` (niet `venv`); namen op `keys` en `oauth`, `jwt`, `otp`, `mnemonic`, `salt`, `seed` geheim-achtig; onder een geheim-achtige naam blijft de vorm staan (sleutels, ja/nee, leeg), een absoluut pad en `public_*` blijven zichtbaar (R-VEILIG-18 t/m 20; ADR-0030 besluit 32).
+
 ### Gerepareerd — Hub: scherpere toonregels voor de preview (S-P2-040 herstelronde 5)
 - Geheim-achtige namen ook genormaliseerd en op `key`/`pwd`/`auth`, URL met alleen een wachtwoord, omgevingscontext alleen bij een heel deel `env`, onder een omgevingssleutel alleen korte niet-willekeurige namen, ook `huidig` door de toonfunctie (R-VEILIG-14 t/m 17; ADR-0030 besluit 32).
 

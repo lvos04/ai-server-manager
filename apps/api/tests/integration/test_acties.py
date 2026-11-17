@@ -931,7 +931,7 @@ def test_geheim_in_een_label_of_een_niet_tekstwaarde_staat_er_als_sterretjes(sta
             ],
         },
         "api_token": "***",
-        "client_secret": "***",
+        "client_secret": {"a": "***"},  # de vorm blijft staan (herstelronde 6, R-VEILIG-20; besluit regisseur)
         "admin_token": True,
         "password": "",
     }, r.text
@@ -1177,6 +1177,90 @@ def test_vormen_van_herreview_4_volgens_het_principe(
             assert geheim not in str(waarden), waarden
         else:
             assert geheim not in r.text and geheim not in tekst, geheim
+
+
+J2_NAMEN = ["encryption_keys", "ssh_keys", "license_keys", "oauth", "jwt", "otp", "mnemonic", "salt", "seed"]
+
+
+@pytest.mark.parametrize(
+    ("values", "verwacht", "geheimen"),
+    [
+        # J1 (R-VEILIG-18): een deel dat op een omgevingswoord eindigt, en environ en dotenv: alleen namen.
+        pytest.param(
+            {
+                "app": {
+                    "additionalenvs": {"DB_HOST": "proefgeheim-j1a"},
+                    "extraenv": {"DB_HOST": "proefgeheim-j1b"},
+                    "appenv": {"DB_HOST": "proefgeheim-j1c"},
+                    "environ": ["DB_HOST=proefgeheim-j1d"],
+                    "dotenv": "DB_HOST=proefgeheim-j1e",
+                    "additional_envs": {"DB_HOST": "proefgeheim-j1f"},
+                }
+            },
+            {
+                "app": {
+                    "additionalenvs": {"DB_HOST": "***"},
+                    "extraenv": {"DB_HOST": "***"},
+                    "appenv": {"DB_HOST": "***"},
+                    "environ": ["DB_HOST"],
+                    "dotenv": "DB_HOST",
+                    "additional_envs": {"DB_HOST": "***"},
+                }
+            },
+            ["proefgeheim"],
+            id="j1_omgevingswoord_aan_het_eind",
+        ),
+        # J2 (R-VEILIG-19): meervoud op keys en de andere geheim-achtige namen; de kale keys en pin niet.
+        pytest.param(
+            {"app": {**{n: f"proefgeheim-j2-{i}" for i, n in enumerate(J2_NAMEN)}, "keys": "zichtbaar", "pin": "z"}},
+            {"app": {**dict.fromkeys(J2_NAMEN, "***"), "keys": "zichtbaar", "pin": "z"}},
+            ["proefgeheim"],
+            id="j2_meervoud_en_andere_namen",
+        ),
+        # J3 (R-VEILIG-20): onder een geheim-achtige naam blijft de vorm staan; een pad en public_key zichtbaar.
+        pytest.param(
+            {
+                "app": {
+                    "basic_auth": {"enabled": False},
+                    "auth": {"enabled": True, "port": 8443},
+                    "tls.key": "/mnt/testpool/certs/app.key",
+                    "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 beheer",
+                    "env_file": "/mnt/testpool/apps/app.env",
+                    "client_secret": {"waarde": "proefgeheim-j3", "aan": True},
+                }
+            },
+            {
+                "app": {
+                    "basic_auth": {"enabled": False},
+                    "auth": {"enabled": True, "port": "***"},
+                    "tls.key": "/mnt/testpool/certs/app.key",
+                    "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 beheer",
+                    "env_file": "/mnt/testpool/apps/app.env",
+                    "client_secret": {"waarde": "***", "aan": True},
+                }
+            },
+            ["proefgeheim"],
+            id="j3_vorm_onder_een_geheime_naam",
+        ),
+    ],
+)
+def test_vormen_van_herreview_5_volgens_het_besluit(
+    stack: Stack, values: Any, verwacht: Any, geheimen: list[str]
+) -> None:
+    """S-P2-040, herstelronde 6 (R-VEILIG-18 t/m 20; besluit regisseur; ADR-0030 besluit 32): de vormen J1-J3 van
+    herreview 5 via de API, ook in wat een kijker ziet. Een deel van de sleutel dat op ``env``/``envs``/
+    ``environment(s)`` eindigt, en ``environ`` en ``dotenv``, is een omgevingscontext; namen op ``keys`` en ``oauth``,
+    ``jwt``, ``otp``, ``mnemonic``, ``salt`` en ``seed`` zijn geheim-achtig; onder een geheim-achtige naam blijft de
+    vorm staan (sleutels, ja/nee, leeg), een absoluut pad blijft zichtbaar en ``public_key`` telt niet als geheim."""
+    make_user(stack.admin, "kijker9", "viewer")
+    kijker = login_as(stack.app, "kijker9")
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    waarden = r.json()["preview"]["wijziging"]["waarden"]
+    assert waarden == verwacht, r.text
+    tekst = _kijkers_tekst(stack, kijker, r.json()["request_id"])
+    for geheim in geheimen:
+        assert geheim not in r.text and geheim not in tekst, geheim
 
 
 def test_geen_rauw_veld_in_de_wijziging_van_een_installatie(stack: Stack) -> None:
