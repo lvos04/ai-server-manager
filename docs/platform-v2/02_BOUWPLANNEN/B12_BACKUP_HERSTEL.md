@@ -113,6 +113,8 @@ Bij alle endpoints: authenticatie, rol, inputvalidatie, idempotency voor mutatie
 ## 5. Niet-regressie, randgevallen en verbodsbepalingen
 ZFS-snapshot is geen offsite back-up. OneDrive huidige fotos en appdbs zijn niet hetzelfde als volledige recovery van NAS, credentials of apps.
 
+Een kopie van een dataset waarin een app de sleutel naast haar versleutelde gegevens bewaart, geldt als geheim. Voorbeeld: Node-RED bewaart in `/data` de sleutel die het zelf maakt (`.config.runtime.json`) naast de versleutelde credentials; een snapshot of offsite-kopie van die dataset bevat beide. Zo'n kopie gaat offsite alleen versleuteld, met een sleutel die niet bij die kopie staat (B12-003: "encrypt, offsite key separation"), en de toegang tot de snapshots is even streng als die tot de dataset zelf. Bron: `appstore-en-fork:docs/adr/ADR-0016-beheerder-en-dienstaccount-zonder-geheim-in-het-formulier.md`, eis 9 en "Gevolgen per repo" punt 1 (contract, aanvulling C-12).
+
 ## 6. Oplevering door bouwer
 Opleveren: (1) broncode en tests, (2) migration scripts en versiecompatibiliteit, (3) Compose/TrueNAS app manifest met gepinde images, (4) .env.example zonder geheimen, (5) OpenAPI/connector schemas, (6) test- en auditrapport, (7) restore bewijs, (8) release notes, (9) gebruikershandleiding, (10) screenshots web/mobiel. Markeer niet-geteste hardware/echte accounts als `NIET GEVALIDEERD`.
 

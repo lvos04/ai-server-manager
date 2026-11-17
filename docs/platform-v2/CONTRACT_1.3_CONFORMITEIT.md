@@ -20,6 +20,10 @@ C1.3-ASM-04, -12, -18, -19, -21, C1.3-HCH-02, C1.3-ASF-03, C1.3-MGU-02, -04, C1.
 ontbrekende repowerk Δ-HUB-2 bij ai-server-manager en het nieuwe punt C1.3-MH-07. jelly-leon is daarna verder gegaan
 (P4-0 op 12.4, `55fd3eeeb`); de punten van hoofdstuk 9 zijn daarop nagelopen en blijven gelden.
 
+**Aanvulling C-12 (2026-11-17, blijft `contracts 1.3`; `ai-server-manager:docs/adr/ADR-0031-contract-1-3-aanvulling-c12.md`):**
+drie punten erbij, alle drie voor P3: C1.3-ASF-15 (het veld `accounts` in de validator, eerst), daarna C1.3-JLP-15
+(Node-RED-manifest) en C1.3-HCH-16 (het profiel van home-control-hub vervalt). Bestaande ID's zijn niet hernummerd.
+
 **Lezen van de tabellen:**
 - **ID** = `C1.3-<REPO>-<nn>`; dezelfde ID mag als regel in `EVIDENCE.json` (contract §11).
 - **Contract** = paragraaf van `PLATFORM_CONTRACTEN.md` 1.3 en de groep uit de inventaris (A01–A36).
@@ -167,6 +171,7 @@ dienst-JWT van de Hub (`domains/sso/backup.py`, `authentik_router.py`, A28); dri
 | C1.3-HCH-13 | **Manifest:** geen `HUB_*`, `healthcheck.monitor`, kop 1.3. | §9 (A11, A32) | `deploy/manifest/home-control-hub.manifest.yaml` | NU (na C1.3-ASF-08) |
 | C1.3-HCH-14 | **Kopie 1.3 + drifttest-pin** en EVIDENCE-regels 1.3. | kop, §11 (A35, A33) | `apps/api/tests/unit/test_contract_docs.py`, `docs/platform-v2/EVIDENCE.json` | NU |
 | C1.3-HCH-15 | **Authentik-upgradegate:** catalogusbeschikbaarheid via scope `catalogus.lezen` (nu "catalogusversie onbekend"); `apply` van `sso.oidc.hub.register` en `sso.sessions.revoke` alleen met een ondertekend `ExecutionRequest`; het `client_secret` nooit via Hub-connector, items of events. | §4.4, §8, §3.1 (A18, A28, A10) | `apps/api/src/integrations/domains/sso/backup.py`, `authentik_router.py`, `proposals.py`, `oidc_hub.py` | P2 |
+| C1.3-HCH-16 | **Node-RED-profiel vervalt (C-12):** geen bcrypt-hash, gebruiker of `credentialSecret` als formulierargument (`policy.define_arguments`, `build_profile` en de route `POST /integrations/v1/automation/hardening-profile` gaan weg); een dienstaccount alleen via de beheerder, versleuteld bewaard; voor een account uit `accounts` weigert de bron een wachtwoord of token korter dan 32 tekens (nu `SourceConfig.credential` minstens 8) (ADR-0016 besluit 3 en 6, Gevolgen punt 5). | §3.1, §9 (C-12) | `apps/api/src/integrations/domains/automation/policy.py`, `router.py`, `apps/api/src/integrations/sources.py`, `deploy/truenas/NODE_RED_CUSTOM_APP.md` | P3 (S-P3-360) |
 
 **Repowerk:** geen.
 
@@ -195,6 +200,7 @@ EVIDENCE-test (`apps/api/tests/unit/test_evidence_contract.py`).
 | C1.3-ASF-12 | **Emby als adoptie-item** (`owner.soort: derde`, status volgens §9); herkenning alleen op exacte catalogusappnaam of image-repository. | §2.3, §9 (A03, A31) | `apps/api/src/appstore/bestaande_apps/`, `apps/api/src/appstore/catalog/adoption_manifest.py`, `docs/BESTAANDE_APPS.md` | NU |
 | C1.3-ASF-13 | **Eigen manifest** (geen `HUB_*`, `healthcheck.monitor`, kop 1.3), **kopie 1.3 + drifttest-pin**, EVIDENCE-regels 1.3. | §9, kop, §11 (A11, A32, A35, A33) | `deploy/manifest/appstore-en-fork.manifest.yaml`, `apps/api/tests/unit/test_evidence_contract.py`, `docs/platform-v2/EVIDENCE.json` | NU |
 | C1.3-ASF-14 | **Catalogusapps met geheime values** in de vertaling: alleen een verwijzing naar de vault, nooit een waarde (samen met C1.3-ASM-18). | §3.1, §9 (A10) | `apps/api/src/appstore/manifest/translate.py` | P2 |
+| C1.3-ASF-15 | **Manifeststandaard C-12:** optioneel veld `accounts` (W1, met `account_ongeldig`, `account_controle_ontbreekt`, `account_controle_te_lang`) in beide schemakopieën, model, regels en `docs/MANIFESTSTANDAARD.md`; W2 en W3 (`account_gegevens_verboden`, opnieuw toetsen na het invullen) staan er al (S-P2-520). | §9 (C-12) | `schemas/manifest-v1.schema.json`, `apps/api/src/appstore/manifest/manifest-v1.schema.json`, `apps/api/src/appstore/manifest/model.py`, `rules.py`, `docs/MANIFESTSTANDAARD.md` | P3 (S-P3-490) |
 
 **Repowerk (inventaris C06):** een 429 van de Hub-inventaris volgt `Retry-After` (nu de eigen backoff) — NU;
 herkenning zonder labels/namespace (voorstel: Excel-tekst B08-002 bijwerken); Snapotter/Teeltboek/Uren alleen
@@ -224,6 +230,7 @@ r. ~393, A13 deels); healthcheck wisselt naar 568 met no_new_privs (`deploy/alli
 | C1.3-JLP-12 | **Statische `Idempotency-Key`-test** (ontbreekt). | §5 (A20) | nieuw `apps/api/tests/unit/test_idempotency_routes.py` | NU |
 | C1.3-JLP-13 | **Kopie 1.3 + drifttest** (ontbreekt) en EVIDENCE-regels 1.3. | kop, §11 (A35, A33) | nieuw `tests/repo/test_contract_kopie.py`, `tests/repo/test_repo_rules.py`, `docs/platform-v2/EVIDENCE.json` | NU |
 | C1.3-JLP-14 | **Lifecycle-plannen** lezen inventaris (`inventaris.lezen`) en catalogusbeschikbaarheid (`catalogus.lezen`); `version_unavailable` op basis van de gemeten beschikbaarheid. | §4.4, §2.2 (A18) | lifecycle-planner (B08-003/004) | P2 |
+| C1.3-JLP-15 | **Node-RED-manifest C-12:** geen wachtwoord, hash, gebruiker of `credentialSecret` in manifest of `FLOWS`; validatorkopie op de commit van S-P3-490; geen `accounts` zolang de gebruiker voor Node-RED "Wachten" houdt (ADR-0016 besluit 7). | §9 (C-12) | `install/manifests/node-red.manifest.yaml`, `tools/validator_kopie.py`, `docs/adr/ADR-0023-node-red-als-custom-app.md` | P3 (S-P3-445) |
 
 **Repowerk:** I01 stap 3 doet hier al `app.gpu_choices` + bewijsrecord D08 (inventaris C08; de bron in ai-server-manager
 volgt, C1.3-ASM repowerk). De driftregel van de Peil-kopie (faalt nu bij elke nieuwe versie) gaat mee met Peil 1.1.1

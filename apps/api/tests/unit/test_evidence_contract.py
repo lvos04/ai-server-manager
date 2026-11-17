@@ -4,6 +4,7 @@
 - ``validatie``: één of meer waarden uit de vaste lijst, gescheiden door ``"; "``; nooit leeg; toelichting hoort in
   ``opmerking``. ``Niet getest`` alleen bij status ``Niet gestart`` (nieuw in 1.3).
 - Elke ``NIET GEVALIDEERD (…)`` die in ``blokkade`` staat, staat ook in ``validatie`` (nieuw in 1.3).
+- De vaste lijst hieronder is precies de tabel van §11 (sinds de aanvulling C-12 met ``NIET GEVALIDEERD (echte Hub)``).
 - Naast Excel-ID's mogen contractpunten (``C1.3-<REPO>-<nn>``, ``C1.2-<code>``) en reviews (``REVIEW-<repo>-…``) een
   eigen regel hebben; ``tools/excel/update_excel.py`` meldt die in een eigen overzicht.
 """
@@ -18,6 +19,7 @@ from typing import Any
 import pytest
 
 EVIDENCE = Path(__file__).resolve().parents[4] / "docs" / "platform-v2" / "EVIDENCE.json"
+CONTRACT = EVIDENCE.with_name("PLATFORM_CONTRACTEN.md")
 STATUSSEN = {"Niet gestart", "Bezig", "Geblokkeerd", "N.v.t.", "Mislukt", "Open", "Ingevuld", "Getest"}
 NOOIT = {"Gereed", "Geslaagd"}
 VALIDATIE = {
@@ -28,6 +30,7 @@ VALIDATIE = {
     "NIET GEVALIDEERD (hardware)",
     "NIET GEVALIDEERD (account)",
     "NIET GEVALIDEERD (Mac/Xcode)",
+    "NIET GEVALIDEERD (echte Hub)",
     "Sim-geslaagd",
     "Sim-mislukt",
     "Niet getest",
@@ -80,3 +83,17 @@ def test_contractpunten_en_reviews_hebben_de_vaste_vorm(item: dict[str, Any]) ->
 def test_ids_uniek() -> None:
     ids = [e["id"] for e in _items()]
     assert len(ids) == len(set(ids))
+
+
+def test_vaste_lijst_is_de_tabel_van_paragraaf_11() -> None:
+    """De lijst van deze test volgt het contract: een waarde erbij of eraf zonder contracttekst is rood."""
+    tekst = CONTRACT.read_text(encoding="utf-8")
+    begin = tekst.index("## 11. Bewijs en Excel")
+    p11 = tekst[begin : tekst.index("## 12.", begin)]
+    in_tabel: set[str] = set()
+    for regel in p11.splitlines():
+        regel = regel.strip()
+        if regel.startswith("| `"):
+            eerste_cel = regel.split(" | ")[0]
+            in_tabel.update(re.findall(r"`([^`]+)`", eerste_cel))
+    assert in_tabel == VALIDATIE, f"verschil met contract §11: {sorted(in_tabel ^ VALIDATIE)}"

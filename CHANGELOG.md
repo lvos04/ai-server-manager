@@ -4,6 +4,22 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gewijzigd — Contract 1.3: aanvulling C-12 (S-P2-C12, deel A; ADR-0031; blijft `contracts 1.3`)
+- `docs/platform-v2/PLATFORM_CONTRACTEN.md`: wijzigingslogblok "Aanvulling C-12" (C12-1 tot en met C12-6). §9: het
+  optionele veld `accounts` met de aanmaakwijzen `eerste_gebruik` en `door_beheerder`, de weigering
+  `account_gegevens_verboden`, de 32-tekens-eis voor een dienstaccount en "één weg per document" (geen controlelijst
+  naast een installeerbaar manifest); EX47 noemt de accountgegevens. §3.1: tweede uitzondering voor een geheim van de
+  Hub als vault-verwijzing in een omgevingsvariabele van een Custom App (besluit gebruiker 2026-11-11, S-P2-500), nooit
+  voor een beheerder of dienstaccount; §3.2 en §8 volgen. §8: wat een preview minimaal toont. §11: validatiewaarde
+  `NIET GEVALIDEERD (echte Hub)`. De versieregel blijft letterlijk gelijk.
+- `docs/platform-v2/CONTRACT_1.3_CONFORMITEIT.md`: C1.3-ASF-15, C1.3-JLP-15 en C1.3-HCH-16 (P3).
+- Nieuwe pin in `apps/api/tests/unit/test_contract_pin.py`; tests voor de aanvulling in `test_contract_13.py`; de vaste
+  validatielijst van `test_evidence_contract.py` volgt de tabel van §11.
+- `docs/platform-v2/03_INSTALLATIE/I10_NODE_RED.md` en `02_BOUWPLANNEN/B12_BACKUP_HERSTEL.md` volgen ADR-0016 van
+  appstore-en-fork (Node-RED maakt zijn sleutel zelf, geen beheerder tot de gebruiker een weg kiest; een kopie van een
+  dataset met sleutel en versleutelde gegevens geldt als geheim).
+- De kopieën in de andere tien repos volgen in een eigen stap per repo (deel B).
+
 ### Gerepareerd — Hub: toonregels van de preview bijgesteld (S-P2-040 herstelronde 6)
 - Omgevingscontext ook bij een deel dat op `env`/`envs`/`environment(s)` eindigt en bij `environ`/`dotenv` (niet `venv`); namen op `keys` en `oauth`, `jwt`, `otp`, `mnemonic`, `salt`, `seed` geheim-achtig; onder een geheim-achtige naam blijft de vorm staan (sleutels, ja/nee, leeg), een absoluut pad en `public_*` blijven zichtbaar (R-VEILIG-18 t/m 20; ADR-0030 besluit 32).
 

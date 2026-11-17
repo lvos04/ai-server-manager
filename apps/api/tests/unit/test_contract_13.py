@@ -211,3 +211,121 @@ def test_reviewcorrectie_staat_in_de_juiste_paragraaf(paragraaf: str, zin: str) 
     eind = begin + 1 + volgende.start() if volgende else len(tekst)
     # Regelafbrekingen en inspringing tellen als één spatie (de tekst is op 120 tekens afgebroken).
     assert " ".join(zin.split()) in " ".join(tekst[begin:eind].split()), f"{zin!r} ontbreekt in {paragraaf}"
+
+
+# --- Aanvulling C-12 (2026-11-17, blijft `contracts 1.3`; ADR-0031) -------------------------------------------------
+
+ADR_C12 = Path(__file__).resolve().parents[4] / "docs" / "adr" / "ADR-0031-contract-1-3-aanvulling-c12.md"
+KOP_C12 = "### Aanvulling C-12 (2026-11-17, blijft `contracts 1.3`; ADR-0031)"
+
+
+def _paragraaf(kop: str) -> str:
+    """De tekst van een kop tot de volgende kop van niveau 2 of 3, met regelafbrekingen als één spatie."""
+    tekst = _tekst(CONTRACT)
+    begin = tekst.index(f"\n{kop}")
+    volgende = re.search(r"\n#{2,3} ", tekst[begin + 1 :])
+    eind = begin + 1 + volgende.start() if volgende else len(tekst)
+    return " ".join(tekst[begin:eind].split())
+
+
+def test_versieregel_blijft_letterlijk_staan() -> None:
+    """De aanvulling blijft 1.3: de versieregel (met de peildatum) is gelijk, want de versieparsers en de driftregel
+    van de kopieën lezen haar letterlijk (ADR-0031)."""
+    eerste = _tekst(CONTRACT).splitlines()[2]
+    assert eerste == (
+        "Versie: `contracts 1.3` · Peildatum 2026-11-10 · Eigenaar: `lvos04/ai-server-manager` (bron van waarheid)."
+    )
+
+
+def test_aanvulling_c12_staat_in_het_wijzigingslog_en_in_de_kop() -> None:
+    log = _wijzigingslog()
+    assert KOP_C12 in log
+    # Na de reviewcorrecties, binnen het 1.3-wijzigingslog.
+    assert log.index(KOP_C12) > log.index("### Correcties uit de onafhankelijke review (2026-11-10")
+    for n in range(1, 7):
+        assert f"- C12-{n}. " in log, f"C12-{n} ontbreekt"
+    assert ADR_C12.is_file()
+    kop = _tekst(CONTRACT).split("## Wijzigingslog")[0]
+    assert "`ai-server-manager:docs/adr/ADR-0031-contract-1-3-aanvulling-c12.md`" in kop
+    assert "ADR-0016-beheerder-en-dienstaccount-zonder-geheim-in-het-formulier.md" in kop
+
+
+@pytest.mark.parametrize(
+    "zin",
+    [
+        # C12-1: het veld `accounts` met precies twee aanmaakwijzen, zonder waarde.
+        "**`accounts: [{id, rol: beheerder|dienst, aanmaak: eerste_gebruik|door_beheerder, afnemer, rechten, controle,"
+        " beschrijving_nl}]`** (optioneel)",
+        "het manifest verklaart alleen wat er moet bestaan, nooit een waarde",
+        # C12-2: accountgegevens weigeren; een geheim van de Hub is nooit een aanmelding.
+        "wordt geweigerd (`account_gegevens_verboden`)",
+        "is nooit de aanmelding van een beheerder of dienstaccount (`account_gegevens_verboden`; niet te accepteren)",
+        # BN-C12-3: de 32-tekens-eis van ADR-0016 besluit 3.
+        "Het wachtwoord of token van een dienstaccount is minstens 32 willekeurige tekens uit een generator; de afnemer"
+        " weigert korter.",
+        # EX47 noemt de accountgegevens.
+        "een geheime waarde of accountgegevens (`account_gegevens_verboden`) in een manifest.",
+        # C12-5: één weg per document.
+        "Een controlelijst (`kind: checklist`) staat nooit naast een installeerbaar manifest",
+    ],
+)
+def test_paragraaf_9_heeft_de_aanvulling_c12(zin: str) -> None:
+    p9 = _paragraaf("## 9. Manifeststandaard")
+    assert " ".join(zin.split()) in p9, zin
+    for term in ("`accounts", "eerste_gebruik", "door_beheerder", "`account_gegevens_verboden`"):
+        assert term in p9, term
+
+
+def test_paragraaf_9_ex47_noemt_geen_kale_geheime_waarde_meer() -> None:
+    p9 = _paragraaf("## 9. Manifeststandaard")
+    ex47 = p9[p9.index("Weigeren vóór uitvoering (EX47):") :]
+    assert not ex47.rstrip().endswith("een geheime waarde in een manifest.")
+
+
+def test_paragraaf_3_1_kent_de_vault_uitzondering_maar_nooit_voor_een_account() -> None:
+    """C12-3 (BN-C12-2; besluit van de gebruiker 2026-11-11 bij S-P2-500; ADR-0015 van appstore-en-fork)."""
+    p31 = _paragraaf("### 3.1 Uitgangspunten")
+    assert "`HUB_ENROLLMENT_TOKEN`" in p31
+    assert "Tweede uitzondering (aanvulling C-12; besluit van de gebruiker 2026-11-11, S-P2-500;" in p31
+    assert "`custom_app.env[].value_from`" in p31 and "`vault://app/<app_id>/<parameter>`" in p31
+    assert "alleen de executor vult de waarde in" in p31
+    assert "nooit voor de aanmelding van een beheerder of dienstaccount (`account_gegevens_verboden`, §9)" in p31
+    # §3.2 noemt het enrollment-token niet meer "de enige" uitzondering.
+    assert "(de enige, kortlevende uitzondering" not in _paragraaf("### 3.2 Overzicht enrollment")
+
+
+def test_paragraaf_8_zegt_wat_een_preview_minimaal_toont() -> None:
+    """C12-4 (melding R-VEILIG bij S-P2-040): elk gezet veld door de maskeerregel; eigen opdracht 501."""
+    p8 = _paragraaf("## 8. Risicobeleid")
+    assert "**Preview (gebonden diff; aanvulling C-12):**" in p8
+    assert "elk gezet veld" in p8
+    assert "De hele wijziging gaat door die regel; een gezet veld weglaten mag niet." in p8
+    assert "`***`" in p8
+    assert "`command` of `entrypoint`" in p8 and "`501 capability_unavailable`" in p8
+    assert "ADR-0030-policy-engine-approvals-executor.md` besluit 32" in p8
+
+
+def test_paragraaf_11_kent_de_waarde_echte_hub() -> None:
+    """C12-6 (melding uit jelly-leon S-G1-17): `NIET GEVALIDEERD (echte Hub)` is een vaste validatiewaarde."""
+    tekst = _tekst(CONTRACT)
+    begin = tekst.index("## 11. Bewijs en Excel")
+    p11 = tekst[begin : tekst.index("## 12.", begin)]
+    assert "| `NIET GEVALIDEERD (echte Hub)` |" in p11
+
+
+@pytest.mark.parametrize(
+    ("rid", "afkorting", "moment", "woorden"),
+    [
+        ("C1.3-ASF-15", "ASF", "P3 (S-P3-490)", ("`accounts`", "`account_ongeldig`", "`docs/MANIFESTSTANDAARD.md`")),
+        ("C1.3-JLP-15", "JLP", "P3 (S-P3-445)", ("`credentialSecret`", "`tools/validator_kopie.py`", "besluit 7")),
+        ("C1.3-HCH-16", "HCH", "P3 (S-P3-360)", ("`credentialSecret`", "32 tekens", "integrations/sources.py`")),
+    ],
+)
+def test_conformiteit_heeft_de_regels_van_c12(rid: str, afkorting: str, moment: str, woorden: tuple[str, ...]) -> None:
+    regels = [r for r in _tekst(CONFORMITEIT).splitlines() if r.startswith(f"| {rid} |")]
+    assert len(regels) == 1, rid
+    m = RIJ.match(regels[0])
+    assert m and m.group(2) == afkorting and m.group(5).strip() == moment, regels[0][:80]
+    assert "C-12" in m.group(4)
+    for woord in woorden:
+        assert woord in regels[0], (rid, woord)

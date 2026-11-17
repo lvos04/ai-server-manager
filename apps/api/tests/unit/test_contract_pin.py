@@ -14,11 +14,12 @@ from pathlib import Path
 import pytest
 
 PV2 = Path(__file__).resolve().parents[4] / "docs" / "platform-v2"
-#: Vastgestelde bron-commit van contract 1.3 (na de review, RV1–RV13): 02b119c.
-BRON_COMMIT = "02b119c"
+#: Bron van contract 1.3 met de aanvulling C-12 (ADR-0031, stap S-P2-C12; blijft 1.3). De volle hash van de eind-commit
+#: van die stap staat in de pins van de kopieën in de andere repos. Daarvoor: 02b119c (na de review, RV1–RV13).
+BRON_COMMIT = "aanvulling C-12 (S-P2-C12)"
 PINS = {
-    "PLATFORM_CONTRACTEN.md": "15b30cf17f91b606451ef9c41f02327076ef76ce655ee94e40e3538106962310",
-    "CONTRACT_1.3_CONFORMITEIT.md": "f0a2352ddb27088ae668013501c62a1eaaf879efe742a2d4422ffe8d33b43466",
+    "PLATFORM_CONTRACTEN.md": "3e12ae564e3ea926784659817285d8e9f2bd7b024639e60f26247813a29cc56e",
+    "CONTRACT_1.3_CONFORMITEIT.md": "a9c5c63b4d5f4bc80c2b1a43652d2a8712ee4279d82b42e25344e21c7c1f6f03",
 }
 
 
