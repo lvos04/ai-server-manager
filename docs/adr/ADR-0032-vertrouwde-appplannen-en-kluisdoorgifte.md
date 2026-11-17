@@ -1,7 +1,9 @@
 # ADR-0032 — Vertrouwde appplannen, doelbinding en kluisdoorgifte
 
-Status: ontwerp ter review · 2026-11-17 · S-P2-050 deelstap A · niveau N4.
-Basis: `e88a290c9ad5fef4acf498d05ad3414395a4fcb5` van `ai-server-manager`.
+Status: ontwerp ter review, herstelronde 1 · 2026-11-17 · S-P2-050 deelstap A · niveau N4.
+Basis: `e88a290c9ad5fef4acf498d05ad3414395a4fcb5` van `ai-server-manager`; herstel op
+`58187e38145fd4628d712888a2829bdeb19fbe60` na de reviews R-VEILIG (bevindingen 1–10) en R-TECH (bevinding 1).
+Besluit 8 bevat een besluit van de regisseur namens de afwezige gebruiker; het wordt de gebruiker nog voorgelegd.
 Contract: `contracts 1.3` met aanvulling C-12, ADR-0031.
 Dit document legt bouwgrenzen en toekomstige bewijstests vast; het levert geen uitvoerende code of nieuwe
 bevoegdheid. De contractmeldingen onderaan zijn tekstvoorstellen, geen aangenomen transportcontract.
@@ -25,16 +27,27 @@ De volgende bronnen bepalen de grenzen, naast het dossier S-P2-050, kop "Omvang,
 - `docs/platform-v2/02_BOUWPLANNEN/B01_HOME_CONTROL_HUB.md`, B01-003; `EXCEL_TAKEN.json`, B01-003;
   `01_ARCHITECTUUR/03_RISICO_AUTONOMIE.md`, "Technische handhaving" en "Speciale blokkades";
   `OVERDRACHT/STATUS.md`, gebruikersbesluiten; `02_BOUWPLANNEN/B03_BESLUITEN.md`, genomen en open besluiten.
-- `appstore-en-fork` op `e634cb0c8c8c752acf1082323fb127914fea7fb8`:
-  `apps/api/src/appstore/api/catalog.py::get_version`, `preview`, `_app_id_bound`;
-  `catalog/service.py::verify_stored_provenance`; `manifest/validator.py::validate_data`;
-  `manifest/rules.py::ACCOUNT_WORDS`, `is_account_name`; ADR-0015, besluiten 1–5 en "Gevolgen".
+- `appstore-en-fork` op `a994c2a51f45b81b2c48c6533b0ccf51ba857f5a` (opnieuw gemeten bij het herstel; het
+  eerste ontwerp las `e634cb0`):
+  `apps/api/src/appstore/api/catalog.py::get_version`, `version_summary`, `source_out`, `preview`, `_app_id_bound`;
+  `catalog/service.py::verify_stored_provenance`, `ensure_bundled_source`; `catalog/sources.py::fetch_http`;
+  `manifest/provenance.py::ProvenanceRecord`, `key_id`; `manifest/validator.py::validate_data`;
+  `manifest/rules.py::ACCOUNT_WORDS`, `LOGIN_NAMES`, `is_account_name`; `manifest/translate.py::_Resolver.hub_at`;
+  `secrets_store.py` (`identity.ed25519`); `hublink.py` (`public_key_jwk`);
+  ADR-0015, besluiten 1–5 en "Gevolgen"; ADR-0023, besluiten 1–5.
   `valid` en `provenance_verified` zijn verschillende uitspraken. De laatste controleert opgeslagen bewijs met
   de eigen appstore-identiteit; dat is op zichzelf geen goedkeuring van een uitgever door de Hub.
-- `jelly-leon-platform` op `90c192bad5590bf964ec8cada1bbffe6d297211d`:
+- `jelly-leon-platform` op `5d314cf6952a1f1875990f89ce3b0a67cab2d182` (`apps/api/src/lifecycle` en ADR-0022
+  ongewijzigd ten opzichte van het eerder gelezen `90c192b`):
   `docs/adr/ADR-0022-plannen-installatie-update-terugzetten.md`, "Besluit" en "Open punten";
-  `apps/api/src/lifecycle/api_plans.py`, verzoekmodellen en planroutes. Een los `manifest_yaml` levert daar
+  `apps/api/src/lifecycle/api_plans.py`, verzoekmodellen, planroutes en `report_step`; `lifecycle/auth.py::WRITE_ROLES`;
+  `lifecycle/planner.py::_Bouw.stap`, `plan_update`, `_schaduw` en `meld`. Een los `manifest_yaml` levert daar
   bewust geen vertrouwde geheime vertaling. De ketentest met Hub-/executor-stand-ins is geen volledige Hub-test.
+- In deze repo daarnaast: `apps/executor/src/executor/uitvoeren.py` (kop, `_plan`, `_voer_uit`),
+  `executor/journal.py::save_values`, `executor/hublink.py`, `apps/policy/src/asm_policy/params.py::_app_update` en
+  `_ix_values`, `apps/api/src/hub/vault.py` (`REF_RE`, `last4`, `Vault.put`), `hub/routers/actions.py::propose` en
+  `::approve`, `hub/actions/service.py::stel_voor` en `keur_goed`, `hub/routers/events.py` (connectorroutes) en
+  `hub/routers/services.py` (enrollment-token).
 
 De onderstaande toetsen zijn **nog te bouwen en te draaien**, tenzij een bron uitdrukkelijk bestaande dekking noemt.
 Een toetsnummer in dit ADR is geen bestaande testfunctie of evidence-ID. Per toets moet de bouwer de echte
@@ -49,10 +62,19 @@ gegevens en de echte code van appstore, planner, Hub en executor; alleen TrueNAS
 onveranderlijk gepinde bron. De vertrouwensselectie staat buiten AI en buiten invoer van een planner of aanvrager.
 Zij bindt de actieve ingeschreven appstore-instantie en haar gepinde identiteit aan de bronidentiteit, soort,
 repository/locatie, subpad, exacte revisie en toegelaten uitgeverssleutel. Een bewegende branch, alleen een URL,
-`enabled: true` of `require_signature` zonder aantoonbaar geslaagde verificatie is onvoldoende. De strenge variant
-vraagt zowel een exacte bronpin als een geldige uitgevershandtekening tegen de vooraf toegelaten sleutel.
-Zonder beschikbaar bewijs van die combinatie blijft uitvoering dicht. Een wijziging/intrekking van deze selectie
-maakt open voorstellen ongeldig; de planner en een catalogussynchronisatie mogen de selectie niet verruimen.
+`enabled: true` of `require_signature` zonder aantoonbaar geslaagde verificatie is onvoldoende. Vereist zijn altijd
+beide: een exacte bronpin (een git-commit) én een geldige uitgevershandtekening tegen de vooraf toegelaten sleutel;
+er is geen lossere variant. Een ingebouwde bron (`ensure_bundled_source`: geen handtekening, revisie
+`bundled:<16 hex>`) en een http-bron (revisie is een ETag, `fetch_http`) voldoen daar nooit aan en blijven dicht.
+Als uitgeversbewijs telt de Hub alleen het ondertekende provenance-record (`ProvenanceRecord`, getekend met de
+identiteit die de appstore bij de Hub inschrijft: `secrets_store.py` `identity.ed25519` is dezelfde sleutel als
+`public_key_jwk` in `hublink.py`; de Hub rekent die handtekening zelf na) of een eigen narekening van de
+uitgevershandtekening, nooit het losse statusveld `publisher_signature` uit `version_summary`. Hij vergelijkt de
+volledige uitgeverssleutel (de hele publieke sleutel of een volledige SHA-256-vingerafdruk), nooit alleen een
+sleutel-ID van 16 hex (`key_id`, `trusted_key_id`, `publisher_key_id`). De appstore levert die volledige sleutel
+nu niet (M1). Zonder beschikbaar bewijs van die combinatie blijft uitvoering dicht. Een wijziging/intrekking
+van deze selectie maakt open voorstellen ongeldig; de planner en een catalogussynchronisatie mogen de selectie
+niet verruimen.
 
 De Hub haalt entry, gekozen `version_id`, versiegegevens en bronstatus zelf bij die appstore op. Hij vergelijkt de
 vaste `app_id`, entry-versiebinding en bronidentiteit en valideert het gehele manifest opnieuw met de gepinde
@@ -67,8 +89,30 @@ entry/versie, manifesthash, vaste `app_id`, doelinstantie uit besluit 2, image-d
 schema-/validatorpin, plannerplan en stap, vertaalde payload met verwijzingen, de exacte verzameling gemarkeerde
 `{path, parameter, ref}` en onveranderlijke kluisrevisies uit besluit 4. Dezelfde context telt mee in de
 gebonden preview en `action_scope.parameters_sha256`; daarvoor is eerst de schemavastlegging van M1 nodig.
-Geen vrije extra velden in het huidige `ExecutionRequest`. De executor verifieert deze ondertekende context zelf,
-zijn eigen toegelaten bron-/schemabewijs en zijn verse doelmeting; alleen "de Hub heeft het goedgekeurd" volstaat niet.
+Geen vrije extra velden in het huidige `ExecutionRequest`.
+
+**Eigen anker van de executor.** Voor de executor is elk veld in de ondertekende context een claim, geen bewijs:
+"het veld staat in de ondertekende context" is precies "de Hub heeft het goedgekeurd", en dat volstaat niet. De
+bestaande executor kent alleen de gepinde policy-sleutel, het beleid in zijn image en zijn eigen readback
+(`uitvoeren.py`, kop, stap 1–9); hij heeft geen catalogus- of bronkennis. Hij vergelijkt de claim daarom met twee
+ankers die hij zelf heeft en die de Hub niet kan veranderen:
+
+- **Bron en inhoud:** de witte lijst per app en versie uit besluit 6, als beleidsbestand onder de `policy_hash` in
+  het image van Hub én executor (een verschillende lijst geeft dus al een weigering op de policy-hash; de vorm volgt
+  in C). Elke regel noemt catalogusapp, trein, exacte versie, manifesthash, image-digests, schema-/ix-app-versie, de
+  toegelaten bronidentiteit (soort, locatie, subpad, exacte revisie), de volledige uitgeverssleutel en het veldschema
+  met de toegelaten kluisplekken. De executor weigert als bron, revisie, sleutel, `app_id`, versie, manifesthash of
+  digest niet precies op één regel past, en toetst de werkelijke payload en de gemarkeerde
+  `{path, parameter, ref}` zelf aan het veldschema van die regel. De beheerdersselectie in de Hub kan deze lijst
+  alleen versmallen, nooit verruimen.
+- **Doel:** zijn eigen verse readback via zijn eigen gepinde TrueNAS-verbinding (bestaande stap 5–7: vingerafdruk,
+  `app.query`/`app.image.query`, ETag) en zijn eigen instantielijst zonder waarden uit besluit 4. Bij een nieuwe
+  installatie moet de runtime-naam afwezig zijn; bij een bestaande instantie moeten naam, catalogusapp/trein,
+  image-identiteit en, als er kluisplekken zijn, zijn eigen instantieregistratie passen.
+
+Een registerrevisie, plan-ID of bronselectie van de Hub kan de executor niet zelf nagaan; die vervangen nooit een
+van beide ankers.
+
 Hercontrole gebeurt bij voorstel, goedkeuring en vlak vóór uitvoering/ontsluiting. Elke wijziging vraagt een
 nieuwe preview en goedkeuring. Alleen een aantoonbaar afwezige catalogusversie geeft `version_unavailable`;
 een onbereikbare, onleesbare of verouderde bron geeft onbekend en houdt de gate dicht.
@@ -81,9 +125,18 @@ controleerbare uitgeversbewijs zijn open (M1); er wordt geen echte bron of sleut
 **Bewijstest T1.** Een gegenereerde testuitgever, vooraf gepinde bron en echte catalogusversie leveren één
 goedgekeurd voorstel op. Vervang afzonderlijk bron, uitgeverssleutel, entry, `version_id`, hash, `app_id`, doel,
 payload of `vault_refs`; trek de bron tussen goedkeuring en uitvoering in. Iedere variant weigert vóór
-ondertekening/ontsluiting en vóór een TrueNAS-schrijfaanroep. Test ook ontbrekend bewijs en verdwenen versie.
+ondertekening/ontsluiting en vóór een TrueNAS-schrijfaanroep. Test ook ontbrekend bewijs, verdwenen versie, een
+`bundled`- en een http-bron, een los `publisher_signature: verified` zonder geldig ondertekend record en een andere
+uitgeverssleutel met dezelfde 16-hex sleutel-ID.
+**Directe executorproeven (T1-direct).** Een met de testsleutel van de Hub correct ondertekend verzoek (geldige
+handtekening, nonce, tijden, policy-hash en goedkeuring) gaat rechtstreeks naar de executor, telkens met één
+afwijking: een niet-toegelaten bron of revisie, een andere uitgeverssleutel, manifesthash, digest, `app_id` of
+versie, een ander doel dan de eigen readback, of een extra, ontbrekende of verplaatste kluismarkering. Elk geval:
+weigering met een vaste code, nul kluisopvragen en nul TrueNAS-schrijfaanroepen.
 **Mutatie M-T1.** Sla de bronpin-/uitgeverscontrole of één bindingsvergelijking over: de overeenkomstige weigertest
-moet rood worden, met aantoonbaar bereik van die controle.
+moet rood worden, met aantoonbaar bereik van die controle. Haal de vergelijking met de witte lijst of met de eigen
+readback uit de executor (de Hub-controles blijven staan): de betreffende directe executorproef wordt rood, en een
+teller toont dat het verzoek de executor werkelijk bereikte.
 
 ### 2. Vaste app_id en TrueNAS-appnaam blijven afzonderlijke identiteiten
 
@@ -107,9 +160,20 @@ percent-gecodeerde scheidingstekens, Unicode-normalisatie, hoofdletteralias of w
 credentialreferentie uit §3.10 blijft een andere namespace en is nooit geldig als app-verwijzing. Geen concateneren
 naar een bestandspad en geen uitwijken naar `vault://<scope>/<naam>` als een app-ref niet bestaat.
 
+De app-geheimen staan in een eigen opslagruimte. Een app-ref wordt nooit afgebeeld op de tweeledige vorm van
+`hub/vault.py::REF_RE` (`<scope>/<naam>`) en nooit opgezocht in de bestaande ruimtes van de Hub (`auth`,
+`truenas`, `monitoring`, `meldingen`; `make_ref` in `oidc/service.py`, `truenas/connection.py`,
+`routers/monitoring.py`, `routers/notifications.py` en `routers/breakglass.py`). Anders zou een manifest met
+`app_id` `truenas` en parameter `readonly-api-key` de eigen TrueNAS-sleutel van de Hub ophalen. Een `app_id` die
+gelijk is aan zo'n ruimtenaam krijgt geen andere behandeling dan elke andere `app_id`: de lookup kan die ruimtes
+eenvoudig niet bereiken.
+
 Omdat de publieke verwijzing geen instantie bevat, houdt de interne kluislookup óók de bevestigde doelinstantie en
 kluisrevisie aan. Er is nooit een app-brede fallback. Meerdere instanties van dezelfde vaste app krijgen geen
-toegang tot elkaars geheimen; tot die eenduidige opslagbinding bestaat wordt deze capability geweigerd.
+toegang tot elkaars geheimen; tot die eenduidige opslagbinding bestaat wordt deze capability geweigerd. Dat geldt
+ook voor de schaduwinstallatie uit het updateplan (`planner.py::_schaduw`, stap `schaduw-installeren`: een tweede
+instantie op een kloon). Voor een app met kluisgeheimen blijft die stap dicht tot een besluit in deelstap F (eigen
+geheimen voor de testkopie of geen schaduwtest); de geheimen van de bron-instantie krijgt zij nooit.
 
 **Alternatieven en reden.** Runtime-naam in het vaultpad zetten breekt de vaste identiteit bij een hernoeming.
 Alleen de vaste app-id gebruiken deelt geheimen tussen instanties. Beide zijn verworpen. De precieze
@@ -117,24 +181,70 @@ representatie naast de huidige `target` en de opslagmigratie zijn open in M1/M2.
 
 **Bewijstest T2.** Installeer met een afwijkende runtime-naam en controleer via de echte API dat alleen de juiste
 geregistreerde instantie het verwachte testgeheim ontvangt. Test tweede instantie, naamhergebruik, ontbrekende
-bevestiging, hostwissel en alle ongeldige verwijzingsvormen; geen kluislookup op een ander doel.
+bevestiging, hostwissel en alle ongeldige verwijzingsvormen; geen kluislookup op een ander doel. Botsingsgevallen:
+een vertrouwd testmanifest met `app_id` gelijk aan een bestaande kluisruimte (`truenas`, `auth`, `monitoring`,
+`meldingen`) en een parameter gelijk aan een bestaande naam daar (bijvoorbeeld `readonly-api-key`,
+`oidc-client-secret`), met de bestaande waarde vooraf gevuld: geen waarde, nul opvragen in de bestaande ruimtes
+(teller per ruimte). Schaduwinstallatie van een app met kluisgeheimen: geweigerd, nul kluisopvragen. De
+doelgevallen (tweede instantie, naamhergebruik, hostwissel, andere runtime-naam) gaan ook als correct ondertekend
+verzoek rechtstreeks naar de executor (zoals T1-direct): weigering op zijn eigen readback en instantielijst, nul
+kluisopvragen en nul schrijfaanroepen.
 **Mutatie M-T2.** Vervang de registerbinding door naamvergelijking, laat een instantiecriterium weg of laat `..`
-door de parser: telkens wordt de betreffende negatieve test rood.
+door de parser: telkens wordt de betreffende negatieve test rood. Beeld de app-ref af op twee delen
+(`<app_id>/<parameter>` in de bestaande opslag): de botsingsproef wordt rood. Haal de doelvergelijking uit de
+executor (de Hub-controle blijft): de directe doelproef wordt rood.
 
 ### 3. De Hub orkestreert het plan zonder authenticatie te omzeilen
 
 **Keuze.** Een geautoriseerde gebruikerssessie start de Hub-orkestratie met de bestaande rol-, CSRF- en
 idempotentiecontroles. De Hub zoekt de actieve planner via het register en gebruikt per uitgaande aanroep een
-nieuw kortlevend dienst-JWT met precies de planner als audience en diens `service_id`. Planner-service-tokens
-geven uitsluitend de daarvoor vastgelegde leesscopes op de Hub; zij zijn geen gebruikerssessie en geen approval.
-`apps/api/src/hub/routers/actions.py` wordt hiervoor niet versoepeld.
+nieuw kortlevend dienst-JWT met precies de planner als audience en diens `service_id`. Een planner-service-token
+heeft op de Hub naast de basisroutes van contract §4.4 (events/inbox, services/self, rotate, heartbeat, logs)
+alleen leesscopes; het is geen gebruikerssessie en geen approval. Geen route van de Hub neemt een voorstel,
+goedkeuring of stapresultaat van een dienst-token aan; de bestaande connectorroutes `/connector/v1/propose`,
+`/apply` en `/rollback` (`routers/events.py`, `ViewerOrService`) blijven voor een dienst-token 501.
+`apps/api/src/hub/routers/actions.py` wordt hiervoor niet versoepeld. Zonder vastlegging van M1 en M3 gaat geen
+planstap naar uitvoering.
 
-De Hub roept de bestaande preview-, lees- en resultaatroutes onder `/lifecycle/v1/plans` aan. Hij bewaart plan-ID,
-ETag, manifesthash, vervaltijd en stapbinding en accepteert alleen vrijgegeven DAG-stappen waarvan voorgangers
-met gecontroleerde readback zijn bevestigd. Elke stap doorloopt intern dezelfde proposalservice,
-deterministische policy, actuele gates, preview en menselijke goedkeuring als een rechtstreeks voorstel.
-De actor blijft herleidbaar tot de echte initiator; de planner kan geen gebruiker of risico claimen.
-Een UUID5 van de planner dedupliceert alleen; hij vervangt geen goedkeuring, vervaltijd of nonce.
+**Alleen een eigen plan.** De Hub werkt alleen met een plan dat hij in deze orkestratie zelf bij de planner
+aanmaakte (eigen aanroep van de preview-route onder `/lifecycle/v1/plans`; plan-ID, ETag, manifesthash en
+vervaltijd uit dat antwoord), nooit met een plan-ID, ETag of stappenlijst van de aanvrager. Hij houdt per stap
+zijn eigen boekhouding bij. Toont de planner een wijziging die de Hub niet zelf meldde (een stapstatus, ETag of
+inhoud anders dan zijn boekhouding), dan stopt de orkestratie: geen volgende stap, wel een melding.
+
+**Actiestap en handmatige eigenaarstaak zijn verschillend.** De planner kent stappen van soort `actie` (met
+`voorstel`) en `handmatig` (zonder voorstel en zonder `verwacht`; `planner.py::_Bouw.stap`). Voorbeelden van
+handmatig zijn `export` (bij `backup.db_export.method` `pg_dump`, `sqlite_backup` of `app_native`) en
+`kloon-opruimen`. De planner kan geen van beide nagaan: `meld` vraagt bij een actie alleen een niet-lege
+`execution_id` en bij een handmatige stap niets, en `report_step` staat open voor admin, operator en de Hub als
+dienst (`lifecycle/auth.py::WRITE_ROLES`; ADR-0022 besluit 7). Daarom is de stand in de planner voor de Hub nooit
+bewijs:
+
+- Een voorganger van soort actie telt alleen met een eigen uitgevoerd actieverzoek van de Hub voor precies dat plan
+  en die stap: een `request_id` uit de eigen Hub-administratie, uitkomst uitgevoerd en readback die past bij
+  `verwacht`, vastgelegd vóór de terugmelding.
+- Een handmatige stap telt alleen met een bevestiging in de Hub door een beheerder (levende sessie met rol admin,
+  CSRF, gebonden aan plan, stap, plan-ETag en doel). Zo'n bevestiging levert nooit een geverifieerd app-checkpoint
+  of exportbewijs op. De Hub meldt de stap aan de planner zonder `execution_id`, met de bevestiging als reden; hij
+  verzint nooit een `execution_id`.
+- Een melding die iemand anders rechtstreeks bij de planner deed (operator of beheerder) maakt een stap voor de Hub
+  niet voltooid; ziet de Hub zo'n stand, dan stopt hij.
+- De updatevariant waarvan het plan een handmatige `export` bevat, blijft dicht tot het exportbewijs verifieerbaar
+  is: in F een checkpoint dat de Hub zelf verifieert, gebonden aan doel, database/dataset en tijd. Tot dan geen
+  `bijwerken` na zo'n plan. `kloon-opruimen` blijft een eigenaarstaak; het platform verwijdert geen kloon of dataset.
+
+**Levende sessie per stap, geen uitvoering op de achtergrond.** Elk voorstel en elke uitvoering van een planstap
+vraagt op dat moment een levende sessie met de vereiste rol: voorstel operator of hoger; goedkeuring, R2/R3 en de
+bevestiging van een handmatige stap admin. De controles zijn die van `routers/actions.py::propose` en `::approve`
+(rol, CSRF, `actor_past_niet`); `service.stel_voor` en `keur_goed` doen zelf geen rolcontrole en worden daarom
+alleen vanuit zo'n aanvraag aangeroepen. Er is geen lus die vervolgstappen (ook R0/R1, die zonder goedkeuring
+uitvoeren) op naam van de starter uitvoert. Is de sessie ingetrokken, de rol verlaagd of de gebruiker
+uitgeschakeld, dan volgt geen voorstel en geen uitvoering.
+
+Elke actiestap doorloopt dezelfde proposalservice, deterministische policy, actuele gates, preview en menselijke
+goedkeuring als een rechtstreeks voorstel. De actor blijft herleidbaar tot de echte initiator; de planner kan geen
+gebruiker of risico claimen. Een UUID5 van de planner dedupliceert alleen; hij vervangt geen goedkeuring,
+vervaltijd of nonce.
 
 De appstore-preview moet voor exact dezelfde versie, parameters en gemeten doelcontext `ready_for_install: true`
 én `conflicts.status: ok` geven, naast de Hub-controles. Bij ontbreken, onbekend of veroudering geen vrijgave.
@@ -148,6 +258,8 @@ ook als `app.create` zelf slaagde.
 
 **Alternatieven en reden.** Een planner-token door de gebruikersroute laten gaan, een stand-in als productieroute
 inbouwen of een plannerstap rechtstreeks naar de executor sturen is verworpen: dat omzeilt bestaande autorisatie.
+De stapstatus van de planner als bewijs tellen of vervolgstappen op de achtergrond uitvoeren is verworpen: de
+planner kan een melding niet nagaan en een achtergrondlus handelt na intrekking nog op naam van de starter.
 Voor plannen met geheimen ontbreekt nog een vertrouwde plannerinvoer in de tegenpartij; een door de Hub
 meegegeven YAML-tekst maakt die ingang niet vanzelf vertrouwd (M3). Tot afstemming blijft deze planvorm dicht.
 
@@ -155,8 +267,22 @@ meegegeven YAML-tekst maakt die ingang niet vanzelf vertrouwd (M3). Tot afstemmi
 registratie. Test planner-token op gebruikersroute, ontbrekende gebruikersrol/CSRF/approval, gewijzigde plan-ETag,
 geblokkeerde voorganger, `ready_for_install: false`, conflict, ontbrekende digest, replay en verlopen plan.
 Controleer datasets en snapshots vóór/na verwijderen en geen tweede schrijfaanroep bij dubbele melding.
+Daarnaast, elk met een teller op `stel_voor` en op de executor:
+- een operator meldt een stap rechtstreeks bij de echte planner als voltooid, ook met een verzonnen `execution_id`:
+  de Hub voert de volgende stap niet uit en stopt de orkestratie;
+- een plan-ID van de aanvrager in plaats van een eigen plan: geweigerd;
+- sessie ingetrokken, rol verlaagd of gebruiker uitgeschakeld tussen stap 1 en 2: geen voorstel, geen uitvoering;
+- een planner-token op `/connector/v1/propose`, `/apply` en `/rollback` blijft 501, en geen route neemt een
+  voorstel, goedkeuring of stapresultaat van een dienst-token aan;
+- handmatige stap: een `app_native`- en een `pg_dump`-keten (echte planner, vertrouwd testmanifest met die
+  `backup.db_export.method`). Zonder bevestiging, met een bevestiging door een operator of met alleen een melding
+  bij de planner: geen vervolgstap. Met een beheerdersbevestiging: de stap telt, maar er ontstaat geen geverifieerd
+  checkpoint en `bijwerken` blijft dicht tot F; aan de planner gaat geen `execution_id` mee.
 **Mutatie M-T3.** Schakel één gate, sessiecontrole, ETag-binding of readbackvergelijking uit: de eigen negatieve
-test moet rood worden. Een teller bewijst dat de beoogde stap werkelijk is bereikt.
+test moet rood worden. Een teller bewijst dat de beoogde stap werkelijk is bereikt. Laat de Hub de stapstatus van
+de planner als voorgangerbewijs tellen, of accepteer een beheerdersbevestiging als export- of checkpointbewijs: de
+proef met de verzonnen melding respectievelijk de `app_native`/`pg_dump`-proef wordt rood. Voer een vervolgstap uit
+zonder hercontrole van de sessie: de proef met de ingetrokken sessie wordt rood.
 
 ### 4. Kluisdoorgifte gebeurt afzonderlijk, eenmalig en pas na hercontrole
 
@@ -184,12 +310,19 @@ De verplichte volgorde voor de latere implementatie:
 1. De Hub maakt gegenereerde niet-accountgeheimen uitsluitend in de vault en bindt revisies en alle gemarkeerde
    plekken aan de preview. Parameteropslag en antwoorden bevatten alleen verwijzingen. Iedere ontbrekende,
    dubbele of extra markering weigert; een ref op een andere plek of als deeltekst wordt nooit opgelost.
+   Een Hub-geheim heeft één vaste vorm: `^[A-Za-z0-9][A-Za-z0-9_-]{42}$` (32 willekeurige bytes als base64url
+   zonder opvulling, zoals de bestaande tokenvormen van de Hub; een waarde die met `-` begint wordt verworpen en
+   opnieuw gemaakt). Een app die een andere vorm vraagt, wordt niet ondersteund. De nieuwe app-opslag bewaart geen
+   `last4` of ander deel of afgeleide van de waarde (anders dan `Vault.put`, dat `last4` vult), alleen
+   "gegenereerd" met datum en revisie (contract §3.1 a).
 2. De executor ontvangt eerst uitsluitend het normale ondertekende verzoek met de vastgelegde niet-geheime
    context. Hij controleert zelf handtekening, tijden, nonce, allowlist, schema, C-12, bron-/doelbinding,
    policy-hash, eigen risicoklasse, approval, checkpoints en verse precondities, vóór enige kluisopvraag.
 3. Op de gepinde ophaalverbinding vraagt uitsluitend die executor precies de toegelaten referenties/revisies op,
    gebonden aan de hash van het **ref-only** ondertekende verzoek, request-ID, approval/nonce, doelinstantie,
    uitvoerderidentiteit en vervaltijd. De Hub controleert opnieuw de actuele autorisatie, intrekking en context.
+   Een opvraag met een andere of extra ref of revisie dan aan het verzoek gebonden is, wordt in zijn geheel
+   geweigerd: geen gedeeltelijke afgifte.
    Een vrijgave vervalt uiterlijk bij de eerst aflopende verzoek-/approvaltijd, met maximaal 60 seconden
    ophaaltijd; zij is nooit overdraagbaar aan een andere executor of een volgend verzoek. De laatste lokale
    preconditiecontrole gebeurt na ontvangst, direct vóór de RPC; bij een gewijzigd doel wordt niet geschreven.
@@ -197,26 +330,60 @@ De verplichte volgorde voor de latere implementatie:
    antwoord. Transportreplay of herstart levert geen nieuwe waardeafgifte; bij onzekerheid nieuwe autorisatie,
    nooit blind herhalen. Vervallen approval of onbereikbare Hub betekent geen waarde en geen uitvoering.
 5. Alleen direct voor de goedgekeurde `app.create`/`app.update` vervangt de executor de exacte gemarkeerde
-   tekstplekken in een tijdelijke kopie. Het oorspronkelijke verzoek blijft ref-only. De uitvoer-adapter mag
-   dit object niet via generieke request-/exceptionlogging laten lopen; ook het TrueNAS-clientpad is afgeschermd.
+   tekstplekken in een tijdelijke kopie. De opgehaalde waarde valt buiten de handtekening, de goedgekeurde preview
+   en de parametercontrole (die liep in stap 2 over de verwijzing). Daarom toetst de executor elke opgehaalde
+   waarde vóór het invullen aan de vaste vorm uit stap 1 en aan de gevraagde ref en revisie; past één waarde niet,
+   dan weigert hij het hele verzoek met een vaste code, zonder schrijfaanroep en zonder de waarde te loggen.
+   Het oorspronkelijke verzoek blijft ref-only. De uitvoer-adapter mag dit object niet via generieke
+   request-/exceptionlogging laten lopen; ook het TrueNAS-clientpad is afgeschermd.
    Een capability voor een andere methode, bestemming of accountplek blijft geweigerd.
 6. Bij succes, weigering, fout en time-out worden tijdelijke kopieën en transportbuffers zo snel mogelijk
    losgelaten en nooit gedumpt. Dit is geen bewijs dat alle geheugenkopieën in de runtime fysiek gewist zijn.
    Geen bodies, traceback-locals, ruwe TrueNAS-foutteksten of request-objecten in diagnostiek. Alleen vaste codes
    en aantallen naar het bestaande afgeschermde resultaatpad; bij onbekende uitkomst de bestaande stop/incidentweg.
 
-Het bestaande versleutelde terugzetrecept uit ADR-0030 besluit 8 wordt niet verwijderd. Voor deze nieuwe
-capability mogen opgeloste appgeheimen ook niet via `app.config` alsnog in dat recept of een configuratiehash
-terechtkomen: bekende geheimplekken moeten vóór opslag/hashing terug naar gebonden referenties en revisies.
-Zonder verliesloos en veilig recept wordt de update met deze capability geweigerd. Andere bestaande recepten
-blijven onder het bestaande beleid; dit ADR claimt geen opschoning daarvan. Een rollback die deze nieuwe
-geheimdoorgifte nodig heeft blijft dicht totdat ook zijn gebonden `app.update`-herstelpad aantoonbaar veilig is.
+**Terugzetrecept van een instantie met kluisplekken.** Het bestaande versleutelde terugzetrecept uit ADR-0030
+besluit 8 wordt niet verwijderd. Het bewaart bij elke `app.update`/`app.rollback` van een ix-app de hele
+`app.config` (`uitvoeren.py::_voer_uit`, `journal.py::save_values`), en een gewone image-update draagt geen
+markering (`params.py::_app_update`: alleen `image`, `catalog_version`, `image_digest`, `manifest_sha256`). Een
+geheim dat de executor in E invulde, komt zo bij de eerstvolgende gewone update alsnog (versleuteld) in het recept.
+Daarom weigeren Hub én executor vanaf deelstap E elke `app.update` en `app.rollback` die een recept maakt of
+gebruikt (het `app.config`-pad) op een instantie met gebonden kluisplekken, ook de gewone image-update, tot het
+recept met alleen verwijzingen en revisies (M2) bestaat en met T4 bewezen is. Het catalogus-pad (`app.upgrade`,
+`app.rollback` met `catalog_version`) maakt geen executorrecept en blijft onder besluit 8 en de gates van F.
 
-`HUB_*` wordt uitsluitend intern toegevoegd als de Hub de betrokken eigen dienst koppelt. my_house krijgt alleen
-`HUB_URL`, bestaande adapters krijgen geen automatische enrollment. De korte levensduur en eenmaligheid van een
-enrollment-token blijven gelden; het token volgt dezelfde afscherming. Bij een onzekere uitvoering geen nieuw
-token op hetzelfde oude akkoord en geen automatische tweede installatie; eerst toestand vaststellen, zo nodig
-oude token intrekken en een nieuwe gebonden handeling. OIDC-`client_secret`-overdracht blijft een eigen ADR in 070.
+De executor kent die plekken uit zijn eigen instantielijst. Bij elke geslaagde invulling legt hij in zijn journaal
+vast, zonder waarde of waarde-afgeleide hash, welke instantie (vingerafdruk van zijn gepinde TrueNAS-verbinding,
+runtime-naam, catalogusapp/trein, `request_id` van de installatie) welke gemarkeerde plekken met welke refs en
+revisies kreeg. Alleen de executor vult in, dus alleen hij heeft deze lijst volledig. De Hub houdt dezelfde
+markering in zijn register en zet haar in de ondertekende context van elk update- en terugzetverzoek. Onbekend is
+weigeren: is de lijst niet leesbaar, verschillen lijst en ondertekende markering, of is de instantie niet eenduidig
+vast te stellen, dan weigert de executor met een vaste code vóórdat hij `app.config` leest. Andere bestaande
+recepten (zonder kluisplekken) blijven onder het bestaande beleid; dit ADR claimt geen opschoning daarvan.
+
+**Koppelvelden `HUB_*`.** De Hub voegt ze alleen toe als hij de betrokken eigen dienst koppelt, en zo:
+
+- Nooit uit parameters van de aanvrager. De bestaande weigering `reserved_env` (`params.py::_ix_values`, in Hub én
+  executor) blijft voor elke parameter van een voorstel; er komt geen uitzondering in de parametercontrole.
+- In het voorstel staat alleen een ondertekend, niet-geheim contextveld "de Hub koppelt deze vaste `app_id`", met
+  de soort (volledig, of alleen `HUB_URL` voor my_house). De aanvrager kan het niet zetten; de Hub zet het alleen
+  voor een eigen dienst die op de witte lijst van besluit 6 als koppelbaar staat.
+- De executor zet `HUB_URL` en `HUB_KEY_FINGERPRINT` zelf uit zijn eigen gepinde koppeling met de Hub
+  (`executor/hublink.py`, `hub_url` en `keyset_fingerprint`). Noemt de context een ander adres of een andere
+  vingerafdruk, dan weigert hij zonder schrijfaanroep.
+- `HUB_ENROLLMENT_TOKEN` wordt pas bij de claim uit stap 3–4 gemaakt, niet bij voorstel of goedkeuring (een
+  voorstel kan tot 24 uur open staan, `ProposalIn.expires_in_seconds`; het token leeft 60 minuten). Het is gebonden
+  aan de vaste `app_id`, het verzoek en de doelinstantie, reist alleen over de afzonderlijke ophaalverbinding en is
+  nooit terugleesbaar: de Hub bewaart alleen de hash (contract §3.1), nooit in de kluis, een tabel, het journaal,
+  een recept of een antwoord. De plek van het token telt in de instantielijst als gebonden kluisplek, zodat ook
+  hier de receptweigering hierboven geldt. Opslag en moment van uitgifte worden in M2 vastgelegd.
+- De preview toont de koppeling: "koppelt met de Hub", met adres en vingerafdruk van de eigen koppeling; nooit
+  het token.
+- my_house krijgt alleen `HUB_URL`; bestaande adapters krijgen geen automatische enrollment. Bij een onzekere
+  uitvoering geen nieuw token op hetzelfde oude akkoord en geen automatische tweede installatie; eerst toestand
+  vaststellen, zo nodig het oude token intrekken en een nieuwe gebonden handeling.
+
+OIDC-`client_secret`-overdracht blijft een eigen ADR in 070.
 
 **Alternatieven en reden.** Geheim vóór ondertekenen in `parameters` zetten, de vault delen, een algemeen
 `get_secret(ref)` aanbieden of plaintext via het gewone HTTP-kanaal sturen is verworpen: de eerste twee lekken
@@ -226,21 +393,42 @@ voor deze kluiscapability gelden; de vermelding "oplossen bij samenstellen Execu
 
 **Bewijstest T4.** Een per test willekeurig gemaakt geheim bereikt uitsluitend de juiste fake-TrueNAS-waarde bij
 `app.create`/`app.update`. Onderzoek niet-lege vastgelegde requests, canonieke hashinvoer, signatures,
-Hub-tabellen inclusief idempotentie, executorjournaal/recepten, routeantwoorden, events en logs. Nul treffers voor
-de waarde en geen waarde-afgeleide hash zijn vereist. Herhaal bij rotatie, fout vóór/na RPC, timeout, herstart,
-dubbele claim, foutcertificaat/pin, HTTP-downgrade, verkeerde executor, ontbrekende ref en ingetrokken approval. Voor afwijzingen
-vóór ontsluiting is ook het aantal kluisopvragen nul. Geen geheimwaarde in test-/CI-uitvoer.
+Hub-tabellen inclusief idempotentie, executorjournaal en recepten, routeantwoorden, events en logs. De recepten
+worden daarbij ontsleuteld (`Journal.load_values`): in de ruwe journaalbytes staat een versleutelde waarde nooit
+letterlijk, dus een zoektocht daarin kan niet falen. Gezocht wordt op de hele waarde, op haar base64-, URL- en
+JSON-vorm, op haar SHA-256 en, in de kluistabel buiten de ciphertext, op elk venster van vier of meer tekens.
+Nul treffers zijn vereist. Herhaal bij rotatie, fout vóór/na RPC, timeout, herstart, dubbele claim,
+foutcertificaat/pin, HTTP-downgrade, verkeerde executor, ontbrekende ref, een opvraag met een andere of extra ref
+of revisie dan gebonden, en ingetrokken approval. Voor afwijzingen vóór ontsluiting is ook het aantal
+kluisopvragen nul. Daarnaast:
+- recept: installatie met geheim, daarna een gewone image-update en een `app.rollback` met `herstel_van` op die
+  instantie: Hub én executor weigeren vóór `app.config`, nul schrijfaanroepen; hetzelfde met een onleesbare
+  instantielijst en met een ondertekende markering die afwijkt van de eigen lijst;
+- vorm: de test-Hub levert een padtekst, een vlag (een waarde die met `-` begint), een waarde met een regeleinde,
+  een te korte en een te lange waarde en de waarde van een andere ref: weigering, nul schrijfaanroepen, de waarde
+  in geen enkele log;
+- koppelvelden: `HUB_*` als parameter van de aanvrager geweigerd in Hub en executor; een ander adres of andere
+  vingerafdruk in de context dan de eigen koppeling: nul schrijfaanroepen; het enrollment-token in geen tabel,
+  journaal, recept of antwoord (alleen de hash), en de preview toont adres en vingerafdruk.
+Geen geheimwaarde in test-/CI-uitvoer.
 **Mutatie M-T4.** Verplaats ontsluiting vóór de signature/hash, laat de adapter een requestbody loggen, bewaar
-een opgelost recept of verwijder de doel-/eenmaligheidscontrole. Elke variant maakt de betreffende test rood;
-de lektest bewijst haar werking met opzettelijk gevulde opvang, nooit met lege tabellen.
+een opgelost recept, laat de receptweigering vallen, haal de vormcontrole weg, sta een extra ref in de opvraag
+toe, vul `last4` in de nieuwe opslag of neem `HUB_*` uit de parameters over. Elke variant maakt de betreffende test
+rood; de lektest bewijst haar werking met opzettelijk gevulde opvang, nooit met lege tabellen, en de receptproef
+wordt rood bij de mutatie "recept met waarde bewaren" omdat zij het ontsleutelde recept doorzoekt.
 
 ### 5. C-12-accountgegevens worden in elke vorm geweigerd
 
 **Keuze.** Hub en executor gebruiken dezelfde gepinde woordenlijst en dezelfde accountcontextregels als de
 manifeststandaard van appstore-en-fork, eigenaar ASF-15. Geen eigen aanvullende of versmalde Hub-lijst. De
-C-12-uitbreiding van ADR-0031 moet daar eerst gepusht, gecontroleerd en gepind zijn; de gelezen `ACCOUNT_WORDS`
-bevat die uitbreiding nog niet. Alleen een oudere validator importeren of alleen naar de direct omliggende
-sleutel kijken voldoet dus niet.
+C-12-uitbreiding van ADR-0031 staat sinds `a994c2a` in die bron (ADR-0023): het veld `accounts`; `INIT`, `LOGIN`
+en `BASIC_AUTH` in `ACCOUNT_WORDS`; de aanmeldnamen `JUPYTER_TOKEN` en `PASSWORD` alleen als hele naam
+(`LOGIN_NAMES`); en variant B: een geheim van de Hub in een omgevingsvariabele van een Custom App alleen onder een
+geheimnaam die geen accountnaam is (anders `account_gegevens_verboden` of `secret_in_form`). De validatorpin van
+deze repo (`ASF_COMMIT` in `.github/workflows/ci.yml`) wijst nog naar een oudere commit. In deelstap C nemen Hub
+en executor dezelfde gepinde toets over als de validator in de CI: één pin, vóór gebruik opnieuw gemeten in de
+bron, met een driftcontrole. Alleen een oudere validator importeren of alleen naar de direct omliggende sleutel
+kijken voldoet dus niet. Variant B geldt ook voor de gemarkeerde kluisplekken van besluit 4.
 
 Weigering geldt op het gehele oorspronkelijke manifest, na parameterinvulling, op de werkelijke vertaalde
 payload en opnieuw vóór kluisontsluiting. Het betreft letterlijke gegevens, gewone parameters, `value_from`,
@@ -256,10 +444,14 @@ per laag laten beleid uiteenlopen. Het leverings-/pinmechanisme voor dezelfde re
 
 **Bewijstest T5.** Eén gedeelde gepinde matrix van de eigenaar door validator, Hub-API en directe executor:
 alle bovenstaande invoervormen en de C-12-regressies uit ADR-0031 worden geweigerd met
-`account_gegevens_verboden`, zonder secretlookup/RPC. Een toegelaten niet-accountgeheim en gewone openbare
-instelling blijven als positieve controles aanwezig. Ontbrekende/verouderde regelset geeft geen vrijgave.
+`account_gegevens_verboden`, zonder secretlookup/RPC. Daarbij horen de gevallen van ADR-0023: `INIT`, `LOGIN`,
+`BASIC_AUTH`, `JUPYTER_TOKEN` en `PASSWORD` als hele naam, en een kluisplek in een Custom App-omgevingsvariabele
+onder een accountnaam; onder een naam die geen geheimnaam is weigert dezelfde matrix met `secret_in_form`
+(variant B). Een toegelaten niet-accountgeheim en gewone openbare instelling blijven als positieve controles
+aanwezig. Ontbrekende/verouderde regelset of een pin die afwijkt van die van de validator geeft geen vrijgave.
 **Mutatie M-T5.** Sla de hercontrole na invullen over, laat oudercontext weg of vervang de regelset door de oude
-lijst: minimaal de daarbij horende concrete accountcase moet rood worden.
+lijst (zonder ADR-0023): minimaal de daarbij horende concrete accountcase moet rood worden. Laat Hub of executor
+een andere pin gebruiken dan de validator: de driftcontrole wordt rood.
 
 ### 6. Opslag en preview krijgen een witte lijst per app én versie
 
@@ -267,7 +459,10 @@ lijst: minimaal de daarbij horende concrete accountcase moet rood worden.
 exacte versie, manifesthash/image-digests en TrueNAS-/ix-app-schemaversie. De latere C-stap stelt de eerste
 concrete ondersteunde combinaties vast uit gepinde fixtures; dit ADR noemt geen ongecontroleerde versie als
 ondersteund. Een onbekende versie of onbekend veld betekent **geen toestemming**, ook met `null`, `{}` of een
-onschuldig lijkende naam. Geen generieke recursieve verbodslijst als vervanging van zo'n schema.
+onschuldig lijkende naam. Geen generieke recursieve verbodslijst als vervanging van zo'n schema. Dezelfde lijst
+is het eigen anker van de executor uit besluit 1: zij staat als beleidsbestand onder de `policy_hash` in beide
+images en noemt per regel ook de toegelaten bronidentiteit, de volledige uitgeverssleutel, de toegelaten
+kluisplekken en of de app een koppelbare eigen dienst is (`HUB_*`, besluit 4).
 
 De witte lijst beschrijft typen, grenzen, betekenis, toegelaten opslagconfiguraties en één previewregel voor
 ieder gezet veld. Bestaande ix-app-lijsten, hostpad-/datasetnaam-/ACL-weigeringen, verboden mounts en GPU-grenzen
@@ -333,18 +528,42 @@ de respectieve ontsnappingsproef moet rood worden. Alleen fixtures inspecteren t
 
 **Keuze.** Manifest-/upgradecontext en het werkelijk uitgevoerde updateverleden worden onveranderlijk aan het
 recept, doel en checkpoint gebonden. Hub én executor weigeren image-only `app.rollback` na een migratie, bij
-`tag_only_rollback_safe: false`, ontbrekende/tegenstrijdige migratiecontext of onbekende herstelbron. Dit geldt ook
-voor een rechtstreeks ingediend voorstel dat de planner overslaat en voor een catalogusrollback.
+`tag_only_rollback_safe: false` of bij een onbekende herstelbron. Bij een recept zonder (geldige) migratiecontext
+geldt het besluit hieronder. Dit geldt ook voor een rechtstreeks ingediend voorstel dat de planner overslaat en
+voor een catalogusrollback.
+
+**Besluit over recepten zonder migratiecontext.** Het gebruikersbesluit van 2026-11-14 (KLEIN-85; VOORTGANG.md:
+"terugzetten gaat altijd door; HARDE EIS bestaande apps terug te zetten") en EX15 botsen bij een recept zonder
+migratiecontext. Geen bestaand recept en geen update buiten een plan draagt die context: `_app_update` kent het veld
+niet en de journaaltabel `app_values` bewaart alleen `request_id`, app, versleuteld vak en tijd.
+
+| Optie | Regel | Gevolg |
+|---|---|---|
+| 1 | Weigeren bij elke ontbrekende context. | Na F is geen bestaand recept en geen update buiten de keten meer via het platform terug te zetten; dat breekt KLEIN-85 voor bestaande apps. |
+| 2 | Alleen weigeren als de context aantoonbaar een migratie of `tag_only_rollback_safe: false` noemt; ontbrekende context gaat door met een melding. | KLEIN-85 blijft heel, maar EX15 hangt af van de aanwezigheid van de context: een keten-update van ná F waarvan de context verloren of weggelaten is, gaat door. |
+| 3 | Recepten van vóór deelstap F en van updates buiten de vertrouwde keten gaan door met een duidelijke melding. Recepten van updates die ná F via de vertrouwde keten liepen, dragen altijd migratiecontext en worden geweigerd als die ontbreekt, tegenstrijdig is of een migratie zonder veilige tag-terugval noemt (EX15). | KLEIN-85 blijft heel voor bestaande apps en voor updates buiten de keten; elke update via de keten is beschermd. Restrisico: een migratie bij een update buiten de keten wordt alleen gemeld. |
+
+**BESLOTEN door regisseur (gebruiker afwezig), wordt de gebruiker voorgelegd in het eindoverzicht: optie 3.**
+Het onderscheid komt nooit uit een veld van het terugzetverzoek. Bij het bewaren van een recept legt de executor
+zelf vast of de update via de vertrouwde keten liep (ondertekende context aanwezig en tegen zijn anker uit besluit 1
+gecontroleerd) en zo ja met welke migratiecontext; dat staat in hetzelfde versleutelde vak, gebonden aan het
+`request_id`, en een terugzetverzoek kan het niet veranderen. De Hub legt hetzelfde vast bij zijn eigen
+updateverzoek. Een recept zonder die vastlegging is "van vóór F of buiten de keten". De melding is een vaste
+waarschuwing in het antwoord, het journaal en één logregel, zonder waarden, zoals de KLEIN-85-melding.
+
 Een beheerder kan de weigering niet wegklikken. De uitkomst verwijst naar `eigenaar_herstel`: de eigenaar moet
 image en bijbehorende data/database als één herstelroute behandelen. Er wordt geen nieuwe R3-actie, database-
 schrijfroute, snapshot-rollback of automatische data-overschrijving verzonnen. Tot die eigenaarsroute beschikbaar
 en geverifieerd is blijft herstel geblokkeerd; R3 in de risicotabel is op zichzelf geen uitvoerbare capability.
 
-Zonder migratie kan de bestaande rollback alleen met aantoonbaar veilige context, passende geverifieerde
-checkpointdekking en nieuwe gebonden goedkeuring. Hij gebruikt precies de vorige waarden en controleert
+Zonder migratie gaat de bestaande rollback alleen met passende geverifieerde checkpointdekking (`requires_backup`
+in `policy/acties.yaml`) en nieuwe gebonden goedkeuring; bij een keten-recept van ná F bovendien met aantoonbaar
+veilige context. Hij gebruikt precies de vorige waarden en controleert
 vorige digest/versie en readback. Het besluit KLEIN-85 blijft gelden: de hercontrole van historische waarden
-meldt overtredingen en blokkeert op zichzelf het terugzetten niet. Deze meldregel is geen vrijstelling van de
-aparte migratie-, doel-, checkpoint- of geheimtransportgates; er wordt geen verborgen wijziging van die meldregel gedaan.
+meldt overtredingen en blokkeert op zichzelf het terugzetten niet, en recepten van vóór F of buiten de keten
+blijven terug te zetten (optie 3). Deze meldregel is geen vrijstelling van de aparte migratie-, doel-, checkpoint-
+of geheimtransportgates (zoals de receptweigering van besluit 4); er wordt geen verborgen wijziging van die
+meldregel gedaan.
 
 Emby blijft onder alle namen beschermd, ook met approval. MediaGuard en de mediaservers blijven onder hun
 bestaande strenge blokkades totdat de daarvoor bedoelde eigenaarsbesluiten en het upgradebewijs beschikbaar
@@ -361,8 +580,16 @@ onveilig tagherstel, checkpoint van ander doel, ontbrekende database of verlopen
 Een veilige niet-migrerende testapp zet werkelijk de vorige waarden en digest terug. Bestaande KLEIN-85-proeven
 voor overtreding, geen overtreding en hercontrolefout blijven aanwezig. Emby stop/update/uninstall worden ook
 hernoemd en met approval geweigerd. Een gevulde checkpointfixture maakt ontbrekende database aantoonbaar.
+Voor optie 3: een recept van vóór F (bewaard door de huidige code, zonder context) en een recept van een update
+buiten de keten na F worden teruggezet met precies dezelfde waarden en de vaste melding. Een recept van een
+keten-update na F zonder context, met tegenstrijdige context of met een migratie zonder veilige tag-terugval wordt
+geweigerd: geen rollback-RPC. Een terugzetverzoek dat zelf "buiten de keten" of een context meestuurt, verandert
+daar niets aan.
 **Mutatie M-T8.** Verwijder de zelfstandige migratiegate of vervang checkpointverificatie door "ID bestaat":
 de betreffende directe weigertest moet rood worden. Verander één oude waarde/digest: de positieve hersteltest faalt.
+Lees de herkomst van het recept uit het terugzetverzoek in plaats van uit het eigen vak, of behandel een
+keten-recept zonder context als van vóór F: de weigerproef wordt rood. Weiger elk recept zonder context (optie 1):
+de proef met het recept van vóór F wordt rood.
 
 ### 9. De afhankelijkheidslus wordt door begrensde leveringen doorbroken
 
@@ -375,11 +602,11 @@ geen andere schrijver in hetzelfde bereik. Het planbestand wordt in deze ontwerp
 | Deel en bereik | Naar voren gehaald en eigen resultaat | Blijft elders / vrijgavegrens |
 |---|---|---|
 | A, H0..HA | Dit ontwerp met besluiten 1–9, test-/mutatiematrix en contractmeldingen. | Geen code of statusverhoging; R-TECH en R-VEILIG, herstel/herreview waar nodig, daarna R-EERLIJK vóór B. |
-| B, HA..HB | Uit 080 uitsluitend `catalogus.lezen`: scopehandhaving, gemeten ja/nee/onbekend, versheid en verdwenen versie; interop met echte `HubLezer`. | Route/schema eerst als M3 vastleggen; eigenaar-connector, unlink en algemene 080-acceptatie blijven bij 080. |
-| C, HB..HC | Per app/versie schema voor opslag en preview, V1–V7, parser/doelgrenzen en C-12-accountweigering. De aangevulde eigenaarsvalidator eerst gepusht en gepind. | Geen kluisontsluiting; NFS/SMB en onbekende schema's blijven dicht. Symlinkbewijs is een harde capabilitygrens. |
-| D, HC..HD | Echte plannerclient, bronvertrouwen, manifest-/appstore-preview, installatie zonder nieuwe geheimcapability, container-only verwijderen, readback/incident en registerbinding. Uit 080 de voor deze installatie vereiste post-install-gate. | Bestaande echte gates blijven verplicht; noodzakelijke hercontrole wordt met de installatie getest, geen testoverride. Geheimplan zonder vertrouwde plannerinvoer blijft dicht; geen totaalafvinking. |
-| E, HD..HE | Uit 070 de volledige relevante keten voor gegenereerde appgeheimen en intern toegevoegde `HUB_*`, samen met ASM-24, doelbinding, wisgedrag en afzonderlijk transport uit besluit 4. | Eerst M1–M4 oplossen; OIDC-client_secret-overdracht en eigen ADR blijven bij 070, geen automatische accountvoorziening. |
-| F, HE..HF | Uit 090 geverifieerde app-checkpoints, duurzame registratie/verificatie, RPO en database-/snapshotdekking, `Approval.backup_checkpoint_id` en pre-update-gate voor update/rollback; EX15. Noodzakelijke 060-gatehercontrole sluit aan op deze echte data. | Geen vervanging van `verified_checkpoint` door een teststub. Overige pool-/boiler-/back-upblokkades en bewijs van 060 blijven daar; externe uploadverificatie, echte accountproef en overige 090-acceptatie blijven bij 090. |
+| B, HA..HB | Uit 080 uitsluitend `catalogus.lezen`: scopehandhaving, gemeten ja/nee/onbekend, versheid en verdwenen versie; interop met echte `HubLezer`. Begrensd: trein, app en versie alleen in vaste patronen, geen vrije filters of zoektekst naar TrueNAS, een grens op metingen per dienst en tijd, en antwoorden uit een eigen gemeten voorraad met versheid in plaats van een TrueNAS-meting per aanvraag. | Route/schema eerst als M3 vastleggen; eigenaar-connector, unlink en algemene 080-acceptatie blijven bij 080. |
+| C, HB..HC | Per app/versie schema voor opslag en preview (tevens het executoranker van besluit 1), V1–V7, parser/doelgrenzen en C-12-accountweigering. De aangevulde eigenaarsvalidator (in de bron sinds `a994c2a`) opnieuw meten; één pin voor validator-CI, Hub en executor (M4). | Geen kluisontsluiting; NFS/SMB en onbekende schema's blijven dicht. Symlinkbewijs is een harde capabilitygrens. |
+| D, HC..HD | Echte plannerclient met alleen een eigen plan, actiestap en handmatige stap gescheiden, levende sessie per stap (besluit 3), bronvertrouwen met het eigen executoranker, manifest-/appstore-preview, installatie zonder nieuwe geheimcapability, container-only verwijderen, readback/incident en registerbinding. Uit 080 de voor deze installatie vereiste post-install-gate. | Eerst M1 en M3; zonder die vastlegging gaat geen planstap naar uitvoering. Bestaande echte gates blijven verplicht; noodzakelijke hercontrole wordt met de installatie getest, geen testoverride. Geheimplan zonder vertrouwde plannerinvoer blijft dicht; geen totaalafvinking. |
+| E, HD..HE | Uit 070 de volledige relevante keten voor gegenereerde appgeheimen en `HUB_*` volgens besluit 4 (koppelvelden), samen met ASM-24, doelbinding, vaste geheimvorm, instantielijst, wisgedrag en afzonderlijk transport. Vanaf E weigeren Hub en executor elke update/rollback met recept op een instantie met kluisplekken. | Eerst M1–M4 oplossen; OIDC-client_secret-overdracht en eigen ADR blijven bij 070, geen automatische accountvoorziening. |
+| F, HE..HF | Uit 090 geverifieerde app-checkpoints, duurzame registratie/verificatie, RPO en database-/snapshotdekking, `Approval.backup_checkpoint_id` en pre-update-gate voor update/rollback; EX15 met optie 3 van besluit 8. Noodzakelijke 060-gatehercontrole sluit aan op deze echte data. Besluit over de schaduwinstallatie van een app met kluisgeheimen (besluit 2) en, als het exportbewijs verifieerbaar is, opening van de updatevariant met handmatige export (besluit 3). | Geen vervanging van `verified_checkpoint` door een teststub. Ref-only recept (M2) vóór update/rollback met recept op een instantie met kluisplekken. Overige pool-/boiler-/back-upblokkades en bewijs van 060 blijven daar; externe uploadverificatie, echte accountproef en overige 090-acceptatie blijven bij 090. |
 | G, HF..HG | Appstore → planner → echte Hub → echte executor → fake TrueNAS en terug. Positief/negatief T1–T8, V7, alle oorspronkelijke verplichte 050-tests, mutaties, volledige toepasselijke poorten en CI op HG. | Pas dan beoordeling van heel 050; resterende lokale bouwgaten nooit als alleen NAS-resttest presenteren. UI blijft bij 160/170/180 met ontwerp/review. |
 
 Voor B betreft interop met de echte `HubLezer` de echte broncode van de planner, niet een eigen kopie van zijn
@@ -402,10 +629,14 @@ de verplaatsing van concrete bouwstenen behoudt dezelfde volledige eindacceptati
 **Bewijstest T9.** De regisseur/reviewer vergelijkt per deelbereik diff, echte tests, mutatie-uitvoer, pins en CI.
 G vereist een positieve update met werkelijk via de productieroute gemaakt en geverifieerd app-checkpoint en
 dezelfde update negatief zonder dat checkpoint; de verificatiefunctie en autorisatie worden niet vervangen.
+G herhaalt de handmatige-stapketen van T3 (`app_native` en `pg_dump`): een beheerdersbevestiging of een
+plannermelding alleen geeft geen checkpoint en geen `bijwerken`; alleen het door de Hub geverifieerde
+exportcheckpoint uit F opent die variant.
 Alle oorspronkelijke 050-negatieven blijven: EX47, data behouden bij uninstall, EX15, Emby en verdwenen versie.
 **Mutatie M-T9.** Vervang in een tijdelijke tegenproef de checkpointverificatie door altijd geldig, de echte
 Hub door een stand-in of verwijder een vereiste ketenschakel/negatief scenario. De negatieve integratietest of
-expliciete controles op geladen productiecomponenten en verplichte scenario's moeten rood worden.
+expliciete controles op geladen productiecomponenten en verplichte scenario's moeten rood worden. Accepteer een
+beheerdersbevestiging van `export` als checkpointbewijs: de negatieve `app_native`/`pg_dump`-update wordt rood.
 
 ## Open contractmeldingen en tekstvoorstellen
 
@@ -415,10 +646,10 @@ is opgelost blijft de betrokken capability dicht; andere onafhankelijke deelstap
 
 | Melding | Eigenaar en bron | Tekstvoorstel / benodigde vastlegging | Blokkeert |
 |---|---|---|---|
-| M1 bron- en identiteitsbinding | ai-server-manager; contract §3.1, §8, ASM-24; appstore `get_version`, `_app_id_bound` en provenance. | "Een geldige versie is pas uitvoerbaar na eigen Hub-brongoedkeuring en controleerbaar gepinde herkomst. De ondertekende autorisatie bindt entry, versie, manifesthash, bronpin, vaste app_id, bevestigde runtime-doelinstantie, schema, payload en gemarkeerde vault_refs. Wijziging laat goedkeuring vervallen. De executor controleert die binding zelf." Leg de exacte strikte parameters-/bewijsvelden en beschikbaarheid van het oorspronkelijke manifestobject vast; `target.app_id` niet stil herdefiniëren. | D voor volledige vertrouwde uitvoering; E/F voor nieuwe capabilities. |
-| M2 afzonderlijke geheime overdracht | ai-server-manager; contract §3.1 en §8; 070 bouwpunt 2; `docs/EXECUTION_REQUEST.md`. | "ExecutionRequest, hashes en duurzame uitvoerregistraties bevatten uitsluitend verwijzingen en onveranderlijke revisies. Na eigen verificatie haalt alleen de bedoelde executor waarden eenmalig op via afzonderlijk wederzijds geauthenticeerd, versleuteld en gepind transport, gebonden aan verzoek, approval, doel, methode en vervaltijd. Geen gedeelde database of hoofdsleutel; geen geheimwaarde in foutpaden, journaal of recept." Leg protocol, sleutellevenscyclus, claim-/crashgedrag en ref-only herstel vast vóór uitvoering. | E en geheim-afhankelijke update/rollback in F. |
-| M3 catalogusroute en vertrouwde plannerinvoer | ai-server-manager + jelly-leon-platform, ieder eigen opdracht; contract §4.4, §6.1 en §8; planner ADR-0022 "Open punten" en `api_plans.py`. | "Catalogusbeschikbaarheid is een gescopete verse meting ja/nee/onbekend voor exacte trein/app/versie; alleen nee betekent version_unavailable. De planner bindt vertrouwde catalogusidentiteit en manifesthash aan het plan en mag een losse manifestclaim niet tot geheime vertaling verheffen. Een planner-token is geen gebruikerssessie of approval." Exacte route, velden, fouten en authenticeerbaar bronbewijs door beide eigenaren vastleggen; het voorlopige pad in `hubread` is nog geen contract. | B voor definitieve route; D/E voor geheimhoudende plannen. |
-| M4 eigenaarsregels C-12 | appstore-en-fork; contract §9/ASF-15; `manifest/rules.py::ACCOUNT_WORDS` en ADR-0016 W2/W3. | "De uitgebreide woordenlijst en contextregels uit ADR-0031 zijn één gepinde bron voor validator, Hub en executor. Accountgegevens worden vóór en na invulling in alle vormen geweigerd, ook via generated, value_from en vault_refs; ontbrekende of verouderde regels geven geen vrijgave." Lever reproduceerbare gedeelde testmatrix en regelset; leg pin-/driftcontrole vast. Geen eigen Hub-woordenlijst. | C en daarmee E/G. |
+| M1 bron- en identiteitsbinding | ai-server-manager; contract §3.1, §8, ASM-24; appstore `get_version`, `_app_id_bound` en provenance. | "Een geldige versie is pas uitvoerbaar na eigen Hub-brongoedkeuring en controleerbaar gepinde herkomst. De ondertekende autorisatie bindt entry, versie, manifesthash, bronpin, vaste app_id, bevestigde runtime-doelinstantie, schema, payload en gemarkeerde vault_refs. Wijziging laat goedkeuring vervallen. De executor controleert die binding zelf tegen zijn eigen anker: de witte lijst in zijn image en zijn eigen readback van het doel." Leg de exacte strikte parameters-/bewijsvelden en beschikbaarheid van het oorspronkelijke manifestobject vast; `target.app_id` niet stil herdefiniëren. Aanvulling uit de bron (`a994c2a`): `version_summary`/`get_version` leveren geen `entry_id`, geen handtekeningbytes van de uitgever (alleen de status `publisher_signature`) en van bron en uitgever alleen een sleutel-ID van 16 hex (`trusted_key_id`, `publisher_key_id`). Nodig van de appstore: `entry_id` in het antwoord en in het ondertekende record de volledige uitgeverssleutel of SHA-256-vingerafdruk (of de handtekeningbytes voor eigen narekening). Het record is getekend met de bij de Hub ingeschreven appstore-identiteit, dus de Hub kan het zelf narekenen. | D voor volledige vertrouwde uitvoering (zonder M1 en M3 geen planstap naar uitvoering); E/F voor nieuwe capabilities. |
+| M2 afzonderlijke geheime overdracht | ai-server-manager; contract §3.1 en §8; 070 bouwpunt 2; `docs/EXECUTION_REQUEST.md`. | "ExecutionRequest, hashes en duurzame uitvoerregistraties bevatten uitsluitend verwijzingen en onveranderlijke revisies. Na eigen verificatie haalt alleen de bedoelde executor waarden eenmalig op via afzonderlijk wederzijds geauthenticeerd, versleuteld en gepind transport, gebonden aan verzoek, approval, doel, methode en vervaltijd. Geen gedeelde database of hoofdsleutel; geen geheimwaarde in foutpaden, journaal of recept." Leg protocol, sleutellevenscyclus, claim-/crashgedrag en ref-only herstel vast vóór uitvoering. Leg ook opslag en moment van uitgifte van het enrollment-token vast (besluit 4, koppelvelden: pas bij de claim, gebonden, alleen de hash bewaard, contract §3.1). Contract §3.2 zegt nu "de vertaling voegt ze bij `app.install`/`app.update` toe als de Hub koppelt"; appstore `translate.py` (`_Resolver.hub_at`) zegt dat de vertaling dat nu nooit doet; dit ADR legt het invullen bij de executor. De contracttekst moet daarop worden afgestemd. | E en geheim-afhankelijke update/rollback in F. |
+| M3 catalogusroute en vertrouwde plannerinvoer | ai-server-manager + jelly-leon-platform, ieder eigen opdracht; contract §4.4, §6.1 en §8; planner ADR-0022 "Open punten" en `api_plans.py`. | "Catalogusbeschikbaarheid is een gescopete verse meting ja/nee/onbekend voor exacte trein/app/versie; alleen nee betekent version_unavailable. De planner bindt vertrouwde catalogusidentiteit en manifesthash aan het plan en mag een losse manifestclaim niet tot geheime vertaling verheffen. Een planner-token is geen gebruikerssessie of approval." Exacte route, velden, fouten en authenticeerbaar bronbewijs door beide eigenaren vastleggen; het voorlopige pad in `hubread` is nog geen contract. Het open punt van ADR-0022 over een route waarmee een dienst een `ActionProposal` indient, wordt gesloten als "bestaat niet": de Hub haalt zijn eigen plan op en geen route van de Hub neemt een voorstel van een dienst-token aan (besluit 3). `report_step` blijft in de planner open voor een operator; de Hub telt zo'n melding niet. | B voor definitieve route; D (zonder M1 en M3 geen planstap naar uitvoering) en E voor geheimhoudende plannen. |
+| M4 eigenaarsregels C-12 | appstore-en-fork; contract §9/ASF-15; `manifest/rules.py::ACCOUNT_WORDS` en ADR-0016 W2/W3. | "De uitgebreide woordenlijst en contextregels uit ADR-0031 zijn één gepinde bron voor validator, Hub en executor. Accountgegevens worden vóór en na invulling in alle vormen geweigerd, ook via generated, value_from en vault_refs; ontbrekende of verouderde regels geven geen vrijgave." Lever reproduceerbare gedeelde testmatrix en regelset; leg pin-/driftcontrole vast. Geen eigen Hub-woordenlijst. Bronstand: de regels staan sinds `a994c2a` in de bron (ADR-0023, besluit 5 hierboven); `ASF_COMMIT` in `ci.yml` wijst nog naar een oudere commit. Hub en executor nemen in C dezelfde gepinde toets over als de validator in de CI en meten de bron dan opnieuw. | C en daarmee E/G. |
 | M5 bewijsgrens imagepaden | ai-server-manager, afstemmen met manifeststandaardeigenaar; ADR-0030 besluit 6 en "Engine-regels buiten de policy_hash". | "Een toegelaten padtekst of gepinde image bewijst geen afwezigheid van symlinks. Nieuwe opslagtoestemming vereist controleerbaar digest- en mountgebonden bewijs voor elk padonderdeel en runtime-mutatie; ontbreekt dat, dan capability niet beschikbaar. Geen shell of Docker-socket als omweg." Het algemeen bruikbare bewijsmechanisme is ONBEKEND; eerst bronnen/capabilities vaststellen met `rg -n 'symlink|rootfs|mount_path' apps/executor/src apps/policy/src` in de repo en beoordeling van gepinde imagefixtures. | Verruiming van catalogusmounts in C/D; geen algemene veiligheidsclaim in G. |
 
 Overige open grenzen: toegelaten echte bronconfiguratie, exacte eerste ondersteunde app-/versiecombinaties,
@@ -429,7 +660,9 @@ bijpassende geteste Hub-/executor-images op digest vereist; geen nieuw enginevel
 
 ## Verificatie van deze ontwerpstap
 
-Alleen dit ADR en verwijzingen in ADR-0030 en `docs/EXECUTION_REQUEST.md` horen bij de repo-diff.
+Alleen dit ADR en verwijzingen in ADR-0030 en `docs/EXECUTION_REQUEST.md` horen bij de repo-diff, ook in de
+herstelronde. De herstelronde voegt geen genummerd besluit toe maar werkt besluit 1–6, 8 (met het besluit van de
+regisseur) en 9, de toetsen T1–T5, T8 en T9 en de meldingen M1–M4 bij; de toetsen blijven toekomstige acceptatie.
 Controleer relatieve links, besluiten 1–9 met alternatief/reden en test/mutatie, scope en ongewijzigde contract-,
 policy- en evidencebestanden. Draai de bestaande contract-/manifest-/evidencecontroles uit P-ai-server-manager
 voor het geraakte documentatiedeel en P-GIT; P-VEILIG, P-HARDE-EIS en P-INSTALLATIE zijn ontwerpchecklijsten.

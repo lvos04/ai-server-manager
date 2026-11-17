@@ -6,10 +6,13 @@ pakket. Besluiten: ADR-0030.
 
 Ontwerp voor catalogus-/plan-/doelbinding en afzonderlijke kluisdoorgifte:
 [ADR-0032](adr/ADR-0032-vertrouwde-appplannen-en-kluisdoorgifte.md), besluiten 1–4 en open meldingen M1–M4.
-Dit is nog geen transportcontract: het voegt geen veld aan deze envelope toe. Geheime waarden komen nooit in
-de ondertekende envelope, verzoekhash, idempotentie-opslag of het journaal; zij worden niet vóór ondertekening
-in parameters opgelost. Tot het afzonderlijke transport en de binding zijn vastgesteld en gebouwd, blijft de
-betrokken kluiscapability `501 capability_unavailable`.
+Dit is nog geen transportcontract: het voegt geen veld aan deze envelope toe. Een geheim dat de Hub maakt
+(kluisverwijzing `vault://app/<app_id>/<parameter>`) komt als waarde nooit in de ondertekende envelope,
+verzoekhash, idempotentie-opslag of het journaal; het wordt niet vóór ondertekening in parameters opgelost. Dat
+geldt niet voor de bestaande waarden van omgevingsvariabelen in een voorstel: die staan nu in de envelope en tellen
+mee in `parameters_sha256`; preview, log en audit tonen alleen hun namen en de Hub wist ze na afloop (ADR-0030,
+besluit 28). Tot het afzonderlijke transport en de binding zijn vastgesteld en gebouwd, blijft de betrokken
+kluiscapability `501 capability_unavailable`.
 
 ## ActionProposal
 

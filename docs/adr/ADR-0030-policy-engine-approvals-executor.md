@@ -661,6 +661,11 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
   planorkestratie, C-12, opslag/preview, symlinkgrens, migratieveilig terugzetten en de deelketens B–G ter review
   vast. Zijn test-/mutatiematrix is nog te bouwen; zijn contractmeldingen zijn open. Het ontwerp heft de huidige
   capabilityweigeringen en beschermregels niet op en vervangt de meldregel bij historische herstelwaarden niet.
+  Besluit 8 daar (besluit van de regisseur namens de afwezige gebruiker, optie 3; wordt de gebruiker nog
+  voorgelegd): recepten van vóór deelstap F en van updates buiten de vertrouwde keten blijven terug te zetten met een
+  melding, zoals besluit 8 hier; een recept van een update die ná F via de vertrouwde keten liep, wordt zonder
+  geldige migratiecontext geweigerd (EX15). Besluit 4 daar weigert vanaf deelstap E elke `app.update`/`app.rollback`
+  met recept op een instantie met kluisplekken, tot een recept met alleen verwijzingen bestaat.
 
 - **Eigen opdracht bij een installatie (S-P2-040, besluit regisseur optie C; besluit 32).** De Hub weigert `command`
   en `entrypoint` tot er een installatiescherm is dat ze veilig kan tonen (UI-stappen S-P2-170 en S-P2-180). Daar
