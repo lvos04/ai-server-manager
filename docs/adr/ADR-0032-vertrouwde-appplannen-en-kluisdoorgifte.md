@@ -313,8 +313,9 @@ vastgesteld en interoperabel getest. Dit ADR verzint daarvoor geen reeds bestaan
 De verplichte volgorde voor de latere implementatie:
 
 1. De Hub maakt gegenereerde niet-accountgeheimen (type appgeheim hieronder) uitsluitend in de vault en bindt
-   revisies en alle gemarkeerde plekken aan de preview. Parameteropslag en antwoorden bevatten alleen verwijzingen. Iedere ontbrekende,
-   dubbele of extra markering weigert; een ref op een andere plek of als deeltekst wordt nooit opgelost.
+   revisies en alle gemarkeerde plekken aan de preview. Parameteropslag en antwoorden bevatten alleen
+   verwijzingen. Iedere ontbrekende, dubbele of extra markering weigert; een ref op een andere plek of als
+   deeltekst wordt nooit opgelost.
    Er zijn precies twee gebonden typen, elk met een eigen vaste vorm en eigen opslag- en hashregels:
    - **appgeheim** (contract §3.1 a en de tweede uitzondering, C-12), op een toegelaten kluisplek van de eigen
      witte-lijstregel (besluit 6). Vorm `^[A-Za-z0-9][A-Za-z0-9_-]{42}$`: 43 tekens, 32 willekeurige bytes als
@@ -667,7 +668,8 @@ recepten eenmalig en duurzaam als `oud` vast:
 - Herhaalbaar: een onderbroken poging laat niets achter en wordt bij de volgende start opnieuw gedaan, met
   dezelfde uitkomst. Na voltooiing gebeurt zij nooit opnieuw, en een recept van na de voltooiing komt nooit in de
   verzameling. Ontbreekt de vastlegging terwijl er al een recept met eigen herkomst bestaat (F was dus in gebruik),
-  dan maakt de executor haar niet opnieuw: recepten zonder eigen herkomst zijn dan ONBEKEND.
+  dan maakt de executor haar niet opnieuw en blijft de weigering uit het vorige punt staan; dat is een storing
+  voor de eigenaar, geen normale toestand.
 - De Hub doet hetzelfde, eenmalig en in één transactie, voor elk verzoek `app.update` of `app.rollback` dat hij
   vóór F ondertekende, ongeacht de uitkomst (uit zijn eigen actieadministratie), zonder bestaande gegevens te
   wijzigen.
@@ -713,7 +715,8 @@ de hele herkomstregistratie verwijdert (bij de executor, bij de Hub en bij beide
 recept met eigen herkomst dat ook in de oud-vastlegging staat. Eenmalige vastlegging: een onderbroken poging laat
 geen `oud` achter en tot de voltooiing voert de executor geen update of rollback met recept uit; een herhaalde
 start na voltooiing verandert de verzameling niet; een recept van na de voltooiing is nooit `oud`; een verwijderde
-vastlegging wordt niet opnieuw gemaakt zolang er recepten met eigen herkomst bestaan. Een terugzetverzoek dat zelf
+vastlegging wordt niet opnieuw gemaakt zolang er recepten met eigen herkomst bestaan, en geen recept wordt dan
+teruggezet (geen rollback-RPC). Een terugzetverzoek dat zelf
 "buiten de keten", "oud" of een context meestuurt, verandert daar niets aan.
 **Mutatie M-T8.** Verwijder de zelfstandige migratiegate of vervang checkpointverificatie door "ID bestaat":
 de betreffende directe weigertest moet rood worden. Verander één oude waarde/digest: de positieve hersteltest faalt.
