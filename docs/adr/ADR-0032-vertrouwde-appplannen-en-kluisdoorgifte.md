@@ -1,8 +1,10 @@
 # ADR-0032 — Vertrouwde appplannen, doelbinding en kluisdoorgifte
 
-Status: ontwerp ter review, herstelronde 1 · 2026-11-17 · S-P2-050 deelstap A · niveau N4.
+Status: ontwerp ter review, herstelronde 2 · 2026-11-17 · S-P2-050 deelstap A · niveau N4.
 Basis: `e88a290c9ad5fef4acf498d05ad3414395a4fcb5` van `ai-server-manager`; herstel op
-`58187e38145fd4628d712888a2829bdeb19fbe60` na de reviews R-VEILIG (bevindingen 1–10) en R-TECH (bevinding 1).
+`58187e38145fd4628d712888a2829bdeb19fbe60` na de reviews R-VEILIG (bevindingen 1–10) en R-TECH (bevinding 1);
+herstelronde 2 op `a03ca73e2ee0d12b0d9aad272529be19ead3dbf1` na de herreview (R-TECH-1 tot en met -3 en twee
+kleine punten).
 Besluit 8 bevat een besluit van de regisseur namens de afwezige gebruiker; het wordt de gebruiker nog voorgelegd.
 Contract: `contracts 1.3` met aanvulling C-12, ADR-0031.
 Dit document legt bouwgrenzen en toekomstige bewijstests vast; het levert geen uitvoerende code of nieuwe
@@ -104,7 +106,10 @@ ankers die hij zelf heeft en die de Hub niet kan veranderen:
   met de toegelaten kluisplekken. De executor weigert als bron, revisie, sleutel, `app_id`, versie, manifesthash of
   digest niet precies op één regel past, en toetst de werkelijke payload en de gemarkeerde
   `{path, parameter, ref}` zelf aan het veldschema van die regel. De beheerdersselectie in de Hub kan deze lijst
-  alleen versmallen, nooit verruimen.
+  alleen versmallen, nooit verruimen. Elke nieuw toegelaten cataloguscombinatie vraagt daarom een gezamenlijke
+  release en uitrol van Hub- én executor-image met dezelfde nieuwe lijst; zolang de twee lijsten niet overeenkomen,
+  weigert de executor op de policy-hash. Combinaties die nog nodig zijn voor terugzetten blijven in de nieuwe lijst
+  staan (besluit 6).
 - **Doel:** zijn eigen verse readback via zijn eigen gepinde TrueNAS-verbinding (bestaande stap 5–7: vingerafdruk,
   `app.query`/`app.image.query`, ETag) en zijn eigen instantielijst zonder waarden uit besluit 4. Bij een nieuwe
   installatie moet de runtime-naam afwezig zijn; bij een bestaande instantie moeten naam, catalogusapp/trein,
@@ -307,20 +312,34 @@ vastgesteld en interoperabel getest. Dit ADR verzint daarvoor geen reeds bestaan
 
 De verplichte volgorde voor de latere implementatie:
 
-1. De Hub maakt gegenereerde niet-accountgeheimen uitsluitend in de vault en bindt revisies en alle gemarkeerde
-   plekken aan de preview. Parameteropslag en antwoorden bevatten alleen verwijzingen. Iedere ontbrekende,
+1. De Hub maakt gegenereerde niet-accountgeheimen (type appgeheim hieronder) uitsluitend in de vault en bindt
+   revisies en alle gemarkeerde plekken aan de preview. Parameteropslag en antwoorden bevatten alleen verwijzingen. Iedere ontbrekende,
    dubbele of extra markering weigert; een ref op een andere plek of als deeltekst wordt nooit opgelost.
-   Een Hub-geheim heeft één vaste vorm: `^[A-Za-z0-9][A-Za-z0-9_-]{42}$` (32 willekeurige bytes als base64url
-   zonder opvulling, zoals de bestaande tokenvormen van de Hub; een waarde die met `-` begint wordt verworpen en
-   opnieuw gemaakt). Een app die een andere vorm vraagt, wordt niet ondersteund. De nieuwe app-opslag bewaart geen
-   `last4` of ander deel of afgeleide van de waarde (anders dan `Vault.put`, dat `last4` vult), alleen
-   "gegenereerd" met datum en revisie (contract §3.1 a).
+   Er zijn precies twee gebonden typen, elk met een eigen vaste vorm en eigen opslag- en hashregels:
+   - **appgeheim** (contract §3.1 a en de tweede uitzondering, C-12), op een toegelaten kluisplek van de eigen
+     witte-lijstregel (besluit 6). Vorm `^[A-Za-z0-9][A-Za-z0-9_-]{42}$`: 43 tekens, 32 willekeurige bytes als
+     base64url zonder opvulling; een waarde die met `-` begint wordt verworpen en opnieuw gemaakt. Opslag
+     versleuteld in de eigen app-opslag van besluit 2, op te halen met ref en revisie. Die opslag bewaart geen
+     `last4` of ander deel of afgeleide van de waarde (anders dan `Vault.put`, dat `last4` vult), alleen
+     "gegenereerd" met datum en revisie (contract §3.1 a); nergens staat een hash van de waarde.
+   - **enrollment-token**, uitsluitend op de plek `HUB_ENROLLMENT_TOKEN` van een koppelbare eigen dienst met
+     volledige koppeling (koppelvelden hieronder; my_house krijgt alleen `HUB_URL` en heeft geen tokenplek). Vorm:
+     het bestaande formaat, ongewijzigd: `^enr_[A-Za-z0-9_-]{43}$`, dus `enr_` plus 43 tekens, 47 in totaal
+     (contract §3.2–§3.4; `hub/security.py::new_token`, `hub/routers/services.py` `ENROLLMENT_TOKEN`). Nooit in de
+     kluis of de app-opslag en nooit terugleesbaar; de Hub bewaart alleen de SHA-256 in zijn bestaande
+     enrollment-opslag (contract §3.1 en §3.4), nergens anders een hash of deel.
+
+   Het type van elke plek volgt uitsluitend uit de eigen witte-lijstregel (de toegelaten kluisplekken zijn
+   appgeheimen; de koppelbare eigen dienst geeft de ene tokenplek); Hub en executor bepalen het elk zelf. Geen veld
+   van de aanvrager, het voorstel, het manifest, de planner of het ophaalantwoord kiest of verandert type of
+   patroon. Een app die voor een appgeheim een andere vorm vraagt, wordt niet ondersteund.
 2. De executor ontvangt eerst uitsluitend het normale ondertekende verzoek met de vastgelegde niet-geheime
    context. Hij controleert zelf handtekening, tijden, nonce, allowlist, schema, C-12, bron-/doelbinding,
    policy-hash, eigen risicoklasse, approval, checkpoints en verse precondities, vóór enige kluisopvraag.
-3. Op de gepinde ophaalverbinding vraagt uitsluitend die executor precies de toegelaten referenties/revisies op,
-   gebonden aan de hash van het **ref-only** ondertekende verzoek, request-ID, approval/nonce, doelinstantie,
-   uitvoerderidentiteit en vervaltijd. De Hub controleert opnieuw de actuele autorisatie, intrekking en context.
+3. Op de gepinde ophaalverbinding vraagt uitsluitend die executor precies de toegelaten referenties/revisies op
+   (en, bij een gekoppelde eigen dienst, het token voor de ene tokenplek), gebonden aan de hash van het
+   **ref-only** ondertekende verzoek, request-ID, approval/nonce, doelinstantie, uitvoerderidentiteit en vervaltijd.
+   De Hub controleert opnieuw de actuele autorisatie, intrekking en context.
    Een opvraag met een andere of extra ref of revisie dan aan het verzoek gebonden is, wordt in zijn geheel
    geweigerd: geen gedeeltelijke afgifte.
    Een vrijgave vervalt uiterlijk bij de eerst aflopende verzoek-/approvaltijd, met maximaal 60 seconden
@@ -332,8 +351,10 @@ De verplichte volgorde voor de latere implementatie:
 5. Alleen direct voor de goedgekeurde `app.create`/`app.update` vervangt de executor de exacte gemarkeerde
    tekstplekken in een tijdelijke kopie. De opgehaalde waarde valt buiten de handtekening, de goedgekeurde preview
    en de parametercontrole (die liep in stap 2 over de verwijzing). Daarom toetst de executor elke opgehaalde
-   waarde vóór het invullen aan de vaste vorm uit stap 1 en aan de gevraagde ref en revisie; past één waarde niet,
-   dan weigert hij het hele verzoek met een vaste code, zonder schrijfaanroep en zonder de waarde te loggen.
+   waarde vóór het invullen aan de vaste vorm van het type dat zijn eigen witte-lijstregel aan die plek geeft
+   (stap 1) en aan de gevraagde ref en revisie (bij het token: aan de gevraagde plek en het verzoek). Een waarde
+   van het andere type past nooit. Past één waarde niet, dan weigert hij het hele verzoek met een vaste code,
+   zonder schrijfaanroep en zonder de waarde te loggen.
    Het oorspronkelijke verzoek blijft ref-only. De uitvoer-adapter mag dit object niet via generieke
    request-/exceptionlogging laten lopen; ook het TrueNAS-clientpad is afgeschermd.
    Een capability voor een andere methode, bestemming of accountplek blijft geweigerd.
@@ -375,13 +396,35 @@ recepten (zonder kluisplekken) blijven onder het bestaande beleid; dit ADR claim
   voorstel kan tot 24 uur open staan, `ProposalIn.expires_in_seconds`; het token leeft 60 minuten). Het is gebonden
   aan de vaste `app_id`, het verzoek en de doelinstantie, reist alleen over de afzonderlijke ophaalverbinding en is
   nooit terugleesbaar: de Hub bewaart alleen de hash (contract §3.1), nooit in de kluis, een tabel, het journaal,
-  een recept of een antwoord. De plek van het token telt in de instantielijst als gebonden kluisplek, zodat ook
-  hier de receptweigering hierboven geldt. Opslag en moment van uitgifte worden in M2 vastgelegd.
+  een recept of een antwoord. Het heeft het type enrollment-token uit stap 1 met het bestaande formaat; de
+  executor toetst het in stap 5 aan dat formaat, nooit aan de vorm van een appgeheim. De plek van het token telt
+  in de instantielijst als gebonden kluisplek, zodat ook hier de receptweigering hierboven geldt (gevolgen
+  hieronder). Opslag en moment van uitgifte worden in M2 vastgelegd.
 - De preview toont de koppeling: "koppelt met de Hub", met adres en vingerafdruk van de eigen koppeling; nooit
   het token.
 - my_house krijgt alleen `HUB_URL`; bestaande adapters krijgen geen automatische enrollment. Bij een onzekere
   uitvoering geen nieuw token op hetzelfde oude akkoord en geen automatische tweede installatie; eerst toestand
   vaststellen, zo nodig het oude token intrekken en een nieuwe gebonden handeling.
+
+**Gevolgen van de tokenmarkering (vastgesteld vóór E).** Voor een eigen dienst waarvan de executor zelf het token
+invulde, geldt vanaf E:
+
+- Een gewone image-update en een `app.rollback` met `herstel_van` lopen over het `app.config`-pad en worden door
+  Hub én executor geweigerd tot het ref-only recept (M2) bestaat en de fase na M2 van T4 bewezen is. Tot dan kan
+  het platform zo'n dienst langs die weg niet bijwerken of terugzetten.
+- Een verlopen of gebruikt token heft de markering niet op: de waarde kan in de TrueNAS-configuratie blijven staan
+  (hoe TrueNAS haar bewaart is NIET GEVALIDEERD, contract §3.1) en zou anders bij de volgende update in het
+  recept komen. Er is geen vrijgave na alleen tijd of gebruik.
+- Hoe het ref-only recept de tokenplek vastlegt (alleen plek en type, nooit waarde of hash) en wat een terugzetting
+  daar invult, legt M2 vast; tot dan geldt de weigering.
+- Alleen wat de executor zelf invulde, wordt gemarkeerd. Bestaande adapters (MediaGuard, MSO, Jellyfin/Jelly
+  Leon, Emby: geen enrollment, contract §2.3 regel 2), de plugin die met een publieke sleutelset koppelt (regel 9),
+  my_house (alleen `HUB_URL`, niet geheim), een eigen dienst die vóór E of met de hand is gekoppeld (koppelcode, of
+  een token dat de beheerder zelf in het formulier zette, contract §3.2 punt 2) en elke andere instantie zonder
+  eigen invulling krijgen geen markering. Hun gewone updates en hun bestaande terugval blijven onder het bestaande
+  beleid, met hun bestaande blokkades (zoals de Emby-bescherming).
+
+De acceptatie van E toont dit aan (T4, tokenmarkering); zonder dat bewijs geen vrijgave van E.
 
 OIDC-`client_secret`-overdracht blijft een eigen ADR in 070.
 
@@ -401,21 +444,57 @@ Nul treffers zijn vereist. Herhaal bij rotatie, fout vóór/na RPC, timeout, her
 foutcertificaat/pin, HTTP-downgrade, verkeerde executor, ontbrekende ref, een opvraag met een andere of extra ref
 of revisie dan gebonden, en ingetrokken approval. Voor afwijzingen vóór ontsluiting is ook het aantal
 kluisopvragen nul. Daarnaast:
-- recept: installatie met geheim, daarna een gewone image-update en een `app.rollback` met `herstel_van` op die
-  instantie: Hub én executor weigeren vóór `app.config`, nul schrijfaanroepen; hetzelfde met een onleesbare
-  instantielijst en met een ondertekende markering die afwijkt van de eigen lijst;
-- vorm: de test-Hub levert een padtekst, een vlag (een waarde die met `-` begint), een waarde met een regeleinde,
-  een te korte en een te lange waarde en de waarde van een andere ref: weigering, nul schrijfaanroepen, de waarde
-  in geen enkele log;
+- recept, fase vóór de vrijgave van M2 (vanaf E): installatie met geheim, daarna een gewone image-update en een
+  `app.rollback` met `herstel_van` op die instantie: Hub én executor weigeren vóór `app.config`, nul
+  schrijfaanroepen en nul aanroepen van de receptopslag (teller op `save_values`/`load_values` of hun opvolger);
+  hetzelfde met een onleesbare instantielijst en met een ondertekende markering die afwijkt van de eigen lijst.
+  Deze fase bewijst de weigering, niet de receptschrijver;
+- recept, fase na de vrijgave van M2: op een gemarkeerde instantie een echte gewone image-update en daarna een
+  `app.rollback` met `herstel_van` naar het daarbij gemaakte recept, via de productieschrijver (`_voer_uit` en de
+  receptopslag; een teller toont dat de schrijver werkelijk is bereikt). Het ontsleutelde recept is niet leeg en
+  bevat op de gemarkeerde plekken uitsluitend de juiste refs en revisies uit de eigen instantielijst (geen
+  ontbrekende, extra of andere); na de rollback staan in de nagebootste TrueNAS exact de vorige waarden (de
+  geheime plek opnieuw ingevuld uit de gebonden ref en revisie volgens stap 2–5) en de vorige digest; de
+  zoektocht hierboven geeft nul treffers op de waarde en haar afgeleide vormen;
+- vorm, voor beide typen: de test-Hub levert een padtekst, een vlag (een waarde die met `-` begint), een waarde
+  met een regeleinde, een te korte en een te lange waarde en de waarde van een andere ref; voor het token ook een
+  waarde zonder `enr_` en een met 42 of 44 tekens na `enr_`: weigering, nul schrijfaanroepen, de waarde in geen
+  enkele log;
+- kruisverwisseling: de test-Hub levert op de tokenplek een waarde in de vorm van een appgeheim en op een
+  appgeheimplek een geldig `enr_`-token, telkens met het bijpassende (verkeerde) type in zijn antwoord; en een
+  voorstel of manifest dat zelf een type of patroon noemt: weigering van het hele verzoek met een vaste code, nul
+  schrijfaanroepen, de waarde in geen enkele log;
 - koppelvelden: `HUB_*` als parameter van de aanvrager geweigerd in Hub en executor; een ander adres of andere
   vingerafdruk in de context dan de eigen koppeling: nul schrijfaanroepen; het enrollment-token in geen tabel,
-  journaal, recept of antwoord (alleen de hash), en de preview toont adres en vingerafdruk.
+  journaal, recept of antwoord (alleen de hash), en de preview toont adres en vingerafdruk;
+- koppelketen (positief): echte Hub, echte executor, nagebootste TrueNAS en een koppelbare eigen dienst op een
+  gepinde commit. Na goedkeuring en claim ontvangt de nagebootste TrueNAS `HUB_URL` en `HUB_KEY_FINGERPRINT` uit
+  de eigen koppeling en op `HUB_ENROLLMENT_TOKEN` een token van 47 tekens dat past op `^enr_[A-Za-z0-9_-]{43}$`.
+  De dienst wordt in de test gestart met precies die omgevingswaarden, meldt zich aan met
+  `POST /api/v1/services/enroll` (contract §3.3) en bevestigt met `GET /api/v1/services/self`; de Hub toont hem
+  als gekoppeld. Daarna staat het token alleen als SHA-256 in de enrollment-opslag van de Hub, in geen andere
+  tabel, journaal, recept, antwoord of log, en na de bevestiging geeft hetzelfde token 401 `invalid_enrollment`;
+- tokenmarkering (acceptatie E): voor de dienst uit de koppelketen worden een gewone image-update en een
+  `app.rollback` met `herstel_van` vóór `app.config` geweigerd, ook nadat het token verlopen en gebruikt is.
+  In dezelfde testopzet, vergeleken met de build van vóór E: instanties van MediaGuard, MSO, Jelly Leon en Emby
+  (bestaande adapters), my_house met alleen `HUB_URL` en een met de hand of vóór E gekoppelde eigen dienst hebben
+  geen regel in de instantielijst, en een gewone image-update en een `app.rollback` met `herstel_van` met een
+  bestaand recept hebben dezelfde uitkomst en dezelfde weigercode als vóór E (een bestaande blokkade zoals de
+  Emby-bescherming blijft de reden, nooit de tokenmarkering); waar er vóór E geen blokkade was, worden precies
+  dezelfde waarden teruggezet.
 Geen geheimwaarde in test-/CI-uitvoer.
-**Mutatie M-T4.** Verplaats ontsluiting vóór de signature/hash, laat de adapter een requestbody loggen, bewaar
-een opgelost recept, laat de receptweigering vallen, haal de vormcontrole weg, sta een extra ref in de opvraag
-toe, vul `last4` in de nieuwe opslag of neem `HUB_*` uit de parameters over. Elke variant maakt de betreffende test
-rood; de lektest bewijst haar werking met opzettelijk gevulde opvang, nooit met lege tabellen, en de receptproef
-wordt rood bij de mutatie "recept met waarde bewaren" omdat zij het ontsleutelde recept doorzoekt.
+**Mutatie M-T4.** Verplaats ontsluiting vóór de signature/hash, laat de adapter een requestbody loggen, laat de
+receptweigering vallen, haal de vormcontrole weg, sta een extra ref in de opvraag toe, vul `last4` in de nieuwe
+opslag of neem `HUB_*` uit de parameters over. Elke variant maakt de betreffende test rood; de lektest bewijst haar
+werking met opzettelijk gevulde opvang, nooit met lege tabellen. Zonder receptweigering wordt de fase vóór M2 rood
+(de teller op de receptopslag is dan niet nul). Verander alleen de receptschrijver zodat hij opgeloste waarden
+bewaart, terwijl alle andere controles blijven staan: de fase na M2 wordt rood, omdat zij het ontsleutelde recept
+van de bereikte schrijver doorzoekt; de fase vóór M2 blijft weigeren. Pas de vorm van het appgeheim (43 tekens) ook
+op het enrollment-token toe: de koppelketen wordt rood. Neem het type van een plek uit het ophaalantwoord, het
+voorstel of het manifest in plaats van uit de eigen witte-lijstregel: de kruisverwisseling wordt rood. Markeer
+elke instantie met een `HUB_*`-variabele of een token in haar configuratie, in plaats van alleen eigen invulling:
+de proef met de bestaande adapters en de met de hand gekoppelde dienst wordt rood. Hef de markering op na verval of
+gebruik van het token: de proef met het verlopen token wordt rood.
 
 ### 5. C-12-accountgegevens worden in elke vorm geweigerd
 
@@ -463,6 +542,11 @@ onschuldig lijkende naam. Geen generieke recursieve verbodslijst als vervanging 
 is het eigen anker van de executor uit besluit 1: zij staat als beleidsbestand onder de `policy_hash` in beide
 images en noemt per regel ook de toegelaten bronidentiteit, de volledige uitgeverssleutel, de toegelaten
 kluisplekken en of de app een koppelbare eigen dienst is (`HUB_*`, besluit 4).
+Een nieuwe toegelaten combinatie komt er alleen bij via een gezamenlijke release en uitrol van Hub- en
+executor-image met dezelfde nieuwe lijst; zolang de twee niet overeenkomen, blijft uitvoering geweigerd
+(policy-hash). Een nieuwe lijst voegt toe en behoudt de historische combinaties die nog nodig zijn voor terugzetten
+(de vorige versie van een geïnstalleerde instantie, of een bewaard recept of checkpoint verwijst ernaar); zo'n
+combinatie verdwijnt niet als bijwerking van een nieuwe release.
 
 De witte lijst beschrijft typen, grenzen, betekenis, toegelaten opslagconfiguraties en één previewregel voor
 ieder gezet veld. Bestaande ix-app-lijsten, hostpad-/datasetnaam-/ACL-weigeringen, verboden mounts en GPU-grenzen
@@ -496,8 +580,12 @@ onbruikbaar maken. De witte lijst staat veilige getypte informatie toe en weiger
 en voeg op elke toegelaten objectplek één onbekend veld toe. Onbekende versie, NFS/SMB en ACL blijven dicht;
 bekende geldige opslag en grote geldige tmpfs blijven regressiecontroles. V1–V7 via echte API en opslag, niet
 alleen `_toon`. Weigering en maskering worden afzonderlijk aangetoond.
+Releaseproef: een Hub met een nieuwe combinatie in zijn lijst tegen een executor met de vorige lijst (twee
+beleidskopieën): weigering op de policy-hash, nul kluisopvragen en nul schrijfaanroepen; na de gezamenlijke uitrol
+slaagt de nieuwe combinatie en blijft de terugzetting naar de vorige combinatie toegelaten.
 **Mutatie M-T6.** Laat onbekende velden/versies door, open NFS/SMB of zet de betreffende V1–V6-maskering uit:
 iedere gerichte test wordt rood. Een kunstmatige bovengrens voor tmpfs maakt de positieve regressietest rood.
+Laat de nieuwe lijst de vorige combinatie weg: de terugzetting in de releaseproef wordt rood.
 
 ### 7. Padtekst bewijst geen veilige grens voor symlinks in een image
 
@@ -544,12 +632,47 @@ niet en de journaaltabel `app_values` bewaart alleen `request_id`, app, versleut
 | 3 | Recepten van vóór deelstap F en van updates buiten de vertrouwde keten gaan door met een duidelijke melding. Recepten van updates die ná F via de vertrouwde keten liepen, dragen altijd migratiecontext en worden geweigerd als die ontbreekt, tegenstrijdig is of een migratie zonder veilige tag-terugval noemt (EX15). | KLEIN-85 blijft heel voor bestaande apps en voor updates buiten de keten; elke update via de keten is beschermd. Restrisico: een migratie bij een update buiten de keten wordt alleen gemeld. |
 
 **BESLOTEN door regisseur (gebruiker afwezig), wordt de gebruiker voorgelegd in het eindoverzicht: optie 3.**
-Het onderscheid komt nooit uit een veld van het terugzetverzoek. Bij het bewaren van een recept legt de executor
-zelf vast of de update via de vertrouwde keten liep (ondertekende context aanwezig en tegen zijn anker uit besluit 1
-gecontroleerd) en zo ja met welke migratiecontext; dat staat in hetzelfde versleutelde vak, gebonden aan het
-`request_id`, en een terugzetverzoek kan het niet veranderen. De Hub legt hetzelfde vast bij zijn eigen
-updateverzoek. Een recept zonder die vastlegging is "van vóór F of buiten de keten". De melding is een vaste
-waarschuwing in het antwoord, het journaal en één logregel, zonder waarden, zoals de KLEIN-85-melding.
+Het onderscheid komt nooit uit een veld van het terugzetverzoek. "Oud" en "buiten de keten" zijn een positief
+vastgestelde herkomst, nooit de afwezigheid van een vastlegging. Elk recept heeft precies één van drie herkomsten:
+
+- `oud`: het recept bestond bij de ingebruikname van deelstap F en staat in de eenmalige vastlegging hieronder;
+- `keten`: de update liep via de vertrouwde keten (ondertekende context aanwezig en tegen het anker uit besluit 1
+  gecontroleerd), met de migratiecontext;
+- `buiten_keten`: een update ná F zonder die context.
+
+Bij het bewaren van elk nieuw recept na F legt de executor zelf uitdrukkelijk `keten` (met migratiecontext) of
+`buiten_keten` vast, in hetzelfde versleutelde vak, gebonden aan het `request_id`; een terugzetverzoek kan het niet
+veranderen. De Hub legt voor zijn eigen updateverzoek in zijn eigen administratie dezelfde herkomst vast. Bij een
+terugzetting beslissen Hub en executor elk uit hun eigen vastlegging, met dezelfde regel: `oud` en `buiten_keten`
+gaan door met de melding; `keten` alleen met geldige context (EX15). Ontbreekt de herkomst, of is zij onleesbaar of
+tegenstrijdig (eigen herkomst in het vak én in de oud-vastlegging), dan is zij ONBEKEND: weigering met een vaste
+code, geen rollback-RPC. Een nieuw ketenrecept waarvan de hele herkomstvastlegging ontbreekt, valt dus nooit onder
+de uitzondering. De melding is een vaste waarschuwing in het antwoord, het journaal en één logregel, zonder
+waarden, zoals de KLEIN-85-melding.
+
+**Eenmalige vastlegging van bestaande recepten bij de ingebruikname van F.** De executor legt bij zijn eerste start
+met de F-code, vóór hij een `app.update` of `app.rollback` over het `app.config`-pad uitvoert, alle dan bestaande
+recepten eenmalig en duurzaam als `oud` vast:
+
+- Geen wijziging van bestaande recepten: hij leest per recept alleen `request_id` en tijd uit `app_values`; hij
+  ontsleutelt, herschrijft, verplaatst of verwijdert geen recept (vak, app en tijd blijven byte-gelijk). De
+  vastlegging staat afzonderlijk en is met zijn eigen vault-sleutel verzegeld: de verzameling `request_id`'s met
+  hun tijd, het aantal en het tijdstip. Een recept waarvan `request_id` of tijd niet precies op de vastlegging past,
+  is niet `oud`.
+- Fail-closed: verzameling en markering "voltooid" worden in één transactie geschreven. Zonder voltooide, leesbare
+  en geldig verzegelde vastlegging is geen recept `oud`, en voert de executor geen `app.update` of `app.rollback`
+  over het `app.config`-pad uit. De vastlegging mag niets anders vragen dan zo'n terugzetting zelf al vraagt
+  (leesbaar en schrijfbaar journaal en `vault.key`), zodat zij de bestaande terugval niet blokkeert in een toestand
+  waarin die nu wel werkt.
+- Herhaalbaar: een onderbroken poging laat niets achter en wordt bij de volgende start opnieuw gedaan, met
+  dezelfde uitkomst. Na voltooiing gebeurt zij nooit opnieuw, en een recept van na de voltooiing komt nooit in de
+  verzameling. Ontbreekt de vastlegging terwijl er al een recept met eigen herkomst bestaat (F was dus in gebruik),
+  dan maakt de executor haar niet opnieuw: recepten zonder eigen herkomst zijn dan ONBEKEND.
+- De Hub doet hetzelfde, eenmalig en in één transactie, voor elk verzoek `app.update` of `app.rollback` dat hij
+  vóór F ondertekende, ongeacht de uitkomst (uit zijn eigen actieadministratie), zonder bestaande gegevens te
+  wijzigen.
+
+Zo blijven bestaande recepten terug te zetten met de melding (HARDE EIS, KLEIN-85); optie 3 zelf verandert niet.
 
 Een beheerder kan de weigering niet wegklikken. De uitkomst verwijst naar `eigenaar_herstel`: de eigenaar moet
 image en bijbehorende data/database als één herstelroute behandelen. Er wordt geen nieuwe R3-actie, database-
@@ -580,16 +703,29 @@ onveilig tagherstel, checkpoint van ander doel, ontbrekende database of verlopen
 Een veilige niet-migrerende testapp zet werkelijk de vorige waarden en digest terug. Bestaande KLEIN-85-proeven
 voor overtreding, geen overtreding en hercontrolefout blijven aanwezig. Emby stop/update/uninstall worden ook
 hernoemd en met approval geweigerd. Een gevulde checkpointfixture maakt ontbrekende database aantoonbaar.
-Voor optie 3: een recept van vóór F (bewaard door de huidige code, zonder context) en een recept van een update
-buiten de keten na F worden teruggezet met precies dezelfde waarden en de vaste melding. Een recept van een
-keten-update na F zonder context, met tegenstrijdige context of met een migratie zonder veilige tag-terugval wordt
-geweigerd: geen rollback-RPC. Een terugzetverzoek dat zelf "buiten de keten" of een context meestuurt, verandert
-daar niets aan.
+Voor optie 3: een recept van vóór F (bewaard door de huidige code, zonder context; na de eenmalige vastlegging
+`oud`) en een recept van een update buiten de keten na F (vastgelegd als `buiten_keten`) worden teruggezet met
+precies dezelfde waarden en de vaste melding; vak, app en tijd van elk bestaand recept zijn vóór en na de
+eenmalige vastlegging byte-gelijk. Een recept van een keten-update na F zonder context, met tegenstrijdige context
+of met een migratie zonder veilige tag-terugval wordt geweigerd: geen rollback-RPC. Ook ONBEKEND en geweigerd, geen
+rollback-RPC: een ketenrecept dat via de echte updateroute van Hub en executor is gemaakt en waarvan de test daarna
+de hele herkomstregistratie verwijdert (bij de executor, bij de Hub en bij beide), een onleesbare herkomst, en een
+recept met eigen herkomst dat ook in de oud-vastlegging staat. Eenmalige vastlegging: een onderbroken poging laat
+geen `oud` achter en tot de voltooiing voert de executor geen update of rollback met recept uit; een herhaalde
+start na voltooiing verandert de verzameling niet; een recept van na de voltooiing is nooit `oud`; een verwijderde
+vastlegging wordt niet opnieuw gemaakt zolang er recepten met eigen herkomst bestaan. Een terugzetverzoek dat zelf
+"buiten de keten", "oud" of een context meestuurt, verandert daar niets aan.
 **Mutatie M-T8.** Verwijder de zelfstandige migratiegate of vervang checkpointverificatie door "ID bestaat":
 de betreffende directe weigertest moet rood worden. Verander één oude waarde/digest: de positieve hersteltest faalt.
 Lees de herkomst van het recept uit het terugzetverzoek in plaats van uit het eigen vak, of behandel een
 keten-recept zonder context als van vóór F: de weigerproef wordt rood. Weiger elk recept zonder context (optie 1):
-de proef met het recept van vóór F wordt rood.
+de proef met het recept van vóór F wordt rood. Behandel een recept zonder herkomstregistratie als `oud` of
+`buiten_keten` (de oude regel "zonder vastlegging = van vóór F of buiten de keten"): de proef met het ketenrecept
+zonder registratie wordt rood. Laat de registratie bij het bewaren weg: de positieve terugzetting van het recept
+buiten de keten wordt rood (ONBEKEND), zonder dat optie 3 verandert. Maak de eenmalige vastlegging bij elke start
+opnieuw of neem recepten van na de voltooiing op: de proef met het recept van na de voltooiing respectievelijk met
+de verwijderde vastlegging wordt rood. Laat de vastlegging een bestaand recept herschrijven: de byte-vergelijking
+wordt rood.
 
 ### 9. De afhankelijkheidslus wordt door begrensde leveringen doorbroken
 
@@ -605,7 +741,7 @@ geen andere schrijver in hetzelfde bereik. Het planbestand wordt in deze ontwerp
 | B, HA..HB | Uit 080 uitsluitend `catalogus.lezen`: scopehandhaving, gemeten ja/nee/onbekend, versheid en verdwenen versie; interop met echte `HubLezer`. Begrensd: trein, app en versie alleen in vaste patronen, geen vrije filters of zoektekst naar TrueNAS, een grens op metingen per dienst en tijd, en antwoorden uit een eigen gemeten voorraad met versheid in plaats van een TrueNAS-meting per aanvraag. | Route/schema eerst als M3 vastleggen; eigenaar-connector, unlink en algemene 080-acceptatie blijven bij 080. |
 | C, HB..HC | Per app/versie schema voor opslag en preview (tevens het executoranker van besluit 1), V1–V7, parser/doelgrenzen en C-12-accountweigering. De aangevulde eigenaarsvalidator (in de bron sinds `a994c2a`) opnieuw meten; één pin voor validator-CI, Hub en executor (M4). | Geen kluisontsluiting; NFS/SMB en onbekende schema's blijven dicht. Symlinkbewijs is een harde capabilitygrens. |
 | D, HC..HD | Echte plannerclient met alleen een eigen plan, actiestap en handmatige stap gescheiden, levende sessie per stap (besluit 3), bronvertrouwen met het eigen executoranker, manifest-/appstore-preview, installatie zonder nieuwe geheimcapability, container-only verwijderen, readback/incident en registerbinding. Uit 080 de voor deze installatie vereiste post-install-gate. | Eerst M1 en M3; zonder die vastlegging gaat geen planstap naar uitvoering. Bestaande echte gates blijven verplicht; noodzakelijke hercontrole wordt met de installatie getest, geen testoverride. Geheimplan zonder vertrouwde plannerinvoer blijft dicht; geen totaalafvinking. |
-| E, HD..HE | Uit 070 de volledige relevante keten voor gegenereerde appgeheimen en `HUB_*` volgens besluit 4 (koppelvelden), samen met ASM-24, doelbinding, vaste geheimvorm, instantielijst, wisgedrag en afzonderlijk transport. Vanaf E weigeren Hub en executor elke update/rollback met recept op een instantie met kluisplekken. | Eerst M1–M4 oplossen; OIDC-client_secret-overdracht en eigen ADR blijven bij 070, geen automatische accountvoorziening. |
+| E, HD..HE | Uit 070 de volledige relevante keten voor gegenereerde appgeheimen en `HUB_*` volgens besluit 4 (koppelvelden), samen met ASM-24, doelbinding, de twee gebonden typen (appgeheim en enrollment-token) met hun vaste vorm, instantielijst, wisgedrag en afzonderlijk transport. Vanaf E weigeren Hub en executor elke update/rollback met recept op een instantie met kluisplekken. De acceptatie toont de gevolgen van de tokenmarkering: bestaande adapters en bestaande terugval worden niet gemarkeerd of afgesloten (besluit 4, T4). | Eerst M1–M4 oplossen; OIDC-client_secret-overdracht en eigen ADR blijven bij 070, geen automatische accountvoorziening. |
 | F, HE..HF | Uit 090 geverifieerde app-checkpoints, duurzame registratie/verificatie, RPO en database-/snapshotdekking, `Approval.backup_checkpoint_id` en pre-update-gate voor update/rollback; EX15 met optie 3 van besluit 8. Noodzakelijke 060-gatehercontrole sluit aan op deze echte data. Besluit over de schaduwinstallatie van een app met kluisgeheimen (besluit 2) en, als het exportbewijs verifieerbaar is, opening van de updatevariant met handmatige export (besluit 3). | Geen vervanging van `verified_checkpoint` door een teststub. Ref-only recept (M2) vóór update/rollback met recept op een instantie met kluisplekken. Overige pool-/boiler-/back-upblokkades en bewijs van 060 blijven daar; externe uploadverificatie, echte accountproef en overige 090-acceptatie blijven bij 090. |
 | G, HF..HG | Appstore → planner → echte Hub → echte executor → fake TrueNAS en terug. Positief/negatief T1–T8, V7, alle oorspronkelijke verplichte 050-tests, mutaties, volledige toepasselijke poorten en CI op HG. | Pas dan beoordeling van heel 050; resterende lokale bouwgaten nooit als alleen NAS-resttest presenteren. UI blijft bij 160/170/180 met ontwerp/review. |
 
@@ -663,6 +799,9 @@ bijpassende geteste Hub-/executor-images op digest vereist; geen nieuw enginevel
 Alleen dit ADR en verwijzingen in ADR-0030 en `docs/EXECUTION_REQUEST.md` horen bij de repo-diff, ook in de
 herstelronde. De herstelronde voegt geen genummerd besluit toe maar werkt besluit 1–6, 8 (met het besluit van de
 regisseur) en 9, de toetsen T1–T5, T8 en T9 en de meldingen M1–M4 bij; de toetsen blijven toekomstige acceptatie.
+Herstelronde 2 werkt alleen bij: besluit 1 en 6 met T6/M-T6 (gezamenlijke uitrol van beide images), besluit 4 met
+T4/M-T4 (receptproef in twee fasen rond M2, twee gebonden typen, gevolgen van de tokenmarkering), besluit 8 met
+T8/M-T8 (positief vastgestelde herkomst en eenmalige vastlegging bij F; optie 3 ongewijzigd) en rij E van besluit 9.
 Controleer relatieve links, besluiten 1–9 met alternatief/reden en test/mutatie, scope en ongewijzigde contract-,
 policy- en evidencebestanden. Draai de bestaande contract-/manifest-/evidencecontroles uit P-ai-server-manager
 voor het geraakte documentatiedeel en P-GIT; P-VEILIG, P-HARDE-EIS en P-INSTALLATIE zijn ontwerpchecklijsten.
