@@ -4,6 +4,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: elk veld van de preview door één toonfunctie (S-P2-040 herstelronde 4)
+- Geen rauw veld meer in `preview.wijziging` (ook `resources`); onder elke sleutel met `env` (genormaliseerd) alleen namen, paren `key`/`name`/`value` in elke schrijfwijze, overige tekst en sleutels via `redact_text`; bewakingstest per veld (R-VEILIG-9 t/m 13; ADR-0030 besluit 32).
+
 ### Gerepareerd — Hub: omgevingsvariabelen in andere vormen alleen met naam in de preview (S-P2-040 herstelronde 3)
 - Onder `environment`/`env`/`envs` van een catalogusapp, als `NAAM=waarde`, als `Name`/`Value` of als paar direct onder `values` staat alleen de naam in de preview; tests voor labels met een geheime `key` en niet-tekstgeheimen (R-VEILIG-8; ADR-0030 besluit 32).
 

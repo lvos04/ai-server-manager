@@ -9,18 +9,28 @@ Geheimen: waarden van omgevingsvariabelen staan nooit in de preview (alleen de n
 (``vault://…``) worden als verwijzing getoond, nooit ingevuld.
 
 Installeren (S-P2-040, R-VEILIG-1; ADR-0030 besluit 32): ``wijziging.waarden`` toont elk gezet veld van
-``app_create.values`` mét zijn waarde, zodat een beheerder niets ongezien goedkeurt. Uitzonderingen: van ``envs``
-alleen de namen, en een geheim (waarde onder een geheim-achtige sleutel, ook direct onder ``values``, of naast een
-geheim-achtige ``key`` in een paar ``key`` + ``value``) als ``***``. Van elk paar ``name`` + ``value`` (zoals de
-omgevingsvariabelen van een catalogusapp) staat alleen de naam erin; de waarde is altijd ``***`` (ADR-0030 besluit 28;
-S-P2-040 herstelronde 2, R-VEILIG-5 en -6), ook met hoofdletters (``Name``/``Value``) en direct onder ``values``;
-onder een sleutel ``environment``, ``env`` of ``envs`` alleen de namen (herstelronde 3). ``command`` en
-``entrypoint`` komen hier niet: die weigert de Hub al bij het voorstel (:func:`eigen_opdracht`, besluit regisseur
-optie C) tot een installatiescherm ze veilig kan tonen.
+``app_create.values`` mét zijn waarde, zodat een beheerder niets ongezien goedkeurt; alleen een geheim niet.
+``command`` en ``entrypoint`` komen hier niet: die weigert de Hub al bij het voorstel (:func:`eigen_opdracht`, besluit
+regisseur optie C) tot een installatiescherm ze veilig kan tonen.
+
+Eén principe (S-P2-040 herstelronde 4, besluit regisseur; ADR-0030 besluit 32): :func:`bouw` stuurt de hele
+``wijziging`` van elke actie door één toonfunctie (:func:`_toon`); er staat geen rauw veld in. Die toont alles,
+behalve:
+
+- de waarde onder een geheim-achtige sleutel (``hub.redact``): ``***``;
+- in een paar (een object met ``name`` of ``key`` én ``value``, elke schrijfwijze, genormaliseerd zoals ``_nk`` in het
+  beleid): de ``value`` als ``***`` bij een ``name`` (een omgevingsvariabele, ADR-0030 besluit 28) of bij een
+  geheim-achtige ``key``;
+- onder een sleutel met een omgevingsbetekenis (genormaliseerd bevat hij ``env``, of het Nederlandse ``omgeving``):
+  alleen namen (:func:`_omgeving`);
+- elke andere tekst, ook een sleutel, gaat door ``redact_text`` (URL met wachtwoord, ``Bearer``).
+
+Leeg (``None``, ``""``) en ja/nee blijven altijd zichtbaar.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -28,7 +38,7 @@ from asm_policy import Policy, execreq
 from asm_policy.canonical import canonical_sha256
 from asm_policy.engine import Classification
 from asm_policy.loader import ActieDef
-from asm_policy.params import IX_APP, expected_image, vault_refs
+from asm_policy.params import IX_APP, NIET_ALFANUM_RE, expected_image, vault_refs
 
 from hub.actions.doel import Doel
 from hub.redact import LOG_SECRET_KEY_RE, REDACTED, redact_text
@@ -102,60 +112,99 @@ def _verborgen(waarde: Any) -> bool:
     return waarde not in (None, "") and not isinstance(waarde, bool)
 
 
-def _is_sleutel(k: Any, naam: str) -> bool:
-    return isinstance(k, str) and k.lower() == naam
-
-
-def _alleen_naam(waarde: Any, diepte: int) -> Any:
-    """Een omgevingsvariabele als element van een lijst onder ``environment``/``env``/``envs``: een tekst
-    ``NAAM=waarde`` als ``NAAM``, een paar ``name`` + ``value`` met de waarde als ``***``, al het andere (behalve leeg
-    en ja/nee) als ``***``."""
-    if isinstance(waarde, str):
-        return waarde.split("=", 1)[0]
-    if isinstance(waarde, Mapping):
-        return _omgeving(waarde, diepte + 1)
+def _verberg(waarde: Any) -> Any:
     return REDACTED if _verborgen(waarde) else waarde
 
 
+def _nk(sleutel: Any) -> str:
+    """Een sleutel genormaliseerd voor vergelijking, zoals het beleid (``asm_policy.params._nk``): kleine letters en
+    alleen letters en cijfers (``Additional-Envs``, ``additionalEnvs`` en ``additional_envs`` worden
+    ``additionalenvs``)."""
+    return NIET_ALFANUM_RE.sub("", str(sleutel).lower())
+
+
+OMGEVING_DELEN = ("env", "omgeving")  # een sleutel met een omgevingsbetekenis bevat (genormaliseerd) een van deze
+PAAR_NAMEN = ("name", "key")  # de naam van een paar; met beide telt name (de waarde is dan altijd geheim)
+PAAR_WAARDE = "value"
+NAAM_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")  # een variabelenaam (volledig)
+SCHEIDING_RE = re.compile(r"[=:]")
+
+
+def _is_omgeving(sleutel: Any) -> bool:
+    nk = _nk(sleutel)
+    return any(deel in nk for deel in OMGEVING_DELEN)
+
+
+def _paarsoort(waarde: Mapping[str, Any]) -> str | None:
+    """``"name"`` of ``"key"`` als het object een paar is: een naam (``name`` of ``key``) én een ``value``, in elke
+    schrijfwijze. Een object met alleen een naam (zoals een portaal) of alleen een waarde is geen paar."""
+    soorten = {_nk(k) for k in waarde}
+    if PAAR_WAARDE not in soorten:
+        return None
+    return next((s for s in PAAR_NAMEN if s in soorten), None)
+
+
+def _namen(tekst: str) -> str:
+    """Tekst in een omgevingscontext, per regel: de naam vóór het eerste ``=`` of ``:`` (zonder scheiding: de hele
+    regel) als die op een variabelenaam lijkt (:data:`NAAM_RE`), anders ``***``. Een lege regel blijft leeg."""
+    uit = []
+    for regel in tekst.splitlines():
+        naam = SCHEIDING_RE.split(regel, maxsplit=1)[0].strip()
+        uit.append("" if not regel.strip() else naam if NAAM_RE.fullmatch(naam) else REDACTED)
+    return "\n".join(uit)
+
+
+def _zet(uit: dict[str, Any], sleutel: Any, waarde: Any) -> None:
+    """Een sleutel staat als tekst in de preview: ook hij gaat door ``redact_text``. Worden twee sleutels daardoor
+    gelijk, dan blijven ze allebei staan (met een volgnummer), zodat er niets ongezien verdwijnt."""
+    tekst = redact_text(str(sleutel))
+    naam, n = tekst, 2
+    while naam in uit:
+        naam, n = f"{tekst} ({n})", n + 1
+    uit[naam] = waarde
+
+
 def _omgeving(waarde: Any, diepte: int) -> Any:
-    """De waarde onder een sleutel ``environment``, ``env`` of ``envs`` (ook met hoofdletters): alleen de namen
-    (S-P2-040 herstelronde 3, besluit regisseur; ADR-0030 besluit 28). Een object houdt zijn sleutels (de namen) met
-    elke waarde als ``***``; een paar ``name`` + ``value`` volgt de paarregel; in een lijst elk element als
-    :func:`_alleen_naam`. Leeg en ja/nee blijven zichtbaar, zoals bij een paar."""
+    """De waarde onder een sleutel met een omgevingsbetekenis: alleen namen (S-P2-040 herstelronde 4, besluit
+    regisseur; ADR-0030 besluit 28). Een tekst per regel als :func:`_namen`; een object toont zijn sleutels met elke
+    waarde als ``***``, en bij een paar daarnaast de naam; een lijst elk element zo (een getal of een geneste lijst als
+    ``***``). Leeg en ja/nee blijven zichtbaar."""
+    if diepte > GEHEIM_DIEPTE:
+        return REDACTED
+    if isinstance(waarde, str):
+        return _namen(waarde)
+    if isinstance(waarde, list | tuple):
+        return [_omgeving(w, diepte + 1) if isinstance(w, str | Mapping) else _verberg(w) for w in waarde]
     if isinstance(waarde, Mapping):
-        if any(_is_sleutel(k, "name") for k in waarde):
-            return _toon(waarde, diepte + 1)
-        return {str(k): REDACTED if _verborgen(w) else w for k, w in waarde.items()}
-    if isinstance(waarde, list):
-        return [_alleen_naam(w, diepte + 1) for w in waarde]
-    return _alleen_naam(waarde, diepte)
-
-
-OMGEVING_SLEUTELS = ("environment", "env", "envs")
+        soort = _paarsoort(waarde)
+        uit: dict[str, Any] = {}
+        for k, w in waarde.items():
+            naam = soort is not None and _nk(k) == soort and isinstance(w, str)
+            _zet(uit, k, _namen(w) if naam else _verberg(w))
+        return uit
+    return _verberg(waarde)
 
 
 def _toon(waarde: Any, diepte: int = 0) -> Any:
-    """Een waarde zoals de beheerder hem in de preview ziet: alles, behalve een geheim (``***``). Een geheim is de
-    waarde onder een geheim-achtige sleutel (``hub.redact``), de ``value`` naast een geheim-achtige ``key``, en elke
-    ``value`` in een paar ``name`` + ``value`` (ook met hoofdletters, zoals ``Name``/``Value``): dat is de vorm van een
-    omgevingsvariabele (zoals ``additional_envs`` van een catalogusapp), en daarvan staat alleen de naam in een preview
-    (ADR-0030 besluit 28). Onder een sleutel ``environment``, ``env`` of ``envs`` staan alleen de namen
-    (:func:`_omgeving`; S-P2-040 herstelronde 3)."""
+    """Een waarde zoals de beheerder hem in de preview ziet: alles, behalve een geheim (zie de moduletekst). Elke
+    ``wijziging`` gaat hier in zijn geheel doorheen (:func:`bouw`)."""
     if diepte > GEHEIM_DIEPTE:
         return REDACTED
     if isinstance(waarde, Mapping):
-        paar_geheim = any(_is_sleutel(k, "name") for k in waarde) or _geheime_naam(waarde.get("key"))
+        soort = _paarsoort(waarde)
+        paarwaarde_geheim = soort == "name" or (
+            soort == "key" and any(_nk(k) == "key" and _geheime_naam(w) for k, w in waarde.items())
+        )
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
-            geheim = _geheime_naam(k) or (paar_geheim and _is_sleutel(k, "value"))
-            if geheim and _verborgen(w):
-                uit[str(k)] = REDACTED
-            elif isinstance(k, str) and k.lower() in OMGEVING_SLEUTELS:
-                uit[str(k)] = _omgeving(w, diepte + 1)
+            if _geheime_naam(k) or (paarwaarde_geheim and _nk(k) == PAAR_WAARDE):
+                _zet(uit, k, _verberg(w))
+            elif _is_omgeving(k):
+                _zet(uit, k, _omgeving(w, diepte + 1))
             else:
-                uit[str(k)] = _toon(w, diepte + 1)
+                _zet(uit, k, _toon(w, diepte + 1))
         return uit
-    if isinstance(waarde, list):
+    if isinstance(waarde, list | tuple):
         return [_toon(w, diepte + 1) for w in waarde]
     if isinstance(waarde, str):
         return redact_text(waarde)
@@ -163,25 +212,21 @@ def _toon(waarde: Any, diepte: int = 0) -> Any:
 
 
 def _waarden(standaard: bool, values: Mapping[str, Any]) -> dict[str, Any]:
-    """Elk gezet veld van ``app_create.values`` (R-VEILIG-1). Bij de standaard Custom App volgens
-    :data:`IX_PREVIEWREGELS` (een onbekend veld laat het beleid niet toe; mocht het er toch zijn, dan met waarde); bij
-    een catalogusapp de eigen waarden zoals ze zijn, met geheimen als ``***``."""
+    """Elk gezet veld van ``app_create.values`` (R-VEILIG-1), nog zonder toon: :func:`bouw` stuurt de hele wijziging
+    door :func:`_toon`. Bij de standaard Custom App volgens :data:`IX_PREVIEWREGELS` (van ``envs`` komen alleen de
+    namen mee; een onbekend veld laat het beleid niet toe, mocht het er toch zijn, dan met waarde); bij een
+    catalogusapp de eigen waarden zoals ze zijn."""
     if not standaard:
-        # Alles via _toon, ook bovenaan: een geheim-achtige sleutel (R-VEILIG-5), een paar name/value direct onder
-        # values en een sleutel environment/env/envs (S-P2-040 herstelronde 3).
-        toon = _toon(values)
-        return toon if isinstance(toon, dict) else {}
+        return dict(values)
     uit: dict[str, Any] = {}
     for k, w in values.items():
         regel = IX_PREVIEWREGELS.get(k, WAARDE)
         if regel == NAMEN:
-            uit[k] = [str(e.get("name")) for e in _lijst(w) if isinstance(e, Mapping) and e.get("name")]
+            uit[k] = [e.get("name") for e in _lijst(w) if isinstance(e, Mapping) and e.get("name")]
         elif regel == GEWEIGERD:
             uit[k] = {"geweigerd": "eigen_opdracht"}  # komt niet voor: het voorstel wordt al geweigerd
-        elif _geheime_naam(k) and _verborgen(w):
-            uit[str(k)] = REDACTED  # ook een geheim-achtige sleutel direct onder values (R-VEILIG-5)
         else:
-            uit[str(k)] = _toon(w)
+            uit[k] = w
     return uit
 
 
@@ -225,7 +270,7 @@ def _install(target: Mapping[str, Any], parameters: Mapping[str, Any]) -> dict[s
             for s in _lijst(values.get("storage"))
             if isinstance(s, Mapping)
         ],
-        # Alleen de namen: een waarde kan een geheim zijn en hoort nooit in een preview, log of audit.
+        # Alleen de namen (omgevingscontext in _toon): een waarde kan een geheim zijn en hoort nooit in een preview.
         "omgevingsvariabelen": sorted(
             str(e.get("name")) for e in _lijst(values.get("envs")) if isinstance(e, Mapping) and e.get("name")
         ),
@@ -246,6 +291,7 @@ def _install(target: Mapping[str, Any], parameters: Mapping[str, Any]) -> dict[s
 
 
 def _wijziging(actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[str, Any], doel: Doel) -> dict[str, Any]:
+    """De wijziging nog zonder toon; :func:`bouw` stuurt hem in zijn geheel door :func:`_toon` (geen rauw veld)."""
     aid = actie.action_id
     if aid == "app.install":
         return _install(target, parameters)
@@ -345,7 +391,7 @@ def bouw(
         "policy_hash": policy.hash,
         "resource_etag": doel.etag,
         "huidig": doel.staat,
-        "wijziging": _wijziging(actie, target, parameters, doel),
+        "wijziging": _toon(_wijziging(actie, target, parameters, doel)),
         "dataretentie": DATA_BLIJFT,
         "terugdraaien": _terugdraaien(actie.action_id, doel),
     }

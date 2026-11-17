@@ -593,6 +593,23 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       `NAAM`; een paar `name` + `value` ook met hoofdletters (`Name`/`Value`) en direct onder `values`. Leeg en ja/nee
       blijven zichtbaar. Tests eisen nu ook `***` voor een label met een geheim-achtige `key` en voor een geheim dat
       een getal, lijst of object is. Beleid en `policy_hash` ongewijzigd.
+    - *Aanvulling 2026-11-17 (herstelronde 4; R-VEILIG-9 t/m 13; besluit regisseur): één principe in plaats van een
+      opsomming.* De Hub stuurt de hele `wijziging` van elke actie door één toonfunctie (`_toon` in
+      `apps/api/src/hub/actions/preview.py`); er staat geen rauw veld meer in, ook niet `resources`, het
+      herstartbeleid, poorten, opslag of de redenen en controles uit het manifest. Een bewakingstest
+      (`apps/api/tests/unit/test_preview_toon.py`) plant per actie een geheim in elke bron van `wijziging` en is rood
+      als er een veld bijkomt dat niet door de toonfunctie gaat. De regel: (1) de waarde onder een geheim-achtige
+      sleutel is `***`; (2) een paar is een object met een naam (`name` of `key`) én een `value`, herkend in elke
+      schrijfwijze en genormaliseerd zoals `_nk` in het beleid; bij een `name` (of een geheim-achtige `key`) is de
+      `value` `***`; (3) onder elke sleutel met een omgevingsbetekenis (genormaliseerd bevat hij `env`, zoals
+      `additional_envs`, `env_vars` en `environment_variables`, of het Nederlandse `omgeving`) staan alleen namen: een
+      object met zijn sleutels en `***`, een paar met alleen zijn naam, een tekst per regel als de naam vóór `=` of
+      `:` (zonder scheiding de hele regel) als die op een variabelenaam lijkt (`^[A-Za-z_][A-Za-z0-9_]*`), anders
+      `***`; (4) elke andere tekst, ook een sleutel, gaat door `redact_text` (URL met wachtwoord, `Bearer`); (5) leeg
+      en ja/nee blijven zichtbaar, net als poorten, opslag, labels zonder geheim, `run_as` en `dns_config`. Een losse
+      naam zonder scheiding (zoals `env: production`) blijft dus zichtbaar. De vorm van de preview verandert alleen
+      waar een geheim stond; een open voorstel met zo'n vorm krijgt bij goedkeuren een nieuwe `preview_hash` (409 en
+      een nieuwe diff, besluit 9). Beleid en `policy_hash` ongewijzigd.
 
 ## Open punten
 

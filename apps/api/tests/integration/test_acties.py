@@ -986,6 +986,175 @@ def test_omgevingsvariabelen_in_andere_vormen_alleen_met_naam(stack: Stack, valu
     assert "proefgeheim" not in r.text and "proefgeheim" not in stack.admin.get("/api/v1/actions").text
 
 
+@pytest.mark.parametrize(
+    ("values", "verwacht"),
+    [
+        # G1 (R-VEILIG-9): een object met een variabele NAME is geen paar; onder een omgevingssleutel alleen namen.
+        pytest.param(
+            {"app": {"environment": {"NAME": "mijnapp", "DB_HOST": "proefgeheim-g1a"}}},
+            {"app": {"environment": {"NAME": "***", "DB_HOST": "***"}}},
+            id="g1_object_met_NAME",
+        ),
+        pytest.param(
+            {"app": {"env": [{"Name": "mijnapp", "DB_HOST": "proefgeheim-g1b"}]}},
+            {"app": {"env": [{"Name": "***", "DB_HOST": "***"}]}},
+            id="g1_lijst_object_met_Name",
+        ),
+        pytest.param(
+            {"app": {"environment": [{"name": "DB_HOST", "value": "proefgeheim-g1c", "uitleg": "proefgeheim-g1d"}]}},
+            {"app": {"environment": [{"name": "DB_HOST", "value": "***", "uitleg": "***"}]}},
+            id="g1_paar_met_extra_veld",
+        ),
+        # G2 (R-VEILIG-10): tekst onder een omgevingssleutel, per regel alleen een naam.
+        pytest.param(
+            {"app": {"environment": ["postgres://beheer:proefgeheim-g2a@db/app"]}},
+            {"app": {"environment": ["postgres"]}},
+            id="g2_url_met_wachtwoord",
+        ),
+        pytest.param(
+            {"app": {"env": "Bearer proefgeheim-g2b-abcdefgh"}},
+            {"app": {"env": "***"}},
+            id="g2_bearer_als_losse_tekst",
+        ),
+        pytest.param(
+            {"app": {"environment": ["https://beheer:proefgeheim-g2c@host/x?sslmode=require"]}},
+            {"app": {"environment": ["https"]}},
+            id="g2_url_met_query",
+        ),
+        pytest.param(
+            {"app": {"environment": ["DB_HOST: proefgeheim-g2d", "export DB=proefgeheim-g2e"]}},
+            {"app": {"environment": ["DB_HOST", "***"]}},
+            id="g2_dubbele_punt_en_geen_naam",
+        ),
+        pytest.param(
+            {"app": {"environment": "DB_HOST=x\nLD_PRELOAD=/opt/proefgeheim-g2f.so"}},
+            {"app": {"environment": "DB_HOST\nLD_PRELOAD"}},
+            id="g2_meerdere_regels",
+        ),
+        # G3 (R-VEILIG-11): Key/Value in elke schrijfwijze.
+        pytest.param(
+            {
+                "app": {
+                    "labels": [{"Key": "x.token", "Value": "proefgeheim-g3a"}, {"KEY": "x.info", "VALUE": "zichtbaar"}]
+                }
+            },
+            {"app": {"labels": [{"Key": "x.token", "Value": "***"}, {"KEY": "x.info", "VALUE": "zichtbaar"}]}},
+            id="g3_Key_Value",
+        ),
+        pytest.param(
+            {"app": {"labels": [{"KEY": "proef.password", "VALUE": "proefgeheim-g3b"}]}},
+            {"app": {"labels": [{"KEY": "proef.password", "VALUE": "***"}]}},
+            id="g3_KEY_VALUE",
+        ),
+        # G4 (R-VEILIG-12): elke sleutel met een omgevingsbetekenis (genormaliseerd: bevat "env").
+        pytest.param(
+            {
+                "app": {
+                    "additional_envs": ["DB_HOST=proefgeheim-g4a"],
+                    "Additional-Envs": {"DB_HOST": "proefgeheim-g4b"},
+                }
+            },
+            {"app": {"additional_envs": ["DB_HOST"], "Additional-Envs": {"DB_HOST": "***"}}},
+            id="g4_additional_envs",
+        ),
+        pytest.param(
+            {"app": {"env_vars": {"DB_HOST": "proefgeheim-g4c"}, "environment_variables": ["DB_HOST=proefgeheim-g4d"]}},
+            {"app": {"env_vars": {"DB_HOST": "***"}, "environment_variables": ["DB_HOST"]}},
+            id="g4_env_vars_en_environment_variables",
+        ),
+        pytest.param(
+            {"app": {"additional_envs": ["DB_WACHTWOORD=proefgeheim-g4e"]}},
+            {"app": {"additional_envs": ["DB_WACHTWOORD"]}},
+            id="g4_geheime_naam_in_een_tekst",
+        ),
+    ],
+)
+def test_omgevingscontext_en_paren_volgens_een_regel(stack: Stack, values: Any, verwacht: Any) -> None:
+    """S-P2-040, herstelronde 4 (R-VEILIG-9 t/m 12; besluit regisseur; ADR-0030 besluit 32): onder een sleutel met een
+    omgevingsbetekenis (``env``, ``environment``, ``additional_envs``, ``env_vars``, … in elke schrijfwijze) staan
+    alleen namen: een object met zijn sleutels en ``***``, een tekst per regel als naam (anders ``***``), een paar met
+    alleen de naam. ``key``/``name``/``value`` tellen in elke schrijfwijze; een paar alleen met naam én waarde."""
+    make_user(stack.admin, "kijker7", "viewer")
+    kijker = login_as(stack.app, "kijker7")
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 201, r.text
+    assert r.json()["preview"]["wijziging"]["waarden"] == verwacht, r.text
+    assert "proefgeheim" not in r.text and "proefgeheim" not in _kijkers_tekst(stack, kijker, r.json()["request_id"])
+
+
+def test_geen_rauw_veld_in_de_wijziging_van_een_installatie(stack: Stack) -> None:
+    """S-P2-040, herstelronde 4 (R-VEILIG-13; besluit regisseur punt 1): ook ``resources`` en de andere velden van een
+    installatie (herstartbeleid, poorten, opslag, namen van omgevingsvariabelen, redenen en controles uit het manifest)
+    gaan door de toonfunctie. Een geheim staat er nergens in, ook niet in de bewaarde preview."""
+    values = {
+        "resources": {"limits": {"cpus": 1}, "api_token": "proefgeheim-g6"},
+        "restart_policy": "postgres://beheer:proefgeheim-r1@db/app",
+        "ports": [{"port_number": 30200, "protocol": "Bearer proefgeheim-r2-abcdefgh"}],
+        "storage": [{"type": "Bearer proefgeheim-r3-abcdefgh", "mount_path": "/data"}],
+        "envs": [{"name": "Bearer proefgeheim-r4-abcdefgh", "value": "x"}],
+    }
+    params = _catalogus_waarden("huis", values)
+    params["manifest"].update(
+        version="postgres://beheer:proefgeheim-r5@db/app",
+        install_reason="proef; sleutel Bearer proefgeheim-r6-abcdefgh",
+        post_install_checks=[{"id": "web", "soort": "handmatig", "beschrijving_nl": "Bearer proefgeheim-r7-abcdefgh"}],
+    )
+    r = stel_voor(stack.admin, "app.install", app_target("huis"), params)
+    assert r.status_code == 201, r.text
+    w = r.json()["preview"]["wijziging"]
+    assert w["resources"] == {"limits": {"cpus": 1}, "api_token": "***"} == w["waarden"]["resources"], w
+    assert w["restart_policy"] == "postgres://beheer:***@db/app", w
+    assert w["poorten"][0]["protocol"] == "Bearer ***" and w["opslag"][0]["type"] == "Bearer ***", w
+    assert w["omgevingsvariabelen"] == ["***"], w
+    assert w["manifest"]["version"] == "postgres://beheer:***@db/app", w
+    assert w["reden_catalogusapp"] == "proef; sleutel Bearer ***", w
+    assert w["controles_na_installatie"] == [{"id": "web", "soort": "handmatig", "beschrijving_nl": "Bearer ***"}], w
+    assert "proefgeheim" not in r.text and "proefgeheim" not in stack.admin.get("/api/v1/actions").text
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(r.json()["request_id"]))
+        assert rij is not None and "proefgeheim" not in str(rij.preview)
+
+
+def test_de_toonfunctie_verbergt_niets_wat_de_beheerder_moet_zien(stack: Stack) -> None:
+    """S-P2-040, herstelronde 4 (besluit regisseur punt 5; proef G5 van R-VEILIG): poorten, opslag, labels zonder
+    geheim, run_as, dns_config, portalen, leeg en ja/nee blijven zichtbaar, bij de standaard Custom App en bij een
+    catalogusapp; een losse naam onder ``env`` ook."""
+    p = install_params(
+        "demo-g5",
+        portals=[{"name": "Web UI", "scheme": "http", "host": "0.0.0.0", "port": 30555, "path": "/zichtbaar-portal"}],
+        labels=[{"key": "x.info", "value": "zichtbaar-label", "containers": []}],
+        run_as_custom_user=True,
+        run_as={"user": 568, "group": 568},
+        dns_config={"nameservers": ["1.1.1.1"], "searches": [], "options": [{"key": "ndots", "value": "2"}]},
+    )
+    r = stel_voor(stack.admin, "app.install", app_target("demo-g5"), p)
+    assert r.status_code == 201, r.text
+    wz = r.json()["preview"]["wijziging"]
+    verwacht = {k: v for k, v in p["app_create"]["values"].items() if k != "envs"}
+    assert {k: v for k, v in wz["waarden"].items() if k != "envs"} == verwacht, wz
+    assert wz["waarden"]["envs"] == ["APP_MODE"] and wz["omgevingsvariabelen"] == ["APP_MODE"], wz
+    assert wz["poorten"] == [
+        {"host_poort": 30555, "container_poort": 8080, "protocol": "tcp", "bind_mode": "published"}
+    ]
+    assert wz["opslag"] == [
+        {"type": "host_path", "mount_path": "/data", "host_path": "/mnt/testpool/apps/demo-app", "alleen_lezen": False}
+    ], wz
+    assert wz["resources"] == {"limits": {"cpus": 2, "memory": 1024}} and wz["restart_policy"] == "unless-stopped"
+    cat = {
+        "network": {"web_port": {"bind_mode": "published", "port_number": 30080}},
+        "storage": {"config": {"type": "ix_volume", "ix_volume_config": {"dataset_name": "config"}}},
+        "run_as": {"user": 568, "group": 568},
+        "resources": {"limits": {"cpus": 2, "memory": 4096}},
+        "labels": [{"key": "x.info", "value": "zichtbaar-cat", "containers": ["app"]}],
+        "app": {"env": "production", "debug": False, "leeg": "", "additional_envs": [{"name": "TZ", "value": "x"}]},
+    }
+    r = stel_voor(stack.admin, "app.install", app_target("cat-g5"), _catalogus_waarden("cat-g5", cat))
+    assert r.status_code == 201, r.text
+    verwacht_cat = copy.deepcopy(cat)
+    verwacht_cat["app"]["additional_envs"] = [{"name": "TZ", "value": "***"}]
+    assert r.json()["preview"]["wijziging"]["waarden"] == verwacht_cat, r.text
+
+
 def test_open_voorstel_met_eigen_opdracht_van_voor_het_herstel_wordt_geweigerd(stack: Stack) -> None:
     """S-P2-040, R-VEILIG-1 (optie C): een voorstel dat vóór dit herstel met ``command`` is gemaakt, toonde die opdracht
     niet in de preview. Goedkeuren kan dan niet meer: ``501 capability_unavailable``, status ``geweigerd``, en de vrije
