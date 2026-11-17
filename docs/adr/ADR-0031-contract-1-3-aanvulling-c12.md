@@ -6,7 +6,8 @@ Bouwt op: ADR-0027 (contract 1.3), ADR-0028 (review 1.3, vorm van een aanvulling
 C-12, uitgewerkt), `appstore-en-fork:docs/adr/ADR-0015-vault-verwijzing-geheimen-in-de-vertaling.md` (vault-verwijzing
 voor Custom Apps), `jelly-leon-platform:docs/adr/ADR-0027-controlelijsten-bestaande-apps.md` (één weg per document).
 Resultaat: `docs/platform-v2/PLATFORM_CONTRACTEN.md` blijft `contracts 1.3`, met het blok "Aanvulling C-12" (C12-1 tot
-en met C12-6) in het wijzigingslog; `CONTRACT_1.3_CONFORMITEIT.md` krijgt C1.3-ASF-15, C1.3-JLP-15 en C1.3-HCH-16.
+en met C12-7) in het wijzigingslog; `CONTRACT_1.3_CONFORMITEIT.md` krijgt C1.3-ASM-24, C1.3-ASF-15, C1.3-JLP-15 en
+C1.3-HCH-16.
 Niets hiervan is op een echte NAS, met echte accounts of op echte hardware gevalideerd.
 
 ## Context
@@ -51,9 +52,12 @@ opnieuw worden overgenomen:
    (EX47)" noemt nu ook de accountgegevens.
 3. **§3.1 krijgt een tweede uitzondering: een geheim van de Hub als vault-verwijzing in een omgevingsvariabele van een
    Custom App (C12-3; besluit regisseur BN-C12-2, op het besluit van de gebruiker 2026-11-11 bij S-P2-500).** Alleen
-   voor een parameter met `source: generated` + `secret: true`, via `custom_app.env[].value_from`; manifest, vertaling,
-   preview, goedkeuring, audit, log en evidence bevatten nooit de waarde, hooguit de verwijzing
-   `vault://app/<app_id>/<parameter>`; alleen de executor vult de waarde in. Nooit voor een geheim van de gebruiker,
+   voor een parameter met `source: generated` + `secret: true`, via `custom_app.env[].value_from`. Een manifest bevat
+   nooit een kluisverwijzing (ADR-0015 besluit 5: `vault_ref_not_allowed`); alleen de Hub en, bij het uitvoeren, de
+   executor vullen een kluisverwijzing `vault://app/<app_id>/<parameter>` in, alleen voor de `app_id` van het doel van
+   de ondertekende actie en nooit onder een accountnaam; vertaling, preview, goedkeuring, verzoekhash,
+   idempotentie-opslag, audit, log en evidence bevatten nooit de waarde (aangescherpt na de review, besluit 9).
+   Nooit voor een geheim van de gebruiker,
    nooit letterlijk of via een gewone parameter, en nooit voor de aanmelding van een beheerder of dienstaccount
    (`account_gegevens_verboden`). Dat laatste is de grens van C-12: ADR-0016 eis 1 ("er komt geen tweede uitzondering
    (C-12)") gaat over accounts, en ADR-0016 besluit 9 laat de melding van ADR-0015 uitdrukkelijk apart. C-12 zelf
@@ -81,6 +85,29 @@ opnieuw worden overgenomen:
 8. **Pin en kopieën.** `apps/api/tests/unit/test_contract_pin.py` pint de nieuwe sha256 van beide bestanden. De tien
    andere repos nemen de nieuwe tekst over in een eigen kopiestap per repo (deel B van S-P2-C12), byte-gelijk vanaf de
    gepushte eind-commit van deze stap; de volle hash staat in hun pins.
+
+9. **Herstel na de review van de bron (R-MANIFEST, R-VEILIG, R-TECH; besluit regisseur, vóór de kopieën).**
+   - §3.1 (R-VEILIG-1): de eerste tekst liet een manifest een verwijzing dragen, met de `app_id` "uit het manifest".
+     Dat botst met ADR-0015 besluit 1 en 5 (een los manifest kan de `app_id` van een andere app claimen; een
+     letterlijke verwijzing in een manifest is `vault_ref_not_allowed`). Het beleid van de Hub accepteert nu bij
+     `app.install` een verwijzing naar een andere app en onder `ADMIN_PASSWORD` (proef van R-VEILIG, nagedraaid);
+     alleen de `501 capability_unavailable` (reden `vault_verwijzingen`) houdt dat tegen. Nieuwe tekst: zie besluit 3;
+     de Hub- en executorkant staat in C1.3-ASM-24 (P2, S-P2-050, met C1.3-ASM-18; R-MANIFEST-1).
+   - §9 (R-VEILIG-2): een geheim van de Hub kwam met alleen de waarschuwing `secret_in_form` door de validator en de
+     vertaling naar `DOCKER_INFLUXDB_INIT_PASSWORD`, `N8N_BASIC_AUTH_PASSWORD` en `JUPYTER_TOKEN` (proef nagedraaid).
+     Nu is een kluisverwijzing of geheim van de Hub onder een accountnaam een fout, nooit een waarschuwing; de
+     woordenlijst van de standaard (ADR-0016 W2) krijgt `INIT`, `LOGIN`, `BASIC_AUTH` en de aanmeldnamen van een app
+     (`*_INIT_PASSWORD`, `*_BASIC_AUTH_PASSWORD`, `JUPYTER_TOKEN`, de kale naam `PASSWORD`). De lijst en de validator
+     bouwt appstore-en-fork (C1.3-ASF-15; een aanvulling van ADR-0016 W2 en van de woorden "enige uitzondering" in
+     ADR-0016 eis 1, besluit 9 en W3 is werk van die repo); de Hub toetst dezelfde lijst opnieuw (C1.3-ASM-24).
+   - §9 (R-VEILIG-3): de 32 tekens gelden ook in de vorm `gebruiker:wachtwoord` (ADR-0016 besluit 3); C1.3-HCH-16 noemt
+     het ook.
+   - §11 (C12-7, besluit regisseur optie A): de statusregel zei "(of `Geblokkeerd` als echte NAS/hardware/account nodig
+     is)" en botste met het statusbesluit van de gebruiker van 2026-11-11. Nu: rest alleen de test op de echte NAS,
+     hardware of met een echt account, dan blijft het `Bezig`, met `alleen NAS-test nodig` en `NIET GEVALIDEERD (…)`;
+     `Geblokkeerd` alleen als het werk zonder NAS, hardware of account niet verder kan worden gebouwd.
+   - Tests (R-TECH-1): elke kernzin van §3.1, §8, §9 en §11 heeft een eigen test; een afzwakking van één zin is ook na
+     een nieuwe pin rood (mutatieproef in een kopie buiten de repo: 40 van 40 afzwakkingen rood buiten de pin).
 
 ## Wat niet verandert
 
@@ -116,6 +143,7 @@ opnieuw worden overgenomen:
 ## Verificatie
 
 - `apps/api/tests/unit/test_contract_13.py`: de versieregel letterlijk, het blok "Aanvulling C-12" met C12-1 tot en met
-  C12-6, de kernzinnen in §3.1, §8, §9 en §11, en de drie conformiteitsregels (rood zonder de aanvulling).
+  C12-7, elke kernzin in §3.1, §8, §9 en §11 in een eigen test, en de vier conformiteitsregels (rood zonder de
+  aanvulling en rood bij een afzwakking van één zin, los van de pin).
 - `apps/api/tests/unit/test_evidence_contract.py`: de vaste lijst is precies de tabel van §11.
 - `apps/api/tests/unit/test_contract_pin.py`: de nieuwe sha256 van beide bestanden (rood met de oude).

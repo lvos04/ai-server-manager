@@ -242,7 +242,7 @@ def test_aanvulling_c12_staat_in_het_wijzigingslog_en_in_de_kop() -> None:
     assert KOP_C12 in log
     # Na de reviewcorrecties, binnen het 1.3-wijzigingslog.
     assert log.index(KOP_C12) > log.index("### Correcties uit de onafhankelijke review (2026-11-10")
-    for n in range(1, 7):
+    for n in range(1, 8):
         assert f"- C12-{n}. " in log, f"C12-{n} ontbreekt"
     assert ADR_C12.is_file()
     kop = _tekst(CONTRACT).split("## Wijzigingslog")[0]
@@ -267,6 +267,26 @@ def test_aanvulling_c12_staat_in_het_wijzigingslog_en_in_de_kop() -> None:
         "een geheime waarde of accountgegevens (`account_gegevens_verboden`) in een manifest.",
         # C12-5: één weg per document.
         "Een controlelijst (`kind: checklist`) staat nooit naast een installeerbaar manifest",
+        # C12-5, eigen zin (R-TECH-1, mutatie M13): het eigen manifest van een dienst maakt geen installatie.
+        "Het eigen manifest van een dienst (`deploy/manifest/`), dat een I-document alleen als verwijzing in"
+        " `docs` noemt, maakt dat document geen installatie.",
+        # R-VEILIG-3: de 32 tekens gelden ook voor het wachtwoord in `gebruiker:wachtwoord` (ADR-0016 besluit 3).
+        "de afnemer weigert korter. Ook in de vorm `gebruiker:wachtwoord` telt dat voor het wachtwoord.",
+        # R-VEILIG-2: een kluisverwijzing of geheim van de Hub onder een accountnaam is een fout, geen waarschuwing.
+        "Een kluisverwijzing of een geheim van de Hub onder een accountnaam is een fout"
+        " (`account_gegevens_verboden`, een weigering), nooit een waarschuwing.",
+        # R-VEILIG-2: de woordenlijst van de standaard, aangevuld (besluit regisseur).
+        "Een accountnaam is een geheimnaam met een woord uit de vaste woordenlijst van de standaard (ADR-0016 W2),"
+        " aangevuld met `INIT`, `LOGIN` en `BASIC_AUTH`, en met namen die de aanmelding bij de app zelf zijn, zoals"
+        " `*_INIT_PASSWORD`, `*_BASIC_AUTH_PASSWORD`, `JUPYTER_TOKEN` en de kale naam `PASSWORD`.",
+        # R-VEILIG-2: wie de lijst en de validator bouwt, en dat de Hub opnieuw toetst.
+        "De woordenlijst en de validator bouwt `appstore-en-fork` (vervolg op ADR-0016 W2); de Hub en de executor"
+        " toetsen dezelfde lijst opnieuw vóór het invullen (`ai-server-manager`, S-P2-050).",
+        # R-VEILIG-2: `secret_in_form` is nooit te accepteren onder een accountnaam.
+        "`secret_in_form` (alleen bij een parameter met `source: generated` en `secret: true`, nooit onder een"
+        " accountnaam)",
+        # R-MANIFEST-1: de regel voor geheime parameters noemt ook de tweede uitzondering.
+        "**Geheime parameters die de Hub maakt** (§3.1 a en de tweede uitzondering van §3.1)",
     ],
 )
 def test_paragraaf_9_heeft_de_aanvulling_c12(zin: str) -> None:
@@ -288,10 +308,48 @@ def test_paragraaf_3_1_kent_de_vault_uitzondering_maar_nooit_voor_een_account() 
     assert "`HUB_ENROLLMENT_TOKEN`" in p31
     assert "Tweede uitzondering (aanvulling C-12; besluit van de gebruiker 2026-11-11, S-P2-500;" in p31
     assert "`custom_app.env[].value_from`" in p31 and "`vault://app/<app_id>/<parameter>`" in p31
-    assert "alleen de executor vult de waarde in" in p31
     assert "nooit voor de aanmelding van een beheerder of dienstaccount (`account_gegevens_verboden`, §9)" in p31
     # §3.2 noemt het enrollment-token niet meer "de enige" uitzondering.
     assert "(de enige, kortlevende uitzondering" not in _paragraaf("### 3.2 Overzicht enrollment")
+
+
+#: De kernzinnen van de tweede uitzondering (C12-3), elk met een eigen test: een afzwakking van één zin maakt precies
+#: die test rood, los van de sha256-pin (R-TECH-1 en R-VEILIG-1 van de review van S-P2-C12; V-003).
+KERNZINNEN_3_1 = {
+    # Alleen een geheim dat de Hub maakt, en alleen via value_from (niet "elk geheim").
+    "alleen_geheim_van_de_hub": "een geheim dat de Hub maakt (`source: generated` + `secret: true`, punt (a) hieronder)"
+    " mag via `custom_app.env[].value_from` als omgevingsvariabele in het formulier van een Custom App komen.",
+    # R-VEILIG-1: een manifest bevat nooit een kluisverwijzing; alleen de vertaling zet haar (ADR-0015 besluit 5).
+    "manifest_nooit_een_kluisverwijzing": "Een manifest bevat nooit een kluisverwijzing: het noemt alleen de parameter;"
+    " een kluisverwijzing in een manifest wordt geweigerd (`vault_ref_not_allowed`; de verwijzing zet alleen de"
+    " vertaling, ADR-0015 besluit 5).",
+    # R-VEILIG-1: alleen de Hub en de executor vullen in, alleen voor het doel, nooit onder een accountnaam.
+    "alleen_hub_en_executor_vullen_in": "Alleen de Hub en, bij het uitvoeren, de executor vullen een kluisverwijzing"
+    " `vault://app/<app_id>/<parameter>` in,",
+    "alleen_voor_het_doel": "alleen voor de `app_id` van het doel van de ondertekende actie: nooit voor een andere app"
+    " en nooit onder een accountnaam (§9); anders weigeren ze de actie.",
+    # De kerngarantie: nooit de waarde (ook niet in verzoekhash en idempotentie-opslag).
+    "nooit_de_waarde": "Vertaling, preview, goedkeuring, verzoekhash, idempotentie-opslag, audit, log en evidence"
+    " bevatten nooit de waarde, hooguit de verwijzing;",
+    # Nooit een geheim van de gebruiker, nooit letterlijk of via een gewone parameter, nooit een aanmelding.
+    "nooit_gebruiker_letterlijk_of_account": "Dit geldt alleen voor zo'n geheim van de Hub: nooit voor een geheim van"
+    " de gebruiker, nooit als letterlijke waarde of via een gewone parameter, en nooit voor de aanmelding van een"
+    " beheerder of dienstaccount (`account_gegevens_verboden`, §9).",
+}
+
+
+@pytest.mark.parametrize("sleutel", sorted(KERNZINNEN_3_1))
+def test_paragraaf_3_1_kernzin_van_de_tweede_uitzondering(sleutel: str) -> None:
+    p31 = _paragraaf("### 3.1 Uitgangspunten")
+    zin = " ".join(KERNZINNEN_3_1[sleutel].split())
+    assert zin in p31, f"§3.1, kernzin {sleutel!r} ontbreekt of is veranderd: {zin!r}"
+
+
+def test_paragraaf_3_1_laat_de_app_id_niet_uit_het_manifest_komen() -> None:
+    """R-VEILIG-1: de oude tekst liet het manifest een verwijzing dragen, met de app_id 'uit het manifest'."""
+    p31 = _paragraaf("### 3.1 Uitgangspunten")
+    assert "met de vaste `app_id` uit het manifest" not in p31
+    assert "Manifest, vertaling, preview" not in p31
 
 
 def test_paragraaf_8_zegt_wat_een_preview_minimaal_toont() -> None:
@@ -305,6 +363,14 @@ def test_paragraaf_8_zegt_wat_een_preview_minimaal_toont() -> None:
     assert "ADR-0030-policy-engine-approvals-executor.md` besluit 32" in p8
 
 
+def test_paragraaf_8_preview_toont_van_een_omgevingsvariabele_alleen_de_naam() -> None:
+    """C12-4, eigen test (R-TECH-1): de maskeerregel voor geheimen en omgevingsvariabelen staat er volledig."""
+    p8 = _paragraaf("## 8. Risicobeleid")
+    zin = "elk door dezelfde maskeerregel: een geheim staat er als `***` en van een omgevingsvariabele staat alleen de"
+    zin += " naam erin."
+    assert zin in p8
+
+
 def test_paragraaf_11_kent_de_waarde_echte_hub() -> None:
     """C12-6 (melding uit jelly-leon S-G1-17): `NIET GEVALIDEERD (echte Hub)` is een vaste validatiewaarde."""
     tekst = _tekst(CONTRACT)
@@ -313,12 +379,75 @@ def test_paragraaf_11_kent_de_waarde_echte_hub() -> None:
     assert "| `NIET GEVALIDEERD (echte Hub)` |" in p11
 
 
+def _paragraaf_11() -> str:
+    tekst = _tekst(CONTRACT)
+    begin = tekst.index("## 11. Bewijs en Excel")
+    return " ".join(tekst[begin : tekst.index("## 12.", begin)].split())
+
+
+@pytest.mark.parametrize(
+    "zin",
+    [
+        "code + CI + simulator-E2E geslaagd ⇒ `status: Bezig`.",
+        "Rest alleen nog de test op de echte NAS, op echte hardware of met een echt account, dan blijft het `Bezig`,"
+        " met in `opmerking` de aantekening `alleen NAS-test nodig` en in `validatie` de passende"
+        " `NIET GEVALIDEERD (…)` (besluit van de gebruiker 2026-11-11).",
+        "`Geblokkeerd` (met `NIET GEVALIDEERD (…)`) alleen voor werk dat zonder de echte NAS, hardware of het account"
+        " niet verder kan worden gebouwd.",
+        "In beide gevallen staat in `blokkade` wat er nog nodig is.",
+    ],
+)
+def test_paragraaf_11_statusregel_volgt_het_besluit_van_de_gebruiker(zin: str) -> None:
+    """C12-7: de statusregel van §11 volgt het statusbesluit van de gebruiker van 2026-11-11 (R3)."""
+    assert " ".join(zin.split()) in _paragraaf_11(), zin
+
+
+def test_paragraaf_11_zet_alleen_nas_test_nooit_op_geblokkeerd() -> None:
+    """De oude regel zette werk waarvoor alleen de NAS-test rest op `Geblokkeerd`; dat strijdt met R3."""
+    assert "(of `Geblokkeerd` als echte NAS/hardware/account nodig is)" not in _paragraaf_11()
+
+
 @pytest.mark.parametrize(
     ("rid", "afkorting", "moment", "woorden"),
     [
-        ("C1.3-ASF-15", "ASF", "P3 (S-P3-490)", ("`accounts`", "`account_ongeldig`", "`docs/MANIFESTSTANDAARD.md`")),
+        (
+            "C1.3-ASF-15",
+            "ASF",
+            "P3 (S-P3-490)",
+            # R-VEILIG-1 en -2: de validator weigert een kluisverwijzing in een manifest en kent de aangevulde lijst.
+            (
+                "`accounts`",
+                "`account_ongeldig`",
+                "`docs/MANIFESTSTANDAARD.md`",
+                "`vault_ref_not_allowed`",
+                "`INIT`",
+                "`LOGIN`",
+                "`BASIC_AUTH`",
+            ),
+        ),
         ("C1.3-JLP-15", "JLP", "P3 (S-P3-445)", ("`credentialSecret`", "`tools/validator_kopie.py`", "besluit 7")),
-        ("C1.3-HCH-16", "HCH", "P3 (S-P3-360)", ("`credentialSecret`", "32 tekens", "integrations/sources.py`")),
+        (
+            "C1.3-HCH-16",
+            "HCH",
+            "P3 (S-P3-360)",
+            ("`credentialSecret`", "32 tekens", "integrations/sources.py`", "`gebruiker:wachtwoord`"),
+        ),
+        # R-MANIFEST-1: de Hub- en executorkant van de tweede uitzondering van §3.1 (C12-3).
+        (
+            "C1.3-ASM-24",
+            "ASM",
+            "P2 (S-P2-050, met C1.3-ASM-18)",
+            (
+                "tweede uitzondering",
+                "`values.envs`",
+                "vullen een kluisverwijzing `vault://app/<app_id>/<parameter>` in `values.envs` van een Custom App"
+                " alleen in als `<app_id>` de `app_id` van het doel van de ondertekende actie is",
+                "nooit onder een accountnaam",
+                "`501 capability_unavailable`",
+                "apps/policy/src/asm_policy/params.py`",
+                "apps/executor/src/executor/uitvoeren.py`",
+            ),
+        ),
     ],
 )
 def test_conformiteit_heeft_de_regels_van_c12(rid: str, afkorting: str, moment: str, woorden: tuple[str, ...]) -> None:

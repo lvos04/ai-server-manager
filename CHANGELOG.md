@@ -4,6 +4,22 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Contract 1.3: aanvulling C-12 na de review van de bron (S-P2-C12, deel A, A-HERSTEL; blijft `contracts 1.3`)
+- §3.1, tweede uitzondering: een manifest bevat nooit een kluisverwijzing (`vault_ref_not_allowed`); alleen de Hub en,
+  bij het uitvoeren, de executor vullen een kluisverwijzing in, alleen voor de `app_id` van het doel van de ondertekende
+  actie, nooit voor een andere app en nooit onder een accountnaam; verzoekhash en idempotentie-opslag staan in de lijst
+  van plekken zonder waarde (R-VEILIG-1).
+- §9: een kluisverwijzing of geheim van de Hub onder een accountnaam is een fout, nooit een waarschuwing; de woordenlijst
+  van de standaard krijgt `INIT`, `LOGIN`, `BASIC_AUTH` en de aanmeldnamen van een app (`*_INIT_PASSWORD`,
+  `*_BASIC_AUTH_PASSWORD`, `JUPYTER_TOKEN`, de kale naam `PASSWORD`); bouw in appstore-en-fork (C1.3-ASF-15), opnieuw
+  toetsen in de Hub (S-P2-050) (R-VEILIG-2). De 32 tekens gelden ook in de vorm `gebruiker:wachtwoord` (R-VEILIG-3).
+- §11: de statusregel volgt het besluit van de gebruiker van 2026-11-11 (rest alleen de NAS-test: `Bezig`, met
+  `alleen NAS-test nodig`; `Geblokkeerd` alleen als het werk niet verder kan worden gebouwd) (C12-7).
+- Conformiteitslijst: nieuw C1.3-ASM-24 (Hub- en executorkant van de tweede uitzondering, P2) (R-MANIFEST-1); C1.3-ASF-15
+  en C1.3-HCH-16 aangevuld.
+- `test_contract_13.py`: een eigen test per kernzin van §3.1, §8, §9 en §11, zodat een afzwakking ook na een nieuwe pin
+  rood is (R-TECH-1); nieuwe pin in `test_contract_pin.py`; ADR-0031 besluit 3 en 9.
+
 ### Gewijzigd — Contract 1.3: aanvulling C-12 (S-P2-C12, deel A; ADR-0031; blijft `contracts 1.3`)
 - `docs/platform-v2/PLATFORM_CONTRACTEN.md`: wijzigingslogblok "Aanvulling C-12" (C12-1 tot en met C12-6). §9: het
   optionele veld `accounts` met de aanmaakwijzen `eerste_gebruik` en `door_beheerder`, de weigering
