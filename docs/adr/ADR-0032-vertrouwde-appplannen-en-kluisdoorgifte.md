@@ -644,39 +644,130 @@ vastgestelde herkomst, nooit de afwezigheid van een vastlegging. Elk recept heef
 Bij het bewaren van elk nieuw recept na F legt de executor zelf uitdrukkelijk `keten` (met migratiecontext) of
 `buiten_keten` vast, in hetzelfde versleutelde vak, gebonden aan het `request_id`; een terugzetverzoek kan het niet
 veranderen. De Hub legt voor zijn eigen updateverzoek in zijn eigen administratie dezelfde herkomst vast. Bij een
-terugzetting beslissen Hub en executor elk uit hun eigen vastlegging, met dezelfde regel: `oud` en `buiten_keten`
-gaan door met de melding; `keten` alleen met geldige context (EX15). Ontbreekt de herkomst, of is zij onleesbaar of
-tegenstrijdig (eigen herkomst in het vak én in de oud-vastlegging), dan is zij ONBEKEND: weigering met een vaste
-code, geen rollback-RPC. Een nieuw ketenrecept waarvan de hele herkomstvastlegging ontbreekt, valt dus nooit onder
-de uitzondering. De melding is een vaste waarschuwing in het antwoord, het journaal en één logregel, zonder
-waarden, zoals de KLEIN-85-melding.
+terugzetting beslissen Hub en executor elk uit hun eigen registratie, met dezelfde volgorde:
+
+1. Een recept met zelfstandig geldige eigen herkomst `keten` of `buiten_keten`, vastgelegd bij dat recept zelf,
+   is niet afhankelijk van de oud-verzameling. Zij controleren de verzegeling en de binding aan recept, app,
+   instantie en oorspronkelijke update; `buiten_keten` gaat door met de melding, `keten` alleen met geldige
+   migratiecontext (EX15). Verlies, onleesbaarheid of verschil tussen de exemplaren van de oud-verzameling
+   verandert die eigen herkomst niet en blokkeert deze route niet, ook niet voor `app.update` met zo'n recept.
+   Noemt de geldige, onderling gelijke oud-verzameling hetzelfde recept óók `oud`, dan is dat tegenstrijdig met
+   die eigen herkomst: weigering. Een onleesbare of tegenstrijdige eigen herkomst wordt nooit alsnog `oud`.
+2. Alleen een recept zonder eigen herkomst heeft de geldige oud-vastlegging hieronder nodig. Past zijn binding
+   daar precies op, dan gaat het als `oud` door met de melding. Ontbreekt de vastlegging of is zij onbruikbaar,
+   dan volgt eerst herstel; zonder herstel is uitsluitend de hieronder gebonden beheerdersbevestiging mogelijk
+   voor een aantoonbaar recept van vóór F. Afwezigheid alleen bewijst nooit `oud` of `buiten_keten`.
+
+Overige ontbrekende, onleesbare of tegenstrijdige herkomst is ONBEKEND: weigering met een vaste code, geen
+rollback-RPC. Een ketenrecept van ná F waarvan de hele herkomstregistratie ontbreekt blijft geweigerd, ook met
+een beheerdersbevestiging. De melding is een vaste waarschuwing in het antwoord, het journaal en één logregel,
+zonder waarden, zoals de KLEIN-85-melding.
 
 **Eenmalige vastlegging van bestaande recepten bij de ingebruikname van F.** De executor legt bij zijn eerste start
 met de F-code, vóór hij een `app.update` of `app.rollback` over het `app.config`-pad uitvoert, alle dan bestaande
 recepten eenmalig en duurzaam als `oud` vast:
 
-- Geen wijziging van bestaande recepten: hij leest per recept alleen `request_id` en tijd uit `app_values`; hij
-  ontsleutelt, herschrijft, verplaatst of verwijdert geen recept (vak, app en tijd blijven byte-gelijk). De
-  vastlegging staat afzonderlijk en is met zijn eigen vault-sleutel verzegeld: de verzameling `request_id`'s met
-  hun tijd, het aantal en het tijdstip. Een recept waarvan `request_id` of tijd niet precies op de vastlegging past,
-  is niet `oud`.
-- Fail-closed: verzameling en markering "voltooid" worden in één transactie geschreven. Zonder voltooide, leesbare
-  en geldig verzegelde vastlegging is geen recept `oud`, en voert de executor geen `app.update` of `app.rollback`
-  over het `app.config`-pad uit. De vastlegging mag niets anders vragen dan zo'n terugzetting zelf al vraagt
-  (leesbaar en schrijfbaar journaal en `vault.key`), zodat zij de bestaande terugval niet blokkeert in een toestand
-  waarin die nu wel werkt.
-- Herhaalbaar: een onderbroken poging laat niets achter en wordt bij de volgende start opnieuw gedaan, met
-  dezelfde uitkomst. Na voltooiing gebeurt zij nooit opnieuw, en een recept van na de voltooiing komt nooit in de
-  verzameling. Ontbreekt de vastlegging terwijl er al een recept met eigen herkomst bestaat (F was dus in gebruik),
-  dan maakt de executor haar niet opnieuw en blijft de weigering uit het vorige punt staan; dat is een storing
-  voor de eigenaar, geen normale toestand.
-- De Hub doet hetzelfde, eenmalig en in één transactie, voor elk verzoek `app.update` of `app.rollback` dat hij
-  vóór F ondertekende, ongeacht de uitkomst (uit zijn eigen actieadministratie), zonder bestaande gegevens te
-  wijzigen.
+- Geen wijziging van bestaande recepten: hij leest per recept alleen `request_id`, app en tijd uit `app_values`,
+  gebonden aan de eigen instantieadministratie; hij ontsleutelt, herschrijft, verplaatst of verwijdert geen recept
+  (vak, app en tijd blijven byte-gelijk). De vastlegging staat afzonderlijk en is met zijn eigen vault-sleutel
+  verzegeld: de verzameling `request_id`'s met
+  hun tijd, app en instantie, het aantal, de inhoudsvingerafdruk en het tijdstip van ingebruikname van F. Een
+  recept waarvan een binding niet precies op de vastlegging past, is niet `oud`.
+- De executor legt het tijdstip van ingebruikname van F zelf eenmalig en duurzaam vast, vóór enige F-uitvoering,
+  afzonderlijk van de oud-verzameling en verzegeld gebonden aan zijn identiteit en de instantie. Dit tijdanker
+  blijft bij verlies van de verzameling bestaan; de Hub bewaart een geauthenticeerde kopie. Een verzoek, herstart
+  of beheerdersbevestiging kan dit tijdstip niet verschuiven. Een ontbrekend of ongeldig tijdanker moet uit de
+  oorspronkelijke back-up worden hersteld; het huidige tijdstip of de huidige voorraad geldt nooit als vervanging.
+- Fail-closed bij de eerste ingebruikname: verzameling en lokale markering "voltooid" worden in één transactie
+  geschreven, met een consistente journaalgrens en zonder gelijktijdige update-/rollbackschrijvers. Tot deze
+  eerste vastlegging en de vergelijking met de Hub voltooid zijn, begint geen F-uitvoering met recept. Een
+  onderbroken transactie laat geen gedeeltelijke verzameling achter; alleen aantoonbaar nog onvoltooide eerste
+  ingebruikname mag vanaf hetzelfde tijdanker en dezelfde oorspronkelijke journaalgrens worden hervat, vóór enige
+  F-uitvoering. Een onderbreking na lokale voltooiing hervat uitsluitend de kopie en vergelijking met de Hub.
+- Herhaalbaar na voltooiing: de verzameling blijft onveranderlijk; geen nieuwe inventarisatie bij een herstart
+  of bij verlies, ook niet als er geen recepten met eigen herkomst meer over zijn. Een recept van na de
+  oorspronkelijke grens komt er nooit in. Verlies raakt alleen recepten zonder eigen herkomst; recepten met
+  zelfstandig geldige eigen herkomst volgen hun eigen regel. Nieuwe F-updates blijven hun herkomst atomair bij
+  het nieuwe recept bewaren en omzeilen geen bestaande gate.
+- Twee bewaarplekken: de executor bewaart de vastlegging en de Hub bewaart dezelfde verzameling als administratie,
+  gekoppeld aan zijn eigen vóór F ondertekende update-/rollbackverzoeken ongeacht hun uitkomst. Bestaande
+  administratie wordt niet herschreven. Beide kanten verzegelen hun exemplaar met hun eigen sleutel; geen
+  vault-sleutel delen. Vóór gebruik controleren zij elk hun eigen zegel en vergelijken via de bestaande gepinde,
+  geauthenticeerde verbinding de inhoudsvingerafdruk, het aantal, het tijdanker en alle recept-/doelbindingen van
+  beide exemplaren. Verschil betekent: geen van beide geldt als waar zonder herstel; niet de nieuwste, de Hub of
+  de executor automatisch laten winnen. Ontbreken van een exemplaar is een herstelbare storing, geen bewijs van
+  een lege verzameling. De zelfstandige-herkomstroute blijft in beide gevallen beschikbaar.
+- Beide exemplaren, hun voltooiingsgegevens, het afzonderlijke tijdanker, de bijbehorende Hub-administratie en
+  de voor verificatie benodigde eigen sleutelmaterialen horen consistent bij dezelfde versleutelde back-upset,
+  met gescheiden sleutelbewaring. Alleen een Hub-database-export dekt de executorvastlegging niet. Een back-up
+  telt hiervoor pas na verificatie van de set, de zegels en een proefherstel met exacte bindingvergelijking.
+
+**Verlies en herstel voor de eigenaar, zonder terminal.** De bestaande back-up- en herstelvoorziening uit
+`docs/platform-v2/03_INSTALLATIE/I02_BACKUP_EN_RESTORE.md` (controle back-upbestand, geïsoleerd proefherstel,
+app-consistente export en gescheiden sleutelbewaring) wordt hergebruikt; geen tweede back-upstelsel of nieuwe
+generieke database-restoreactie. De vereiste bediening is onderdeel van de vrijgave van F/G, met UI-uitwerking in
+de bestaande schermstappen. De huidige Hub-back-updekking en hersteltestregistratie zijn nog geen uitvoerbare
+herstelknop voor deze nieuwe metadata; dit ADR claimt dat niet.
+
+1. De Hub toont bij het betrokken recept "Herkomstadministratie ontbreekt" of "Herkomstadministratie verschilt",
+   welke kopie ontbreekt/faalt, bron en meettijd, en de vervolgstap "Herkomstadministratie herstellen" bij Backups.
+   De executorpagina toont dezelfde lokale storing en het eigen oordeel. Geldige eigen herkomst blijft bruikbaar;
+   de UI toont dat per recept, zonder geheime waarden.
+2. De eigenaar kiest in die herstelbediening een geverifieerde back-upset van dezelfde executor/Hub en instantie.
+   Eerst worden de twee exemplaren, de oorspronkelijke voltooiingsgegevens, het tijdanker en de bijbehorende
+   administratie geïsoleerd uit die set gelezen en met de eigen sleutelmaterialen geverifieerd. Beide kanten
+   vergelijken de volledige oorspronkelijke bindingen, zegels en inhoud; de UI toont datum, bron, aantal,
+   overeenkomst of concrete afwijking en wat zal worden teruggezet. Eén intact overgebleven exemplaar wordt
+   alleen vanuit zo'n geverifieerde oorspronkelijke set hersteld, nooit blind tot waarheid verheven.
+3. Na een gebonden beheerdersgoedkeuring via de bestaande herstelvoorziening wordt uitsluitend de ontbrekende
+   herkomstadministratie hersteld, bij verschil worden beide exemplaren door de geverifieerde oorspronkelijke
+   exemplaren vervangen. Geen nieuwe `oud`-leden, geen nieuwe tijden; geen appwaarden, journaalrecepten, nonces,
+   latere eigen herkomstregistraties of appdatabases overschrijven. De activering van beide exemplaren is pas
+   bruikbaar na duurzame opslag en onderlinge herverificatie; bij onderbreking blijft deze route in herstelstand.
+   De UI toont daarna "Herkomstadministratie hersteld" met verificatietijd en auditverwijzing. Een aparte nieuwe
+   goedkeuring voor het terugzetten van de app blijft nodig. Zo worden de oorspronkelijke bindingen exact terug
+   beschikbaar en blijven bestaande recepten en hun vorige waarden/digest intact.
+4. Een ontbrekende, onleesbare, verkeerde of onvolledige back-up geeft geen herstelbewijs. De UI toont de reden en
+   biedt voor uitsluitend het onderstaande geval de per recept gebonden bevestiging; anders blijft het recept
+   geweigerd met de concrete ontbrekende voorwaarde. Geen stil eindpunt zonder hersteluitleg.
+
+**Alleen zonder herstel: gebonden beheerdersbevestiging voor een recept van vóór F.** Voor een leesbaar recept
+zonder eigen herkomst waarvoor de oud-vastlegging niet te herstellen is, tonen Hub én executor wat zij zelf
+kunnen vaststellen: recept-ID, receptvingerafdruk, app en instantie, het oorspronkelijke tijdstip uit hun eigen
+journaal/actieadministratie tegenover het door de executor zelf vastgelegde tijdanker van F, en de ontbrekende
+bewijsstukken. Geen tijd of herkomst uit het terugzetverzoek aannemen. Alleen als beide hun bindingen onafhankelijk
+kunnen verifiëren, de tijdstippen overeenstemmen en het recept aantoonbaar strikt vóór F is gemaakt, verschijnt in
+de Hub "Dit ene oude recept terugzetten met waarschuwing". Bij ná F, een gelijke of onbepaalbare tijd, een
+ontbrekend tijdanker, tegenstrijdigheid of onleesbaar recept blijft deze mogelijkheid gesloten. Een ketenrecept
+van ná F zonder registratie blijft dus geweigerd; ook een beheerder kan dat niet langs deze route vrijgeven.
+
+Dit vraagt een uitdrukkelijke bevestiging door een beheerder in een levende beheerderssessie, als hoogste
+risicoklasse R3 met menselijke goedkeuring van precies die diff. De bevestiging bindt uitsluitend dit recept en
+zijn vingerafdruk, app, instantie, oorspronkelijke tijden, F-tijdanker, huidige doelversie/ETag, checkpoint,
+policy-hash en de waarschuwing. Zij vervalt bij wijziging van een binding, verlopen sessie/goedkeuring of hergebruik;
+de bestaande vervaltijd en eenmalige nonce blijven gelden. De Hub legt vóór uitvoering een auditregel vast met
+beheerder, bindingen, verliesreden en bevestiging zonder waarden. De executor controleert zelf opnieuw de
+ondertekende gebonden goedkeuring, de levende sessie volgens besluit 3, het eigen recept en tijdanker en alle
+bestaande gates; zijn journaal koppelt uitkomst en waarschuwing aan dezelfde auditverwijzing. Zonder duurzame audit
+en journaal geen uitvoering. AI, planner, dienst-token of algemene instelling kan deze bevestiging niet geven.
+
+Na bevestiging wordt precies dat ene recept teruggezet volgens optie 3, met dezelfde vaste melding en exact de
+vorige waarden en digest plus readback. De bevestiging maakt het recept niet blijvend `oud`, vult de verloren
+verzameling niet opnieuw en geeft geen ander recept of volgende uitvoering vrij. Zij ontsluit uitsluitend dit
+herkomstgeval; migratie-, checkpoint-, doel-, Emby- en geheimtransportgates blijven verplicht. Dit is een ontwerp
+voor gebonden autorisatie bij de bestaande terugzetroute, geen nieuwe vrije R3-actie of algemene vrijgave.
+
+**Aan de gebruiker voor te leggen bij optie 3.** Bij verlies eerst de verzegelde herkomstadministratie uit de
+bestaande back-upvoorziening herstellen. Lukt dat niet, dan mag alleen een aantoonbaar recept van vóór F zonder
+eigen herkomst na bovenstaande R3-beheerdersbevestiging van precies dat recept met waarschuwing worden teruggezet;
+een recept van ná F zonder herkomst blijft geweigerd. Zelfstandig geldige eigen herkomst blijft onafhankelijk
+bruikbaar. Dit hoort bij het bestaande regisseursbesluit en wordt niet als reeds door de gebruiker goedgekeurd
+gepresenteerd.
 
 Zo blijven bestaande recepten terug te zetten met de melding (HARDE EIS, KLEIN-85); optie 3 zelf verandert niet.
 
-Een beheerder kan de weigering niet wegklikken. De uitkomst verwijst naar `eigenaar_herstel`: de eigenaar moet
+Een beheerder kan een weigering door de migratiegate niet wegklikken, ook niet met de bovenstaande
+herkomstbevestiging. Die uitkomst verwijst naar `eigenaar_herstel`: de eigenaar moet
 image en bijbehorende data/database als één herstelroute behandelen. Er wordt geen nieuwe R3-actie, database-
 schrijfroute, snapshot-rollback of automatische data-overschrijving verzonnen. Tot die eigenaarsroute beschikbaar
 en geverifieerd is blijft herstel geblokkeerd; R3 in de risicotabel is op zichzelf geen uitvoerbare capability.
@@ -712,12 +803,37 @@ eenmalige vastlegging byte-gelijk. Een recept van een keten-update na F zonder c
 of met een migratie zonder veilige tag-terugval wordt geweigerd: geen rollback-RPC. Ook ONBEKEND en geweigerd, geen
 rollback-RPC: een ketenrecept dat via de echte updateroute van Hub en executor is gemaakt en waarvan de test daarna
 de hele herkomstregistratie verwijdert (bij de executor, bij de Hub en bij beide), een onleesbare herkomst, en een
-recept met eigen herkomst dat ook in de oud-vastlegging staat. Eenmalige vastlegging: een onderbroken poging laat
-geen `oud` achter en tot de voltooiing voert de executor geen update of rollback met recept uit; een herhaalde
-start na voltooiing verandert de verzameling niet; een recept van na de voltooiing is nooit `oud`; een verwijderde
-vastlegging wordt niet opnieuw gemaakt zolang er recepten met eigen herkomst bestaan, en geen recept wordt dan
-teruggezet (geen rollback-RPC). Een terugzetverzoek dat zelf
-"buiten de keten", "oud" of een context meestuurt, verandert daar niets aan.
+recept met eigen herkomst dat ook in de geldige, onderling gelijke oud-vastlegging staat. Eenmalige vastlegging:
+een onderbroken eerste transactie laat geen gedeeltelijk `oud` achter en tot voltooiing en vergelijking begint
+geen F-uitvoering met recept; hervatten bewaart tijdanker en oorspronkelijke grens. Een herhaalde start na
+voltooiing verandert de verzameling niet; een recept van na die grens is nooit `oud`. Verwijdering leidt nooit
+tot herinventarisatie, ook niet als alle recepten met eigen herkomst inmiddels weg zijn. Een terugzetverzoek dat
+zelf "buiten de keten", "oud" of een context meestuurt, verandert daar niets aan.
+
+Verlies- en herstelproef via de echte Hub/executor-updateroute, samen groen met alle bovenstaande T8-negatieven:
+
+- Verwijder alleen de oud-verzameling bij de executor, bij de Hub en bij beide; laat recepten, journaal en sleutels
+  intact. Geldige eigen herkomst `keten` en `buiten_keten` volgt steeds haar eigen regel: veilige ketencontext
+  herstelt, onveilige/ontbrekende migratiecontext weigert, buiten de keten herstelt met melding. Ook een update met
+  zelfstandig geldige eigen herkomst blijft mogelijk, met alle bestaande gates. Verwijdering mag nooit in een
+  algemene stop veranderen of een nieuwe oud-inventarisatie starten.
+- Eén ontbrekend exemplaar, een ongeldig zegel, twee geldig verzegelde maar verschillende exemplaren en een
+  afgebroken kopie-/herstelactivering geven geen automatische winnaar of `oud`. Geldige eigen herkomst blijft
+  onafhankelijk; een werkelijk tegenstrijdig recept bij een geldige gelijke verzameling blijft geweigerd.
+- Herstel via de beschreven eigenaarsbediening uit dezelfde geverifieerde back-upset maakt de oorspronkelijke
+  bindingen exact terug beschikbaar: identieke leden, tijden, app-/instantie-/requestbindingen, aantal,
+  inhoudsvingerafdruk, voltooiing en F-tijdanker in beide exemplaren. Vergelijk tevens oude én latere recepten,
+  hun versleutelde vak, app en tijd vóór/na byte-gelijk; zet daarna de oude waarden en digest werkelijk terug met
+  melding. Verkeerde instantie, gewijzigde bindingen, kapot zegel of ontbrekend onderdeel van de set weigert.
+- Zonder herstel: een intact recept van vóór F zonder eigen herkomst weigert zonder de gebonden
+  beheerdersbevestiging, en zet na precies die R3-bevestiging in een levende sessie dezelfde vorige waarden en
+  digest terug met melding, auditregel en readback. Dezelfde bevestiging voor een ander recept, een gewijzigde
+  receptvingerafdruk/app/instantie/diff, replay, verlopen sessie/goedkeuring, ontbrekende audit, ontbrekend tijdanker
+  of een gelijke/onbekende recepttijd: geen rollback-RPC. Test de Hub- én de eigen executorcontrole afzonderlijk.
+- Een ketenrecept van ná F zonder herkomstregistratie blijft geweigerd bij verwijdering bij de executor, de Hub
+  en beide, ook zonder oud-verzameling en mét een beheerdersbevestiging; geen rollback-RPC. De UI biedt voor dit
+  recept geen bevestigingsmogelijkheid en toont waarom. Na een bevestigde oude terugzetting blijft een tweede
+  recept zonder nieuwe eigen bevestiging geweigerd. Geen algemene instelling of meegegeven tijd verandert dat.
 **Mutatie M-T8.** Verwijder de zelfstandige migratiegate of vervang checkpointverificatie door "ID bestaat":
 de betreffende directe weigertest moet rood worden. Verander één oude waarde/digest: de positieve hersteltest faalt.
 Lees de herkomst van het recept uit het terugzetverzoek in plaats van uit het eigen vak, of behandel een
@@ -726,9 +842,16 @@ de proef met het recept van vóór F wordt rood. Behandel een recept zonder herk
 `buiten_keten` (de oude regel "zonder vastlegging = van vóór F of buiten de keten"): de proef met het ketenrecept
 zonder registratie wordt rood. Laat de registratie bij het bewaren weg: de positieve terugzetting van het recept
 buiten de keten wordt rood (ONBEKEND), zonder dat optie 3 verandert. Maak de eenmalige vastlegging bij elke start
-opnieuw of neem recepten van na de voltooiing op: de proef met het recept van na de voltooiing respectievelijk met
-de verwijderde vastlegging wordt rood. Laat de vastlegging een bestaand recept herschrijven: de byte-vergelijking
-wordt rood.
+of bij verlies opnieuw, verschuif het F-tijdanker of neem recepten van na de oorspronkelijke grens op: de
+herstart-/verlies-/ná-F-proef wordt rood. Laat de vastlegging of haar herstel een bestaand of later recept
+herschrijven: de byte-vergelijking wordt rood.
+Verliesmutaties: "neem bij verlies alles als oud aan" maakt de ná-F-weigerproef rood; "weiger bij verlies alles"
+maakt de positieve proef met zelfstandige eigen herkomst en de bevestigde vóór-F-terugzetting rood;
+"bevestiging geldt voor een ander recept of voor een recept van na F" maakt de betreffende gebonden weigertest
+rood. Laat een ongeldig/afwijkend exemplaar winnen, herstel andere oorspronkelijke bindingen of sla vergelijking
+van beide exemplaren over: de verlies-/herstelproef wordt rood. Sla R3-goedkeuring, levende sessie, verval,
+eenmaligheid of duurzame audit over, of laat de herkomstbevestiging een migratiegate opheffen: de betreffende
+negatieve proef wordt rood. Deze mutaties worden pas in F/G uitgevoerd; hier zijn het ontwerpcriteria.
 
 ### 9. De afhankelijkheidslus wordt door begrensde leveringen doorbroken
 
