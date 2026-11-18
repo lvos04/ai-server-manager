@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub import audit, breakglass
-from hub.deps import DB, Admin, Idem, SettingsDep, get_keyring, get_vault
+from hub.deps import DB, Admin, Idem, SettingsDep, get_keyring, get_vault, require_local_admin
 from hub.errors import HubError
 from hub.keys import KeyRing
 from hub.models import OidcConfig, OidcIdentity, Service, User, WebSession
@@ -135,6 +135,8 @@ def put_oidc(
     # Zelfde schema als de Secure-cookiecontrole; uvicorn verwerkt alleen vertrouwde proxyheaders.
     if (body.client_secret or body.client_secret_wissen) and request.url.scheme != "https":
         raise HubError(403, "oidc_geheim_https_vereist", "Het clientgeheim schrijven of wissen kan alleen via HTTPS.")
+    if body.client_secret or body.client_secret_wissen:
+        require_local_admin(principal)
     if (replay := idem.replay()) is not None:
         return replay
     try:

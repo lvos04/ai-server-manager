@@ -65,6 +65,8 @@ class Principal:
     session_id: uuid.UUID | None = None
     service_app_id: str | None = None
     service_token_id: uuid.UUID | None = None
+    auth_bron: str | None = None
+    break_glass: bool = False
 
     @property
     def actor(self) -> str:
@@ -165,7 +167,15 @@ def _session_principal(request: Request, db: Session, settings: Settings) -> Pri
     if now - sess.last_seen_at > timedelta(seconds=60):
         sess.last_seen_at = now
         db.commit()
-    return Principal("user", str(user.id), user.username, role=Role(user.role), session_id=sess.id)
+    return Principal(
+        "user",
+        str(user.id),
+        user.username,
+        role=Role(user.role),
+        session_id=sess.id,
+        auth_bron=sess.auth_bron,
+        break_glass=sess.break_glass,
+    )
 
 
 def optional_principal(request: Request, db: DB, settings: SettingsDep) -> Principal | None:
@@ -226,6 +236,16 @@ def require_viewer_or_scope(scope: str | None) -> Callable[..., Principal]:
 
 
 Admin = Annotated[Principal, Depends(require_user(Role.admin))]
+
+
+def require_local_admin(principal: Admin) -> Principal:
+    """De aanmeldbron komt uit de levende sessie, nooit uit een header of gebruikersclaim."""
+    if principal.auth_bron != "lokaal" and not principal.break_glass:
+        raise HubError(403, "lokale_beheerder_vereist", "Hiervoor is een lokale beheerderssessie of noodsessie nodig.")
+    return principal
+
+
+LocalAdmin = Annotated[Principal, Depends(require_local_admin)]
 Operator = Annotated[Principal, Depends(require_user(Role.operator))]
 Viewer = Annotated[Principal, Depends(require_user(Role.viewer))]
 AnyUser = Annotated[Principal, Depends(require_user(Role.kind))]

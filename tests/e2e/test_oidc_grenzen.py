@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from e2e.test_oidc_sso import MAPPINGS, NOOD_PW, REDIRECT, _breakglass, configure
+from e2e.test_oidc_sso import (
+    MAPPINGS,
+    NOOD_PW,
+    REDIRECT,
+    _breakglass,
+    configure,
+    enable,
+    sso_login,
+)
 from fakes.fake_oidc import FakeOidc
 from fastapi.testclient import TestClient
 from hub import breakglass
@@ -118,3 +126,35 @@ def test_geheim_volgt_alleen_vertrouwde_proxy(
         },
     )
     assert r.status_code == (200 if trusted else 403)
+
+
+@pytest.mark.parametrize("wissen", [False, True])
+def test_alleen_lokale_beheerder_of_noodsessie_wijzigt_geheim(
+    admin: Any, app: Any, idp: FakeOidc, wissen: bool
+) -> None:
+    secret = _breakglass(admin)
+    enable(admin, idp)
+    sso, page = sso_login(app, idp)
+    assert page.status_code == 200
+    sso.headers["X-CSRF-Token"] = sso.cookies.get("hub_csrf") or ""
+    fields = (
+        {"client_secret_wissen": True}
+        if wissen
+        else {"client_secret": idp.client_secret}
+    )
+    before = unchanged(app)
+    r = sso.put("/api/v1/auth/oidc", json=body(idp, **fields), headers=idem())
+    assert r.status_code == 403
+    assert r.json()["code"] == "lokale_beheerder_vereist"
+    assert unchanged(app) == before
+    assert (
+        sso.put("/api/v1/auth/oidc", json=body(idp), headers=idem()).status_code == 200
+    )
+    nood = noodlogin(app, secret)
+    assert (
+        nood.put(
+            "/api/v1/auth/oidc", json=body(idp, **fields), headers=idem()
+        ).status_code
+        == 200
+    )
+    assert admin.get("/api/v1/auth/me").status_code == 200
