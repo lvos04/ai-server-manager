@@ -24,6 +24,7 @@ from hub.deps import (
     SettingsDep,
     Viewer,
     get_keyring,
+    require_local_admin,
 )
 from hub.errors import HubError
 from hub.firststart import mark_setup_completed, setup_pending, verify_setup_code
@@ -461,6 +462,8 @@ def list_users(db: DB, _: Admin) -> dict[str, Any]:
 
 @router.post("/users", status_code=201, summary="Gebruiker aanmaken (admin)")
 def create_user(body: UserIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
+    if body.role == Role.admin:
+        require_local_admin(principal)
     if (replay := idem.replay()) is not None:
         return replay
     if db.scalars(select(User.id).where(User.username == body.username)).first() is not None:
@@ -493,11 +496,13 @@ def create_user(body: UserIn, db: DB, settings: SettingsDep, principal: Admin, i
 
 @router.patch("/users/{user_id}", summary="Rol/status wijzigen (admin)")
 def patch_user(user_id: uuid.UUID, body: UserPatch, db: DB, principal: Admin, idem: Idem) -> JSONResponse:
-    if (replay := idem.replay()) is not None:
-        return replay
     user = db.get(User, user_id)
     if user is None:
         raise HubError(404, "not_found", "Gebruiker niet gevonden.")
+    if user.break_glass or body.role == Role.admin:
+        require_local_admin(principal)
+    if (replay := idem.replay()) is not None:
+        return replay
     if user.break_glass and body.role is not None and body.role != Role.admin:
         raise HubError(409, "break_glass_stays_admin", "Het noodaccount houdt de rol 'admin'.")
     demote = (body.role is not None and body.role != Role.admin) or body.disabled is True

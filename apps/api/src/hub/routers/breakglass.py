@@ -113,7 +113,7 @@ def get_status(db: DB, settings: SettingsDep, _: Admin) -> dict[str, Any]:
 
 
 @router.post("/setup", status_code=201, summary="Noodaccount aanmaken met TOTP (admin; geheim wordt één keer getoond)")
-def setup(body: SetupIn, db: DB, settings: SettingsDep, principal: Admin, vault: VaultDep) -> JSONResponse:
+def setup(body: SetupIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: VaultDep) -> JSONResponse:
     _reauth(db, settings, principal, body.huidig_wachtwoord)
     if breakglass.account(db) is not None:
         raise HubError(409, "break_glass_exists", "Er is al een noodaccount; gebruik 'roteren'.")
@@ -157,7 +157,7 @@ def setup(body: SetupIn, db: DB, settings: SettingsDep, principal: Admin, vault:
 
 
 @router.post("/rotate", summary="Noodaccount roteren: nieuw wachtwoord en nieuwe TOTP (admin; rotatieplicht)")
-def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: Admin, vault: VaultDep) -> JSONResponse:
+def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: VaultDep) -> JSONResponse:
     _reauth(db, settings, principal, body.huidig_wachtwoord)
     user = breakglass.account(db)
     if user is None:
@@ -211,7 +211,7 @@ def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmi
     summary="TOTP van het noodaccount bevestigen of herbevestigen (admin); foute code → 422 invalid_totp",
     responses={422: {"description": "invalid_totp: foute code binnen een geldige sessie (nooit 401)"}},
 )
-def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: Admin, vault: VaultDep) -> dict[str, Any]:
+def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: VaultDep) -> dict[str, Any]:
     user = breakglass.account(db)
     if user is None or user.totp_secret_ref is None:
         raise HubError(404, "not_found", "Er is nog geen noodaccount met TOTP.")
