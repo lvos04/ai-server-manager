@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hub import __version__, logsink
+from hub.breakglass import audit_missing_totp_on_start
 from hub.config import Settings, get_settings
 from hub.db import make_engine, make_sessionmaker
 from hub.errors import install_error_handlers
@@ -233,6 +234,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 db.commit()
         except Exception as exc:
             log.warning("SSO-beschikbaarheid bij start niet geaudit: %s", type(exc).__name__)
+        try:
+            with factory.begin() as db:
+                audit_missing_totp_on_start(db, readable_vault())
+        except Exception as exc:
+            log.warning("Nood-TOTP bij start niet geaudit: %s", type(exc).__name__)
         handler = logsink.install(factory, "hub-api", vault, settings.log_hub_level)
         try:
             yield

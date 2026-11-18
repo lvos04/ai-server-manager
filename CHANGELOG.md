@@ -4,6 +4,12 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: lokale aanmelding bij ontbrekende nood-TOTP (KLEIN-110)
+- Bij een ontbrekende of onleesbare nood-TOTP-kluisrij meldt de Hub dat het noodaccount niet werkt. "OIDC verplicht"
+  geldt tijdelijk niet, zodat bestaande lokale beheerders kunnen inloggen. SSO blijft beschikbaar met een leesbaar
+  clientgeheim. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount. De eerste start die de kluisfout
+  aantreft voegt één auditregel toe met een vaste redencode.
+
 ### Gerepareerd — Hub: OIDC-invoer, sessiegrenzen en lokale noodbediening (KLEIN-107)
 - Upgradenotitie KLEIN-107: vanaf databaseversie 0012 vervallen alle bestaande OIDC-sessies. SSO zonder leesbaar
   clientgeheim is onbeschikbaar. Inloggen en de SSO-instellingen tonen de reden en lokale aanmelding blijft mogelijk,
@@ -21,9 +27,8 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 - Zonder actief leesbaar clientgeheim geen testlogin, callback-tokenaanvraag of inschakelen; wissen verwijdert
   de oude ciphertext. OIDC-idempotentieantwoorden zonder laatste vier, inclusief oude cache-antwoorden (migratie 0014).
 - De noodlogin met het nieuwe wachtwoord en een geldige nieuwe TOTP-code bevestigt een openstaande rotatie.
-  Verlies van de nieuwe gegevens kan de enige noodroute onbruikbaar maken. Bij een ontbrekende nood-TOTP-kluisrij
-  kan het noodaccount als werkend en verplichte SSO als effectief blijven gelden, terwijl lokale login (403) en
-  noodlogin (401) worden geweigerd. Alleen lokale beheerders en noodsessies mogen noodsessies intrekken.
+  Verlies van de nieuwe gegevens kan de enige noodroute onbruikbaar maken. Alleen lokale beheerders en noodsessies
+  mogen noodsessies intrekken.
 - Bij de eerste start vervangt de Hub oude uitleg met het algoritme uit het ID-token door de vaste foutcode in de
   SSO-configuratie en OIDC-idempotentieantwoorden. Eén auditregel telt de aangepaste velden. Historische verzegelde
   auditregels blijven intact, inclusief de tekst die daarin al stond.

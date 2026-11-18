@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from hub import audit, breakglass
-from hub.deps import DB, Admin, Idem, LocalAdmin, Principal, SettingsDep, get_vault
+from hub.deps import DB, Admin, Idem, LocalAdmin, Principal, ReadableVault, SettingsDep, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.models import User
@@ -125,8 +125,8 @@ def _confirm_totp(db: DB, user: User, now: datetime, actor: str) -> None:
 
 
 @router.get("", summary="Status van het noodaccount (admin)")
-def get_status(db: DB, settings: SettingsDep, _: Admin) -> dict[str, Any]:
-    return breakglass.status(db, settings)
+def get_status(db: DB, settings: SettingsDep, _: Admin, vault: ReadableVault) -> dict[str, Any]:
+    return breakglass.status(db, settings, vault)
 
 
 @router.post("/setup", status_code=201, summary="Noodaccount aanmaken met TOTP (admin; geheim wordt één keer getoond)")
@@ -209,7 +209,9 @@ def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: LocalAdmin,
     "/cgnat",
     summary="100.64.0.0/10 (CGNAT, ook Tailscale) wel of niet als privé tellen voor de noodlogin (admin; audit)",
 )
-def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmin, idem: Idem) -> JSONResponse:
+def put_cgnat(
+    body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmin, idem: Idem, vault: ReadableVault
+) -> JSONResponse:
     """Contract 1.3 §4.1: standaard uit. Alleen een beheerder in de Hub-UI; geen ``action_id``, nooit door de AI."""
     if (replay := idem.replay()) is not None:
         return replay
@@ -225,7 +227,7 @@ def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmi
         details={"was": before, "wordt": body.toestaan},
     )
     db.flush()
-    return idem.save(200, breakglass.status(db, settings))
+    return idem.save(200, breakglass.status(db, settings, vault))
 
 
 @router.post(
@@ -233,14 +235,16 @@ def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmi
     summary="TOTP van het noodaccount bevestigen of herbevestigen (admin); foute code → 422 invalid_totp",
     responses={422: {"description": "invalid_totp: foute code binnen een geldige sessie (nooit 401)"}},
 )
-def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: VaultDep) -> dict[str, Any]:
+def confirm(
+    body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: ReadableVault
+) -> dict[str, Any]:
     user = breakglass.account(db, lock=True)
     if user is None or user.totp_secret_ref is None:
         raise HubError(404, "not_found", "Er is nog geen noodaccount met TOTP.")
     key = f"breakglass-confirm:{principal.id}"
     if failures_in_window(db, key, settings.login_window_seconds) >= settings.login_max_failures:
         raise HubError(429, "rate_limited", "Te veel mislukte pogingen; probeer het later opnieuw.")
-    secret = vault.get(db, user.totp_secret_ref)
+    secret = breakglass.read_totp(db, vault, user)
     now = utcnow()
     step = breakglass.verify_totp(secret, body.totp, now, user.totp_last_step) if secret else None
     if step is None:
@@ -251,7 +255,7 @@ def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmi
     user.totp_last_step = step
     _confirm_totp(db, user, now, principal.name)
     db.commit()
-    return breakglass.status(db, settings)
+    return breakglass.status(db, settings, vault)
 
 
 @router.post(
@@ -259,7 +263,7 @@ def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmi
     summary="Noodlogin met wachtwoord + TOTP, alleen vanaf privé-adressen (sessie ≤ 60 min, niet verlengbaar)",
     responses={401: {"description": "invalid_credentials"}, 403: {"description": "source_not_private"}},
 )
-def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault: VaultDep) -> JSONResponse:
+def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault: ReadableVault) -> JSONResponse:
     ip = client_ip(request)
     username = body.username.strip().lower()
     # Per (account, bron-IP), nooit alleen per account: anders kan iemand op het LAN het noodaccount blokkeren.
@@ -290,13 +294,8 @@ def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault:
     ok_password = verify_password(user.password_hash if user else None, body.password)
     now = utcnow()
     step = None
-    if (
-        ok_password
-        and user is not None
-        and breakglass.is_working(user, allow_pending_rotation=True)
-        and user.totp_secret_ref
-    ):
-        secret = vault.get(db, user.totp_secret_ref)
+    if ok_password and user is not None and breakglass.eligible_for_totp(user, allow_pending_rotation=True):
+        secret = breakglass.read_totp(db, vault, user)
         step = breakglass.verify_totp(secret, body.totp, now, user.totp_last_step) if secret else None
     if user is None or step is None:
         record_failure(db, key)
@@ -333,5 +332,5 @@ def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault:
 
 
 @router.post("/selftest", summary="Zelftest van de noodlogin zonder in te loggen en zonder mutatie (admin)")
-def selftest(request: Request, db: DB, _: Admin) -> dict[str, Any]:
-    return breakglass.selftest(db, client_ip(request))
+def selftest(request: Request, db: DB, _: Admin, vault: ReadableVault) -> dict[str, Any]:
+    return breakglass.selftest(db, client_ip(request), vault)

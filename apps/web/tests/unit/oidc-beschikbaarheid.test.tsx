@@ -1,10 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Login } from "@/app/inloggen/Login";
+import { NoodaccountScreen } from "@/app/instellingen/noodaccount/NoodaccountScreen";
 import { ToegangScreen } from "@/app/instellingen/toegang/ToegangScreen";
 
 const reden = "oidc_clientgeheim_ontbreekt";
-const scenario = vi.hoisted(() => ({ herstelroute: true, authBron: "lokaal", noodlogin: false }));
+const noodTotpReden = "nood_totp_kluisrij_ontbreekt";
+const scenario = vi.hoisted(() => ({ herstelroute: true, authBron: "lokaal", noodlogin: false, noodTotpOntbreekt: false }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({}),
@@ -20,22 +22,30 @@ vi.mock("@/lib/session", async (importOriginal) => ({
 vi.mock("@/lib/use-api", () => ({
   useApi: (pad: string) => ({
     data: pad === "/api/v1/auth/oidc/beschikbaar"
-      ? { ingeschakeld: false, login_url: null, reden }
+      ? scenario.noodTotpOntbreekt
+        ? { ingeschakeld: true, login_url: "/api/v1/auth/oidc/login", reden: noodTotpReden }
+        : { ingeschakeld: false, login_url: null, reden }
       : pad === "/api/v1/auth/oidc"
         ? {
-          ingeschakeld: true, reden, lokale_herstelroute: scenario.herstelroute,
-          client_secret: { ingesteld: false, laatste4: null },
+          ingeschakeld: true, reden: scenario.noodTotpOntbreekt ? noodTotpReden : reden,
+          verplicht: scenario.noodTotpOntbreekt, noodaccount_werkend: false, lokale_herstelroute: scenario.herstelroute,
+          client_secret: { ingesteld: scenario.noodTotpOntbreekt, laatste4: null },
           gate_authentik: { status: "toegestaan", redenen: [] },
           issuer: "https://issuer.example", rolkoppelingen: [],
           discovery: { status: "onbekend" }, jwks: { sleutels: [] },
         }
-        : null,
+        : pad === "/api/v1/auth/break-glass"
+          ? {
+            noodaccount: { username: "nood", sessieduur_minuten: 60 }, werkend: false, reden: noodTotpReden,
+            uitleg: "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount.",
+          }
+          : null,
   }),
 }));
 
 describe("SSO-beschikbaarheid", () => {
   afterEach(() => {
-    Object.assign(scenario, { herstelroute: true, authBron: "lokaal", noodlogin: false });
+    Object.assign(scenario, { herstelroute: true, authBron: "lokaal", noodlogin: false, noodTotpOntbreekt: false });
     vi.unstubAllGlobals();
   });
 
@@ -50,6 +60,29 @@ describe("SSO-beschikbaarheid", () => {
     const html = renderToStaticMarkup(<ToegangScreen />);
     expect(html).toContain("SSO staat aan maar werkt niet: het clientgeheim ontbreekt");
     expect(html).toContain("Stel het clientgeheim in via HTTPS of zet SSO uit.");
+  });
+
+  it("legt lokale aanmelding uit bij ontbrekende nood-TOTP en behoudt de SSO-knop", () => {
+    scenario.noodTotpOntbreekt = true;
+    const html = renderToStaticMarkup(<Login />);
+    expect(html).toContain("De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar");
+    expect(html).toContain("Je kunt lokaal inloggen met een bestaand account.");
+    expect(html).toContain('data-testid="sso-inloggen"');
+    expect(html).not.toContain('data-testid="sso-fout"');
+  });
+
+  it("verwijst bij SSO-instellingen naar het vernieuwen van het noodaccount", () => {
+    scenario.noodTotpOntbreekt = true;
+    const html = renderToStaticMarkup(<ToegangScreen />);
+    expect(html).toContain("De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar");
+    expect(html).toContain('href="/instellingen/noodaccount#nood-instellen-titel"');
+  });
+
+  it("toont op Noodaccount waarom noodlogin faalt en waar je die herstelt", () => {
+    const html = renderToStaticMarkup(<NoodaccountScreen />);
+    expect(html).toContain("De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar");
+    expect(html).toContain('href="#nood-instellen-titel"');
+    expect(html).toContain('data-testid="nood-werkt-niet"');
   });
 
   it("waarschuwt vooraf voor ontbreken van herstelroute en afmelding", () => {

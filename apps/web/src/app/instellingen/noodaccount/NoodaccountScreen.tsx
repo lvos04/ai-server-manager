@@ -32,6 +32,7 @@ interface Nood {
   } | null;
   werkend: boolean;
   oidc_verplicht_mogelijk: boolean;
+  uitleg?: string | null;
   /** Contract 1.3 §4.1: 100.64.0.0/10 (CGNAT, ook Tailscale) telt standaard niet als privé. */
   cgnat?: { toegestaan: boolean; gewijzigd_door: string | null; gewijzigd_op: string | null; waarschuwing: string };
   toelichting: string;
@@ -340,8 +341,13 @@ export function NoodaccountScreen() {
                   <p>Bevestig de rotatie hier of gebruik de noodlogin met het nieuwe wachtwoord en TOTP.</p>
                 </Melding>
               ) : !n.werkend ? (
-                <Melding soort="onbekend" data-testid="nood-werkt-niet">
-                  <p>Noodlogin werkt nu niet: {waarom ?? "onbekende reden."}</p>
+                <Melding soort="onbekend" titel={n.uitleg ? "Noodlogin werkt nu niet" : undefined} data-testid="nood-werkt-niet">
+                  {n.uitleg ? (
+                    <>
+                      <p>{n.uitleg}</p>
+                      <p><a href="#nood-instellen-titel" className="inline-flex min-h-touch items-center underline">Wachtwoord en TOTP vernieuwen</a></p>
+                    </>
+                  ) : <p>Noodlogin werkt nu niet: {waarom ?? "onbekende reden."}</p>}
                 </Melding>
               ) : (
                 <p data-testid="nood-werkt">Noodlogin is ingesteld en bevestigd.</p>

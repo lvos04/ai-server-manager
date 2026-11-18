@@ -113,12 +113,16 @@ def available(db: DB, vault: ReadableVault) -> dict[str, Any]:
     cfg = db.get(OidcConfig, 1)
     ontbreekt = bool(cfg and cfg.ingeschakeld and not service.active_secret(db, cfg, vault))
     on = bool(cfg and cfg.ingeschakeld and not ontbreekt)
+    verplicht = False
+    reason = service.SSO_UNAVAILABLE if ontbreekt else None
+    if on and cfg is not None and cfg.verplicht:
+        verplicht, reason = breakglass.working_status(db, vault, breakglass.account(db))
     return {
         "ingeschakeld": on,
-        "verplicht": on and service.effective_required(db, vault),
+        "verplicht": verplicht,
         "login_url": "/api/v1/auth/oidc/login" if on else None,
         "noodlogin": "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk.",
-        **({"reden": service.SSO_UNAVAILABLE} if ontbreekt else {}),
+        **({"reden": reason} if reason else {}),
     }
 
 
@@ -312,7 +316,7 @@ def enable(
                 409, "gate_authentik_dicht", "Gate 'Authentik/OIDC' is dicht: D17 moet Getest zijn.", {"gate": gate}
             )
         if body.verplicht:
-            breakglass.assert_oidc_required_allowed(db)
+            breakglass.assert_oidc_required_allowed(db, vault)
     else:
         breakglass.require_local_recovery(db, vault)
         cfg.config_versie += 1

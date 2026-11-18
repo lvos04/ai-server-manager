@@ -299,6 +299,7 @@ function Sso() {
   const secretInput = useRef<HTMLInputElement>(null);
   const [testErr, setTestErr] = useState<unknown>(null);
   const c = cfg.data;
+  const noodTotpOntbreekt = c?.reden === "nood_totp_kluisrij_ontbreekt";
   const redirect = typeof window !== "undefined" ? `${window.location.origin}/api/v1/auth/oidc/callback` : "";
   const f =
     form ??
@@ -331,12 +332,20 @@ function Sso() {
             : "Gebruik de noodlogin of vraag een lokale beheerder om het clientgeheim in te stellen."}</p>
         </Melding>
       ) : null}
+      {noodTotpOntbreekt ? (
+        <Melding soort="beperkt" titel="OIDC is tijdelijk niet verplicht">
+          <p>De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Lokale aanmelding is toegestaan.</p>
+          {lokaalBeheer ? (
+            <p><Link href="/instellingen/noodaccount#nood-instellen-titel" className={buttonVariants({ variant: "secundair" })}>Wachtwoord en TOTP vernieuwen</Link></p>
+          ) : <p>Vraag een lokale beheerder om het noodaccount opnieuw in te stellen.</p>}
+        </Melding>
+      ) : null}
       {c?.lokale_herstelroute === false ? (
         <Melding soort="beperkt" titel="Er is geen werkende lokale herstelroute">
           <p>
             {lokaalBeheer
               ? "Maak een lokale beheerder of een noodaccount aan."
-              : "Gebruik de noodlogin of vraag een lokale beheerder om hulp."}{" "}
+              : noodTotpOntbreekt ? "Vraag een lokale beheerder om hulp." : "Gebruik de noodlogin of vraag een lokale beheerder om hulp."}{" "}
             Bij gewijzigde gegevens van de issuer kan SSO automatisch uitgaan.
           </p>
         </Melding>

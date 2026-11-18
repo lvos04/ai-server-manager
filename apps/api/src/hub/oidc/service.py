@@ -85,13 +85,10 @@ def require_generation(db: Session, generation: int, *, login: bool = False) -> 
 
 def effective_required(db: Session, vault: Vault | None) -> bool:
     cfg = db.get(OidcConfig, 1)
-    return bool(
-        cfg
-        and cfg.ingeschakeld
-        and cfg.verplicht
-        and active_secret(db, cfg, vault)
-        and breakglass.is_working(breakglass.account(db))
-    )
+    if cfg is None or not cfg.ingeschakeld or not cfg.verplicht or not active_secret(db, cfg, vault):
+        return False
+    working, _ = breakglass.working_status(db, vault, breakglass.account(db))
+    return working
 
 
 def audit_missing_secret_on_start(db: Session, vault: Vault | None) -> None:
@@ -191,14 +188,19 @@ def safe_provider_error(result: dict[str, Any]) -> dict[str, Any]:
 def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None, *, show_last4: bool = False) -> dict[str, Any]:
     secret = active_secret(db, cfg, vault)
     has_secret = bool(secret)
-    working = breakglass.is_working(breakglass.account(db))
+    working, noodreden = breakglass.working_status(db, vault, breakglass.account(db))
+    reason = None
+    if cfg.ingeschakeld and not has_secret:
+        reason = SSO_UNAVAILABLE
+    elif cfg.ingeschakeld and cfg.verplicht:
+        reason = noodreden
     test = safe_provider_error(cfg.laatste_test or {})
     test_actueel = bool(test.get("resultaat") == "geslaagd" and test.get("config_versie") == cfg.config_versie)
     return {
         "ingeschakeld": cfg.ingeschakeld,
         "verplicht": cfg.verplicht,
         "verplicht_effectief": bool(cfg.ingeschakeld and cfg.verplicht and working and has_secret),
-        "reden": SSO_UNAVAILABLE if cfg.ingeschakeld and not has_secret else None,
+        "reden": reason,
         "noodaccount_werkend": working,
         "lokale_herstelroute": breakglass.has_local_recovery(db, vault),
         "issuer": cfg.issuer,

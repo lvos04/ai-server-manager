@@ -117,7 +117,9 @@ def test_instellen_bevestigen_en_inloggen(admin: Any, app: Any, clean_db: str) -
     st = admin.get("/api/v1/auth/break-glass").json()["noodaccount"]
     assert st["rotatie_vereist"] is False and st["herbevestiging_nodig"] is False
     with Session(app.state.engine) as db:
-        breakglass.assert_oidc_required_allowed(db)  # werkend noodaccount: 'OIDC verplicht' mag (B13)
+        breakglass.assert_oidc_required_allowed(
+            db, app.state.vault()
+        )  # werkend noodaccount: 'OIDC verplicht' mag (B13)
 
 
 def test_alleen_prive_bronadres_en_rate_limit_per_account_en_ip(admin: Any, app: Any) -> None:
@@ -159,7 +161,7 @@ def test_zelftest_zonder_mutatie_toont_bron_ip(admin: Any, app: Any, clean_db: s
     from sqlalchemy.orm import Session
 
     with Session(app.state.engine) as db:
-        res = gw(db, "172.17.0.1")
+        res = gw(db, "172.17.0.1", app.state.vault())
     bron = next(c for c in res["controles"] if c["naam"] == "bron_ip")
     assert bron["lijkt_docker_gateway"] is True and bron["status"] == "waarschuwing" and res["resultaat"] == "ok"
 
@@ -168,7 +170,7 @@ def test_negatieve_gevallen_instellen(admin: Any, app: Any) -> None:
     from sqlalchemy.orm import Session
 
     with Session(app.state.engine) as db, pytest.raises(Exception, match="noodaccount"):
-        breakglass.assert_oidc_required_allowed(db)
+        breakglass.assert_oidc_required_allowed(db, app.state.vault())
     base = {"huidig_wachtwoord": STRONG_PASSWORD, "username": "nood", "password": NOOD_PW}
     fout = admin.post("/api/v1/auth/break-glass/setup", json={**base, "huidig_wachtwoord": "fout"})
     assert fout.status_code == 422 and fout.json()["code"] == "invalid_credentials"  # binnen een sessie: nooit 401

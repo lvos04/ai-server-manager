@@ -40,7 +40,8 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const back = safeReturnPath(params.get("terug"));
   const sso = useApi<{ ingeschakeld: boolean; login_url: string | null; reden?: string }>("/api/v1/auth/oidc/beschikbaar");
-  const ssoFout = params.get("sso_fout") ?? sso.data?.reden;
+  const noodTotpOntbreekt = sso.data?.reden === "nood_totp_kluisrij_ontbreekt";
+  const ssoFout = params.get("sso_fout") ?? (noodTotpOntbreekt ? null : sso.data?.reden);
 
   useEffect(() => {
     if (state.status === "auth") router.replace(back);
@@ -82,6 +83,11 @@ export function Login() {
             <p className="text-sm">
               Code <code>{ssoFout}</code>
             </p>
+          </Melding>
+        ) : null}
+        {noodTotpOntbreekt ? (
+          <Melding soort="beperkt" titel="OIDC is tijdelijk niet verplicht" role="status">
+            <p>De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Je kunt lokaal inloggen met een bestaand account.</p>
           </Melding>
         ) : null}
         {sso.data?.ingeschakeld && sso.data.login_url ? (
