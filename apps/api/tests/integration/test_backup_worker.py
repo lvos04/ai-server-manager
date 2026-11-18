@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import stat
+import time
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +90,57 @@ def test_retentie(settings: Any, app: Any) -> None:
         assert all(r.status == "geslaagd" for r in rows)
         assert rows[0].deleted_at is not None and rows[2].deleted_at is None
     assert len(list(settings.backups_dir.glob("*.dump"))) == 2
+
+
+def test_retentie_laat_pre_upgrade_export_staan_bij_samenloop(settings: Any, app: Any, tmp_path: Path) -> None:
+    """Een oudere export die later afrondt, mag het net gecontroleerde pre-upgrade-archief niet verwijderen."""
+    import shutil
+    import threading
+
+    from hub.backup.selfbackup import run_self_backup
+
+    settings.self_backup_keep = 1
+    poort = tmp_path / "poort"
+    echt = shutil.which("pg_dump")
+    traag = _stub(
+        tmp_path,
+        "pg_dump",
+        f'case "$1" in --version) exec {echt} "$@";; esac\n'
+        f'while [ ! -e {poort} ]; do sleep 0.05; done\nexec {echt} "$@"\n',
+    )
+    echte_bin, uitkomst = settings.pg_dump_bin, {}
+
+    def eerdere_export() -> None:
+        eigen = settings.model_copy(update={"pg_dump_bin": traag})
+        with app.state.sessionmaker() as db:
+            uitkomst["rij"] = run_self_backup(db, eigen, trigger="manual")
+
+    thread = threading.Thread(target=eerdere_export)
+    thread.start()
+    time.sleep(0.5)  # de oudere export is begonnen en wacht op zijn dump
+    settings.pg_dump_bin = echte_bin
+    with app.state.sessionmaker() as db:
+        upgrade = run_self_backup(db, settings, trigger="pre-upgrade")
+        assert upgrade.status == "geslaagd"
+        poort.touch()
+        thread.join(30)
+        assert uitkomst["rij"].status == "geslaagd"
+        db.refresh(upgrade)
+        assert upgrade.deleted_at is None and (settings.backups_dir / upgrade.file_name).is_file()
+        from hub.backup.selfbackup import verify_pre_upgrade
+
+        assert verify_pre_upgrade(db, settings).ok
+
+
+def test_pre_upgrade_controle_faalt_zonder_archief(settings: Any, app: Any) -> None:
+    from hub.backup.selfbackup import run_self_backup, verify_pre_upgrade
+
+    with app.state.sessionmaker() as db:
+        assert verify_pre_upgrade(db, settings).reason_code == "not_available"
+        rij = run_self_backup(db, settings, trigger="pre-upgrade")
+        assert verify_pre_upgrade(db, settings).ok
+        (settings.backups_dir / rij.file_name).unlink()
+        assert verify_pre_upgrade(db, settings).reason_code == "dump_missing"
 
 
 def test_worker_plant_backup_maar_geen_inventaris_zonder_d03(admin: Any, worker_once: Any) -> None:

@@ -289,6 +289,9 @@ def main() -> None:
                     fail("te weinig ruimte voor de back-up vóór upgrade; maak ruimte vrij en start de Hub opnieuw.")
                 if run_once("back-up vóór upgrade", [py, "-m", "hub", "backup-now", "--trigger", "pre-upgrade"]) != 0:
                     fail("back-up vóór upgrade niet geverifieerd; de Hub stopt vóór de schemawijziging.")
+                # Retentie of samenloop mag het net gemaakte archief niet hebben verwijderd.
+                if run_once("controle archief vóór upgrade", [py, "-m", "hub", "backup-controle"]) != 0:
+                    fail("pre-upgrade-archief ontbreekt of klopt niet meer; de Hub stopt vóór de schemawijziging.")
     except (OSError, subprocess.CalledProcessError, SystemExit):
         pg.stop()
         raise

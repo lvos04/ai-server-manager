@@ -256,7 +256,17 @@ def test_terugval_na_klokcorrectie(lege_db: str, tmp_path: Path, monkeypatch: py
 
 
 @pytest.mark.parametrize(
-    "storing", ["ruimtegebrek", "exportfout", "verificatiefout", "verdwenen", "verwisseld", "zonder_controlesom", None]
+    "storing",
+    [
+        "ruimtegebrek",
+        "exportfout",
+        "verificatiefout",
+        "verdwenen",
+        "verwisseld",
+        "zonder_controlesom",
+        "weg_voor_migratie",
+        None,
+    ],
 )
 def test_opstartmigratie_wacht_op_geverifieerde_backup(
     lege_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, storing: str | None
@@ -298,6 +308,9 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
 
             monkeypatch.setattr(cli, "get_settings", lambda: instellingen)
             return cli.main(cmd[3:])
+        if naam == "controle archief vóór upgrade" and storing == "weg_voor_migratie":
+            for dump in tmp_path.glob("backups/*.dump"):  # samenloop na backup-now, vóór de migratie
+                dump.unlink()
         result = subprocess.run(cmd, env=env, capture_output=True, check=False)
         if naam == "migraties":
             assert result.returncode == 0
@@ -338,12 +351,18 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
         if storing:
             assert revision == vorige and "migraties" not in uitgevoerd
             postgres.stop.assert_called_once()
-            if storing in na_retentie:
+            if storing == "weg_voor_migratie":
+                assert backup and backup.status == "geslaagd"
+            elif storing in na_retentie:
                 assert backup and (backup.status, backup.reason_code) == ("mislukt", na_retentie[storing])
             else:
                 assert backup is None if storing == "ruimtegebrek" else backup[:2] == ("mislukt", None)
         else:
-            assert revision == head and uitgevoerd[-2:] == ["back-up vóór upgrade", "migraties"]
+            assert revision == head and uitgevoerd[-3:] == [
+                "back-up vóór upgrade",
+                "controle archief vóór upgrade",
+                "migraties",
+            ]
             assert backup and backup.status == "geslaagd" and len(backup.sha256) == 64
             assert len(list((tmp_path / "backups").glob("*.dump"))) == 1
         assert _meet(engine, {t: c for t, c in kolommen.items() if t != "self_backup"}) == {

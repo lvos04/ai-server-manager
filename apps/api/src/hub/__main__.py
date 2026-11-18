@@ -107,6 +107,19 @@ def cmd_backup_now(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_backup_controle(_args: argparse.Namespace) -> int:
+    from hub.backup.selfbackup import verify_pre_upgrade
+    from hub.db import make_engine, make_sessionmaker
+
+    s = get_settings()
+    engine = make_engine(s.database_url)
+    with make_sessionmaker(engine)() as db:
+        ver = verify_pre_upgrade(db, s)
+    engine.dispose()
+    print(json.dumps({"ok": ver.ok, "reason_code": ver.reason_code, "melding": ver.message}))
+    return 0 if ver.ok else 1
+
+
 def cmd_herstel_lokale_beheerder(args: argparse.Namespace) -> int:
     import re
     import warnings
@@ -217,6 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--check", action="store_true")
     b = sub.add_parser("backup-now", help="eigen database-export maken en verifiëren")
     b.add_argument("--trigger", default="manual", choices=["manual", "pre-upgrade", "schedule"])
+    sub.add_parser("backup-controle", help="controleer de vastgehouden pre-upgrade-export (SHA-256) vóór de migratie")
     h = sub.add_parser(
         "herstel-lokale-beheerder", help="lokaal beheer herstellen bij storing van noodwachtwoord of TOTP"
     )
@@ -236,6 +250,7 @@ def main(argv: list[str] | None = None) -> int:
         "ai-runner": cmd_ai_runner,
         "migrate": cmd_migrate,
         "backup-now": cmd_backup_now,
+        "backup-controle": cmd_backup_controle,
         "herstel-lokale-beheerder": cmd_herstel_lokale_beheerder,
         "export-openapi": cmd_export_openapi,
         "export-runbooks": cmd_export_runbooks,

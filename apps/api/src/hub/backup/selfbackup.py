@@ -5,6 +5,8 @@ Een back-up krijgt pas status ``geslaagd`` als **alle** controles slagen — noo
 2. ``pg_restore --list`` kan de inhoudsopgave lezen en die bevat de verwachte tabellen (incl. data);
 3. de SHA-256 is na het hernoemen opnieuw berekend en gelijk.
 4. na de retentie zijn dezelfde export, inhoudsopgave, controlesom en herstelgegevens opnieuw gecontroleerd.
+Een ``pre-upgrade``-export krijgt een ``.hold``-bestand: retentie laat hem staan (ook bij samenloop of klokverschuiving)
+totdat de eerstvolgende ``pre-upgrade``-export het overneemt.
 Het bestand staat in ``/appdata/backups`` met een ``.sha256``- en ``.json``-bestand ernaast (ook leesbaar als de
 database zelf verloren is).
 """
@@ -186,6 +188,8 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
     manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
     # Alleen de afronding is serieel. Andere exports kunnen hun dump intussen schrijven.
     db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": RETENTION_LOCK})
+    if trigger == "pre-upgrade":
+        _hold(backups, name)
     row.status, row.reason_code, row.message = (
         "geslaagd",
         None,
@@ -227,16 +231,24 @@ def reverify(db: Session, settings: Settings, row: SelfBackup) -> Verification:
     return Verification(True, None, "Opnieuw geverifieerd: checksum en inhoudsopgave kloppen.", ver.details)
 
 
+def _hold(backups: Path, name: str) -> None:
+    """Houd alleen de nieuwste pre-upgrade-export vast. Aanroeper houdt RETENTION_LOCK."""
+    for oud in backups.glob("*.hold"):
+        oud.unlink(missing_ok=True)
+    (backups / (name + ".hold")).write_text("pre-upgrade\n")
+
+
 def apply_retention(db: Session, settings: Settings, *, keep_id: uuid.UUID) -> list[str]:
     """De huidige export bezet één plaats, ook na een klokcorrectie. De aanroeper commit na herverificatie."""
-    rows = list(
-        db.scalars(
+    rows = [
+        r
+        for r in db.scalars(
             select(SelfBackup)
             .where(SelfBackup.id != keep_id, SelfBackup.status == "geslaagd", SelfBackup.deleted_at.is_(None))
             .order_by(SelfBackup.started_at.desc(), SelfBackup.id.desc())
-            .offset(settings.self_backup_keep - 1)
         )
-    )
+        if not (r.file_name and (settings.backups_dir / (r.file_name + ".hold")).exists())
+    ][settings.self_backup_keep - 1 :]
     removed: list[str] = []
     for old in rows:
         if old.file_name:
@@ -246,6 +258,19 @@ def apply_retention(db: Session, settings: Settings, *, keep_id: uuid.UUID) -> l
             removed.append(old.file_name)
         old.deleted_at = utcnow()
     return removed
+
+
+def verify_pre_upgrade(db: Session, settings: Settings) -> Verification:
+    """Direct vóór de migratie: de vastgehouden pre-upgrade-export bestaat nog en klopt (SHA-256, inhoudsopgave)."""
+    row = db.scalars(
+        select(SelfBackup)
+        .where(SelfBackup.trigger == "pre-upgrade", SelfBackup.status == "geslaagd", SelfBackup.deleted_at.is_(None))
+        .order_by(SelfBackup.started_at.desc(), SelfBackup.id.desc())
+        .limit(1)
+    ).first()
+    if row is None or not row.file_name or not (settings.backups_dir / (row.file_name + ".hold")).exists():
+        return Verification(False, "not_available", "Geen vastgehouden pre-upgrade-export.", {})
+    return reverify(db, settings, row)
 
 
 def latest_verified(db: Session) -> SelfBackup | None:
