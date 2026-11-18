@@ -24,14 +24,15 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from cryptography.exceptions import InvalidTag
-from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy import Text, and_, cast, func, or_, select, text, update
+from sqlalchemy.orm import InstrumentedAttribute, Session
+from sqlalchemy.sql import ColumnElement
 
 from hub import audit, breakglass
 from hub.config import Settings
 from hub.incidents.rules import EventIn
-from hub.models import AuditEvent, OidcConfig, OidcIdentity, OidcTransaction, User, WebSession
-from hub.oidc import client
+from hub.models import AuditEvent, IdempotencyRecord, OidcConfig, OidcIdentity, OidcTransaction, User, WebSession
+from hub.oidc import IDEMPOTENCY_ROUTES, client
 from hub.security import ROLE_RANK, Role, sha256_hex
 from hub.timeutil import iso, utcnow
 from hub.vault import Vault, VaultError, last4, make_ref
@@ -43,6 +44,10 @@ UNUSABLE_PASSWORD = "!oidc-geen-wachtwoord"  # noqa: S105 - geen geheim: argon2 
 USERNAME_OK = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 HCH = "home-control-hub"
 SSO_UNAVAILABLE = "oidc_clientgeheim_ontbreekt"
+_ALG_ERROR_CODE = "alg_niet_toegestaan"
+# De oude tekst nam maximaal zestien tekens uit het alg-kopveld over.
+_OLD_ALG_EXPLANATION = r"^Algoritme '.{0,16}' is niet toegestaan \(alleen asymmetrisch\)\.$"
+_ALG_CLEANUP_LOCK = 0x4855_424F_4944_4341  # "HUBOIDCA"
 
 
 def config(db: Session, *, lock: bool = False) -> OidcConfig:
@@ -103,6 +108,47 @@ def audit_missing_secret_on_start(db: Session, vault: Vault | None) -> None:
             target_type="oidc",
             target_id="hub",
             details={"reden": SSO_UNAVAILABLE},
+        )
+
+
+def _old_alg_error(document: InstrumentedAttribute[dict[str, Any]], path: tuple[str, ...]) -> ColumnElement[bool]:
+    return and_(
+        document[(*path, "reden")].astext == _ALG_ERROR_CODE,
+        document[(*path, "uitleg")].astext.regexp_match(_OLD_ALG_EXPLANATION),
+    )
+
+
+def clean_old_alg_explanations(db: Session) -> None:
+    """Schoon historische foutuitleg en verzegel de telling in dezelfde transactie."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:sleutel)"), {"sleutel": _ALG_CLEANUP_LOCK})
+    code = func.to_jsonb(cast(_ALG_ERROR_CODE, Text))
+    test = OidcConfig.laatste_test
+    changed = db.execute(
+        update(OidcConfig)
+        .where(OidcConfig.id == 1, _old_alg_error(test, ()))
+        .values(laatste_test=func.jsonb_set(test, ["uitleg"], code))
+        .execution_options(synchronize_session=False)
+    )
+    total = int(getattr(changed, "rowcount", 0))
+    body = IdempotencyRecord.response_body
+    scope = or_(*(IdempotencyRecord.scope.endswith(f":{method}:{route}") for method, route in IDEMPOTENCY_ROUTES))
+    for path in ((), ("laatste_test",), ("oidc",), ("oidc", "laatste_test")):
+        changed = db.execute(
+            update(IdempotencyRecord)
+            .where(scope, _old_alg_error(body, path))
+            .values(response_body=func.jsonb_set(body, [*path, "uitleg"], code))
+            .execution_options(synchronize_session=False)
+        )
+        total += int(getattr(changed, "rowcount", 0))
+    if total:
+        audit.record(
+            db,
+            actor_type="system",
+            actor_id="hub",
+            action="auth.oidc.alg_uitleg_opgeschoond",
+            target_type="oidc",
+            target_id="hub",
+            details={"aantal": total},
         )
 
 

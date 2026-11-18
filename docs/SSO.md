@@ -22,8 +22,13 @@ Bewaar bij een rotatie het nieuwe wachtwoord en het nieuwe TOTP offline voordat 
 sessie eindigt vóór de bevestiging, kies je op het inlogscherm **Noodlogin**. Meld je vanaf het thuisnetwerk aan met
 het nieuwe wachtwoord en een geldige code uit de nieuwe authenticator. De Hub bevestigt daarmee het nieuwe TOTP en
 markeert de noodlogin zoals gebruikelijk voor rotatie. Vanuit die noodsessie kun je een lokale beheerder aanmaken of
-heractiveren en de SSO-instellingen herstellen. SSO-sessies kunnen de noodsessies niet intrekken. Als er alleen
-SSO-beheerders zijn en de noodlogin onbruikbaar is, ontbreekt een herstelroute binnen de Hub.
+heractiveren en de SSO-instellingen herstellen. Verlies van het nieuwe wachtwoord of de nieuwe TOTP-gegevens kan
+de enige noodroute onbruikbaar maken. Als er alleen SSO-beheerders zijn en de noodlogin onbruikbaar is, ontbreekt
+een herstelroute binnen de Hub.
+
+Als de kluisrij voor het nood-TOTP ontbreekt, kan de Hub het noodaccount nog als werkend tonen. Met een leesbaar
+SSO-clientgeheim kan "OIDC verplicht" dan effectief blijven. In de simulatie weigerde de Hub de lokale login (403)
+en de noodlogin (401).
 
 ## In Authentik (door de beheerder, in de Authentik-web-UI)
 1. Een **OAuth2/OpenID-provider** voor de Hub: client type *Confidential*, redirect-URI exact
@@ -71,9 +76,17 @@ of de noodlogin om SSO zonder leesbaar geheim opnieuw in te richten. De instelli
 van de onbeschikbaarheid. De Hub legt die toestand bij de eerste start vast in het auditspoor. Lokale en noodsessies
 blijven geldig.
 
+Bij de eerste start na dit herstel vervangt de Hub de oude fouttekst met het algoritme uit het ID-token door de
+vaste code `alg_niet_toegestaan` in het laatste SSO-testresultaat en de opgeslagen OIDC-idempotentieantwoorden.
+Als velden zijn aangepast, krijgt het auditspoor één nieuwe regel met alleen het aantal. Volgens het bewaarbeleid
+blijven bestaande verzegelde auditregels intact. Daarin kan de historische tekst nog staan.
+
 ## Sessies
-- Uitloggen en intrekken werken direct. Een beheerder ziet alle actieve sessies (`GET /api/v1/sessions`) en kan alle
-  sessies van een gebruiker intrekken (`POST /api/v1/users/{id}/sessions/revoke`).
+- Uitloggen en intrekken werken direct. Gebruikers kunnen hun eigen sessies intrekken via
+  `POST /api/v1/auth/sessions/{session_id}/revoke`. Een beheerder ziet alle actieve sessies (`GET /api/v1/sessions`)
+  en kan sessies afzonderlijk of per gebruiker intrekken (`POST /api/v1/users/{user_id}/sessions/revoke`). Alleen een
+  lokale beheerder of noodsessie mag een noodsessie afzonderlijk of alle sessies van het noodaccount intrekken.
+  Een SSO-beheerder krijgt daarbij op beide routes 403.
 - Elke OIDC-sessie geldt alleen met SSO aan en dezelfde configuratieversie. Migratie 0013 voegt die binding toe;
   oudere OIDC-sessies zonder binding moeten opnieuw aanmelden. Lokale sessies en noodsessies blijven geldig.
 - SSO uitzetten (ook als het al uit staat), gewijzigde discovery, issuer, client, redirect, scopes, sessieduur,

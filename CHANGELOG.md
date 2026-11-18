@@ -20,9 +20,16 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   Lokale sessies, noodsessies, bestaand TOTP en de gedeelde kluissleutel blijven behouden.
 - Zonder actief leesbaar clientgeheim geen testlogin, callback-tokenaanvraag of inschakelen; wissen verwijdert
   de oude ciphertext. OIDC-idempotentieantwoorden zonder laatste vier, inclusief oude cache-antwoorden (migratie 0014).
+- De noodlogin met het nieuwe wachtwoord en een geldige nieuwe TOTP-code bevestigt een openstaande rotatie.
+  Verlies van de nieuwe gegevens kan de enige noodroute onbruikbaar maken. Bij een ontbrekende nood-TOTP-kluisrij
+  kan het noodaccount als werkend en verplichte SSO als effectief blijven gelden, terwijl lokale login (403) en
+  noodlogin (401) worden geweigerd. Alleen lokale beheerders en noodsessies mogen noodsessies intrekken.
+- Bij de eerste start vervangt de Hub oude uitleg met het algoritme uit het ID-token door de vaste foutcode in de
+  SSO-configuratie en OIDC-idempotentieantwoorden. Eén auditregel telt de aangepaste velden. Historische verzegelde
+  auditregels blijven intact, inclusief de tekst die daarin al stond.
 - CGNAT-beheer alleen via lokale beheerder of noodsessie; setting, standaard uit en noodlogin blijven gelijk.
-- O1 (herstelbestendig intrekkingsanker) en O2 (geheime bodyhash in verzoek-idempotentie) blijven open;
-  de tijdelijke overdracht blijft dicht volgens ADR-0033. Contract 1.3, policy en ADR-0033 zijn ongewijzigd.
+- O1 (herstelbestendig intrekkingsanker), O2 (geheime bodyhash in verzoek-idempotentie) en O3 (beleid uitsluitend LAN)
+  blijven open. De tijdelijke overdracht blijft dicht volgens ADR-0033. Contract 1.3, policy en ADR-0033 zijn ongewijzigd.
 
 ### Gerepareerd — Contract 1.3: aanvulling C-12 na de review van de bron (S-P2-C12, deel A, A-HERSTEL; blijft `contracts 1.3`)
 - §3.1, tweede uitzondering: een manifest bevat nooit een kluisverwijzing (`vault_ref_not_allowed`); alleen de Hub en,

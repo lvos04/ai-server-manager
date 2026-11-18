@@ -22,6 +22,7 @@ from hub.config import Settings
 from hub.errors import HubError
 from hub.keys import KeyRing
 from hub.models import IdempotencyRecord, OidcConfig, Service, ServiceToken, User, WebSession
+from hub.oidc import IDEMPOTENCY_ROUTES
 from hub.scopes import has_scope
 from hub.security import ROLE_RANK, Role, constant_eq, sha256_hex
 from hub.timeutil import utcnow
@@ -355,11 +356,7 @@ async def _idempotency(
     scope = f"{who}:{request.method}:{path}"[:128]
     rhash = hashlib.sha256(f"{request.url.path}\n{canonical}".encode()).hexdigest()
     response_filter = None
-    if (request.method, request.url.path) in {
-        ("PUT", "/api/v1/auth/oidc"),
-        ("POST", "/api/v1/auth/oidc/discover"),
-        ("POST", "/api/v1/auth/oidc/inschakelen"),
-    }:
+    if (request.method, request.url.path) in IDEMPOTENCY_ROUTES:
         from hub.oidc.service import idempotency_response
 
         response_filter = idempotency_response

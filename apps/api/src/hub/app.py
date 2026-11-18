@@ -18,7 +18,7 @@ from hub.db import make_engine, make_sessionmaker
 from hub.errors import install_error_handlers
 from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
-from hub.oidc.service import audit_missing_secret_on_start
+from hub.oidc.service import audit_missing_secret_on_start, clean_old_alg_explanations
 from hub.onboarding.service import seed
 from hub.routers import (
     actions,
@@ -222,6 +222,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 db.commit()
         except Exception as exc:
             log.warning("besluiten nog niet geïnitialiseerd: %s", type(exc).__name__)
+        try:
+            with factory.begin() as db:
+                clean_old_alg_explanations(db)
+        except Exception as exc:
+            log.warning("oude SSO-fouttekst bij start niet opgeschoond: %s", type(exc).__name__)
         try:
             with factory() as db:
                 audit_missing_secret_on_start(db, readable_vault())
