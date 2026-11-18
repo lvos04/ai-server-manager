@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from hub import __main__ as hub_cli
 from hub import breakglass
-from hub.models import AuditEvent, User, VaultSecret
+from hub.models import AuditEvent, OidcConfig, User, VaultSecret
 from hub.timeutil import utcnow
 
 idp = test_oidc_sso.idp
@@ -112,7 +112,45 @@ def test_oidc_verplicht_beschermt_laatste_gewone_lokale_beheerder(
     assert sso.get(OIDC).json()["verplicht_effectief"] is True
 
 
-@pytest.mark.parametrize("verwijderen", [True, False], ids=["ontbreekt", "onleesbaar"])
+def test_noodwachtwoord_status_zelftest_en_hersteladvies(admin: Any, app: Any, idp: Any) -> None:
+    _breakglass(admin)
+    enable(admin, idp)
+    with app.state.sessionmaker.begin() as db:
+        nood = breakglass.account(db)
+        nood.password_hash = nood.password_hash.rsplit("$", 1)[0] + "$"
+
+    status = admin.get(NOOD).json()
+    assert status["reden"] == "nood_wachtwoord_onbruikbaar"
+    assert not status["werkend"] and not status["oidc_verplicht_mogelijk"]
+    assert status["noodaccount"]["totp_ingesteld"]
+    zelftest = admin.post(f"{NOOD}/selftest").json()
+    assert zelftest["resultaat"] == "niet_ok"
+    controles = {c["naam"]: c["status"] for c in zelftest["controles"]}
+    assert controles["wachtwoord"] == "fout" and controles["totp"] == "ok"
+    poging = admin.post(f"{OIDC}/inschakelen", json=VERPLICHT, headers=idem())
+    assert poging.status_code == 409 and "wachtwoord" in poging.json()["message"]
+    assert admin.get(OIDC).json()["verplicht"] is False
+    publiek = admin.get(f"{OIDC}/beschikbaar").json()
+    assert publiek["ingeschakeld"] and "bestaand beheerdersaccount" in publiek["noodlogin"]
+
+    with app.state.sessionmaker.begin() as db:
+        db.get(OidcConfig, 1).client_secret_ref = None
+        breakglass.audit_missing_totp_on_start(db, app.state.vault())
+        storing = select(AuditEvent).where(AuditEvent.action == "auth.break_glass.totp_kluisrij_ontbreekt")
+        assert db.scalar(storing) is None
+    publiek = admin.get(f"{OIDC}/beschikbaar").json()
+    assert not publiek["ingeschakeld"] and publiek["reden"] == "oidc_clientgeheim_ontbreekt"
+    assert "noodaccount" in publiek["noodaccount_storing"] and "bestaand beheerdersaccount" in publiek["noodlogin"]
+
+
+@pytest.mark.parametrize(
+    ("storing", "reden"),
+    [
+        ("ontbreekt", breakglass.TOTP_UNAVAILABLE),
+        ("onleesbaar", breakglass.TOTP_UNAVAILABLE),
+        ("wachtwoord", "nood_wachtwoord_onbruikbaar"),
+    ],
+)
 def test_bestaande_installatie_zonder_lokale_beheerder_herstelt_via_console(
     admin: Any,
     app: Any,
@@ -120,7 +158,8 @@ def test_bestaande_installatie_zonder_lokale_beheerder_herstelt_via_console(
     settings: Any,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    verwijderen: bool,
+    storing: str,
+    reden: str,
 ) -> None:
     oude_totp = _breakglass(admin)
     enable(admin, idp, verplicht=True)
@@ -138,13 +177,16 @@ def test_bestaande_installatie_zonder_lokale_beheerder_herstelt_via_console(
     with app.state.sessionmaker.begin() as db:
         nood = breakglass.account(db)
         rij = db.scalar(select(VaultSecret).where(VaultSecret.ref == nood.totp_secret_ref))
-        if verwijderen:
+        if storing == "ontbreekt":
             db.delete(rij)
-        else:
+        elif storing == "onleesbaar":
             rij.ciphertext = b"onleesbare rij"
+        else:
+            nood.password_hash = nood.password_hash.rsplit("$", 1)[0] + "$"
 
     status = sso.get(OIDC).json()
     assert status["verplicht"] and not status["verplicht_effectief"]
+    assert status["reden"] == reden
     assert not status["noodaccount_werkend"] and not status["lokale_herstelroute"]
     publiek = sso.get(f"{OIDC}/beschikbaar").json()
     assert publiek["ingeschakeld"] and not publiek["verplicht"]
@@ -192,4 +234,4 @@ def test_bestaande_installatie_zonder_lokale_beheerder_herstelt_via_console(
 
     with app.state.sessionmaker() as db:
         regels = db.scalars(select(AuditEvent).where(AuditEvent.action == "auth.lokale_beheerder_hersteld")).all()
-        assert len(regels) == 1 and regels[0].details == {"reden": breakglass.TOTP_UNAVAILABLE}
+        assert len(regels) == 1 and regels[0].details == {"reden": reden}

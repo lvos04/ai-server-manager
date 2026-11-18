@@ -156,9 +156,11 @@ def cmd_herstel_lokale_beheerder(args: argparse.Namespace) -> int:
             breakglass.lock_local_recovery(db)
             nood = breakglass.account(db, lock=True)
             _, reden = breakglass.working_status(db, vault, nood)
-            if reden != breakglass.TOTP_UNAVAILABLE or breakglass.has_local_admin(db):
+            herstelredenen = (breakglass.TOTP_UNAVAILABLE, breakglass.VERIFIER_UNUSABLE)
+            if reden not in herstelredenen or breakglass.has_local_admin(db):
                 print(
-                    "Herstel vereist een ontbrekende of onleesbare nood-TOTP en geen bruikbare lokale beheerder.",
+                    "Herstel vereist een onbruikbare wachtwoordhash of onleesbare TOTP van het noodaccount "
+                    "en geen bruikbare gewone lokale beheerder.",
                     file=sys.stderr,
                 )
                 return 1
@@ -215,7 +217,9 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--check", action="store_true")
     b = sub.add_parser("backup-now", help="eigen database-export maken en verifiëren")
     b.add_argument("--trigger", default="manual", choices=["manual", "pre-upgrade", "schedule"])
-    h = sub.add_parser("herstel-lokale-beheerder", help="lokaal beheer herstellen bij verlies van de nood-TOTP")
+    h = sub.add_parser(
+        "herstel-lokale-beheerder", help="lokaal beheer herstellen bij storing van noodwachtwoord of TOTP"
+    )
     h.add_argument("gebruikersnaam")
     e = sub.add_parser("export-openapi", help="OpenAPI exporteren of op drift controleren")
     e.add_argument("--out", default="docs/openapi/hub-api.openapi.json")

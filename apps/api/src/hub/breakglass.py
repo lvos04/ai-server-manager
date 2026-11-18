@@ -40,8 +40,12 @@ TOTP_WINDOW = 1  # één tijdstap speling naar voren en naar achteren (klokversc
 RECOVERY_LOCK_KEY = 0x48554252_45434F56  # "HUBRECOV"
 ISSUER = "TrueNAS Home Platform"  # productnaam (besluit gebruiker O-07)
 TOTP_UNAVAILABLE = "nood_totp_kluisrij_ontbreekt"
-TOTP_UNAVAILABLE_CAUSE = "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar."
-TOTP_UNAVAILABLE_DETAIL = f"{TOTP_UNAVAILABLE_CAUSE} Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
+VERIFIER_UNUSABLE = "nood_wachtwoord_onbruikbaar"
+RECOVERY_CAUSES = {
+    TOTP_UNAVAILABLE: "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar.",
+    VERIFIER_UNUSABLE: "Het opgeslagen wachtwoord van het noodaccount is onbruikbaar.",
+}
+RECOVERY_STEP = "Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
 
 PRIVATE_NETWORKS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
 CGNAT = ipaddress.ip_network("100.64.0.0/10")
@@ -191,6 +195,8 @@ def working_status(db: Session, vault: Vault | None, user: User | None) -> tuple
         return False, None
     if (user.totp_secret_ref is not None or user.totp_confirmed_at is not None) and read_totp(db, vault, user) is None:
         return False, TOTP_UNAVAILABLE
+    if not has_usable_password(user.password_hash):
+        return False, VERIFIER_UNUSABLE
     return eligible_for_totp(user), None
 
 
@@ -205,7 +211,7 @@ def audit_missing_totp_on_start(db: Session, vault: Vault | None) -> None:
     if user is None:
         return
     _, reason = working_status(db, vault, user)
-    if reason is None:
+    if reason != TOTP_UNAVAILABLE:
         return
     action = "auth.break_glass.totp_kluisrij_ontbreekt"
     if db.scalar(select(AuditEvent.id).where(AuditEvent.action == action).limit(1)) is None:
@@ -241,12 +247,7 @@ def has_local_recovery(db: Session, vault: Vault | None, *, exclude_user: uuid.U
         return True
 
     nood = account(db)
-    return bool(
-        nood is not None
-        and nood.id != exclude_user
-        and has_usable_password(nood.password_hash)
-        and working_status(db, vault, nood)[0]
-    )
+    return nood is not None and nood.id != exclude_user and working_status(db, vault, nood)[0]
 
 
 def require_local_recovery(db: Session, vault: Vault | None, *, exclude_user: uuid.UUID | None = None) -> None:
@@ -277,8 +278,8 @@ def status(db: Session, settings: Settings, vault: Vault | None, now: datetime |
             "id": str(user.id),
             "username": user.username,
             "uitgeschakeld": user.disabled,
-            "totp_ingesteld": reason is None and user.totp_confirmed_at is not None,
-            "totp_wacht_op_bevestiging": reason is None
+            "totp_ingesteld": reason != TOTP_UNAVAILABLE and user.totp_confirmed_at is not None,
+            "totp_wacht_op_bevestiging": reason != TOTP_UNAVAILABLE
             and user.totp_secret_ref is not None
             and user.totp_confirmed_at is None,
             "sessieduur_minuten": session_minutes(user, settings),
@@ -293,7 +294,7 @@ def status(db: Session, settings: Settings, vault: Vault | None, now: datetime |
         "werkend": working,
         "oidc_verplicht_mogelijk": working and has_local_admin(db),
         "reden": reason,
-        "uitleg": TOTP_UNAVAILABLE_DETAIL if reason else None,
+        "uitleg": f"{RECOVERY_CAUSES[reason]} {RECOVERY_STEP}" if reason else None,
         "cgnat": cgnat_setting(db),
         "toelichting": "Noodlogin: wachtwoord (≥ 20 tekens) plus TOTP, alleen vanaf privé-adressen, sessie hooguit "
         f"{settings.break_glass_session_minutes_default} minuten (instelbaar 5–240). Voor 'OIDC verplicht' zijn een "
@@ -308,7 +309,7 @@ def assert_oidc_required_allowed(db: Session, vault: Vault | None) -> None:
         raise HubError(
             409,
             "break_glass_required",
-            TOTP_UNAVAILABLE_DETAIL
+            f"{RECOVERY_CAUSES[reason]} {RECOVERY_STEP}"
             if reason
             else "'OIDC verplicht' kan pas aan als er een werkend noodaccount is (wachtwoord + bevestigde TOTP).",
         )
@@ -320,7 +321,8 @@ def selftest(db: Session, source_ip: str, vault: Vault | None, now: datetime | N
     now = now or utcnow()
     user = account(db)
     _, reason = working_status(db, vault, user)
-    totp_confirmed = reason is None and user is not None and user.totp_confirmed_at is not None
+    usable_password = user is not None and has_usable_password(user.password_hash)
+    totp_confirmed = reason != TOTP_UNAVAILABLE and user is not None and user.totp_confirmed_at is not None
     totp_detail = "ingesteld en bevestigd" if totp_confirmed else "TOTP niet ingesteld of nog niet bevestigd"
     cgnat = cgnat_allowed(db)
     checks: list[dict[str, Any]] = [
@@ -330,9 +332,14 @@ def selftest(db: Session, source_ip: str, vault: Vault | None, now: datetime | N
             "detail": "aanwezig" if user is not None else "geen noodaccount ingesteld",
         },
         {
+            "naam": "wachtwoord",
+            "status": "ok" if usable_password else "fout",
+            "detail": "Wachtwoordhash is bruikbaar." if usable_password else RECOVERY_CAUSES[VERIFIER_UNUSABLE],
+        },
+        {
             "naam": "totp",
             "status": "ok" if totp_confirmed else "fout",
-            "detail": TOTP_UNAVAILABLE_DETAIL if reason else totp_detail,
+            "detail": f"{RECOVERY_CAUSES[reason]} {RECOVERY_STEP}" if reason == TOTP_UNAVAILABLE else totp_detail,
         },
         {
             "naam": "bereik_binnen",

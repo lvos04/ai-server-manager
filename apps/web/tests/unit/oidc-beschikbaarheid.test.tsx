@@ -6,7 +6,12 @@ import { ToegangScreen } from "@/app/instellingen/toegang/ToegangScreen";
 
 const reden = "oidc_clientgeheim_ontbreekt";
 const noodTotpReden = "nood_totp_kluisrij_ontbreekt";
-const scenario = vi.hoisted(() => ({ herstelroute: true, authBron: "lokaal", noodlogin: false, noodTotpOntbreekt: false }));
+const totpStoring = "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar.";
+const wachtwoordStoring = "Het opgeslagen wachtwoord van het noodaccount is onbruikbaar.";
+const scenario = vi.hoisted(() => ({
+  herstelroute: true, authBron: "lokaal", noodlogin: false, noodTotpOntbreekt: false,
+  noodwachtwoordOnbruikbaar: false, clientgeheimOntbreekt: false, optioneel: false,
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({}),
@@ -20,38 +25,39 @@ vi.mock("@/lib/session", async (importOriginal) => ({
   }),
 }));
 vi.mock("@/lib/use-api", () => ({
-  useApi: (pad: string) => ({
-    data: pad === "/api/v1/auth/oidc/beschikbaar"
-      ? scenario.noodTotpOntbreekt
-        ? {
-          ingeschakeld: true, login_url: "/api/v1/auth/oidc/login", reden: noodTotpReden,
-          noodlogin: scenario.herstelroute
-            ? "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Je kunt lokaal inloggen met een bestaand beheerdersaccount. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
-            : "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Laat een beheerder met toegang tot de Hub-console python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam> uitvoeren.",
-        }
-        : { ingeschakeld: false, login_url: null, reden }
-      : pad === "/api/v1/auth/oidc"
-        ? {
-          ingeschakeld: true, reden: scenario.noodTotpOntbreekt ? noodTotpReden : reden,
-          verplicht: scenario.noodTotpOntbreekt, noodaccount_werkend: false,
-          lokale_herstelroute: scenario.herstelroute, lokale_beheerder_aanwezig: scenario.herstelroute,
-          client_secret: { ingesteld: scenario.noodTotpOntbreekt, laatste4: null },
-          gate_authentik: { status: "toegestaan", redenen: [] },
-          issuer: "https://issuer.example", rolkoppelingen: [],
-          discovery: { status: "onbekend" }, jwks: { sleutels: [] },
-        }
-        : pad === "/api/v1/auth/break-glass"
-          ? {
-            noodaccount: { username: "nood", sessieduur_minuten: 60 }, werkend: false, reden: noodTotpReden,
-            uitleg: "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount.",
-          }
-          : null,
-  }),
+  useApi: (pad: string) => {
+    const storing = scenario.noodwachtwoordOnbruikbaar ? wachtwoordStoring : scenario.noodTotpOntbreekt ? totpStoring : null;
+    const ssoAan = !!storing && !scenario.clientgeheimOntbreekt;
+    const verplicht = !!storing && !scenario.optioneel;
+    const noodReden = scenario.noodwachtwoordOnbruikbaar ? "nood_wachtwoord_onbruikbaar" : noodTotpReden;
+    const hoofdreden = ssoAan ? (verplicht ? noodReden : null) : reden;
+    const herstel = scenario.herstelroute
+      ? "Je kunt lokaal inloggen met een bestaand beheerdersaccount. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
+      : "Laat een beheerder met toegang tot de Hub-console python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam> uitvoeren.";
+    if (pad === "/api/v1/auth/oidc/beschikbaar") return { data: {
+      ingeschakeld: ssoAan, login_url: ssoAan ? "/api/v1/auth/oidc/login" : null, reden: hoofdreden,
+      noodaccount_storing: storing, noodlogin: storing ? `${storing} ${herstel}` : "Noodlogin op het thuisnetwerk.",
+    } };
+    if (pad === "/api/v1/auth/oidc") return { data: {
+      ingeschakeld: true, reden: hoofdreden, verplicht, noodaccount_werkend: false, noodaccount_storing: storing,
+      lokale_herstelroute: scenario.herstelroute, lokale_beheerder_aanwezig: scenario.herstelroute,
+      client_secret: { ingesteld: ssoAan, laatste4: null }, gate_authentik: { status: "toegestaan", redenen: [] },
+      issuer: "https://issuer.example", rolkoppelingen: [], discovery: { status: "onbekend" }, jwks: { sleutels: [] },
+    } };
+    if (pad === "/api/v1/auth/break-glass") return { data: {
+      noodaccount: { username: "nood", sessieduur_minuten: 60 }, werkend: false,
+      uitleg: `${storing} Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount.`,
+    } };
+    return { data: null };
+  },
 }));
 
 describe("SSO-beschikbaarheid", () => {
   afterEach(() => {
-    Object.assign(scenario, { herstelroute: true, authBron: "lokaal", noodlogin: false, noodTotpOntbreekt: false });
+    Object.assign(scenario, {
+      herstelroute: true, authBron: "lokaal", noodlogin: false, noodTotpOntbreekt: false,
+      noodwachtwoordOnbruikbaar: false, clientgeheimOntbreekt: false, optioneel: false,
+    });
     vi.unstubAllGlobals();
   });
 
@@ -103,10 +109,28 @@ describe("SSO-beschikbaarheid", () => {
   });
 
   it("toont op Noodaccount waarom noodlogin faalt en waar je die herstelt", () => {
+    scenario.noodTotpOntbreekt = true;
     const html = renderToStaticMarkup(<NoodaccountScreen />);
     expect(html).toContain("De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar");
     expect(html).toContain('href="#nood-instellen-titel"');
     expect(html).toContain('data-testid="nood-werkt-niet"');
+  });
+
+  it.each(["verplicht", "optioneel", "clientgeheim ontbreekt"])("toont consoleherstel bij onbruikbaar noodwachtwoord en SSO %s", (modus) => {
+    Object.assign(scenario, {
+      noodwachtwoordOnbruikbaar: true, herstelroute: false, authBron: "oidc",
+      optioneel: modus === "optioneel", clientgeheimOntbreekt: modus === "clientgeheim ontbreekt",
+    });
+    for (const scherm of [<Login key="login" />, <ToegangScreen key="toegang" />]) {
+      const html = renderToStaticMarkup(scherm);
+      expect(html).toContain(wachtwoordStoring);
+      expect(html).toContain("herstel-lokale-beheerder");
+      expect(html).not.toContain('href="/inloggen/nood"');
+      expect(html).not.toContain("Gebruik de noodlogin");
+    }
+    const inloggen = renderToStaticMarkup(<Login />);
+    expect(inloggen.includes('data-testid="sso-inloggen"')).toBe(!scenario.clientgeheimOntbreekt);
+    expect(inloggen.includes('data-testid="sso-fout"')).toBe(scenario.clientgeheimOntbreekt);
   });
 
   it("waarschuwt vooraf voor ontbreken van herstelroute en afmelding", () => {

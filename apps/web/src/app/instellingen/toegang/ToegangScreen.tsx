@@ -259,6 +259,7 @@ function AlleSessies() {
 interface Oidc {
   ingeschakeld: boolean;
   reden: string | null;
+  noodaccount_storing?: string | null;
   lokale_herstelroute: boolean;
   lokale_beheerder_aanwezig: boolean;
   verplicht: boolean;
@@ -300,7 +301,8 @@ function Sso() {
   const secretInput = useRef<HTMLInputElement>(null);
   const [testErr, setTestErr] = useState<unknown>(null);
   const c = cfg.data;
-  const noodTotpOntbreekt = c?.reden === "nood_totp_kluisrij_ontbreekt";
+  const noodStoring = c?.noodaccount_storing ?? (c?.reden === "nood_totp_kluisrij_ontbreekt"
+    ? "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar." : null);
   const redirect = typeof window !== "undefined" ? `${window.location.origin}/api/v1/auth/oidc/callback` : "";
   const f =
     form ??
@@ -330,12 +332,13 @@ function Sso() {
         <Melding soort="beperkt" titel="SSO staat aan maar werkt niet: het clientgeheim ontbreekt">
           <p>{lokaalBeheer
             ? "Stel het clientgeheim in via HTTPS of zet SSO uit."
-            : "Gebruik de noodlogin of vraag een lokale beheerder om het clientgeheim in te stellen."}</p>
+            : noodStoring ? "Herstel eerst de lokale beheertoegang."
+              : "Gebruik de noodlogin of vraag een lokale beheerder om het clientgeheim in te stellen."}</p>
         </Melding>
       ) : null}
-      {noodTotpOntbreekt ? (
-        <Melding soort="beperkt" titel="OIDC is tijdelijk niet verplicht">
-          <p>De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Lokale aanmelding is toegestaan.</p>
+      {c && noodStoring ? (
+        <Melding soort="beperkt" titel={c.verplicht ? "OIDC is tijdelijk niet verplicht" : "Noodlogin werkt nu niet"}>
+          <p>{noodStoring} Lokale aanmelding is toegestaan.</p>
           {lokaalBeheer ? (
             <p><Link href="/instellingen/noodaccount#nood-instellen-titel" className={buttonVariants({ variant: "secundair" })}>Wachtwoord en TOTP vernieuwen</Link></p>
           ) : c.lokale_herstelroute ? <p>Vraag een lokale beheerder om het noodaccount opnieuw in te stellen.</p> : null}
@@ -346,7 +349,7 @@ function Sso() {
           <p>
             {lokaalBeheer
               ? "Maak een lokale beheerder of een noodaccount aan."
-              : noodTotpOntbreekt
+              : noodStoring
                 ? <>Laat een beheerder met toegang tot de Hub-console <code>python -m hub herstel-lokale-beheerder &lt;nieuwe-gebruikersnaam&gt;</code> uitvoeren.</>
                 : "Gebruik de noodlogin of vraag een lokale beheerder om hulp."}{" "}
             Bij gewijzigde gegevens van de issuer kan SSO automatisch uitgaan.
@@ -395,7 +398,7 @@ function Sso() {
           <Field id="sso-client" label="Client-ID" help={`Bij wijzigen vervalt het clientgeheim als je geen nieuw geheim invult. ${waarschuwing ?? ""}`}>
             {(a) => <input {...a} value={f.client_id} onChange={(e) => setForm({ ...f, client_id: e.target.value })} autoComplete="off" />}
           </Field>
-          {!noodTotpOntbreekt || lokaalBeheer ? (
+          {!noodStoring || lokaalBeheer ? (
             <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
               lokaalBeheer={lokaalBeheer} waarschuwing={waarschuwing}
               ingesteld={c.client_secret.ingesteld} laatste4={c.client_secret.laatste4}

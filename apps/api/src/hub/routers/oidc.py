@@ -113,27 +113,29 @@ def available(db: DB, vault: ReadableVault) -> dict[str, Any]:
     cfg = db.get(OidcConfig, 1)
     ontbreekt = bool(cfg and cfg.ingeschakeld and not service.active_secret(db, cfg, vault))
     on = bool(cfg and cfg.ingeschakeld and not ontbreekt)
-    verplicht = False
+    working, noodreden = breakglass.working_status(db, vault, breakglass.account(db))
+    verplicht_ingesteld = bool(on and cfg and cfg.verplicht)
     reason = service.SSO_UNAVAILABLE if ontbreekt else None
-    if on and cfg is not None and cfg.verplicht:
-        verplicht, reason = breakglass.working_status(db, vault, breakglass.account(db))
+    if verplicht_ingesteld:
+        reason = noodreden
     noodadvies = "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk."
-    if reason == breakglass.TOTP_UNAVAILABLE:
+    oorzaak = breakglass.RECOVERY_CAUSES[noodreden] if noodreden else None
+    if oorzaak:
         if breakglass.has_local_admin(db):
             noodadvies = (
-                f"{breakglass.TOTP_UNAVAILABLE_CAUSE} Je kunt lokaal inloggen met een bestaand beheerdersaccount. "
-                "Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
+                f"{oorzaak} Je kunt lokaal inloggen met een bestaand beheerdersaccount. {breakglass.RECOVERY_STEP}"
             )
         else:
             noodadvies = (
-                f"{breakglass.TOTP_UNAVAILABLE_CAUSE} Laat een beheerder met toegang tot de Hub-console "
+                f"{oorzaak} Laat een beheerder met toegang tot de Hub-console "
                 "python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam> uitvoeren."
             )
     return {
         "ingeschakeld": on,
-        "verplicht": verplicht,
+        "verplicht": verplicht_ingesteld and working,
         "login_url": "/api/v1/auth/oidc/login" if on else None,
         "noodlogin": noodadvies,
+        **({"noodaccount_storing": oorzaak} if oorzaak else {}),
         **({"reden": reason} if reason else {}),
     }
 

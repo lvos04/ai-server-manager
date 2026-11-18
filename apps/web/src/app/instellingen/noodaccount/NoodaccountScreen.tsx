@@ -59,6 +59,7 @@ interface Selftest {
 
 const NAAM: Record<string, string> = {
   noodaccount: "Noodaccount",
+  wachtwoord: "Noodwachtwoord",
   totp: "TOTP",
   bereik_binnen: "Privé-adres wordt toegelaten",
   bereik_buiten: "Internetadres wordt geweigerd",
@@ -336,7 +337,7 @@ export function NoodaccountScreen() {
                 {a ? <StatusBadge view={{ tone: "neutral", label: "Ingesteld", icon: "ingesteld" }} /> : <StatusBadge view={{ tone: "unknown", label: "Niet ingesteld" }} />}
                 {a?.totp_wacht_op_bevestiging ? <StatusBadge view={{ tone: "info", label: "Rotatie loopt" }} /> : a?.rotatie_vereist ? <StatusBadge view={{ tone: "info", label: "Rotatie vereist" }} /> : null}
               </div>
-              {rotatieOpen ? (
+              {rotatieOpen && !n.uitleg ? (
                 <Melding soort="info">
                   <p>Bevestig de rotatie hier of gebruik de noodlogin met het nieuwe wachtwoord en TOTP.</p>
                 </Melding>

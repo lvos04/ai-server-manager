@@ -14,6 +14,10 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   beheerder zolang verplichting is ingesteld. Bij een oudere installatie zonder gewone lokale beheerder biedt de
   Hub-console een herstelcommando voor een ontbrekende of onleesbare nood-TOTP-kluisrij. De Hub toont de beschikbare
   herstelstap en blokkeert gewone lokale aanmeldingen weer zodra de nood-TOTP is bevestigd en SSO beschikbaar is.
+- Ook een onbruikbare wachtwoordhash van het noodaccount blokkeert verplichte OIDC. De zelftest noemt de oorzaak.
+  Zonder gewone lokale beheerder biedt de console eenmalig herstel met audit. Een lokale aanmelding vereist een
+  volledige Argon2id-verifier met een digest van 32 bytes. Oudere ondersteunde verifiers kunnen na aanmelding
+  automatisch worden vernieuwd.
 
 ### Gerepareerd — Hub: OIDC-invoer, sessiegrenzen en lokale noodbediening (KLEIN-107)
 - Upgradenotitie KLEIN-107: vanaf databaseversie 0012 vervallen alle bestaande OIDC-sessies. SSO zonder leesbaar

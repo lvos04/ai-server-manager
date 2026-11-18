@@ -6,6 +6,7 @@ from typing import Any
 
 import jwt
 import pytest
+from argon2.low_level import Type, hash_secret
 from conftest import STRONG_PASSWORD, idem, login_as, make_user
 
 pytestmark = pytest.mark.integration
@@ -170,6 +171,46 @@ def test_login_rate_limit_en_logout(admin: Any, app: Any) -> None:
     other = login_as(app, "beheerder")
     assert other.post("/api/v1/auth/logout").status_code == 204
     assert other.get("/api/v1/auth/me").status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("algoritme", "lengte", "zonder_versie", "toegestaan"),
+    [
+        pytest.param(Type.I, 32, False, False, id="argon2i"),
+        pytest.param(Type.ID, 16, False, False, id="kort-digest"),
+        pytest.param(Type.ID, 32, False, True, id="ouder-argon2id"),
+        pytest.param(Type.ID, 32, True, True, id="ouder-zonder-versie"),
+    ],
+)
+def test_wachtwoordprofiel_voor_sessie_en_herhash(
+    admin: Any, app: Any, algoritme: Type, lengte: int, zonder_versie: bool, toegestaan: bool
+) -> None:
+    from fastapi.testclient import TestClient
+    from sqlalchemy import func, select
+
+    from hub.models import User, WebSession
+    from hub.security import has_usable_password, needs_rehash, verify_password
+
+    verifier = hash_secret(STRONG_PASSWORD.encode(), b"testzout", 1, 1024, 1, lengte, algoritme, version=16).decode()
+    if zonder_versie:
+        verifier = verifier.replace("$v=16", "")
+    assert has_usable_password(verifier) is toegestaan
+    account = select(User).where(User.username == "beheerder")
+    sessies = select(func.count()).select_from(WebSession)
+    with app.state.sessionmaker.begin() as db:
+        db.scalar(account).password_hash = verifier
+        voor = db.scalar(sessies)
+    with TestClient(app, base_url="https://testserver") as bezoeker:
+        antwoord = bezoeker.post("/api/v1/auth/login", json={"username": "beheerder", "password": STRONG_PASSWORD})
+        assert antwoord.status_code == (200 if toegestaan else 401)
+        assert ("hub_session" in bezoeker.cookies) is toegestaan
+    with app.state.sessionmaker() as db:
+        assert db.scalar(sessies) == voor + int(toegestaan)
+        opgeslagen = db.scalar(account).password_hash
+        if toegestaan:
+            assert not needs_rehash(opgeslagen) and verify_password(opgeslagen, STRONG_PASSWORD)
+        else:
+            assert opgeslagen == verifier
 
 
 def test_sessie_intrekken_en_wachtwoord_wijzigen(admin: Any, app: Any) -> None:

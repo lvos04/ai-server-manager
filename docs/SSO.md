@@ -26,9 +26,15 @@ het nieuwe wachtwoord en een geldige code uit de nieuwe authenticator. De Hub be
 markeert de noodlogin zoals gebruikelijk voor rotatie. Vanuit die noodsessie kun je een lokale beheerder aanmaken of
 heractiveren en de SSO-instellingen herstellen.
 
-Als de kluisrij voor de nood-TOTP ontbreekt of onleesbaar is, meldt de Hub dat de noodlogin niet werkt.
-"OIDC verplicht" geldt dan tijdelijk niet. De openbare SSO-status, het inlogscherm en de SSO-instellingen tonen
-bij die terugval de oorzaak en de beschikbare herstelstap. Log in met een bestaand lokaal beheerdersaccount.
+De Hub controleert voor lokale accounts en het noodaccount of de opgeslagen wachtwoordhash een volledig
+gecodeerde Argon2id-verifier met een digest van 32 bytes is. Ondersteunde oudere Argon2id-verifiers blijven
+bruikbaar. Na een geslaagde gewone aanmelding vernieuwt de Hub zo nodig de hash. Bij een afgekeurd profiel
+weigert de Hub de aanmelding en blijft de opgeslagen hash behouden.
+
+Bij een onbruikbare wachtwoordhash van het noodaccount of een ontbrekende of onleesbare nood-TOTP-kluisrij
+geeft de zelftest aan welke controle faalt. De Hub weigert het inschakelen van verplichte OIDC. Een eerder
+ingestelde verplichting vervalt tijdelijk. De openbare SSO-status en de schermen voor inloggen en SSO-beheer
+tonen de oorzaak en de beschikbare herstelstap. Log in met een bestaand lokaal beheerdersaccount.
 Vernieuw onder Instellingen → Noodaccount het noodwachtwoord en de TOTP en bevestig de nieuwe code. SSO blijft beschikbaar
 zolang het clientgeheim leesbaar is. Na bevestiging geldt "OIDC verplicht" weer als die instelling aanstaat en SSO
 beschikbaar is. Bij de eerste start die de kluisfout aantreft, schrijft de Hub één auditregel
@@ -37,7 +43,8 @@ beschikbaar is. Bij de eerste start die de kluisfout aantreft, schrijft de Hub �
 ### Bestaande installatie zonder bruikbare lokale beheerder
 
 Werkt de noodlogin nog, maak dan vanuit een noodsessie een gewone lokale beheerder aan of activeer die opnieuw.
-Bij een ontbrekende of onleesbare nood-TOTP-kluisrij kan de beheerder van de installatie via de Hub-console
+Bij een onbruikbare wachtwoordhash van het noodaccount of een ontbrekende of onleesbare nood-TOTP-kluisrij kan
+de beheerder van de installatie via de Hub-console
 een lokaal beheerdersaccount aanmaken. Open een interactieve terminal in de draaiende Hub-container als de
 gebruiker waaronder de Hub draait. Gebruik bij een losse installatie de terminal met de gebruikelijke
 Hub-configuratie. Voer het commando uit met een nieuwe, vrije gebruikersnaam.
@@ -47,8 +54,8 @@ python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam>
 ```
 
 Vervang de plaatsaanduiding door de gebruikersnaam. Voer het nieuwe wachtwoord twee keer in bij de afgeschermde
-prompt. Het commando weigert herstel als er al een bruikbare gewone lokale beheerder is of de nood-TOTP-kluisrij
-leesbaar is. Het aanmaken komt in het auditspoor. Meld je daarna aan met het nieuwe lokale account en herstel
+prompt. Het commando controleert de storing en weigert een tweede herstel zodra er een bruikbare gewone lokale
+beheerder is. Het aanmaken en de reden komen samen in het auditspoor. Meld je daarna aan met het nieuwe lokale account en herstel
 het noodaccount via Instellingen → Noodaccount. Bewaar het lokale account voor een volgende storing.
 
 ## In Authentik (door de beheerder, in de Authentik-web-UI)

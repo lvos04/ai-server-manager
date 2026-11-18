@@ -19,15 +19,19 @@ import { useApi } from "@/lib/use-api";
 export const SSO_FOUT: Record<string, string> = {
   sso_uit: "Inloggen via SSO staat uit. Log in met je eigen account.",
   sso_gewijzigd: "De SSO-instellingen zijn net gewijzigd. Probeer opnieuw.",
-  oidc_clientgeheim_ontbreekt: "Het clientgeheim voor SSO ontbreekt of is onleesbaar. Gebruik je eigen account of de noodlogin.",
+  oidc_clientgeheim_ontbreekt: "Het clientgeheim voor SSO ontbreekt of is onleesbaar.",
   geen_rol: "Je account hoort bij geen enkele groep die toegang heeft. Vraag een beheerder om je groep te koppelen.",
   account_uitgeschakeld: "Dit account is uitgeschakeld. Vraag een beheerder.",
-  issuer_onbereikbaar: "Authentik is niet bereikbaar. Gebruik je eigen account of de noodlogin.",
-  netwerk: "Authentik is niet bereikbaar. Gebruik je eigen account of de noodlogin.",
+  issuer_onbereikbaar: "Authentik is niet bereikbaar.",
+  netwerk: "Authentik is niet bereikbaar.",
 };
 
-export function ssoFoutTekst(code: string): string {
-  return SSO_FOUT[code] ?? "Inloggen via SSO is mislukt.";
+export function ssoFoutTekst(code: string, noodStoring = false): string {
+  const tekst = SSO_FOUT[code] ?? "Inloggen via SSO is mislukt.";
+  if (!noodStoring && ["oidc_clientgeheim_ontbreekt", "issuer_onbereikbaar", "netwerk"].includes(code)) {
+    return `${tekst} Gebruik je eigen account of de noodlogin.`;
+  }
+  return tekst;
 }
 
 export function Login() {
@@ -39,9 +43,10 @@ export function Login() {
   const [error, setError] = useState<HubApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const back = safeReturnPath(params.get("terug"));
-  const sso = useApi<{ ingeschakeld: boolean; login_url: string | null; noodlogin: string; reden?: string }>("/api/v1/auth/oidc/beschikbaar");
-  const noodTotpOntbreekt = sso.data?.reden === "nood_totp_kluisrij_ontbreekt";
-  const ssoFout = params.get("sso_fout") ?? (noodTotpOntbreekt ? null : sso.data?.reden);
+  const sso = useApi<{ ingeschakeld: boolean; login_url: string | null; noodlogin: string; reden?: string; noodaccount_storing?: string }>("/api/v1/auth/oidc/beschikbaar");
+  const noodStoring = Boolean(sso.data?.noodaccount_storing || sso.data?.reden === "nood_totp_kluisrij_ontbreekt");
+  const oidcTerugval = noodStoring && sso.data?.ingeschakeld && Boolean(sso.data.reden);
+  const ssoFout = params.get("sso_fout") ?? (oidcTerugval ? null : sso.data?.reden);
 
   useEffect(() => {
     if (state.status === "auth") router.replace(back);
@@ -79,14 +84,14 @@ export function Login() {
         {state.status === "error" ? <ErrorPanel error={state.error} onRetry={() => void refresh()} /> : null}
         {ssoFout ? (
           <Melding soort="fout" titel="Inloggen via SSO is niet gelukt" role="alert" data-testid="sso-fout" data-code={ssoFout}>
-            <p>{ssoFoutTekst(ssoFout)}</p>
+            <p>{ssoFoutTekst(ssoFout, noodStoring)}</p>
             <p className="text-sm">
               Code <code>{ssoFout}</code>
             </p>
           </Melding>
         ) : null}
-        {noodTotpOntbreekt ? (
-          <Melding soort="beperkt" titel="OIDC is tijdelijk niet verplicht" role="status">
+        {noodStoring ? (
+          <Melding soort="beperkt" titel={oidcTerugval ? "OIDC is tijdelijk niet verplicht" : "Noodlogin werkt nu niet"} role="status">
             <p>{sso.data?.noodlogin}</p>
           </Melding>
         ) : null}
@@ -114,7 +119,7 @@ export function Login() {
             </Button>
           </div>
         </form>
-        {!noodTotpOntbreekt ? (
+        {!noodStoring ? (
           <p className="flex items-center gap-2 text-sm">
             <LifeBuoy aria-hidden="true" className="size-4" />
             <Link href="/inloggen/nood" className="inline-flex min-h-touch items-center">

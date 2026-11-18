@@ -49,6 +49,8 @@ def hash_password(password: str) -> str:
 
 def verify_password(stored_hash: str | None, password: str) -> bool:
     """Constante-tijd-achtig: ook voor onbekende gebruikers wordt een hash geverifieerd."""
+    if stored_hash is not None and not has_usable_password(stored_hash):
+        stored_hash = None
     try:
         return _hasher.verify(stored_hash or _DUMMY_HASH, password) and stored_hash is not None
     except (VerifyMismatchError, VerificationError, InvalidHashError):
