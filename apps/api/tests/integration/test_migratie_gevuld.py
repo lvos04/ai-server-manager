@@ -13,9 +13,12 @@ kent, maakt de test rood. Dan moet de migratie (of deze test) uitdrukkelijk zegg
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import importlib
 import os
+import shutil
 import subprocess
+import sys
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -31,6 +34,8 @@ from conftest import ADMIN_URL
 from sqlalchemy.dialects import postgresql as pg
 
 from hub import migrations
+from hub.backup import selfbackup
+from hub.config import Settings
 
 pytestmark = pytest.mark.integration
 RIJEN = 3
@@ -184,7 +189,75 @@ def test_de_vergelijking_ziet_een_verdwenen_rij(lege_db: str) -> None:
         engine.dispose()
 
 
-@pytest.mark.parametrize("storing", ["ruimtegebrek", "exportfout", "verificatiefout", None])
+@pytest.mark.parametrize("bewaren", [1, 7])
+def test_terugval_na_klokcorrectie(lege_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bewaren: int) -> None:
+    vorige, _ = _vorige_en_head()
+    settings = Settings(database_url=lege_db, data_dir=tmp_path, self_backup_keep=bewaren)
+    engine = sa.create_engine(lege_db)
+    try:
+        migrations.upgrade(lege_db, vorige)
+        _vul(engine)
+        with monkeypatch.context() as klok, sa.orm.Session(engine) as db:
+            toekomst = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=2)
+            klok.setattr(selfbackup, "utcnow", lambda: toekomst)
+            for _ in range(bewaren):
+                assert selfbackup.run_self_backup(db, settings, trigger="manual").status == "geslaagd"
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "UPDATE app_user SET username='laatste-wijziging' "
+                "WHERE id=(SELECT id FROM app_user ORDER BY id LIMIT 1)"
+            )
+        env = {
+            **os.environ,
+            "HUB_DATABASE_URL": lege_db,
+            "HUB_DATA_DIR": str(tmp_path),
+            "HUB_SELF_BACKUP_KEEP": str(bewaren),
+        }
+        subprocess.run(
+            [sys.executable, "-m", "hub", "backup-now", "--trigger", "pre-upgrade"],
+            env=env,
+            check=True,
+            capture_output=True,
+        )
+        with engine.connect() as conn:
+            backup = conn.exec_driver_sql(
+                "SELECT status, deleted_at, file_name, sha256 FROM self_backup WHERE trigger='pre-upgrade'"
+            ).one()
+        assert backup.status == "geslaagd" and backup.deleted_at is None
+        dump = settings.backups_dir / backup.file_name
+        assert len(list(settings.backups_dir.glob("*.dump"))) == bewaren
+        assert hashlib.sha256(dump.read_bytes()).hexdigest() == backup.sha256
+        assert Path(str(dump) + ".sha256").read_text().split() == [backup.sha256, dump.name]
+        # Herstel op een leeg schema zodat de gebruikerswijziging alleen uit deze export kan komen.
+        migrations.downgrade(lege_db, "base")
+        subprocess.run(
+            [
+                settings.pg_restore_bin,
+                "--clean",
+                "--if-exists",
+                "--exit-on-error",
+                "--single-transaction",
+                "--no-owner",
+                "-d",
+                settings.libpq_url,
+                dump,
+            ],
+            check=True,
+            capture_output=True,
+        )
+        with engine.connect() as conn:
+            assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == vorige
+            assert (
+                conn.exec_driver_sql("SELECT count(*) FROM app_user WHERE username='laatste-wijziging'").scalar_one()
+                == 1
+            )
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "storing", ["ruimtegebrek", "exportfout", "verificatiefout", "verdwenen", "verwisseld", "zonder_controlesom", None]
+)
 def test_opstartmigratie_wacht_op_geverifieerde_backup(
     lege_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, storing: str | None
 ) -> None:
@@ -205,6 +278,12 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
     elif storing in {"exportfout", "verificatiefout"}:
         tool = "DUMP" if storing == "exportfout" else "RESTORE"
         env[f"HUB_PG_{tool}_BIN"] = str(tmp_path / "ontbrekend-testprogramma")
+    instellingen = Settings(database_url=lege_db, data_dir=tmp_path)
+    na_retentie = {
+        "verdwenen": "dump_missing",
+        "verwisseld": "checksum_mismatch",
+        "zonder_controlesom": "backup_unavailable",
+    }
     uitgevoerd = []
 
     class MigratieAfgerond(Exception):
@@ -214,6 +293,11 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
         uitgevoerd.append(naam)
         if naam == "first-start-init":
             return 0
+        if naam == "back-up vóór upgrade" and storing in na_retentie:
+            from hub import __main__ as cli
+
+            monkeypatch.setattr(cli, "get_settings", lambda: instellingen)
+            return cli.main(cmd[3:])
         result = subprocess.run(cmd, env=env, capture_output=True, check=False)
         if naam == "migraties":
             assert result.returncode == 0
@@ -225,17 +309,39 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
     try:
         vorige, head = _vorige_en_head()
         kolommen, voor = _gevuld(engine, lege_db)
+        if storing in na_retentie:
+            with sa.orm.Session(engine) as db:
+                eerder = selfbackup.run_self_backup(db, instellingen, trigger="manual")
+                assert eerder.status == "geslaagd" and eerder.file_name
+                oud = instellingen.backups_dir / eerder.file_name
+            retentie = selfbackup.apply_retention
+
+            def verstoor(*args: Any, **kwargs: Any) -> list[str]:
+                verwijderd = retentie(*args, **kwargs)
+                (nieuw,) = set(instellingen.backups_dir.glob("*.dump")) - {oud}
+                if storing == "verdwenen":
+                    nieuw.unlink()
+                elif storing == "verwisseld":
+                    shutil.copyfile(oud, nieuw)  # Leesbaar pg_dump-archief, maar van een andere export.
+                else:
+                    Path(str(nieuw) + ".sha256").unlink()
+                return verwijderd
+
+            monkeypatch.setattr(selfbackup, "apply_retention", verstoor)
         with pytest.raises(SystemExit if storing else MigratieAfgerond):
             supervisor.main()
         with engine.connect() as conn:
             revision = conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
             backup = conn.execute(
-                sa.text("SELECT status, sha256 FROM self_backup WHERE trigger = 'pre-upgrade'")
+                sa.text("SELECT status, sha256, reason_code FROM self_backup WHERE trigger = 'pre-upgrade'")
             ).first()
         if storing:
             assert revision == vorige and "migraties" not in uitgevoerd
             postgres.stop.assert_called_once()
-            assert backup is None if storing == "ruimtegebrek" else backup == ("mislukt", None)
+            if storing in na_retentie:
+                assert backup and (backup.status, backup.reason_code) == ("mislukt", na_retentie[storing])
+            else:
+                assert backup is None if storing == "ruimtegebrek" else backup[:2] == ("mislukt", None)
         else:
             assert revision == head and uitgevoerd[-2:] == ["back-up vóór upgrade", "migraties"]
             assert backup and backup.status == "geslaagd" and len(backup.sha256) == 64

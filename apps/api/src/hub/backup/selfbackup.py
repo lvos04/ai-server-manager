@@ -4,6 +4,7 @@ Een back-up krijgt pas status ``geslaagd`` als **alle** controles slagen — noo
 1. ``pg_dump -Fc`` eindigt met 0 en schreef een niet-leeg bestand met de ``PGDMP``-header;
 2. ``pg_restore --list`` kan de inhoudsopgave lezen en die bevat de verwachte tabellen (incl. data);
 3. de SHA-256 is na het hernoemen opnieuw berekend en gelijk.
+4. na de retentie zijn dezelfde export, inhoudsopgave, controlesom en herstelgegevens opnieuw gecontroleerd.
 Het bestand staat in ``/appdata/backups`` met een ``.sha256``- en ``.json``-bestand ernaast (ook leesbaar als de
 database zelf verloren is).
 """
@@ -18,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,7 @@ log = logging.getLogger("hub.backup")
 EXPECTED_TABLES = ("alembic_version", "app_user", "decision", "audit_event")
 PG_MAGIC = b"PGDMP"
 FILE_RE = re.compile(r"^hub-(\d{8}T\d{6}Z)-[0-9a-f]{8}\.dump$")
+RETENTION_LOCK = 0x41534D424B50
 
 
 @dataclass
@@ -167,7 +170,8 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
     os.replace(partial, final)
     if sha256_file(final) != digest:
         return fail("checksum_unstable", "Checksum veranderde na het wegschrijven.")
-    (backups / (name + ".sha256")).write_text(f"{digest}  {name}\n")
+    checksum_file = backups / (name + ".sha256")
+    checksum_file.write_text(f"{digest}  {name}\n")
     manifest = {
         "bestand": name,
         "sha256": digest,
@@ -178,7 +182,10 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
         "aanleiding": trigger,
         "verificatie": {"pg_restore_list_entries": ver.details.get("entries"), "tabellen": list(EXPECTED_TABLES)},
     }
-    (backups / (name + ".json")).write_text(json.dumps(manifest, indent=2) + "\n")
+    manifest_file = backups / (name + ".json")
+    manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
+    # Alleen de afronding is serieel. Andere exports kunnen hun dump intussen schrijven.
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": RETENTION_LOCK})
     row.status, row.reason_code, row.message = (
         "geslaagd",
         None,
@@ -187,9 +194,17 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
     row.file_name, row.size_bytes, row.sha256 = name, final.stat().st_size, digest
     row.toc_entries = int(ver.details.get("entries") or 0)
     row.verification = {"pg_restore_list": "ok", "entries": ver.details.get("entries"), "sha256_herberekend": True}
+    try:
+        apply_retention(db, settings, keep_id=row.id)
+        verification = reverify(db, settings, row)
+        if not verification.ok:
+            return fail(verification.reason_code or "verify_failed", verification.message, verification.details)
+        if checksum_file.read_text().split() != [digest, name] or json.loads(manifest_file.read_text()) != manifest:
+            return fail("metadata_mismatch", "De herstelgegevens horen niet bij de zojuist gemaakte export.")
+    except (OSError, ValueError):
+        return fail("backup_unavailable", "Opruimen of controleren van de export en de herstelgegevens is mislukt.")
     row.finished_at = utcnow()
     db.commit()
-    apply_retention(db, settings)
     log.info("back-up geslaagd: %s (%s bytes, sha256 %s)", name, row.size_bytes, digest[:12])
     return row
 
@@ -212,23 +227,24 @@ def reverify(db: Session, settings: Settings, row: SelfBackup) -> Verification:
     return Verification(True, None, "Opnieuw geverifieerd: checksum en inhoudsopgave kloppen.", ver.details)
 
 
-def apply_retention(db: Session, settings: Settings) -> list[str]:
+def apply_retention(db: Session, settings: Settings, *, keep_id: uuid.UUID) -> list[str]:
+    """De huidige export bezet één plaats, ook na een klokcorrectie. De aanroeper commit na herverificatie."""
     rows = list(
         db.scalars(
             select(SelfBackup)
-            .where(SelfBackup.status == "geslaagd", SelfBackup.deleted_at.is_(None))
-            .order_by(SelfBackup.started_at.desc())
+            .where(SelfBackup.id != keep_id, SelfBackup.status == "geslaagd", SelfBackup.deleted_at.is_(None))
+            .order_by(SelfBackup.started_at.desc(), SelfBackup.id.desc())
+            .offset(settings.self_backup_keep - 1)
         )
     )
     removed: list[str] = []
-    for old in rows[settings.self_backup_keep :]:
+    for old in rows:
         if old.file_name:
             for suffix in ("", ".sha256", ".json"):
                 with contextlib.suppress(FileNotFoundError):
                     (settings.backups_dir / (old.file_name + suffix)).unlink()
             removed.append(old.file_name)
         old.deleted_at = utcnow()
-    db.commit()
     return removed
 
 
