@@ -7,15 +7,17 @@ combinatie van `train`, `app` en `version` op te vragen. Het antwoord bevat die 
 
 De Hub-worker leest maximaal eens per vijf minuten de TrueNAS-catalogusindex via `catalog.apps` met `cache_only`.
 Via `catalog.get_app_details` meet hij ook de volledige versielijst voor `stable/ix-app` en maximaal drie andere
-apps per ronde. Die apps rouleren op trein en naam. Een geldige index bewijst de exacte nieuwste versie en
-de afwezigheid van een app uit een gemeten trein. Voor een andere versie van een aanwezige app is de volledige
-versielijst van de app nodig. Bij ontbrekende dekking, een mislukte meting of een niet-actueel meettijdstip geeft de
+apps per ronde. Die apps rouleren op trein en naam. De index bepaalt welke apps aan de beurt zijn.
+Alleen de volledige, gemeten versielijst van de gevraagde trein en app kan een `ja` of `nee` opleveren, ook voor de
+nieuwste versie. Bij ontbrekende dekking, een mislukte meting of een niet-actueel meettijdstip geeft de
 route `onbekend` met `gemeten_op: null`. De meettijd zegt wanneer de Hub de lokale TrueNAS-catalogus heeft gelezen.
 
 De Hub houdt één momentopname bij. Een meetpoging verwerkt hoogstens 8 MiB en 50.000 versiecombinaties binnen
-15 seconden. Leesverzoeken plannen geen metingen. Per geregistreerde dienst geldt een venster van 60 verzoeken
-per voortschrijdende minuut, ook tijdens tokenrotatie. Bij overschrijding geeft de Hub `429 rate_limited` en
-`Retry-After`. Bij een onleesbare Hub-meetvoorraad geeft de route `503 dependency_unavailable` en `Retry-After`.
+15 seconden, inclusief kluislezing en publicatie in PostgreSQL. Verloopt die tijd, dan blijft de momentopname
+onbekend met `gemeten_op: null`. Leesverzoeken plannen geen metingen. Per geregistreerde dienst geldt een venster
+van 60 verzoeken per voortschrijdende minuut, ook tijdens tokenrotatie. Bij overschrijding geeft de Hub
+`429 rate_limited` en `Retry-After`. Bij een onleesbare Hub-meetvoorraad geeft de route `503 dependency_unavailable`
+en `Retry-After`.
 
 De lokale integratieproef gebruikt de echte Hub met PostgreSQL en de TrueNAS-simulator. De interopproef laadt
 `HubLezer` en de planner uit jelly-leon-platform-commit `26746920e643cdbb5f9dc31b90cbcc29b65c1f1e` en controleert

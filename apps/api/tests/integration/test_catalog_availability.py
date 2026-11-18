@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -161,6 +162,59 @@ def test_deadline_omvat_kluistijd(
     availability.refresh_if_due(factory, settings, vault)
     assert fake_nas.calls == calls
     assert admin.get(PATH, params=PIN, headers=headers).json() == {**PIN, "beschikbaar": "onbekend", "gemeten_op": None}
+
+
+def test_deadline_omvat_publicatie(
+    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    factory = app.state.sessionmaker
+    nu = NOW
+    monkeypatch.setattr(availability, "utcnow", lambda: nu)
+    availability.refresh_if_due(factory, settings, app.state.vault())
+    pins = (PIN, {**PIN, "version": "1.4.7"})
+    assert [admin.get(PATH, params=pin, headers=headers).json()["beschikbaar"] for pin in pins] == ["ja", "nee"]
+    nu += availability.MEASUREMENT_INTERVAL
+    start_bron = len(fake_nas.calls)
+    grens = 2.0
+    monkeypatch.setattr(availability, "MEASUREMENT_TIMEOUT", grens)
+    fake_nas.delays["catalog.apps"] = 0.8
+    with factory.begin() as db:
+        db.execute(
+            text("""
+            CREATE FUNCTION trage_publicatie() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN PERFORM pg_sleep(3); RETURN NULL; END $$
+        """)
+        )
+        db.execute(
+            text("""
+            CREATE CONSTRAINT TRIGGER trage_publicatie AFTER UPDATE ON catalog_snapshot
+            DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.observed_at IS NOT NULL)
+            EXECUTE FUNCTION trage_publicatie()
+        """)
+        )
+    try:
+        start = time.monotonic()
+        availability.refresh_if_due(factory, settings, app.state.vault())
+        duur = time.monotonic() - start
+        for pin in pins:
+            antwoord = admin.get(PATH, params=pin, headers=headers)
+            assert antwoord.status_code == 200
+            assert antwoord.json() == {**pin, "beschikbaar": "onbekend", "gemeten_op": None}
+        assert any(method == "catalog.get_app_details" for method, _ in fake_nas.calls[start_bron:])
+        assert not fake_nas.mutations
+        assert duur < grens + 0.5
+        with factory.begin() as db:
+            assert db.scalar(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": availability.MEASUREMENT_LOCK})
+    finally:
+        with factory.begin() as db:
+            db.execute(text("DROP TRIGGER trage_publicatie ON catalog_snapshot"))
+            db.execute(text("DROP FUNCTION trage_publicatie()"))
 
 
 def test_onleesbare_kluis_laat_periodieke_taken_door(

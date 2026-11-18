@@ -7,11 +7,16 @@ import math
 import re
 import time
 import uuid
+from contextlib import suppress
 from datetime import datetime, timedelta
+from threading import Timer
 from typing import Any, Literal
 
 from cryptography.exceptions import InvalidTag
-from sqlalchemy import select, text, update
+from psycopg import OperationalError
+from psycopg.errors import IdleInTransactionSessionTimeout, QueryCanceled
+from sqlalchemy import Connection, select, text, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
 from hub.config import Settings
@@ -33,6 +38,7 @@ MAX_VERSION_LENGTH = 64
 MAX_COMBINATIONS = 50_000
 MAX_SOURCE_BYTES = 8 * 1024 * 1024
 MEASUREMENT_TIMEOUT = 15.0
+ROLLBACK_BUDGET = 0.1
 MEASUREMENT_INTERVAL = timedelta(seconds=300)
 MEASUREMENT_LOCK = 0x41534D4D33
 DETAILS_PER_ROUND = 4
@@ -149,49 +155,101 @@ async def _measure(client: TrueNASClient, round_number: int, deadline: float) ->
     return {}
 
 
+def _storage_budget(conn: Connection, deadline: float) -> bool:
+    milliseconds = int((deadline - time.monotonic()) * 1000)
+    if milliseconds <= 0:  # PostgreSQL zou 0 als onbeperkt uitleggen.
+        return False
+    conn.execute(
+        text(
+            "SELECT set_config('statement_timeout', :ms, true), "
+            "set_config('idle_in_transaction_session_timeout', :ms, true)"
+        ),
+        {"ms": str(milliseconds)},
+    )
+    return True
+
+
+def _publish(db: Session, catalog: dict[str, Any], observed: datetime, deadline: float) -> None:
+    conn = db.connection()
+    if not _storage_budget(conn, deadline):
+        return
+    driver = conn.connection.driver_connection
+    assert driver is not None
+
+    # PostgreSQL 16 stopt de statement_timeout vóór de afhandeling van COMMIT.
+    # Voer uitgestelde controles al bij de UPDATE uit en bewaak COMMIT tot de verbinding terugkeert.
+    def cancel_publication() -> None:
+        # Bij een weggevallen verbinding blijven de tijdgrenzen op de server zelf gelden.
+        with suppress(OperationalError):
+            driver.cancel_safe(timeout=ROLLBACK_BUDGET)
+
+    timer = Timer(max(0.0, deadline - time.monotonic()), cancel_publication)
+    timer.start()
+    try:
+        db.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+        db.execute(update(CatalogSnapshot).where(CatalogSnapshot.id == 1).values(catalog=catalog, observed_at=observed))
+        if _storage_budget(conn, deadline) and time.monotonic() < deadline:
+            db.commit()
+    finally:
+        timer.cancel()
+        timer.join()
+
+
 def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Vault) -> None:
-    with factory.begin() as db:
-        if not db.scalar(text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": MEASUREMENT_LOCK}):
-            return
-        target = current_target(db)
-        connection = db.get(TrueNASConnection, 1)
-        if target is None or connection is None:
-            return
-        binding = _binding(db, target, connection)
-        deadline = time.monotonic() + MEASUREMENT_TIMEOUT
-        now = utcnow()
-        # Commit de start onder dezelfde Hub-brede lock, zodat een afgebroken worker het interval niet vergeet.
-        with factory.begin() as reservation:
-            previous = reservation.get(CatalogSnapshot, 1)
-            if previous is not None and now - previous.started_at < MEASUREMENT_INTERVAL:
-                return
-            round_number = previous.round_number + 1 if previous is not None and previous.binding == binding else 0
-            reservation.merge(
-                CatalogSnapshot(
-                    id=1, started_at=now, binding=binding, round_number=round_number, catalog={}, observed_at=None
-                )
-            )
-        if time.monotonic() >= deadline:
-            return
+    # Houd de meetverbinding ook na commit uitgecheckt tot de annuleerder klaar is.
+    # Zo raakt een annulering nooit een andere gebruiker van de pool.
+    with factory() as reservation, reservation.get_bind().engine.connect() as conn:
         try:
-            api_key = vault.get(db, API_KEY_REF)
-        except (VaultError, InvalidTag, ValueError):
+            with factory(bind=conn) as db:
+                _refresh(db, reservation, settings, vault)
+        except DBAPIError as exc:
+            if not exc.connection_invalidated and not isinstance(
+                exc.orig, (QueryCanceled, IdleInTransactionSessionTimeout)
+            ):
+                raise
+
+
+def _refresh(db: Session, reservation: Session, settings: Settings, vault: Vault) -> None:
+    if not db.scalar(text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": MEASUREMENT_LOCK}):
+        return
+    target = current_target(db)
+    connection = db.get(TrueNASConnection, 1)
+    if target is None or connection is None:
+        return
+    binding = _binding(db, target, connection)
+    # Annulering, rollback en vrijgeven van de lock horen bij dezelfde meetpoging.
+    deadline = time.monotonic() + MEASUREMENT_TIMEOUT - min(ROLLBACK_BUDGET, MEASUREMENT_TIMEOUT / 10)
+    now = utcnow()
+    # Commit de start onder dezelfde Hub-brede lock, zodat een afgebroken worker het interval niet vergeet.
+    with reservation.begin():
+        previous = reservation.get(CatalogSnapshot, 1)
+        if previous is not None and now - previous.started_at < MEASUREMENT_INTERVAL:
             return
-        if not api_key or time.monotonic() >= deadline:
-            return
-        client = TrueNASClient(
-            target.url,
-            api_key,
-            tls=tls_for(connection, target, settings),
-            connect_timeout=settings.truenas_connect_timeout,
-            read_timeout=settings.truenas_read_timeout,
-            response_budget=MAX_SOURCE_BYTES,
+        round_number = previous.round_number + 1 if previous is not None and previous.binding == binding else 0
+        reservation.merge(
+            CatalogSnapshot(
+                id=1, started_at=now, binding=binding, round_number=round_number, catalog={}, observed_at=None
+            )
         )
-        catalog = asyncio.run(_measure(client, round_number, deadline))
-        if catalog and time.monotonic() < deadline:
-            db.execute(update(CatalogSnapshot).where(CatalogSnapshot.id == 1).values(catalog=catalog, observed_at=now))
-            if time.monotonic() >= deadline:
-                db.rollback()
+    if not _storage_budget(db.connection(), deadline):
+        return
+    try:
+        api_key = vault.get(db, API_KEY_REF)
+    except (VaultError, InvalidTag, ValueError):
+        return
+    if not api_key or time.monotonic() >= deadline:
+        return
+    client = TrueNASClient(
+        target.url,
+        api_key,
+        tls=tls_for(connection, target, settings),
+        connect_timeout=settings.truenas_connect_timeout,
+        read_timeout=settings.truenas_read_timeout,
+        response_budget=MAX_SOURCE_BYTES,
+    )
+    catalog = asyncio.run(_measure(client, round_number, deadline))
+    if catalog and time.monotonic() < deadline:
+        _publish(db, catalog, now, deadline)
 
 
 def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availability, datetime | None]:
