@@ -56,13 +56,14 @@ changelog-, ADR- en evidenceaantekeningen; de gelezen SSO-code veranderde niet.
 - [Overdrachtstatus](../platform-v2/OVERDRACHT/STATUS.md), gebruikersbesluiten;
   [B03-besluiten](../platform-v2/02_BOUWPLANNEN/B03_BESLUITEN.md), genomen en open besluiten;
   [risicogrenzen](../platform-v2/01_ARCHITECTUUR/03_RISICO_AUTONOMIE.md), technische handhaving.
-  `EXCEL_TAKEN.json`, B01-006: een viewer kan nooit geheimen exporteren; sessie-intrekking werkt direct.
+  `EXCEL_TAKEN.json`, B01-006: “Een viewer kan nooit update/stop of export secrets;
+  logout/sessie-intrekking werkt na revocation.”
 
 ### Bestaande afwijkingen: eerst afzonderlijk herstellen
 
-De regisseur plant de volgende bestaande afwijkingen als eigen herstelstap in ai-server-manager; dit ADR
-herstelt uitsluitend het ontwerp. Zij zijn geen bewijs dat de tijdelijke contractweg veilig is. De eerste
-drie invoereisen vragen **geen contractwijziging en wachten niet op O2**:
+De regisseur plant de volgende bestaande afwijkingen als eigen herstelstap KLEIN-107 in ai-server-manager;
+dit ADR herstelt uitsluitend het ontwerp. Zij zijn geen bewijs dat de tijdelijke contractweg veilig is.
+De drie invoereisen in de eerste tabelrij vragen **geen contractwijziging en wachten niet op O2**:
 
 | Bestaande bron en afwijking | Vereist vóór gebruik van de tussenweg | Bewijs bij de bouw |
 |---|---|---|
@@ -71,6 +72,23 @@ drie invoereisen vragen **geen contractwijziging en wachten niet op O2**:
 | `oidc/service.py::finish` geeft zonder ref `None` aan `oidc/client.py::exchange_code`; die kiest dan een publieke client. `put_oidc` wist alleen de ref; `enable` eist geen actieve geheime revisie. | Ontbrekend, gewist of ingetrokken geheim sluit testlogin, callback en inschakelen vóór een tokenaanroep; oude ciphertext blijft geblokkeerd of wordt verwijderd. | T5: wissen en opnieuw proberen geeft een vaste fout, nul tokenaanroepen zonder geheim en geen hergebruik van de oude rij. |
 | `deps.py::_idempotency` bewaart een hash van pad plus body met geheim; `oidc/service.py::config_dict` levert laatste vier tekens ook aan opgeslagen antwoorden. | Geen geheime invoer of afgeleide vorm in idempotentieopslag, ook geen hash of laatste vier in `response_body`. De nieuwe eenmalige claim blijft dicht tot O2; geen ongeautoriseerde uitzondering op §5. | T3/T7: structurele opslagcontrole, raadorakelcontrole en controles van discover-/inschakelantwoorden. |
 | `routers/breakglass.py::put_cgnat` laat een SSO-beheerder de noodlogin verruimen zonder eigen herbevestiging. | Eigen herstelstap van de noodlogineigenaar; valt buiten dit OIDC-ontwerp. Het ontwerp mag niet op die verruiming steunen of haar activeren. O3 blijft open tegenover het gebruikersbesluit alleen LAN. | T5 bewijst dat alle OIDC-stappen de bestaande netwerksetting ongewijzigd laten; dit bewijst geen herstel van deze beheerroute. |
+
+KLEIN-107 kan zonder O1/O2 de volgende onderdelen dichten en afzonderlijk toetsen:
+
+- Schrijven en wissen weigeren zonder echte HTTPS, ook bij een vervalste schemaheader; nul kluiswijzigingen.
+- Alleen een lokale `admin` of geldige lokale noodsessie mag schrijven/wissen; een OIDC-beheerder krijgt 403.
+- Het invoerveld gebruikt geen `new-password`, geen app-opslag en wordt na verzenden, fout of verlaten leeggemaakt.
+- OIDC-sessies alleen toelaten met SSO aan en de actuele configuratieversie; intrekken bij uitzetten, ook
+  automatisch, en bij vervangen/wissen, ook als SSO al uit stond. Lokale en noodsessies blijven ongemoeid.
+- Zonder actief geheim geen publieke-clientterugval: testlogin, callback en inschakelen weigeren vóór een
+  tokenaanroep; de oude kluisrij wordt verwijderd of geblokkeerd.
+- Geen laatste vier tekens in opgeslagen idempotentie-antwoorden van put, discover of inschakelen.
+
+In de tweede tabelrij wacht het **herstelbestendige intrekkingsanker op O1**. In de vierde tabelrij wacht
+het verwijderen van de **bodyhash met geheim op O2**, de vereiste uitzondering op contract §5. Die twee
+onderdelen zijn dus niet zelfstandig door KLEIN-107 te sluiten; de tussenweg blijft tot hun bewezen herstel
+eveneens dicht. De vijfde rij, netwerkverruiming van de noodlogin, hoort bij de eigenaar van de noodlogin
+in een eigen herstelstap en bij O3, niet bij KLEIN-107.
 
 Zolang deze toepasselijke herstelvoorwaarden niet zijn bewezen, geeft de tussenweg geen vrijgave voor geheime
 invoer. App-attributen kunnen browser-/wachtwoordmanagersynchronisatie niet afdwingen; dat restrisico blijft
@@ -274,7 +292,7 @@ herhaling aan of gebruik de generieke bodyhash: de betreffende negatieve proef m
 Injecteer afzonderlijk een hash van pad plus geheime body of laatste vier in een opgeslagen antwoord:
 de structurele opslag-/orakelcontrole en T7 moeten beide rood worden, ook als zoeken naar alleen SHA-256 van de waarde niets vindt.
 
-### 4. Een eigen credentialruimte in de Hub-kluis; herstel omvat ook de kluissleutel
+### 4. Een eigen credentialruimte in de Hub-kluis; OIDC-herstel behoudt de huidige hoofdsleutel
 
 **Keuze.** Het OIDC-clientgeheim krijgt een **eigen uitsluitend voor OIDC bestemde credentialruimte en
 binding**, via een eigen codepad/opslagstructuur. De bestaande `vault://auth/oidc-client-secret` is een
@@ -286,8 +304,10 @@ Onbekende of tegenstrijdige eigenaar geeft weigering.
 
 De bouw voegt onveranderlijke interne revisies met de context uit besluit 3 toe: een kandidaat is nog niet
 actief; de actieve verwijzing kiest alleen een aan die configuratie gebonden revisie. Een nieuwe revisie is
-een willekeurige identificatie, nooit een hash van de waarde. Geen stil overschrijven via `Vault.put` zonder
-verwachte oude revisie. Migratie van de bestaande singleton vereist eerst bevestiging van de eigenaar;
+een willekeurige identificatie, nooit een hash van de waarde. Geen stil overschrijven in het eigen
+OIDC-schrijfpad zonder verwachte oude revisie. Dit wijzigt niet de gedeelde `Vault.put`: de bestaande
+noodaccountrotatie moet haar eigen TOTP-rij kunnen blijven vervangen en bevestigen.
+Migratie van de bestaande singleton vereist eerst bevestiging van de eigenaar;
 onbekende bestaande binding wordt niet automatisch vertrouwd. Tabellen/schema en migratie worden bij bouw
 vastgesteld, niet als bestaande voorziening verondersteld.
 
@@ -305,17 +325,28 @@ Opslag is AES-256-GCM; gekoppelde data bindt ref én de onveranderlijke eigenaar
 verwisselde ciphertext niet opent. **Die nieuwe binding geldt uitsluitend voor de eigen OIDC-opslag.**
 De gedeelde `Vault.encrypt/decrypt` en de AAD-vorm van bestaande nood-TOTP-, TrueNAS-, monitoring- en
 notificatierijen blijven compatibel en ongewijzigd. Geen migratie of rotatie van nood-TOTP als OIDC-bijwerking;
-de noodlogin mag door geen enkele ontwerpstap stukgaan. Sleutel in `/appdata/secrets/vault.key`, geheimenmap 0700, bestanden
+de noodlogin mag door geen enkele ontwerpstap stukgaan, ook niet door OIDC-herstel.
+Het OIDC-geheim blijft de hoofdsleutel van de Hub delen; alleen zijn ruimte en binding zijn eigen.
+Sleutel in `/appdata/secrets/vault.key`, geheimenmap 0700, bestanden
 0600, eigenaar 568:568, buiten bereik van de AI-runner. Bestaande andere kluisgeheimen en sleutels worden
 niet geroteerd of gewist voor een OIDC-wijziging. UI-metadata is uitsluitend ingesteld, datum en hooguit
 laatste vier tekens volgens §3.10; alleen voor bevoegde beheerders, nooit in connector, audit of events.
 Die uitzondering geldt niet voor de appgeheimen van ADR-0032, die ook geen laatste vier bewaren.
 
-De eigen versleutelde herstelset van de Hub omvat ciphertext, revisie-/eigenaarbindingen, noodzakelijke
+De eigen versleutelde OIDC-herstelset van de Hub omvat ciphertext, revisie-/eigenaarbindingen, noodzakelijke
 configuratie en de bijpassende kluissleutel, met aparte versleuteling van de hele set en beheerdersbeveiliging
 van het ontsluitmateriaal. Sleutel en database naast elkaar in een leesbaar archief is geen veilige back-up.
 Map 0700, bestanden 0600 en toegang tot alleen de herstelbediening; geen download voor viewers of AI.
-Herstel van de kluis is een afzonderlijke geautoriseerde herstelhandeling, geen los key-exportendpoint.
+Het OIDC-herstel is een afzonderlijke geautoriseerde herstelhandeling, geen los key-exportendpoint.
+Het zet **uitsluitend OIDC-rijen, hun bindingen en revisies** terug, inclusief de noodzakelijke
+OIDC-configuratie. Het vervangt **nooit de gedeelde `vault.key`** en schrijft nooit nood-TOTP-, noodaccount-
+of andere niet-OIDC-rijen. Die blijven bij elk OIDC-herstel byte-gelijk, zonder uitzondering.
+De sleutel in de set dient uitsluitend om de OIDC-gegevens binnen de afgeschermde herstelbediening te
+ontsluiten. Bevat de set een andere sleutel dan de huidige, dan worden de OIDC-gegevens onder de
+**huidige sleutel opnieuw versleuteld**, met behoud van hun eigen binding; anders weigert het herstel
+zonder enige wijziging. Ook bij ontbrekende/onbruikbare setonderdelen of een fout tijdens herstel wordt
+zonder wijziging geweigerd. Nooit de setsleutel over de huidige sleutel schrijven.
+Een volledig Hub-herstel valt buiten deze OIDC-bediening en vraagt een eigen noodloginregel en herstelproef.
 Een database-dump met een controlelijst alleen bewijst geen herstel van de kluis (V-085).
 
 Na herstel blijven open/geclaimde overdrachten ongeldig; een oud snapshot mag geen replay opnieuw mogelijk
@@ -339,34 +370,51 @@ het onafhankelijke anker vernieuwen, daarna oude sessies/transacties blokkeren e
 testlogin heropenen. Zonder aantoonbaar actueel anker geen SSO, ook na zo'n terugrol; geen terminalomweg.
 Verlies van de kluissleutel kan ook het lokale TOTP-geheim raken:
 dit ADR claimt daarvoor geen onafhankelijkheid van de kluis. Volledige herstelproeven horen bij de Hub-back-up,
-terwijl de gewone OIDC-overdracht die sleutel en het nood-TOTP juist nooit verandert.
+terwijl iedere stap van dit OIDC-ontwerp, inclusief OIDC-herstel, de huidige sleutel, het nood-TOTP en
+het noodaccount juist nooit verandert.
 
 **Alternatieven en reden.** Opslag als appgeheim geeft de verkeerde eigenaar en toegangspaden. Alleen
-`vault.key` bewaren mist de data; alleen de dump bewaren mist de sleutel. Een gedeelde sleutel of een
-onversleutelde key-export maakt de scheiding ongedaan. Alle zijn verworpen.
+`vault.key` bewaren mist de data; alleen de dump bewaren mist de sleutel. De Hub-hoofdsleutel delen met
+executor, app-opslag uit ADR-0032 of andere diensten, of een onversleutelde key-export, maakt de scheiding
+ongedaan en is verworpen. Het interne gebruik van dezelfde Hub-hoofdsleutel blijft behouden.
 
 **Bewijstest T4.** Schrijf en ontsluit uitsluitend via de echte kluis/OIDC-component met juiste context.
 Wissel ciphertext/revisie/clientbinding: weigering. Vul een appgeheim met dezelfde namen en controleer nul
 toegang tot de OIDC-ruimte en gedeelde `auth`-geheimen; directe executor-/dienst-/viewer-/AI-pogingen leveren
-niets. Maak een niet-lege eigen herstelset, controleer rechten en herstel in isolatie; verwijder sleutel,
-binding of setonderdeel: weigering.
+niets. Maak een niet-lege eigen OIDC-herstelset, controleer rechten en herstel in isolatie; verwijder
+setsleutel, binding of setonderdeel: weigering zonder enige wijziging, met behoud van de huidige sleutel.
 Maak vóór de migratie met de bestaande code een werkend noodaccount, bevestigd TOTP, andere kluisrijen,
 lokale/noodsessies en een niet-lege logsink. Bewijs een echte LAN-noodlogin in deze geïsoleerde fixture vóór
 én na migratie, overdracht en herstel, met hetzelfde bestaande TOTP; niet opnieuw instellen of roteren om
 de proef te laten slagen. Alle bestaande niet-OIDC-rijen blijven ontsleutelbaar; hun ciphertext en TOTP blijven
-byte-gelijk buiten de bewust geïsoleerde herstelactie. De logsink herkent vóór migratie de bestaande
+byte-gelijk, ook na de OIDC-herstelactie. Vergelijk de huidige `vault.key` en alle niet-OIDC-rijen,
+inclusief het noodaccount, direct vóór en na elk OIDC-herstel: byte-gelijk, zonder uitzondering.
+De logsink herkent vóór migratie de bestaande
 OIDC-canary en daarna de gemigreerde/nieuwe canary via de verwachte vingerafdruk voor elke aanwezige rij;
 tel positieve redactietreffers vóór/na, geen stil wegvallen. Controleer lokale sessies en accountbeleid naast
 de normale bijwerkingen van een echte proefnoodlogin.
-Herstel eerst `web_session`, daarna een volledige set van vóór intrekking: oude OIDC-cookies geven 401,
+Zet in de geïsoleerde sessieproef eerst uitsluitend OIDC-rijen uit `web_session` terug; bied daarna een
+volledige oude herstelset van vóór intrekking aan de OIDC-herstelbediening aan, die uitsluitend de
+OIDC-rijen, hun bindingen en revisies mag terugzetten: oude OIDC-cookies geven 401,
 open/geclaimde overdrachten blijven ongeldig, óók na nieuwe testlogin en opnieuw inschakelen. Het actuele
 anker blijft gelden; een ontbrekend/teruggezet anker houdt OIDC dicht. Lokale/noodsessies blijven geldig
 binnen hun eigen grenzen. Dit bewijst meer dan alleen de stand 'SSO uit'.
+Voeg twee afzonderlijke herstelvarianten toe: (a) maak de set vóór een bewuste noodaccountrotatie,
+roteer en bevestig daarna het noodaccount, en herstel uitsluitend OIDC uit die oudere set; de LAN-noodlogin
+met het **huidige wachtwoord en huidige TOTP geeft 200**. (b) Bied een set met een andere sleutel aan:
+het herstel versleutelt uitsluitend OIDC opnieuw onder de huidige sleutel en bewijst ontsleuteling daarmee,
+of weigert zonder enige wijziging. De LAN-noodlogin met de bestaande huidige gegevens blijft 200.
+Beide varianten bewijzen de byte-vergelijking vóór/na herstel, vóór de normale bijwerkingen van de
+proefnoodlogin; gebruik verse geldige TOTP-codes om replayweigering niet met herstel te verwarren.
 **Mutatie M-T4.** Voeg namespacefallback toe, laat revisiecontext uit gekoppelde data weg, maak de back-up
 leesbaar voor anderen of activeer automatisch een herstelde oude revisie: telkens moet de betreffende proef rood.
 Pas de nieuwe AAD naïef in de gedeelde `Vault` toe of laat de logsink OIDC-rijen stil overslaan: de
 bestaande-TOTP-/vingerafdrukproef moet rood worden. Herstel `web_session` zonder actuele generatiecontrole,
 toets alleen 'SSO uit' of verlaag het anker met de oude set: de sessieherstelproef moet rood worden.
+Laat afzonderlijk het OIDC-herstel de gedeelde `vault.key`, het nood-TOTP, het noodaccount of een andere
+niet-OIDC-rij uit de set terugzetten: elke mutatie maakt de betreffende herstelvariant rood, ook wanneer
+de set van vóór de noodrotatie is of een andere sleutel bevat. Een gedeeltelijk gewijzigde weigering
+maakt de byte-vergelijking rood.
 
 ### 5. Rotatie en intrekken sluiten SSO; de lokale noodlogin blijft uitsluitend via LAN werken
 
@@ -444,11 +492,17 @@ een brede/all_users-variant mag zonder bewezen lokale scheiding niet open. Nieuw
 met de nieuwe revisie plus nieuwe testlogin; extern oud geheim wordt door de nagebootste provider geweigerd.
 Wis het geheim en probeer testlogin, callback en inschakelen: vaste fout en nul publieke-client-/tokenaanroepen;
 de oude ciphertext is niet meer ontsluitbaar via de actieve of een oude binding.
+Toets daarnaast in afzonderlijke scenario's de eigen noodaccountrotatie **vóór én na de OIDC-migratie**:
+`rotate` en bevestiging slagen, gevolgd door een LAN-noodlogin met de nieuwe huidige gegevens: 200.
+Alleen die expliciete noodrotatie mag haar eigen account/TOTP wijzigen; de tussenliggende OIDC-stappen
+behouden die gegevens byte-gelijk. Zo wordt ook het bestaande overschrijven via `Vault.put` bewaakt.
 **Mutatie M-T5.** Laat de OIDC-filter weg, gebruik algemene afmelding, hergebruik het oude testresultaat,
 maak noodlogin afhankelijk van de issuer of verruim LAN naar VPN/CGNAT: elke variant maakt de proef rood.
 Wijzig de gedeelde AAD, richt het nood-TOTP pas ná migratie opnieuw in, verlies de logsink-vingerafdruk,
 vervang de zelftest door een echte noodlogin, sla intrekking over als SSO al uit staat of laat zonder geheim
 een publieke tokenaanroep toe: elke eigen proef moet rood worden. T4 vangt ook herleven na herstel.
+Leg de OIDC-revisievoorwaarde ten onrechte op aan de gedeelde `Vault.put`, zodat de eigen noodrotatie
+haar bestaande TOTP niet meer kan vervangen: de rotatie-/bevestigingsproef moet rood worden.
 
 ### 6. De repo-eigenaren leveren afzonderlijk; geen afronding van ongebouwd werk
 
@@ -457,7 +511,7 @@ een publieke tokenaanroep toe: elke eigen proef moet rood worden. T4 vangt ook h
 | Eigenaar/stap | Te bouwen en te bewijzen | Grens |
 |---|---|---|
 | home-control-hub, S-P2-330 | Echte uitvoering van registratie en sessie-intrekking met alle eigen ExecutionRequest-controles; Authentik-adapter met geverifieerde HTTPS/server-/doelbinding vóór ophalen/schrijven op de eerste verbinding, whitelist op ruwe lees-/aanmaakantwoorden en crashafhandeling. Later de verzendkant van O1; in de handmatige fase nooit een geheim in connectorantwoord. | Geen toegang tot de Hub-kluis, geen lokaal Hub-accountbeheer. Registratie voltooid en geheimoverdracht/SSO voltooid zijn verschillende uitkomsten; ontbrekende overdracht eerlijk onbekend/niet beschikbaar. |
-| ai-server-manager, resterend S-P2-070 | Ontvangst en beheerdersbediening, context/claim/revisies, lek-/idempotentiebescherming, herstelbestendige OIDC-sessie-intrekking en eigen OIDC-kluismigratie met bestaand nood-TOTP en logsink intact. De regisseur plant de bestaande afwijkingen als eigen herstelstap vóór gebruik van de tussenweg; haar drie invoereisen wachten niet op O2. UI eerst ontwerp in Peil en daarna ontwerpreview. | Geen Authentik-beheercredential of generieke geheimexport; geen nieuwe actiebevoegdheid. Het vervolg over SSO-beheer van noodnetwerkverruiming krijgt een eigen herstelstap bij de noodlogineigenaar en valt buiten dit ontwerp. |
+| ai-server-manager, resterend S-P2-070 | Ontvangst en beheerdersbediening, context/claim/revisies, lek-/idempotentiebescherming, herstelbestendige OIDC-sessie-intrekking en eigen OIDC-kluismigratie met bestaand nood-TOTP en logsink intact. KLEIN-107 sluit eerst de hierboven genoemde zelfstandige herstelonderdelen; het herstelbestendige anker wacht op O1 en de bodyhash-uitzondering op O2. De tussenweg blijft tot alle toepasselijke herstelvoorwaarden dicht. UI eerst ontwerp in Peil en daarna ontwerpreview. | Geen Authentik-beheercredential of generieke geheimexport; geen nieuwe actiebevoegdheid. Het vervolg over SSO-beheer van noodnetwerkverruiming krijgt een eigen herstelstap bij de noodlogineigenaar en valt buiten KLEIN-107 en dit ontwerp. |
 | ai-server-manager, S-P2-050 deel e | Appgeheimen en enrollment-token, hun eigen opslag, vorm-/doelcontrole en Hub→executor-transport volgens ADR-0032, na diens M2. | Geen OIDC-clientgeheim, geen derde transporttype, geen accountvoorziening via C-12. |
 | Contracteigenaar, afzonderlijke contractronde | O1/O2 en de bestaande ADR-0032 M2/M3 afstemmen, exacte vormen en bijbehorende kopieën/pins; O3 bij de bevoegde eigenaarsbeoordeling. | Deze ontwerpcommit verandert het contract en andere repos niet. |
 
@@ -565,9 +619,10 @@ bron-/versieproef en hierboven vereiste bouwtests. Geen echte NAS-/accountgegeve
 
 ## Verificatie van deze ontwerpstap
 
-De oorspronkelijke ontwerpcommit voegde dit ADR en een verwijzing in ADR-0032 toe. Deze herstelronde wijzigt
-uitsluitend dit ADR: de bestaande besluiten/T1–T7/M-T1–M-T7, bestaande afwijkingen en open O1/O2/O3 worden
-aangescherpt; de verwijzing blijft geldig. Mutaties worden hier alleen ontworpen, niet gedraaid. Controleer relatieve
+De oorspronkelijke ontwerpcommit voegde dit ADR en een verwijzing in ADR-0032 toe. Deze tweede herstelronde
+werkt de bestaande besluiten/T1–T7/M-T1–M-T7, bestaande afwijkingen en open O1/O2/O3 in dit ADR bij en
+corrigeert uitsluitend die ene verwijzing in ADR-0032 naar de eigen OIDC-ruimte, niet de gedeelde `auth`-ruimte.
+Mutaties worden hier alleen ontworpen, niet gedraaid. Controleer relatieve
 documentlinks, besluiten 1–7 met alternatief/reden en bewijstest/mutatie, de harde connectorweigering,
 de afzonderlijke richting/namespace en de open vrijgavegrenzen. Draai de bestaande contract-, manifest-
 en evidencecontroles van P-ai-server-manager voor het geraakte documentatiedeel, plus P-GIT en P-EERLIJK.
