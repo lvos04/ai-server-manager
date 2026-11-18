@@ -5,14 +5,14 @@ from threading import Event
 from typing import Any
 
 import pytest
+from conftest import idem
 from e2e import test_oidc_sso
 from e2e.test_oidc_sso import callback, enable, fout
 from fastapi.testclient import TestClient
-from hub.models import User, WebSession
-from hub.oidc import client
 from sqlalchemy import select
 
-from conftest import idem
+from hub.models import User, WebSession
+from hub.oidc import client
 
 idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]

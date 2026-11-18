@@ -3,11 +3,10 @@
 from typing import Any
 
 import pytest
+from conftest import STRONG_PASSWORD, idem
 from e2e import test_oidc_sso
 from e2e.test_oidc_grenzen import noodlogin
 from e2e.test_oidc_sso import NOOD_PW, _breakglass, enable, sso_login
-
-from conftest import STRONG_PASSWORD, idem
 
 idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]

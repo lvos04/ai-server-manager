@@ -3,15 +3,15 @@
 from typing import Any
 
 import pytest
+from conftest import idem
 from e2e import test_oidc_sso
 from e2e.test_oidc_grenzen import body
 from e2e.test_oidc_sso import enable, sso_login
 from fakes.fake_oidc import FakeOidc
 from fastapi.testclient import TestClient
+
 from hub.models import OidcConfig
 from hub.oidc.service import SECRET_REF
-
-from conftest import idem
 
 idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]

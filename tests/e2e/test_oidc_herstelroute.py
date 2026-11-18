@@ -4,15 +4,15 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from conftest import idem
 from e2e import test_oidc_sso
 from e2e.test_oidc_grenzen import body, noodlogin
 from e2e.test_oidc_sso import _breakglass, enable, fout, sso_login
 from fastapi.testclient import TestClient
-from hub.models import OidcConfig, User
-from hub.timeutil import utcnow
 from sqlalchemy import select
 
-from conftest import idem
+from hub.models import OidcConfig, User
+from hub.timeutil import utcnow
 
 idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]

@@ -3,18 +3,18 @@
 from typing import Any
 
 import pytest
+from conftest import STRONG_PASSWORD
 from e2e import test_oidc_sso
 from e2e.test_oidc_grenzen import noodlogin
 from e2e.test_oidc_sso import REDIRECT, _breakglass, fout
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+
 from hub import migrations
 from hub.app import create_app
 from hub.models import AuditEvent, OidcConfig
 from hub.oidc import service
 from hub.timeutil import utcnow
-from sqlalchemy import func, select
-
-from conftest import STRONG_PASSWORD
 
 idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
