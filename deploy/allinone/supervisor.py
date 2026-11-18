@@ -14,8 +14,8 @@ Regels:
 - Een oude postmaster.pid na een harde stop wordt verwijderd (de container is de enige gebruiker).
 - Kinderen die stoppen worden met backoff herstart; SIGTERM stopt web → worker → api → database netjes.
 - Als PID 1 ruimt de bewaker ook verweesde processen (zombies) op; er draait dus geen root-init meer.
-- Vóór openstaande migraties: back-up ('pre-upgrade', echte pg_dump + verificatie); mislukt die, dan start de Hub
-  wel door (de oude database blijft bij een mislukte migratie onaangeroerd).
+- Vóór openstaande migraties op een bestaande database: back-up ('pre-upgrade', echte pg_dump + verificatie).
+  Zonder geverifieerde back-up stopt de Hub vóór de schemawijziging.
 """
 
 from __future__ import annotations
@@ -246,9 +246,9 @@ def wait_for_db(pg: Child, timeout: float = 90) -> None:
 
 
 def has_schema() -> bool:
-    out = subprocess.run(["psql", "-h", str(SOCKET_DIR), "-U", "hub", "-d", "hub", "-tAc",
+    out = subprocess.run(["psql", "-X", "-h", str(SOCKET_DIR), "-U", "hub", "-d", "hub", "-tAc",
                           "SELECT to_regclass('public.alembic_version') IS NOT NULL"],
-                         env=env_for(), preexec_fn=demote, capture_output=True, text=True, check=False)
+                         env=env_for(), preexec_fn=demote, capture_output=True, text=True, check=True)
     return out.stdout.strip() == "t"
 
 
@@ -279,11 +279,19 @@ def main() -> None:
     pg = postgres_child()
     pg.start()
     wait_for_db(pg)
-    if has_schema() and run_once("migratiecontrole", [py, "-m", "hub", "migrate", "--check"]) != 0:
-        if shutil.disk_usage(DATA).free < 200 * 1024 * 1024 or \
-                run_once("back-up vóór upgrade", [py, "-m", "hub", "backup-now", "--trigger", "pre-upgrade"]) != 0:
-            log("back-up vóór upgrade niet gelukt (zie log); de Hub start door, de oude database blijft bij een "
-                "mislukte migratie onaangeroerd")
+    try:
+        if has_schema():
+            check = run_once("migratiecontrole", [py, "-m", "hub", "migrate", "--check"])
+            if check not in (0, 1):
+                fail("migratiecontrole mislukt; de Hub stopt vóór de schemawijziging.")
+            if check == 1:
+                if shutil.disk_usage(DATA).free < 200 * 1024 * 1024:
+                    fail("te weinig ruimte voor de back-up vóór upgrade; maak ruimte vrij en start de Hub opnieuw.")
+                if run_once("back-up vóór upgrade", [py, "-m", "hub", "backup-now", "--trigger", "pre-upgrade"]) != 0:
+                    fail("back-up vóór upgrade niet geverifieerd; de Hub stopt vóór de schemawijziging.")
+    except (OSError, subprocess.CalledProcessError, SystemExit):
+        pg.stop()
+        raise
     if run_once("migraties", [py, "-m", "hub", "migrate"]) != 0:
         pg.stop()
         fail("databasemigratie mislukt; de vorige versie van de database is ongewijzigd.")

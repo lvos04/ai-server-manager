@@ -13,10 +13,15 @@ kent, maakt de test rood. Dan moet de migratie (of deze test) uitdrukkelijk zegg
 from __future__ import annotations
 
 import datetime as dt
+import importlib
 import os
+import subprocess
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import Mock
 
 import psycopg
 import pytest
@@ -175,5 +180,68 @@ def test_de_vergelijking_ziet_een_verdwenen_rij(lege_db: str) -> None:
         na = _meet(engine, kolommen)
         assert na != voor and na[tabel][0] == RIJEN - 1, (tabel, na[tabel], voor[tabel])
         assert {t: m for t, m in na.items() if t != tabel} == {t: m for t, m in voor.items() if t != tabel}
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("storing", ["ruimtegebrek", "exportfout", "verificatiefout", None])
+def test_opstartmigratie_wacht_op_geverifieerde_backup(
+    lege_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, storing: str | None
+) -> None:
+    repo = Path(__file__).resolve().parents[4]
+    monkeypatch.syspath_prepend(str(repo / "deploy/common"))
+    supervisor = importlib.import_module("deploy.allinone.supervisor")
+    postgres = Mock()
+    for name in ("prepare_dirs", "demote", "init_database", "wait_for_db"):
+        monkeypatch.setattr(supervisor, name, Mock())
+    monkeypatch.setattr(supervisor, "postgres_child", lambda: postgres)
+    monkeypatch.setattr(supervisor, "has_schema", lambda: True)
+    monkeypatch.setattr(supervisor, "DATA", tmp_path)
+    monkeypatch.setattr(supervisor, "os", SimpleNamespace(getuid=lambda: supervisor.UID))
+    monkeypatch.setattr(supervisor, "fail", Mock(side_effect=SystemExit(78)))
+    env = {**os.environ, "HUB_DATABASE_URL": lege_db, "HUB_DATA_DIR": str(tmp_path)}
+    if storing == "ruimtegebrek":
+        monkeypatch.setattr(supervisor.shutil, "disk_usage", Mock(return_value=Mock(free=0)))
+    elif storing in {"exportfout", "verificatiefout"}:
+        tool = "DUMP" if storing == "exportfout" else "RESTORE"
+        env[f"HUB_PG_{tool}_BIN"] = str(tmp_path / "ontbrekend-testprogramma")
+    uitgevoerd = []
+
+    class MigratieAfgerond(Exception):
+        pass
+
+    def voer_uit(naam: str, cmd: list[str]) -> int:
+        uitgevoerd.append(naam)
+        if naam == "first-start-init":
+            return 0
+        result = subprocess.run(cmd, env=env, capture_output=True, check=False)
+        if naam == "migraties":
+            assert result.returncode == 0
+            raise MigratieAfgerond
+        return result.returncode
+
+    monkeypatch.setattr(supervisor, "run_once", voer_uit)
+    engine = sa.create_engine(lege_db)
+    try:
+        vorige, head = _vorige_en_head()
+        kolommen, voor = _gevuld(engine, lege_db)
+        with pytest.raises(SystemExit if storing else MigratieAfgerond):
+            supervisor.main()
+        with engine.connect() as conn:
+            revision = conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
+            backup = conn.execute(
+                sa.text("SELECT status, sha256 FROM self_backup WHERE trigger = 'pre-upgrade'")
+            ).first()
+        if storing:
+            assert revision == vorige and "migraties" not in uitgevoerd
+            postgres.stop.assert_called_once()
+            assert backup is None if storing == "ruimtegebrek" else backup == ("mislukt", None)
+        else:
+            assert revision == head and uitgevoerd[-2:] == ["back-up vóór upgrade", "migraties"]
+            assert backup and backup.status == "geslaagd" and len(backup.sha256) == 64
+            assert len(list((tmp_path / "backups").glob("*.dump"))) == 1
+        assert _meet(engine, {t: c for t, c in kolommen.items() if t != "self_backup"}) == {
+            t: meting for t, meting in voor.items() if t != "self_backup"
+        }
     finally:
         engine.dispose()
