@@ -146,7 +146,7 @@ def put_oidc(
     except client.OidcError as exc:
         raise HubError(422, exc.reden, exc.uitleg) from exc
     breakglass.lock_local_recovery(db)
-    cfg = service.config(db)
+    cfg = service.config(db, lock=True)
     mappings = [m.model_dump(mode="json") for m in body.rolkoppelingen]
     critical = (
         cfg.issuer,
@@ -207,6 +207,7 @@ def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault:
     cfg = service.config(db)
     if not cfg.issuer:
         raise HubError(409, "oidc_niet_ingericht", "Stel eerst de issuer in.")
+    generation = cfg.config_versie
     policy = settings.outbound_policy()
     try:
         meta = client.discover(cfg.issuer, policy)
@@ -223,8 +224,12 @@ def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault:
                 "oidc": service.config_dict(db, cfg, vault),
             },
         )
+    breakglass.lock_local_recovery(db)
+    try:
+        cfg = service.require_generation(db, generation)
+    except client.OidcError as exc:
+        raise HubError(409, exc.reden, exc.uitleg) from exc
     if meta != cfg.discovery:
-        breakglass.lock_local_recovery(db)
         breakglass.require_local_recovery(db, vault)
         cfg.config_versie += 1
         cfg.ingeschakeld = cfg.verplicht = False
@@ -280,7 +285,7 @@ def enable(
     if not body.ingeschakeld and body.verplicht:
         raise HubError(422, "validation_error", "'OIDC verplicht' kan alleen met SSO ingeschakeld.")
     breakglass.lock_local_recovery(db)
-    cfg = service.config(db)
+    cfg = service.config(db, lock=True)
     revoked = 0
     if body.ingeschakeld:
         try:
@@ -337,7 +342,9 @@ def oidc_login(
     try:
         service.require_secret(db, cfg, vault)
         if cfg.discovery_op is None or utcnow() - cfg.discovery_op > timedelta(hours=24):
+            generation = cfg.config_versie
             meta = client.discover(str(cfg.issuer), settings.outbound_policy())
+            cfg = service.require_generation(db, generation, login=True)
             if meta != cfg.discovery:
                 # Gewijzigde discovery = nieuwe test nodig; tot dan geen SSO (break-glass blijft werken).
                 cfg.ingeschakeld = cfg.verplicht = False
@@ -407,7 +414,6 @@ def oidc_callback(
     error: Annotated[str | None, Query(max_length=128)] = None,
 ) -> Response:
     ip = client_ip(request)
-    cfg = service.config(db)
     try:
         tx = service.claim_transaction(db, state, request.cookies.get(TX_COOKIE))
     except client.OidcError as exc:
@@ -427,14 +433,13 @@ def oidc_callback(
     try:
         if error or not code:
             raise client.OidcError("idp_weigerde", f"De identity provider gaf: {(error or 'geen code')[:64]}.")
-        if not is_test and not cfg.ingeschakeld:
-            raise client.OidcError("sso_uit", "SSO is uitgeschakeld.")
-        info = service.finish(db, cfg, settings, vault, tx, code)
+        cfg, info = service.finish(db, settings, vault, tx, code)
     except client.OidcError as exc:
         db.rollback()
-        cfg = service.config(db)
         if is_test:
-            _record_test(db, cfg, actor, {"resultaat": "mislukt", "reden": exc.reden, "uitleg": exc.uitleg})
+            cfg = db.get(OidcConfig, 1, with_for_update=True, populate_existing=True)
+            if cfg is not None and cfg.config_versie == tx.config_versie:
+                _record_test(db, cfg, actor, {"resultaat": "mislukt", "reden": exc.reden, "uitleg": exc.uitleg})
             db.commit()
             return _page("Testlogin mislukt", f"{exc.uitleg} (reden: {exc.reden})", status=400)
         audit.record(
@@ -446,7 +451,6 @@ def oidc_callback(
         )
         db.commit()
         return _login_error(exc.reden)
-    db.commit()  # eventueel opnieuw opgehaalde JWKS bewaren
     role = Role(info["rol"]) if info["rol"] else None
     if is_test:
         _record_test(db, cfg, actor, {"resultaat": "geslaagd" if role else "geen_rol", **info})

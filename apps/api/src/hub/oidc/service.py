@@ -45,8 +45,8 @@ HCH = "home-control-hub"
 SSO_UNAVAILABLE = "oidc_clientgeheim_ontbreekt"
 
 
-def config(db: Session) -> OidcConfig:
-    row = db.get(OidcConfig, 1)
+def config(db: Session, *, lock: bool = False) -> OidcConfig:
+    row = db.get(OidcConfig, 1, with_for_update=lock, populate_existing=lock)
     if row is None:
         row = OidcConfig(
             id=1,
@@ -67,6 +67,15 @@ def config(db: Session) -> OidcConfig:
         db.add(row)
         db.flush()
     return row
+
+
+def require_generation(db: Session, generation: int, *, login: bool = False) -> OidcConfig:
+    cfg = db.get(OidcConfig, 1, with_for_update=True, populate_existing=True)
+    if cfg is None or cfg.config_versie != generation:
+        raise client.OidcError("config_gewijzigd", "De SSO-instellingen zijn intussen gewijzigd; probeer opnieuw.")
+    if login and not cfg.ingeschakeld:
+        raise client.OidcError("sso_uit", "SSO is uitgeschakeld.")
+    return cfg
 
 
 def effective_required(db: Session, vault: Vault | None) -> bool:
@@ -316,24 +325,24 @@ def claim_transaction(db: Session, state: str, browser: str | None) -> OidcTrans
     return tx
 
 
-def _jwks_for(db: Session, cfg: OidcConfig, settings: Settings, kid: str | None) -> dict[str, Any]:
+def _jwks_for(cfg: OidcConfig, settings: Settings, kid: str | None) -> tuple[dict[str, Any], datetime | None]:
     keys = (cfg.jwks or {}).get("keys") or []
     known = any(k.get("kid") == kid for k in keys) if kid else bool(keys)
     recent = cfg.jwks_op is not None and utcnow() - cfg.jwks_op < timedelta(seconds=60)
     if (not known and not recent) or not keys:
-        cfg.jwks = client.fetch_jwks(cfg.discovery, settings.outbound_policy())
-        cfg.jwks_op = utcnow()
-    return cfg.jwks
+        return client.fetch_jwks(cfg.discovery, settings.outbound_policy()), utcnow()
+    return cfg.jwks, None
 
 
 def finish(
-    db: Session, cfg: OidcConfig, settings: Settings, vault: Vault, tx: OidcTransaction, code: str
-) -> dict[str, Any]:
-    """Code inwisselen, ID-token valideren en groepen/rol bepalen. Geeft een samenvatting zonder tokens."""
-    if tx.config_versie != cfg.config_versie:
-        raise client.OidcError("config_gewijzigd", "De SSO-instellingen zijn intussen gewijzigd; probeer opnieuw.")
+    db: Session, settings: Settings, vault: Vault, tx: OidcTransaction, code: str
+) -> tuple[OidcConfig, dict[str, Any]]:
+    """Bind de tokenuitwisseling aan één provider en de afronding aan dezelfde configuratiegeneratie."""
+    login = tx.doel == "login"
+    cfg = require_generation(db, tx.config_versie, login=login)
     assert cfg.client_id and cfg.redirect_uri and cfg.issuer
     secret = require_secret(db, cfg, vault)
+    db.commit()  # Configuratie en geheim zijn samen gelezen; houd geen rijslot vast over netwerk-I/O.
     policy = settings.outbound_policy()
     tokens = client.exchange_code(
         cfg.discovery,
@@ -351,7 +360,7 @@ def finish(
         kid = _jwt.get_unverified_header(id_token).get("kid")
     except Exception:
         kid = None
-    jwks = _jwks_for(db, cfg, settings, str(kid) if kid else None)
+    jwks, jwks_op = _jwks_for(cfg, settings, str(kid) if kid else None)
     v = client.validate_id_token(
         id_token,
         jwks=jwks,
@@ -372,7 +381,11 @@ def finish(
             groups, groepen_bron = [], "geen"
     groups = [str(g)[:128] for g in groups or []][:100]
     role = map_role(groups, cfg.rolkoppelingen or [])
-    return {
+    cfg = require_generation(db, tx.config_versie, login=login)
+    if jwks_op is not None and (cfg.jwks_op is None or cfg.jwks_op < jwks_op):
+        cfg.jwks, cfg.jwks_op = jwks, jwks_op
+    # Het rijslot blijft tot de commit van testuitkomst of account plus sessie.
+    return cfg, {
         "sub": str(claims["sub"])[:255],
         "gebruikersnaam": str(claims.get("preferred_username") or claims.get("nickname") or "")[:255],
         "naam": str(claims.get("name") or "")[:128],
