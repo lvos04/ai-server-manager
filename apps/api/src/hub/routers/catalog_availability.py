@@ -79,7 +79,10 @@ async def _check_shape(request: Request) -> None:
     summary="Beschikbaarheid van één vastgezette TrueNAS-catalogusversie (dienstscope catalogus.lezen)",
     dependencies=[Depends(_authorize), Depends(_check_shape)],
     responses={
-        401: {"model": ErrorResponse, "description": "unauthorized: geldig Bearer-service-token vereist"},
+        401: {
+            "model": ErrorResponse,
+            "description": "unauthorized met details.reason: geldig Bearer-service-token vereist",
+        },
         403: {"model": ErrorResponse, "description": "scope_ontbreekt"},
         422: {"model": ErrorResponse, "description": "validation_error met details.fouten"},
         429: {

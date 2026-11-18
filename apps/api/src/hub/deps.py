@@ -90,11 +90,15 @@ def _bearer(request: Request) -> str | None:
 def _service_principal(request: Request, db: Session, settings: Settings, token: str) -> Principal:
     row = db.scalars(select(ServiceToken).where(ServiceToken.token_hash == sha256_hex(token))).first()
     now = utcnow()
-    if row is None or row.revoked_at is not None or (row.expires_at is not None and row.expires_at <= now):
-        raise HubError(401, "unauthorized", "Service-token ongeldig, verlopen of ingetrokken.")
+    if row is None:
+        raise HubError(401, "unauthorized", "Ongeldig service-token.", {"reason": "invalid_token"})
     svc = db.get(Service, row.service_id)
-    if svc is None or svc.status != "active":
-        raise HubError(401, "unauthorized", "Deze dienst is ingetrokken.")
+    if svc is None:
+        raise HubError(401, "unauthorized", "Deze dienst is niet gekoppeld.", {"reason": "not_linked"})
+    if svc.status != "active" or row.revoked_at is not None:
+        raise HubError(401, "unauthorized", "Deze dienst of het service-token is ingetrokken.", {"reason": "revoked"})
+    if row.expires_at is not None and row.expires_at <= now:
+        raise HubError(401, "unauthorized", "Dit service-token is verlopen.", {"reason": "token_expired"})
     changed = False
     if row.first_used_at is None and row.grant_id is not None:
         # Eerste gebruik van een token uit een (her)koppeling (contract 1.3 §3.6): nu pas vervallen de oude tokens van
@@ -231,7 +235,9 @@ def require_user(min_role: Role) -> Callable[..., Principal]:
 
 def require_service(principal: Annotated[Principal | None, Depends(optional_principal)]) -> Principal:
     if principal is None or principal.kind != "service":
-        raise HubError(401, "unauthorized", "Service-token vereist (Authorization: Bearer).")
+        raise HubError(
+            401, "unauthorized", "Service-token vereist (Authorization: Bearer).", {"reason": "invalid_token"}
+        )
     return principal
 
 

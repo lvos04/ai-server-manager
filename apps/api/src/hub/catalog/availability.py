@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
+from cryptography.exceptions import InvalidTag
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -53,10 +54,10 @@ def _valid_version(value: object) -> bool:
     )
 
 
-def _catalog_index(raw: Any) -> dict[str, dict[str, dict[str, Any]]]:
+def _catalog_index(raw: Any) -> dict[str, dict[str, str | None]]:
     if not isinstance(raw, dict) or not raw:
         raise ValueError("Geen leesbare catalogusindex.")
-    catalog: dict[str, dict[str, dict[str, Any]]] = {}
+    catalog: dict[str, dict[str, str | None]] = {}
     count = 0
     for train in TRAINS:
         if train not in raw:
@@ -64,13 +65,10 @@ def _catalog_index(raw: Any) -> dict[str, dict[str, dict[str, Any]]]:
         entries = raw[train]
         if not isinstance(entries, dict):
             raise ValueError("Ongeldige catalogustrein.")
-        # Een lege trein heeft geen bewijs dat de bron deze trein volledig heeft ingelezen.
-        if not entries:
-            continue
         count += len(entries)
         if count > MAX_COMBINATIONS:
             raise ValueError("Te veel catalogusversies.")
-        apps: dict[str, dict[str, Any]] = {}
+        apps: dict[str, str | None] = {}
         for app, entry in entries.items():
             if (
                 re.fullmatch(APP_PATTERN, app) is None
@@ -81,7 +79,7 @@ def _catalog_index(raw: Any) -> dict[str, dict[str, dict[str, Any]]]:
                 raise ValueError("Ongeldige catalogusapp.")
             if entry["healthy"] and not _valid_version(entry.get("latest_version")):
                 raise ValueError("Ongeldige indexversie.")
-            apps[app] = {"latest": entry["latest_version"] if entry["healthy"] else None}
+            apps[app] = entry["latest_version"] if entry["healthy"] else None
         catalog[train] = apps
     return catalog
 
@@ -100,24 +98,25 @@ async def _collect(client: TrueNASClient, round_number: int) -> dict[str, dict[s
     candidates = sorted(
         (train, app)
         for train, apps in catalog.items()
-        for app, entry in apps.items()
-        if entry["latest"] is not None and (train, app) != IX_APP
+        for app, latest in apps.items()
+        if latest is not None and (train, app) != IX_APP
     )
     # De versie van het Custom App-sjabloon wordt elke ronde gemeten. Andere apps rouleren op indexvolgorde.
     batch_size = DETAILS_PER_ROUND - 1
     offset = (round_number * batch_size) % len(candidates) if candidates else 0
     selected = (candidates[offset:] + candidates[:offset])[:batch_size]
-    if catalog.get("stable", {}).get("ix-app", {}).get("latest") is not None:
+    if catalog.get("stable", {}).get("ix-app") is not None:
         selected.insert(0, IX_APP)
+    measured: dict[str, dict[str, dict[str, bool]]] = {}
     for train, app in selected:
-        entry = catalog[train][app]
+        latest = catalog[train][app]
         detail = await client.call("catalog.get_app_details", [app, {"train": train}])
         versions = detail.get("versions") if isinstance(detail, dict) and detail.get("name") == app else None
         if (
             not isinstance(versions, dict)
             or detail.get("healthy") is not True
-            or detail.get("latest_version") != entry["latest"]
-            or entry["latest"] not in versions
+            or detail.get("latest_version") != latest
+            or latest not in versions
         ):
             raise ValueError("Onvolledige catalogusversies.")
         remaining -= len(versions) - 1  # de indexversie telde al mee
@@ -128,19 +127,20 @@ async def _collect(client: TrueNASClient, round_number: int) -> dict[str, dict[s
             for version, info in versions.items()
         ):
             raise ValueError("Ongeldig versierecord.")
-        entry["versions"] = dict.fromkeys(versions, True)
-    return catalog
+        measured.setdefault(train, {})[app] = dict.fromkeys(versions, True)
+    return {"measured_versions": measured} if measured else {}
 
 
-async def _measure(client: TrueNASClient, round_number: int) -> dict[str, Any]:
-    started = time.monotonic()
+async def _measure(client: TrueNASClient, round_number: int, deadline: float) -> dict[str, Any]:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return {}
     try:
-        async with asyncio.timeout(MEASUREMENT_TIMEOUT):
+        async with asyncio.timeout(remaining):
             await client.open()
             catalog = await _collect(client, round_number)
             await client.close()
-        if time.monotonic() - started <= MEASUREMENT_TIMEOUT:
-            return catalog
+        return catalog
     except (TrueNASError, OSError, TypeError, ValueError):
         pass  # Sla nooit ongefilterde brondata of bronfouten op.
     finally:
@@ -158,6 +158,7 @@ def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Va
         if target is None or connection is None:
             return
         binding = _binding(db, target, connection)
+        deadline = time.monotonic() + MEASUREMENT_TIMEOUT
         now = utcnow()
         # Commit de start onder dezelfde Hub-brede lock, zodat een afgebroken worker het interval niet vergeet.
         with factory.begin() as reservation:
@@ -170,11 +171,13 @@ def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Va
                     id=1, started_at=now, binding=binding, round_number=round_number, catalog={}, observed_at=None
                 )
             )
+        if time.monotonic() >= deadline:
+            return
         try:
             api_key = vault.get(db, API_KEY_REF)
-        except VaultError:
+        except (VaultError, InvalidTag, ValueError):
             return
-        if not api_key:
+        if not api_key or time.monotonic() >= deadline:
             return
         client = TrueNASClient(
             target.url,
@@ -184,9 +187,11 @@ def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Va
             read_timeout=settings.truenas_read_timeout,
             response_budget=MAX_SOURCE_BYTES,
         )
-        catalog = asyncio.run(_measure(client, round_number))
-        if catalog:
+        catalog = asyncio.run(_measure(client, round_number, deadline))
+        if catalog and time.monotonic() < deadline:
             db.execute(update(CatalogSnapshot).where(CatalogSnapshot.id == 1).values(catalog=catalog, observed_at=now))
+            if time.monotonic() >= deadline:
+                db.rollback()
 
 
 def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availability, datetime | None]:
@@ -194,21 +199,20 @@ def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availab
     if target is None or connection is None:
         return "onbekend", None
     catalog = CatalogSnapshot.catalog
-    entry = catalog[train][app]
+    # Alleen een gevalideerde versielijst uit deze ronde bewijst aanwezigheid of afwezigheid.
+    # Eerdere Hub-versies sloegen ook de bronindex op. Hun momentopnamen tellen hier niet mee.
+    versions = catalog["measured_versions"][train][app]
     row = db.execute(
-        select(
-            CatalogSnapshot.observed_at,
-            catalog[train].bool_op("?")(app),
-            entry["latest"].as_string(),
-            entry["versions"].bool_op("?")(version),
-        ).where(CatalogSnapshot.id == 1, CatalogSnapshot.binding == _binding(db, target, connection))
+        select(CatalogSnapshot.observed_at, versions.bool_op("?")(version)).where(
+            CatalogSnapshot.id == 1, CatalogSnapshot.binding == _binding(db, target, connection)
+        )
     ).first()
     if row is None or row[0] is None or not -120 <= (utcnow() - row[0]).total_seconds() <= 900:
         return "onbekend", None
-    measured, exists, latest, present = row
-    if latest == version or present is True:
+    measured, present = row
+    if present is True:
         return "ja", measured
-    if exists is False or present is False:  # gemeten trein zonder deze app, of volledige versielijst zonder de pin
+    if present is False:
         return "nee", measured
     return "onbekend", None
 
@@ -217,7 +221,7 @@ def charge_read(db: Session, service_id: str) -> None:
     """Eén begrensd schuivend venster per registratie, gedeeld door alle tokens en API-processen."""
     service_uuid = uuid.UUID(service_id)
     if db.scalar(select(Service.status).where(Service.id == service_uuid).with_for_update()) != "active":
-        raise HubError(401, "unauthorized", "Deze dienst is ingetrokken.")
+        raise HubError(401, "unauthorized", "Deze dienst is ingetrokken.", {"reason": "revoked"})
     now = utcnow()
     row = db.get(CatalogReadWindow, service_uuid)
     recent = [at for at in row.requests if (now - at).total_seconds() < 60] if row else []

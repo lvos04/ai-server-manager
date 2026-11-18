@@ -5014,7 +5014,7 @@
                 }
               }
             },
-            "description": "unauthorized: geldig Bearer-service-token vereist"
+            "description": "unauthorized met details.reason: geldig Bearer-service-token vereist"
           },
           "403": {
             "content": {

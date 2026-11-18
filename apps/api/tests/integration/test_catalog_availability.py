@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import secrets
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -56,6 +58,140 @@ def test_weigert_dubbele_ontbrekende_en_body(admin: Any) -> None:
         assert r.json()["code"] == "validation_error" and r.json()["details"]["fouten"]
 
 
+@pytest.mark.parametrize(
+    ("toestand", "reden"),
+    [
+        ("sessie", "invalid_token"),
+        ("ongeldig", "invalid_token"),
+        ("verlopen", "token_expired"),
+        ("ingetrokken", "revoked"),
+    ],
+)
+def test_401_bevat_contractreden(admin: Any, app: Any, toestand: str, reden: str) -> None:
+    from sqlalchemy import select
+
+    from hub.models import ServiceToken
+    from hub.timeutil import utcnow
+
+    headers = _headers(admin) if toestand in {"verlopen", "ingetrokken"} else {}
+    if toestand == "ongeldig":
+        headers = {"Authorization": "Bearer geen-diensttoken"}
+    if toestand in {"verlopen", "ingetrokken"}:
+        with app.state.sessionmaker.begin() as db:
+            token = db.scalars(select(ServiceToken)).one()
+            if toestand == "verlopen":
+                token.expires_at = utcnow() - timedelta(minutes=1)
+            else:
+                token.revoked_at = utcnow()
+    r = admin.get(PATH, params=PIN, headers=headers)
+    assert r.status_code == 401
+    assert set(r.json()) == {"code", "message", "details", "trace_id"}
+    assert r.json()["code"] == "unauthorized" and r.json()["details"] == {"reason": reden}
+
+
+def test_onvolledige_trein_bewijst_geen_afwezigheid(admin: Any, fake_nas: Any, worker_once: Any) -> None:
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    fake_nas.data["catalog.apps"]["stable"] = {
+        "andere-app": {"name": "andere-app", "healthy": False},
+    }
+    assert PIN["version"] in fake_nas.data["catalog.get_app_details"]["stable"]["ix-app"]["versions"]
+    worker_once(schedule=True)
+    assert admin.get(PATH, params=PIN, headers=headers).json() == {**PIN, "beschikbaar": "onbekend", "gemeten_op": None}
+
+
+def test_verlopen_broncache_ververst_geen_meettijd(
+    admin: Any, app: Any, fake_nas: Any, worker_once: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub.catalog import availability
+    from hub.models import CatalogSnapshot
+
+    now = NOW
+    monkeypatch.setattr(availability, "utcnow", lambda: now)
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    index = fake_nas.data["catalog.apps"]
+    details = fake_nas.data["catalog.get_app_details"]
+    for suffix in "abc":
+        naam = "app-" + suffix
+        entry = {"name": naam, "healthy": True, "latest_version": "1.0.0"}
+        index["community"][naam] = entry
+        details["community"][naam] = {**entry, "versions": {"1.0.0": {"version": "1.0.0"}}}
+    pin = {"train": "community", "app": "app-c", "version": "1.0.0"}
+    worker_once(schedule=True)
+    assert admin.get(PATH, params=pin, headers=headers).json()["beschikbaar"] == "ja"
+    details["community"]["app-c"]["versions"] = {"1.0.1": {"version": "1.0.1"}}
+    now += timedelta(seconds=901)
+    onbekend = {**pin, "beschikbaar": "onbekend", "gemeten_op": None}
+    assert admin.get(PATH, params=pin, headers=headers).json() == onbekend
+    start = len(fake_nas.calls)
+    worker_once(schedule=True)
+    assert ("catalog.get_app_details", ["app-c", {"train": "community"}]) not in fake_nas.calls[start:]
+    assert admin.get(PATH, params=pin, headers=headers).json() == onbekend
+    with app.state.sessionmaker.begin() as db:
+        snapshot = db.get(CatalogSnapshot, 1)
+        assert snapshot is not None
+        snapshot.catalog = {"community": {"app-c": {"latest": "1.0.0", "versions": {"1.0.0": True}}}}
+    assert admin.get(PATH, params=pin, headers=headers).json() == onbekend
+
+
+def test_deadline_omvat_kluistijd(
+    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub.catalog import availability
+    from hub.models import CatalogSnapshot
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    factory, vault = app.state.sessionmaker, app.state.vault()
+    started = 0.0
+    monkeypatch.setattr(availability, "time", SimpleNamespace(monotonic=lambda: started))
+    real_get = vault.get
+
+    def trage_kluis(db: Any, ref: str) -> str | None:
+        nonlocal started
+        with factory() as lezer:
+            snapshot = lezer.get(CatalogSnapshot, 1)
+            assert snapshot is not None and snapshot.observed_at is None
+        started += availability.MEASUREMENT_TIMEOUT + 0.2
+        return real_get(db, ref)
+
+    monkeypatch.setattr(vault, "get", trage_kluis)
+    calls = list(fake_nas.calls)
+    availability.refresh_if_due(factory, settings, vault)
+    assert fake_nas.calls == calls
+    assert admin.get(PATH, params=PIN, headers=headers).json() == {**PIN, "beschikbaar": "onbekend", "gemeten_op": None}
+
+
+def test_onleesbare_kluis_laat_periodieke_taken_door(
+    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub import worker
+    from hub.catalog import availability
+    from hub.vault import Vault
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    factory = app.state.sessionmaker
+    now = NOW
+    monkeypatch.setattr(availability, "utcnow", lambda: now)
+    worker.run_once(factory, settings, app.state.vault())
+    assert admin.get(PATH, params=PIN, headers=headers).json()["beschikbaar"] == "ja"
+    calls = len(fake_nas.calls)
+    periodiek = []
+
+    def run_due(*args: Any) -> list[Any]:
+        periodiek.append(True)
+        return []
+
+    monkeypatch.setattr(worker.periodic, "run_due", run_due)
+    now += timedelta(seconds=300)
+    worker.run_once(factory, settings, Vault(secrets.token_bytes(32)))
+    assert periodiek == [True]
+    assert all(not method.startswith("catalog.") for method, _ in fake_nas.calls[calls:])
+    assert admin.get(PATH, params=PIN, headers=headers).json() == {**PIN, "beschikbaar": "onbekend", "gemeten_op": None}
+
+
 def test_meting_versheid_en_geen_bronaanroepen_per_leesverzoek(
     admin: Any, fake_nas: Any, worker_once: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -82,7 +218,13 @@ def test_meting_versheid_en_geen_bronaanroepen_per_leesverzoek(
     assert meting == {**PIN, "beschikbaar": "ja", "gemeten_op": "2026-11-18T15:00:00Z"}
     assert read(version="1.4.7")["beschikbaar"] == "nee"
     assert read(version="1.4.6")["beschikbaar"] == "ja"
-    assert read(train="community")["beschikbaar"] == "nee"
+    assert read(train="community") == {
+        **PIN,
+        "train": "community",
+        "beschikbaar": "onbekend",
+        "gemeten_op": None,
+    }
+    assert read(train="community", app="authentik", version="1.3.64")["beschikbaar"] == "ja"
     assert read(train="enterprise")["beschikbaar"] == "onbekend"
     assert read(version="v1.4.8")["beschikbaar"] == "nee"
     assert [params for method, params in calls if method == "catalog.apps"] == [
