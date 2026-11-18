@@ -139,8 +139,10 @@ def test_verlopen_broncache_ververst_geen_meettijd(
 def test_deadline_omvat_kluistijd(
     admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from sqlalchemy import select
+
     from hub.catalog import availability
-    from hub.models import CatalogSnapshot
+    from hub.models import CatalogAttempt
 
     connect(admin, fake_nas)
     headers = _headers(admin)
@@ -152,8 +154,9 @@ def test_deadline_omvat_kluistijd(
     def trage_kluis(db: Any, ref: str) -> str | None:
         nonlocal started
         with factory() as lezer:
-            snapshot = lezer.get(CatalogSnapshot, 1)
-            assert snapshot is not None and snapshot.observed_at is None
+            poging = lezer.scalars(select(CatalogAttempt)).one()
+            assert poging.completed_at is None
+        assert admin.get(PATH, params=PIN, headers=headers).json()["gemeten_op"] is None
         started += availability.MEASUREMENT_TIMEOUT + 0.2
         return real_get(db, ref)
 
@@ -245,7 +248,7 @@ def test_deadline_omvat_vertraagde_reservering(
             return time.monotonic() - begin
 
         taak = worker.submit(meet)
-        time.sleep(grens + 0.4)  # de meting is over de grens, maar de reservering wacht nog
+        time.sleep(grens + 0.4)  # de rij blijft tot na de grens bezet
         for pin in pins:
             assert admin.get(PATH, params=pin, headers=headers).json() == {
                 **pin,
@@ -260,12 +263,8 @@ def test_deadline_omvat_vertraagde_reservering(
     duur = taak.result(timeout=5)
     assert worker_vrij and meetlock_vrij
     assert duur <= grens
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:  # de wachtende reservering rondt na het vrijgeven af
-        with factory.begin() as lezer:
-            if lezer.scalar(text("SELECT observed_at IS NULL AND started_at = :nu FROM catalog_snapshot"), {"nu": nu}):
-                break
-        time.sleep(0.05)
+    with factory.begin() as lezer:
+        assert lezer.scalar(text("SELECT failed FROM catalog_attempt WHERE started_at = :nu"), {"nu": nu})
     for pin in pins:
         assert admin.get(PATH, params=pin, headers=headers).json() == {
             **pin,
@@ -461,3 +460,169 @@ def test_tweede_worker_start_geen_meting_tijdens_een_lopende_meting(
         assert all(method != "catalog.apps" for method, _ in fake_nas.calls)
     worker_once(schedule=True)
     assert sum(method == "catalog.apps" for method, _ in fake_nas.calls) == 1
+
+
+@pytest.fixture
+def vorige_meting(admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
+    from hub.catalog import availability
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    with monkeypatch.context() as klok:
+        klok.setattr(availability, "utcnow", lambda: datetime.now(UTC) - timedelta(seconds=301))
+        availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
+
+    def pins() -> list[tuple[str, str | None]]:
+        antwoorden = []
+        for versie in (PIN["version"], "1.4.7"):
+            r = admin.get(PATH, params={**PIN, "version": versie}, headers=headers)
+            assert r.status_code == 200
+            antwoorden.append((r.json()["beschikbaar"], r.json()["gemeten_op"]))
+        return antwoorden
+
+    assert [staat for staat, _ in pins()] == ["ja", "nee"]
+    return pins
+
+
+def test_geblokkeerde_voorraadlezing_houdt_worker_niet_vast(
+    vorige_meting: Any, app: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    factory = app.state.sessionmaker
+    monkeypatch.setattr(availability, "MEASUREMENT_TIMEOUT", 1.0)
+    bron = list(fake_nas.calls)
+    with ThreadPoolExecutor(max_workers=1) as worker, factory.begin() as houder:
+        houder.execute(text("LOCK TABLE catalog_snapshot IN ACCESS EXCLUSIVE MODE"))
+        taak = worker.submit(availability.refresh_if_due, factory, settings, app.state.vault())
+        tijdig = taak.result(timeout=1.4)
+    assert tijdig is None and fake_nas.calls == bron
+    assert vorige_meting() == [("onbekend", None)] * 2
+
+
+def test_geweigerde_publicatie_herstelt_geen_vorige_nee(
+    vorige_meting: Any, app: Any, settings: Any, fake_nas: Any
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    factory = app.state.sessionmaker
+    with factory.begin() as db:
+        db.execute(
+            text("""CREATE FUNCTION weiger_voorraad() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'meetvoorraad niet beschikbaar' USING ERRCODE = '57014'; END $$""")
+        )
+        db.execute(
+            text("""CREATE TRIGGER weiger_voorraad BEFORE UPDATE ON catalog_snapshot
+            FOR EACH ROW EXECUTE FUNCTION weiger_voorraad()""")
+        )
+    try:
+        availability.refresh_if_due(factory, settings, app.state.vault())
+        factory.kw["bind"].dispose()
+        assert vorige_meting() == [("onbekend", None)] * 2
+        assert not fake_nas.mutations
+    finally:
+        with factory.begin() as db:
+            db.execute(text("DROP TRIGGER weiger_voorraad ON catalog_snapshot"))
+            db.execute(text("DROP FUNCTION weiger_voorraad()"))
+
+
+def test_afgeronde_meting_laat_geen_sessieslot_achter(admin: Any, app: Any, settings: Any, fake_nas: Any) -> None:
+    from contextlib import ExitStack
+
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+    from hub.db import make_engine, make_sessionmaker
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    engine = make_engine(settings.database_url)
+    try:
+        with ExitStack() as stack:
+            for _ in range(3):
+                stack.enter_context(engine.connect())
+        availability.refresh_if_due(make_sessionmaker(engine), settings, app.state.vault())
+        with engine.connect() as lezer:
+            assert (
+                lezer.scalar(
+                    text("""SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted
+                AND database=(SELECT oid FROM pg_database WHERE datname=current_database())""")
+                )
+                == 0
+            )
+        for versie, verwacht in ((PIN["version"], "ja"), ("1.4.7", "nee")):
+            r = admin.get(PATH, params={**PIN, "version": versie}, headers=headers)
+            assert r.json()["beschikbaar"] == verwacht and r.json()["gemeten_op"]
+    finally:
+        engine.dispose()
+
+
+def test_geblokkeerde_rij_laat_geen_wachtende_verbinding_achter(
+    vorige_meting: Any, app: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+    from hub.db import make_engine, make_sessionmaker
+
+    engine = make_engine(settings.database_url)
+    monkeypatch.setattr(availability, "MEASUREMENT_TIMEOUT", 1.0)
+    try:
+        with app.state.sessionmaker.begin() as houder:
+            houder.execute(text("SELECT id FROM catalog_snapshot WHERE id=1 FOR UPDATE"))
+            availability.refresh_if_due(make_sessionmaker(engine), settings, app.state.vault())
+            assert engine.pool.checkedout() == 0
+            assert not houder.scalar(
+                text("""SELECT EXISTS (SELECT FROM pg_stat_activity
+                WHERE datname = current_database() AND pg_backend_pid() = ANY(pg_blocking_pids(pid)))""")
+            )
+            assert vorige_meting() == [("onbekend", None)] * 2
+        assert not fake_nas.mutations
+    finally:
+        engine.dispose()
+
+
+def test_lezer_toetst_commit_en_verlopen_poging_na_herstart(
+    vorige_meting: Any, app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import select
+
+    from hub.catalog import availability
+    from hub.models import CatalogAttempt
+
+    factory = app.state.sessionmaker
+    geldig = vorige_meting()
+    onbekend = [("onbekend", None)] * 2
+    with factory.begin() as db:
+        afgerond = db.scalars(select(CatalogAttempt)).one()
+        assert afgerond.completed_at is not None
+        # De inhoud blijft leesbaar en vers. Alleen het opgeslagen commitbewijs is te laat.
+        afgerond.completed_at = afgerond.started_at + timedelta(seconds=15, microseconds=1)
+        begin = afgerond.started_at
+    factory.kw["bind"].dispose()
+    assert vorige_meting() == onbekend
+    with factory.begin() as db:
+        db.get(CatalogAttempt, afgerond.id).completed_at = begin + timedelta(seconds=15)
+        nieuwe_start = begin + timedelta(seconds=300)
+        db.add(CatalogAttempt(started_at=nieuwe_start))
+    nu = nieuwe_start + timedelta(seconds=15)
+    monkeypatch.setattr(availability, "utcnow", lambda: nu)
+    assert vorige_meting() == geldig
+    nu += timedelta(microseconds=1)
+    assert vorige_meting() == onbekend
+
+
+def test_oude_sessiemarkering_heeft_geen_invloed_op_pins(vorige_meting: Any, pg_url: str) -> None:
+    import psycopg
+    from sqlalchemy.engine import make_url
+
+    geldig = vorige_meting()
+    # De oude markering in een tweede database op hetzelfde lokale testcluster.
+    andere_db = make_url(pg_url).set(database="postgres").render_as_string(hide_password=False)
+    with psycopg.connect(andere_db) as andere:
+        andere.execute("SELECT pg_advisory_xact_lock(%s)", (0x41534D4D34,))
+        assert vorige_meting() == geldig

@@ -148,10 +148,10 @@ def proef(vorig, nieuw, bewaren):
             in_hub(container, "vullen")
             in_hub(container, "setup/admin", "0014", wachtwoord)
         with hub_image(nieuw, bron, bewaren) as container:
-            in_hub(container, "auth/login", "0015", wachtwoord)
+            in_hub(container, "auth/login", "0016", wachtwoord)
             bestand = in_hub(container, "archief")
             if not bestand:
-                raise SystemExit(f"Retentie {bewaren}: schema 0015 bereikt zonder bewaard pre-upgradearchief.")
+                raise SystemExit(f"Retentie {bewaren}: schema 0016 bereikt zonder bewaard pre-upgradearchief.")
         docker(
             "run",
             "--rm",
@@ -174,7 +174,7 @@ def proef(vorig, nieuw, bewaren):
         )
         with hub_image(vorig, terug, bewaren) as container:
             in_hub(container, "auth/login", "0014", wachtwoord)
-    print(f"Retentie {bewaren}: upgrade 0015, eigen export hersteld op 0014, laatste testgebruiker aangemeld.")
+    print(f"Retentie {bewaren}: upgrade 0016, eigen export hersteld op 0014, laatste testgebruiker aangemeld.")
 
 
 if __name__ == "__main__":

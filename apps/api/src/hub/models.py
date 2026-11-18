@@ -254,6 +254,15 @@ class CatalogSnapshot(Base):
     catalog: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
+class CatalogAttempt(Base):
+    __tablename__ = "catalog_attempt"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(TS)
+    completed_at: Mapped[datetime | None] = mapped_column(TS)
+    failed: Mapped[bool] = mapped_column(Boolean, server_default="false")
+
+
 class CatalogReadWindow(Base):
     __tablename__ = "catalog_read_window"
 

@@ -13,8 +13,12 @@ nieuwste versie. Bij ontbrekende dekking, een mislukte meting of een niet-actuee
 route `onbekend` met `gemeten_op: null`. De meettijd zegt wanneer de Hub de lokale TrueNAS-catalogus heeft gelezen.
 
 De Hub houdt één momentopname bij. Een meetpoging verwerkt hoogstens 8 MiB en 50.000 versiecombinaties binnen
-15 seconden, inclusief kluislezing en publicatie in PostgreSQL. Verloopt die tijd, dan blijft de momentopname
-onbekend met `gemeten_op: null`. Leesverzoeken plannen geen metingen. Per geregistreerde dienst geldt een venster
+15 seconden, inclusief kluislezing en publicatie in PostgreSQL. De worker legt de start in een eigen korte
+transactie vast, onafhankelijk van de momentopname. Pas nadat PostgreSQL de momentopname heeft gecommit,
+legt de worker de bevestigingstijd vast. De leesroute vergelijkt beide tijden. Een mislukte poging, een late
+publicatie of een poging die na 15 seconden nog geen bevestiging heeft, geeft `onbekend` met `gemeten_op: null`.
+Tijdens een nog lopende poging mag de vorige geldige meting binnen haar versheidstermijn worden gelezen.
+Na een workerherstart gelden dezelfde regels. Voor een momentopname uit schema 0015 is een nieuwe meting nodig. Leesverzoeken plannen geen metingen. Per geregistreerde dienst geldt een venster
 van 60 verzoeken per voortschrijdende minuut, ook tijdens tokenrotatie. Bij overschrijding geeft de Hub
 `429 rate_limited` en `Retry-After`. Bij een onleesbare Hub-meetvoorraad geeft de route `503 dependency_unavailable`
 en `Retry-After`.

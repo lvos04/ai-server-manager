@@ -89,6 +89,8 @@ def _waarde(col: sa.Column[Any], i: int, tabel: str) -> Any:
     if isinstance(t, sa.LargeBinary | pg.BYTEA):
         return f"{tabel}-{col.name}-{i}".encode()
     if isinstance(t, pg.ARRAY):
+        if isinstance(t.item_type, sa.DateTime):
+            return [dt.datetime(2026, 1, 1, tzinfo=dt.UTC) + dt.timedelta(minutes=i)]
         return [f"{col.name}-{i}"]
     if isinstance(t, pg.INET):
         return f"127.0.0.{i + 1}"
@@ -98,7 +100,7 @@ def _waarde(col: sa.Column[Any], i: int, tabel: str) -> Any:
 
 
 def _vul(engine: sa.Engine) -> dict[str, list[str]]:
-    """Vul elke tabel met ``RIJEN`` rijen (ouders eerst). Geeft de kolommen per tabel op deze revisie."""
+    """Vul alle tabellen met drie rijen en de verplichte singleton met haar ene rij (ouders eerst)."""
     md = sa.MetaData()
     md.reflect(engine)
     tabellen = [t for t in md.sorted_tables if t.name != "alembic_version"]
@@ -106,7 +108,7 @@ def _vul(engine: sa.Engine) -> dict[str, list[str]]:
     with engine.begin() as c:
         for tab in tabellen:
             rows = []
-            for i in range(RIJEN):
+            for i in range(1 if tab.name == "catalog_snapshot" else RIJEN):
                 row: dict[str, Any] = {}
                 for col in tab.columns:
                     fks = list(col.foreign_keys)
@@ -143,7 +145,7 @@ def _gevuld(engine: sa.Engine, url: str) -> tuple[dict[str, list[str]], dict[str
     migrations.upgrade(url, vorige)
     kolommen = _vul(engine)
     voor = _meet(engine, kolommen)
-    te_weinig = sorted(t for t, (n, _md5) in voor.items() if n < RIJEN)
+    te_weinig = sorted(t for t, (n, _md5) in voor.items() if n != (1 if t == "catalog_snapshot" else RIJEN))
     assert voor and te_weinig == [], f"lege meting of te weinig rijen: {te_weinig}"
     return kolommen, voor
 
