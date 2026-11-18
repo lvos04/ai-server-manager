@@ -41,7 +41,12 @@ def readyz(request: Request, db: DB, settings: SettingsDep) -> JSONResponse:
         )
         ok = ok and good
     secrets_ok = all(
-        (settings.secrets_dir / n).exists() for n in ("vault.key", "jwt-signing.ed25519", "policy-signing.ed25519")
+        (settings.secrets_dir / n).exists()
+        for n in (
+            "vault.key",
+            "jwt-signing.ed25519",
+            "policy-signing.ed25519",
+        )
     )
     checks.append({"name": "geheimen", "status": "ok" if secrets_ok else "down"})
     ok = ok and secrets_ok

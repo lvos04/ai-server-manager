@@ -49,7 +49,7 @@ WRITE_KEY = "write-test-key-0123456789abc"
 # beheer van de executorpagina in de browser (contract 1.3 §3.7 punt 6 via §3.9; R-VEILIG-5). Alleen testwaarden.
 EXECUTOR_SLEUTEL = "executor-sleutel-aaaabbbbcccc"
 EXECUTOR_SLEUTEL_NIEUW = "executor-sleutel-ddddeeeeffff"
-KUMA_KEY = "uk1_testkey_abcdef"
+KUMA_KEY = "uk1_testkey_abcdef"  # gitleaks:allow -- testwaarde
 GOTIFY_TOKEN = "AppTokenHub123"
 BESZEL_USER = "hub-lezer"
 BESZEL_PW = "Lees-Alleen-Wachtwoord-1"

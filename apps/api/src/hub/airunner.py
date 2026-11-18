@@ -15,7 +15,12 @@ from pathlib import Path
 
 log = logging.getLogger("hub.ai-runner")
 
-FORBIDDEN = ("vault.key", "jwt-signing.ed25519", "policy-signing.ed25519", "hub-identity.ed25519")
+FORBIDDEN = (
+    "vault.key",
+    "jwt-signing.ed25519",
+    "policy-signing.ed25519",
+    "hub-identity.ed25519",
+)
 
 
 def can_read_secrets(secrets_dir: Path) -> list[str]:

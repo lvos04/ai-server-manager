@@ -23,8 +23,8 @@ from hub import logsink
 
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 GOTIFY_TOKEN = "GotifyGeheimToken42"
-JWT = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJsZW9uIiwiYXVkIjoiaHViIn0.c2lnbmF0dXJlLXZhbi1kZS1odWI"
-PEM = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIDummyDummyDummyDummyDummyDummy\n-----END PRIVATE KEY-----"
+JWT = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJsZW9uIiwiYXVkIjoiaHViIn0.c2lnbmF0dXJlLXZhbi1kZS1odWI"  # gitleaks:allow -- testwaarde  # noqa: E501
+PEM = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIDummyDummyDummyDummyDummyDummy\n-----END PRIVATE KEY-----"  # gitleaks:allow -- testwaarde  # noqa: E501
 
 
 def _line(msg: str, *, trace: str | None = None, niveau: str = "error", **velden: Any) -> dict[str, Any]:

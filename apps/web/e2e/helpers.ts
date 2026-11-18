@@ -7,9 +7,9 @@ import path from "node:path";
 export const STATE_DIR = process.env.HUB_E2E_STATE_DIR ?? path.join(__dirname, ".state");
 export const ADMIN_STATE = path.join(__dirname, ".auth", "beheerder.json");
 export const SCREENSHOT_DIR = path.resolve(__dirname, "..", "..", "..", "docs", "screenshots", "p1");
-export const ADMIN = { username: "beheerder", password: "Correct-Paard-Batterij-Nietje-42" };
-export const VIEWER = { username: "kijker", password: "Kijker-Wachtwoord-Lang-2026" };
-export const KIND = { username: "kind", password: "Kind-Wachtwoord-Lang-2026" };
+export const ADMIN = { username: "beheerder", password: "Correct-Paard-Batterij-Nietje-42" };  // gitleaks:allow -- synthetische testwaarde
+export const VIEWER = { username: "kijker", password: "Kijker-Wachtwoord-Lang-2026" };  // gitleaks:allow -- synthetische testwaarde
+export const KIND = { username: "kind", password: "Kind-Wachtwoord-Lang-2026" };  // gitleaks:allow -- synthetische testwaarde
 export const NOOD = { username: "nood", password: "Paraplu-Vuurtoren-Lang-Genoeg-2026!" };
 
 export interface StackState {

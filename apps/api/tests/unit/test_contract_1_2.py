@@ -21,7 +21,7 @@ from hub.registry import app_name_candidates, expected_repository
 from hub.security import is_valid_pairing_code, normalize_pairing_code
 from hub.servicecalls import ServiceCallError, call
 
-RFC6238_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"  # ASCII "12345678901234567890" (RFC 6238 bijlage B, SHA-1)
+RFC6238_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"  # ASCII "12345678901234567890" (RFC 6238 bijlage B, SHA-1)  # gitleaks:allow -- testwaarde  # noqa: E501
 
 
 @pytest.fixture

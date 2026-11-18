@@ -206,7 +206,7 @@ def test_nas_zonder_api_autorisatie_geeft_gerichte_fout(admin: Any, fake_nas: Fa
 
 
 def test_ontbrekend_leesrecht_per_onderdeel_is_unknown_niet_overgeslagen(admin: Any, worker_once: Any) -> None:
-    key = "beperkte-key-zonder-apps-0123456"
+    key = "beperkte-key-zonder-apps-0123456"  # gitleaks:allow -- testwaarde
     nas = FakeTrueNAS(keys={key: KeyProfile(deny={"app.query", "cloudsync.query"})}).start()
     try:
         _connect(admin, nas, key)

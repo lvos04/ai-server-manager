@@ -22,7 +22,7 @@ from fakes.fake_truenas import FakeTrueNAS, _app
 from nashelpers import connect, refresh
 
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
-KEY = "uk1_testkey_abcdef"
+KEY = "uk1_testkey_abcdef"  # gitleaks:allow -- testwaarde
 GOTIFY_KUMA = "KumaEigenToken77"
 GOTIFY_HUB = "HubEigenToken88"
 

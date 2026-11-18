@@ -22,7 +22,7 @@ from sqlalchemy import select
 from hub.models import OutboxEvent
 
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
-KEY = "uk1_testkey_abcdef"
+KEY = "uk1_testkey_abcdef"  # gitleaks:allow -- testwaarde
 BESZEL_PW = "Lees-Alleen-Wachtwoord-1"
 
 

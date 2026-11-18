@@ -9,7 +9,7 @@ from typing import Any
 
 import psycopg
 import pytest
-from conftest import idem
+from conftest import STRONG_PASSWORD, idem
 
 from hub import audit
 
@@ -24,7 +24,7 @@ def test_ketting_doorlopend_en_intact_na_beheerhandelingen(admin: Any, settings:
     for i in range(3):
         r = admin.post(
             "/api/v1/users",
-            json={"username": f"gebruiker{i}", "password": "Lang-Genoeg-Wachtwoord-1", "role": "viewer"},
+            json={"username": f"gebruiker{i}", "password": STRONG_PASSWORD, "role": "viewer"},
             headers=idem(),
         )
         assert r.status_code == 201, r.text
@@ -75,7 +75,7 @@ def test_manipulatie_wordt_gevonden(admin: Any, settings: Any) -> None:
     for i in range(4):
         admin.post(
             "/api/v1/users",
-            json={"username": f"m{i}-gebruiker", "password": "Lang-Genoeg-Wachtwoord-1", "role": "viewer"},
+            json={"username": f"m{i}-gebruiker", "password": STRONG_PASSWORD, "role": "viewer"},
             headers=idem(),
         ).raise_for_status()
     _tamper(settings, 'UPDATE audit_event SET details = \'{"role": "admin"}\'::jsonb WHERE ketting_nr = 3')
@@ -89,7 +89,7 @@ def test_verwijderde_rij_geeft_gat(admin: Any, settings: Any) -> None:
     for i in range(3):
         admin.post(
             "/api/v1/users",
-            json={"username": f"g{i}-gebruiker", "password": "Lang-Genoeg-Wachtwoord-1", "role": "viewer"},
+            json={"username": f"g{i}-gebruiker", "password": STRONG_PASSWORD, "role": "viewer"},
             headers=idem(),
         ).raise_for_status()
     _tamper(settings, "DELETE FROM audit_event WHERE ketting_nr = 2")
@@ -100,7 +100,7 @@ def test_verwijderde_rij_geeft_gat(admin: Any, settings: Any) -> None:
 def test_anker_vindt_afgeknipte_staart(admin: Any, app: Any, settings: Any, periodic_run: Any) -> None:
     admin.post(
         "/api/v1/users",
-        json={"username": "staart-test", "password": "Lang-Genoeg-Wachtwoord-1", "role": "viewer"},
+        json={"username": "staart-test", "password": STRONG_PASSWORD, "role": "viewer"},
         headers=idem(),
     ).raise_for_status()
     out = periodic_run("audit_verankeren")["audit_verankeren"]

@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 ADMIN_URL = os.environ.get("HUB_TEST_ADMIN_URL", "postgresql://postgres@127.0.0.1:5432/postgres")
-STRONG_PASSWORD = "Correct-Paard-Batterij-Nietje-42"
+STRONG_PASSWORD = "Correct-Paard-Batterij-Nietje-42"  # gitleaks:allow -- testwaarde
 
 
 def _psycopg_url(url: str) -> str:
