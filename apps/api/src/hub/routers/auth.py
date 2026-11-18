@@ -26,6 +26,7 @@ from hub.deps import (
     Viewer,
     get_keyring,
     require_local_admin,
+    visible_oidc_session,
 )
 from hub.errors import HubError
 from hub.firststart import mark_setup_completed, setup_pending, verify_setup_code
@@ -327,13 +328,15 @@ def me(db: DB, principal: AnyUser) -> dict[str, Any]:
 
 
 @router.get("/auth/sessions", summary="Eigen actieve sessies")
-def my_sessions(db: DB, principal: AnyUser) -> dict[str, Any]:
+def my_sessions(db: DB, principal: AnyUser, settings: SettingsDep) -> dict[str, Any]:
+    now = utcnow()
     rows = db.scalars(
         select(WebSession)
         .where(
             WebSession.user_id == uuid.UUID(principal.id),
             WebSession.revoked_at.is_(None),
-            WebSession.expires_at > utcnow(),
+            WebSession.expires_at > now,
+            visible_oidc_session(now, settings),
         )
         .order_by(WebSession.created_at.desc())
     )

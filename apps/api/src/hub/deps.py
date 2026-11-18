@@ -8,14 +8,15 @@ import json
 import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import ColumnElement
 
 from hub.config import Settings
 from hub.errors import HubError
@@ -189,6 +190,24 @@ def _session_principal(request: Request, db: Session, settings: Settings) -> Pri
     )
 
 
+def visible_oidc_session(now: datetime, settings: Settings) -> ColumnElement[bool]:
+    """Toon OIDC-sessies alleen zolang ze op een verzoek geldig zouden zijn."""
+    current = (
+        select(OidcConfig.id)
+        .where(OidcConfig.id == 1, OidcConfig.ingeschakeld, OidcConfig.config_versie == WebSession.oidc_config_versie)
+        .correlate(WebSession)
+        .exists()
+    )
+    enabled_user = (
+        select(User.id).where(User.id == WebSession.user_id, User.disabled.is_(False)).correlate(WebSession).exists()
+    )
+    return or_(
+        WebSession.auth_bron != "oidc",
+        WebSession.break_glass,
+        and_(current, enabled_user, WebSession.last_seen_at >= now - timedelta(seconds=settings.session_idle_seconds)),
+    )
+
+
 def optional_principal(request: Request, db: DB, settings: SettingsDep) -> Principal | None:
     token = _bearer(request)
     if token:
@@ -249,9 +268,13 @@ def require_viewer_or_scope(scope: str | None) -> Callable[..., Principal]:
 Admin = Annotated[Principal, Depends(require_user(Role.admin))]
 
 
-def require_local_admin(principal: Admin) -> Principal:
+def is_local_admin(principal: Principal) -> bool:
     """De aanmeldbron komt uit de levende sessie, nooit uit een header of gebruikersclaim."""
-    if principal.auth_bron != "lokaal" and not principal.break_glass:
+    return principal.role == Role.admin and (principal.auth_bron == "lokaal" or principal.break_glass)
+
+
+def require_local_admin(principal: Admin) -> Principal:
+    if not is_local_admin(principal):
         raise HubError(403, "lokale_beheerder_vereist", "Hiervoor is een lokale beheerderssessie of noodsessie nodig.")
     return principal
 

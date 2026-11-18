@@ -30,11 +30,11 @@ from sqlalchemy.orm import Session
 from hub import audit, breakglass
 from hub.config import Settings
 from hub.incidents.rules import EventIn
-from hub.models import AuditEvent, OidcConfig, OidcIdentity, OidcTransaction, User, VaultSecret, WebSession
+from hub.models import AuditEvent, OidcConfig, OidcIdentity, OidcTransaction, User, WebSession
 from hub.oidc import client
 from hub.security import ROLE_RANK, Role, sha256_hex
 from hub.timeutil import iso, utcnow
-from hub.vault import Vault, VaultError, make_ref
+from hub.vault import Vault, VaultError, last4, make_ref
 
 SECRET_REF = make_ref("auth", "oidc-client-secret")
 CALLBACK_PATH = "/api/v1/auth/oidc/callback"
@@ -142,9 +142,9 @@ def safe_provider_error(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None) -> dict[str, Any]:
-    has_secret = bool(active_secret(db, cfg, vault))
-    secret = db.scalar(select(VaultSecret).where(VaultSecret.ref == SECRET_REF)) if has_secret else None
+def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None, *, show_last4: bool = False) -> dict[str, Any]:
+    secret = active_secret(db, cfg, vault)
+    has_secret = bool(secret)
     working = breakglass.is_working(breakglass.account(db))
     test = safe_provider_error(cfg.laatste_test or {})
     test_actueel = bool(test.get("resultaat") == "geslaagd" and test.get("config_versie") == cfg.config_versie)
@@ -157,7 +157,7 @@ def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None) -> dict[str, 
         "lokale_herstelroute": breakglass.has_local_recovery(db, vault),
         "issuer": cfg.issuer,
         "client_id": cfg.client_id,
-        "client_secret": {"ingesteld": has_secret, "laatste4": secret.last4 if secret else None},
+        "client_secret": {"ingesteld": has_secret, "laatste4": last4(secret) if show_last4 and secret else None},
         "redirect_uri": cfg.redirect_uri,
         "redirect_uri_https": bool(cfg.redirect_uri and cfg.redirect_uri.startswith("https://")),
         "scopes": cfg.scopes,

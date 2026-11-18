@@ -28,15 +28,21 @@ describe("OIDC-clientgeheim", () => {
     expect(takeOidcSecret(null)).toBe("");
   });
   it("biedt het veld alleen over HTTPS aan en verklaart de HTTP-grens", () => {
-    const http = renderToStaticMarkup(<OidcSecretField https={false} ingesteld={false} laatste4={null} />);
+    const http = renderToStaticMarkup(<OidcSecretField https={false} lokaalBeheer ingesteld={false} laatste4={null} />);
     expect(http).not.toContain("<input");
     expect(http).toContain("HTTPS");
-    const https = renderToStaticMarkup(<OidcSecretField https ingesteld={false} laatste4={null} />);
+    const https = renderToStaticMarkup(<OidcSecretField https lokaalBeheer ingesteld={false} laatste4={null} />);
     expect(https).toContain('type="password"');
   });
 
+  it("toont een SSO-beheerder uitleg in plaats van invoer", () => {
+    const html = renderToStaticMarkup(<OidcSecretField https lokaalBeheer={false} ingesteld laatste4={null} />);
+    expect(html).not.toContain("<input");
+    expect(html).toContain("Meld je aan als lokale beheerder of via de noodlogin");
+  });
+
   it("ontmoedigt aanvullen en opslaan bij browser en wachtwoordmanagers", () => {
-    const html = renderToStaticMarkup(<OidcSecretField https ingesteld={false} laatste4={null} />);
+    const html = renderToStaticMarkup(<OidcSecretField https lokaalBeheer ingesteld={false} laatste4={null} />);
     expect(html).toContain('autoComplete="off"');
     expect(html).toContain('data-lpignore="true"');
     expect(html).toContain('data-1p-ignore="true"');

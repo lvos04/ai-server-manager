@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api";
 import { aantal, formatDateTime, formatTime } from "@/lib/format";
-import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
+import { hasRole, ROLE_LABEL, useRole, useSession } from "@/lib/session";
 import type { Role, User } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
 import { useApi } from "@/lib/use-api";
@@ -287,6 +287,9 @@ interface SsoStatus {
 
 /** S-163 Inloggen via SSO: config, controle van de issuer, groep → rol, testlogin, gate D17, advies home-control-hub. */
 function Sso() {
+  const { state } = useSession();
+  const gebruiker = state.status === "auth" ? state.me.user : null;
+  const lokaalBeheer = gebruiker?.auth_bron === "lokaal" || gebruiker?.break_glass === true;
   const cfg = useApi<Oidc>("/api/v1/auth/oidc");
   const advies = useApi<SsoStatus>("/api/v1/sso/status");
   const save = useAction<Oidc>();
@@ -374,6 +377,7 @@ function Sso() {
             {(a) => <input {...a} value={f.client_id} onChange={(e) => setForm({ ...f, client_id: e.target.value })} autoComplete="off" />}
           </Field>
           <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
+            lokaalBeheer={lokaalBeheer} waarschuwing={waarschuwing}
             ingesteld={c.client_secret.ingesteld} laatste4={c.client_secret.laatste4}
             inputRef={secretInput} />
           <KopieerVeld label="Terugkeer-adres (zet dit in Authentik)" waarde={redirect} testId="sso-redirect" />

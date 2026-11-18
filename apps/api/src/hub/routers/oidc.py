@@ -24,7 +24,18 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from hub import audit, breakglass
-from hub.deps import DB, Admin, Idem, ReadableVault, SettingsDep, get_keyring, get_vault, require_local_admin
+from hub.deps import (
+    DB,
+    Admin,
+    Idem,
+    ReadableVault,
+    SettingsDep,
+    get_keyring,
+    get_vault,
+    is_local_admin,
+    require_local_admin,
+    visible_oidc_session,
+)
 from hub.errors import HubError
 from hub.keys import KeyRing
 from hub.models import OidcConfig, OidcIdentity, Service, User, VaultSecret, WebSession
@@ -112,9 +123,9 @@ def available(db: DB, vault: ReadableVault) -> dict[str, Any]:
 
 
 @router.get("/api/v1/auth/oidc", summary="SSO-instellingen en -status (admin; clientgeheim nooit terug)")
-def get_oidc(db: DB, settings: SettingsDep, _: Admin, vault: ReadableVault) -> dict[str, Any]:
+def get_oidc(db: DB, settings: SettingsDep, principal: Admin, vault: ReadableVault) -> dict[str, Any]:
     cfg = service.config(db)
-    out = service.config_dict(db, cfg, vault)
+    out = service.config_dict(db, cfg, vault, show_last4=is_local_admin(principal))
     out["gate_authentik"] = _gate(db, settings)
     db.commit()
     return out
@@ -437,9 +448,9 @@ def oidc_callback(
     except client.OidcError as exc:
         db.rollback()
         if is_test:
-            cfg = db.get(OidcConfig, 1, with_for_update=True, populate_existing=True)
-            if cfg is not None and cfg.config_versie == tx.config_versie:
-                _record_test(db, cfg, actor, {"resultaat": "mislukt", "reden": exc.reden, "uitleg": exc.uitleg})
+            current = db.get(OidcConfig, 1, with_for_update=True, populate_existing=True)
+            if current is not None and current.config_versie == tx.config_versie:
+                _record_test(db, current, actor, {"resultaat": "mislukt", "reden": exc.reden, "uitleg": exc.uitleg})
             db.commit()
             return _page("Testlogin mislukt", f"{exc.uitleg} (reden: {exc.reden})", status=400)
         audit.record(
@@ -509,12 +520,12 @@ def oidc_callback(
 
 # ------------------------------------------------------------------ sessies (admin)
 @router.get("/api/v1/sessions", summary="Alle actieve sessies (admin): gebruiker, bron (lokaal/oidc), noodlogin")
-def all_sessions(db: DB, _: Admin) -> dict[str, Any]:
+def all_sessions(db: DB, _: Admin, settings: SettingsDep) -> dict[str, Any]:
     now = utcnow()
     rows = db.execute(
         select(WebSession, User)
         .join(User, User.id == WebSession.user_id)
-        .where(WebSession.revoked_at.is_(None), WebSession.expires_at > now)
+        .where(WebSession.revoked_at.is_(None), WebSession.expires_at > now, visible_oidc_session(now, settings))
         .order_by(WebSession.created_at.desc())
         .limit(500)
     ).all()

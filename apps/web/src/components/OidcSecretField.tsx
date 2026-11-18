@@ -20,14 +20,16 @@ export function watchOidcSecret(input: HTMLInputElement | null, target: EventTar
   };
 }
 
-export function OidcSecretField({ https, ingesteld, laatste4, inputRef }: { https: boolean; ingesteld: boolean; laatste4: string | null; inputRef?: RefObject<HTMLInputElement | null> }) {
+export function OidcSecretField({ https, lokaalBeheer, ingesteld, laatste4, inputRef, waarschuwing }: { https: boolean; lokaalBeheer: boolean; ingesteld: boolean; laatste4: string | null; inputRef?: RefObject<HTMLInputElement | null>; waarschuwing?: string }) {
   const ownRef = useRef<HTMLInputElement>(null);
   const fieldRef = inputRef ?? ownRef;
-  useEffect(() => watchOidcSecret(fieldRef.current, window), [fieldRef]);
+  useEffect(() => watchOidcSecret(fieldRef.current, window), [fieldRef, https, lokaalBeheer]);
+  if (!lokaalBeheer) return <p className="help">Meld je aan als lokale beheerder of via de noodlogin om het clientgeheim te beheren.</p>;
   if (!https) return <p className="help">Het clientgeheim invoeren kan alleen via HTTPS. Open de Hub via een vertrouwde HTTPS-verbinding.</p>;
+  const uitleg = ingesteld ? `Ingesteld: ••••${laatste4 ?? ""}. Leeg laten = niet wijzigen.` : "Wordt versleuteld opgeslagen; je ziet daarna alleen de laatste 4 tekens.";
   return (
     <Field id="sso-geheim" label={ingesteld ? "Clientgeheim vervangen (optioneel)" : "Clientgeheim"}
-      help={ingesteld ? `Ingesteld: ••••${laatste4 ?? ""}. Leeg laten = niet wijzigen.` : "Wordt versleuteld opgeslagen; je ziet daarna alleen de laatste 4 tekens."}>
+      help={waarschuwing ? `${uitleg} ${waarschuwing}` : uitleg}>
       {(a) => <input {...a} ref={fieldRef} type="password" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" spellCheck={false} autoCapitalize="none" />}
     </Field>
   );
