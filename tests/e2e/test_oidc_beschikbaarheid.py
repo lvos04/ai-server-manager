@@ -115,6 +115,8 @@ def test_ontbrekende_nood_totp_laat_lokale_aanmelding_toe(
         beschikbaar = lokaal.get("/api/v1/auth/oidc/beschikbaar").json()
         assert beschikbaar["ingeschakeld"] and beschikbaar["login_url"] and not beschikbaar["verplicht"]
         assert beschikbaar["reden"] == reden
+        assert "ontbreekt of is onleesbaar" in beschikbaar["noodlogin"]
+        assert "Instellingen → Noodaccount" in beschikbaar["noodlogin"]
         r = lokaal.post(
             "/api/v1/auth/login",
             json={"username": "beheerder", "password": STRONG_PASSWORD},

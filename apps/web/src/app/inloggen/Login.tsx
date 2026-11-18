@@ -39,7 +39,7 @@ export function Login() {
   const [error, setError] = useState<HubApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const back = safeReturnPath(params.get("terug"));
-  const sso = useApi<{ ingeschakeld: boolean; login_url: string | null; reden?: string }>("/api/v1/auth/oidc/beschikbaar");
+  const sso = useApi<{ ingeschakeld: boolean; login_url: string | null; noodlogin: string; reden?: string }>("/api/v1/auth/oidc/beschikbaar");
   const noodTotpOntbreekt = sso.data?.reden === "nood_totp_kluisrij_ontbreekt";
   const ssoFout = params.get("sso_fout") ?? (noodTotpOntbreekt ? null : sso.data?.reden);
 
@@ -87,7 +87,8 @@ export function Login() {
         ) : null}
         {noodTotpOntbreekt ? (
           <Melding soort="beperkt" titel="OIDC is tijdelijk niet verplicht" role="status">
-            <p>De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Je kunt lokaal inloggen met een bestaand account.</p>
+            <p>Je kunt lokaal inloggen met een bestaand beheerdersaccount.</p>
+            <p>{sso.data?.noodlogin}</p>
           </Melding>
         ) : null}
         {sso.data?.ingeschakeld && sso.data.login_url ? (
@@ -114,12 +115,14 @@ export function Login() {
             </Button>
           </div>
         </form>
-        <p className="flex items-center gap-2 text-sm">
-          <LifeBuoy aria-hidden="true" className="size-4" />
-          <Link href="/inloggen/nood" className="inline-flex min-h-touch items-center">
-            Noodlogin (alleen vanaf je eigen netwerk)
-          </Link>
-        </p>
+        {!noodTotpOntbreekt ? (
+          <p className="flex items-center gap-2 text-sm">
+            <LifeBuoy aria-hidden="true" className="size-4" />
+            <Link href="/inloggen/nood" className="inline-flex min-h-touch items-center">
+              Noodlogin (alleen vanaf je eigen netwerk)
+            </Link>
+          </p>
+        ) : null}
       </section>
     </div>
   );

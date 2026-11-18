@@ -27,11 +27,12 @@ de enige noodroute onbruikbaar maken. Als er alleen SSO-beheerders zijn en de no
 een herstelroute binnen de Hub.
 
 Als de kluisrij voor de nood-TOTP ontbreekt of onleesbaar is, meldt de Hub dat de noodlogin niet werkt.
-"OIDC verplicht" geldt dan tijdelijk niet. Op Inloggen en bij de SSO-instellingen staat de reden. Je kunt inloggen
-met een bestaand lokaal beheerdersaccount. SSO blijft beschikbaar zolang het clientgeheim leesbaar is. Vernieuw via
-Instellingen → Noodaccount het wachtwoord en de TOTP en bevestig de nieuwe code. Daarna geldt "OIDC verplicht" weer
-als die instelling aanstaat en SSO beschikbaar is. Bij de eerste start die de kluisfout aantreft, schrijft de Hub één
-auditregel `auth.break_glass.totp_kluisrij_ontbreekt` met een vaste redencode.
+"OIDC verplicht" geldt dan tijdelijk niet. De openbare SSO-status, het inlogscherm en de SSO-instellingen tonen
+bij die terugval de oorzaak en verwijzen naar Instellingen → Noodaccount. Log in met een bestaand lokaal
+beheerdersaccount, vernieuw daar het wachtwoord en de TOTP en bevestig de nieuwe code. SSO blijft beschikbaar
+zolang het clientgeheim leesbaar is. Na bevestiging geldt "OIDC verplicht" weer als die instelling aanstaat en SSO
+beschikbaar is. Bij de eerste start die de kluisfout aantreft, schrijft de Hub één auditregel
+`auth.break_glass.totp_kluisrij_ontbreekt` met een vaste redencode.
 
 ## In Authentik (door de beheerder, in de Authentik-web-UI)
 1. Een **OAuth2/OpenID-provider** voor de Hub: client type *Confidential*, redirect-URI exact

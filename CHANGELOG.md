@@ -7,8 +7,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 ### Gerepareerd — Hub: lokale aanmelding bij ontbrekende nood-TOTP (KLEIN-110)
 - Bij een ontbrekende of onleesbare nood-TOTP-kluisrij meldt de Hub dat het noodaccount niet werkt. "OIDC verplicht"
   geldt tijdelijk niet, zodat bestaande lokale beheerders kunnen inloggen. SSO blijft beschikbaar met een leesbaar
-  clientgeheim. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount. De eerste start die de kluisfout
-  aantreft voegt één auditregel toe met een vaste redencode.
+  clientgeheim. De openbare SSO-status en het inlogscherm verwijzen bij die terugval naar Instellingen → Noodaccount
+  om het wachtwoord en de TOTP te vernieuwen. De eerste start die de kluisfout aantreft voegt één auditregel toe met
+  een vaste redencode.
 
 ### Gerepareerd — Hub: OIDC-invoer, sessiegrenzen en lokale noodbediening (KLEIN-107)
 - Upgradenotitie KLEIN-107: vanaf databaseversie 0012 vervallen alle bestaande OIDC-sessies. SSO zonder leesbaar

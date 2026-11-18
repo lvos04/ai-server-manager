@@ -121,7 +121,9 @@ def available(db: DB, vault: ReadableVault) -> dict[str, Any]:
         "ingeschakeld": on,
         "verplicht": verplicht,
         "login_url": "/api/v1/auth/oidc/login" if on else None,
-        "noodlogin": "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk.",
+        "noodlogin": breakglass.TOTP_UNAVAILABLE_DETAIL
+        if reason == breakglass.TOTP_UNAVAILABLE
+        else "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk.",
         **({"reden": reason} if reason else {}),
     }
 

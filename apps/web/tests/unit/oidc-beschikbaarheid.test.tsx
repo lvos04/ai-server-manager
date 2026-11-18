@@ -23,7 +23,10 @@ vi.mock("@/lib/use-api", () => ({
   useApi: (pad: string) => ({
     data: pad === "/api/v1/auth/oidc/beschikbaar"
       ? scenario.noodTotpOntbreekt
-        ? { ingeschakeld: true, login_url: "/api/v1/auth/oidc/login", reden: noodTotpReden }
+        ? {
+          ingeschakeld: true, login_url: "/api/v1/auth/oidc/login", reden: noodTotpReden,
+          noodlogin: "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount.",
+        }
         : { ingeschakeld: false, login_url: null, reden }
       : pad === "/api/v1/auth/oidc"
         ? {
@@ -54,6 +57,7 @@ describe("SSO-beschikbaarheid", () => {
     expect(html).toContain("Het clientgeheim voor SSO ontbreekt");
     expect(html).not.toContain('data-testid="sso-inloggen"');
     expect(html).toContain('name="username"');
+    expect(html).toContain('href="/inloggen/nood"');
   });
 
   it("toont de oorzaak en de herstelactie bij SSO-instellingen", () => {
@@ -66,9 +70,11 @@ describe("SSO-beschikbaarheid", () => {
     scenario.noodTotpOntbreekt = true;
     const html = renderToStaticMarkup(<Login />);
     expect(html).toContain("De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar");
-    expect(html).toContain("Je kunt lokaal inloggen met een bestaand account.");
+    expect(html).toContain("Je kunt lokaal inloggen met een bestaand beheerdersaccount.");
     expect(html).toContain('data-testid="sso-inloggen"');
     expect(html).not.toContain('data-testid="sso-fout"');
+    expect(html).toContain("Instellingen → Noodaccount");
+    expect(html).not.toContain('href="/inloggen/nood"');
   });
 
   it("verwijst bij SSO-instellingen naar het vernieuwen van het noodaccount", () => {
