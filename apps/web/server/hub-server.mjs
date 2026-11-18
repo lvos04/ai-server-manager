@@ -68,6 +68,13 @@ function proxy(req, res) {
     sendTooLarge(req, res, traceId);
     return;
   }
+  const headers = upstreamHeaders(req.headers, {
+    remoteAddress: req.socket.remoteAddress,
+    encrypted: Boolean(req.socket.encrypted),
+    trusted,
+  });
+  // Node geeft de gedecodeerde chunks door. Frame ze opnieuw, ook bij GET waarvoor Node dat niet vanzelf doet.
+  if (req.headers["transfer-encoding"]) headers["transfer-encoding"] = "chunked";
   let rejected = false;
   const upstream = httpRequest(
     {
@@ -76,11 +83,7 @@ function proxy(req, res) {
       port: api.port || 80,
       method: req.method,
       path: req.url,
-      headers: upstreamHeaders(req.headers, {
-        remoteAddress: req.socket.remoteAddress,
-        encrypted: Boolean(req.socket.encrypted),
-        trusted,
-      }),
+      headers,
       timeout: API_TIMEOUT_MS,
     },
     (up) => {

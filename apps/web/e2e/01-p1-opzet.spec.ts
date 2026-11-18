@@ -4,11 +4,59 @@
  * noodaccount (H6), incidenten-inbox en SSO-instellingen. Alles Sim-getest; niets op een echte NAS.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { generateKeyPairSync } from "node:crypto";
+import { request as httpRequest } from "node:http";
 import { startTlsHub } from "./tls-hub";
 import { ADMIN, ADMIN_STATE, NOOD, control, expectAccessible, ready, saveP1State, stackState, totp } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.use({ storageState: ADMIN_STATE, viewport: { width: 1440, height: 900 }, trace: "off", screenshot: "off", video: "off" });
+
+test("catalogusdoorgang weigert een GET-body met vaste lengte of in chunks", async ({ request, baseURL }) => {
+  const appId = "jelly-leon-platform";
+  const { cookies } = await request.storageState();
+  const csrf = cookies.find(({ name }) => name === "hub_csrf")?.value ?? "";
+  const grant = await request.post("/api/v1/services/enrollment-tokens", {
+    headers: { "X-CSRF-Token": csrf }, data: { app_id: appId },
+  });
+  expect(grant.status()).toBe(201);
+  const { publicKey } = generateKeyPairSync("ed25519");
+  const enrollment = await request.post("/api/v1/services/enroll", {
+    data: {
+      app_id: appId, version: "0.1.0", base_url: null, enrollment_token: (await grant.json()).enrollment_token,
+      public_key_jwk: publicKey.export({ format: "jwk" }),
+    },
+  });
+  expect(enrollment.status()).toBe(200);
+  const authorization = `Bearer ${(await enrollment.json()).service_token}`;
+  const url = new URL("/api/v1/catalog/availability?train=stable&app=ix-app&version=1.4.8", baseURL);
+  expect((await request.get(url.href, { headers: { authorization } })).status()).toBe(200);
+
+  const sendBody = (content: Buffer, chunked: boolean) => new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const framing = chunked ? { "Transfer-Encoding": "chunked" } : { "Content-Length": content.length };
+    const req = httpRequest(url, { method: "GET", headers: { authorization, ...framing } }, (res) => {
+      let payload = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { payload += chunk; });
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode ?? 0, body: JSON.parse(payload) }); } catch (err) { reject(err); }
+      });
+      res.on("error", reject);
+    });
+    req.setTimeout(10_000, () => req.destroy(new Error("Geen antwoord van de webdoorgang")));
+    req.on("error", reject);
+    req.end(content);
+  });
+
+  for (const chunked of [false, true]) {
+    expect(await sendBody(Buffer.from("{}"), chunked)).toMatchObject({
+      status: 422, body: { code: "validation_error", details: { fouten: [{ veld: "body", type: "extra_forbidden" }] } },
+    });
+    expect(await sendBody(Buffer.alloc(1024 * 1024 + 1), chunked)).toMatchObject({
+      status: 413, body: { code: "payload_too_large", details: { max_bytes: 1024 * 1024 } },
+    });
+  }
+});
 
 async function refreshInventory(page: Page): Promise<void> {
   await page.goto("/server");
