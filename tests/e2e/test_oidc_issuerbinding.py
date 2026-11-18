@@ -18,9 +18,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 
 @pytest.mark.parametrize("veld", ["issuer", "client_id"])
-def test_wissel_zonder_nieuw_geheim_ontkoppelt_kluis(
-    admin: Any, app: Any, idp: FakeOidc, veld: str
-) -> None:
+def test_wissel_zonder_nieuw_geheim_ontkoppelt_kluis(admin: Any, app: Any, idp: FakeOidc, veld: str) -> None:
     enable(admin, idp)
     sso, page = sso_login(app, idp)
     assert page.status_code == 200
@@ -37,16 +35,14 @@ def test_wissel_zonder_nieuw_geheim_ontkoppelt_kluis(
         assert r.status_code == 200
         assert r.json()["ingeschakeld"] is False
         assert sso.get("/api/v1/auth/me").status_code == 401
+        controle = http.post("/api/v1/auth/oidc/discover", headers=idem())
+        assert controle.status_code == 200 and controle.json()["resultaat"] == "ok"
         testlogin = http.post("/api/v1/auth/oidc/test")
         assert (testlogin.status_code, testlogin.json().get("code")) == (
             409,
             "oidc_clientgeheim_ontbreekt",
         )
-        assert not [
-            r
-            for r in tweede.requests
-            if r.method == "POST" and r.path.endswith("/token/")
-        ]
+        assert not [r for r in tweede.requests if r.method == "POST" and r.path.endswith("/token/")]
         with app.state.sessionmaker() as db:
             assert db.get(OidcConfig, 1).client_secret_ref is None
             assert app.state.vault().get(db, SECRET_REF) is None

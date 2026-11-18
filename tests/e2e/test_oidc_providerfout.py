@@ -38,9 +38,7 @@ def test_providerfout_bewaart_alleen_vaste_reden(
         from urllib.parse import parse_qs, urlsplit
 
         state = parse_qs(urlsplit(start.json()["autorisatie_url"]).query)["state"][0]
-        resultaat = admin.get(
-            "/api/v1/auth/oidc/callback", params={"state": state, "error": canary}
-        )
+        resultaat = admin.get("/api/v1/auth/oidc/callback", params={"state": state, "error": canary})
         reden = "idp_weigerde"
     assert resultaat.status_code == 400
 
@@ -52,12 +50,8 @@ def test_providerfout_bewaart_alleen_vaste_reden(
     beheer = admin.get("/api/v1/auth/oidc")
     with app.state.sessionmaker() as db:
         cfg = db.get(OidcConfig, 1)
-        audit = db.scalars(
-            select(AuditEvent.details).where(AuditEvent.action == "auth.oidc.tested")
-        ).all()
+        audit = db.scalars(select(AuditEvent.details).where(AuditEvent.action == "auth.oidc.tested")).all()
         idempotentie = db.scalars(select(IdempotencyRecord.response_body)).all()
         assert cfg.laatste_test["reden"] == reden
-        assert all(
-            canary not in str(deel) for deel in (cfg.laatste_test, audit, idempotentie)
-        )
+        assert all(canary not in str(deel) for deel in (cfg.laatste_test, audit, idempotentie))
     assert all(canary not in r.text for r in (resultaat, mutatie, herhaling, beheer))

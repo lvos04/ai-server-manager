@@ -12,9 +12,7 @@ idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 
-def test_alleen_lokale_beheerder_of_noodsessie_verleent_beheer(
-    admin: Any, app: Any, idp: Any
-) -> None:
+def test_alleen_lokale_beheerder_of_noodsessie_verleent_beheer(admin: Any, app: Any, idp: Any) -> None:
     totp = _breakglass(admin)
     enable(admin, idp)
     sso, page = sso_login(app, idp)
@@ -43,21 +41,14 @@ def test_alleen_lokale_beheerder_of_noodsessie_verleent_beheer(
             headers=idem(),
         )
         assert r.status_code == 201
-        r = beheerder.post(
-            gebruikers, json={**account, "username": f"test-kijker-{i}"}, headers=idem()
-        )
+        r = beheerder.post(gebruikers, json={**account, "username": f"test-kijker-{i}"}, headers=idem())
         r.raise_for_status()
         assert (
-            beheerder.patch(
-                f"{gebruikers}/{r.json()['id']}", json={"role": "admin"}, headers=idem()
-            ).status_code
-            == 200
+            beheerder.patch(f"{gebruikers}/{r.json()['id']}", json={"role": "admin"}, headers=idem()).status_code == 200
         )
 
 
-def test_sso_beheerder_mag_noodaccount_niet_wijzigen(
-    admin: Any, app: Any, idp: Any
-) -> None:
+def test_sso_beheerder_mag_noodaccount_niet_wijzigen(admin: Any, app: Any, idp: Any) -> None:
     totp = _breakglass(admin)
     enable(admin, idp)
     sso, page = sso_login(app, idp)
@@ -83,7 +74,5 @@ def test_sso_beheerder_mag_noodaccount_niet_wijzigen(
         ),
         sso.post(f"{basis}/confirm", json={"totp": "000000"}),
     ]
-    assert [(r.status_code, r.json().get("code")) for r in acties] == [
-        (403, "lokale_beheerder_vereist")
-    ] * len(acties)
+    assert [(r.status_code, r.json().get("code")) for r in acties] == [(403, "lokale_beheerder_vereist")] * len(acties)
     assert noodlogin(app, totp).get("/api/v1/auth/me").status_code == 200

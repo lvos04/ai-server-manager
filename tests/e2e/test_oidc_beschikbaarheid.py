@@ -20,9 +20,7 @@ idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 
-def test_upgrade_publieke_client_laat_lokale_en_noodlogin_toe(
-    admin: Any, app: Any, settings: Any, idp: Any
-) -> None:
+def test_upgrade_publieke_client_laat_lokale_en_noodlogin_toe(admin: Any, app: Any, settings: Any, idp: Any) -> None:
     totp = _breakglass(admin)
     migrations.downgrade(settings.database_url, "0012")
     try:
@@ -43,10 +41,7 @@ def test_upgrade_publieke_client_laat_lokale_en_noodlogin_toe(
     nieuwe_app = create_app(settings)
     with TestClient(nieuwe_app, base_url="https://testserver") as lokaal:
         beschikbaar = lokaal.get("/api/v1/auth/oidc/beschikbaar").json()
-        assert (
-            fout(lokaal.get("/api/v1/auth/oidc/login", follow_redirects=False))
-            == "oidc_clientgeheim_ontbreekt"
-        )
+        assert fout(lokaal.get("/api/v1/auth/oidc/login", follow_redirects=False)) == "oidc_clientgeheim_ontbreekt"
         r = lokaal.post(
             "/api/v1/auth/login",
             json={"username": "beheerder", "password": STRONG_PASSWORD},
@@ -59,11 +54,7 @@ def test_upgrade_publieke_client_laat_lokale_en_noodlogin_toe(
         ) == (False, False, None)
         assert beschikbaar["reden"] == "oidc_clientgeheim_ontbreekt"
         beheer = lokaal.get("/api/v1/auth/oidc").json()
-        assert (
-            beheer["ingeschakeld"]
-            and beheer["verplicht"]
-            and not beheer["verplicht_effectief"]
-        )
+        assert beheer["ingeschakeld"] and beheer["verplicht"] and not beheer["verplicht_effectief"]
         assert beheer["reden"] == "oidc_clientgeheim_ontbreekt"
         assert noodlogin(nieuwe_app, totp).get("/api/v1/auth/me").status_code == 200
 
@@ -78,6 +69,4 @@ def test_upgrade_publieke_client_laat_lokale_en_noodlogin_toe(
             )
             == 1
         )
-    assert not [
-        r for r in idp.requests if r.method == "POST" and r.path.endswith("/token/")
-    ]
+    assert not [r for r in idp.requests if r.method == "POST" and r.path.endswith("/token/")]

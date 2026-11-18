@@ -18,9 +18,7 @@ idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 
-def test_callback_schrijft_niets_na_uitzetten(
-    admin: Any, app: Any, idp: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_callback_schrijft_niets_na_uitzetten(admin: Any, app: Any, idp: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     enable(admin, idp)
     browser = TestClient(app, base_url="https://testserver")
     start = browser.get("/api/v1/auth/oidc/login", follow_redirects=False)
@@ -51,8 +49,6 @@ def test_callback_schrijft_niets_na_uitzetten(
 
     with app.state.sessionmaker() as db:
         assert not db.scalars(select(User.id).where(User.auth_bron == "oidc")).all()
-        assert not db.scalars(
-            select(WebSession.id).where(WebSession.auth_bron == "oidc")
-        ).all()
+        assert not db.scalars(select(WebSession.id).where(WebSession.auth_bron == "oidc")).all()
     assert fout(antwoord) == "config_gewijzigd"
     assert "hub_session" not in browser.cookies

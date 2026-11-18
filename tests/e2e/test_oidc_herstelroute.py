@@ -19,9 +19,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 
 @pytest.mark.parametrize("noodaccount", [False, True])
-@pytest.mark.parametrize(
-    "actie", ["uitzetten", "wissen", "issuer", "client", "scopes", "duur", "discovery"]
-)
+@pytest.mark.parametrize("actie", ["uitzetten", "wissen", "issuer", "client", "scopes", "duur", "discovery"])
 def test_configuratie_intrekken_vraagt_herstelroute(
     admin: Any, app: Any, idp: Any, noodaccount: bool, actie: str
 ) -> None:
@@ -62,9 +60,7 @@ def test_configuratie_intrekken_vraagt_herstelroute(
             "scopes": {"scopes": "openid profile"},
             "duur": {"sessie_minuten": 60},
         }
-        antwoord = beheerder.put(
-            "/api/v1/auth/oidc", json=body(idp, **updates[actie]), headers=idem()
-        )
+        antwoord = beheerder.put("/api/v1/auth/oidc", json=body(idp, **updates[actie]), headers=idem())
     if totp:
         assert antwoord.status_code == 200
         assert sso.get("/api/v1/auth/me").status_code == 401
@@ -78,9 +74,7 @@ def test_configuratie_intrekken_vraagt_herstelroute(
 
 
 @pytest.mark.parametrize("wijziging", [{"disabled": True}, {"role": "viewer"}])
-def test_laatste_lokale_beheerder_telt_oidc_niet_mee(
-    admin: Any, app: Any, idp: Any, wijziging: dict[str, Any]
-) -> None:
+def test_laatste_lokale_beheerder_telt_oidc_niet_mee(admin: Any, app: Any, idp: Any, wijziging: dict[str, Any]) -> None:
     enable(admin, idp)
     sso, page = sso_login(app, idp)
     assert page.status_code == 200
@@ -91,9 +85,7 @@ def test_laatste_lokale_beheerder_telt_oidc_niet_mee(
     assert admin.get("/api/v1/auth/me").status_code == 200
 
 
-def test_automatische_discovery_trekt_ook_zonder_herstelroute_in(
-    admin: Any, app: Any, idp: Any
-) -> None:
+def test_automatische_discovery_trekt_ook_zonder_herstelroute_in(admin: Any, app: Any, idp: Any) -> None:
     enable(admin, idp)
     sso, page = sso_login(app, idp)
     assert page.status_code == 200
@@ -103,8 +95,5 @@ def test_automatische_discovery_trekt_ook_zonder_herstelroute_in(
         db.commit()
     idp.algs = ["RS256", "ES256"]
     nieuw = TestClient(app, base_url="https://testserver")
-    assert (
-        fout(nieuw.get("/api/v1/auth/oidc/login", follow_redirects=False))
-        == "sso_gewijzigd"
-    )
+    assert fout(nieuw.get("/api/v1/auth/oidc/login", follow_redirects=False)) == "sso_gewijzigd"
     assert sso.get("/api/v1/auth/me").status_code == 401

@@ -14,9 +14,7 @@ idp = test_oidc_sso.idp
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 
-def test_sessieoverzichten_filteren_oude_oidc_generatie(
-    admin: Any, app: Any, idp: Any
-) -> None:
+def test_sessieoverzichten_filteren_oude_oidc_generatie(admin: Any, app: Any, idp: Any) -> None:
     enable(admin, idp)
     oud, page = sso_login(app, idp)
     assert page.status_code == 200
@@ -37,9 +35,7 @@ def test_sessieoverzichten_filteren_oude_oidc_generatie(
     assert oud.get("/api/v1/auth/me").status_code == 401
 
 
-def test_laatste_vier_zijn_alleen_voor_lokale_beheerder_of_noodsessie(
-    admin: Any, app: Any, idp: Any
-) -> None:
+def test_laatste_vier_zijn_alleen_voor_lokale_beheerder_of_noodsessie(admin: Any, app: Any, idp: Any) -> None:
     totp = _breakglass(admin)
     enable(admin, idp)
     sso, page = sso_login(app, idp)
@@ -48,7 +44,4 @@ def test_laatste_vier_zijn_alleen_voor_lokale_beheerder_of_noodsessie(
     metadata = sso.get(pad).json()["client_secret"]
     assert metadata == {"ingesteld": True, "laatste4": None}
     for beheerder in (admin, noodlogin(app, totp)):
-        assert (
-            beheerder.get(pad).json()["client_secret"]["laatste4"]
-            == idp.client_secret[-4:]
-        )
+        assert beheerder.get(pad).json()["client_secret"]["laatste4"] == idp.client_secret[-4:]
