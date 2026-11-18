@@ -87,6 +87,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/logs"): "operator",
     ("GET", "/api/v1/logs/bronnen"): "operator",
     ("GET", "/api/v1/apps"): "viewer",
+    ("GET", "/api/v1/catalog/availability"): SERVICE,
     ("POST", "/api/v1/apps/discover"): "operator",
     ("GET", "/api/v1/apps/{app_uuid}"): "viewer",
     ("GET", "/api/v1/monitoring/sources"): "operator",
@@ -297,6 +298,12 @@ def test_vaste_scopes_per_dienst(admin: Any, app: Any) -> None:
         return {"Authorization": f"Bearer {r.json()['service_token']}"}
 
     asf, jlp, hch = token("appstore-en-fork"), token("jelly-leon-platform"), token("home-control-hub")
+    path = "/api/v1/catalog/availability?train=stable&app=ix-app&version=1.4.8"
+    for hdr in (jlp, hch):
+        assert admin.get(path, headers=hdr).json()["beschikbaar"] == "onbekend"
+    r = admin.get(path, headers=asf)
+    assert r.status_code == 403 and r.json()["code"] == "scope_ontbreekt"
+    assert r.json()["details"] == {"vereiste_scope": "catalogus.lezen"}
     for hdr in (asf, jlp):
         assert admin.get("/api/v1/apps", headers=hdr).status_code == 200
         r = admin.get(f"/api/v1/apps/{uuid.uuid4()}", headers=hdr)

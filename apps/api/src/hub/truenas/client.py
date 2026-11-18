@@ -43,6 +43,8 @@ READ_ONLY_METHODS: frozenset[str] = frozenset(
         "app.query",
         "app.image.query",
         "app.gpu_choices",
+        "catalog.apps",
+        "catalog.get_app_details",
         "device.get_info",
         "disk.query",
         "smart.test.results",
@@ -192,6 +194,7 @@ class TrueNASClient:
         tls: TLSSettings | None = None,
         connect_timeout: float = 5.0,
         read_timeout: float = 15.0,
+        response_budget: int | None = None,
     ) -> None:
         if not url.startswith("wss://"):
             raise TrueNASError("not_configured", "alleen wss:// is toegestaan (geen onversleutelde verbinding)")
@@ -200,6 +203,7 @@ class TrueNASClient:
         self.tls = tls or TLSSettings()
         self.connect_timeout = connect_timeout
         self.read_timeout = read_timeout
+        self._response_budget = response_budget
         self._ws: ClientConnection | None = None
         self._ids = itertools.count(1)
         self.tls_mode: Literal["verified", "pinned"] = "pinned" if self.tls.pinned_fingerprint else "verified"
@@ -222,7 +226,7 @@ class TrueNASClient:
                 ssl=ctx,
                 open_timeout=self.connect_timeout,
                 close_timeout=2,
-                max_size=MAX_MESSAGE_BYTES,
+                max_size=self._response_budget if self._response_budget is not None else MAX_MESSAGE_BYTES,
                 proxy=None,  # LAN-verbinding; nooit via een proxy
                 user_agent_header="ai-server-manager-hub",
                 ping_interval=None,
@@ -274,9 +278,17 @@ class TrueNASClient:
 
     async def close(self) -> None:
         if self._ws is not None:
+            try:
+                with contextlib.suppress(OSError, ConnectionClosed):
+                    await self._ws.close()
+            finally:
+                self.abort()
+
+    def abort(self) -> None:
+        """Verbreek de verbinding ook na een harde deadline, zonder op de sluitingshanddruk te wachten."""
+        if self._ws is not None:
             ws, self._ws = self._ws, None
-            with contextlib.suppress(OSError, ConnectionClosed):
-                await ws.close()
+            ws.transport.abort()
 
     async def first_event(self, event: str, timeout: float) -> dict[str, Any]:
         """Abonneer op een alleen-lezen event source, wacht op de eerste ``collection_update`` met ``fields`` en zeg
@@ -329,10 +341,14 @@ class TrueNASClient:
             await self._ws.send(payload)
             async with asyncio.timeout(self.read_timeout):
                 while True:
-                    raw = await self._ws.recv()
+                    raw = await self._ws.recv(decode=False if self._response_budget is not None else None)
+                    if self._response_budget is not None:
+                        self._response_budget -= len(raw)
+                        if self._response_budget < 0:
+                            raise TrueNASError("protocol_error", "Het meetantwoord overschrijdt het bytebudget.")
                     try:
                         msg = json.loads(raw)
-                    except (TypeError, ValueError) as exc:
+                    except (TypeError, ValueError, RecursionError) as exc:
                         raise TrueNASError("protocol_error", f"{method}: geen geldige JSON") from exc
                     if not isinstance(msg, dict) or msg.get("id") != req_id:
                         continue  # notificaties (bv. collection_update) of oude antwoorden negeren

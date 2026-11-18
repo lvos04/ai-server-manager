@@ -9,6 +9,7 @@ from typing import Any, ClassVar
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -23,7 +24,7 @@ from sqlalchemy import (
     Uuid,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -239,6 +240,25 @@ class TrueNASConnection(Base):
     api_key_set_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     api_key_set_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class CatalogSnapshot(Base):
+    __tablename__ = "catalog_snapshot"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_catalog_snapshot_singleton"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    started_at: Mapped[datetime] = mapped_column(TS)
+    observed_at: Mapped[datetime | None] = mapped_column(TS)
+    binding: Mapped[str] = mapped_column(String(64))
+    round_number: Mapped[int] = mapped_column(Integer)
+    catalog: Mapped[dict[str, Any]] = mapped_column(JSONB)
+
+
+class CatalogReadWindow(Base):
+    __tablename__ = "catalog_read_window"
+
+    service_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("service.id", ondelete="CASCADE"), primary_key=True)
+    requests: Mapped[list[datetime]] = mapped_column(ARRAY(TS))
 
 
 class InventoryRun(Base):

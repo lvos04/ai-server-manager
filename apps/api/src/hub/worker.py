@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from hub import logsink
 from hub.backup.selfbackup import run_self_backup
 from hub.catalog.appstore import sync_appstore
+from hub.catalog.availability import refresh_if_due
 from hub.catalog.discovery import discover
 from hub.config import Settings
 from hub.events.envelope import emit
@@ -222,6 +223,7 @@ def run_once(
             done.append({"id": str(job.id), "kind": job.kind, **result})
         cleanup(db)
     if schedule:
+        refresh_if_due(factory, settings, vault)
         # Periodieke taken (meten, tijdreeksen, alerts, meldingen) staan in periodic_task, niet in de joblijst.
         for t in periodic.run_due(factory, settings, vault, keyring):
             if t.get("status") != "ok":

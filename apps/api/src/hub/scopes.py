@@ -5,7 +5,7 @@ een beheerder ziet ze in de Hub-UI (Instellingen → Diensten). Zonder scope →
 intrekking (§3.8). Nooit geheimen via deze routes.
 
 - ``inventaris.lezen``: ``GET /api/v1/apps`` en ``GET /api/v1/apps/{id}`` (gepagineerd over een momentopname, §5).
-- ``catalogus.lezen``: route voor catalogusbeschikbaarheid — **nog niet gebouwd (P2)**; de scope staat al vast.
+- ``catalogus.lezen``: ``GET /api/v1/catalog/availability`` voor één vastgezette versie (§4.4, M3).
 - ``besluiten.lezen``: ``GET /connector/v1/items?type=decision`` — standaard aan **geen** dienst (K6: gemeten leest geen
   dienst besluiten van de Hub). Toekennen vraagt een ADR met de lijst per besluittype.
 
@@ -21,7 +21,7 @@ BESLUITEN_LEZEN = "besluiten.lezen"
 
 ALLE_SCOPES: dict[str, str] = {
     INVENTARIS_LEZEN: "Inventaris lezen: GET /api/v1/apps en /api/v1/apps/{id}",
-    CATALOGUS_LEZEN: "Catalogusbeschikbaarheid lezen (route volgt in fase P2)",
+    CATALOGUS_LEZEN: "Catalogusbeschikbaarheid lezen: GET /api/v1/catalog/availability",
     BESLUITEN_LEZEN: "Besluiten lezen: GET /connector/v1/items?type=decision (standaard aan geen enkele dienst)",
 }
 

@@ -51,6 +51,7 @@ def test_capabilities_terugval_op_versietabel() -> None:
 
 
 SUBSCRIBE = {"core.subscribe", "core.unsubscribe"}
+CATALOG_READ = {"catalog.apps", "catalog.get_app_details"}
 
 
 def test_alleen_leesmethoden_toegestaan() -> None:
@@ -70,9 +71,13 @@ def test_alleen_leesmethoden_toegestaan() -> None:
                 ".login_with_api_key",
             )
         )
-        for m in READ_ONLY_METHODS - SUBSCRIBE
+        for m in READ_ONLY_METHODS - SUBSCRIBE - CATALOG_READ
     )
-    assert not {"app.create", "app.delete", "pool.snapshot.create", "app.redeploy"} & READ_ONLY_METHODS
+    assert CATALOG_READ <= READ_ONLY_METHODS
+    assert (
+        not {"app.create", "app.delete", "pool.snapshot.create", "app.redeploy", "catalog.sync", "catalog.update"}
+        & READ_ONLY_METHODS
+    )
     # Abonneren mag alleen op alleen-lezen event sources (reporting.realtime); verder niets.
     assert SUBSCRIBE <= READ_ONLY_METHODS
     assert set(READ_ONLY_EVENTS) == {"reporting.realtime"}

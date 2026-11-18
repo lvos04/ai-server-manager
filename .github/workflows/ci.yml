@@ -55,6 +55,17 @@ jobs:
         run: make type BIN="$(dirname "$(command -v python)")"
       - name: pytest (unit, integratie, dienst-E2E met fake TrueNAS)
         run: python -m pytest -q
+      - name: Gepinde plannerbron voor M3-interop
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lvos04/jelly-leon-platform
+          ref: 26746920e643cdbb5f9dc31b90cbcc29b65c1f1e
+          path: .jlp-interop
+          persist-credentials: false
+      - name: M3-interop met echte Hub en gepinde planner
+        env:
+          JLP_SOURCE: .jlp-interop
+        run: python -m pytest -q tests/interop/test_catalog_availability.py
       - name: alembic upgrade → downgrade → upgrade op een lege database
         env:
           HUB_DATABASE_URL: postgresql+psycopg://postgres@127.0.0.1:5432/asm_ci_migrate

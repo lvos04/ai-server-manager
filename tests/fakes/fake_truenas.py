@@ -61,6 +61,8 @@ READ_METHODS = {
     "app.query",
     "app.image.query",
     "app.gpu_choices",
+    "catalog.apps",
+    "catalog.get_app_details",
     "device.get_info",
     "disk.query",
     "smart.test.results",
@@ -202,7 +204,23 @@ def _make_tls(tmp: Path) -> tuple[Path, Path, Path]:
 def default_data() -> dict[str, Any]:
     """Testdata (geen echte NAS-waarden): pool ``testpool`` met MediaGuard, MSO, my_house en een gestopte app."""
     mnt = "/mnt/testpool"
+    catalog = {
+        "stable": {
+            "ix-app": {"name": "ix-app", "healthy": True, "latest_version": "1.4.8"},
+        },
+        "community": {
+            "authentik": {"name": "authentik", "healthy": True, "latest_version": "1.3.64"},
+        },
+    }
     return {
+        "catalog.apps": catalog,
+        "catalog.get_app_details": {
+            train: {
+                app: {**entry, "versions": {entry["latest_version"]: {"version": entry["latest_version"]}}}
+                for app, entry in apps.items()
+            }
+            for train, apps in catalog.items()
+        },
         "system.info": {
             "version": "TrueNAS-25.04.2",
             "hostname": "fake-truenas",
@@ -762,6 +780,9 @@ class FakeTrueNAS:
             return {m: {"description": None} for m in sorted(self.methods)}
         if method == "auth.me":
             return {"pw_name": "hub-lezer", "privilege": {"roles": {"$set": list(profile.roles)}, "web_shell": False}}
+        if method == "catalog.get_app_details":
+            app, options = params
+            return self.data["catalog.get_app_details"].get(options["train"], {}).get(app)
         if method == "core.get_jobs":
             return self._jobs(params)
         if (

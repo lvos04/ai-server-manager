@@ -96,6 +96,59 @@
         "title": "ApproveIn",
         "type": "object"
       },
+      "CatalogPin": {
+        "additionalProperties": false,
+        "properties": {
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "beschikbaar": {
+            "enum": [
+              "ja",
+              "nee",
+              "onbekend"
+            ],
+            "title": "Beschikbaar",
+            "type": "string"
+          },
+          "gemeten_op": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Bronmeettijd in UTC met Z. Bij onbekend is de waarde null.",
+            "format": "date-time",
+            "title": "Gemeten Op"
+          },
+          "train": {
+            "enum": [
+              "stable",
+              "community",
+              "enterprise"
+            ],
+            "title": "Train",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "train",
+          "app",
+          "version",
+          "beschikbaar",
+          "gemeten_op"
+        ],
+        "title": "CatalogPin",
+        "type": "object"
+      },
       "CgnatIn": {
         "additionalProperties": false,
         "properties": {
@@ -468,6 +521,35 @@
           }
         },
         "title": "ErkenIn",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details",
+          "trace_id"
+        ],
+        "title": "ErrorResponse",
         "type": "object"
       },
       "EventEnvelope": {
@@ -4869,6 +4951,131 @@
         "summary": "Snapshotbeleid als voorstel (wordt niet toegepast)",
         "tags": [
           "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/catalog/availability": {
+      "get": {
+        "operationId": "catalog_availability_api_v1_catalog_availability_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "train",
+            "required": true,
+            "schema": {
+              "enum": [
+                "stable",
+                "community",
+                "enterprise"
+              ],
+              "title": "Train",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9-]{0,62}$",
+              "title": "App",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+([.+_-][0-9A-Za-z.+_-]+)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPin"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "unauthorized: geldig Bearer-service-token vereist"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "scope_ontbreekt"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error met details.fouten"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "rate_limited",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "dependency_unavailable",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Beschikbaarheid van één vastgezette TrueNAS-catalogusversie (dienstscope catalogus.lezen)",
+        "tags": [
+          "appcatalogus"
         ]
       }
     },
