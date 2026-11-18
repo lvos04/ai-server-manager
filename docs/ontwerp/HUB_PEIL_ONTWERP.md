@@ -295,12 +295,10 @@ knoppen dragen de dienstnaam in de toegankelijke naam ("Intrekken…: home-contr
 **Opbouw** (≥ 1280 twee kolommen: links status + instellen/vernieuwen, rechts zelftest + gebruik):
 
 1. **Status** (`data-testid="noodaccount-status"`): pillen **neutraal** "Ingesteld" (`life-buoy`) of Onbekend "Niet
-   ingesteld"; "Rotatie loopt"/"Rotatie vereist" als `status-info`. Werkt de noodlogin niet (`werkend: false`), dan een
-   `melding-onbekend` met de reden in één zin, bijvoorbeeld **"Noodlogin werkt nu niet: de nieuwe TOTP is nog niet
-   bevestigd."** Belangrijk (gemeten in `breakglass.py`): tijdens een rotatie is `totp_confirmed_at` leeg, dus werkt
-   de noodlogin **pas weer na de bevestiging** — de UI zegt dat vóór de gebruiker begint ("Tot je de nieuwe code
-   bevestigt, werkt de noodlogin niet."). `dl`: Account (mono), Rol "Beheerder (vast)", Sessieduur "60 min, niet te
-   verlengen", Laatst gebruikt (+ "incident gemeld"), Herbevestiging "Volgende uiterlijk <datum>. Elke 90 dagen een
+   ingesteld"; "Rotatie loopt"/"Rotatie vereist" als `status-info`. Bij een openstaande rotatie legt `melding-info`
+   uit dat de gebruiker de nieuwe TOTP hier kan bevestigen of via een noodlogin met de nieuwe gegevens. Bij een
+   onbruikbaar noodaccount meldt `melding-onbekend` de reden. `dl`: Account (mono), Rol "Beheerder (vast)", Sessieduur
+   "60 min, niet te verlengen", Laatst gebruikt (+ "incident gemeld"), Herbevestiging "Volgende uiterlijk <datum>. Elke 90 dagen een
    melding, nooit een blokkade.", Inloggen kan "Alleen vanaf privé-adressen (LAN of VPN), nooit vanaf internet."
 2. **Instellen / vernieuwen** (TotpInstellen C-59): stepper "Nieuw wachtwoord · Authenticator-app en code".
    Stap 1 vraagt **je eigen wachtwoord** + het nieuwe noodwachtwoord (≥ 20 tekens, niet de gebruikersnaam) + sessieduur.
@@ -309,10 +307,10 @@ knoppen dragen de dienstnaam in de toegankelijke naam ("Intrekken…: home-contr
    authenticator-app en bewaar een kopie offline, bijvoorbeeld op papier bij je herstelkit. De Hub toont het hierna
    nooit meer." en het veld "Code uit de authenticator-app" (6 cijfers, `inputmode=numeric`,
    `autocomplete=one-time-code`) → "Code bevestigen". **Geen QR-code** zolang er geen lokaal gebundelde generator is
-   (OB-07). Verlaat de gebruiker de pagina vóór bevestiging: waarschuwing "Het geheim is dan weg; je moet opnieuw
-   beginnen." Fout 401 `invalid_totp` → veldfout "Deze code klopt niet. Wacht op de volgende code en probeer opnieuw."
+   (OB-07). De gebruiker bewaart het geheim vóór het verlaten van de pagina. Bij een rotatie verwijst de uitleg ook
+   naar bevestiging via de noodlogin. Fout 422 `invalid_totp` → veldfout "Deze code klopt niet. Wacht op de volgende code en probeer opnieuw."
 3. **Zelftest** (C-58): knop "Zelftest uitvoeren" (`list-checks`); samenvatting met `role=status` ("Uitkomst om 11:56:
-   noodlogin werkt nu niet (1 controle mislukt)."); controles: Noodaccount · TOTP · "Privé-adres wordt toegelaten"
+   1 controle vraagt aandacht."); controles: Noodaccount · TOTP · "Privé-adres wordt toegelaten"
    (`10.0.0.1`) · "Internetadres wordt geweigerd" (`192.0.2.10`, RFC 5737) · **"Jouw adres zoals de Hub het
    ziet"**: privé → neutraal vinkje; **lijkt Docker-gateway** (`lijkt_docker_gateway`) → `controle-onbekend` "Onbekend:
    dit lijkt het gateway-adres van het Docker-netwerk. Dan ziet de Hub niet het echte adres van je apparaat en is de
@@ -640,7 +638,7 @@ Volledige specificatie in `design/ontwerptaal/COMPONENTEN.md` §27; samengevat (
   "Rotatie aangevraagd"; ontkoppelen bij onbereikbare dienst → `error-panel` `data-code=service_unreachable` en de
   dienst blijft gekoppeld; intrekken pas na het typen van de app-id; kijker ziet geen mutatieknoppen.
 - **Noodaccount:** setup → geheim één keer (na herladen weg) → foute code (veldfout) → goede code (TOTP berekend in de
-  test) → werkend; zelftest toont het bron-IP; rotatie zet "werkt nu niet" tot bevestiging; noodlogin vanaf
+  test) → werkend; zelftest toont het bron-IP; een noodlogin met de nieuwe gegevens bevestigt een lopende rotatie; noodlogin vanaf
   `127.0.0.1` wordt **geweigerd** (loopback telt niet als privé: `source_not_private`) en de zelftest zegt dat; "OIDC verplicht" `aria-disabled` zolang niet werkend.
 - **Apps/appdetail:** status-chips met aantallen; `Draait` is nooit Gezond; acties-tab: alle knoppen
   `aria-disabled` met "Volgt in fase P2"; deep link opent in een nieuw tabblad.

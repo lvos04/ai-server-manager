@@ -118,7 +118,7 @@ function selftestControles(s: Selftest): Controle[] {
 }
 
 /** TotpInstellen (C-59): geheim één keer tonen, bevestigen met een code. Geen QR (OB-07). */
-function TotpStap({ totp, onKlaar }: { totp: Totp; onKlaar: () => void }) {
+function TotpStap({ totp, rotatie, onKlaar }: { totp: Totp; rotatie: boolean; onKlaar: () => void }) {
   const [code, setCode] = useState("");
   const confirm = useAction();
   useEffect(() => {
@@ -158,7 +158,11 @@ function TotpStap({ totp, onKlaar }: { totp: Totp; onKlaar: () => void }) {
           </Button>
         </div>
       </form>
-      <p className="text-sm">Verlaat je de pagina vóór de bevestiging, dan is het geheim weg en moet je opnieuw beginnen.</p>
+      <p className="text-sm">
+        {rotatie
+          ? "Met het nieuwe wachtwoord en een code uit de nieuwe authenticator kun je de rotatie ook via de noodlogin bevestigen."
+          : "Bevestig de code hier om de noodlogin te activeren. Bewaar het geheim voordat je deze pagina verlaat."}
+      </p>
     </div>
   );
 }
@@ -179,6 +183,7 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
     return (
       <TotpStap
         totp={totp}
+        rotatie={bestaand}
         onKlaar={() => {
           setTotp(null);
           onKlaar();
@@ -206,7 +211,7 @@ function Instellen({ nood, onKlaar }: { nood: Nood; onKlaar: () => void }) {
       <h3>Stap 1 van 2 · {bestaand ? "Nieuw wachtwoord" : "Account en wachtwoord"}</h3>
       {bestaand ? (
         <Melding soort="info">
-          <p>Tot je de nieuwe code bevestigt, werkt de noodlogin niet.</p>
+          <p>Het nieuwe wachtwoord en TOTP gaan direct in. Bewaar beide voordat je uitlogt.</p>
         </Melding>
       ) : null}
       <Field id="nood-eigen" label="Je eigen wachtwoord" help="Wijzigen vraagt je eigen wachtwoord." error={eigenFout ? act.error?.message : undefined}>
@@ -306,6 +311,7 @@ export function NoodaccountScreen() {
   const selftest = useAction<Selftest>();
   const n = nood.data;
   const a = n?.noodaccount;
+  const rotatieOpen = a?.totp_wacht_op_bevestiging && !a.uitgeschakeld && (a.rotatie_vereist || a.laatst_bevestigd !== null);
   const waarom = n ? reden(n) : null;
   const adres = typeof window !== "undefined" ? `${window.location.origin}/inloggen/nood` : "/inloggen/nood";
   const herbevestig = a?.laatst_bevestigd ? new Date(Date.parse(a.laatst_bevestigd) + 90 * 86_400_000).toISOString() : null;
@@ -329,7 +335,11 @@ export function NoodaccountScreen() {
                 {a ? <StatusBadge view={{ tone: "neutral", label: "Ingesteld", icon: "ingesteld" }} /> : <StatusBadge view={{ tone: "unknown", label: "Niet ingesteld" }} />}
                 {a?.totp_wacht_op_bevestiging ? <StatusBadge view={{ tone: "info", label: "Rotatie loopt" }} /> : a?.rotatie_vereist ? <StatusBadge view={{ tone: "info", label: "Rotatie vereist" }} /> : null}
               </div>
-              {!n.werkend ? (
+              {rotatieOpen ? (
+                <Melding soort="info">
+                  <p>Bevestig de rotatie hier of gebruik de noodlogin met het nieuwe wachtwoord en TOTP.</p>
+                </Melding>
+              ) : !n.werkend ? (
                 <Melding soort="onbekend" data-testid="nood-werkt-niet">
                   <p>Noodlogin werkt nu niet: {waarom ?? "onbekende reden."}</p>
                 </Melding>
@@ -381,7 +391,7 @@ export function NoodaccountScreen() {
                 <>
                   <p role="status" data-testid="zelftest-samenvatting">
                     Uitkomst om {formatTime(selftest.result.gemeten_op)}:{" "}
-                    {selftest.result.resultaat === "ok" ? "noodlogin werkt nu." : `noodlogin werkt nu niet (${failed} ${failed === 1 ? "controle" : "controles"} mislukt).`}
+                    {selftest.result.resultaat === "ok" ? "noodlogin werkt nu." : `${failed} ${failed === 1 ? "controle vraagt" : "controles vragen"} aandacht.`}
                   </p>
                   <Controles items={selftestControles(selftest.result)} testId="zelftest-controles" />
                 </>

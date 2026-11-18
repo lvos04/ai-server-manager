@@ -234,6 +234,7 @@ test("noodaccount (H6): geheim één keer, foute code → veldfout, goede code �
   await ready(page);
   await expect(page.getByTestId("totp-stap")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(geheim);
+  await expect(page.getByTestId("noodaccount-instellen")).toContainText("Bewaar beide voordat je uitlogt.");
 
   await page.getByTestId("zelftest-uitvoeren").click();
   await expect(page.getByTestId("zelftest-samenvatting")).toContainText("noodlogin werkt nu");
