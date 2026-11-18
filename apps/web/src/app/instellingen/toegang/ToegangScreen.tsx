@@ -2,13 +2,13 @@
 
 import { KeyRound, LogIn, Plus, ShieldX, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Controles } from "@/components/Controles";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { Field } from "@/components/Field";
 import { KopieerVeld } from "@/components/KopieerVeld";
 import { Loading } from "@/components/Loading";
-import { OidcSecretField } from "@/components/OidcSecretField";
+import { OidcSecretField, takeOidcSecret } from "@/components/OidcSecretField";
 import { Melding } from "@/components/Melding";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import { RolMelding } from "@/components/RolMelding";
@@ -290,7 +290,8 @@ function Sso() {
   const save = useAction<Oidc>();
   const disc = useAction<{ resultaat: string; reden?: string; uitleg?: string }>();
   const aan = useAction<Oidc>();
-  const [form, setForm] = useState<{ issuer: string; client_id: string; client_secret: string; scopes: string; groepen_claim: string; sessie_minuten: number; rolkoppelingen: { groep: string; rol: Role | "" }[] } | null>(null);
+  const [form, setForm] = useState<{ issuer: string; client_id: string; scopes: string; groepen_claim: string; sessie_minuten: number; rolkoppelingen: { groep: string; rol: Role | "" }[] } | null>(null);
+  const secretInput = useRef<HTMLInputElement>(null);
   const [testErr, setTestErr] = useState<unknown>(null);
   const c = cfg.data;
   const redirect = typeof window !== "undefined" ? `${window.location.origin}/api/v1/auth/oidc/callback` : "";
@@ -300,7 +301,6 @@ function Sso() {
       ? {
           issuer: c.issuer ?? "",
           client_id: c.client_id ?? "",
-          client_secret: "",
           scopes: c.scopes,
           groepen_claim: c.groepen_claim,
           sessie_minuten: c.sessie_minuten,
@@ -335,10 +335,11 @@ function Sso() {
           className="form"
           onSubmit={async (e) => {
             e.preventDefault();
+            const secret = takeOidcSecret(secretInput.current);
             const body = {
               issuer: f.issuer.trim(),
               client_id: f.client_id.trim(),
-              ...(f.client_secret ? { client_secret: f.client_secret } : {}),
+              ...(secret ? { client_secret: secret } : {}),
               redirect_uri: redirect,
               scopes: f.scopes,
               groepen_claim: f.groepen_claim,
@@ -360,7 +361,7 @@ function Sso() {
           </Field>
           <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
             ingesteld={c.client_secret.ingesteld} laatste4={c.client_secret.laatste4}
-            value={f.client_secret} onChange={(e) => setForm({ ...f, client_secret: e.target.value })} />
+            inputRef={secretInput} />
           <KopieerVeld label="Terugkeer-adres (zet dit in Authentik)" waarde={redirect} testId="sso-redirect" />
           {redirect.startsWith("http://") ? (
             <Melding soort="info">

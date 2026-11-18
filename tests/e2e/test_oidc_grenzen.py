@@ -107,6 +107,12 @@ def test_geheim_http_geweigerd_zonder_mutatie(
     noodlogin(app, secret)
 
 
+def test_bestaand_totp_na_clientinvoer(admin: Any, app: Any, idp: FakeOidc) -> None:
+    secret = _breakglass(admin)
+    configure(admin, idp)
+    noodlogin(app, secret)
+
+
 @pytest.mark.parametrize("trusted", [False, True])
 def test_geheim_volgt_alleen_vertrouwde_proxy(
     admin: Any, app: Any, idp: FakeOidc, trusted: bool
