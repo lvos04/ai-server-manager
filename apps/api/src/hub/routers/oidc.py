@@ -432,7 +432,7 @@ def oidc_callback(
     actor = tx.gestart_door or "onbekend"
     try:
         if error or not code:
-            raise client.OidcError("idp_weigerde", f"De identity provider gaf: {(error or 'geen code')[:64]}.")
+            raise client.OidcError("idp_weigerde", client.PROVIDER_ERRORS["idp_weigerde"])
         cfg, info = service.finish(db, settings, vault, tx, code)
     except client.OidcError as exc:
         db.rollback()

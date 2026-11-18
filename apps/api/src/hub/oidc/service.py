@@ -135,11 +135,18 @@ def safe_return(path: str | None) -> str:
     return p
 
 
+def safe_provider_error(result: dict[str, Any]) -> dict[str, Any]:
+    reason = result.get("reden")
+    if isinstance(reason, str) and reason in client.PROVIDER_ERRORS:
+        return {**result, "uitleg": client.PROVIDER_ERRORS[reason]}
+    return result
+
+
 def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None) -> dict[str, Any]:
     has_secret = bool(active_secret(db, cfg, vault))
     secret = db.scalar(select(VaultSecret).where(VaultSecret.ref == SECRET_REF)) if has_secret else None
     working = breakglass.is_working(breakglass.account(db))
-    test = cfg.laatste_test or {}
+    test = safe_provider_error(cfg.laatste_test or {})
     test_actueel = bool(test.get("resultaat") == "geslaagd" and test.get("config_versie") == cfg.config_versie)
     return {
         "ingeschakeld": cfg.ingeschakeld,
@@ -176,11 +183,13 @@ def idempotency_response(body: Any) -> Any:
     """Alleen rechtstreekse beheer-GET mag laatste vier tonen; nooit een opgeslagen mutatieantwoord."""
     if not isinstance(body, dict):
         return body
-    out = dict(body)
+    out = dict(safe_provider_error(body))
     if isinstance(out.get("client_secret"), dict):
         out["client_secret"] = {k: v for k, v in out["client_secret"].items() if k != "laatste4"}
     if isinstance(out.get("oidc"), dict):
         out["oidc"] = idempotency_response(out["oidc"])
+    if isinstance(out.get("laatste_test"), dict):
+        out["laatste_test"] = safe_provider_error(out["laatste_test"])
     return out
 
 

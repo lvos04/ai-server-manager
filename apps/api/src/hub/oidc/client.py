@@ -31,6 +31,11 @@ ALLOWED_ALGS = ("RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "
 LEEWAY_S = 30
 MAX_IAT_AGE_S = 600
 DISCOVERY_PATH = "/.well-known/openid-configuration"
+PROVIDER_ERRORS = {
+    "idp_weigerde": "De identity provider heeft de aanmelding geweigerd of geen aanmeldcode teruggestuurd.",
+    "token_geweigerd": "De identity provider weigerde de code.",
+    "issuer_komt_niet_overeen": "De issuer uit de discovery komt niet overeen met de ingestelde issuer.",
+}
 
 
 class OidcError(Exception):
@@ -85,10 +90,7 @@ def discover(issuer: str, policy: OutboundPolicy) -> dict[str, Any]:
     issuer = validate_issuer(issuer, allow_loopback=policy.allow_loopback)
     meta = _get_json(issuer.rstrip("/") + DISCOVERY_PATH, policy)
     if meta.get("issuer") != issuer:
-        raise OidcError(
-            "issuer_komt_niet_overeen",
-            f"De discovery noemt een andere issuer ({str(meta.get('issuer'))[:200]}); gebruik exact die waarde.",
-        )
+        raise OidcError("issuer_komt_niet_overeen", PROVIDER_ERRORS["issuer_komt_niet_overeen"])
     origin = _origin(issuer)
     out: dict[str, Any] = {"issuer": issuer}
     for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
@@ -181,8 +183,7 @@ def exchange_code(
         raise OidcError("token_onbereikbaar", f"Token-endpoint niet bereikbaar ({exc.reason}).") from exc
     body = res.json()
     if res.status != 200 or not isinstance(body, dict):
-        err = str(body.get("error"))[:64] if isinstance(body, dict) and body.get("error") else f"HTTP {res.status}"
-        raise OidcError("token_geweigerd", f"De identity provider weigerde de code ({err}).")
+        raise OidcError("token_geweigerd", PROVIDER_ERRORS["token_geweigerd"])
     if str(body.get("token_type", "")).lower() != "bearer" or not isinstance(body.get("id_token"), str):
         raise OidcError("token_antwoord_ongeldig", "Het tokenantwoord mist een ID-token of is geen Bearer.")
     return body
