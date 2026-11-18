@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from hub import audit, breakglass
-from hub.deps import DB, Admin, Idem, Principal, SettingsDep, get_vault
+from hub.deps import DB, Admin, Idem, LocalAdmin, Principal, SettingsDep, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.models import User
@@ -187,7 +187,7 @@ def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: Admin, vaul
     "/cgnat",
     summary="100.64.0.0/10 (CGNAT, ook Tailscale) wel of niet als privé tellen voor de noodlogin (admin; audit)",
 )
-def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
+def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmin, idem: Idem) -> JSONResponse:
     """Contract 1.3 §4.1: standaard uit. Alleen een beheerder in de Hub-UI; geen ``action_id``, nooit door de AI."""
     if (replay := idem.replay()) is not None:
         return replay

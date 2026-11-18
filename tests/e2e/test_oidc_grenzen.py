@@ -362,3 +362,19 @@ def test_oude_oidc_antwoorden_worden_bij_replay_en_migratie_geschoond(
         assert rows
         for row in rows:
             assert "laatste4" not in str(row.response_body)
+
+
+@pytest.mark.parametrize("toestaan", [False, True])
+def test_cgnat_alleen_via_lokale_beheerder_of_noodsessie(admin: Any, app: Any, idp: FakeOidc, toestaan: bool) -> None:
+    secret = _breakglass(admin)
+    enable(admin, idp)
+    sso, page = sso_login(app, idp)
+    assert page.status_code == 200
+    sso.headers["X-CSRF-Token"] = sso.cookies.get("hub_csrf") or ""
+    before = admin.get("/api/v1/auth/break-glass").json()["cgnat"]
+    r = sso.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": toestaan}, headers=idem())
+    assert r.status_code == 403 and r.json()["code"] == "lokale_beheerder_vereist"
+    assert admin.get("/api/v1/auth/break-glass").json()["cgnat"] == before
+    nood = noodlogin(app, secret)
+    assert nood.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": toestaan}, headers=idem()).status_code == 200
+    assert admin.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": False}, headers=idem()).status_code == 200
