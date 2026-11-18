@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 from hub import audit, breakglass
 from hub.config import Settings
 from hub.incidents.rules import EventIn
-from hub.models import OidcConfig, OidcIdentity, OidcTransaction, User, WebSession
+from hub.models import AuditEvent, OidcConfig, OidcIdentity, OidcTransaction, User, VaultSecret, WebSession
 from hub.oidc import client
 from hub.security import ROLE_RANK, Role, sha256_hex
 from hub.timeutil import iso, utcnow
@@ -42,6 +42,7 @@ TX_TTL = timedelta(minutes=10)
 UNUSABLE_PASSWORD = "!oidc-geen-wachtwoord"  # noqa: S105 - geen geheim: argon2 weigert dit altijd
 USERNAME_OK = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 HCH = "home-control-hub"
+SSO_UNAVAILABLE = "oidc_clientgeheim_ontbreekt"
 
 
 def config(db: Session) -> OidcConfig:
@@ -68,9 +69,32 @@ def config(db: Session) -> OidcConfig:
     return row
 
 
-def effective_required(db: Session) -> bool:
+def effective_required(db: Session, vault: Vault | None) -> bool:
     cfg = db.get(OidcConfig, 1)
-    return bool(cfg and cfg.ingeschakeld and cfg.verplicht and breakglass.is_working(breakglass.account(db)))
+    return bool(
+        cfg
+        and cfg.ingeschakeld
+        and cfg.verplicht
+        and active_secret(db, cfg, vault)
+        and breakglass.is_working(breakglass.account(db))
+    )
+
+
+def audit_missing_secret_on_start(db: Session, vault: Vault | None) -> None:
+    cfg = db.scalar(select(OidcConfig).where(OidcConfig.id == 1, OidcConfig.ingeschakeld).with_for_update())
+    if cfg is None or active_secret(db, cfg, vault):
+        return
+    action = "auth.oidc.clientgeheim_ontbreekt"
+    if db.scalar(select(AuditEvent.id).where(AuditEvent.action == action).limit(1)) is None:
+        audit.record(
+            db,
+            actor_type="system",
+            actor_id="hub",
+            action=action,
+            target_type="oidc",
+            target_id="hub",
+            details={"reden": SSO_UNAVAILABLE},
+        )
 
 
 def map_role(groups: list[str], mappings: list[dict[str, Any]]) -> Role | None:
@@ -102,21 +126,21 @@ def safe_return(path: str | None) -> str:
     return p
 
 
-def config_dict(db: Session, cfg: OidcConfig) -> dict[str, Any]:
-    from hub.models import VaultSecret
-
-    secret = db.scalar(select(VaultSecret).where(VaultSecret.ref == SECRET_REF)) if cfg.client_secret_ref else None
+def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None) -> dict[str, Any]:
+    has_secret = bool(active_secret(db, cfg, vault))
+    secret = db.scalar(select(VaultSecret).where(VaultSecret.ref == SECRET_REF)) if has_secret else None
     working = breakglass.is_working(breakglass.account(db))
     test = cfg.laatste_test or {}
     test_actueel = bool(test.get("resultaat") == "geslaagd" and test.get("config_versie") == cfg.config_versie)
     return {
         "ingeschakeld": cfg.ingeschakeld,
         "verplicht": cfg.verplicht,
-        "verplicht_effectief": bool(cfg.ingeschakeld and cfg.verplicht and working),
+        "verplicht_effectief": bool(cfg.ingeschakeld and cfg.verplicht and working and has_secret),
+        "reden": SSO_UNAVAILABLE if cfg.ingeschakeld and not has_secret else None,
         "noodaccount_werkend": working,
         "issuer": cfg.issuer,
         "client_id": cfg.client_id,
-        "client_secret": {"ingesteld": secret is not None, "laatste4": secret.last4 if secret else None},
+        "client_secret": {"ingesteld": has_secret, "laatste4": secret.last4 if secret else None},
         "redirect_uri": cfg.redirect_uri,
         "redirect_uri_https": bool(cfg.redirect_uri and cfg.redirect_uri.startswith("https://")),
         "scopes": cfg.scopes,
@@ -214,18 +238,30 @@ def handle_event(db: Session, settings: Settings, ev: EventIn, now: datetime) ->
 
 
 # ------------------------------------------------------------------ aanmelden
-def require_secret(db: Session, cfg: OidcConfig, vault: Vault) -> str:
-    secret = None
-    if cfg.client_secret_ref == SECRET_REF:
+def active_secret(db: Session, cfg: OidcConfig, vault: Vault | None) -> str | None:
+    if cfg.client_secret_ref == SECRET_REF and vault is not None:
         with suppress(InvalidTag, VaultError, UnicodeDecodeError, ValueError):
-            secret = vault.get(db, SECRET_REF)
+            return vault.get(db, SECRET_REF)
+    return None
+
+
+def require_secret(db: Session, cfg: OidcConfig, vault: Vault | None) -> str:
+    secret = active_secret(db, cfg, vault)
     if not secret:
-        raise client.OidcError("oidc_clientgeheim_ontbreekt", "Een actief, leesbaar clientgeheim is vereist.")
+        raise client.OidcError(SSO_UNAVAILABLE, "Een actief, leesbaar clientgeheim is vereist.")
     return secret
 
 
 def start(
-    db: Session, cfg: OidcConfig, settings: Settings, vault: Vault, *, doel: str, terug: str, actor: str | None, ip: str
+    db: Session,
+    cfg: OidcConfig,
+    settings: Settings,
+    vault: Vault | None,
+    *,
+    doel: str,
+    terug: str,
+    actor: str | None,
+    ip: str,
 ) -> tuple[str, str]:
     """Nieuwe transactie; geeft (autorisatie-URL, browsergeheim voor het cookie)."""
     require_secret(db, cfg, vault)

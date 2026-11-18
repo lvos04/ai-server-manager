@@ -21,6 +21,7 @@ from hub.deps import (
     AnyUser,
     Idem,
     Principal,
+    ReadableVault,
     SettingsDep,
     Viewer,
     get_keyring,
@@ -265,13 +266,13 @@ def setup_admin(body: SetupAdminIn, request: Request, db: DB, settings: Settings
 
 
 @router.post("/auth/login", summary="Aanmelden (argon2id, rate-limit)")
-def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep) -> JSONResponse:
+def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault: ReadableVault) -> JSONResponse:
     username = body.username.strip().lower()
     key = f"login:{username}:{client_ip(request)}"
     _rate_check(db, key, settings)
     from hub.oidc.service import effective_required
 
-    if effective_required(db):
+    if effective_required(db, vault):
         # Geen wachtwoordcontrole (geen orakel); het noodaccount logt via /auth/break-glass/login in.
         raise HubError(
             403,

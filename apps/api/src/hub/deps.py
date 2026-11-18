@@ -52,8 +52,13 @@ def get_vault(request: Request) -> Vault:
     return request.app.state.vault()  # type: ignore[no-any-return]
 
 
+def get_readable_vault(request: Request) -> Vault | None:
+    return request.app.state.readable_vault()  # type: ignore[no-any-return]
+
+
 DB = Annotated[Session, Depends(get_db)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+ReadableVault = Annotated[Vault | None, Depends(get_readable_vault)]
 
 
 @dataclass

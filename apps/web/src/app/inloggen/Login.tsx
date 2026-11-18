@@ -19,6 +19,7 @@ import { useApi } from "@/lib/use-api";
 export const SSO_FOUT: Record<string, string> = {
   sso_uit: "Inloggen via SSO staat uit. Log in met je eigen account.",
   sso_gewijzigd: "De SSO-instellingen zijn net gewijzigd. Probeer opnieuw.",
+  oidc_clientgeheim_ontbreekt: "Het clientgeheim voor SSO ontbreekt of is onleesbaar. Gebruik je eigen account of de noodlogin.",
   geen_rol: "Je account hoort bij geen enkele groep die toegang heeft. Vraag een beheerder om je groep te koppelen.",
   account_uitgeschakeld: "Dit account is uitgeschakeld. Vraag een beheerder.",
   issuer_onbereikbaar: "Authentik is niet bereikbaar. Gebruik je eigen account of de noodlogin.",
@@ -38,8 +39,8 @@ export function Login() {
   const [error, setError] = useState<HubApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const back = safeReturnPath(params.get("terug"));
-  const ssoFout = params.get("sso_fout");
-  const sso = useApi<{ ingeschakeld: boolean; login_url: string | null }>("/api/v1/auth/oidc/beschikbaar");
+  const sso = useApi<{ ingeschakeld: boolean; login_url: string | null; reden?: string }>("/api/v1/auth/oidc/beschikbaar");
+  const ssoFout = params.get("sso_fout") ?? sso.data?.reden;
 
   useEffect(() => {
     if (state.status === "auth") router.replace(back);

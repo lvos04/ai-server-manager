@@ -258,6 +258,7 @@ function AlleSessies() {
 
 interface Oidc {
   ingeschakeld: boolean;
+  reden: string | null;
   verplicht: boolean;
   noodaccount_werkend: boolean;
   issuer: string | null;
@@ -317,6 +318,11 @@ function Sso() {
       </div>
       {cfg.error ? <ErrorPanel error={cfg.error} alert={false} /> : null}
       {!c && cfg.loading ? <Loading /> : null}
+      {c?.reden === "oidc_clientgeheim_ontbreekt" ? (
+        <Melding soort="beperkt" titel="SSO staat aan maar werkt niet: het clientgeheim ontbreekt">
+          <p>Stel het clientgeheim in via HTTPS of zet SSO uit.</p>
+        </Melding>
+      ) : null}
       {c && gateDicht ? (
         <Melding soort="gate" titel="Inschakelen kan nog niet: geblokkeerd door de HTTPS-voorwaarde" data-testid="sso-gate">
           <p>

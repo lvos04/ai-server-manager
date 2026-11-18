@@ -24,7 +24,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from hub import audit, breakglass
-from hub.deps import DB, Admin, Idem, SettingsDep, get_keyring, get_vault, require_local_admin
+from hub.deps import DB, Admin, Idem, ReadableVault, SettingsDep, get_keyring, get_vault, require_local_admin
 from hub.errors import HubError
 from hub.keys import KeyRing
 from hub.models import OidcConfig, OidcIdentity, Service, User, VaultSecret, WebSession
@@ -98,21 +98,23 @@ def _audit(db: Session, actor: str, action: str, details: dict[str, Any] | None 
 
 
 @router.get("/api/v1/auth/oidc/beschikbaar", summary="Openbaar: is inloggen via SSO beschikbaar (zonder geheimen)?")
-def available(db: DB) -> dict[str, Any]:
+def available(db: DB, vault: ReadableVault) -> dict[str, Any]:
     cfg = db.get(OidcConfig, 1)
-    on = bool(cfg and cfg.ingeschakeld)
+    ontbreekt = bool(cfg and cfg.ingeschakeld and not service.active_secret(db, cfg, vault))
+    on = bool(cfg and cfg.ingeschakeld and not ontbreekt)
     return {
         "ingeschakeld": on,
-        "verplicht": service.effective_required(db),
+        "verplicht": on and service.effective_required(db, vault),
         "login_url": "/api/v1/auth/oidc/login" if on else None,
         "noodlogin": "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk.",
+        **({"reden": service.SSO_UNAVAILABLE} if ontbreekt else {}),
     }
 
 
 @router.get("/api/v1/auth/oidc", summary="SSO-instellingen en -status (admin; clientgeheim nooit terug)")
-def get_oidc(db: DB, settings: SettingsDep, _: Admin) -> dict[str, Any]:
+def get_oidc(db: DB, settings: SettingsDep, _: Admin, vault: ReadableVault) -> dict[str, Any]:
     cfg = service.config(db)
-    out = service.config_dict(db, cfg)
+    out = service.config_dict(db, cfg, vault)
     out["gate_authentik"] = _gate(db, settings)
     db.commit()
     return out
@@ -192,11 +194,11 @@ def put_oidc(
         },
     )
     db.flush()
-    return idem.save(200, service.config_dict(db, cfg))
+    return idem.save(200, service.config_dict(db, cfg, vault))
 
 
 @router.post("/api/v1/auth/oidc/discover", summary="Discovery en JWKS van de issuer nu ophalen en controleren (admin)")
-def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
+def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault: VaultDep) -> JSONResponse:
     if (replay := idem.replay()) is not None:
         return replay
     cfg = service.config(db)
@@ -211,7 +213,12 @@ def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSO
         db.flush()
         return idem.save(
             200,
-            {"resultaat": "mislukt", "reden": exc.reden, "uitleg": exc.uitleg, "oidc": service.config_dict(db, cfg)},
+            {
+                "resultaat": "mislukt",
+                "reden": exc.reden,
+                "uitleg": exc.uitleg,
+                "oidc": service.config_dict(db, cfg, vault),
+            },
         )
     if meta != cfg.discovery:
         cfg.config_versie += 1
@@ -220,7 +227,7 @@ def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSO
     cfg.discovery, cfg.discovery_op, cfg.jwks, cfg.jwks_op = meta, utcnow(), jwks, utcnow()
     _audit(db, principal.name, "auth.oidc.discovered", {"issuer": cfg.issuer, "sleutels": len(jwks["keys"])})
     db.flush()
-    return idem.save(200, {"resultaat": "ok", "oidc": service.config_dict(db, cfg)})
+    return idem.save(200, {"resultaat": "ok", "oidc": service.config_dict(db, cfg, vault)})
 
 
 def _tx_cookie(resp: Response, request: Request, settings: Any, value: str) -> None:
@@ -297,7 +304,7 @@ def enable(
         {"voor": list(before), "na": [body.ingeschakeld, body.verplicht], "sessies_ingetrokken": revoked},
     )
     db.flush()
-    return idem.save(200, service.config_dict(db, cfg))
+    return idem.save(200, service.config_dict(db, cfg, vault))
 
 
 def _login_error(code: str) -> RedirectResponse:
@@ -313,7 +320,7 @@ def oidc_login(
     request: Request,
     db: DB,
     settings: SettingsDep,
-    vault: VaultDep,
+    vault: ReadableVault,
     terug: Annotated[str, Query(max_length=256)] = "/",
 ) -> Response:
     cfg = db.get(OidcConfig, 1)
@@ -321,6 +328,7 @@ def oidc_login(
         return _login_error("sso_uit")
     _start_limit(db, settings, client_ip(request))
     try:
+        service.require_secret(db, cfg, vault)
         if cfg.discovery_op is None or utcnow() - cfg.discovery_op > timedelta(hours=24):
             meta = client.discover(str(cfg.issuer), settings.outbound_policy())
             if meta != cfg.discovery:

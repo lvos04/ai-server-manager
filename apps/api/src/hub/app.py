@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from functools import lru_cache
 
 from fastapi import FastAPI, Request, Response
@@ -18,6 +18,7 @@ from hub.db import make_engine, make_sessionmaker
 from hub.errors import install_error_handlers
 from hub.firststart import ensure_secrets, log_lines
 from hub.keys import KeyRing
+from hub.oidc.service import audit_missing_secret_on_start
 from hub.onboarding.service import seed
 from hub.routers import (
     actions,
@@ -40,7 +41,7 @@ from hub.routers import (
     runbooks,
     services,
 )
-from hub.vault import Vault
+from hub.vault import Vault, VaultError
 
 log = logging.getLogger("hub")
 MAX_BODY_BYTES = 1024 * 1024
@@ -202,6 +203,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def vault() -> Vault:
         return Vault.from_file(settings.secrets_dir / "vault.key")
 
+    def readable_vault() -> Vault | None:
+        with suppress(OSError, ValueError, VaultError):
+            return vault()
+        return None
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Alleen ontbrekende geheimen aanmaken; een bestaande geldige setupcode blijft gelden (ADR-0004).
@@ -216,6 +222,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 db.commit()
         except Exception as exc:
             log.warning("besluiten nog niet geïnitialiseerd: %s", type(exc).__name__)
+        try:
+            with factory() as db:
+                audit_missing_secret_on_start(db, readable_vault())
+                db.commit()
+        except Exception as exc:
+            log.warning("SSO-beschikbaarheid bij start niet geaudit: %s", type(exc).__name__)
         handler = logsink.install(factory, "hub-api", vault, settings.log_hub_level)
         try:
             yield
@@ -239,6 +251,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sessionmaker = factory
     app.state.keyring = keyring
     app.state.vault = vault
+    app.state.readable_vault = readable_vault
     install_error_handlers(app)
     app.add_middleware(BodyLimit)
 
