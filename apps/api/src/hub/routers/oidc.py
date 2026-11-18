@@ -162,13 +162,14 @@ def put_oidc(
         body.scopes,
         body.sessie_minuten,
     )
+    binding_gewijzigd = (cfg.issuer, cfg.client_id) != (issuer, body.client_id)
     if body.client_secret:
         vault.put(db, service.SECRET_REF, body.client_secret, actor=principal.actor)
         cfg.client_secret_ref, critical = service.SECRET_REF, True
-    elif body.client_secret_wissen:
+    elif body.client_secret_wissen or binding_gewijzigd:
         db.execute(delete(VaultSecret).where(VaultSecret.ref == service.SECRET_REF))
         cfg.client_secret_ref, critical = None, True
-    if (cfg.issuer, cfg.client_id) != (issuer, body.client_id):
+    if binding_gewijzigd:
         cfg.discovery, cfg.jwks, cfg.discovery_op, cfg.jwks_op = {}, {}, None, None
     revoked = 0
     if critical:
