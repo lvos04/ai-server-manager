@@ -28,6 +28,13 @@ def _sso_beheerder(app: Any, idp: Any) -> TestClient:
     return sso
 
 
+def _verwijder_wachtwoorddigest(app: Any) -> None:
+    with app.state.sessionmaker.begin() as db:
+        beheerder = db.scalar(select(User).where(User.username == "beheerder"))
+        assert beheerder is not None
+        beheerder.password_hash = beheerder.password_hash.rsplit("$", 1)[0] + "$"
+
+
 def test_oidc_verplicht_weigert_noodaccount_als_enige_lokale_beheerroute(admin: Any, app: Any, idp: Any) -> None:
     _breakglass(admin)
     enable(admin, idp)
@@ -41,6 +48,50 @@ def test_oidc_verplicht_weigert_noodaccount_als_enige_lokale_beheerroute(admin: 
         "lokale_beheerder_ontbreekt",
     )
     assert sso.get(OIDC).json()["verplicht"] is False
+
+
+def test_oidc_verplicht_weigert_lokale_beheerder_zonder_wachtwoorddigest(admin: Any, app: Any, idp: Any) -> None:
+    _breakglass(admin)
+    enable(admin, idp)
+    sso = _sso_beheerder(app, idp)
+    _verwijder_wachtwoorddigest(app)
+    antwoord = sso.post(f"{OIDC}/inschakelen", json=VERPLICHT, headers=idem())
+
+    assert (antwoord.status_code, antwoord.json().get("code")) == (409, "lokale_beheerder_ontbreekt")
+    status = sso.get(OIDC).json()
+    assert status["noodaccount_werkend"] and not status["lokale_beheerder_aanwezig"] and not status["verplicht"]
+
+
+def test_consoleherstelt_bij_ontbrekende_nood_totp_en_wachtwoorddigest(
+    admin: Any, app: Any, idp: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _breakglass(admin)
+    enable(admin, idp, verplicht=True)
+    sso = _sso_beheerder(app, idp)
+    _verwijder_wachtwoorddigest(app)
+    with app.state.sessionmaker.begin() as db:
+        nood = breakglass.account(db)
+        rij = db.scalar(select(VaultSecret).where(VaultSecret.ref == nood.totp_secret_ref))
+        db.delete(rij)
+
+    status = sso.get(OIDC).json()
+    assert status["verplicht"] and not status["verplicht_effectief"]
+    with TestClient(app, base_url="https://testserver") as lokaal:
+        oud = lokaal.post("/api/v1/auth/login", json={"username": "beheerder", "password": STRONG_PASSWORD})
+        assert oud.status_code == 401
+
+        monkeypatch.setattr(hub_cli, "get_settings", lambda: settings)
+        monkeypatch.setattr("getpass.getpass", lambda _prompt: STRONG_PASSWORD)
+        assert hub_cli.main(["herstel-lokale-beheerder", "herstelbeheer"]) == 0
+        assert hub_cli.main(["herstel-lokale-beheerder", "tweede-herstelbeheer"]) != 0
+
+        nieuw = lokaal.post("/api/v1/auth/login", json={"username": "herstelbeheer", "password": STRONG_PASSWORD})
+        assert nieuw.status_code == 200
+    assert not status["lokale_herstelroute"]
+    assert sso.get(OIDC).json()["lokale_herstelroute"]
+    with app.state.sessionmaker() as db:
+        regels = db.scalars(select(AuditEvent).where(AuditEvent.action == "auth.lokale_beheerder_hersteld")).all()
+        assert len(regels) == 1 and regels[0].details == {"reden": breakglass.TOTP_UNAVAILABLE}
 
 
 @pytest.mark.parametrize("wijziging", [{"disabled": True}, {"role": "viewer"}])

@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import math
+import re
 import secrets
+from base64 import b64decode, b64encode
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from argon2 import PasswordHasher, extract_parameters
+from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -30,6 +32,15 @@ ROLE_RANK = {Role.kind: 0, Role.viewer: 1, Role.operator: 2, Role.admin: 3}
 # argon2id met expliciete parameters (RFC 9106 "tweede aanbevolen" profiel, geschikt voor een thuis-NAS)
 _hasher = PasswordHasher(time_cost=3, memory_cost=64 * 1024, parallelism=2, hash_len=32, salt_len=16)
 _DUMMY_HASH = _hasher.hash("dummy-wachtwoord-voor-gelijke-tijd")
+# Zonder versieveld leest Argon2 de hash als versie 16. De velden staan in vaste volgorde.
+_ARGON2ID_HASH = re.compile(
+    r"\$argon2id\$(?:v=(?:16|19)\$)?m=([1-9][0-9]{0,9}),t=([1-9][0-9]{0,9}),p=([1-9][0-9]{0,7})"
+    r"\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)"
+)
+# Grenzen uit de Argon2-specificatie (RFC 9106 §3.1).
+_ARGON2_MAX_COST = 2**32 - 1
+_ARGON2_MAX_PARALLELISM = 2**24 - 1
+_ARGON2_MIN_SALT_LEN = 8  # Ondergrens van de Argon2-verificatiebibliotheek.
 
 
 def hash_password(password: str) -> str:
@@ -48,13 +59,34 @@ def needs_rehash(stored_hash: str) -> bool:
     return _hasher.check_needs_rehash(stored_hash)
 
 
+def _decode_argon2_base64(value: str) -> bytes:
+    decoded = b64decode(value + "=" * (-len(value) % 4), validate=True)
+    if b64encode(decoded).decode("ascii").rstrip("=") != value:
+        raise ValueError("Ongeldige Argon2-base64")
+    return decoded
+
+
 def has_usable_password(stored_hash: str) -> bool:
-    """Een lokaal wachtwoord herkennen zonder een wachtwoord te proberen."""
-    try:
-        extract_parameters(stored_hash)
-    except (InvalidHashError, ValueError):
+    """Controleer de opgeslagen verifier zonder een wachtwoord te proberen."""
+    match = _ARGON2ID_HASH.fullmatch(stored_hash)
+    if match is None:
         return False
-    return True
+
+    memory, iterations, lanes, salt, digest = match.groups()
+    parallelism = int(lanes)
+    if not (
+        parallelism <= _ARGON2_MAX_PARALLELISM
+        and 8 * parallelism <= int(memory) <= _ARGON2_MAX_COST
+        and int(iterations) <= _ARGON2_MAX_COST
+    ):
+        return False
+
+    try:
+        decoded_salt = _decode_argon2_base64(salt)
+        decoded_digest = _decode_argon2_base64(digest)
+    except ValueError:
+        return False
+    return len(decoded_salt) >= _ARGON2_MIN_SALT_LEN and len(decoded_digest) == _hasher.hash_len
 
 
 def new_token(prefix: str, nbytes: int = 32) -> str:
