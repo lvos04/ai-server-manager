@@ -273,6 +273,8 @@ test("noodaccount (H6): geheim één keer, foute code → veldfout, goede code �
 });
 
 test.describe("SSO via HTTPS", () => {
+  test.skip(Boolean(process.env.HUB_E2E_BASE_URL), "TLS-proef vereist de eigen teststack met vertrouwde testproxy.");
+
   test("SSO: gate zichtbaar zonder D17, issuer gecontroleerd, testlogin tegen de fake-issuer zonder sessie, ‘OIDC verplicht’ uit", async ({ page: httpPage, browser }) => {
     await httpPage.goto("/instellingen/toegang");
     await ready(httpPage);

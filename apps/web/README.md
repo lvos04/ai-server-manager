@@ -81,6 +81,12 @@ HUB_E2E_SETUP_CODE="$(docker logs asm-web-e2e 2>&1 | grep -o 'SETUPCODE[^:]*: [A
 (`--network host` en `HUB_OUTBOUND_ALLOW_LOOPBACK=true` alleen hier, zodat de container de simulators op de
 testmachine bereikt; nooit in een echte installatie.)
 
+Met `HUB_E2E_BASE_URL` meldt Playwright de proef **SSO via HTTPS** als overgeslagen. De image-opstelling
+heeft geen vertrouwde testproxy. Draai `make web-e2e` zonder `HUB_E2E_BASE_URL` voor de lokale opstelling met
+die proxy. Daar toont de HTTP-pagina geen geheimveld en bewijst de HTTPS-proef dat het clientgeheim wordt
+opgeslagen en de testlogin slaagt. De dienst-E2E-proef `test_geheim_http_geweigerd_zonder_mutatie` controleert
+de HTTP-weigering door de API.
+
 ### Schemafixture
 
 `tests/unit/fixtures/decision-schemas.json` is een kopie van de besluitschema's uit de API

@@ -6,8 +6,8 @@ import path from "node:path";
  *
  * Standaard start Playwright zelf: tests/e2e/web_stack.py (API + worker + fake NAS, eigen tijdelijke database) en de
  * productie-build van de web-UI via server/hub-server.mjs (zelfde server als in de image).
- * Met HUB_E2E_BASE_URL (bv. http://127.0.0.1:30400) draait dezelfde suite tegen de alles-in-één image; start dan
- * `web_stack.py --alleen-nas` voor de fake NAS en geef de setupcode uit de containerlog mee in HUB_E2E_SETUP_CODE.
+ * Met HUB_E2E_BASE_URL draait de suite tegen de alles-in-één image. Playwright start dan alleen de
+ * simulators en gebruikt HUB_E2E_SETUP_CODE uit de containerlog. De TLS-proef vereist de eigen teststack.
  */
 const WEB_PORT = Number(process.env.HUB_E2E_WEB_PORT ?? 39400);
 const API_PORT = Number(process.env.HUB_E2E_API_PORT ?? 39401);
