@@ -13,6 +13,11 @@ Zorg dat de noodlogin werkt (Instellingen → Noodaccount: wachtwoord ≥ 20 tek
 ook als Authentik onbereikbaar is, en alleen vanaf het thuisnetwerk. Zonder werkend noodaccount kan "OIDC verplicht" niet
 aan.
 
+Maak een lokale beheerder of een noodaccount aan voordat je voor beheer op SSO vertrouwt. De Hub weigert handmatige
+wijzigingen die SSO uitzetten of alle OIDC-sessies intrekken zonder werkende lokale herstelroute. Hetzelfde geldt als
+je de laatste werkende lokale herstelroute via gebruikersbeheer uitschakelt. Bij gewijzigde discovery zet de Hub
+SSO automatisch uit, ook als er geen lokale herstelroute is. Op Gebruikers en toegang staat dan vooraf een waarschuwing.
+
 ## In Authentik (door de beheerder, in de Authentik-web-UI)
 1. Een **OAuth2/OpenID-provider** voor de Hub: client type *Confidential*, redirect-URI exact
    `https://<adres van de Hub>/api/v1/auth/oidc/callback`, **signing key** kiezen (RS256; zonder signing key gebruikt Authentik HS256 en dat weigert
@@ -20,6 +25,8 @@ aan.
 2. Een applicatie met die provider en groepen voor de Hub-rollen (bijvoorbeeld beheerders, beheer, kijkers, kinderen).
 
 ## In de Hub (admin)
+SSO inrichten vereist een vertrouwde HTTPS-route naar de Hub.
+
 1. `PUT /api/v1/auth/oidc`: issuer (exact zoals Authentik hem toont, met slash aan het eind), client-id, clientgeheim
    (alleen schrijven; daarna toont de Hub alleen de laatste 4 tekens), redirect-URI, scopes, groepsclaim (`groups`) en
    de koppelingen groep → rol (`admin`, `operator`, `viewer`, `kind`; `kind` wint altijd).
@@ -27,7 +34,9 @@ aan.
    krijgt `403 lokale_beheerder_vereist`; HTTP krijgt `403 oidc_geheim_https_vereist`, zonder configuratie- of
    kluiswijziging. De API gebruikt hetzelfde verzoeksschema als Secure-cookies: de echte verbinding of headers die
    uvicorn van een expliciet vertrouwde proxy accepteert. Een door de browser aangeleverde schemaheader is onvoldoende.
-   Over HTTP toont de UI geen geheimveld; overige configuratievelden blijven beschikbaar.
+   Het geheimveld verschijnt alleen via HTTPS voor lokale beheerders en noodsessies. Een SSO-beheerder kan gewone
+   gebruikers en hun lagere rollen blijven beheren. Alleen een lokale beheerder of noodsessie kan een gebruiker met
+   rol beheerder aanmaken, een rol naar beheerder wijzigen of het noodaccount aanmaken of wijzigen.
    De invoer staat uitsluitend tijdelijk in het veld en het uitgaande verzoek, niet in React-state of browseropslag.
    Verzenden (ook bij fout), verlaten en pagina-herstel maken het veld leeg. `autocomplete=off` en uitsluitingsattributen
    ontmoedigen wachtwoordmanagers; extern opslag-/synchronisatiegedrag kan de app niet afdwingen.
@@ -39,11 +48,20 @@ aan.
 5. `POST /api/v1/auth/oidc/inschakelen` met `ingeschakeld: true` (en eventueel `verplicht: true`).
 
 Inloggen gaat daarna via `GET /api/v1/auth/oidc/login`; fouten komen terug als `/inloggen?sso_fout=<reden>`.
-Zonder actief leesbaar clientgeheim weigeren testlogin en inschakelen met `oidc_clientgeheim_ontbreekt` (409),
-de callback toont dezelfde vaste reden, en er volgt geen tokenaanvraag. Er is geen publieke-clientterugval.
-Wissen verwijdert ook de oude OIDC-kluisrij en zet SSO uit. Het nood-TOTP en de gedeelde kluissleutel blijven behouden.
-Alleen de bevoegde beheer-GET toont de laatste vier tekens; opgeslagen antwoorden van opslaan, discovery en
+Zonder actief leesbaar clientgeheim toont Inloggen de reden, verdwijnt de SSO-knop en kun je lokaal inloggen,
+ook als "OIDC verplicht" is ingesteld. Testlogin en inschakelen weigeren met `oidc_clientgeheim_ontbreekt` (409).
+Ook de callback stopt vóór de tokenaanvraag. Stel het clientgeheim opnieuw in via HTTPS.
+Wissen en een wijziging van issuer of client-ID zonder nieuw geheim verwijderen de oude kluisrij, zetten SSO uit
+en trekken OIDC-sessies in. Het nood-TOTP en de gedeelde kluissleutel blijven behouden.
+Alleen de beheer-GET voor een lokale beheerder of noodsessie toont de laatste vier tekens. Opgeslagen antwoorden van opslaan, discovery en
 inschakelen bevatten die niet. Migratie 0014 schoont bestaande OIDC-antwoorden; andere routes en verzoekhashes blijven gelijk.
+
+## Upgraden
+
+Bij upgrade vanaf databaseversie 0012 vervallen alle bestaande OIDC-sessies. Gebruik een lokale beheerderssessie
+of de noodlogin om SSO zonder leesbaar geheim opnieuw in te richten. De instelling blijft zichtbaar met de oorzaak
+van de onbeschikbaarheid. De Hub legt die toestand bij de eerste start vast in het auditspoor. Lokale en noodsessies
+blijven geldig.
 
 ## Sessies
 - Uitloggen en intrekken werken direct. Een beheerder ziet alle actieve sessies (`GET /api/v1/sessions`) en kan alle

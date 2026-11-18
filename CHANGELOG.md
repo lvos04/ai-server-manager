@@ -5,6 +5,13 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
 ### Gerepareerd — Hub: OIDC-invoer, sessiegrenzen en lokale noodbediening (KLEIN-107)
+- Upgradenotitie KLEIN-107: vanaf databaseversie 0012 vervallen alle bestaande OIDC-sessies. SSO zonder leesbaar
+  clientgeheim is onbeschikbaar. Inloggen en de SSO-instellingen tonen de reden en lokale aanmelding blijft mogelijk,
+  ook als "OIDC verplicht" is ingesteld. Richt SSO opnieuw in via een vertrouwde HTTPS-route.
+- Alleen lokale beheerders en noodsessies mogen beheerdersrechten toekennen, het noodaccount wijzigen en de laatste
+  vier tekens van het clientgeheim zien. SSO-beheerders kunnen gewone gebruikers en lagere rollen blijven beheren.
+- Een nieuwe issuer of client-ID krijgt een eigen clientgeheim. Zonder nieuw geheim bij de wijziging verwijdert de Hub
+  de oude kluisrij en zet SSO uit. Handmatige intrekking van SSO vereist een werkende lokale herstelroute.
 - Schrijven/wissen van het OIDC-clientgeheim alleen via vertrouwde HTTPS door een lokale beheerder of noodsessie;
   HTTP en SSO-beheerders krijgen een vaste 403 zonder configuratie- of kluiswijziging. UI-veld alleen via HTTPS,
   zonder React-state, browseropslag of `new-password`; leeg bij verzenden, fout en verlaten.
