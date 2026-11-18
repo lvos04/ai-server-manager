@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from hub.config import Settings
 from hub.errors import HubError
 from hub.keys import KeyRing
-from hub.models import IdempotencyRecord, Service, ServiceToken, User, WebSession
+from hub.models import IdempotencyRecord, OidcConfig, Service, ServiceToken, User, WebSession
 from hub.scopes import has_scope
 from hub.security import ROLE_RANK, Role, constant_eq, sha256_hex
 from hub.timeutil import utcnow
@@ -153,6 +153,12 @@ def _session_principal(request: Request, db: Session, settings: Settings) -> Pri
     now = utcnow()
     if sess is None or sess.revoked_at is not None or sess.expires_at <= now:
         return None
+    if sess.auth_bron == "oidc" and not sess.break_glass:
+        cfg = db.get(OidcConfig, 1)
+        if cfg is None or not cfg.ingeschakeld or sess.oidc_config_versie != cfg.config_versie:
+            sess.revoked_at = now
+            db.commit()
+            return None
     if now - sess.last_seen_at > timedelta(seconds=settings.session_idle_seconds):
         sess.revoked_at = now
         db.commit()

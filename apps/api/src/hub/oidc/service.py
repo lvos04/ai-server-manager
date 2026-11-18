@@ -140,7 +140,7 @@ def config_dict(db: Session, cfg: OidcConfig) -> dict[str, Any]:
 def revoke_sessions(db: Session, *, user_ids: list[uuid.UUID] | None = None, only_oidc: bool = True) -> int:
     q = update(WebSession).where(WebSession.revoked_at.is_(None))
     if only_oidc:
-        q = q.where(WebSession.auth_bron == "oidc")
+        q = q.where(WebSession.auth_bron == "oidc", WebSession.break_glass.is_(False))
     if user_ids is not None:
         if not user_ids:
             return 0

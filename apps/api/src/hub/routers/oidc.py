@@ -145,12 +145,22 @@ def put_oidc(
         raise HubError(422, exc.reden, exc.uitleg) from exc
     cfg = service.config(db)
     mappings = [m.model_dump(mode="json") for m in body.rolkoppelingen]
-    critical = (cfg.issuer, cfg.client_id, cfg.redirect_uri, cfg.rolkoppelingen, cfg.groepen_claim) != (
+    critical = (
+        cfg.issuer,
+        cfg.client_id,
+        cfg.redirect_uri,
+        cfg.rolkoppelingen,
+        cfg.groepen_claim,
+        cfg.scopes,
+        cfg.sessie_minuten,
+    ) != (
         issuer,
         body.client_id,
         body.redirect_uri,
         mappings,
         body.groepen_claim,
+        body.scopes,
+        body.sessie_minuten,
     )
     if body.client_secret:
         vault.put(db, service.SECRET_REF, body.client_secret, actor=principal.actor)
@@ -162,9 +172,8 @@ def put_oidc(
     revoked = 0
     if critical:
         cfg.config_versie += 1
-        if cfg.ingeschakeld:
-            cfg.ingeschakeld = cfg.verplicht = False
-            revoked = service.revoke_sessions(db)
+        cfg.ingeschakeld = cfg.verplicht = False
+        revoked = service.revoke_sessions(db)
     cfg.issuer, cfg.client_id, cfg.redirect_uri = issuer, body.client_id, body.redirect_uri
     cfg.scopes, cfg.groepen_claim, cfg.rolkoppelingen = body.scopes, body.groepen_claim, mappings
     cfg.sessie_minuten = body.sessie_minuten
@@ -204,6 +213,8 @@ def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSO
         )
     if meta != cfg.discovery:
         cfg.config_versie += 1
+        cfg.ingeschakeld = cfg.verplicht = False
+        service.revoke_sessions(db)
     cfg.discovery, cfg.discovery_op, cfg.jwks, cfg.jwks_op = meta, utcnow(), jwks, utcnow()
     _audit(db, principal.name, "auth.oidc.discovered", {"issuer": cfg.issuer, "sleutels": len(jwks["keys"])})
     db.flush()
@@ -263,7 +274,8 @@ def enable(body: InschakelenIn, db: DB, settings: SettingsDep, principal: Admin,
             )
         if body.verplicht:
             breakglass.assert_oidc_required_allowed(db)
-    elif cfg.ingeschakeld:
+    else:
+        cfg.config_versie += 1
         revoked = service.revoke_sessions(db)
     if not body.ingeschakeld and body.verplicht:
         raise HubError(422, "validation_error", "'OIDC verplicht' kan alleen met SSO ingeschakeld.")
@@ -306,6 +318,7 @@ def oidc_login(
                 # Gewijzigde discovery = nieuwe test nodig; tot dan geen SSO (break-glass blijft werken).
                 cfg.ingeschakeld = cfg.verplicht = False
                 cfg.config_versie += 1
+                service.revoke_sessions(db)
                 audit.record(
                     db,
                     actor_type="system",
@@ -454,6 +467,7 @@ def oidc_callback(
         user,
         ttl_seconds=ttl,
         auth_bron="oidc",
+        oidc_config_versie=cfg.config_versie,
         action="auth.oidc.login",
         details={"nieuw_account": created, "rol": role.value, "groepen_bron": info["groepen_bron"], "ip": ip},
     )

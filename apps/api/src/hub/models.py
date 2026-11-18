@@ -77,6 +77,7 @@ class WebSession(Base):
     client_ip: Mapped[str] = mapped_column(String(64), default="")
     break_glass: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     auth_bron: Mapped[str] = mapped_column(String(8), default="lokaal", server_default="lokaal")
+    oidc_config_versie: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class LoginAttempt(Base):

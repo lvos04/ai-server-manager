@@ -141,6 +141,7 @@ def create_session(
     ttl_seconds: int | None = None,
     break_glass: bool = False,
     auth_bron: str = "lokaal",
+    oidc_config_versie: int | None = None,
     action: str | None = None,
     details: dict[str, Any] | None = None,
 ) -> tuple[str, str, WebSession, int]:
@@ -161,6 +162,7 @@ def create_session(
         client_ip=client_ip(request),
         break_glass=break_glass,
         auth_bron=auth_bron,
+        oidc_config_versie=oidc_config_versie,
     )
     db.add(sess)
     audit.record(
