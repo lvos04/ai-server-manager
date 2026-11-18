@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 
-from hub import audit
+from hub import audit, breakglass
 from hub.deps import (
     CSRF_COOKIE,
     DB,
@@ -496,7 +496,12 @@ def create_user(body: UserIn, db: DB, settings: SettingsDep, principal: Admin, i
 
 
 @router.patch("/users/{user_id}", summary="Rol/status wijzigen (admin)")
-def patch_user(user_id: uuid.UUID, body: UserPatch, db: DB, principal: Admin, idem: Idem) -> JSONResponse:
+def patch_user(
+    user_id: uuid.UUID, body: UserPatch, db: DB, principal: Admin, idem: Idem, vault: ReadableVault
+) -> JSONResponse:
+    demote = (body.role is not None and body.role != Role.admin) or body.disabled is True
+    if demote:
+        breakglass.lock_local_recovery(db)
     user = db.get(User, user_id)
     if user is None:
         raise HubError(404, "not_found", "Gebruiker niet gevonden.")
@@ -506,13 +511,14 @@ def patch_user(user_id: uuid.UUID, body: UserPatch, db: DB, principal: Admin, id
         return replay
     if user.break_glass and body.role is not None and body.role != Role.admin:
         raise HubError(409, "break_glass_stays_admin", "Het noodaccount houdt de rol 'admin'.")
-    demote = (body.role is not None and body.role != Role.admin) or body.disabled is True
     if user.role == Role.admin.value and demote:
         admins = db.scalar(select(func.count()).select_from(User).where(User.role == "admin", User.disabled.is_(False)))
         if (admins or 0) <= 1:
             raise HubError(
                 409, "last_admin", "De laatste actieve beheerder kan niet worden gedegradeerd of uitgeschakeld."
             )
+        if not user.disabled and (user.auth_bron == "lokaal" or user.break_glass):
+            breakglass.require_local_recovery(db, vault, exclude_user=user.id)
     if body.role is not None:
         user.role = body.role.value
     if body.disabled is not None:

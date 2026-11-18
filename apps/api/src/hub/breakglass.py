@@ -16,21 +16,27 @@ import hmac
 import ipaddress
 import secrets
 import struct
+import uuid
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
-from sqlalchemy import select
+from cryptography.exceptions import InvalidTag
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from hub.config import Settings
 from hub.errors import HubError
 from hub.models import HubSetting, User
+from hub.security import has_usable_password
 from hub.timeutil import iso, utcnow
+from hub.vault import Vault, VaultError
 
 TOTP_PERIOD = 30
 TOTP_DIGITS = 6
 TOTP_WINDOW = 1  # één tijdstap speling naar voren en naar achteren (klokverschil telefoon)
+RECOVERY_LOCK_KEY = 0x48554252_45434F56  # "HUBRECOV"
 ISSUER = "TrueNAS Home Platform"  # productnaam (besluit gebruiker O-07)
 
 PRIVATE_NETWORKS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
@@ -156,6 +162,38 @@ def is_working(user: User | None) -> bool:
         and user.totp_secret_ref is not None
         and user.totp_confirmed_at is not None
     )
+
+
+def lock_local_recovery(db: Session) -> None:
+    """Toets en wijzig een herstelroute in dezelfde transactie, ook bij gelijktijdige verzoeken."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": RECOVERY_LOCK_KEY})
+
+
+def has_local_recovery(db: Session, vault: Vault | None, *, exclude_user: uuid.UUID | None = None) -> bool:
+    beheerders = select(User.id, User.password_hash).where(
+        User.role == "admin", User.disabled.is_(False), User.auth_bron == "lokaal", User.break_glass.is_(False)
+    )
+    if any(user_id != exclude_user and has_usable_password(hash_) for user_id, hash_ in db.execute(beheerders)):
+        return True
+
+    nood = account(db)
+    if vault is None or nood is None or nood.id == exclude_user or not is_working(nood):
+        return False
+    if nood.totp_secret_ref and has_usable_password(nood.password_hash):
+        with suppress(InvalidTag, VaultError, ValueError):
+            secret = vault.get(db, nood.totp_secret_ref)
+            return bool(secret and _key(secret))
+    return False
+
+
+def require_local_recovery(db: Session, vault: Vault | None, *, exclude_user: uuid.UUID | None = None) -> None:
+    if not has_local_recovery(db, vault, exclude_user=exclude_user):
+        raise HubError(
+            409,
+            "lokale_herstelroute_vereist",
+            "Deze wijziging vereist een werkende lokale herstelroute. Maak eerst een lokale beheerder "
+            "of een werkend noodaccount aan.",
+        )
 
 
 def session_minutes(user: User, settings: Settings) -> int:

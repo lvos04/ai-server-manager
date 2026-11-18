@@ -9,7 +9,7 @@ import secrets
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-from argon2 import PasswordHasher
+from argon2 import PasswordHasher, extract_parameters
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -46,6 +46,15 @@ def verify_password(stored_hash: str | None, password: str) -> bool:
 
 def needs_rehash(stored_hash: str) -> bool:
     return _hasher.check_needs_rehash(stored_hash)
+
+
+def has_usable_password(stored_hash: str) -> bool:
+    """Een lokaal wachtwoord herkennen zonder een wachtwoord te proberen."""
+    try:
+        extract_parameters(stored_hash)
+    except (InvalidHashError, ValueError):
+        return False
+    return True
 
 
 def new_token(prefix: str, nbytes: int = 32) -> str:

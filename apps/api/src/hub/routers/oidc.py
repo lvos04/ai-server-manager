@@ -145,6 +145,7 @@ def put_oidc(
         issuer = client.validate_issuer(body.issuer, allow_loopback=settings.outbound_allow_loopback)
     except client.OidcError as exc:
         raise HubError(422, exc.reden, exc.uitleg) from exc
+    breakglass.lock_local_recovery(db)
     cfg = service.config(db)
     mappings = [m.model_dump(mode="json") for m in body.rolkoppelingen]
     critical = (
@@ -165,6 +166,8 @@ def put_oidc(
         body.sessie_minuten,
     )
     binding_gewijzigd = (cfg.issuer, cfg.client_id) != (issuer, body.client_id)
+    if critical or body.client_secret or body.client_secret_wissen:
+        breakglass.require_local_recovery(db, vault)
     if body.client_secret:
         vault.put(db, service.SECRET_REF, body.client_secret, actor=principal.actor)
         cfg.client_secret_ref, critical = service.SECRET_REF, True
@@ -221,6 +224,8 @@ def discover(db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault:
             },
         )
     if meta != cfg.discovery:
+        breakglass.lock_local_recovery(db)
+        breakglass.require_local_recovery(db, vault)
         cfg.config_versie += 1
         cfg.ingeschakeld = cfg.verplicht = False
         service.revoke_sessions(db)
@@ -272,6 +277,9 @@ def enable(
 ) -> JSONResponse:
     if (replay := idem.replay()) is not None:
         return replay
+    if not body.ingeschakeld and body.verplicht:
+        raise HubError(422, "validation_error", "'OIDC verplicht' kan alleen met SSO ingeschakeld.")
+    breakglass.lock_local_recovery(db)
     cfg = service.config(db)
     revoked = 0
     if body.ingeschakeld:
@@ -290,10 +298,9 @@ def enable(
         if body.verplicht:
             breakglass.assert_oidc_required_allowed(db)
     else:
+        breakglass.require_local_recovery(db, vault)
         cfg.config_versie += 1
         revoked = service.revoke_sessions(db)
-    if not body.ingeschakeld and body.verplicht:
-        raise HubError(422, "validation_error", "'OIDC verplicht' kan alleen met SSO ingeschakeld.")
     before = (cfg.ingeschakeld, cfg.verplicht)
     cfg.ingeschakeld, cfg.verplicht = body.ingeschakeld, body.verplicht
     cfg.bijgewerkt_door, cfg.bijgewerkt_op, cfg.version = principal.actor, utcnow(), cfg.version + 1

@@ -259,6 +259,7 @@ function AlleSessies() {
 interface Oidc {
   ingeschakeld: boolean;
   reden: string | null;
+  lokale_herstelroute: boolean;
   verplicht: boolean;
   noodaccount_werkend: boolean;
   issuer: string | null;
@@ -310,6 +311,8 @@ function Sso() {
       : null);
   const gateDicht = c?.gate_authentik.status !== "toegestaan";
   const test = c?.laatste_test;
+  const afmelding = "SSO gaat uit tot een nieuwe testlogin slaagt. Ook je eigen SSO-sessie eindigt.";
+  const waarschuwing = c?.ingeschakeld ? afmelding : undefined;
   return (
     <section className="card" id="sso" aria-labelledby="sso-titel" data-testid="sso">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -321,6 +324,11 @@ function Sso() {
       {c?.reden === "oidc_clientgeheim_ontbreekt" ? (
         <Melding soort="beperkt" titel="SSO staat aan maar werkt niet: het clientgeheim ontbreekt">
           <p>Stel het clientgeheim in via HTTPS of zet SSO uit.</p>
+        </Melding>
+      ) : null}
+      {c?.lokale_herstelroute === false ? (
+        <Melding soort="beperkt" titel="Er is geen werkende lokale herstelroute">
+          <p>Maak een lokale beheerder of een noodaccount aan. Bij gewijzigde gegevens van de issuer kan SSO automatisch uitgaan.</p>
         </Melding>
       ) : null}
       {c && gateDicht ? (
@@ -359,10 +367,10 @@ function Sso() {
             }
           }}
         >
-          <Field id="sso-issuer" label="Issuer-adres" help="Alleen https. Wijzigen zet SSO uit tot een nieuwe testlogin slaagt.">
+          <Field id="sso-issuer" label="Issuer-adres" help={`Alleen HTTPS. Bij wijzigen vervalt het clientgeheim als je geen nieuw geheim invult. ${waarschuwing ?? ""}`}>
             {(a) => <input {...a} type="url" value={f.issuer} onChange={(e) => setForm({ ...f, issuer: e.target.value })} autoComplete="off" />}
           </Field>
-          <Field id="sso-client" label="Client-ID">
+          <Field id="sso-client" label="Client-ID" help={`Bij wijzigen vervalt het clientgeheim als je geen nieuw geheim invult. ${waarschuwing ?? ""}`}>
             {(a) => <input {...a} value={f.client_id} onChange={(e) => setForm({ ...f, client_id: e.target.value })} autoComplete="off" />}
           </Field>
           <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
@@ -371,22 +379,23 @@ function Sso() {
           <KopieerVeld label="Terugkeer-adres (zet dit in Authentik)" waarde={redirect} testId="sso-redirect" />
           {redirect.startsWith("http://") ? (
             <Melding soort="info">
-              <p>De aanmeldcode is beschermd met PKCE en een browsercookie, maar zet HTTPS aan zodra D17 klaar is.</p>
+              <p>Open de Hub via een vertrouwde HTTPS-verbinding om SSO in te richten.</p>
             </Melding>
           ) : null}
           <div className="grid gap-3 md:grid-cols-3">
-            <Field id="sso-scopes" label="Scopes">
+            <Field id="sso-scopes" label="Scopes" help={waarschuwing}>
               {(a) => <input {...a} value={f.scopes} onChange={(e) => setForm({ ...f, scopes: e.target.value })} />}
             </Field>
-            <Field id="sso-claim" label="Groepen-claim">
+            <Field id="sso-claim" label="Groepen-claim" help={waarschuwing}>
               {(a) => <input {...a} value={f.groepen_claim} onChange={(e) => setForm({ ...f, groepen_claim: e.target.value })} />}
             </Field>
-            <Field id="sso-duur" label="Sessieduur (minuten)" help="15–720.">
+            <Field id="sso-duur" label="Sessieduur (minuten)" help={`15–720. ${waarschuwing ?? ""}`}>
               {(a) => <input {...a} type="number" min={15} max={720} value={f.sessie_minuten} onChange={(e) => setForm({ ...f, sessie_minuten: Number(e.target.value) })} />}
             </Field>
           </div>
           <fieldset>
             <legend>Groep → rol</legend>
+            {waarschuwing ? <p className="help">{waarschuwing}</p> : null}
             {/* Containerquery: naast elkaar pas als de kolom zelf breed genoeg is (op 1024 staat er ook een subnavigatie). */}
             <div className="@container flex flex-col gap-2">
               {f.rolkoppelingen.map((k, i) => (
@@ -419,8 +428,9 @@ function Sso() {
             </div>
           </fieldset>
           {save.error ? <ErrorPanel error={save.error} title="Opslaan mislukt" /> : null}
+          {waarschuwing ? <p id="sso-opslaan-reden" className="help">Bij gewijzigde instellingen of een nieuw clientgeheim geldt het volgende. {waarschuwing}</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primair" bezig={save.busy} data-testid="sso-opslaan">
+            <Button type="submit" variant="primair" bezig={save.busy} data-testid="sso-opslaan" aria-describedby={waarschuwing ? "sso-opslaan-reden" : undefined}>
               Opslaan
             </Button>
           </div>
@@ -429,8 +439,9 @@ function Sso() {
       {c?.issuer ? (
         <div className="flex flex-col gap-2">
           <h3>Controle van de issuer</h3>
+          {waarschuwing ? <p id="sso-controleren-reden" className="help">Als de issuer gewijzigde gegevens teruggeeft, gaat SSO uit. Ook je eigen SSO-sessie eindigt.</p> : null}
           <div>
-            <Button bezig={disc.busy} onClick={async () => (await disc.run("/api/v1/auth/oidc/discover")) && void cfg.reload()} data-testid="sso-controleren">
+            <Button bezig={disc.busy} onClick={async () => (await disc.run("/api/v1/auth/oidc/discover")) && void cfg.reload()} data-testid="sso-controleren" aria-describedby={waarschuwing ? "sso-controleren-reden" : undefined}>
               Issuer controleren
             </Button>
           </div>
@@ -501,12 +512,13 @@ function Sso() {
               SSO aanzetten
             </Button>
             {c.ingeschakeld ? (
-              <Button onClick={async () => (await aan.run("/api/v1/auth/oidc/inschakelen", { body: { ingeschakeld: false } })) && void cfg.reload()}>SSO uitzetten</Button>
+              <Button aria-describedby="sso-uit-reden" onClick={async () => (await aan.run("/api/v1/auth/oidc/inschakelen", { body: { ingeschakeld: false } })) && void cfg.reload()}>SSO uitzetten</Button>
             ) : null}
             <Button uit={!c.ingeschakeld || !c.noodaccount_werkend} aria-describedby="sso-verplicht-reden" data-testid="oidc-verplicht">
               OIDC verplicht maken
             </Button>
           </div>
+          {waarschuwing ? <p id="sso-uit-reden" className="help">Bij uitzetten worden alle SSO-sessies afgemeld. Ook je eigen SSO-sessie eindigt.</p> : null}
           <p id="sso-aan-reden" className="help">
             {gateDicht ? "Aanzetten kan pas als D17 (HTTPS) Getest is." : !test?.actueel ? "Aanzetten kan pas na een geslaagde testlogin met de huidige instellingen." : ""}
           </p>
