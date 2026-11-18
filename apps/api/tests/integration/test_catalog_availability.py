@@ -217,6 +217,64 @@ def test_deadline_omvat_publicatie(
             db.execute(text("DROP FUNCTION trage_publicatie()"))
 
 
+def test_deadline_omvat_vertraagde_reservering(
+    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    factory = app.state.sessionmaker
+    nu = NOW
+    monkeypatch.setattr(availability, "utcnow", lambda: nu)
+    availability.refresh_if_due(factory, settings, app.state.vault())
+    pins = (PIN, {**PIN, "version": "1.4.7"})
+    assert [admin.get(PATH, params=pin, headers=headers).json()["beschikbaar"] for pin in pins] == ["ja", "nee"]
+    nu += availability.MEASUREMENT_INTERVAL
+    grens = 1.5
+    monkeypatch.setattr(availability, "MEASUREMENT_TIMEOUT", grens)
+    calls = list(fake_nas.calls)
+    with ThreadPoolExecutor(max_workers=1) as worker, factory.begin() as houder:
+        houder.execute(text("SELECT id FROM catalog_snapshot WHERE id = 1 FOR UPDATE"))
+
+        def meet() -> float:
+            begin = time.monotonic()
+            availability.refresh_if_due(factory, settings, app.state.vault())
+            return time.monotonic() - begin
+
+        taak = worker.submit(meet)
+        time.sleep(grens + 0.4)  # de meting is over de grens, maar de reservering wacht nog
+        for pin in pins:
+            assert admin.get(PATH, params=pin, headers=headers).json() == {
+                **pin,
+                "beschikbaar": "onbekend",
+                "gemeten_op": None,
+            }
+        with factory.begin() as lezer:
+            meetlock_vrij = lezer.scalar(
+                text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": availability.MEASUREMENT_LOCK}
+            )
+        worker_vrij = taak.done()
+    duur = taak.result(timeout=5)
+    assert worker_vrij and meetlock_vrij
+    assert duur <= grens
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:  # de wachtende reservering rondt na het vrijgeven af
+        with factory.begin() as lezer:
+            if lezer.scalar(text("SELECT observed_at IS NULL AND started_at = :nu FROM catalog_snapshot"), {"nu": nu}):
+                break
+        time.sleep(0.05)
+    for pin in pins:
+        assert admin.get(PATH, params=pin, headers=headers).json() == {
+            **pin,
+            "beschikbaar": "onbekend",
+            "gemeten_op": None,
+        }
+    assert fake_nas.calls == calls and not fake_nas.mutations
+
+
 def test_onleesbare_kluis_laat_periodieke_taken_door(
     admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

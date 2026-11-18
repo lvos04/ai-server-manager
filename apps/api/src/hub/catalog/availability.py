@@ -9,7 +9,7 @@ import time
 import uuid
 from contextlib import suppress
 from datetime import datetime, timedelta
-from threading import Timer
+from threading import Event, Thread, Timer
 from typing import Any, Literal
 
 from cryptography.exceptions import InvalidTag
@@ -41,6 +41,8 @@ MEASUREMENT_TIMEOUT = 15.0
 ROLLBACK_BUDGET = 0.1
 MEASUREMENT_INTERVAL = timedelta(seconds=300)
 MEASUREMENT_LOCK = 0x41534D4D33
+RESERVATION_MARK = 0x41534D4D34  # sessielock zolang een meetstart wordt vastgelegd: pins zijn dan onbekend
+RESERVATION_CAP = 60
 DETAILS_PER_ROUND = 4
 IX_APP = ("stable", "ix-app")
 
@@ -195,13 +197,40 @@ def _publish(db: Session, catalog: dict[str, Any], observed: datetime, deadline:
         timer.join()
 
 
+def _reserve(factory: sessionmaker[Session], snapshot: CatalogSnapshot, klaar: Event, uitkomst: list[bool]) -> None:
+    """Leg de meetstart vast op een eigen verbinding. Wacht op een rijvergrendeling mag langer duren dan de meting.
+
+    De pins blijven onbekend (RESERVATION_MARK) totdat dit klaar is, ook nadat de meetpoging zelf is verlopen.
+    """
+    try:
+        with factory() as session:
+            if not session.scalar(text("SELECT pg_try_advisory_lock(:k)"), {"k": RESERVATION_MARK}):
+                return
+            try:
+                session.execute(
+                    text("SELECT set_config('statement_timeout', :ms, true)"), {"ms": str(RESERVATION_CAP * 1000)}
+                )
+                session.merge(snapshot)
+                session.commit()
+                uitkomst.append(True)
+                klaar.set()
+            finally:
+                session.rollback()
+                session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": RESERVATION_MARK})
+                session.commit()
+    except DBAPIError:
+        pass  # Zonder vastlegging volgt geen meting; de volgende ronde probeert opnieuw.
+    finally:
+        klaar.set()
+
+
 def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Vault) -> None:
     # Houd de meetverbinding ook na commit uitgecheckt tot de annuleerder klaar is.
     # Zo raakt een annulering nooit een andere gebruiker van de pool.
-    with factory() as reservation, reservation.get_bind().engine.connect() as conn:
+    with factory.kw["bind"].connect() as conn:
         try:
             with factory(bind=conn) as db:
-                _refresh(db, reservation, settings, vault)
+                _refresh(db, factory, settings, vault)
         except DBAPIError as exc:
             if not exc.connection_invalidated and not isinstance(
                 exc.orig, (QueryCanceled, IdleInTransactionSessionTimeout)
@@ -209,7 +238,9 @@ def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Va
                 raise
 
 
-def _refresh(db: Session, reservation: Session, settings: Settings, vault: Vault) -> None:
+def _refresh(db: Session, factory: sessionmaker[Session], settings: Settings, vault: Vault) -> None:
+    # De tijdgrens geldt vanaf de reservering tot en met de commit en publicatie.
+    deadline = time.monotonic() + MEASUREMENT_TIMEOUT - min(ROLLBACK_BUDGET, MEASUREMENT_TIMEOUT / 10)
     if not db.scalar(text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": MEASUREMENT_LOCK}):
         return
     target = current_target(db)
@@ -217,20 +248,19 @@ def _refresh(db: Session, reservation: Session, settings: Settings, vault: Vault
     if target is None or connection is None:
         return
     binding = _binding(db, target, connection)
-    # Annulering, rollback en vrijgeven van de lock horen bij dezelfde meetpoging.
-    deadline = time.monotonic() + MEASUREMENT_TIMEOUT - min(ROLLBACK_BUDGET, MEASUREMENT_TIMEOUT / 10)
     now = utcnow()
+    previous = db.get(CatalogSnapshot, 1)
+    if previous is not None and now - previous.started_at < MEASUREMENT_INTERVAL:
+        return
+    round_number = previous.round_number + 1 if previous is not None and previous.binding == binding else 0
     # Commit de start onder dezelfde Hub-brede lock, zodat een afgebroken worker het interval niet vergeet.
-    with reservation.begin():
-        previous = reservation.get(CatalogSnapshot, 1)
-        if previous is not None and now - previous.started_at < MEASUREMENT_INTERVAL:
-            return
-        round_number = previous.round_number + 1 if previous is not None and previous.binding == binding else 0
-        reservation.merge(
-            CatalogSnapshot(
-                id=1, started_at=now, binding=binding, round_number=round_number, catalog={}, observed_at=None
-            )
-        )
+    snapshot = CatalogSnapshot(
+        id=1, started_at=now, binding=binding, round_number=round_number, catalog={}, observed_at=None
+    )
+    klaar, uitkomst = Event(), list[bool]()
+    Thread(target=_reserve, args=(factory, snapshot, klaar, uitkomst), daemon=True).start()
+    if not klaar.wait(max(0.0, deadline - time.monotonic())) or not uitkomst:
+        return  # De reservering loopt zo nodig door op haar eigen verbinding; de meetlock komt nu vrij.
     if not _storage_budget(db.connection(), deadline):
         return
     try:
@@ -256,6 +286,14 @@ def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availab
     target, connection = current_target(db), db.get(TrueNASConnection, 1)
     if target is None or connection is None:
         return "onbekend", None
+    if db.scalar(
+        text(
+            "SELECT EXISTS (SELECT FROM pg_locks WHERE locktype = 'advisory' AND objsubid = 1 AND granted "
+            "AND (classid::bigint << 32) | objid::bigint = :k)"
+        ),
+        {"k": RESERVATION_MARK},
+    ):
+        return "onbekend", None  # een meetstart wordt vastgelegd of wacht nog; de vorige meting geldt niet meer
     catalog = CatalogSnapshot.catalog
     # Alleen een gevalideerde versielijst uit deze ronde bewijst aanwezigheid of afwezigheid.
     # Eerdere Hub-versies sloegen ook de bronindex op. Hun momentopnamen tellen hier niet mee.
