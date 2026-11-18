@@ -13,7 +13,7 @@ export async function startTlsHub(upstream: string): Promise<{ url: string; clos
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=localhost", "-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost", "-days", "1", "-keyout", key, "-out", cert], { stdio: "ignore" });
   const server = createServer({ cert: readFileSync(cert), key: readFileSync(key) }, (incoming, response) => {
     const target = new URL(incoming.url ?? "/", upstream);
-    const outgoing = request(target, { method: incoming.method, headers: { ...incoming.headers, "x-forwarded-proto": "https", "x-forwarded-for": "127.0.0.1" } }, (res) => {
+    const outgoing = request(target, { localAddress: "127.0.0.2", method: incoming.method, headers: { ...incoming.headers, "x-forwarded-proto": "https", "x-forwarded-for": "127.0.0.1" } }, (res) => {
       response.writeHead(res.statusCode ?? 502, res.headers);
       res.pipe(response);
     });

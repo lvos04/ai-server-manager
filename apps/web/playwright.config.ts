@@ -90,7 +90,7 @@ export default defineConfig({
         {
           command: "node server/hub-server.mjs",
           url: `http://127.0.0.1:${WEB_PORT}/`,
-          env: { PORT: String(WEB_PORT), HOSTNAME: "127.0.0.1", HUB_API_URL: `http://127.0.0.1:${API_PORT}`, HUB_WEB_TRUSTED_PROXIES: "127.0.0.1" },
+          env: { PORT: String(WEB_PORT), HOSTNAME: "127.0.0.1", HUB_API_URL: `http://127.0.0.1:${API_PORT}`, HUB_WEB_TRUSTED_PROXIES: "127.0.0.2" },
           timeout: 60_000,
           reuseExistingServer: false,
           gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
