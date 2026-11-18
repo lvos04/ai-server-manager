@@ -1,8 +1,25 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { OidcSecretField, takeOidcSecret } from "@/components/OidcSecretField";
+import { OidcSecretField, takeOidcSecret, watchOidcSecret } from "@/components/OidcSecretField";
 
 describe("OIDC-clientgeheim", () => {
+  it("wist bij verlaten, paginaherstel en ontkoppelen van het veld", () => {
+    const input = { value: "testinvoer" } as HTMLInputElement;
+    const page = new EventTarget();
+    const cleanup = watchOidcSecret(input, page);
+    page.dispatchEvent(new Event("pagehide"));
+    expect(input.value).toBe("");
+    input.value = "testinvoer";
+    page.dispatchEvent(new Event("pageshow"));
+    expect(input.value).toBe("");
+    input.value = "testinvoer";
+    cleanup();
+    expect(input.value).toBe("");
+    input.value = "losgekoppeld";
+    page.dispatchEvent(new Event("pagehide"));
+    page.dispatchEvent(new Event("pageshow"));
+    expect(input.value).toBe("losgekoppeld");
+  });
   it("verwijdert de invoer meteen vóór de aanvraag en bewaart geen formulierwaarde", () => {
     const input = { value: "tijdelijke-testinvoer" } as HTMLInputElement;
     expect(takeOidcSecret(input)).toBe("tijdelijke-testinvoer");

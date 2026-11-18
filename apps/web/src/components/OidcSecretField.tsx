@@ -9,20 +9,21 @@ export function takeOidcSecret(input: HTMLInputElement | null): string {
   return value;
 }
 
+export function watchOidcSecret(input: HTMLInputElement | null, target: EventTarget): () => void {
+  const clear = () => { takeOidcSecret(input); };
+  target.addEventListener("pagehide", clear);
+  target.addEventListener("pageshow", clear);
+  return () => {
+    clear();
+    target.removeEventListener("pagehide", clear);
+    target.removeEventListener("pageshow", clear);
+  };
+}
+
 export function OidcSecretField({ https, ingesteld, laatste4, inputRef }: { https: boolean; ingesteld: boolean; laatste4: string | null; inputRef?: RefObject<HTMLInputElement | null> }) {
   const ownRef = useRef<HTMLInputElement>(null);
   const fieldRef = inputRef ?? ownRef;
-  useEffect(() => {
-    const input = fieldRef.current;
-    const clear = () => { takeOidcSecret(input); };
-    window.addEventListener("pagehide", clear);
-    window.addEventListener("pageshow", clear);
-    return () => {
-      clear();
-      window.removeEventListener("pagehide", clear);
-      window.removeEventListener("pageshow", clear);
-    };
-  }, [fieldRef]);
+  useEffect(() => watchOidcSecret(fieldRef.current, window), [fieldRef]);
   if (!https) return <p className="help">Het clientgeheim invoeren kan alleen via HTTPS. Open de Hub via een vertrouwde HTTPS-verbinding.</p>;
   return (
     <Field id="sso-geheim" label={ingesteld ? "Clientgeheim vervangen (optioneel)" : "Clientgeheim"}
