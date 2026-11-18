@@ -19,9 +19,11 @@ import hashlib
 import re
 import secrets
 import uuid
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import Any
 
+from cryptography.exceptions import InvalidTag
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -32,7 +34,7 @@ from hub.models import OidcConfig, OidcIdentity, OidcTransaction, User, WebSessi
 from hub.oidc import client
 from hub.security import ROLE_RANK, Role, sha256_hex
 from hub.timeutil import iso, utcnow
-from hub.vault import Vault, make_ref
+from hub.vault import Vault, VaultError, make_ref
 
 SECRET_REF = make_ref("auth", "oidc-client-secret")
 CALLBACK_PATH = "/api/v1/auth/oidc/callback"
@@ -200,10 +202,21 @@ def handle_event(db: Session, settings: Settings, ev: EventIn, now: datetime) ->
 
 
 # ------------------------------------------------------------------ aanmelden
+def require_secret(db: Session, cfg: OidcConfig, vault: Vault) -> str:
+    secret = None
+    if cfg.client_secret_ref == SECRET_REF:
+        with suppress(InvalidTag, VaultError, UnicodeDecodeError, ValueError):
+            secret = vault.get(db, SECRET_REF)
+    if not secret:
+        raise client.OidcError("oidc_clientgeheim_ontbreekt", "Een actief, leesbaar clientgeheim is vereist.")
+    return secret
+
+
 def start(
-    db: Session, cfg: OidcConfig, settings: Settings, *, doel: str, terug: str, actor: str | None, ip: str
+    db: Session, cfg: OidcConfig, settings: Settings, vault: Vault, *, doel: str, terug: str, actor: str | None, ip: str
 ) -> tuple[str, str]:
     """Nieuwe transactie; geeft (autorisatie-URL, browsergeheim voor het cookie)."""
+    require_secret(db, cfg, vault)
     meta = cfg.discovery or {}
     if not meta or not cfg.client_id or not cfg.redirect_uri:
         raise client.OidcError("oidc_niet_ingericht", "SSO is nog niet volledig ingesteld (issuer, client, redirect).")
@@ -271,7 +284,7 @@ def finish(
     if tx.config_versie != cfg.config_versie:
         raise client.OidcError("config_gewijzigd", "De SSO-instellingen zijn intussen gewijzigd; probeer opnieuw.")
     assert cfg.client_id and cfg.redirect_uri and cfg.issuer
-    secret = vault.get(db, cfg.client_secret_ref) if cfg.client_secret_ref else None
+    secret = require_secret(db, cfg, vault)
     policy = settings.outbound_policy()
     tokens = client.exchange_code(
         cfg.discovery,

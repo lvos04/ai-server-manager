@@ -163,17 +163,17 @@ def exchange_code(
     verifier: str,
     policy: OutboundPolicy,
 ) -> dict[str, Any]:
+    if not client_secret:
+        raise OidcError("oidc_clientgeheim_ontbreekt", "Een actief clientgeheim is vereist.")
     form = {"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri, "code_verifier": verifier}
     headers: dict[str, str] = {}
     methods = meta.get("token_auth_methods") or ["client_secret_basic"]
-    if client_secret and "client_secret_basic" in methods:
+    if "client_secret_basic" in methods:
         from urllib.parse import quote
 
         headers["Authorization"] = basic_auth(quote(client_id, safe=""), quote(client_secret, safe=""))
-    elif client_secret:
-        form.update({"client_id": client_id, "client_secret": client_secret})
     else:
-        form["client_id"] = client_id
+        form.update({"client_id": client_id, "client_secret": client_secret})
     try:
         base, path = split_url(str(meta["token_endpoint"]), allow_loopback=policy.allow_loopback)
         res = request(base, "POST", path, policy=policy, headers=headers, form_body=form, max_bytes=256 * 1024)

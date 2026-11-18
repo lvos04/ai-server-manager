@@ -20,14 +20,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from hub import audit, breakglass
 from hub.deps import DB, Admin, Idem, SettingsDep, get_keyring, get_vault, require_local_admin
 from hub.errors import HubError
 from hub.keys import KeyRing
-from hub.models import OidcConfig, OidcIdentity, Service, User, WebSession
+from hub.models import OidcConfig, OidcIdentity, Service, User, VaultSecret, WebSession
 from hub.oidc import client, service
 from hub.routers.auth import client_ip, create_session, set_session_cookies
 from hub.security import Role, failures_in_window, record_failure
@@ -166,6 +166,7 @@ def put_oidc(
         vault.put(db, service.SECRET_REF, body.client_secret, actor=principal.actor)
         cfg.client_secret_ref, critical = service.SECRET_REF, True
     elif body.client_secret_wissen:
+        db.execute(delete(VaultSecret).where(VaultSecret.ref == service.SECRET_REF))
         cfg.client_secret_ref, critical = None, True
     if (cfg.issuer, cfg.client_id) != (issuer, body.client_id):
         cfg.discovery, cfg.jwks, cfg.discovery_op, cfg.jwks_op = {}, {}, None, None
@@ -239,12 +240,12 @@ def _start_limit(db: Session, settings: Any, ip: str) -> None:
 
 
 @router.post("/api/v1/auth/oidc/test", summary="Testlogin starten (admin): volledige aanmelding zonder sessie")
-def oidc_test_start(request: Request, db: DB, settings: SettingsDep, principal: Admin) -> JSONResponse:
+def oidc_test_start(request: Request, db: DB, settings: SettingsDep, principal: Admin, vault: VaultDep) -> JSONResponse:
     cfg = service.config(db)
     _start_limit(db, settings, client_ip(request))
     try:
         url, browser = service.start(
-            db, cfg, settings, doel="test", terug="/", actor=principal.actor, ip=client_ip(request)
+            db, cfg, settings, vault, doel="test", terug="/", actor=principal.actor, ip=client_ip(request)
         )
     except client.OidcError as exc:
         raise HubError(409, exc.reden, exc.uitleg) from exc
@@ -258,12 +259,18 @@ def oidc_test_start(request: Request, db: DB, settings: SettingsDep, principal: 
 
 
 @router.post("/api/v1/auth/oidc/inschakelen", summary="SSO aan/uit en 'OIDC verplicht' (admin)")
-def enable(body: InschakelenIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
+def enable(
+    body: InschakelenIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault: VaultDep
+) -> JSONResponse:
     if (replay := idem.replay()) is not None:
         return replay
     cfg = service.config(db)
     revoked = 0
     if body.ingeschakeld:
+        try:
+            service.require_secret(db, cfg, vault)
+        except client.OidcError as exc:
+            raise HubError(409, exc.reden, exc.uitleg) from exc
         test = cfg.laatste_test or {}
         if test.get("resultaat") != "geslaagd" or test.get("config_versie") != cfg.config_versie:
             raise HubError(409, "testlogin_vereist", "Doe eerst een geslaagde testlogin met de huidige instellingen.")
@@ -305,6 +312,7 @@ def oidc_login(
     request: Request,
     db: DB,
     settings: SettingsDep,
+    vault: VaultDep,
     terug: Annotated[str, Query(max_length=256)] = "/",
 ) -> Response:
     cfg = db.get(OidcConfig, 1)
@@ -331,7 +339,9 @@ def oidc_login(
                 db.commit()
                 return _login_error("sso_gewijzigd")
             cfg.discovery_op = utcnow()
-        url, browser = service.start(db, cfg, settings, doel="login", terug=terug, actor=None, ip=client_ip(request))
+        url, browser = service.start(
+            db, cfg, settings, vault, doel="login", terug=terug, actor=None, ip=client_ip(request)
+        )
     except client.OidcError as exc:
         db.commit()
         return _login_error(exc.reden)

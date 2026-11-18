@@ -12,13 +12,14 @@ from e2e.test_oidc_sso import (
     NOOD_PW,
     REDIRECT,
     _breakglass,
+    callback,
     configure,
     enable,
     sso_login,
 )
 from fakes.fake_oidc import FakeOidc
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from hub import breakglass
@@ -248,3 +249,59 @@ def test_alleen_lokale_beheerder_of_noodsessie_wijzigt_geheim(
     nood = noodlogin(app, secret)
     assert nood.put("/api/v1/auth/oidc", json=body(idp, **fields), headers=idem()).status_code == 200
     assert admin.get("/api/v1/auth/me").status_code == 200
+
+
+@pytest.mark.parametrize("ontbreekt", ["ref", "rij", "onleesbaar"])
+def test_zonder_actief_geheim_geen_test_callback_of_inschakelen(
+    admin: Any, app: Any, idp: FakeOidc, ontbreekt: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub.oidc import client as oidc_client
+
+    secret = _breakglass(admin)
+    enable(admin, idp)
+    started = admin.post("/api/v1/auth/oidc/test")
+    assert started.status_code == 200
+    with app.state.sessionmaker() as db:
+        if ontbreekt == "ref":
+            db.get(OidcConfig, 1).client_secret_ref = None
+        elif ontbreekt == "rij":
+            db.execute(delete(VaultSecret).where(VaultSecret.ref == db.get(OidcConfig, 1).client_secret_ref))
+        else:
+            row = db.scalar(select(VaultSecret).where(VaultSecret.ref == db.get(OidcConfig, 1).client_secret_ref))
+            row.ciphertext = b"onleesbare-testciphertext"
+        db.commit()
+    tokens_before = len([r for r in idp.requests if r.path.endswith("/token/")])
+    exchange = oidc_client.exchange_code
+    exchanges = []
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        exchanges.append(True)
+        return exchange(*args, **kwargs)
+
+    monkeypatch.setattr(oidc_client, "exchange_code", spy)
+    r = admin.post("/api/v1/auth/oidc/test")
+    assert r.status_code == 409
+    assert r.json()["code"] == "oidc_clientgeheim_ontbreekt"
+    page = callback(admin, idp, started.json()["autorisatie_url"])
+    assert page.status_code == 400 and "oidc_clientgeheim_ontbreekt" in page.text
+    r = admin.post("/api/v1/auth/oidc/inschakelen", json={"ingeschakeld": True}, headers=idem())
+    assert r.status_code == 409
+    assert r.json()["code"] == "oidc_clientgeheim_ontbreekt"
+    assert len([r for r in idp.requests if r.path.endswith("/token/")]) == tokens_before
+    assert not exchanges
+    noodlogin(app, secret)
+
+
+def test_wissen_verwijdert_oude_ciphertext_en_zet_sso_uit(admin: Any, app: Any, idp: FakeOidc) -> None:
+    from hub.oidc.service import SECRET_REF
+
+    secret = _breakglass(admin)
+    enable(admin, idp)
+    r = admin.put("/api/v1/auth/oidc", json=body(idp, client_secret_wissen=True), headers=idem())
+    assert r.status_code == 200 and r.json()["ingeschakeld"] is False
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref == SECRET_REF)) is None
+        assert app.state.vault().get(db, SECRET_REF) is None
+    r = admin.post("/api/v1/auth/oidc/test")
+    assert r.status_code == 409 and r.json()["code"] == "oidc_clientgeheim_ontbreekt"
+    noodlogin(app, secret)
