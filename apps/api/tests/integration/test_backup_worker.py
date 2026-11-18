@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import stat
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -129,18 +130,22 @@ def test_retentie_laat_pre_upgrade_export_staan_bij_samenloop(settings: Any, app
         assert upgrade.deleted_at is None and (settings.backups_dir / upgrade.file_name).is_file()
         from hub.backup.selfbackup import verify_pre_upgrade
 
-        assert verify_pre_upgrade(db, settings).ok
+        assert verify_pre_upgrade(db, settings, upgrade.id).ok
 
 
 def test_pre_upgrade_controle_faalt_zonder_archief(settings: Any, app: Any) -> None:
     from hub.backup.selfbackup import run_self_backup, verify_pre_upgrade
 
     with app.state.sessionmaker() as db:
-        assert verify_pre_upgrade(db, settings).reason_code == "not_available"
+        assert verify_pre_upgrade(db, settings, uuid.uuid4()).reason_code == "not_available"
         rij = run_self_backup(db, settings, trigger="pre-upgrade")
-        assert verify_pre_upgrade(db, settings).ok
+        assert verify_pre_upgrade(db, settings, rij.id).ok
+        andere = run_self_backup(db, settings, trigger="pre-upgrade")
+        gewoon = run_self_backup(db, settings, trigger="manual")
+        assert verify_pre_upgrade(db, settings, gewoon.id).reason_code == "not_available"
         (settings.backups_dir / rij.file_name).unlink()
-        assert verify_pre_upgrade(db, settings).reason_code == "dump_missing"
+        assert verify_pre_upgrade(db, settings, andere.id).ok
+        assert verify_pre_upgrade(db, settings, rij.id).reason_code == "dump_missing"
 
 
 def test_worker_plant_backup_maar_geen_inventaris_zonder_d03(admin: Any, worker_once: Any) -> None:
@@ -202,3 +207,36 @@ def test_worker_plant_inventaris_niet_elke_ronde(admin: Any, worker_once: Any) -
     assert r.status_code == 202
     done = [d for d in worker_once() if d["kind"] == "inventory_refresh"]
     assert done and done[0]["reason_code"] == "unreachable"
+
+
+@pytest.mark.parametrize("bewaren", [1, 7])
+def test_mislukte_opvolger_behoudt_vorig_herstelpunt(
+    settings: Any, app: Any, monkeypatch: pytest.MonkeyPatch, bewaren: int
+) -> None:
+    from hub.backup import selfbackup
+
+    settings.self_backup_keep = bewaren
+    with app.state.sessionmaker() as db:
+        vorig = selfbackup.run_self_backup(db, settings, trigger="pre-upgrade")
+        assert vorig.status == "geslaagd"
+        archief = settings.backups_dir / vorig.file_name
+        bestanden = [archief, Path(str(archief) + ".sha256"), Path(str(archief) + ".json")]
+        digests = [selfbackup.sha256_file(pad) for pad in bestanden]
+        for _ in range(bewaren):
+            assert selfbackup.run_self_backup(db, settings, trigger="manual").status == "geslaagd"
+        controle = selfbackup.reverify
+
+        def verlies_nieuwe_dump(sessie: Any, config: Any, rij: Any) -> Any:
+            assert rij.id != vorig.id
+            (config.backups_dir / rij.file_name).unlink()
+            return controle(sessie, config, rij)
+
+        with monkeypatch.context() as fout:
+            fout.setattr(selfbackup, "reverify", verlies_nieuwe_dump)
+            nieuw = selfbackup.run_self_backup(db, settings, trigger="pre-upgrade")
+        assert (nieuw.status, nieuw.reason_code) == ("mislukt", "dump_missing")
+        assert selfbackup.run_self_backup(db, settings, trigger="schedule").status == "geslaagd"
+        db.refresh(vorig)
+        assert vorig.deleted_at is None and controle(db, settings, vorig).ok
+        assert [selfbackup.sha256_file(pad) for pad in bestanden] == digests
+        assert len(list(settings.backups_dir.glob("*.dump"))) == bewaren + 1

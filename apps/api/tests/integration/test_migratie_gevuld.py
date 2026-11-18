@@ -225,7 +225,7 @@ def test_terugval_na_klokcorrectie(lege_db: str, tmp_path: Path, monkeypatch: py
             ).one()
         assert backup.status == "geslaagd" and backup.deleted_at is None
         dump = settings.backups_dir / backup.file_name
-        assert len(list(settings.backups_dir.glob("*.dump"))) == bewaren
+        assert len(list(settings.backups_dir.glob("*.dump"))) == bewaren + 1
         assert hashlib.sha256(dump.read_bytes()).hexdigest() == backup.sha256
         assert Path(str(dump) + ".sha256").read_text().split() == [backup.sha256, dump.name]
         # Herstel op een leeg schema zodat de gebruikerswijziging alleen uit deze export kan komen.
@@ -265,6 +265,7 @@ def test_terugval_na_klokcorrectie(lege_db: str, tmp_path: Path, monkeypatch: py
         "verwisseld",
         "zonder_controlesom",
         "weg_voor_migratie",
+        "klokcorrectie",
         None,
     ],
 )
@@ -322,6 +323,12 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
     try:
         vorige, head = _vorige_en_head()
         kolommen, voor = _gevuld(engine, lege_db)
+        if storing == "klokcorrectie":
+            with sa.orm.Session(engine) as db, monkeypatch.context() as klok:
+                toekomst = selfbackup.utcnow() + dt.timedelta(minutes=5)
+                klok.setattr(selfbackup, "utcnow", lambda: toekomst)
+                eerder = selfbackup.run_self_backup(db, instellingen, trigger="pre-upgrade")
+                assert eerder.status == "geslaagd"
         if storing in na_retentie:
             with sa.orm.Session(engine) as db:
                 eerder = selfbackup.run_self_backup(db, instellingen, trigger="manual")
@@ -341,14 +348,15 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
                 return verwijderd
 
             monkeypatch.setattr(selfbackup, "apply_retention", verstoor)
-        with pytest.raises(SystemExit if storing else MigratieAfgerond):
+        moet_stoppen = storing not in (None, "klokcorrectie")
+        with pytest.raises(SystemExit if moet_stoppen else MigratieAfgerond):
             supervisor.main()
         with engine.connect() as conn:
             revision = conn.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
             backup = conn.execute(
                 sa.text("SELECT status, sha256, reason_code FROM self_backup WHERE trigger = 'pre-upgrade'")
             ).first()
-        if storing:
+        if moet_stoppen:
             assert revision == vorige and "migraties" not in uitgevoerd
             postgres.stop.assert_called_once()
             if storing == "weg_voor_migratie":
@@ -364,7 +372,7 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
                 "migraties",
             ]
             assert backup and backup.status == "geslaagd" and len(backup.sha256) == 64
-            assert len(list((tmp_path / "backups").glob("*.dump"))) == 1
+            assert len(list((tmp_path / "backups").glob("*.dump"))) == (2 if storing == "klokcorrectie" else 1)
         assert _meet(engine, {t: c for t, c in kolommen.items() if t != "self_backup"}) == {
             t: meting for t, meting in voor.items() if t != "self_backup"
         }

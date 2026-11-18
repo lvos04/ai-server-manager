@@ -28,6 +28,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -287,11 +288,17 @@ def main() -> None:
             if check == 1:
                 if shutil.disk_usage(DATA).free < 200 * 1024 * 1024:
                     fail("te weinig ruimte voor de back-up vóór upgrade; maak ruimte vrij en start de Hub opnieuw.")
-                if run_once("back-up vóór upgrade", [py, "-m", "hub", "backup-now", "--trigger", "pre-upgrade"]) != 0:
-                    fail("back-up vóór upgrade niet geverifieerd; de Hub stopt vóór de schemawijziging.")
-                # Retentie of samenloop mag het net gemaakte archief niet hebben verwijderd.
-                if run_once("controle archief vóór upgrade", [py, "-m", "hub", "backup-controle"]) != 0:
-                    fail("pre-upgrade-archief ontbreekt of klopt niet meer; de Hub stopt vóór de schemawijziging.")
+                with tempfile.TemporaryDirectory(prefix=".upgrade-", dir=DATA) as beurt:
+                    bewijs = Path(beurt) / "export-id"
+                    export = [py, "-m", "hub", "backup-now", "--trigger", "pre-upgrade", "--id-bestand", str(bewijs)]
+                    if run_once("back-up vóór upgrade", export) != 0:
+                        fail("back-up vóór upgrade niet geverifieerd; de Hub stopt vóór de schemawijziging.")
+                    try:
+                        export_id = bewijs.read_text(encoding="ascii").strip()
+                    except (OSError, UnicodeError):
+                        fail("identiteit van de pre-upgrade-export ontbreekt; de Hub stopt vóór de schemawijziging.")
+                    if run_once("controle archief vóór upgrade", [py, "-m", "hub", "backup-controle", "--id", export_id]) != 0:
+                        fail("pre-upgrade-archief ontbreekt of klopt niet meer; de Hub stopt vóór de schemawijziging.")
     except (OSError, subprocess.CalledProcessError, SystemExit):
         pg.stop()
         raise

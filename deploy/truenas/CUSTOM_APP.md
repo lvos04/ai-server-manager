@@ -217,7 +217,12 @@ stuurt de API-documentatie van de Hub (`/api/docs`) niet mee.
 
 - **Updaten:** app → **Edit** → Tag naar de nieuwe `<versie>@sha256:<digest>` (of alleen de versie, zie stap 0) →
   **Update**. Zijn er databasewijzigingen, dan maakt de Hub bij
-  de start eerst een geverifieerde back-up (`/appdata/backups`, *pre-upgrade*) en voert daarna de migraties uit. Een
+  de start eerst een geverifieerde back-up (`/appdata/backups`, *pre-upgrade*). Direct vóór de migratie controleert
+  de Hub de export-ID uit deze opstartbeurt, de inhoudsopgave, SHA-256 en de bijbehorende herstelbestanden.
+  Bij een ontbrekend of ongeldig bewijs stopt de upgrade. De automatische retentie geldt alleen voor geplande
+  en handmatige exports. Pre-upgrade-exports blijven apart bewaard, ook na een volgende upgrade of een fout.
+  Bewaar het vorige herstelpunt minstens tot de migratie is gelukt én er een nieuwere geverifieerde
+  pre-upgrade-export beschikbaar is. Zie het platformcontract §2.2 voor terugval na een schemawijziging. Een
   mislukte migratie laat de oude database ongemoeid. Een ZFS-snapshot vooraf blijft verstandig.
 - **Terugdraaien:** een Custom App heeft geen catalogusversies: TrueNAS' *Roll Back* werkt hier niet voor een andere
   image-tag (contract 1.3 §2.2, NIET GEVALIDEERD op een echte NAS). Terugdraaien = **Edit** → de vorige tag (met

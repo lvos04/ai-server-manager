@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import sys
+import uuid
 from pathlib import Path
 
 from hub.config import get_settings
@@ -103,18 +104,25 @@ def cmd_backup_now(args: argparse.Namespace) -> int:
         row = run_self_backup(db, s, trigger=args.trigger)
         print(json.dumps(to_dict(row), indent=2))
         ok = row.status == "geslaagd"
+        if ok and args.id_bestand:
+            try:
+                with args.id_bestand.open("x", encoding="ascii") as receipt:
+                    receipt.write(f"{row.id}\n")
+            except OSError:
+                print("De identiteit van de nieuwe export kon niet worden vastgelegd.", file=sys.stderr)
+                ok = False
     engine.dispose()
     return 0 if ok else 1
 
 
-def cmd_backup_controle(_args: argparse.Namespace) -> int:
+def cmd_backup_controle(args: argparse.Namespace) -> int:
     from hub.backup.selfbackup import verify_pre_upgrade
     from hub.db import make_engine, make_sessionmaker
 
     s = get_settings()
     engine = make_engine(s.database_url)
     with make_sessionmaker(engine)() as db:
-        ver = verify_pre_upgrade(db, s)
+        ver = verify_pre_upgrade(db, s, args.id)
     engine.dispose()
     print(json.dumps({"ok": ver.ok, "reason_code": ver.reason_code, "melding": ver.message}))
     return 0 if ver.ok else 1
@@ -230,7 +238,9 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--check", action="store_true")
     b = sub.add_parser("backup-now", help="eigen database-export maken en verifiëren")
     b.add_argument("--trigger", default="manual", choices=["manual", "pre-upgrade", "schedule"])
-    sub.add_parser("backup-controle", help="controleer de vastgehouden pre-upgrade-export (SHA-256) vóór de migratie")
+    b.add_argument("--id-bestand", type=Path, help="schrijf de UUID van de geverifieerde export in een nieuw bestand")
+    controle = sub.add_parser("backup-controle", help="controleer een specifieke pre-upgrade-export vóór de migratie")
+    controle.add_argument("--id", type=uuid.UUID, required=True, help="export-UUID uit deze upgradebeurt")
     h = sub.add_parser(
         "herstel-lokale-beheerder", help="lokaal beheer herstellen bij storing van noodwachtwoord of TOTP"
     )

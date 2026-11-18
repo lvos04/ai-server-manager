@@ -60,7 +60,7 @@ def stap_in_image(stap, argument):
             return
         naam, digest = archief
         map_backups = settings.backups_dir
-        assert len(list(map_backups.glob("*.dump"))) == settings.self_backup_keep
+        assert len(list(map_backups.glob("*.dump"))) == settings.self_backup_keep + 1
         assert selfbackup.sha256_file(map_backups / naam) == digest
         assert (map_backups / (naam + ".sha256")).read_text().split() == [digest, naam]
         assert json.loads((map_backups / (naam + ".json")).read_text())["schema_revisie"] == "0014"
