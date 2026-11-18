@@ -202,6 +202,7 @@ def config_dict(db: Session, cfg: OidcConfig, vault: Vault | None, *, show_last4
         "verplicht_effectief": bool(cfg.ingeschakeld and cfg.verplicht and working and has_secret),
         "reden": reason,
         "noodaccount_werkend": working,
+        "lokale_beheerder_aanwezig": breakglass.has_local_admin(db),
         "lokale_herstelroute": breakglass.has_local_recovery(db, vault),
         "issuer": cfg.issuer,
         "client_id": cfg.client_id,

@@ -87,7 +87,6 @@ export function Login() {
         ) : null}
         {noodTotpOntbreekt ? (
           <Melding soort="beperkt" titel="OIDC is tijdelijk niet verplicht" role="status">
-            <p>Je kunt lokaal inloggen met een bestaand beheerdersaccount.</p>
             <p>{sso.data?.noodlogin}</p>
           </Melding>
         ) : null}

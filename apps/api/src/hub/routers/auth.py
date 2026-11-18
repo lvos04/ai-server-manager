@@ -31,7 +31,7 @@ from hub.deps import (
 from hub.errors import HubError
 from hub.firststart import mark_setup_completed, setup_pending, verify_setup_code
 from hub.keys import KeyRing
-from hub.models import Service, User, WebSession
+from hub.models import OidcConfig, Service, User, WebSession
 from hub.security import (
     Role,
     clear_failures,
@@ -470,6 +470,7 @@ def list_users(db: DB, _: Admin) -> dict[str, Any]:
 def create_user(body: UserIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem) -> JSONResponse:
     if body.role == Role.admin:
         require_local_admin(principal)
+        breakglass.lock_local_recovery(db)
     if (replay := idem.replay()) is not None:
         return replay
     if db.scalars(select(User.id).where(User.username == body.username)).first() is not None:
@@ -505,9 +506,10 @@ def patch_user(
     user_id: uuid.UUID, body: UserPatch, db: DB, principal: Admin, idem: Idem, vault: ReadableVault
 ) -> JSONResponse:
     demote = (body.role is not None and body.role != Role.admin) or body.disabled is True
-    if demote:
+    account_change = body.role is not None or body.disabled is not None
+    if account_change:
         breakglass.lock_local_recovery(db)
-    user = db.get(User, user_id)
+    user = db.get(User, user_id, populate_existing=account_change)
     if user is None:
         raise HubError(404, "not_found", "Gebruiker niet gevonden.")
     reactivate_local_admin = (
@@ -530,7 +532,11 @@ def patch_user(
                 409, "last_admin", "De laatste actieve beheerder kan niet worden gedegradeerd of uitgeschakeld."
             )
         if not user.disabled and (user.auth_bron == "lokaal" or user.break_glass):
-            breakglass.require_local_recovery(db, vault, exclude_user=user.id)
+            cfg = db.get(OidcConfig, 1)
+            if cfg is not None and cfg.ingeschakeld and cfg.verplicht and not user.break_glass:
+                breakglass.require_local_admin_account(db, exclude_user=user.id)
+            else:
+                breakglass.require_local_recovery(db, vault, exclude_user=user.id)
     if body.role is not None:
         user.role = body.role.value
     if body.disabled is not None:

@@ -10,6 +10,10 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   clientgeheim. De openbare SSO-status en het inlogscherm verwijzen bij die terugval naar Instellingen → Noodaccount
   om het wachtwoord en de TOTP te vernieuwen. De eerste start die de kluisfout aantreft voegt één auditregel toe met
   een vaste redencode.
+- Verplichte OIDC vereist ook een gewone lokale beheerder. Gebruikersbeheer beschermt de laatste gewone lokale
+  beheerder zolang verplichting is ingesteld. Bij een oudere installatie zonder gewone lokale beheerder biedt de
+  Hub-console een herstelcommando voor een ontbrekende of onleesbare nood-TOTP-kluisrij. De Hub toont de beschikbare
+  herstelstap en blokkeert gewone lokale aanmeldingen weer zodra de nood-TOTP is bevestigd en SSO beschikbaar is.
 
 ### Gerepareerd — Hub: OIDC-invoer, sessiegrenzen en lokale noodbediening (KLEIN-107)
 - Upgradenotitie KLEIN-107: vanaf databaseversie 0012 vervallen alle bestaande OIDC-sessies. SSO zonder leesbaar

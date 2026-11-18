@@ -25,13 +25,16 @@ vi.mock("@/lib/use-api", () => ({
       ? scenario.noodTotpOntbreekt
         ? {
           ingeschakeld: true, login_url: "/api/v1/auth/oidc/login", reden: noodTotpReden,
-          noodlogin: "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount.",
+          noodlogin: scenario.herstelroute
+            ? "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Je kunt lokaal inloggen met een bestaand beheerdersaccount. Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
+            : "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Laat een beheerder met toegang tot de Hub-console python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam> uitvoeren.",
         }
         : { ingeschakeld: false, login_url: null, reden }
       : pad === "/api/v1/auth/oidc"
         ? {
           ingeschakeld: true, reden: scenario.noodTotpOntbreekt ? noodTotpReden : reden,
-          verplicht: scenario.noodTotpOntbreekt, noodaccount_werkend: false, lokale_herstelroute: scenario.herstelroute,
+          verplicht: scenario.noodTotpOntbreekt, noodaccount_werkend: false,
+          lokale_herstelroute: scenario.herstelroute, lokale_beheerder_aanwezig: scenario.herstelroute,
           client_secret: { ingesteld: scenario.noodTotpOntbreekt, laatste4: null },
           gate_authentik: { status: "toegestaan", redenen: [] },
           issuer: "https://issuer.example", rolkoppelingen: [],
@@ -82,6 +85,21 @@ describe("SSO-beschikbaarheid", () => {
     const html = renderToStaticMarkup(<ToegangScreen />);
     expect(html).toContain("De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar");
     expect(html).toContain('href="/instellingen/noodaccount#nood-instellen-titel"');
+  });
+
+  it("verwijst bij ontbrekende nood-TOTP en geen lokale beheerder naar de Hub-console", () => {
+    scenario.noodTotpOntbreekt = true;
+    scenario.herstelroute = false;
+    scenario.authBron = "oidc";
+    const html = renderToStaticMarkup(<ToegangScreen />);
+    expect(html).toContain("herstel-lokale-beheerder");
+    expect(html).not.toContain("Vraag een lokale beheerder");
+    expect(html).not.toContain("Meld je aan als lokale beheerder of via de noodlogin");
+    expect(html).not.toContain('href="/instellingen/noodaccount#nood-instellen-titel"');
+    const inloggen = renderToStaticMarkup(<Login />);
+    expect(inloggen).toContain("herstel-lokale-beheerder");
+    expect(inloggen).not.toContain("bestaand beheerdersaccount");
+    expect(inloggen).not.toContain('href="/inloggen/nood"');
   });
 
   it("toont op Noodaccount waarom noodlogin faalt en waar je die herstelt", () => {

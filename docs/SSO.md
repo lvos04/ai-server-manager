@@ -10,8 +10,10 @@ het herstelbestendige intrekkingsanker en het verwijderen van de geheime bodyhas
 
 ## Eerst: de noodlogin
 Stel de noodlogin in via Instellingen → Noodaccount met een wachtwoord van minimaal 20 tekens en bevestig het TOTP.
-De noodlogin werkt vanaf een toegestaan privéadres, ook als Authentik onbereikbaar is. Voor "OIDC verplicht" is een
-werkend noodaccount vereist.
+De noodlogin werkt vanaf een toegestaan privéadres, ook als Authentik onbereikbaar is. Voor "OIDC verplicht" zijn
+een werkend noodaccount én een actief gewoon lokaal beheerdersaccount met een wachtwoord vereist. De Hub beschermt
+dan de laatste gewone lokale beheerder tegen uitschakelen of degraderen. Zolang SSO beschikbaar is en het
+noodaccount werkt, weigert de Hub gewone lokale aanmeldingen.
 
 Maak een lokale beheerder of een noodaccount aan voordat je voor beheer op SSO vertrouwt. De Hub weigert handmatige
 wijzigingen die SSO uitzetten of alle OIDC-sessies intrekken zonder werkende lokale herstelroute. Hetzelfde geldt als
@@ -22,17 +24,32 @@ Bewaar bij een rotatie het nieuwe wachtwoord en het nieuwe TOTP offline voordat 
 sessie eindigt vóór de bevestiging, kies je op het inlogscherm **Noodlogin**. Meld je vanaf het thuisnetwerk aan met
 het nieuwe wachtwoord en een geldige code uit de nieuwe authenticator. De Hub bevestigt daarmee het nieuwe TOTP en
 markeert de noodlogin zoals gebruikelijk voor rotatie. Vanuit die noodsessie kun je een lokale beheerder aanmaken of
-heractiveren en de SSO-instellingen herstellen. Verlies van het nieuwe wachtwoord of de nieuwe TOTP-gegevens kan
-de enige noodroute onbruikbaar maken. Als er alleen SSO-beheerders zijn en de noodlogin onbruikbaar is, ontbreekt
-een herstelroute binnen de Hub.
+heractiveren en de SSO-instellingen herstellen.
 
 Als de kluisrij voor de nood-TOTP ontbreekt of onleesbaar is, meldt de Hub dat de noodlogin niet werkt.
 "OIDC verplicht" geldt dan tijdelijk niet. De openbare SSO-status, het inlogscherm en de SSO-instellingen tonen
-bij die terugval de oorzaak en verwijzen naar Instellingen → Noodaccount. Log in met een bestaand lokaal
-beheerdersaccount, vernieuw daar het wachtwoord en de TOTP en bevestig de nieuwe code. SSO blijft beschikbaar
+bij die terugval de oorzaak en de beschikbare herstelstap. Log in met een bestaand lokaal beheerdersaccount.
+Vernieuw onder Instellingen → Noodaccount het noodwachtwoord en de TOTP en bevestig de nieuwe code. SSO blijft beschikbaar
 zolang het clientgeheim leesbaar is. Na bevestiging geldt "OIDC verplicht" weer als die instelling aanstaat en SSO
 beschikbaar is. Bij de eerste start die de kluisfout aantreft, schrijft de Hub één auditregel
 `auth.break_glass.totp_kluisrij_ontbreekt` met een vaste redencode.
+
+### Bestaande installatie zonder bruikbare lokale beheerder
+
+Werkt de noodlogin nog, maak dan vanuit een noodsessie een gewone lokale beheerder aan of activeer die opnieuw.
+Bij een ontbrekende of onleesbare nood-TOTP-kluisrij kan de beheerder van de installatie via de Hub-console
+een lokaal beheerdersaccount aanmaken. Open een interactieve terminal in de draaiende Hub-container als de
+gebruiker waaronder de Hub draait. Gebruik bij een losse installatie de terminal met de gebruikelijke
+Hub-configuratie. Voer het commando uit met een nieuwe, vrije gebruikersnaam.
+
+```sh
+python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam>
+```
+
+Vervang de plaatsaanduiding door de gebruikersnaam. Voer het nieuwe wachtwoord twee keer in bij de afgeschermde
+prompt. Het commando weigert herstel als er al een bruikbare gewone lokale beheerder is of de nood-TOTP-kluisrij
+leesbaar is. Het aanmaken komt in het auditspoor. Meld je daarna aan met het nieuwe lokale account en herstel
+het noodaccount via Instellingen → Noodaccount. Bewaar het lokale account voor een volgende storing.
 
 ## In Authentik (door de beheerder, in de Authentik-web-UI)
 1. Een **OAuth2/OpenID-provider** voor de Hub: client type *Confidential*, redirect-URI exact

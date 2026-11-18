@@ -107,6 +107,85 @@ def cmd_backup_now(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_herstel_lokale_beheerder(args: argparse.Namespace) -> int:
+    import re
+    import warnings
+    from getpass import GetPassWarning, getpass
+
+    from sqlalchemy import select
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from hub import audit, breakglass
+    from hub.db import make_engine, make_sessionmaker
+    from hub.errors import HubError
+    from hub.models import User
+    from hub.routers.auth import USERNAME_PATTERN, _check_password_policy
+    from hub.security import Role, hash_password
+    from hub.vault import Vault, VaultError
+
+    settings = get_settings()
+    naam = args.gebruikersnaam
+    if not re.fullmatch(USERNAME_PATTERN, naam):
+        print("Kies een geldige lokale gebruikersnaam.", file=sys.stderr)
+        return 1
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", GetPassWarning)
+            wachtwoord = getpass("Nieuw wachtwoord: ")
+            bevestiging = getpass("Herhaal het nieuwe wachtwoord: ")
+    except (EOFError, GetPassWarning, KeyboardInterrupt):
+        print("Herstel vereist een interactieve terminal met afgeschermde invoer.", file=sys.stderr)
+        return 1
+    if wachtwoord != bevestiging or len(wachtwoord) > 256:
+        print("De ingevoerde wachtwoorden komen niet overeen of zijn te lang.", file=sys.stderr)
+        return 1
+    try:
+        _check_password_policy(wachtwoord, settings.password_min_length, naam)
+    except HubError as exc:
+        print(exc.message, file=sys.stderr)
+        return 1
+    try:
+        vault = Vault.from_file(settings.secrets_dir / "vault.key")
+    except (OSError, ValueError, VaultError):
+        print("De Hub-kluissleutel kan niet worden gelezen.", file=sys.stderr)
+        return 1
+
+    engine = make_engine(settings.database_url)
+    try:
+        with make_sessionmaker(engine).begin() as db:
+            breakglass.lock_local_recovery(db)
+            nood = breakglass.account(db, lock=True)
+            _, reden = breakglass.working_status(db, vault, nood)
+            if reden != breakglass.TOTP_UNAVAILABLE or breakglass.has_local_admin(db):
+                print(
+                    "Herstel vereist een ontbrekende of onleesbare nood-TOTP en geen bruikbare lokale beheerder.",
+                    file=sys.stderr,
+                )
+                return 1
+            if db.scalar(select(User.id).where(User.username == naam)) is not None:
+                print("Deze gebruikersnaam bestaat al.", file=sys.stderr)
+                return 1
+            gebruiker = User(username=naam, role=Role.admin.value, password_hash=hash_password(wachtwoord))
+            db.add(gebruiker)
+            db.flush()
+            audit.record(
+                db,
+                actor_type="system",
+                actor_id="hub-console",
+                action="auth.lokale_beheerder_hersteld",
+                target_type="user",
+                target_id=str(gebruiker.id),
+                details={"reden": reden},
+            )
+    except SQLAlchemyError:
+        print("Het lokale beheerdersaccount kon niet worden opgeslagen.", file=sys.stderr)
+        return 1
+    finally:
+        engine.dispose()
+    print("Lokaal beheerdersaccount aangemaakt. Meld je aan en herstel het noodaccount.")
+    return 0
+
+
 def cmd_export_openapi(args: argparse.Namespace) -> int:
     from hub.openapi_export import export
 
@@ -136,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("--check", action="store_true")
     b = sub.add_parser("backup-now", help="eigen database-export maken en verifiëren")
     b.add_argument("--trigger", default="manual", choices=["manual", "pre-upgrade", "schedule"])
+    h = sub.add_parser("herstel-lokale-beheerder", help="lokaal beheer herstellen bij verlies van de nood-TOTP")
+    h.add_argument("gebruikersnaam")
     e = sub.add_parser("export-openapi", help="OpenAPI exporteren of op drift controleren")
     e.add_argument("--out", default="docs/openapi/hub-api.openapi.json")
     e.add_argument("--check", action="store_true")
@@ -151,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         "ai-runner": cmd_ai_runner,
         "migrate": cmd_migrate,
         "backup-now": cmd_backup_now,
+        "herstel-lokale-beheerder": cmd_herstel_lokale_beheerder,
         "export-openapi": cmd_export_openapi,
         "export-runbooks": cmd_export_runbooks,
     }

@@ -40,10 +40,8 @@ TOTP_WINDOW = 1  # één tijdstap speling naar voren en naar achteren (klokversc
 RECOVERY_LOCK_KEY = 0x48554252_45434F56  # "HUBRECOV"
 ISSUER = "TrueNAS Home Platform"  # productnaam (besluit gebruiker O-07)
 TOTP_UNAVAILABLE = "nood_totp_kluisrij_ontbreekt"
-TOTP_UNAVAILABLE_DETAIL = (
-    "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. "
-    "Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
-)
+TOTP_UNAVAILABLE_CAUSE = "De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar."
+TOTP_UNAVAILABLE_DETAIL = f"{TOTP_UNAVAILABLE_CAUSE} Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
 
 PRIVATE_NETWORKS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
 CGNAT = ipaddress.ip_network("100.64.0.0/10")
@@ -222,11 +220,24 @@ def audit_missing_totp_on_start(db: Session, vault: Vault | None) -> None:
         )
 
 
-def has_local_recovery(db: Session, vault: Vault | None, *, exclude_user: uuid.UUID | None = None) -> bool:
+def has_local_admin(db: Session, *, exclude_user: uuid.UUID | None = None) -> bool:
     beheerders = select(User.id, User.password_hash).where(
         User.role == "admin", User.disabled.is_(False), User.auth_bron == "lokaal", User.break_glass.is_(False)
     )
-    if any(user_id != exclude_user and has_usable_password(hash_) for user_id, hash_ in db.execute(beheerders)):
+    return any(user_id != exclude_user and has_usable_password(hash_) for user_id, hash_ in db.execute(beheerders))
+
+
+def require_local_admin_account(db: Session, *, exclude_user: uuid.UUID | None = None) -> None:
+    if not has_local_admin(db, exclude_user=exclude_user):
+        raise HubError(
+            409,
+            "lokale_beheerder_ontbreekt",
+            "'OIDC verplicht' vereist een actief gewoon lokaal beheerdersaccount met een wachtwoord.",
+        )
+
+
+def has_local_recovery(db: Session, vault: Vault | None, *, exclude_user: uuid.UUID | None = None) -> bool:
+    if has_local_admin(db, exclude_user=exclude_user):
         return True
 
     nood = account(db)
@@ -280,18 +291,18 @@ def status(db: Session, settings: Settings, vault: Vault | None, now: datetime |
     return {
         "noodaccount": acc,
         "werkend": working,
-        "oidc_verplicht_mogelijk": working,
+        "oidc_verplicht_mogelijk": working and has_local_admin(db),
         "reden": reason,
         "uitleg": TOTP_UNAVAILABLE_DETAIL if reason else None,
         "cgnat": cgnat_setting(db),
         "toelichting": "Noodlogin: wachtwoord (≥ 20 tekens) plus TOTP, alleen vanaf privé-adressen, sessie hooguit "
-        f"{settings.break_glass_session_minutes_default} minuten (instelbaar 5–240). Zonder werkend noodaccount kan "
-        "'OIDC verplicht' niet aan.",
+        f"{settings.break_glass_session_minutes_default} minuten (instelbaar 5–240). Voor 'OIDC verplicht' zijn een "
+        "werkend noodaccount en een gewoon lokaal beheerdersaccount nodig.",
     }
 
 
 def assert_oidc_required_allowed(db: Session, vault: Vault | None) -> None:
-    """Contract §4.1: toets de noodroute voordat 'OIDC verplicht' aangaat."""
+    """Toets de noodroute en de onafhankelijke lokale terugval vóór 'OIDC verplicht'."""
     working, reason = working_status(db, vault, account(db))
     if not working:
         raise HubError(
@@ -301,6 +312,7 @@ def assert_oidc_required_allowed(db: Session, vault: Vault | None) -> None:
             if reason
             else "'OIDC verplicht' kan pas aan als er een werkend noodaccount is (wachtwoord + bevestigde TOTP).",
         )
+    require_local_admin_account(db)
 
 
 def selftest(db: Session, source_ip: str, vault: Vault | None, now: datetime | None = None) -> dict[str, Any]:

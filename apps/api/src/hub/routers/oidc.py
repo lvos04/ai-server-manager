@@ -117,13 +117,23 @@ def available(db: DB, vault: ReadableVault) -> dict[str, Any]:
     reason = service.SSO_UNAVAILABLE if ontbreekt else None
     if on and cfg is not None and cfg.verplicht:
         verplicht, reason = breakglass.working_status(db, vault, breakglass.account(db))
+    noodadvies = "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk."
+    if reason == breakglass.TOTP_UNAVAILABLE:
+        if breakglass.has_local_admin(db):
+            noodadvies = (
+                f"{breakglass.TOTP_UNAVAILABLE_CAUSE} Je kunt lokaal inloggen met een bestaand beheerdersaccount. "
+                "Vernieuw het wachtwoord en de TOTP via Instellingen → Noodaccount."
+            )
+        else:
+            noodadvies = (
+                f"{breakglass.TOTP_UNAVAILABLE_CAUSE} Laat een beheerder met toegang tot de Hub-console "
+                "python -m hub herstel-lokale-beheerder <nieuwe-gebruikersnaam> uitvoeren."
+            )
     return {
         "ingeschakeld": on,
         "verplicht": verplicht,
         "login_url": "/api/v1/auth/oidc/login" if on else None,
-        "noodlogin": breakglass.TOTP_UNAVAILABLE_DETAIL
-        if reason == breakglass.TOTP_UNAVAILABLE
-        else "Bij nood (SSO werkt niet): de noodlogin van de Hub, alleen vanaf het thuisnetwerk.",
+        "noodlogin": noodadvies,
         **({"reden": reason} if reason else {}),
     }
 

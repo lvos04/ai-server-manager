@@ -260,6 +260,7 @@ interface Oidc {
   ingeschakeld: boolean;
   reden: string | null;
   lokale_herstelroute: boolean;
+  lokale_beheerder_aanwezig: boolean;
   verplicht: boolean;
   noodaccount_werkend: boolean;
   issuer: string | null;
@@ -337,7 +338,7 @@ function Sso() {
           <p>De kluisrij voor de nood-TOTP ontbreekt of is onleesbaar. Lokale aanmelding is toegestaan.</p>
           {lokaalBeheer ? (
             <p><Link href="/instellingen/noodaccount#nood-instellen-titel" className={buttonVariants({ variant: "secundair" })}>Wachtwoord en TOTP vernieuwen</Link></p>
-          ) : <p>Vraag een lokale beheerder om het noodaccount opnieuw in te stellen.</p>}
+          ) : c.lokale_herstelroute ? <p>Vraag een lokale beheerder om het noodaccount opnieuw in te stellen.</p> : null}
         </Melding>
       ) : null}
       {c?.lokale_herstelroute === false ? (
@@ -345,7 +346,9 @@ function Sso() {
           <p>
             {lokaalBeheer
               ? "Maak een lokale beheerder of een noodaccount aan."
-              : noodTotpOntbreekt ? "Vraag een lokale beheerder om hulp." : "Gebruik de noodlogin of vraag een lokale beheerder om hulp."}{" "}
+              : noodTotpOntbreekt
+                ? <>Laat een beheerder met toegang tot de Hub-console <code>python -m hub herstel-lokale-beheerder &lt;nieuwe-gebruikersnaam&gt;</code> uitvoeren.</>
+                : "Gebruik de noodlogin of vraag een lokale beheerder om hulp."}{" "}
             Bij gewijzigde gegevens van de issuer kan SSO automatisch uitgaan.
           </p>
         </Melding>
@@ -392,10 +395,12 @@ function Sso() {
           <Field id="sso-client" label="Client-ID" help={`Bij wijzigen vervalt het clientgeheim als je geen nieuw geheim invult. ${waarschuwing ?? ""}`}>
             {(a) => <input {...a} value={f.client_id} onChange={(e) => setForm({ ...f, client_id: e.target.value })} autoComplete="off" />}
           </Field>
-          <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
-            lokaalBeheer={lokaalBeheer} waarschuwing={waarschuwing}
-            ingesteld={c.client_secret.ingesteld} laatste4={c.client_secret.laatste4}
-            inputRef={secretInput} />
+          {!noodTotpOntbreekt || lokaalBeheer ? (
+            <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
+              lokaalBeheer={lokaalBeheer} waarschuwing={waarschuwing}
+              ingesteld={c.client_secret.ingesteld} laatste4={c.client_secret.laatste4}
+              inputRef={secretInput} />
+          ) : null}
           <KopieerVeld label="Terugkeer-adres (zet dit in Authentik)" waarde={redirect} testId="sso-redirect" />
           {redirect.startsWith("http://") ? (
             <Melding soort="info">
@@ -534,7 +539,7 @@ function Sso() {
             {c.ingeschakeld ? (
               <Button aria-describedby="sso-uit-reden" onClick={async () => (await aan.run("/api/v1/auth/oidc/inschakelen", { body: { ingeschakeld: false } })) && void cfg.reload()}>SSO uitzetten</Button>
             ) : null}
-            <Button uit={!c.ingeschakeld || !c.noodaccount_werkend} aria-describedby="sso-verplicht-reden" data-testid="oidc-verplicht">
+            <Button uit={!c.ingeschakeld || !c.noodaccount_werkend || !c.lokale_beheerder_aanwezig} aria-describedby="sso-verplicht-reden" data-testid="oidc-verplicht">
               OIDC verplicht maken
             </Button>
           </div>
@@ -543,8 +548,9 @@ function Sso() {
             {gateDicht ? "Aanzetten kan pas als D17 (HTTPS) Getest is." : !test?.actueel ? "Aanzetten kan pas na een geslaagde testlogin met de huidige instellingen." : ""}
           </p>
           <p id="sso-verplicht-reden" className="help">
-            OIDC verplicht kan pas als SSO aanstaat én het noodaccount werkt
-            {!c.noodaccount_werkend ? " (nu niet: het noodaccount werkt niet)" : ""}.
+            OIDC verplicht vereist SSO, een werkend noodaccount en een actieve gewone lokale beheerder met een wachtwoord.
+            {!c.noodaccount_werkend ? " Het noodaccount werkt momenteel niet." : ""}
+            {!c.lokale_beheerder_aanwezig ? " Er ontbreekt een gewone lokale beheerder met een wachtwoord." : ""}
           </p>
           {aan.error ? <ErrorPanel error={aan.error} /> : null}
         </div>
