@@ -4,10 +4,11 @@
  * noodaccount (H6), incidenten-inbox en SSO-instellingen. Alles Sim-getest; niets op een echte NAS.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { startTlsHub } from "./tls-hub";
 import { ADMIN, ADMIN_STATE, NOOD, control, expectAccessible, ready, saveP1State, stackState, totp } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
-test.use({ storageState: ADMIN_STATE, viewport: { width: 1440, height: 900 } });
+test.use({ storageState: ADMIN_STATE, viewport: { width: 1440, height: 900 }, trace: "off", screenshot: "off", video: "off" });
 
 async function refreshInventory(page: Page): Promise<void> {
   await page.goto("/server");
@@ -271,29 +272,51 @@ test("noodaccount (H6): geheim één keer, foute code → veldfout, goede code �
   await ctx.close();
 });
 
-test("SSO: gate zichtbaar zonder D17, issuer gecontroleerd, testlogin tegen de fake-issuer zonder sessie, ‘OIDC verplicht’ uit", async ({ page }) => {
-  const st = stackState();
-  await page.goto("/instellingen/toegang");
-  await ready(page);
-  const sso = page.getByTestId("sso");
-  await sso.getByLabel("Issuer-adres").fill(st.oidc_issuer!);
-  await sso.getByLabel("Client-ID").fill(st.oidc_client_id!);
-  await sso.getByLabel("Clientgeheim").fill(st.oidc_client_secret!);
-  await sso.getByLabel("Groep 1").fill("hub-admins");
-  await sso.getByLabel("Rol 1").selectOption("admin");
-  await sso.getByTestId("sso-opslaan").click();
-  await expect(sso.getByTestId("sso-controleren")).toBeVisible();
-  await sso.getByTestId("sso-controleren").click();
-  await expect(sso.getByTestId("sso-controles").locator('[data-controle="sleutels"]')).toHaveAttribute("data-uitkomst", "ok");
-  await expect(sso.getByTestId("sso-gate")).toContainText("D17");
-  await expect(sso.getByRole("button", { name: "SSO aanzetten" })).toHaveAttribute("aria-disabled", "true");
-  await expect(sso.getByTestId("oidc-verplicht")).toHaveAttribute("aria-disabled", "true");
-  await sso.getByTestId("sso-testlogin").click();
-  await page.waitForURL(/\/api\/v1\/auth\/oidc\/callback/, { timeout: 20_000 });
-  await expect(page.locator("body")).toContainText("Testlogin klaar", { timeout: 20_000 });
-  await page.goto("/instellingen/toegang");
-  await ready(page);
-  await expect(page.getByTestId("sso-testuitkomst")).toContainText("Geslaagd");
-  await expect(page.getByTestId("sso-testuitkomst")).toContainText("Er is geen sessie gemaakt");
-  await expectAccessible(page, "toegang en SSO");
+test.describe("SSO via HTTPS", () => {
+  test("SSO: gate zichtbaar zonder D17, issuer gecontroleerd, testlogin tegen de fake-issuer zonder sessie, ‘OIDC verplicht’ uit", async ({ page: httpPage, browser }) => {
+    await httpPage.goto("/instellingen/toegang");
+    await ready(httpPage);
+    await expect(httpPage.locator("#sso-geheim")).toHaveCount(0);
+    await expect(httpPage.getByTestId("sso")).toContainText("invoeren kan alleen via HTTPS");
+    const tls = await startTlsHub(new URL(httpPage.url()).origin);
+    const context = await browser.newContext({ storageState: ADMIN_STATE, ignoreHTTPSErrors: true, baseURL: tls.url });
+    try {
+      const page = await context.newPage();
+      const st = stackState();
+      await page.goto("/instellingen/toegang");
+      await ready(page);
+      const sso = page.getByTestId("sso");
+      await sso.getByLabel("Issuer-adres").fill(st.oidc_issuer!);
+      await sso.getByLabel("Client-ID").fill(st.oidc_client_id!);
+      await sso.getByLabel("Clientgeheim").fill(st.oidc_client_secret!);
+      await sso.getByLabel("Groep 1").fill("hub-admins");
+      await sso.getByLabel("Rol 1").selectOption("admin");
+      await page.route("**/api/v1/auth/oidc", (route) => route.request().method() === "PUT" ? route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "testfout", message: "Tijdelijke testfout" }) }) : route.continue());
+      await sso.getByTestId("sso-opslaan").click();
+      await expect(sso.getByTestId("error-panel")).toBeVisible();
+      await expect(sso.locator("#sso-geheim")).toHaveValue("");
+      await page.unroute("**/api/v1/auth/oidc");
+      await sso.locator("#sso-geheim").fill(st.oidc_client_secret!);
+      await sso.getByTestId("sso-opslaan").click();
+      await expect(sso.locator("#sso-geheim")).toHaveValue("");
+      await expect(sso.getByTestId("sso-controleren")).toBeVisible();
+      await sso.getByTestId("sso-controleren").click();
+      await expect(sso.getByTestId("sso-controles").locator('[data-controle="sleutels"]')).toHaveAttribute("data-uitkomst", "ok");
+      await expect(sso.getByTestId("sso-gate")).toContainText("D17");
+      await expect(sso.getByRole("button", { name: "SSO aanzetten" })).toHaveAttribute("aria-disabled", "true");
+      await expect(sso.getByTestId("oidc-verplicht")).toHaveAttribute("aria-disabled", "true");
+      await sso.getByTestId("sso-testlogin").click();
+      await page.waitForURL(/\/api\/v1\/auth\/oidc\/callback/, { timeout: 20_000 });
+      await expect(page.locator("body")).toContainText("Testlogin klaar", { timeout: 20_000 });
+      await page.goto("/instellingen/toegang");
+      await ready(page);
+      await expect(page.getByTestId("sso-testuitkomst")).toContainText("Geslaagd");
+      await expect(page.getByTestId("sso-testuitkomst")).toContainText("Er is geen sessie gemaakt");
+      await expectAccessible(page, "toegang en SSO");
+      await expect(page.locator("#sso-geheim")).toHaveValue("");
+    } finally {
+      await context.close();
+      await tls.close();
+    }
+  });
 });

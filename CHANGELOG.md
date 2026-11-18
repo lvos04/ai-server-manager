@@ -4,6 +4,19 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Gerepareerd — Hub: OIDC-invoer, sessiegrenzen en lokale noodbediening (KLEIN-107)
+- Schrijven/wissen van het OIDC-clientgeheim alleen via vertrouwde HTTPS door een lokale beheerder of noodsessie;
+  HTTP en SSO-beheerders krijgen een vaste 403 zonder configuratie- of kluiswijziging. UI-veld alleen via HTTPS,
+  zonder React-state, browseropslag of `new-password`; leeg bij verzenden, fout en verlaten.
+- OIDC-sessies per verzoek gebonden aan SSO aan en de actuele configuratie (toevoegende migratie 0013);
+  uitzetten, gewijzigde discovery en vervangen/wissen trekken uitsluitend OIDC-sessies in, ook bij SSO al uit.
+  Lokale sessies, noodsessies, bestaand TOTP en de gedeelde kluissleutel blijven behouden.
+- Zonder actief leesbaar clientgeheim geen testlogin, callback-tokenaanvraag of inschakelen; wissen verwijdert
+  de oude ciphertext. OIDC-idempotentieantwoorden zonder laatste vier, inclusief oude cache-antwoorden (migratie 0014).
+- CGNAT-beheer alleen via lokale beheerder of noodsessie; setting, standaard uit en noodlogin blijven gelijk.
+- O1 (herstelbestendig intrekkingsanker) en O2 (geheime bodyhash in verzoek-idempotentie) blijven open;
+  de tijdelijke overdracht blijft dicht volgens ADR-0033. Contract 1.3, policy en ADR-0033 zijn ongewijzigd.
+
 ### Gerepareerd — Contract 1.3: aanvulling C-12 na de review van de bron (S-P2-C12, deel A, A-HERSTEL; blijft `contracts 1.3`)
 - §3.1, tweede uitzondering: een manifest bevat nooit een kluisverwijzing (`vault_ref_not_allowed`); alleen de Hub en,
   bij het uitvoeren, de executor vullen een kluisverwijzing in, alleen voor de `app_id` van het doel van de ondertekende
