@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/lib/session", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/session")>()),
+  ...(await importOriginal<Record<string, unknown>>()),
   useRole: () => "admin",
   useSession: () => ({ state: { status: "anon" } }),
 }));
