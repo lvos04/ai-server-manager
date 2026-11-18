@@ -149,18 +149,28 @@ def looks_like_docker_gateway(ip: str) -> bool:
 
 
 # ------------------------------------------------------------------ accountstatus
-def account(db: Session) -> User | None:
-    return db.scalars(select(User).where(User.break_glass.is_(True)).order_by(User.created_at)).first()
+def account(db: Session, *, lock: bool = False) -> User | None:
+    query = select(User).where(User.break_glass.is_(True)).order_by(User.created_at).limit(1)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return db.scalar(query)
 
 
-def is_working(user: User | None) -> bool:
+def is_working(user: User | None, *, allow_pending_rotation: bool = False) -> bool:
     return (
         user is not None
         and user.break_glass
         and not user.disabled
         and user.role == "admin"
         and user.totp_secret_ref is not None
-        and user.totp_confirmed_at is not None
+        and (
+            user.totp_confirmed_at is not None
+            # Oudere rotaties zonder rotatieplicht behielden het tijdstip van de vorige bevestiging.
+            or (
+                allow_pending_rotation
+                and (user.break_glass_rotation_required or user.break_glass_reconfirmed_at is not None)
+            )
+        )
     )
 
 

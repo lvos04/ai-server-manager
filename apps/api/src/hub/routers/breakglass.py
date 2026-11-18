@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -107,6 +108,22 @@ def _new_totp(db: Any, vault: Vault, user: User, actor: str) -> dict[str, str]:
     return {"geheim": secret, "otpauth_uri": breakglass.otpauth_uri(secret, user.username)}
 
 
+def _confirm_totp(db: DB, user: User, now: datetime, actor: str) -> None:
+    first = user.totp_confirmed_at is None
+    if first:
+        user.totp_confirmed_at = now
+        user.break_glass_rotation_required = False
+    user.break_glass_reconfirmed_at = now
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=actor,
+        action="auth.break_glass.confirmed" if first else "auth.break_glass.reconfirmed",
+        target_type="user",
+        target_id=str(user.id),
+    )
+
+
 @router.get("", summary="Status van het noodaccount (admin)")
 def get_status(db: DB, settings: SettingsDep, _: Admin) -> dict[str, Any]:
     return breakglass.status(db, settings)
@@ -158,8 +175,8 @@ def setup(body: SetupIn, db: DB, settings: SettingsDep, principal: LocalAdmin, v
 
 @router.post("/rotate", summary="Noodaccount roteren: nieuw wachtwoord en nieuwe TOTP (admin; rotatieplicht)")
 def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: VaultDep) -> JSONResponse:
+    user = breakglass.account(db, lock=True)
     _reauth(db, settings, principal, body.huidig_wachtwoord)
-    user = breakglass.account(db)
     if user is None:
         raise HubError(404, "not_found", "Er is nog geen noodaccount.")
     _check_password(body.nieuw_wachtwoord, user.username, settings)
@@ -167,6 +184,7 @@ def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: LocalAdmin,
     if body.sessieduur_minuten is not None:
         user.break_glass_session_minutes = body.sessieduur_minuten
     totp = _new_totp(db, vault, user, principal.name)
+    user.break_glass_rotation_required = True
     user.updated_at, user.version = utcnow(), user.version + 1
     audit.record(
         db,
@@ -178,7 +196,11 @@ def rotate(body: RotateIn, db: DB, settings: SettingsDep, principal: LocalAdmin,
     )
     db.commit()
     return JSONResponse(
-        {"noodaccount": user_dict(user), "totp": totp, "volgende_stap": "Bevestig de nieuwe TOTP met een code."},
+        {
+            "noodaccount": user_dict(user),
+            "totp": totp,
+            "volgende_stap": "Bevestig de nieuwe TOTP met een code of gebruik de noodlogin met de nieuwe gegevens.",
+        },
         headers={"Cache-Control": "no-store"},
     )
 
@@ -212,7 +234,7 @@ def put_cgnat(body: CgnatIn, db: DB, settings: SettingsDep, principal: LocalAdmi
     responses={422: {"description": "invalid_totp: foute code binnen een geldige sessie (nooit 401)"}},
 )
 def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmin, vault: VaultDep) -> dict[str, Any]:
-    user = breakglass.account(db)
+    user = breakglass.account(db, lock=True)
     if user is None or user.totp_secret_ref is None:
         raise HubError(404, "not_found", "Er is nog geen noodaccount met TOTP.")
     key = f"breakglass-confirm:{principal.id}"
@@ -226,20 +248,8 @@ def confirm(body: ConfirmIn, db: DB, settings: SettingsDep, principal: LocalAdmi
         db.commit()
         raise HubError(422, "invalid_totp", "De code klopt niet (of is al gebruikt).")
     clear_failures(db, key)
-    first = user.totp_confirmed_at is None
     user.totp_last_step = step
-    if first:
-        user.totp_confirmed_at = now
-        user.break_glass_rotation_required = False  # nieuwe TOTP na rotatie bevestigd: rotatieplicht voldaan
-    user.break_glass_reconfirmed_at = now
-    audit.record(
-        db,
-        actor_type="user",
-        actor_id=principal.name,
-        action="auth.break_glass.confirmed" if first else "auth.break_glass.reconfirmed",
-        target_type="user",
-        target_id=str(user.id),
-    )
+    _confirm_totp(db, user, now, principal.name)
     db.commit()
     return breakglass.status(db, settings)
 
@@ -275,11 +285,17 @@ def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault:
             "Noodlogin kan alleen vanaf een privé-netwerkadres (thuisnetwerk), nooit vanaf internet.",
             {"bron_ip": ip},
         )
-    user = db.scalars(select(User).where(User.username == username)).first()
+    # Verifieer dezelfde gegevens die we bij een geslaagde login bevestigen en verbruiken.
+    user = db.scalar(select(User).where(User.username == username, User.break_glass.is_(True)).with_for_update())
     ok_password = verify_password(user.password_hash if user else None, body.password)
     now = utcnow()
     step = None
-    if ok_password and breakglass.is_working(user) and user is not None and user.totp_secret_ref is not None:
+    if (
+        ok_password
+        and user is not None
+        and breakglass.is_working(user, allow_pending_rotation=True)
+        and user.totp_secret_ref
+    ):
         secret = vault.get(db, user.totp_secret_ref)
         step = breakglass.verify_totp(secret, body.totp, now, user.totp_last_step) if secret else None
     if user is None or step is None:
@@ -291,6 +307,8 @@ def login(body: LoginIn, request: Request, db: DB, settings: SettingsDep, vault:
         raise HubError(401, "invalid_credentials", "Gebruikersnaam, wachtwoord of code onjuist.")
     clear_failures(db, key)
     user.totp_last_step = step
+    if user.totp_confirmed_at is None:
+        _confirm_totp(db, user, now, user.username)
     user.break_glass_last_used_at = now
     user.break_glass_rotation_required = True
     emit(

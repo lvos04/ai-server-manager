@@ -358,11 +358,13 @@ def my_sessions(db: DB, principal: AnyUser, settings: SettingsDep) -> dict[str, 
 
 @router.post("/auth/sessions/{session_id}/revoke", summary="Sessie intrekken (eigen; admin: iedere)")
 def revoke_session(session_id: uuid.UUID, db: DB, principal: AnyUser, idem: Idem) -> JSONResponse:
-    if (replay := idem.replay()) is not None:
-        return replay
     sess = db.get(WebSession, session_id)
     if sess is None or (str(sess.user_id) != principal.id and principal.role != Role.admin):
         raise HubError(404, "not_found", "Sessie niet gevonden.")
+    if sess.break_glass:
+        require_local_admin(principal)
+    if (replay := idem.replay()) is not None:
+        return replay
     if sess.revoked_at is None:
         sess.revoked_at = utcnow()
     audit.record(

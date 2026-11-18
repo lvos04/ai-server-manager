@@ -9,14 +9,21 @@ KLEIN-107 herstelt bestaande invoer- en sessiegrenzen. De tijdelijke handmatige 
 het herstelbestendige intrekkingsanker en het verwijderen van de geheime bodyhash zijn hier niet gebouwd.
 
 ## Eerst: de noodlogin
-Zorg dat de noodlogin werkt (Instellingen → Noodaccount: wachtwoord ≥ 20 tekens + TOTP, bevestigd). Die werkt altijd,
-ook als Authentik onbereikbaar is, en alleen vanaf het thuisnetwerk. Zonder werkend noodaccount kan "OIDC verplicht" niet
-aan.
+Stel de noodlogin in via Instellingen → Noodaccount met een wachtwoord van minimaal 20 tekens en bevestig het TOTP.
+De noodlogin werkt vanaf een toegestaan privéadres, ook als Authentik onbereikbaar is. Voor "OIDC verplicht" is een
+werkend noodaccount vereist.
 
 Maak een lokale beheerder of een noodaccount aan voordat je voor beheer op SSO vertrouwt. De Hub weigert handmatige
 wijzigingen die SSO uitzetten of alle OIDC-sessies intrekken zonder werkende lokale herstelroute. Hetzelfde geldt als
 je de laatste werkende lokale herstelroute via gebruikersbeheer uitschakelt. Bij gewijzigde discovery zet de Hub
 SSO automatisch uit, ook als er geen lokale herstelroute is. Op Gebruikers en toegang staat dan vooraf een waarschuwing.
+
+Bewaar bij een rotatie het nieuwe wachtwoord en het nieuwe TOTP offline voordat je de beheersessie sluit. Als die
+sessie eindigt vóór de bevestiging, kies je op het inlogscherm **Noodlogin**. Meld je vanaf het thuisnetwerk aan met
+het nieuwe wachtwoord en een geldige code uit de nieuwe authenticator. De Hub bevestigt daarmee het nieuwe TOTP en
+markeert de noodlogin zoals gebruikelijk voor rotatie. Vanuit die noodsessie kun je een lokale beheerder aanmaken of
+heractiveren en de SSO-instellingen herstellen. SSO-sessies kunnen de noodsessies niet intrekken. Als er alleen
+SSO-beheerders zijn en de noodlogin onbruikbaar is, ontbreekt een herstelroute binnen de Hub.
 
 ## In Authentik (door de beheerder, in de Authentik-web-UI)
 1. Een **OAuth2/OpenID-provider** voor de Hub: client type *Confidential*, redirect-URI exact

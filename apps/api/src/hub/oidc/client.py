@@ -32,6 +32,7 @@ LEEWAY_S = 30
 MAX_IAT_AGE_S = 600
 DISCOVERY_PATH = "/.well-known/openid-configuration"
 PROVIDER_ERRORS = {
+    "alg_niet_toegestaan": "Het ID-token gebruikt een niet-toegestaan algoritme (alleen asymmetrisch).",
     "idp_weigerde": "De identity provider heeft de aanmelding geweigerd of geen aanmeldcode teruggestuurd.",
     "token_geweigerd": "De identity provider weigerde de code.",
     "issuer_komt_niet_overeen": "De issuer uit de discovery komt niet overeen met de ingestelde issuer.",
@@ -228,7 +229,7 @@ def validate_id_token(
         raise OidcError("id_token_ongeldig", "Het ID-token is geen geldige JWS.") from exc
     alg = str(header.get("alg") or "")
     if alg not in ALLOWED_ALGS or alg not in allowed_algs:
-        raise OidcError("alg_niet_toegestaan", f"Algoritme '{alg[:16]}' is niet toegestaan (alleen asymmetrisch).")
+        raise OidcError("alg_niet_toegestaan", PROVIDER_ERRORS["alg_niet_toegestaan"])
     kid = header.get("kid")
     key = _find_key(jwks, str(kid) if kid is not None else None, alg)
     try:

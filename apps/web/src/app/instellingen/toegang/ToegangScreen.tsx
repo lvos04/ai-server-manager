@@ -326,12 +326,19 @@ function Sso() {
       {!c && cfg.loading ? <Loading /> : null}
       {c?.reden === "oidc_clientgeheim_ontbreekt" ? (
         <Melding soort="beperkt" titel="SSO staat aan maar werkt niet: het clientgeheim ontbreekt">
-          <p>Stel het clientgeheim in via HTTPS of zet SSO uit.</p>
+          <p>{lokaalBeheer
+            ? "Stel het clientgeheim in via HTTPS of zet SSO uit."
+            : "Gebruik de noodlogin of vraag een lokale beheerder om het clientgeheim in te stellen."}</p>
         </Melding>
       ) : null}
       {c?.lokale_herstelroute === false ? (
         <Melding soort="beperkt" titel="Er is geen werkende lokale herstelroute">
-          <p>Maak een lokale beheerder of een noodaccount aan. Bij gewijzigde gegevens van de issuer kan SSO automatisch uitgaan.</p>
+          <p>
+            {lokaalBeheer
+              ? "Maak een lokale beheerder of een noodaccount aan."
+              : "Gebruik de noodlogin of vraag een lokale beheerder om hulp."}{" "}
+            Bij gewijzigde gegevens van de issuer kan SSO automatisch uitgaan.
+          </p>
         </Melding>
       ) : null}
       {c && gateDicht ? (

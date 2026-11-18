@@ -549,11 +549,13 @@ def all_sessions(db: DB, _: Admin, settings: SettingsDep) -> dict[str, Any]:
 
 @router.post("/api/v1/users/{user_id}/sessions/revoke", summary="Alle sessies van een gebruiker intrekken (admin)")
 def revoke_user_sessions(user_id: uuid.UUID, body: RevokeIn, db: DB, principal: Admin, idem: Idem) -> JSONResponse:
-    if (replay := idem.replay()) is not None:
-        return replay
     user = db.get(User, user_id)
     if user is None:
         raise HubError(404, "not_found", "Gebruiker niet gevonden.")
+    if user.break_glass:
+        require_local_admin(principal)
+    if (replay := idem.replay()) is not None:
+        return replay
     n = service.revoke_sessions(db, user_ids=[user.id], only_oidc=False)
     audit.record(
         db,

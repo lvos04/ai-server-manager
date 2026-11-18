@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Login } from "@/app/inloggen/Login";
 import { ToegangScreen } from "@/app/instellingen/toegang/ToegangScreen";
 
 const reden = "oidc_clientgeheim_ontbreekt";
-const scenario = vi.hoisted(() => ({ herstelroute: true }));
+const scenario = vi.hoisted(() => ({ herstelroute: true, authBron: "lokaal", noodlogin: false }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({}),
@@ -13,7 +13,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/session", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRole: () => "admin",
-  useSession: () => ({ state: { status: "anon" } }),
+  useSession: () => ({
+    state: { status: "auth", me: { user: { role: "admin", auth_bron: scenario.authBron, break_glass: scenario.noodlogin } } },
+  }),
 }));
 vi.mock("@/lib/use-api", () => ({
   useApi: (pad: string) => ({
@@ -32,6 +34,11 @@ vi.mock("@/lib/use-api", () => ({
 }));
 
 describe("SSO-beschikbaarheid", () => {
+  afterEach(() => {
+    Object.assign(scenario, { herstelroute: true, authBron: "lokaal", noodlogin: false });
+    vi.unstubAllGlobals();
+  });
+
   it("toont de Nederlandse reden op Inloggen zonder SSO-knop", () => {
     const html = renderToStaticMarkup(<Login />);
     expect(html).toContain("Het clientgeheim voor SSO ontbreekt");
@@ -52,4 +59,28 @@ describe("SSO-beschikbaarheid", () => {
     expect(html).toContain("Ook je eigen SSO-sessie eindigt.");
   });
 
+  it("verwijst een SSO-beheerder zonder herstelroute naar de noodlogin of een lokale beheerder", () => {
+    scenario.herstelroute = false;
+    scenario.authBron = "oidc";
+    const html = renderToStaticMarkup(<ToegangScreen />);
+    expect(html).toContain("Gebruik de noodlogin of vraag een lokale beheerder om hulp");
+    expect(html).not.toContain("Maak een lokale beheerder of een noodaccount aan");
+  });
+
+  it.each([
+    { naam: "SSO-beheerder", bron: "oidc", noodlogin: false, toegang: false },
+    { naam: "lokale beheerder", bron: "lokaal", noodlogin: false, toegang: true },
+    { naam: "noodsessie", bron: "lokaal", noodlogin: true, toegang: true },
+  ])("toetst het clientgeheimveld via HTTPS voor een $naam", ({ bron, noodlogin, toegang }) => {
+    scenario.authBron = bron;
+    scenario.noodlogin = noodlogin;
+    vi.stubGlobal("window", { location: { origin: "https://hub.example", protocol: "https:" } });
+    const html = renderToStaticMarkup(<ToegangScreen />);
+    if (toegang) {
+      expect(html).toContain('id="sso-geheim"');
+    } else {
+      expect(html).not.toContain('id="sso-geheim"');
+      expect(html).toContain("Meld je aan als lokale beheerder of via de noodlogin");
+    }
+  });
 });
