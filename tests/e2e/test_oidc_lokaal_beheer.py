@@ -76,3 +76,21 @@ def test_sso_beheerder_mag_noodaccount_niet_wijzigen(admin: Any, app: Any, idp: 
     ]
     assert [(r.status_code, r.json().get("code")) for r in acties] == [(403, "lokale_beheerder_vereist")] * len(acties)
     assert noodlogin(app, totp).get("/api/v1/auth/me").status_code == 200
+
+
+def test_sso_beheerder_mag_lokaal_beheeraccount_niet_opnieuw_activeren(admin: Any, app: Any, idp: Any) -> None:
+    enable(admin, idp)
+    sso, page = sso_login(app, idp)
+    assert page.status_code == 200
+    sso.headers["X-CSRF-Token"] = sso.cookies.get("hub_csrf")
+    r = admin.post(
+        "/api/v1/users",
+        json={"username": "slapend-beheer", "password": STRONG_PASSWORD, "role": "admin"},
+        headers=idem(),
+    )
+    assert r.status_code == 201
+    pad = f"/api/v1/users/{r.json()['id']}"
+    assert admin.patch(pad, json={"disabled": True}, headers=idem()).status_code == 200
+    r = sso.patch(pad, json={"disabled": False}, headers=idem())
+    assert (r.status_code, r.json().get("code")) == (403, "lokale_beheerder_vereist")
+    assert admin.patch(pad, json={"disabled": False}, headers=idem()).status_code == 200

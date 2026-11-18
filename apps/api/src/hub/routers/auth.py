@@ -508,7 +508,14 @@ def patch_user(
     user = db.get(User, user_id)
     if user is None:
         raise HubError(404, "not_found", "Gebruiker niet gevonden.")
-    if user.break_glass or body.role == Role.admin:
+    reactivate_local_admin = (
+        user.disabled
+        and body.disabled is False
+        and user.auth_bron == "lokaal"
+        and user.role == Role.admin.value
+        and body.role is None
+    )
+    if user.break_glass or body.role == Role.admin or reactivate_local_admin:
         require_local_admin(principal)
     if (replay := idem.replay()) is not None:
         return replay

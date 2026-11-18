@@ -36,7 +36,8 @@ SSO inrichten vereist een vertrouwde HTTPS-route naar de Hub.
    uvicorn van een expliciet vertrouwde proxy accepteert. Een door de browser aangeleverde schemaheader is onvoldoende.
    Het geheimveld verschijnt alleen via HTTPS voor lokale beheerders en noodsessies. Een SSO-beheerder kan gewone
    gebruikers en hun lagere rollen blijven beheren. Alleen een lokale beheerder of noodsessie kan een gebruiker met
-   rol beheerder aanmaken, een rol naar beheerder wijzigen of het noodaccount aanmaken of wijzigen.
+   rol beheerder aanmaken, een rol naar beheerder wijzigen, een lokaal beheeraccount opnieuw activeren of het
+   noodaccount aanmaken of wijzigen.
    De invoer staat uitsluitend tijdelijk in het veld en het uitgaande verzoek, niet in React-state of browseropslag.
    Verzenden (ook bij fout), verlaten en pagina-herstel maken het veld leeg. `autocomplete=off` en uitsluitingsattributen
    ontmoedigen wachtwoordmanagers; extern opslag-/synchronisatiegedrag kan de app niet afdwingen.
