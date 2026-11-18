@@ -130,8 +130,11 @@ def _gate(db: Session, settings: Any) -> dict[str, Any]:
 
 @router.put("/api/v1/auth/oidc", summary="SSO instellen (admin); wijzigen van issuer/client zet SSO uit")
 def put_oidc(
-    body: OidcIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault: VaultDep
+    body: OidcIn, request: Request, db: DB, settings: SettingsDep, principal: Admin, idem: Idem, vault: VaultDep
 ) -> JSONResponse:
+    # Zelfde schema als de Secure-cookiecontrole; uvicorn verwerkt alleen vertrouwde proxyheaders.
+    if (body.client_secret or body.client_secret_wissen) and request.url.scheme != "https":
+        raise HubError(403, "oidc_geheim_https_vereist", "Het clientgeheim schrijven of wissen kan alleen via HTTPS.")
     if (replay := idem.replay()) is not None:
         return replay
     try:

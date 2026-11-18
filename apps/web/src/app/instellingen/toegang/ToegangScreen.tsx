@@ -8,6 +8,7 @@ import { ErrorPanel } from "@/components/ErrorPanel";
 import { Field } from "@/components/Field";
 import { KopieerVeld } from "@/components/KopieerVeld";
 import { Loading } from "@/components/Loading";
+import { OidcSecretField } from "@/components/OidcSecretField";
 import { Melding } from "@/components/Melding";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import { RolMelding } from "@/components/RolMelding";
@@ -357,13 +358,9 @@ function Sso() {
           <Field id="sso-client" label="Client-ID">
             {(a) => <input {...a} value={f.client_id} onChange={(e) => setForm({ ...f, client_id: e.target.value })} autoComplete="off" />}
           </Field>
-          <Field
-            id="sso-geheim"
-            label={c.client_secret.ingesteld ? "Clientgeheim vervangen (optioneel)" : "Clientgeheim"}
-            help={c.client_secret.ingesteld ? `Ingesteld: ••••${c.client_secret.laatste4 ?? ""}. Leeg laten = niet wijzigen.` : "Wordt versleuteld opgeslagen; je ziet daarna alleen de laatste 4 tekens."}
-          >
-            {(a) => <input {...a} type="password" value={f.client_secret} onChange={(e) => setForm({ ...f, client_secret: e.target.value })} autoComplete="new-password" />}
-          </Field>
+          <OidcSecretField https={typeof window !== "undefined" && window.location.protocol === "https:"}
+            ingesteld={c.client_secret.ingesteld} laatste4={c.client_secret.laatste4}
+            value={f.client_secret} onChange={(e) => setForm({ ...f, client_secret: e.target.value })} />
           <KopieerVeld label="Terugkeer-adres (zet dit in Authentik)" waarde={redirect} testId="sso-redirect" />
           {redirect.startsWith("http://") ? (
             <Melding soort="info">
