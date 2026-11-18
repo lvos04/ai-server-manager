@@ -138,6 +138,18 @@ def config_dict(db: Session, cfg: OidcConfig) -> dict[str, Any]:
     }
 
 
+def idempotency_response(body: Any) -> Any:
+    """Alleen rechtstreekse beheer-GET mag laatste vier tonen; nooit een opgeslagen mutatieantwoord."""
+    if not isinstance(body, dict):
+        return body
+    out = dict(body)
+    if isinstance(out.get("client_secret"), dict):
+        out["client_secret"] = {k: v for k, v in out["client_secret"].items() if k != "laatste4"}
+    if isinstance(out.get("oidc"), dict):
+        out["oidc"] = idempotency_response(out["oidc"])
+    return out
+
+
 # ------------------------------------------------------------------ sessies intrekken
 def revoke_sessions(db: Session, *, user_ids: list[uuid.UUID] | None = None, only_oidc: bool = True) -> int:
     q = update(WebSession).where(WebSession.revoked_at.is_(None))

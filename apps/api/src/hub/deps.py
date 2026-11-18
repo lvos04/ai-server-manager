@@ -263,8 +263,16 @@ ViewerOrService = Annotated[Principal, Depends(require_viewer_or_service)]
 class Idempotency:
     """Herhaling met dezelfde ``Idempotency-Key`` → hetzelfde antwoord, geen tweede uitvoering."""
 
-    def __init__(self, db: Session, scope: str, key: uuid.UUID, request_hash: str) -> None:
+    def __init__(
+        self,
+        db: Session,
+        scope: str,
+        key: uuid.UUID,
+        request_hash: str,
+        response_filter: Callable[[Any], Any] | None = None,
+    ) -> None:
         self.db, self.scope, self.key, self.request_hash = db, scope, key, request_hash
+        self.response_filter = response_filter
 
     def replay(self) -> JSONResponse | None:
         rec = self.db.scalars(
@@ -274,9 +282,16 @@ class Idempotency:
             return None
         if rec.request_hash != self.request_hash:
             raise HubError(422, "idempotency_key_reused", "Deze Idempotency-Key is al gebruikt voor een ander verzoek.")
+        if self.response_filter is not None:
+            clean = self.response_filter(rec.response_body)
+            if clean != rec.response_body:
+                rec.response_body = clean
+                self.db.commit()
         return JSONResponse(rec.response_body, status_code=rec.status_code, headers={"Idempotent-Replay": "true"})
 
     def save(self, status_code: int, body: Any) -> JSONResponse:
+        if self.response_filter is not None:
+            body = self.response_filter(body)
         rec = IdempotencyRecord(
             scope=self.scope, key=self.key, request_hash=self.request_hash, status_code=status_code, response_body=body
         )
@@ -311,7 +326,16 @@ async def _idempotency(
     path = getattr(route, "path", request.url.path)
     scope = f"{who}:{request.method}:{path}"[:128]
     rhash = hashlib.sha256(f"{request.url.path}\n{canonical}".encode()).hexdigest()
-    return Idempotency(db, scope, key, rhash)
+    response_filter = None
+    if (request.method, request.url.path) in {
+        ("PUT", "/api/v1/auth/oidc"),
+        ("POST", "/api/v1/auth/oidc/discover"),
+        ("POST", "/api/v1/auth/oidc/inschakelen"),
+    }:
+        from hub.oidc.service import idempotency_response
+
+        response_filter = idempotency_response
+    return Idempotency(db, scope, key, rhash, response_filter=response_filter)
 
 
 Idem = Annotated[Idempotency, Depends(_idempotency)]

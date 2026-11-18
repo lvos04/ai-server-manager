@@ -305,3 +305,60 @@ def test_wissen_verwijdert_oude_ciphertext_en_zet_sso_uit(admin: Any, app: Any, 
     r = admin.post("/api/v1/auth/oidc/test")
     assert r.status_code == 409 and r.json()["code"] == "oidc_clientgeheim_ontbreekt"
     noodlogin(app, secret)
+
+
+@pytest.mark.parametrize("route", ["put", "discover", "enable"])
+def test_oidc_idempotentie_bewaart_geen_geheime_metadata(admin: Any, app: Any, idp: FakeOidc, route: str) -> None:
+    from hub.models import IdempotencyRecord
+
+    secret = _breakglass(admin)
+    enable(admin, idp)
+    key = idem()
+    if route == "put":
+        r = admin.put("/api/v1/auth/oidc", json=body(idp, client_secret=idp.client_secret), headers=key)
+    elif route == "discover":
+        r = admin.post("/api/v1/auth/oidc/discover", headers=key)
+    else:
+        r = admin.post("/api/v1/auth/oidc/inschakelen", json={"ingeschakeld": True}, headers=key)
+    assert r.status_code == 200
+    with app.state.sessionmaker() as db:
+        records = list(db.scalars(select(IdempotencyRecord)))
+        assert len(records) >= 4
+        for record in records:
+            if ":/api/v1/auth/oidc" in record.scope:
+                assert "laatste4" not in str(record.response_body)
+    assert admin.get("/api/v1/auth/oidc").json()["client_secret"]["laatste4"] == idp.client_secret[-4:]
+    noodlogin(app, secret)
+
+
+def test_oude_oidc_antwoorden_worden_bij_replay_en_migratie_geschoond(
+    admin: Any, app: Any, idp: FakeOidc, settings: Any
+) -> None:
+    import uuid
+
+    from hub import migrations
+    from hub.models import IdempotencyRecord
+
+    configure(admin, idp)
+    key = idem()
+    payload = body(idp)
+    assert admin.put("/api/v1/auth/oidc", json=payload, headers=key).status_code == 200
+    with app.state.sessionmaker() as db:
+        rec = db.scalar(select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(key["Idempotency-Key"])))
+        rec.response_body = {**rec.response_body, "client_secret": {"ingesteld": True, "laatste4": "oude-metadata"}}
+        db.commit()
+    replay = admin.put("/api/v1/auth/oidc", json=payload, headers=key)
+    assert replay.status_code == 200 and replay.headers["Idempotent-Replay"] == "true"
+    assert "laatste4" not in str(replay.json())
+    migrations.downgrade(settings.database_url, "0013")
+    with app.state.sessionmaker() as db:
+        rows = list(db.scalars(select(IdempotencyRecord)))
+        for row in rows:
+            row.response_body = {**row.response_body, "oidc": {"client_secret": {"laatste4": "oude-metadata"}}}
+        db.commit()
+    migrations.upgrade(settings.database_url)
+    with app.state.sessionmaker() as db:
+        rows = list(db.scalars(select(IdempotencyRecord)))
+        assert rows
+        for row in rows:
+            assert "laatste4" not in str(row.response_body)

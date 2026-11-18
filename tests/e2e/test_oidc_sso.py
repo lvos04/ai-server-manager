@@ -360,7 +360,9 @@ def test_inschakelen_vereist_testlogin_en_d17_en_wijzigen_zet_uit(admin: Any, ap
         headers=idem(),
     ).json()
     assert cfg["ingeschakeld"] is False and cfg["laatste_test"]["actueel"] is False
-    assert cfg["client_secret"]["ingesteld"] is True and cfg["client_secret"]["laatste4"] == idp.client_secret[-4:]
+    assert cfg["client_secret"]["ingesteld"] is True and "laatste4" not in cfg["client_secret"]
+    # Alleen de bevoegde beheer-GET toont deze metadata, nooit het opgeslagen PUT-antwoord.
+    assert admin.get("/api/v1/auth/oidc").json()["client_secret"]["laatste4"] == idp.client_secret[-4:]
     assert idp.client_secret not in str(cfg)
     assert c.get("/api/v1/auth/me").status_code == 401
     _, resp = sso_login(app, idp)
