@@ -409,7 +409,12 @@ def update_link(
     catalog_app_id = body.catalog_app_id or row.catalog_app_id
     base = body.basis_url or row.basis_url
     if not body.doel_bevestigd and (catalog_app_id != row.catalog_app_id or base.rstrip("/") != row.basis_url):
-        raise HubError(422, "validation_error", "Bevestig de nieuwe bestemming en voer een nieuw credential in.")
+        melding = (
+            "Bevestig de nieuwe bestemming."
+            if row.app_id == mso.APP_ID
+            else "Bevestig de nieuwe bestemming en voer een nieuw credential in."
+        )
+        raise HubError(422, "validation_error", melding)
     if credential is None and not body.doel_bevestigd:
         raise HubError(422, "validation_error", "Geef een wijziging op.")
     secret = None if row.app_id == mso.APP_ID else _credential(credential)
@@ -446,13 +451,16 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
     if (replay := _replay_link(idem)) is not None:
         return replay
     target = _target(db, row.app_id, row.catalog_app_id)
-    nas = current_target(db)
-    if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
-        raise _binding_conflict()
+
+    def check_binding() -> None:
+        nas = current_target(db)
+        if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
+            raise _binding_conflict()
+
     policy = settings.outbound_policy()
     probes = None
     if row.app_id == mso.APP_ID:
-        result = mso.public_probes(row, policy)
+        result = mso.public_probes(row, policy, check_binding=check_binding)
         measurement, probes = result.connection, result.probes
         for failure in result.failures:
             emit(
@@ -462,9 +470,10 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
                 str(row.id),
                 {"reason_code": failure.reason_code, "correlation_id": failure.correlation_id},
             )
-        if not result.failures:
+        if row.laatste_fout is not None and not result.failures:
             emit(db, "monitoring.mso_probe.recovered", "adapter_link", str(row.id), {})
     else:
+        check_binding()
         measurement = basis.probe(row, policy)
     row.laatste_fout = measurement.reason_code
     if measurement.observed_at is not None:

@@ -73,7 +73,7 @@ def test_ongeldige_setup_levert_geen_meting(link: AdapterLink, monkeypatch: pyte
         side_effect=[outbound.Response(200, b'{"status":"ok","version":"1.6.0"}'), outbound.Response(200, body)]
     )
     monkeypatch.setattr(outbound, "request", transport)
-    result = mso.public_probes(link, outbound.OutboundPolicy())
+    result = mso.public_probes(link, outbound.OutboundPolicy(), check_binding=Mock())
     assert result.probes.healthz is not None
     assert result.probes.setup is None
     assert result.connection == basis.Measurement(status="unknown", reason_code="antwoord_ongeldig")
@@ -95,7 +95,7 @@ def test_foutcorrelatie_vereist_bekende_code_en_vorm(
             ]
         ),
     )
-    result = mso.public_probes(link, outbound.OutboundPolicy())
+    result = mso.public_probes(link, outbound.OutboundPolicy(), check_binding=Mock())
     assert result.probes.healthz is None
     assert result.probes.setup and result.probes.setup.setup_required
     assert result.connection == basis.Measurement(status="unknown", reason_code="bron_credential_geweigerd")

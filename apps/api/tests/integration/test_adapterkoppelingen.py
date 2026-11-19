@@ -421,6 +421,76 @@ def test_mso_openbare_probes(admin: Any, app: Any, doel: dict[str, Any], monkeyp
 
 
 @pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_poorteigenaar_per_probe(admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    assert created.status_code == 201
+    path = f"{ROUTE}/{created.json()['id']}"
+
+    def wissel_poorteigenaar(_base: str, method: str, probe_path: str, **_options: Any) -> outbound.Response:
+        assert method == "GET"
+        if probe_path == "/healthz":
+            with app.state.sessionmaker.begin() as db:
+                _bewaar_apps(db, {APP_ID: (443,)})
+            return outbound.Response(200, b'{"status":"ok","version":"1.6.0"}')
+        raise outbound.OutboundError("doelbinding")
+
+    transport = Mock(side_effect=wissel_poorteigenaar)
+    monkeypatch.setattr(outbound, "request", transport)
+    tested = admin.post(f"{path}/test", headers=idem())
+    assert [call.args[2] for call in transport.call_args_list] == ["/healthz"]
+    assert tested.status_code == 409
+    assert tested.json()["details"]["reason"] == "doelbinding"
+    detail = admin.get(path).json()
+    assert detail["verbinding"]["status"] == "unknown"
+    assert detail["verbinding"]["reason_code"] == "doelbinding"
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_herstelsignaal_vereist_eerdere_storing(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    assert created.status_code == 201
+    link_id = created.json()["id"]
+    path = f"{ROUTE}/{link_id}"
+    healthz = outbound.Response(200, b'{"status":"ok","version":"1.6.0"}')
+    setup = outbound.Response(200, b'{"setup_required":false,"completed":true,"version":"1.6.0"}')
+    geweigerd = outbound.Response(403, b'{"code":"forbidden"}')
+    antwoorden = [healthz, setup] * 2 + [healthz, geweigerd] + [healthz, setup] * 2
+    monkeypatch.setattr(outbound, "request", Mock(side_effect=antwoorden))
+
+    for status in ("healthy", "healthy", "unknown", "healthy", "healthy"):
+        assert admin.post(f"{path}/test", headers=idem()).status_code == 200
+        assert admin.get(path).json()["verbinding"]["status"] == status
+
+    with app.state.sessionmaker() as db:
+        events = db.scalars(
+            select(OutboxEvent.event_type)
+            .where(OutboxEvent.entity_id == link_id, OutboxEvent.event_type.startswith("monitoring.mso_probe."))
+            .order_by(OutboxEvent.seq)
+        ).all()
+    assert events == ["monitoring.mso_probe.failed", "monitoring.mso_probe.recovered"]
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_bevestigingsmelding_voor_mso(admin: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    transport = Mock(side_effect=AssertionError("Een wijziging hoort geen MSO-verzoek te sturen"))
+    monkeypatch.setattr(outbound, "request", transport)
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    assert created.status_code == 201
+    path = f"{ROUTE}/{created.json()['id']}"
+    wijziging = {"basis_url": TWEEDE_BASIS}
+    zonder = admin.patch(path, json=wijziging, headers=idem())
+    assert zonder.status_code == 422
+    assert zonder.json()["message"] == "Bevestig de nieuwe bestemming."
+    bevestigd = {**wijziging, "doel_bevestigd": True}
+    geweigerd = admin.patch(path, json=bevestigd, headers=invoer(secrets.token_urlsafe()))
+    assert geweigerd.status_code == 422
+    assert admin.patch(path, json=bevestigd, headers=idem()).status_code == 200
+    transport.assert_not_called()
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
 def test_mso_weigert_credentials(
     admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: Any
 ) -> None:

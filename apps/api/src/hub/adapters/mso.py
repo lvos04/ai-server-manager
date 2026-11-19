@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -69,8 +70,9 @@ def items(item_type: str, *, cursor: str | None, limit: int) -> dict[str, object
 
 
 def _read[T: BaseModel](
-    link: AdapterLink, path: str, model: type[T], policy: outbound.OutboundPolicy
+    link: AdapterLink, path: str, model: type[T], policy: outbound.OutboundPolicy, check_binding: Callable[[], None]
 ) -> T | ProbeFailure:
+    check_binding()
     try:
         response = basis.read_request(link, path, policy=policy)
     except outbound.OutboundError as exc:
@@ -94,9 +96,11 @@ def _read[T: BaseModel](
         return ProbeFailure("antwoord_ongeldig")
 
 
-def public_probes(link: AdapterLink, policy: outbound.OutboundPolicy) -> ProbeResult:
-    liveness = _read(link, HEALTH_PATH, Liveness, policy)
-    setup = _read(link, basis.MSO_SETUP_PATH, SetupStatus, policy)
+def public_probes(
+    link: AdapterLink, policy: outbound.OutboundPolicy, *, check_binding: Callable[[], None]
+) -> ProbeResult:
+    liveness = _read(link, HEALTH_PATH, Liveness, policy, check_binding)
+    setup = _read(link, basis.MSO_SETUP_PATH, SetupStatus, policy, check_binding)
     if isinstance(setup, SetupStatus) and setup.setup_required == setup.completed:
         setup = ProbeFailure("antwoord_ongeldig")
 
