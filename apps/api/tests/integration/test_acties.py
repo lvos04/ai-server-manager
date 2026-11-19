@@ -30,7 +30,7 @@ from fakes.fake_gotify import FakeGotify
 from fakes.fake_truenas import FakeTrueNAS
 from policyhelpers import DIGEST, install_params
 
-from hub.models import ActionRequest
+from hub.models import ActionRequest, IdempotencyRecord
 
 pytestmark = pytest.mark.integration
 TOKEN = "gotify-app-token-voor-test"
@@ -239,7 +239,9 @@ def _catalogus_install(naam: str, catalogus: str) -> dict[str, Any]:
     return params
 
 
-def test_een_tweede_emby_installeren_onder_een_andere_naam_wordt_geweigerd(stack: Stack) -> None:
+def test_een_tweede_emby_installeren_onder_een_andere_naam_wordt_geweigerd(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """HARDE EIS (S-P2-010, bouwpunt 6g): ``app.install`` met ``catalog_app: "emby"`` onder een andere naam valt onder
     APP-EMBY, ook voor een beheerder. Tegenproef: een andere catalogusapp onder een eigen naam wordt gewoon voorgesteld
     (R2, met goedkeuring)."""
@@ -247,6 +249,9 @@ def test_een_tweede_emby_installeren_onder_een_andere_naam_wordt_geweigerd(stack
     assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
     assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
     assert haal(stack.admin, key)["status"] == "geweigerd"
+    from asm_policy import params
+
+    monkeypatch.setattr(params, "catalogusinstallatie", lambda _params: [])
     r = stel_voor(stack.admin, "app.install", app_target("fotos"), _catalogus_install("fotos", "immich"))
     assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
     assert r.json()["status"] == "wacht_op_goedkeuring" and r.json()["preview"]["herkend_als"] == "immich"
@@ -304,11 +309,87 @@ def _catalogus_waarden(naam: str, values: Any) -> dict[str, Any]:
     return params
 
 
+@pytest.mark.parametrize(
+    ("values", "code"),
+    [
+        ({}, "catalogusversie_niet_toegelaten"),
+        ({"app": {"onbekend": None}}, "catalogusversie_niet_toegelaten"),
+        ({"app": {"init": {"token": "proefgeheim"}}}, "account_gegevens_verboden"),
+        ({"envs": [{"name": "JUPYTER_TOKEN", "value": "vault://app/huis/voorbeeld"}]}, "account_gegevens_verboden"),
+        ({"storage": [{"type": "nfs", "nfs_config": {"path": "export"}}]}, "opslag_verboden"),
+        ({"storage": [{"type": "cifs", "cifs_config": {}}]}, "opslag_verboden"),
+    ],
+)
+def test_deel_c_weigert_een_catalogusvoorstel_zonder_nas_schrijfactie(stack: Stack, values: Any, code: str) -> None:
+    rid, r = _voorstel(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", values))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig"
+    assert code in {f["code"] for f in r.json()["details"]["fouten"]}
+    assert "proefgeheim" not in r.text
+    assert stack.admin.get(f"/api/v1/actions/{rid}").status_code == 404
+    assert _lijst(stack) == [] and schrijfaanroepen(stack.nas) == []
+
+
+@pytest.mark.parametrize("veld", ["host_network", "privileged"])
+def test_deel_c_ex47_weigert_ook_met_voorsteltoelichting(stack: Stack, veld: str) -> None:
+    params = install_params("demo", **{veld: True})
+    params["manifest"]["host_network_reason"] = "Synthetische toelichting voor deze proef."
+    rid, r = _voorstel(stack.admin, "app.install", app_target("demo"), params)
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig"
+    assert f"{veld}_verboden" in {f["code"] for f in r.json()["details"]["fouten"]}
+    assert stack.admin.get(f"/api/v1/actions/{rid}").status_code == 404
+    assert schrijfaanroepen(stack.nas) == []
+
+
+def test_deel_c_oude_preview_maskeren_bij_lezen_en_herhalen(stack: Stack) -> None:
+    body = {
+        "action_id": "app.install",
+        "target": app_target("demo"),
+        "parameters": install_params("demo"),
+        "reason": "test",
+    }
+    headers = idem()
+    pad = "/api/v1/actions"
+    r = stack.admin.post(pad, json=body, headers=headers)
+    assert r.status_code == 201
+    rid = uuid.UUID(r.json()["request_id"])
+    preview_oud = r.json()["preview"]
+    sleutel = "a1b2c3d4-1234-4567-a123-987654321abc"
+    preview_oud["wijziging"]["waarden"]["api_token"] = {sleutel: "/padvormig/geheim"}
+    with stack.app.state.sessionmaker() as db:
+        req = db.get(ActionRequest, rid)
+        rec = db.query(IdempotencyRecord).filter_by(key=rid).one()
+        assert req is not None
+        req.preview = copy.deepcopy(preview_oud)
+        rec.response_body = {**rec.response_body, "preview": preview_oud}
+        db.commit()
+    assert sleutel not in stack.admin.get(pad).text
+    detail = stack.admin.get(f"{pad}/{rid}").json()
+    assert detail["preview"]["wijziging"]["waarden"]["api_token"] == {"***": "***"}
+    herhaling = stack.admin.post(pad, json=body, headers=headers)
+    assert herhaling.status_code == 201 and herhaling.headers["Idempotent-Replay"] == "true"
+    assert sleutel not in herhaling.text and "/padvormig/geheim" not in herhaling.text
+    r = stack.admin.post(f"{pad}/{rid}/reject", json={"reden": "test"}, headers=idem())
+    assert r.status_code == 200 and sleutel not in r.text
+    with stack.app.state.sessionmaker() as db:
+        rec = db.query(IdempotencyRecord).filter_by(key=rid).one()
+        assert sleutel not in str(rec.response_body)
+    assert schrijfaanroepen(stack.nas) == []
+
+
+@pytest.fixture
+def oude_cataloguspreview(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Laat de bestaande presentatietests met hun synthetische invoer een oude cataloguspreview maken."""
+    from asm_policy import params
+
+    c12 = params.c12_installatie
+    monkeypatch.setattr(params, "catalogusinstallatie", lambda _params: [])
+    monkeypatch.setattr(params, "c12_installatie", lambda values, *, ix_app: c12(values, ix_app=True) if ix_app else [])
+
+
 def test_catalogusapp_met_extra_rechten_wordt_geweigerd(stack: Stack) -> None:
     """S-P2-010, R-VEILIG-3 (ADR-0030 besluit 6): ook de eigen waarden van een catalogusapp krijgen geen extra
     capabilities, apparaten, host-PID/-IPC, gedeeld netwerk of GPU zonder ``gpu: intel_render``, ook genest. De Hub
-    geeft 422 met de code per sleutel en bewaart niets. Tegenproef: dezelfde app zonder die waarden wordt
-    voorgesteld."""
+    geeft 422 met de code per sleutel en bewaart niets. Zonder extra rechten resteert de witte-lijstweigering."""
     values = {
         "app": {
             "capabilities": {"add": ["SYS_ADMIN"]},
@@ -333,7 +414,8 @@ def test_catalogusapp_met_extra_rechten_wordt_geweigerd(stack: Stack) -> None:
     assert verwacht <= codes, codes
     assert _lijst(stack) == [] and schrijfaanroepen(stack.nas) == []
     r = stel_voor(stack.admin, "app.install", app_target("huis"), _catalogus_waarden("huis", {"app": {"tz": "x"}}))
-    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert r.status_code == 422
+    assert [f["code"] for f in r.json()["details"]["fouten"]] == ["catalogusversie_niet_toegelaten"]
 
 
 def test_losse_teksten_in_lijsten_worden_geweigerd_en_niet_bewaard(stack: Stack) -> None:
@@ -373,7 +455,8 @@ def test_losse_teksten_in_lijsten_worden_geweigerd_en_niet_bewaard(stack: Stack)
         assert rij is not None and rij.status == "geweigerd" and rij.parameters == {}
     goed = {"volumes": ["/mnt/testpool/media:/media:ro", "data:/data"], "args": ["--config", "/config/app.yml"]}
     r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", goed))
-    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert r.status_code == 422
+    assert [f["code"] for f in r.json()["details"]["fouten"]] == ["catalogusversie_niet_toegelaten"]
     assert schrijfaanroepen(stack.nas) == []
 
 
@@ -426,7 +509,8 @@ def test_objectvormen_in_catalogusapp_waarden_worden_geweigerd_en_niet_bewaard(s
         "opslag": {"source": "/mnt/testpool/media"},
     }
     r = stel_voor(admin, "app.install", app_target("huis"), _catalogus_waarden("huis", goed))
-    assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
+    assert r.status_code == 422
+    assert [f["code"] for f in r.json()["details"]["fouten"]] == ["catalogusversie_niet_toegelaten"]
     # Een eigen opdracht van de standaard Custom App doorstaat het beleid, maar de Hub weigert hem tot een
     # installatiescherm hem veilig kan tonen (S-P2-040, R-VEILIG-1, besluit regisseur optie C; ADR-0030 besluit 32).
     opdracht = install_params("demo", command=["java", "-cp", "/app/lib/*:/app/classes", "nl.Main"])
@@ -786,6 +870,7 @@ def test_preview_van_een_installatie_toont_elk_gezet_veld(stack: Stack) -> None:
     assert schrijfaanroepen(stack.nas) == []
 
 
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_preview_van_een_catalogusapp_toont_de_eigen_waarden(stack: Stack) -> None:
     """S-P2-040, R-VEILIG-1: ook de eigen waarden van een catalogusapp staan in de preview, met hun waarde. Alleen een
     geheim (een waarde onder een geheim-achtige sleutel) staat er als ``***``, zoals overal in de API-uitvoer van de Hub
@@ -816,6 +901,7 @@ def _kijkers_tekst(stack: Stack, kijker: Any, rid: str) -> str:
     )
 
 
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_geheime_sleutel_direct_onder_de_waarden_van_een_catalogusapp_staat_er_als_sterretjes(stack: Stack) -> None:
     """S-P2-040, herstelronde 2 (R-VEILIG-5; ADR-0030 besluit 32): een waarde onder een geheim-achtige sleutel staat er
     als ``***``, ook als die sleutel direct onder ``values`` van een catalogusapp staat; in het antwoord op het
@@ -843,6 +929,7 @@ def test_geheime_sleutel_direct_onder_de_waarden_van_een_catalogusapp_staat_er_a
         assert rij is not None and "proefgeheim" not in str(rij.preview)
 
 
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_omgevingsvariabelen_van_een_catalogusapp_alleen_met_naam_in_de_preview(stack: Stack) -> None:
     """S-P2-040, herstelronde 2 (R-VEILIG-6; ADR-0030 besluit 28): van een paar name/value in de waarden van een
     catalogusapp staat alleen de naam in de preview; de waarde is verborgen (``***``), ook bij een naam die niet op een
@@ -879,6 +966,7 @@ def test_omgevingsvariabelen_van_een_catalogusapp_alleen_met_naam_in_de_preview(
         assert rij is not None and "proefgeheim" not in str(rij.preview)
 
 
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_geheim_in_een_label_of_een_niet_tekstwaarde_staat_er_als_sterretjes(stack: Stack) -> None:
     """S-P2-040, herstelronde 3 (R-VEILIG-8; ADR-0030 besluit 32): (a) de ``value`` van een label met een geheim-achtige
     ``key`` staat er als ``***``, bij de standaard Custom App en bij een catalogusapp; (b) de ``value`` van een paar
@@ -974,6 +1062,7 @@ def test_geheim_in_een_label_of_een_niet_tekstwaarde_staat_er_als_sterretjes(sta
         ),
     ],
 )
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_omgevingsvariabelen_in_andere_vormen_alleen_met_naam(stack: Stack, values: Any, verwacht: Any) -> None:
     """S-P2-040, herstelronde 3 (besluit regisseur; ADR-0030 besluit 28 en 32): van een omgevingsvariabele van een
     catalogusapp staat alleen de naam in de preview, ook als hij geen paar ``name`` + ``value`` in kleine letters is:
@@ -1069,6 +1158,7 @@ def test_omgevingsvariabelen_in_andere_vormen_alleen_met_naam(stack: Stack, valu
         ),
     ],
 )
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_omgevingscontext_en_paren_volgens_een_regel(stack: Stack, values: Any, verwacht: Any) -> None:
     """S-P2-040, herstelronde 4 (R-VEILIG-9 t/m 12; besluit regisseur; ADR-0030 besluit 32): onder een sleutel met een
     omgevingsbetekenis (``env``, ``environment``, ``additional_envs``, ``env_vars``, … in elke schrijfwijze) staan
@@ -1158,6 +1248,7 @@ H1_NAMEN = ["api.key", "Api.Key", "x.api.key", "access-key", "access.key", "encr
         ),
     ],
 )
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_vormen_van_herreview_4_volgens_het_principe(
     stack: Stack, values: Any, verwacht: Any, geheimen: list[str]
 ) -> None:
@@ -1244,6 +1335,7 @@ J2_NAMEN = ["encryption_keys", "ssh_keys", "license_keys", "oauth", "jwt", "otp"
         ),
     ],
 )
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_vormen_van_herreview_5_volgens_het_besluit(
     stack: Stack, values: Any, verwacht: Any, geheimen: list[str]
 ) -> None:
@@ -1263,6 +1355,7 @@ def test_vormen_van_herreview_5_volgens_het_besluit(
         assert geheim not in r.text and geheim not in tekst, geheim
 
 
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_geen_rauw_veld_in_de_wijziging_van_een_installatie(stack: Stack) -> None:
     """S-P2-040, herstelronde 4 (R-VEILIG-13; besluit regisseur punt 1): ook ``resources`` en de andere velden van een
     installatie (herstartbeleid, poorten, opslag, namen van omgevingsvariabelen, redenen en controles uit het manifest)
@@ -1296,6 +1389,7 @@ def test_geen_rauw_veld_in_de_wijziging_van_een_installatie(stack: Stack) -> Non
         assert rij is not None and "proefgeheim" not in str(rij.preview)
 
 
+@pytest.mark.usefixtures("oude_cataloguspreview")
 def test_de_toonfunctie_verbergt_niets_wat_de_beheerder_moet_zien(stack: Stack) -> None:
     """S-P2-040, herstelronde 4 (besluit regisseur punt 5; proef G5 van R-VEILIG): poorten, opslag, labels zonder
     geheim, run_as, dns_config, portalen, leeg en ja/nee blijven zichtbaar, bij de standaard Custom App en bij een

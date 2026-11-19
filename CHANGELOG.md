@@ -4,6 +4,16 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Aangescherpt — Installatiebeleid en preview (S-P2-050c)
+- De Hub en executor toetsen installatiewaarden met de gepinde C-12-eigenaarsregels. Aanmeldgegevens worden
+  geweigerd, ook als kluisverwijzing. Variant B vereist voor een kluisverwijzing in een omgevingsvariabele van
+  de standaard Custom App een toegestane geheimnaam. Het invullen uit de kluis blijft gesloten.
+- Installatiewaarden die host-netwerk of `privileged` inschakelen worden geweigerd. NFS en SMB blijven dicht.
+  De witte lijst voor catalogusinstallaties is leeg. `policy/catalogus.yaml` legt de validatorpin voor beide
+  images en manifest-CI vast.
+- Previews maskeren padvormige geheimen, geheime UUID- en hex-sleutels, omgevingswaarden en geheimen in URL-query's
+  en webhookvelden. Expliciete padvelden en getypte openbare waarden blijven zichtbaar.
+
 ### Vastgelegd — Leesadapters voor bestaande apps (S-P3-010)
 - [ADR-0034](docs/adr/ADR-0034-adapters-bestaande-apps.md) legt voor MediaGuard, MSO en my_house de
   leesroutes, veldselectie, kluiskoppeling en versheid vast. MediaGuard-leesroutes met bijwerkingen

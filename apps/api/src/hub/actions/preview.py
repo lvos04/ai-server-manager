@@ -19,15 +19,15 @@ behalve:
 
 - onder een geheim-achtige sleutel (:func:`_geheime_naam`: ``hub.redact`` op de naam zoals hij is en genormaliseerd,
   een naam die op ``key`` of ``keys`` eindigt (niet de kale ``key`` of ``keys``), met ``pwd``, met ``auth`` als los
-  deel, of met ``oauth``, ``jwt``, ``otp``, ``mnemonic``, ``salt`` of ``seed``; een naam die met ``public`` begint
-  niet): de vorm blijft staan, elk tekst- en getalblad wordt ``***``, behalve een absoluut pad (:func:`_vorm`);
+  deel, of met ``oauth``, ``jwt``, ``otp``, ``mnemonic``, ``salt``, ``seed`` of ``webhook``): de vorm blijft staan,
+  elk tekst- en getalblad wordt ``***``. Een absoluut configuratiepad is alleen zichtbaar bij een bekende padnaam;
 - in een paar (een object met ``name`` of ``key`` én ``value``, elke schrijfwijze, genormaliseerd zoals ``_nk`` in het
   beleid): de ``value`` als ``***`` bij een ``name`` (een omgevingsvariabele, ADR-0030 besluit 28) of bij een
   geheim-achtige ``key``;
 - onder een sleutel met een omgevingsbetekenis (een deel van de sleutel eindigt op ``env``, ``envs``,
   ``environment(s)`` of ``environ``, of is ``omgeving``; ``venv`` niet; :func:`_is_omgeving`): alleen namen die kort en
-  niet willekeurig zijn (:func:`_omgeving`, :func:`_namen`), en een absoluut pad (``env_file``);
-- elke andere tekst, ook een sleutel, gaat door ``redact_text`` (URL met wachtwoord, ``Bearer``).
+  niet willekeurig zijn (:func:`_omgeving`, :func:`_namen`), en een absoluut pad bij ``env_file(s)``;
+- elke andere tekst, ook een sleutel, gaat door ``redact_text`` (URL met wachtwoord of geheim queryveld, ``Bearer``).
 
 Leeg (``None``, ``""``) en ja/nee blijven altijd zichtbaar, ook onder een geheim-achtige naam (S-P2-040 herstelronde
 6). Ook ``huidig`` (de readback van de NAS) gaat door :func:`_toon`; alleen ``target`` en ``resource_etag`` blijven
@@ -121,9 +121,9 @@ def _delen(sleutel: Any) -> list[str]:
 
 # Geheim-achtige woorden (S-P2-040 herstelronde 6, R-VEILIG-19; besluit regisseur), als los deel van de naam of aan
 # het eind van de genormaliseerde naam (``dbsalt``, ``walletseed``). ``pin`` bewust niet: te veel valse treffers.
-GEHEIME_WOORDEN = ("oauth", "jwt", "otp", "mnemonic", "salt", "seed")
+GEHEIME_WOORDEN = ("oauth", "jwt", "otp", "mnemonic", "salt", "seed", "webhook")
 SLEUTEL_EINDES = ("key", "keys")  # niet de kale key (de naam van een labelpaar) of keys
-PUBLIEK = "public"  # een naam die zo begint (public_key, publickey) is niet geheim-achtig (R-VEILIG-20)
+OPENBARE_SLEUTELS = frozenset({"publickey", "publickeys"})
 
 
 def _geheime_naam(naam: Any) -> bool:
@@ -131,13 +131,13 @@ def _geheime_naam(naam: Any) -> bool:
     ``hub.redact`` op de naam zoals hij is én genormaliseerd (``api.key`` wordt ``apikey``), een naam die genormaliseerd
     op ``key`` of ``keys`` eindigt (``encryption_key``, ``ssh_keys``; de kale ``key`` en ``keys`` niet), een naam met
     ``pwd``, met ``auth`` als los deel, of met een van :data:`GEHEIME_WOORDEN` als los deel of aan het eind. Een
-    naam die genormaliseerd met ``public`` begint, is niet geheim-achtig (R-VEILIG-20)."""
+    expliciete openbare sleutelnaam is zichtbaar."""
     if not isinstance(naam, str):
         return False
     nk = _nk(naam)
-    if nk.startswith(PUBLIEK):
-        return False
     delen = _delen(naam)
+    if naam.lower() in OPENBARE_SLEUTELS or (delen[:1] == ["public"] and nk in OPENBARE_SLEUTELS):
+        return False
     return (
         bool(LOG_SECRET_KEY_RE.search(naam) or LOG_SECRET_KEY_RE.search(nk))
         or (nk.endswith(SLEUTEL_EINDES) and nk not in SLEUTEL_EINDES)
@@ -145,6 +145,7 @@ def _geheime_naam(naam: Any) -> bool:
         or "auth" in delen
         or any(w in delen for w in GEHEIME_WOORDEN)
         or nk.endswith(GEHEIME_WOORDEN)
+        or "webhook" in nk
     )
 
 
@@ -168,7 +169,9 @@ def _nk(sleutel: Any) -> str:
 # met vars/variables (S-P2-040 herstelronde 5, R-VEILIG-16), of een deel dat op een van OMGEVING_EINDES eindigt
 # (herstelronde 6, R-VEILIG-18: additionalenvs, extraenv, appenv, environ, dotenv). Venv uitdrukkelijk niet; openvpn en
 # envoy eindigen niet op env.
-OMGEVING_WOORDEN = frozenset({"env", "envs", "environment", "environments", "omgeving"})
+OMGEVING_WOORDEN = frozenset(
+    {"env", "envs", "envconfig", "environment", "environments", "omgeving", "vars", "variables"}
+)
 OMGEVING_EINDES = ("env", "envs", "environment", "environments", "environ")
 GEEN_OMGEVING = frozenset({"venv"})
 OMGEVING_SAMENGESTELD_RE = re.compile(r"(?:env|environment|omgevings?)(?:vars?|variables?|variabelen?)")
@@ -179,7 +182,10 @@ SCHEIDING_RE = re.compile(r"[=:]")
 KORT = 64  # een naam onder een omgevingssleutel is hooguit zo lang (R-VEILIG-17)
 ENTROPIE_DREMPEL = 4.0  # dezelfde drempel als ``hub.redact._maybe_secret``
 HEX_RE = re.compile(r"[0-9A-Fa-f]{16,}")
-PAD_RE = re.compile(r"/[^\s=:]+")  # een absoluut pad: één regel, zonder witruimte, '=' of ':' (R-VEILIG-20)
+HEX_MET_STREEPJES_RE = re.compile(r"[0-9a-fA-F]+(?:-[0-9a-fA-F]+)+")
+PAD_RE = re.compile(r"/[^\x00-\x1f\x7f=:]+")  # één regel, met ruimte voor echte bestandsnamen
+OMGEVING_PADSLEUTELS = frozenset({"envfile", "envfiles"})
+GEHEIME_PADSLEUTELS = frozenset({"clientsecretfile", "seedpath", "tlskey", "sslkey"})
 
 
 def _is_omgeving(sleutel: Any) -> bool:
@@ -196,6 +202,9 @@ def _willekeurig(woord: str) -> bool:
     ``hub.redact._maybe_secret`` of gelijkwaardig). Strenger dan ``_maybe_secret``, omdat een kort woord de drempel van
     4,0 nooit haalt: met een cijfer én (hoofd- en kleine letters, of een entropie van minstens 4,0, of een hexreeks van
     minstens 16 tekens). Een woord zonder cijfer (``production``, ``DB_HOST``) is niet willekeurig."""
+    hex_met_streepjes = bool(HEX_MET_STREEPJES_RE.fullmatch(woord) and HEX_RE.fullmatch(woord.replace("-", "")))
+    if hex_met_streepjes:
+        return True
     if not any(c.isdigit() for c in woord):
         return False
     gemengd = any(c.isupper() for c in woord) and any(c.islower() for c in woord)
@@ -203,10 +212,8 @@ def _willekeurig(woord: str) -> bool:
 
 
 def _pad(tekst: str) -> bool:
-    """Een absoluut pad (S-P2-040 herstelronde 6, R-VEILIG-20; besluit regisseur): het verwijst naar een bestand en is
-    zelf geen geheim. Invulling: één regel die met ``/`` begint, zonder witruimte, ``=`` of ``:`` (:data:`PAD_RE`), en
-    zonder willekeurig deel (:func:`_willekeurig`), want een base64-geheim kan ook met ``/`` beginnen."""
-    return bool(PAD_RE.fullmatch(tekst)) and not any(_willekeurig(d) for d in tekst.split("/"))
+    """Een absoluut pad op één regel, alleen gebruikt bij bekende configuratievelden."""
+    return bool(PAD_RE.fullmatch(tekst)) and len(tekst.splitlines()) == 1
 
 
 def _naam(regel: str) -> str:
@@ -253,7 +260,7 @@ def _zet(uit: dict[str, Any], sleutel: Any, waarde: Any) -> None:
     uit[naam] = waarde
 
 
-def _omgeving(waarde: Any, diepte: int) -> Any:
+def _omgeving(waarde: Any, diepte: int, *, padveld: bool = False) -> Any:
     """De waarde onder een sleutel met een omgevingsbetekenis: alleen namen (S-P2-040 herstelronde 4, besluit
     regisseur; ADR-0030 besluit 28). Een tekst per regel als :func:`_namen` (een absoluut pad, zoals van ``env_file``,
     blijft zichtbaar: :func:`_pad`); een object toont zijn sleutels met elke
@@ -263,9 +270,11 @@ def _omgeving(waarde: Any, diepte: int) -> Any:
     if diepte > GEHEIM_DIEPTE:
         return REDACTED
     if isinstance(waarde, str):
-        return redact_text(waarde) if _pad(waarde) else _namen(waarde)
+        return redact_text(waarde) if padveld and _pad(waarde) else _namen(waarde)
     if isinstance(waarde, list | tuple):
-        return [_omgeving(w, diepte + 1) if isinstance(w, str | Mapping) else _verberg(w) for w in waarde]
+        return [
+            _omgeving(w, diepte + 1, padveld=padveld) if isinstance(w, str | Mapping) else _verberg(w) for w in waarde
+        ]
     if isinstance(waarde, Mapping):
         soort = _paarsoort(waarde)
         uit: dict[str, Any] = {}
@@ -283,7 +292,7 @@ def _vormsleutel(sleutel: Any) -> str:
     return _omgevingssleutel(tekst) if SCHEIDING_RE.search(tekst) or _willekeurig(tekst) else tekst
 
 
-def _vorm(waarde: Any, diepte: int) -> Any:
+def _vorm(waarde: Any, diepte: int, *, padveld: bool = False) -> Any:
     """De waarde onder een geheim-achtige naam (S-P2-040 herstelronde 6, R-VEILIG-20; besluit regisseur): de vorm blijft
     staan. Sleutels (:func:`_vormsleutel`), ja/nee, leeg en ``None`` zijn zichtbaar; elk tekst- en getalblad is ``***``,
     behalve een absoluut pad (:func:`_pad`). Zo ziet de beheerder dat ``basic_auth`` uit staat."""
@@ -295,8 +304,8 @@ def _vorm(waarde: Any, diepte: int) -> Any:
             _zet(uit, _vormsleutel(k), _vorm(w, diepte + 1))
         return uit
     if isinstance(waarde, list | tuple):
-        return [_vorm(w, diepte + 1) for w in waarde]
-    if isinstance(waarde, str) and _pad(waarde):
+        return [_vorm(w, diepte + 1, padveld=padveld) for w in waarde]
+    if padveld and isinstance(waarde, str) and _pad(waarde):
         return redact_text(waarde)
     return _verberg(waarde)
 
@@ -308,17 +317,18 @@ def _toon(waarde: Any, diepte: int = 0) -> Any:
         return REDACTED
     if isinstance(waarde, Mapping):
         soort = _paarsoort(waarde)
-        paarwaarde_geheim = soort == "name" or (
-            soort == "key" and any(_nk(k) == "key" and _geheime_naam(w) for k, w in waarde.items())
-        )
+        label = next((w for k, w in waarde.items() if soort == "key" and _nk(k) == "key" and _geheime_naam(w)), None)
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
             if soort == "name" and _nk(k) == PAAR_WAARDE:
                 _zet(uit, k, _verberg(w))  # de waarde van een omgevingsvariabele (besluit 28): nooit de vorm
-            elif _geheime_naam(k) or (paarwaarde_geheim and _nk(k) == PAAR_WAARDE):
-                _zet(uit, k, _vorm(w, diepte + 1))
+            elif k == "seed_ratio" and type(w) in (int, float):
+                _zet(uit, k, w)
+            elif _geheime_naam(k) or (_nk(k) == PAAR_WAARDE and label is not None):
+                veld = label if _nk(k) == PAAR_WAARDE else k
+                _zet(uit, k, _vorm(w, diepte + 1, padveld=_nk(veld) in GEHEIME_PADSLEUTELS))
             elif _is_omgeving(k):
-                _zet(uit, k, _omgeving(w, diepte + 1))
+                _zet(uit, k, _omgeving(w, diepte + 1, padveld=_nk(k) in OMGEVING_PADSLEUTELS))
             else:
                 _zet(uit, k, _toon(w, diepte + 1))
         return uit
@@ -327,6 +337,18 @@ def _toon(waarde: Any, diepte: int = 0) -> Any:
     if isinstance(waarde, str):
         return redact_text(waarde)
     return waarde
+
+
+def toon_bewaarde_preview(preview: dict[str, Any]) -> dict[str, Any]:
+    """Pas de huidige maskering ook toe op historische previews bij lijst en detail."""
+    return {k: _toon(w) if k in {"huidig", "wijziging"} else w for k, w in preview.items()}
+
+
+def idempotency_response(body: Any) -> Any:
+    """Pas dezelfde weergave toe bij een herhaling van een historisch actieantwoord."""
+    if isinstance(body, dict) and isinstance(getoond := body.get("preview"), dict):
+        return {**body, "preview": toon_bewaarde_preview(getoond)}
+    return body
 
 
 def _waarden(standaard: bool, values: Mapping[str, Any]) -> dict[str, Any]:

@@ -7,9 +7,9 @@ afgekapt. Onbekende velden zijn een fout (strikt).
 ``app.install`` (standaard Custom App = catalogusapp ``ix-app``) weigert vóór uitvoering (EX47): compose/YAML
 (``custom_app: true``, ``custom_compose_config(_string)``), ``privileged``, extra capabilities, apparaten, een
 Docker-socket, hostpaden buiten ``/mnt/<pool>/<dataset>`` (dus ook ``/``, ``/etc``, ``/var/run``, ``/root``), host
-network zonder reden, een gedeeld Docker-netwerk, ``latest`` of een tag zonder digest, ``HUB_*``-variabelen en root
+network, een gedeeld Docker-netwerk, ``latest`` of een tag zonder digest, ``HUB_*``-variabelen en root
 als "custom user". Ook de eigen waarden van een catalogusapp krijgen op elke diepte geen compose, privileged, extra
-capabilities, apparaten, host-PID/-IPC, host network zonder reden, gedeeld netwerk, GPU zonder ``gpu: intel_render``,
+capabilities, apparaten, host-PID/-IPC, host network, gedeeld netwerk, GPU zonder ``gpu: intel_render``,
 Docker-socket of hostpad buiten een dataset (:func:`_deep_forbidden`; S-P2-010, R-VEILIG-3). Dat geldt ook voor een
 losse tekst in een lijst (S-P2-010, herstelronde 2): een Docker-socket, een hostpad in bind- of volumevorm
 (``"/:/host"``, ``"--mount=type=bind,source=/,..."``), een ongeldige kluisverwijzing en een verboden sleutel als vlag
@@ -92,6 +92,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from asm_policy.c12 import installatiecodes
 from asm_policy.canonical import MAX_DIEPTE, CanonicalError, TeDiepGenest, canonical_json
 from asm_policy.loader import ActieDef, Policy
 
@@ -367,7 +368,7 @@ def validate_parameters(policy: Policy, actie: ActieDef, target: Mapping[str, An
     if schema == "app_rollback":
         return _app_rollback(params)
     if schema == "app_install":
-        return validate_install(params, target)
+        return validate_install(params, target) + catalogusinstallatie(params)
     return [_f("parameters", "schema_onbekend", "onbekend parameterschema")]  # pragma: no cover
 
 
@@ -587,10 +588,7 @@ class Sleutelregel:
 
 
 _PRIVILEGED = "privileged (volledige toegang tot de host) is nooit toegestaan"
-_HOST_NETWORK = (
-    "het netwerk van de host (host network) alleen met een reden van minstens 10 tekens in het manifest "
-    "(host_network_reason)"
-)
+_HOST_NETWORK = "het netwerk van de host (host network) is niet toegestaan bij installatie"
 _COMPOSE = "compose en YAML zijn nooit een installatieweg; een sleutel met compose of services wordt daarom geweigerd"
 _PID = "de PID-namespace van de host of van een andere container is nooit toegestaan"
 _IPC = "de IPC-namespace van de host of van een andere container is nooit toegestaan"
@@ -845,7 +843,7 @@ def _sleutel_fout(
     if nk == "hostnetwork":
         reason = manifest.get("host_network_reason")
         if isinstance(reason, str) and len(reason.strip()) >= 10:
-            return None
+            return "host_network_verboden", _HOST_NETWORK
     if nk == "useallgpus" and manifest.get("gpu") == "intel_render":
         return None
     return regel.code, regel.fout
@@ -1155,6 +1153,8 @@ def validate_install(params: Mapping[str, Any], target: Mapping[str, Any]) -> li
         out.append(_f(f"{w}.values", "type", "verwacht een object"))
         return out
     out += _size(values, f"{w}.values", MAX_VALUES_BYTES)
+    if not any(f.code == "te_diep_genest" for f in out):
+        out += c12_installatie(values, ix_app=ac.get("catalog_app") == IX_APP)
     if ac.get("catalog_app") == IX_APP:
         if ac.get("train") != "stable":
             out.append(_f(f"{w}.train", "waarde", "de standaard Custom App (ix-app) staat in de trein stable"))
@@ -1170,6 +1170,24 @@ def validate_install(params: Mapping[str, Any], target: Mapping[str, Any]) -> li
     for f in out:
         uniq.setdefault((f.veld, f.code), f)
     return list(uniq.values())
+
+
+def c12_installatie(values: Mapping[str, Any], *, ix_app: bool) -> list[Fout]:
+    codes = installatiecodes(values, ix_app=ix_app, vault_ref=VAULT_REF_RE)
+    meldingen = {
+        "account_gegevens_verboden": "Gegevens voor een beheerder of dienstaccount horen in de app zelf.",
+        "secret_in_form": "Een kluisverwijzing in een omgevingsvariabele vereist een toegestane geheimnaam.",
+    }
+    return [_f("parameters.app_create.values", code, meldingen[code]) for code in sorted(codes)]
+
+
+def catalogusinstallatie(params: Mapping[str, Any]) -> list[Fout]:
+    """De witte lijst in het beleid bevat nog geen geverifieerde app en versie."""
+    if verwachte_catalogus(params) is None:
+        return []
+    return [
+        _f("parameters.app_create.version", "catalogusversie_niet_toegelaten", "Geen geverifieerde catalogusregel.")
+    ]
 
 
 def expected_image(params: Mapping[str, Any]) -> dict[str, str | None] | None:

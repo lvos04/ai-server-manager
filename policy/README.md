@@ -1,6 +1,6 @@
 # policy/ — risicobeleid (contract 1.3 §8, 03_RISICO_AUTONOMIE, ADR-0030)
 
-De drie bestanden hier zijn het **volledige** beleid van de deterministische policy-engine. Ze worden read-only
+De YAML-bestanden hier zijn het **volledige** beleid van de deterministische policy-engine. Ze worden read-only
 ingebakken in de Hub-image én de executor-image (`/usr/local/share/asm/policy`, eigenaar root, map 0555, bestanden
 0444; de diensten draaien als 568). Beide rekenen dezelfde `policy_hash` uit; de executor weigert elk
 `ExecutionRequest` met een andere hash.
@@ -10,6 +10,7 @@ ingebakken in de Hub-image én de executor-image (`/usr/local/share/asm/policy`,
 | `acties.yaml` | allowlist van `action_id`'s: uitvoerder, TrueNAS-methoden, minimale risicoklasse R0–R3, parameterschema, back-upeis, anti-flap |
 | `apps.yaml` | herkenning van apps, kritieke apps (herstart wordt R2) en beschermde apps (Emby nooit; Hub/executor niet stoppen; MediaGuard en de mediaserver geen update zonder bewijs) |
 | `blokkades.yaml` | wat altijd geweigerd wordt (shell, destructief, beveiligingsbeleid, betaald, database, netwerk, boiler), gereserveerde acties en de dynamische blokkades (pool, back-upgate, noodstop, cooldown, herstelpunt) |
+| `catalogus.yaml` | gedeelde `ASF_COMMIT` voor C-12 en manifestvalidatie, lege witte lijst voor catalogusinstallaties |
 
 Regels:
 

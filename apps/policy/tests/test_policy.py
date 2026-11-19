@@ -28,6 +28,8 @@ from asm_policy.verify import check_decision, check_envelope
 
 POLICY = load_policy(POLICY_DIR)
 APP = {"host_id": HOST, "app_id": "demo-app"}
+CATALOGUS_DICHT = ["catalogusversie_niet_toegelaten"]
+HOST_NETWERK_DICHT = ["host_network_verboden", *CATALOGUS_DICHT]
 
 
 def kopie(tmp_path: Path) -> Path:
@@ -54,6 +56,19 @@ def test_beleid_laadt_en_allowlist_is_die_van_het_contract() -> None:
     assert POLICY.acties["notification.send"].uitvoerder == "hub:gotify"
     assert POLICY.acties["sso.sessions.revoke"].eigenaar == "home-control-hub"
     assert not POLICY.acties["sso.oidc.hub.register"].ai_mag_voorstellen
+
+
+def test_deel_c_pin_afwijkend_of_cataloguslijst_gevuld_geeft_geen_beleid(tmp_path: Path) -> None:
+    pad = kopie(tmp_path) / "catalogus.yaml"
+    inhoud = pad.read_text()
+    pad.write_text(
+        inhoud.replace(next(r for r in inhoud.splitlines() if r.startswith("ASF_COMMIT:")), "ASF_COMMIT: " + "a" * 40)
+    )
+    with pytest.raises(PolicyError, match="validatorcommit wijkt af"):
+        load_policy(pad.parent)
+    pad.write_text(inhoud.replace("installaties: []", "installaties: [{}]"))
+    with pytest.raises(PolicyError, match="schema voor goedgekeurde installaties ontbreekt"):
+        load_policy(pad.parent)
 
 
 def test_policy_hash_verandert_bij_elke_byte_en_negeert_de_readme(tmp_path: Path) -> None:
@@ -488,7 +503,8 @@ def test_installeren_van_een_catalogusapp_herkent_op_de_catalogusnaam() -> None:
     params = install_params("mediaspeler")
     params["app_create"].update(catalog_app="emby", version="1.0.0", values={})
     params["manifest"] = {"app_id": "mediaspeler", "install_reason": "proef"}
-    assert validate_parameters(POLICY, POLICY.acties["app.install"], {"app_id": "mediaspeler"}, params) == []
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], {"app_id": "mediaspeler"}, params)
+    assert [f.code for f in fouten] == CATALOGUS_DICHT
     assert verwachte_catalogus(params) == "emby"
     h = herken_app(POLICY, "mediaspeler", None, [], catalogus=verwachte_catalogus(params))
     assert h.apps == ("emby",) and h.volledig
@@ -622,6 +638,28 @@ def test_ex47_installatie_wordt_voor_uitvoering_geweigerd(pad: str, waarde: Any,
     inst = POLICY.acties["app.install"]
     fouten = validate_parameters(POLICY, inst, APP, _met(install_params(), pad, waarde))
     assert code in [f.code for f in fouten], [f.as_dict() for f in fouten]
+
+
+def test_ex47_host_netwerk_met_reden_wordt_ook_geweigerd() -> None:
+    params = install_params(host_network=True)
+    params["manifest"]["host_network_reason"] = "Synthetische toelichting voor deze proef."
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)
+    assert "host_network_verboden" in {f.code for f in fouten}
+
+
+@pytest.mark.parametrize(
+    "naam", ["INIT_PASSWORD", "LOGIN_TOKEN", "N8N_BASIC_AUTH_PASSWORD", "JUPYTER_TOKEN", "PASSWORD"]
+)
+def test_c12_weigert_aanmeldnamen_ook_bij_een_kluisverwijzing(naam: str) -> None:
+    params = install_params(envs=[{"name": naam, "value": "vault://app/demo-app/voorbeeld"}])
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)
+    assert "account_gegevens_verboden" in {f.code for f in fouten}
+
+
+def test_c12_variant_b_weigert_kluisverwijzing_als_naam_geen_geheimnaam_is() -> None:
+    params = install_params(envs=[{"name": "APP_KEY", "value": "vault://app/demo-app/voorbeeld"}])
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)
+    assert "secret_in_form" in {f.code for f in fouten}
 
 
 HOSTPADEN_FOUT = [
@@ -1100,13 +1138,13 @@ def test_catalogusapp_zonder_extra_rechten_blijft_geldig() -> None:
         "network": {"host_network": False, "web_port": {"port_number": 30200}},
         "resources": {"limits": {"cpus": 2}, "gpus": {"use_all_gpus": False, "nvidia_gpu_selection": {}}},
     }
-    assert _codes(_catalogus(values)) == []
+    assert _codes(_catalogus(values)) == CATALOGUS_DICHT
     gpu = _catalogus({"resources": {"gpus": {"use_all_gpus": True}}}, gpu="intel_render")
-    assert _codes(gpu) == []
+    assert _codes(gpu) == CATALOGUS_DICHT
     host = _catalogus(
         {"network": {"host_network": True}}, host_network_reason="mDNS-ontdekking van apparaten op het LAN"
     )
-    assert _codes(host) == []
+    assert _codes(host) == HOST_NETWERK_DICHT
     # De ix-app-tak meldt een extra recht niet dubbel (zelfde veld, zelfde code).
     fouten = validate_parameters(
         POLICY, POLICY.acties["app.install"], APP, install_params(capabilities={"add": ["SYS_ADMIN"]})
@@ -1297,16 +1335,19 @@ def test_losse_teksten_in_lijsten_tegenproef_en_kluisverwijzingen() -> None:
         "resources": {"limits": {"cpus": 2}},
     }
     params = _catalogus(values)
-    assert _codes(params) == []
+    assert _codes(params) == CATALOGUS_DICHT
     assert vault_refs(params) == ["vault://app/huis/db_wachtwoord"]
     ix = install_params(command=["--config", "/config/app.yml"], entrypoint=["/app/start.sh"])
     assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, ix) == []
     assert vault_refs(install_params(command=["--token", "vault://app/demo-app/token"])) == [
         "vault://app/demo-app/token"
     ]
-    # Host-netwerk als vlag mag met een reden in het manifest, GPU als vlag met gpu: intel_render (zoals in een object).
-    assert _codes(_catalogus({"args": ["--host-network"]}, host_network_reason="mDNS-ontdekking op het LAN")) == []
-    assert _codes(_catalogus({"args": ["use_all_gpus=true"]}, gpu="intel_render")) == []
+    # Host-netwerk als vlag blijft dicht. De toegestane GPU-vlag geeft alleen de witte-lijstweigering.
+    assert (
+        _codes(_catalogus({"args": ["--host-network"]}, host_network_reason="mDNS-ontdekking op het LAN"))
+        == HOST_NETWERK_DICHT
+    )
+    assert _codes(_catalogus({"args": ["use_all_gpus=true"]}, gpu="intel_render")) == CATALOGUS_DICHT
 
 
 HOST_NETWORK_VORMEN = [
@@ -1330,9 +1371,9 @@ def test_host_network_reden_te_kort(values: dict[str, Any], reden: str) -> None:
 
 
 @pytest.mark.parametrize("values", HOST_NETWORK_VORMEN)
-def test_host_network_reden_van_tien_tekens_mag(values: dict[str, Any]) -> None:
-    """Grensgeval: precies 10 tekens na strip is genoeg."""
-    assert _codes(_catalogus(values, host_network_reason="  tien_teken  ")) == []
+def test_host_network_reden_van_tien_tekens_geeft_geen_toestemming(values: dict[str, Any]) -> None:
+    """Ook de voorheen voldoende reden verschaft geen toestemming."""
+    assert _codes(_catalogus(values, host_network_reason="  tien_teken  ")) == HOST_NETWERK_DICHT
 
 
 def test_losse_teksten_tot_de_dieptegrens_gezien() -> None:
@@ -1498,18 +1539,20 @@ def test_verboden_sleutels_tegenproef_uit_standen_en_lege_waarden() -> None:
         "entrypoint": None,
         "resources": {"limits": {"cpus": 2}, "gpus": {"useAllGpus": False, "nvidia_gpu_selection": {}}},
     }
-    assert _codes(_catalogus(values)) == []
+    assert _codes(_catalogus(values)) == CATALOGUS_DICHT
     reden = "mDNS-ontdekking van apparaten op het LAN"
-    assert _codes(_catalogus({"network": {"hostNetwork": 1}}, host_network_reason=reden)) == []
-    assert _codes(_catalogus({"args": ["--hostNetwork"]}, host_network_reason=reden)) == []
-    assert _codes(_catalogus({"gpus": {"UseAllGpus": "true"}}, gpu="intel_render")) == []
+    assert _codes(_catalogus({"network": {"hostNetwork": 1}}, host_network_reason=reden)) == HOST_NETWERK_DICHT
+    assert _codes(_catalogus({"args": ["--hostNetwork"]}, host_network_reason=reden)) == HOST_NETWERK_DICHT
+    assert _codes(_catalogus({"gpus": {"UseAllGpus": "true"}}, gpu="intel_render")) == CATALOGUS_DICHT
     # network_mode host blijft ook met een reden verboden: de reden hoort bij het veld host_network.
     assert "catalogus_waarde_verboden" in _codes(_catalogus({"network_mode": "host"}, host_network_reason=reden))
     # De velden van app_create zelf (naam, catalogusapp, trein) zijn geen waarden: een app die "network" of "services"
     # heet, wordt daar niet om geweigerd.
     for naam in ("network", "services", "privileged", "runtime"):
         doel = {"host_id": HOST, "app_id": naam}
-        assert _codes(_catalogus({"resources": {"limits": {"cpus": 2}}}, naam=naam), target=doel) == [], naam
+        assert _codes(_catalogus({"resources": {"limits": {"cpus": 2}}}, naam=naam), target=doel) == CATALOGUS_DICHT, (
+            naam
+        )
     # De standaard Custom App zonder iets extra's blijft geldig (geen onterechte weigering door de tabel).
     assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params()) == []
 
@@ -1572,7 +1615,7 @@ def test_vrije_tekst_in_catalogusapp_waarden_blijft_toegestaan() -> None:
         "resources": {"limits": {"cpus": 2}},
     }
     params = _catalogus(values)
-    assert _codes(params) == []
+    assert _codes(params) == CATALOGUS_DICHT
     assert vault_refs(params) == ["vault://app/huis/db_wachtwoord"]
     for vrij, code in (
         (
@@ -1631,7 +1674,7 @@ def test_gewone_waarden_van_een_catalogusapp_blijven_geldig() -> None:
             "gpus": {"use_all_gpus": False, "nvidia_gpu_selection": {}},
         },
     }
-    assert _codes(_catalogus(values)) == []
+    assert _codes(_catalogus(values)) == CATALOGUS_DICHT
 
 
 OPDRACHTEN_IX_APP = [
@@ -1750,7 +1793,7 @@ def test_mountpoint_tegenproef_dataset_en_geen_pad() -> None:
         assert [(f.veld, f.code) for f in validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)] == [
             ("parameters.app_create.values.storage[0].mountpoint", "onbekend_veld")
         ], waarde
-        assert _codes(_catalogus({"opslag": {"mountpoint": waarde}})) == [], waarde
+        assert _codes(_catalogus({"opslag": {"mountpoint": waarde}})) == CATALOGUS_DICHT, waarde
     zonder = {
         "type": "ix_volume",
         "mount_path": "/config",
@@ -2024,8 +2067,11 @@ def test_geldige_datasetnamen_blijven_geldig() -> None:
     for naam in DATASETNAAM_GOED:
         regel = _ix_volume_regel("dataset_name", naam)
         assert validate_parameters(POLICY, inst, APP, install_params(storage=[regel])) == [], naam
-        assert _codes(_catalogus({"storage": {"config": regel}})) == [], naam
-        assert _codes(_catalogus({"storage": {"config": {"type": "ix_volume", "ix_volume_config": naam}}})) == [], naam
+        assert _codes(_catalogus({"storage": {"config": regel}})) == CATALOGUS_DICHT, naam
+        assert (
+            _codes(_catalogus({"storage": {"config": {"type": "ix_volume", "ix_volume_config": naam}}}))
+            == CATALOGUS_DICHT
+        ), naam
 
 
 # KLEIN-78, herstel R-VEILIG-1 (besluit van de regisseur: KLEIN-75 A6 optie b, dicht bij twijfel). TrueNAS bouwt de
@@ -2132,10 +2178,13 @@ def test_geldige_catalogusopslag_en_kluisverwijzing_blijven_geldig() -> None:
     }
     tmpfs = {"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 100}}
     for leeg in ({}, {"cifs_config": None}, {"cifs_config": {}}, {"Cifs-Config": None}):
-        assert _codes(_catalogus({"storage": {"config": {**ixvol, **leeg}, "cache": {**tmpfs, **leeg}}})) == [], leeg
+        assert (
+            _codes(_catalogus({"storage": {"config": {**ixvol, **leeg}, "cache": {**tmpfs, **leeg}}}))
+            == CATALOGUS_DICHT
+        ), leeg
     goed = _catalogus({"storage": {"config": ixvol}, "app": {"wachtwoord": SMB_REF}})
-    assert _codes(goed) == [] and vault_refs(goed) == [SMB_REF]
-    assert _codes(_catalogus({"app": {"password": "nep-wachtwoord-test"}})) == []
+    assert _codes(goed) == CATALOGUS_DICHT and vault_refs(goed) == [SMB_REF]
+    assert _codes(_catalogus({"app": {"password": "nep-wachtwoord-test"}})) == CATALOGUS_DICHT
     ongeldig = _codes(_catalogus({"storage": {"smb": _smb({"password": "vault://ander/x"})}}))
     assert "vault_ref_ongeldig" in ongeldig and "opslag_verboden" in ongeldig, ongeldig
     for extra in ({"password": "nep-wachtwoord-test"}, {"options": ["pass=nep-wachtwoord-test"]}):
@@ -2223,8 +2272,11 @@ def test_geldige_catalogusopslag_zonder_nfs_blijft_geldig_en_hostpadregel_blijft
     ixvol["ix_volume_config"]["dataset_name"] = "c"
     tmpfs = {"type": "tmpfs", "mount_path": "/cache", "tmpfs_config": {"size": 100}}
     for leeg in ({}, {"nfs_config": None}, {"nfs_config": {}}, {"Nfs-Config": None}):
-        assert _codes(_catalogus({"storage": {"config": {**ixvol, **leeg}, "cache": {**tmpfs, **leeg}}})) == [], leeg
-    assert _codes(_catalogus({"storage": {"config": ixvol}, "app": {"type": "nfs-client"}})) == []
+        assert (
+            _codes(_catalogus({"storage": {"config": {**ixvol, **leeg}, "cache": {**tmpfs, **leeg}}}))
+            == CATALOGUS_DICHT
+        ), leeg
+    assert _codes(_catalogus({"storage": {"config": ixvol}, "app": {"type": "nfs-client"}})) == CATALOGUS_DICHT
     w = "parameters.app_create.values"
     for values, veld in (
         ({"storage": {"m": {"type": "host_path", "path": "/etc"}}}, "storage.m.path"),

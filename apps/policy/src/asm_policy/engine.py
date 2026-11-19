@@ -31,6 +31,7 @@ from typing import Any
 from asm_policy.canonical import MAX_DIEPTE, TeDiepGenest
 from asm_policy.etag import app_images, catalogus_app
 from asm_policy.loader import RISK_RANK, Policy
+from asm_policy.params import verwachte_catalogus
 
 ACTOR_TYPES = ("user", "ai", "flow", "voice", "service", "system")
 NIET_MENSELIJK = frozenset({"ai", "flow", "voice", "service", "system"})
@@ -239,10 +240,13 @@ def classify(
         herkend: tuple[str, ...] = herkend_als.apps
     else:
         herkend = (herkend_als,) if isinstance(herkend_als, str) else tuple(herkend_als or ())
-    eerste = herkend[0] if herkend else None
     aid = action_id.strip().lower()
     target = target or {}
     parameters = parameters or {}
+    if aid == "app.install":
+        uit_catalogus = recognize_all(policy, None, catalogus=verwachte_catalogus(parameters))
+        herkend = tuple(dict.fromkeys((*herkend, *uit_catalogus)))
+    eerste = herkend[0] if herkend else None
     rules: list[str] = []
     blocks: list[Blokkade] = []
 

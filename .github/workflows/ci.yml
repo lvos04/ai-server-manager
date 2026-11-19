@@ -177,10 +177,13 @@ jobs:
     # op een vaste commit en in --strict (elke waarschuwing zonder reden in accepted_findings is een fout).
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    env:
-      ASF_COMMIT: 77ea6296011aae7fcbe7c6a757b404ff762aebb2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Gedeelde validatorpin lezen
+        run: |
+          ASF_COMMIT=$(awk '$1 == "ASF_COMMIT:" { print $2 }' policy/catalogus.yaml)
+          [[ "$ASF_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          echo "ASF_COMMIT=$ASF_COMMIT" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: lvos04/appstore-en-fork
@@ -193,6 +196,7 @@ jobs:
       - name: Validator van appstore-en-fork (exact vastgezet)
         run: |
           test "$(git -C .asf rev-parse HEAD)" = "$ASF_COMMIT"
+          python tools/sync_asf_c12.py .asf --check
           python -m pip install -r .asf/apps/api/requirements.lock
           python -m pip install --no-deps ./.asf/apps/api
       - name: Eigen manifesten valideren (--strict)

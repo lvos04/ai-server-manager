@@ -43,7 +43,7 @@ from hub import audit, servicecalls
 from hub.actions import blokkades as blok_mod
 from hub.actions.beleid import get_policy
 from hub.actions.doel import Doel, DoelOnbekend, lees_doel
-from hub.actions.preview import SCHEMA, bouw, eigen_opdracht
+from hub.actions.preview import SCHEMA, bouw, eigen_opdracht, toon_bewaarde_preview
 from hub.config import Settings
 from hub.deps import Principal
 from hub.errors import HubError
@@ -147,7 +147,7 @@ def weergave(db: Session, req: ActionRequest) -> dict[str, Any]:
         "uitvoerder": req.uitvoerder,
         "resource_etag": req.resource_etag or None,
         "preview_hash": req.preview_hash or None,
-        "preview": req.preview if req.preview_hash else None,
+        "preview": toon_bewaarde_preview(req.preview) if req.preview_hash else None,
         "blokkades": req.blokkades,
         "goedkeuring": _goedkeuring_dict(ap) if ap is not None else None,
         "resultaat": req.resultaat,

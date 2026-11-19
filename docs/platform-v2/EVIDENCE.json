@@ -20,6 +20,26 @@
     "bijgewerkt": "2026-11-09"
   },
   {
+    "id": "B01-003",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "S-P2-050c: apps/api/tests/unit/test_preview_toon.py::test_previewregels_deel_c en apps/api/tests/integration/test_acties.py::test_deel_c_oude_preview_maskeren_bij_lezen_en_herhalen toetsen V1–V6 op synthetische waarden. De negatieve catalogus- en opslagproeven staan in test_acties.py::test_deel_c_weigert_een_catalogusvoorstel_zonder_nas_schrijfactie. C-12 en variant B zijn getest in apps/policy/tests/test_policy.py en rechtstreeks via apps/executor/tests/test_uitvoeren.py::test_deel_c_weigert_ondertekende_installatiewaarden.",
+    "blokkade": "deel c zonder witte-lijstregel en positieve V7; volgt zodra een echte gepinde catalogusrelease met uitgeversbewijs bestaat. De volledige planner- en installatieketen valt onder volgende deelstappen. NIET GEVALIDEERD (echte NAS).",
+    "opmerking": "De witte lijst is leeg. Een onbekende catalogusrelease wordt voor uitvoering geweigerd. NFS en SMB blijven gesloten. V1–V6 zijn getest met synthetische invoer. De toets van alle productievormen met bronbewijs blijft open (V7).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-19"
+  },
+  {
+    "id": "EX47",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "S-P2-050c: apps/api/tests/integration/test_acties.py::test_deel_c_ex47_weigert_ook_met_voorsteltoelichting en apps/executor/tests/test_uitvoeren.py::test_deel_c_weigert_ondertekende_installatiewaarden controleren weigering vóór schrijven. Appstore-en-fork op ASF_COMMIT: apps/api/tests/unit/test_ex47.py; beide eigen manifesten met --strict.",
+    "blokkade": "De volledige manifest-/plannerketen volgt in volgende deelstappen. NIET GEVALIDEERD (echte NAS).",
+    "opmerking": "Hub en executor weigeren installatiewaarden met host-netwerk of privileged. Een toelichting verleent geen toestemming.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-19"
+  },
+  {
     "id": "B01-006",
     "status": "Bezig",
     "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",

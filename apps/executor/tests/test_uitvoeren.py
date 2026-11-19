@@ -469,6 +469,27 @@ def test_compose_installatie_wordt_geweigerd(stack: Stack, wijziging: dict[str, 
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0
 
 
+@pytest.mark.parametrize(
+    ("values", "code"),
+    [
+        ({"host_network": True}, "host_network_verboden"),
+        ({"privileged": True}, "privileged_verboden"),
+        ({"envs": [{"name": "N8N_BASIC_AUTH_PASSWORD", "value": "proefgeheim"}]}, "account_gegevens_verboden"),
+        ({"envs": [{"name": "PASSWORD", "value": "vault://app/demo-app/voorbeeld"}]}, "account_gegevens_verboden"),
+        ({"envs": [{"name": "APP_KEY", "value": "vault://app/demo-app/voorbeeld"}]}, "secret_in_form"),
+    ],
+)
+def test_deel_c_weigert_ondertekende_installatiewaarden(stack: Stack, values: dict[str, Any], code: str) -> None:
+    hub, c, nas = stack
+    prop = install_prop(**values)
+    prop["parameters"]["manifest"]["host_network_reason"] = "Synthetische toelichting voor deze proef."
+    r = execute(c, hub, approved(hub, prop))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig"
+    assert code in {f["code"] for f in r.json()["details"]["fouten"]}
+    assert "proefgeheim" not in r.text
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+
+
 def test_latest_tag_en_gevaarlijke_waarden_worden_geweigerd(stack: Stack) -> None:
     hub, c, nas = stack
     slecht: list[dict[str, Any]] = [
@@ -709,6 +730,10 @@ def test_smb_wachtwoord_en_datasetnaam_weigert_de_executor_zelf(stack: Stack) ->
     assert nas.created == [] and writes(nas) == [] and nas.logins == 0
     kluis = {"app": {"wachtwoord": "vault://app/huis-kluis/x"}, "storage": {"config": ixvol("config")}}
     r = execute(c, hub, approved(hub, catalogus("huis-kluis", kluis), risk_class="R3"))
+    assert r.status_code == 422 and r.json()["details"]["fouten"][0]["code"] == "catalogusversie_niet_toegelaten"
+    assert nas.created == [] and writes(nas) == [] and nas.logins == 0
+    met_kluis = install_prop(envs=[{"name": "DB_PASSWORD", "value": "vault://app/demo-app/db_password"}])
+    r = execute(c, hub, approved(hub, met_kluis))
     assert r.status_code == 501 and r.json()["details"] == {"reden": "vault_verwijzingen"}, r.text
     assert nas.created == [] and writes(nas) == []
     r = execute(c, hub, approved(hub, install_prop("demo-ds-goed", storage=[ixvol("config")])))

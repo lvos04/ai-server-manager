@@ -82,7 +82,7 @@ COPY --from=web /usr/local/bin/node /usr/local/bin/node
 COPY --from=web /out /opt/hub-web
 # Risicobeleid: read-only ingebakken (eigenaar root, map 0555, bestanden 0444; het proces draait als 568). De Hub en de
 # executor rekenen er dezelfde policy_hash uit (contract 1.3 §8, ADR-0030).
-COPY --chown=0:0 --chmod=0444 policy/acties.yaml policy/apps.yaml policy/blokkades.yaml /usr/local/share/asm/policy/
+COPY --chown=0:0 --chmod=0444 policy/acties.yaml policy/apps.yaml policy/blokkades.yaml policy/catalogus.yaml /usr/local/share/asm/policy/
 COPY deploy/allinone/supervisor.py /usr/local/lib/hub/supervisor.py
 COPY deploy/allinone/healthcheck.py /usr/local/lib/hub/healthcheck.py
 COPY deploy/common/rechten.py /usr/local/lib/hub/rechten.py

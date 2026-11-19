@@ -18,6 +18,8 @@ from typing import Any
 
 import yaml
 
+from asm_policy._asf_c12 import BRONCOMMIT
+
 SCHEMA = "asm-policy/1"
 HASH_PREFIX = b"asm-policy-hash-v1\n"
 RISK_CLASSES = ("R0", "R1", "R2", "R3")
@@ -274,13 +276,22 @@ def load_policy(path: Path | None = None) -> Policy:
     """Lees en controleer het beleid; ``PolicyError`` bij elk probleem (fail-closed)."""
     path = path or default_policy_dir()
     files = {p.name: p for p in policy_files(path)}
-    for needed in ("acties.yaml", "blokkades.yaml", "apps.yaml"):
+    for needed in ("acties.yaml", "blokkades.yaml", "apps.yaml", "catalogus.yaml"):
         if needed not in files:
             raise PolicyError(f"{needed} ontbreekt in {path}")
     try:
         docs = {name: yaml.safe_load(p.read_text(encoding="utf-8")) for name, p in files.items()}
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         raise PolicyError(f"policy onleesbaar: {type(exc).__name__}") from exc
+    catalogus = _keys(
+        _schema(docs["catalogus.yaml"], "catalogus.yaml"), "catalogus.yaml", {"schema", "ASF_COMMIT", "installaties"}
+    )
+    if not re.fullmatch(r"[0-9a-f]{40}", _str(catalogus["ASF_COMMIT"], "catalogus.yaml.ASF_COMMIT")):
+        raise PolicyError("catalogus.yaml: verwacht een volledige validatorcommit")
+    if catalogus["ASF_COMMIT"] != BRONCOMMIT:
+        raise PolicyError("catalogus.yaml: validatorcommit wijkt af van de ingebakken C-12-regels")
+    if catalogus["installaties"] != []:
+        raise PolicyError("catalogus.yaml: een schema voor goedgekeurde installaties ontbreekt")
     acties_doc = _keys(_schema(docs["acties.yaml"], "acties.yaml"), "acties.yaml", {"schema", "acties"})
     if not isinstance(acties_doc["acties"], dict) or not acties_doc["acties"]:
         raise PolicyError("acties.yaml: acties ontbreekt")

@@ -315,10 +315,16 @@ def test_compose_latest_en_gevaarlijke_waarden_worden_al_bij_het_voorstel_geweig
 
 
 def test_kluisverwijzingen_bij_installeren_eerlijk_nog_niet_beschikbaar(stack: Stack) -> None:
-    envs = [{"name": "API_SLEUTEL", "value": "vault://app/demo-app/api-sleutel"}]
+    ref = "vault://app/demo-app/api-sleutel"
+    envs = [{"name": "API_TOKEN", "value": ref}]
     r = stel_voor(stack.admin, "app.install", app_target("demo-app"), install_params("demo-app", envs=envs))
     assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
     assert r.json()["details"]["reden"] == "vault_verwijzingen" and schrijfaanroepen(stack.nas) == []
+    envs = [{"name": "API_SLEUTEL", "value": ref}]
+    r = stel_voor(stack.admin, "app.install", app_target("demo-app"), install_params("demo-app", envs=envs))
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    assert [f["code"] for f in r.json()["details"]["fouten"]] == ["secret_in_form"]
+    assert schrijfaanroepen(stack.nas) == []
 
 
 def _tabellen_met(app: Any, waarde: str) -> list[str]:

@@ -72,7 +72,7 @@ waarden; de Custom App heeft geen verplichte variabelen).
 | `deploy/allinone`, `deploy/executor` | Dockerfiles, procesbewaker, healthchecks |
 | `deploy/truenas` | formuliervelden van de twee Custom Apps |
 | `deploy/manifest` | manifesten (manifeststandaard v1, `install.method: custom_app`) |
-| `policy/`, `apps/policy` | risicobeleid (`acties.yaml`, `apps.yaml`, `blokkades.yaml`) en het gedeelde pakket `asm_policy` dat Hub en executor allebei gebruiken |
+| `policy/`, `apps/policy` | risicobeleid, validatorpin en het gedeelde pakket `asm_policy` dat Hub en executor allebei gebruiken |
 | `docs/openapi`, `docs/adr` | OpenAPI-export en besluiten (ADR's) |
 | `docs/screenshots/p0` | schermafbeeldingen (mobiel en desktop) uit de Playwright-suite |
 | `docs/platform-v2` | pakketdocumentatie, contracten, Excel-taken en `EVIDENCE.json` |

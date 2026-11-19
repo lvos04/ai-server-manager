@@ -22,6 +22,32 @@ HOST = "nas-primary"
 MERK = "proefgeheim"
 
 
+@pytest.mark.parametrize(
+    ("waarden", "verwacht"),
+    [
+        ({"api_token": "/padvormig/geheim", "client_secret_file": "/run/app cert/" + "a1" * 16},
+         {"api_token": "***", "client_secret_file": "/run/app cert/" + "a1" * 16}),
+        ({"client_secret": {"a1b2c3d4-1234-4567-a123-987654321abc": "x", "abcd1234-1234abcd": "y",
+                            "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": "z"}},
+         {"client_secret": {"***": "***", "*** (2)": "***", "*** (3)": "***"}}),
+        ({"publication_token": MERK, "public_key": "openbaar"}, {"publication_token": "***", "public_key": "openbaar"}),
+        ({"envconfig": {"MODUS": MERK}, "variables": [f"X={MERK}"], "vars": "/padvormig/geheim",
+          "extra_vars": [{"name": "Y", "value": MERK}]},
+         {"envconfig": {"MODUS": "***"}, "variables": ["X"], "vars": "***",
+          "extra_vars": [{"name": "Y", "value": "***"}]}),
+        ({"url": f"https://app.invalid/?code={MERK}&mod=debug", "webhook_url": "https://app.invalid/route",
+          "port": 30400},
+         {"url": "https://app.invalid/?code=***&mod=debug", "webhook_url": "***", "port": 30400}),
+        ({"seed_ratio": 1.5, "seed": MERK, "seed_path": "/run/app cert/" + "a1" * 16},
+         {"seed_ratio": 1.5, "seed": "***", "seed_path": "/run/app cert/" + "a1" * 16}),
+        ({"seed_ratio": MERK, "public_token": MERK}, {"seed_ratio": "***", "public_token": "***"}),
+    ],
+    ids=["V1", "V2", "V3", "V4", "V5", "V6", "V6-typen"],
+)  # fmt: skip
+def test_previewregels_deel_c(waarden: dict[str, Any], verwacht: dict[str, Any]) -> None:
+    assert preview._toon(waarden) == verwacht
+
+
 def _g(n: int) -> str:
     """Een geheim in de vorm die ``hub.redact.redact_text`` herkent: een URL met wachtwoord."""
     return f"https://beheer:{MERK}-{n}@db.invalid/x"

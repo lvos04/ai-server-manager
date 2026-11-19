@@ -20,6 +20,7 @@ packages = ["src/asm_policy"]
 line-length = 120
 target-version = "py312"
 src = ["src", "tests"]
+extend-exclude = ["src/asm_policy/_asf_c12.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF"]

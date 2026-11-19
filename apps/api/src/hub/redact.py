@@ -32,7 +32,8 @@ _URL_CRED_RE = re.compile(r"(?i)(\w+://)([^:/@\s]*):([^@\s]+)@")
 
 def redact_text(text: str) -> str:
     text = _BEARER_RE.sub(r"\1 " + REDACTED, text)
-    return _URL_CRED_RE.sub(r"\1\2:" + REDACTED + "@", text)
+    text = _URL_CRED_RE.sub(r"\1\2:" + REDACTED + "@", text)
+    return _QUERY_RE.sub(r"\1" + REDACTED, text)
 
 
 def redact(value: Any, *, depth: int = 0) -> Any:
@@ -147,7 +148,6 @@ def redact_log_text(text: str, matcher: SecretMatcher | None = None, *, max_len:
     text = _JWT_RE.sub("[jwt]", text)
     text = redact_text(text)
     text = _KV_RE.sub(lambda m: m.group(1) + REDACTED, text)
-    text = _QUERY_RE.sub(lambda m: m.group(1) + REDACTED, text)
     text = _PREFIX_RE.sub("[token]", text)
     text = _EMAIL_RE.sub("[e-mail]", text)
     text = _IPV4_RE.sub(lambda m: ip_label(m.group(0)), text)
