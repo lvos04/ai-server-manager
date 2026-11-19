@@ -12,7 +12,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from multiprocessing import get_context
-from threading import Event
+from pathlib import Path
+from threading import Event, Thread, current_thread
 from types import SimpleNamespace
 from typing import Any
 
@@ -174,8 +175,9 @@ def test_deadline_omvat_kluistijd(
     assert admin.get(PATH, params=PIN, headers=headers).json() == {**PIN, "beschikbaar": "onbekend", "gemeten_op": None}
 
 
+@pytest.mark.parametrize("fase", ["schrijven", "commit"])
 def test_deadline_omvat_publicatie(
-    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch, fase: str
 ) -> None:
     from sqlalchemy import text
 
@@ -208,6 +210,15 @@ def test_deadline_omvat_publicatie(
             EXECUTE FUNCTION trage_publicatie()
         """)
         )
+        if fase == "commit":
+            db.execute(
+                text("""CREATE FUNCTION uitstel_publicatie() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN SET CONSTRAINTS trage_publicatie DEFERRED; RETURN NEW; END $$""")
+            )
+            db.execute(
+                text("""CREATE TRIGGER uitstel_publicatie BEFORE UPDATE ON catalog_snapshot
+                FOR EACH ROW EXECUTE FUNCTION uitstel_publicatie()""")
+            )
     try:
         start = time.monotonic()
         availability.refresh_if_due(factory, settings, app.state.vault())
@@ -223,6 +234,9 @@ def test_deadline_omvat_publicatie(
             assert db.scalar(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": availability.MEASUREMENT_LOCK})
     finally:
         with factory.begin() as db:
+            if fase == "commit":
+                db.execute(text("DROP TRIGGER uitstel_publicatie ON catalog_snapshot"))
+                db.execute(text("DROP FUNCTION uitstel_publicatie()"))
             db.execute(text("DROP TRIGGER trage_publicatie ON catalog_snapshot"))
             db.execute(text("DROP FUNCTION trage_publicatie()"))
 
@@ -311,9 +325,10 @@ def test_onleesbare_kluis_laat_periodieke_taken_door(
 
 
 def test_meting_versheid_en_geen_bronaanroepen_per_leesverzoek(
-    admin: Any, fake_nas: Any, worker_once: Any, monkeypatch: pytest.MonkeyPatch
+    admin: Any, app: Any, fake_nas: Any, worker_once: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hub.catalog import availability
+    from hub.models import CatalogSnapshot
 
     now = NOW
     monkeypatch.setattr(availability, "utcnow", lambda: now)
@@ -356,6 +371,13 @@ def test_meting_versheid_en_geen_bronaanroepen_per_leesverzoek(
     now = NOW - timedelta(seconds=120)
     assert read() == meting
     now = NOW + timedelta(seconds=900)
+    assert read() == {**PIN, "beschikbaar": "onbekend", "gemeten_op": None}
+    assert fake_nas.calls == calls
+    # Isoleer de twee grenzen: een nieuwe bevestiging kan de ouderdom van de
+    # onderliggende brongegevens niet verkorten. Toets de bron exact op 900 en 901 s.
+    worker_once(schedule=True)
+    with app.state.sessionmaker.begin() as db:
+        db.get(CatalogSnapshot, 1).observed_at = NOW
     assert read() == meting
     now += timedelta(seconds=1)
     assert read(version="1.4.7")["beschikbaar"] == "onbekend"
@@ -509,19 +531,25 @@ def _pins_na_herstart(settings: Any, headers: dict[str, str]) -> list[tuple[str,
         return proces.submit(_lees_in_hub, settings, headers).result(timeout=15)
 
 
+@pytest.mark.parametrize("leesfout", [PermissionError, BlockingIOError])
 def test_leesroute_weigert_onleesbaar_oud_en_onvolledig_meetbewijs(
-    vorige_meting: Any, admin: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch
+    vorige_meting: Any,
+    admin: Any,
+    settings: Any,
+    fake_nas: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    leesfout: type[OSError],
 ) -> None:
     from hub.catalog import availability
 
     headers = _headers(admin, "home-control-hub")
     bewijs = settings.data_dir / availability.MEASUREMENT_RECEIPT
-    oud_formaat = bewijs.read_bytes().split()[0]  # Alleen het ISO-tijdstip uit de vorige Hub-versie.
+    velden = bewijs.read_bytes().split()
     bron = list(fake_nas.calls)
 
     def geweigerd(pad: Any, modus: str, **opties: Any) -> Any:
         if pad == bewijs and modus == "rb":
-            raise PermissionError("Het meetbewijs is niet leesbaar.")
+            raise leesfout("Het meetbewijs is niet leesbaar.")
         return open(pad, modus, **opties)
 
     with monkeypatch.context() as opslag:
@@ -529,7 +557,7 @@ def test_leesroute_weigert_onleesbaar_oud_en_onvolledig_meetbewijs(
         antwoord = admin.get(PATH, params=PIN, headers=headers)
     assert antwoord.status_code == 503 and antwoord.json()["code"] == "dependency_unavailable"
     assert int(antwoord.headers["Retry-After"]) > 0
-    for inhoud in (oud_formaat, b"onvolledig"):
+    for inhoud in (velden[0], b" ".join(velden[:3]), b"onvolledig"):
         bewijs.write_bytes(inhoud)
         assert vorige_meting() == [("onbekend", None)] * 2
     assert fake_nas.calls == bron and not fake_nas.mutations
@@ -570,6 +598,96 @@ def test_alleen_leesbaar_bewijs_en_bezette_voorraad(
     availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
     assert all(staat == "ja" and tijd is not None for staat, tijd in vorige_meting())
     assert not fake_nas.mutations
+
+
+@pytest.mark.parametrize("storing", ["map_en_onderhoud", "trage_weigering"])
+def test_onzekere_intrekking_vervalt_ook_na_herstart(
+    vorige_meting: Any,
+    admin: Any,
+    app: Any,
+    settings: Any,
+    fake_nas: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    storing: str,
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    voor = vorige_meting()
+    headers = _headers(admin, "home-control-hub")
+    bevestiging = (settings.data_dir / availability.MEASUREMENT_RECEIPT).with_suffix(".bevestigd")
+    versies = fake_nas.data["catalog.get_app_details"]["stable"]["ix-app"]["versions"]
+    versies["1.4.7"] = {"version": "1.4.7"}
+    bron = list(fake_nas.calls)
+    geweigerd, vrij = Event(), Event()
+    schrijvers: list[Thread] = []
+    verwijderen = Path.unlink
+
+    def weiger(pad: Path, missing_ok: bool = False) -> None:
+        if pad != bevestiging:
+            return verwijderen(pad, missing_ok=missing_ok)
+        schrijvers.append(current_thread())
+        geweigerd.set()
+        if storing == "trage_weigering":
+            assert vrij.wait(5)
+        raise PermissionError("De testmap is alleen leesbaar.")
+
+    factory, vault = app.state.sessionmaker, app.state.vault()
+    with monkeypatch.context() as opslag, factory.begin() as onderhoud, ThreadPoolExecutor(max_workers=1) as pool:
+        opslag.setattr(availability, "MEASUREMENT_TIMEOUT", 1.0)
+        opslag.setattr(Path, "unlink", weiger)
+        if storing == "map_en_onderhoud":
+            onderhoud.execute(text("LOCK TABLE catalog_attempt IN SHARE MODE"))
+        werk = pool.submit(availability.refresh_if_due, factory, settings, vault)
+        try:
+            assert geweigerd.wait(3)
+            werk.result(timeout=2)
+        finally:
+            vrij.set()
+    for schrijver in schrijvers:
+        schrijver.join(timeout=3)
+        assert not schrijver.is_alive()
+    # Dezelfde bestanden zijn weer toegankelijk. Zelfs binnen de normale bronversheid
+    # en na het terugzetten van de klok mag de oude uitslag niet opnieuw verschijnen.
+    onbekend = [("onbekend", None)] * 2
+    assert bevestiging.exists()
+    assert _pins_na_herstart(settings, headers) == onbekend
+    with monkeypatch.context() as klok:
+        klok.setattr(availability, "utcnow", lambda: datetime.fromisoformat(voor[0][1]))
+        assert vorige_meting() == onbekend
+    assert fake_nas.calls == bron
+    with monkeypatch.context() as klok:
+        klok.setattr(availability, "utcnow", lambda: datetime.now(UTC) + timedelta(seconds=301))
+        availability.refresh_if_due(factory, settings, vault)
+        assert all(staat == "ja" and tijd is not None for staat, tijd in vorige_meting())
+    assert not fake_nas.mutations
+
+
+@pytest.mark.parametrize("klok", ["bronklok", "verstreken_tijd"])
+def test_bevestiging_verloopt_zonder_enige_schrijfhandeling(
+    vorige_meting: Any, app: Any, monkeypatch: pytest.MonkeyPatch, klok: str
+) -> None:
+    from sqlalchemy import select
+
+    from hub.catalog import availability
+    from hub.models import CatalogAttempt
+
+    voor = vorige_meting()
+    with app.state.sessionmaker() as db:
+        start = db.scalars(select(CatalogAttempt.started_at)).one()
+    horizon = availability.MEASUREMENT_INTERVAL + timedelta(seconds=availability.MEASUREMENT_TIMEOUT)
+    if klok == "bronklok":
+        grens = start + horizon
+        monkeypatch.setattr(availability, "utcnow", lambda: grens)
+        assert vorige_meting() == voor
+        grens += timedelta(microseconds=1)
+    else:
+        monkeypatch.setattr(availability, "utcnow", lambda: start)
+        assert vorige_meting() == voor
+        verlopen = time.monotonic_ns() + round(horizon.total_seconds() * 1_000_000_000)
+        monkeypatch.setattr(availability, "monotonic_ns", lambda: verlopen, raising=False)
+    assert vorige_meting() == [("onbekend", None)] * 2
 
 
 @pytest.mark.parametrize("vertraging", ["voor_schrijven", "na_schrijven", "voor_koppelen", "na_koppelen"])

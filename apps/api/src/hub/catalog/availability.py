@@ -12,11 +12,11 @@ import uuid
 from collections.abc import Iterator
 from concurrent.futures import Future
 from contextlib import closing, contextmanager, suppress
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Lock, Thread
-from time import time_ns
-from typing import Any, BinaryIO, Literal
+from time import monotonic_ns, time_ns
+from typing import Any, BinaryIO, Literal, NamedTuple
 
 import psycopg
 from cryptography.exceptions import InvalidTag
@@ -55,6 +55,13 @@ MEASUREMENT_RECEIPT = "catalogus-meetbewijs"
 _LOCAL_MEASUREMENT = Lock()
 DETAILS_PER_ROUND = 4
 IX_APP = ("stable", "ix-app")
+
+
+class _Confirmation(NamedTuple):
+    attempt_id: int
+    started: datetime
+    monotonic_start: int
+    database_start: datetime
 
 
 def _binding(db: Session, target: NasTarget, connection: TrueNASConnection) -> str:
@@ -219,7 +226,9 @@ def _transaction(factory: sessionmaker[Session], deadline: float) -> Iterator[Se
         db.commit()
 
 
-def _start_attempt(factory: sessionmaker[Session], started: datetime, deadline: float) -> CatalogAttempt | None:
+def _start_attempt(
+    factory: sessionmaker[Session], attempt_id: int, started: datetime, deadline: float
+) -> CatalogAttempt | None:
     with _transaction(factory, deadline) as db:
         if not db.scalar(text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": MEASUREMENT_LOCK}):
             return None
@@ -229,7 +238,7 @@ def _start_attempt(factory: sessionmaker[Session], started: datetime, deadline: 
                 return None
             # Na minstens 300 s kan alleen de vorige poging nog nodig zijn tijdens de nieuwe meting.
             db.execute(delete(CatalogAttempt).where(CatalogAttempt.id < previous.id))
-        attempt = CatalogAttempt(started_at=started)
+        attempt = CatalogAttempt(id=attempt_id, started_at=started)
         db.add(attempt)
     return attempt
 
@@ -311,27 +320,28 @@ def _open_receipt(path: str, flags: int) -> int:
     return os.open(path, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
 
 
-def _confirmed_start(receipt: BinaryIO, confirmation: Path) -> datetime | None:
+def _confirmation(receipt: BinaryIO, confirmation: Path) -> _Confirmation | None:
     """Alleen de na het schrijven aangelegde harde koppeling bevestigt deze meetbeurt."""
     receipt.seek(0)
     try:
-        data = receipt.read(129)
-        if len(data) > 128:
+        data = receipt.read(193)
+        if len(data) > 192:
             return None
-        start, earliest, latest = data.decode("ascii").split()
+        start, earliest, latest, number, ticks, database_start = data.decode("ascii").split()
         started = datetime.fromisoformat(start)
+        proof = _Confirmation(int(number), started, int(ticks), datetime.fromisoformat(database_start))
         stamp = confirmation.stat(follow_symlinks=False)
         same_file = os.path.samestat(stamp, os.fstat(receipt.fileno()))
         if not same_file or not int(earliest) <= stamp.st_ctime_ns <= int(latest):
             return None
     except (FileNotFoundError, ValueError):
         return None
-    return started if started.tzinfo is not None else None
+    return proof if started.tzinfo is not None else None
 
 
 def _is_due(guard: BinaryIO, confirmation: Path, now: datetime) -> bool:
-    previous = _confirmed_start(guard, confirmation)
-    return previous is None or now - previous >= MEASUREMENT_INTERVAL
+    previous = _confirmation(guard, confirmation)
+    return previous is None or now - previous.started >= MEASUREMENT_INTERVAL
 
 
 def _refresh(
@@ -354,18 +364,25 @@ def _refresh(
     except BlockingIOError:
         return
     started = utcnow()
+    monotonic_start = monotonic_ns()
     if not _is_due(guard, confirmation, started):
         return
 
-    # Intrekken vraagt alleen schrijfrecht op de map. Een alleen-leesbaar bestand
-    # en een bezette momentopnamerij kunnen het oude bewijs dus niet behouden.
-    confirmation.unlink(missing_ok=True)
+    # Reserveer het nummer vóór de eerste wijziging aan bestand of tabel. PostgreSQL
+    # draait nextval niet terug als de intrekking of het invoegen van de poging faalt.
+    try:
+        with _transaction(sessions, deadline) as db:
+            attempt_id, database_start = db.execute(
+                text("SELECT nextval('catalog_attempt_id_seq'), pg_postmaster_start_time()")
+            ).one()
+    finally:
+        confirmation.unlink(missing_ok=True)
     with open(path, "a+b", buffering=0, opener=_open_receipt) as receipt:
         if os.fstat(receipt.fileno()).st_size:
             receipt.truncate(0)
             os.fsync(receipt.fileno())
         work_until = deadline - min(FINISH_BUDGET, MEASUREMENT_TIMEOUT / 3)
-        attempt = _start_attempt(sessions, started, work_until)
+        attempt = _start_attempt(sessions, attempt_id, started, work_until)
         if attempt is None:
             return
         try:
@@ -382,7 +399,10 @@ def _refresh(
         if not published or time.monotonic() >= deadline:
             return
         wall_start, wall_end = wall_window
-        data = f"{started.isoformat()} {wall_start} {wall_end}\n".encode("ascii")
+        data = (
+            f"{started.isoformat()} {wall_start} {wall_end} {attempt_id} "
+            f"{monotonic_start} {database_start.isoformat()}\n"
+        ).encode("ascii")
         if receipt.write(data) != len(data):
             return
         os.fsync(receipt.fileno())
@@ -447,6 +467,7 @@ def read_pin(
         # Beide pogingen en de voorraad voor deze bronbinding komen uit dezelfde MVCC-lezing.
         rows = db.execute(
             select(
+                CatalogAttempt.id,
                 CatalogAttempt.started_at,
                 CatalogAttempt.completed_at,
                 CatalogAttempt.failed,
@@ -464,29 +485,47 @@ def read_pin(
             .order_by(CatalogAttempt.id.desc())
             .limit(2)
         ).all()
-    try:
+        if not rows:
+            return "onbekend", None
         path = settings.data_dir / MEASUREMENT_RECEIPT
-        with open(path, "rb", opener=_open_receipt) as receipt:
-            # Een koppeling kan al zichtbaar zijn terwijl de publicerende aanroep
-            # nog wacht. Pas na de laatste tijdcontrole geeft de schrijver het slot vrij.
-            try:
-                fcntl.flock(receipt, fcntl.LOCK_SH | fcntl.LOCK_NB)
-            except BlockingIOError:
-                return "onbekend", None
-            confirmed = _confirmed_start(receipt, path.with_suffix(".bevestigd"))
-    except FileNotFoundError:
-        confirmed = None
+        try:
+            with open(path, "rb", opener=_open_receipt) as receipt:
+                try:
+                    fcntl.flock(receipt, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return "onbekend", None
+                confirmed = _confirmation(receipt, path.with_suffix(".bevestigd"))
+                # Controleer onder hetzelfde slot als de schrijver het laatst uitgegeven
+                # nummer, ook als de bijbehorende rij nooit kon worden vastgelegd.
+                issued, database_start = db.execute(
+                    text("SELECT last_value, pg_postmaster_start_time() FROM catalog_attempt_id_seq")
+                ).one()
+        except FileNotFoundError:
+            return "onbekend", None
     now = utcnow()
-    for started, completed, failed, observed, present in rows:
+    # Ook zonder spoor van een opvolger vervalt het bewijs na het volgende interval
+    # plus de meetduur. De monotone klok loopt door bij een klokcorrectie. Vergelijk
+    # haar alleen binnen dezelfde PostgreSQL-instantie (dus ook dezelfde systeemstart).
+    horizon = MEASUREMENT_INTERVAL + timedelta(seconds=MEASUREMENT_TIMEOUT)
+    if (
+        confirmed is None
+        or rows[0].id != issued
+        or confirmed.database_start != database_start.astimezone(UTC)
+        or now - confirmed.started > horizon
+        or not 0 <= monotonic_ns() - confirmed.monotonic_start <= round(horizon.total_seconds() * 1_000_000_000)
+    ):
+        return "onbekend", None
+    for attempt_id, started, completed, failed, observed, present in rows:
+        started = started.astimezone(UTC)
         if failed:
             break
         if completed is None:
             if 0 <= (now - started).total_seconds() <= MEASUREMENT_TIMEOUT:
                 continue  # De eerdere meting kan tijdens een lopende poging nog geldig zijn.
             break
-        if not 0 <= (completed - started).total_seconds() <= MEASUREMENT_TIMEOUT:
+        if not 0 <= (completed.astimezone(UTC) - started).total_seconds() <= MEASUREMENT_TIMEOUT:
             break
-        if confirmed != started:
+        if confirmed.attempt_id != attempt_id or confirmed.started != started:
             break
         if observed is not None and -120 <= (now - observed).total_seconds() <= 900 and present is not None:
             return ("ja" if present else "nee"), observed
