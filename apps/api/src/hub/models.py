@@ -440,6 +440,25 @@ class CatalogApp(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
 
 
+class AdapterLink(Base):
+    """Bevestigde koppeling naar één geregistreerde instantie van een bestaande app."""
+
+    __tablename__ = "adapter_link"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    app_id: Mapped[str] = mapped_column(String(64))
+    catalog_app_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("catalog_app.id"), unique=True)
+    basis_url: Mapped[str] = mapped_column(String(512))
+    peer_addresses: Mapped[list[str]] = mapped_column(JSONB)
+    geheim_ref: Mapped[str] = mapped_column(String(200), unique=True)
+    laatste4: Mapped[str] = mapped_column(String(8))
+    ingevoerd_op: Mapped[datetime] = mapped_column(TS)
+    laatste_status: Mapped[str | None] = mapped_column(String(16))
+    observed_at: Mapped[datetime | None] = mapped_column(TS)
+    max_age_s: Mapped[int | None] = mapped_column(Integer)
+    laatste_fout: Mapped[str | None] = mapped_column(String(64))
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
 class HealthObservation(Base):
     """Laatste waarneming per bron (Uptime Kuma-monitor, heartbeat of connector-health van een eigen dienst).
     Veroudering wordt op leestijd beoordeeld (``ttl_seconds``); een verouderde waarneming telt als ``unknown``."""

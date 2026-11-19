@@ -67,6 +67,14 @@
         "title": "ApiKeyIn",
         "type": "object"
       },
+      "AppId": {
+        "enum": [
+          "mediaguard",
+          "media-source-optimizer",
+          "my_house"
+        ],
+        "type": "string"
+      },
       "ApproveIn": {
         "additionalProperties": false,
         "description": "De drie hashes van de preview die de beheerder zag; wijkt er één af, dan is er niets goedgekeurd.",
@@ -820,6 +828,175 @@
         "title": "Koppeling",
         "type": "object"
       },
+      "LinkIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "$ref": "#/components/schemas/AppId"
+          },
+          "basis_url": {
+            "maxLength": 512,
+            "minLength": 8,
+            "title": "Basis Url",
+            "type": "string"
+          },
+          "catalog_app_id": {
+            "format": "uuid",
+            "title": "Catalog App Id",
+            "type": "string"
+          },
+          "doel_bevestigd": {
+            "const": true,
+            "title": "Doel Bevestigd",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "app_id",
+          "catalog_app_id",
+          "basis_url",
+          "doel_bevestigd"
+        ],
+        "title": "LinkIn",
+        "type": "object"
+      },
+      "LinkList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LinkView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "LinkList",
+        "type": "object"
+      },
+      "LinkPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "basis_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Url"
+          },
+          "catalog_app_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog App Id"
+          },
+          "doel_bevestigd": {
+            "default": false,
+            "title": "Doel Bevestigd",
+            "type": "boolean"
+          }
+        },
+        "title": "LinkPatch",
+        "type": "object"
+      },
+      "LinkReceipt": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "title": "LinkReceipt",
+        "type": "object"
+      },
+      "LinkView": {
+        "properties": {
+          "app_id": {
+            "title": "App Id",
+            "type": "string"
+          },
+          "basis_url": {
+            "title": "Basis Url",
+            "type": "string"
+          },
+          "catalog_app_id": {
+            "format": "uuid",
+            "title": "Catalog App Id",
+            "type": "string"
+          },
+          "gezondheid": {
+            "$ref": "#/components/schemas/Measurement"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingevoerd_op": {
+            "title": "Ingevoerd Op",
+            "type": "string"
+          },
+          "laatste4": {
+            "title": "Laatste4",
+            "type": "string"
+          },
+          "verbinding": {
+            "$ref": "#/components/schemas/Measurement"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "app_id",
+          "catalog_app_id",
+          "basis_url",
+          "laatste4",
+          "ingevoerd_op",
+          "verbinding",
+          "gezondheid",
+          "version"
+        ],
+        "title": "LinkView",
+        "type": "object"
+      },
       "LogsIn": {
         "additionalProperties": false,
         "properties": {
@@ -837,6 +1014,50 @@
           "regels"
         ],
         "title": "LogsIn",
+        "type": "object"
+      },
+      "Measurement": {
+        "properties": {
+          "laatste_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Measurement",
         "type": "object"
       },
       "NoodstopIn": {
@@ -2053,6 +2274,15 @@
         "title": "SourcePatch",
         "type": "object"
       },
+      "Status": {
+        "enum": [
+          "healthy",
+          "unknown",
+          "degraded",
+          "down"
+        ],
+        "type": "string"
+      },
       "StatusIn": {
         "additionalProperties": false,
         "properties": {
@@ -2259,6 +2489,20 @@
           "reden"
         ],
         "title": "VeiligeModusIn",
+        "type": "object"
+      },
+      "Verwijderd": {
+        "properties": {
+          "verwijderd": {
+            "const": true,
+            "title": "Verwijderd",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "verwijderd"
+        ],
+        "title": "Verwijderd",
         "type": "object"
       },
       "Worker": {
@@ -2977,6 +3221,429 @@
         "summary": "Voorstel afwijzen (beheerder); er wordt niets uitgevoerd",
         "tags": [
           "acties en goedkeuringen"
+        ]
+      }
+    },
+    "/api/v1/adapterkoppelingen": {
+      "get": {
+        "operationId": "list_links_api_v1_adapterkoppelingen_get",
+        "parameters": [
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adapterkoppelingen lezen",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      },
+      "post": {
+        "operationId": "create_link_api_v1_adapterkoppelingen_post",
+        "parameters": [
+          {
+            "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+            "in": "header",
+            "name": "X-Adapter-Credential",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "password",
+                  "type": "string",
+                  "writeOnly": true
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+              "title": "X-Adapter-Credential"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."
+          }
+        },
+        "summary": "Adapterkoppeling maken (beheerder)",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      }
+    },
+    "/api/v1/adapterkoppelingen/{link_id}": {
+      "delete": {
+        "operationId": "delete_link_api_v1_adapterkoppelingen__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Verwijderd"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adapterkoppeling en kluiswaarde wissen (beheerder)",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      },
+      "get": {
+        "operationId": "get_link_api_v1_adapterkoppelingen__link_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adapterkoppeling lezen",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      },
+      "patch": {
+        "operationId": "update_link_api_v1_adapterkoppelingen__link_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+            "in": "header",
+            "name": "X-Adapter-Credential",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "password",
+                  "type": "string",
+                  "writeOnly": true
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+              "title": "X-Adapter-Credential"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adapterkoppeling wijzigen (beheerder)",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      }
+    },
+    "/api/v1/adapterkoppelingen/{link_id}/test": {
+      "post": {
+        "operationId": "test_link_api_v1_adapterkoppelingen__link_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Openbare verbinding testen (beheerder)",
+        "tags": [
+          "adapterkoppelingen"
         ]
       }
     },
@@ -9723,6 +10390,10 @@
     {
       "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
       "name": "appcatalogus"
+    },
+    {
+      "description": "Beheer en openbare contactproef van bevestigde appkoppelingen.",
+      "name": "adapterkoppelingen"
     },
     {
       "description": "Bronnen (Uptime Kuma, Beszel), healthchecks en heartbeat van eigen diensten (B09-002).",

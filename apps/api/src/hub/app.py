@@ -23,6 +23,7 @@ from hub.oidc.service import audit_missing_secret_on_start, clean_old_alg_explan
 from hub.onboarding.service import seed
 from hub.routers import (
     actions,
+    adapterkoppelingen,
     alerts,
     auth,
     backups,
@@ -147,6 +148,10 @@ OPENAPI_TAGS = [
     {
         "name": "appcatalogus",
         "description": "Centrale appcatalogus (B01-002): identiteit, herkomst, image/digest, gezondheid; alleen-lezen.",
+    },
+    {
+        "name": "adapterkoppelingen",
+        "description": "Beheer en openbare contactproef van bevestigde appkoppelingen.",
     },
     {
         "name": "monitoring",
@@ -301,6 +306,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         catalog.router,
         catalog_availability.router,
         monitoring.router,
+        adapterkoppelingen.router,
         observability.router,
         metrics.router,
         alerts.router,

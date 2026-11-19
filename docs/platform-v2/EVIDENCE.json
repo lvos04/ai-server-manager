@@ -661,11 +661,11 @@
   },
   {
     "id": "C1.3-ASM-21",
-    "status": "Niet gestart",
-    "validatie": "Niet getest",
-    "bewijs": "S-P3-010: docs/adr/ADR-0034-adapters-bestaande-apps.md",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "S-P3-010: docs/adr/ADR-0034-adapters-bestaande-apps.md; S-P3-020: apps/api/tests/unit/test_adapterbasis.py en apps/api/tests/integration/test_adapterkoppelingen.py",
     "blokkade": "",
-    "opmerking": "besluit vastgelegd en na review aangescherpt, bouw volgt vanaf S-P3-020",
+    "opmerking": "Koppeling, kluis, contact en versheid op lokale testgegevens beproefd. Appspecifieke leesadapters en de overige conformiteit volgen in aparte stappen.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-19"
   },

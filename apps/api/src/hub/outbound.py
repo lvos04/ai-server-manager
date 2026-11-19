@@ -65,6 +65,7 @@ class OutboundPolicy:
     read_timeout: float = 15.0
     allow_loopback: bool = False
     extra_ca_file: Path | None = None
+    allowed_peer_addresses: frozenset[str] | None = None
 
 
 def validate_base_url(url: str, *, allow_loopback: bool = False) -> str:
@@ -112,12 +113,13 @@ def _check_host(host: str, *, allow_loopback: bool) -> None:
         raise OutboundError("adres_niet_toegestaan", "loopback-, link-local- of onbepaald adres is niet toegestaan")
 
 
-def _resolved_ok(host: str, port: int, allow_loopback: bool) -> None:
+def resolve_peer_addresses(host: str, port: int, allow_loopback: bool) -> frozenset[str]:
     """Controleer ook de opgeloste adressen van een hostnaam (geen omweg via DNS naar loopback/link-local)."""
     try:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError as exc:
         raise OutboundError("niet_bereikbaar", "hostnaam niet gevonden") from exc
+    addresses: set[str] = set()
     for info in infos:
         try:
             ip = ipaddress.ip_address(str(info[4][0]).split("%", 1)[0])
@@ -125,6 +127,30 @@ def _resolved_ok(host: str, port: int, allow_loopback: bool) -> None:
             continue
         if _forbidden_ip(ip, allow_loopback):
             raise OutboundError("adres_niet_toegestaan", "de hostnaam verwijst naar een niet-toegestaan adres")
+        addresses.add(str(ip))
+    if not addresses:
+        raise OutboundError("niet_bereikbaar", "hostnaam heeft geen bruikbaar adres")
+    return frozenset(addresses)
+
+
+class _BoundHTTPSConnection(http.client.HTTPSConnection):
+    """Verbind met een gecontroleerd numeriek adres en verifieer TLS tegen de ingestelde hostnaam."""
+
+    def __init__(self, host: str, port: int, *, timeout: float, context: ssl.SSLContext, peer: str) -> None:
+        super().__init__(host, port, timeout=timeout, context=context)
+        self._tls_context = context
+        self._peer = peer
+
+    def connect(self) -> None:
+        raw = socket.create_connection((self._peer, self.port), self.timeout)
+        try:
+            actual = str(ipaddress.ip_address(raw.getpeername()[0]))
+            if actual != self._peer:
+                raise OutboundError("doelbinding_gewijzigd")
+            self.sock = self._tls_context.wrap_socket(raw, server_hostname=self.host)
+        except BaseException:
+            raw.close()
+            raise
 
 
 def basic_auth(user: str, password: str) -> str:
@@ -152,7 +178,13 @@ def request(
         full_path += "?" + "&".join(f"{quote(k, safe='')}={quote(v, safe='')}" for k, v in query.items())
     host = parts.hostname or ""
     port = parts.port or (443 if parts.scheme == "https" else 80)
-    _resolved_ok(host, port, policy.allow_loopback)
+    addresses = resolve_peer_addresses(host, port, policy.allow_loopback)
+    allowed = policy.allowed_peer_addresses
+    if allowed is not None:
+        if parts.scheme != "https":
+            raise OutboundError("https_verplicht")
+        if not addresses or not addresses <= allowed:
+            raise OutboundError("doelbinding_gewijzigd")
     hdrs = {"Accept": "application/json", "User-Agent": "ai-server-manager"}
     hdrs.update(headers or {})
     data = None
@@ -168,7 +200,10 @@ def request(
         if policy.extra_ca_file is not None:
             ctx.load_verify_locations(cafile=str(policy.extra_ca_file))
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        conn = http.client.HTTPSConnection(host, port, timeout=policy.connect_timeout, context=ctx)
+        if allowed is not None:
+            conn = _BoundHTTPSConnection(host, port, timeout=policy.connect_timeout, context=ctx, peer=min(addresses))
+        else:
+            conn = http.client.HTTPSConnection(host, port, timeout=policy.connect_timeout, context=ctx)
     else:
         conn = http.client.HTTPConnection(host, port, timeout=policy.connect_timeout)
     try:
