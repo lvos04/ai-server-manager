@@ -11,7 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 from conftest import idem, login_as, make_user
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from hub import migrations, outbound
@@ -895,7 +895,7 @@ def test_my_house_wist_metingen_en_behoudt_bevestigingen(
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
-def test_my_house_upgrade_wist_oude_herhalingen_ook_zonder_koppeling(
+def test_my_house_upgrade_wist_oude_herhalingen_en_status_zonder_meettijd(
     admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, settings: Settings
 ) -> None:
     code, _, calls = huis_simulatie
@@ -905,6 +905,7 @@ def test_my_house_upgrade_wist_oude_herhalingen_ook_zonder_koppeling(
     antwoord = admin.post(f"{path}/test", headers=headers).json()
     assert antwoord["my_house"]["woningen"]
     assert admin.delete(path, headers=idem()).status_code == 200
+    actieve_link = uuid.UUID(admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"])
     migrations.downgrade(settings.database_url, "0019")
     try:
         with app.state.sessionmaker.begin() as db:
@@ -912,6 +913,7 @@ def test_my_house_upgrade_wist_oude_herhalingen_ook_zonder_koppeling(
                 select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(headers["Idempotency-Key"]))
             )
             record.response_body = antwoord
+            db.execute(text("UPDATE adapter_link SET my_house_status = 'healthy' WHERE id = :id"), {"id": actieve_link})
     finally:
         migrations.upgrade(settings.database_url)
     calls_voor = list(calls)
@@ -920,6 +922,8 @@ def test_my_house_upgrade_wist_oude_herhalingen_ook_zonder_koppeling(
             select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(headers["Idempotency-Key"]))
         )
         assert record.response_body == {**antwoord, "my_house": None}
+        assert db.get(AdapterLink, actieve_link).my_house_status is None
+    assert admin.get(f"{ROUTE}/{actieve_link}").json()["gezondheid"]["status"] == "unknown"
     assert admin.post(f"{path}/test", headers=headers).json() == {**antwoord, "my_house": None}
     assert calls == calls_voor
 

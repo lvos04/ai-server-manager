@@ -21,11 +21,16 @@ def _clear_legacy_measurements() -> None:
             "AND response_body->'my_house' <> 'null'::jsonb"
         ).bindparams(test_scope=":POST:/api/v1/adapterkoppelingen/{link_id}/test")
     )
+    # De oude status bevat geen bronmeettijd en mag na terugrol geen gezonde meting suggereren.
+    op.execute(
+        sa.text(
+            "UPDATE adapter_link SET my_house_status = NULL WHERE app_id = 'my_house' AND my_house_status IS NOT NULL"
+        )
+    )
 
 
 def upgrade() -> None:
     _clear_legacy_measurements()
-    op.drop_column("adapter_link", "my_house_status")
     op.add_column("adapter_link", sa.Column("my_house_checks", JSONB()))
     op.create_table(
         "adapter_house_snapshot",
@@ -48,4 +53,3 @@ def downgrade() -> None:
     _clear_legacy_measurements()
     op.drop_table("adapter_house_snapshot")
     op.drop_column("adapter_link", "my_house_checks")
-    op.add_column("adapter_link", sa.Column("my_house_status", sa.String(16)))

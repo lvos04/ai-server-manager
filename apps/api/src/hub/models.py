@@ -461,6 +461,7 @@ class AdapterLink(Base):
     my_house_server_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     my_house_client_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     my_house_expires_at: Mapped[datetime | None] = mapped_column(TS)
+    my_house_status: Mapped[str | None] = mapped_column(String(16))  # Voor terugrol naar 0019.
     my_house_checks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
 
 
