@@ -177,6 +177,26 @@ def _safe_details(ev: EventIn, keys: tuple[str, ...] | None = None) -> dict[str,
 def _hub(ev: EventIn) -> Signaal | None:
     p = ev.payload or {}
     et, eid = ev.event_type, ev.entity_id
+    if et in ("monitoring.mso_probe.failed", "monitoring.mso_probe.recovered"):
+        recovered = et.endswith(".recovered")
+        if recovered:
+            title = "Openbare MSO-probes weer bereikbaar"
+        elif p.get("reason_code") == "bron_credential_geweigerd":
+            title = "MSO weigert een openbare probe"
+        else:
+            title = "Openbare MSO-probe mislukt"
+        return Signaal(
+            "herstel" if recovered else "probleem",
+            "monitoring.mso_probe",
+            f"{APP_ID}:mso_probe:{eid}",
+            title,
+            "info" if recovered else "waarschuwing",
+            "hub:monitoring",
+            "adapter_link",
+            eid,
+            "Media Source Optimizer",
+            details=_safe_details(ev, ("reason_code",)),
+        )
     if et in ("monitoring.source.failed", "monitoring.source.recovered"):
         naam = _s(p.get("naam"), 64) or eid
         fp = f"{APP_ID}:monitor_source:{eid}"

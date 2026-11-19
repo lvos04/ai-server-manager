@@ -15,14 +15,15 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy import select
 
 from hub import audit
-from hub.adapters import basis
+from hub.adapters import basis, mso
 from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, get_vault
 from hub.errors import HubError
+from hub.events.envelope import emit
 from hub.inventory.store import kind_state
 from hub.models import AdapterLink, CatalogApp, VaultSecret
 from hub.outbound import OutboundError
-from hub.timeutil import UtcDateTime
+from hub.timeutil import UtcDateTime, utcnow
 from hub.truenas.connection import NasTarget, current_target
 from hub.vault import Vault, make_ref
 
@@ -31,7 +32,10 @@ VaultDep = Annotated[Vault, Depends(get_vault)]
 Credential = Annotated[
     SecretStr | None,
     Header(
-        alias="X-Adapter-Credential", description="Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging."
+        alias="X-Adapter-Credential",
+        description=(
+            "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging."
+        ),
     ),
 ]
 IfMatch = Annotated[str | None, Header(alias="If-Match")]
@@ -61,7 +65,7 @@ class LinkView(BaseModel):
     catalog_app_id: uuid.UUID
     basis_url: str
     laatste4: str
-    ingevoerd_op: UtcDateTime
+    ingevoerd_op: UtcDateTime | None
     verbinding: basis.Measurement
     gezondheid: basis.Measurement
     version: int
@@ -75,6 +79,10 @@ class LinkList(BaseModel):
 class LinkReceipt(BaseModel):
     id: uuid.UUID
     version: int
+
+
+class MsoTestReceipt(LinkReceipt):
+    probes: mso.PublicProbes
 
 
 class Verwijderd(BaseModel):
@@ -98,15 +106,17 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
             observed_at=row.observed_at,
             laatste_status=row.laatste_status if row.observed_at else None,
         )
+    is_mso = row.app_id == mso.APP_ID
+    health = mso.health() if is_mso else basis.Measurement(status="unknown", reason_code="capability_unavailable")
     return LinkView(
         id=row.id,
         app_id=row.app_id,
         catalog_app_id=row.catalog_app_id,
         basis_url=row.basis_url,
-        laatste4=row.laatste4,
-        ingevoerd_op=row.ingevoerd_op,
+        laatste4="" if is_mso else row.laatste4,
+        ingevoerd_op=None if is_mso else row.ingevoerd_op,
         verbinding=measurement,
-        gezondheid=basis.Measurement(status="unknown", reason_code="capability_unavailable"),
+        gezondheid=health,
         version=row.version,
     )
 
@@ -216,11 +226,11 @@ def _binding_is_current(
 
 
 def _destination(
-    target: CatalogApp, url: str, credential: str, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
+    target: CatalogApp, url: str, credential: str | None, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
 ) -> tuple[str, list[str]]:
     try:
         base = basis.validate_base_url(url)
-        if credential.casefold() in base.casefold():
+        if credential is not None and credential.casefold() in base.casefold():
             raise OutboundError("adres_ongeldig")
         port = _registered_port(base, target, nas, owners)
         if port is None:
@@ -240,6 +250,17 @@ def _credential(value: SecretStr | None) -> str:
     if not re.fullmatch(r"[!-~]{8,512}", secret):
         raise HubError(422, "validation_error", "De waarde van het adaptercredential is ongeldig.")
     return secret
+
+
+def _reject_mso_credential(app_id: str | None, credential: SecretStr | None) -> None:
+    if app_id == mso.APP_ID and credential is not None:
+        raise HubError(422, "validation_error", "MSO gebruikt voor deze koppeling alleen openbare probes.")
+
+
+def _delete_credential(db: DB, row: AdapterLink) -> None:
+    secret = db.scalar(select(VaultSecret).where(VaultSecret.ref == row.geheim_ref))
+    if secret is not None:
+        db.delete(secret)
 
 
 def _record(db: DB, principal: Principal, row: AdapterLink, action: str) -> None:
@@ -263,8 +284,12 @@ def _precondition(row: AdapterLink, if_match: str | None) -> None:
         raise HubError(412, "precondition_failed", "De koppeling is gewijzigd.", {"huidige_etag": _etag(row.version)})
 
 
-def _save_link(idem: Idem, status: int, row: AdapterLink) -> JSONResponse:
-    receipt = LinkReceipt(id=row.id, version=row.version)
+def _save_link(idem: Idem, status: int, row: AdapterLink, *, probes: mso.PublicProbes | None = None) -> JSONResponse:
+    receipt: LinkReceipt
+    if probes is None:
+        receipt = LinkReceipt(id=row.id, version=row.version)
+    else:
+        receipt = MsoTestReceipt(id=row.id, version=row.version, probes=probes)
     response = idem.save(status, receipt.model_dump(mode="json"))
     response.headers["ETag"] = _etag(row.version)
     return response
@@ -318,11 +343,18 @@ def get_link(link_id: uuid.UUID, response: Response, db: DB, _: AnyUser, setting
     responses={501: {"description": "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."}},
 )
 def create_link(
-    body: LinkIn, db: DB, admin: Admin, idem: Idem, vault: VaultDep, credential: Credential, settings: SettingsDep
+    body: LinkIn,
+    db: DB,
+    admin: Admin,
+    idem: Idem,
+    vault: VaultDep,
+    settings: SettingsDep,
+    credential: Credential = None,
 ) -> JSONResponse:
+    _reject_mso_credential(body.app_id, credential)
     if (replay := _replay_link(idem)) is not None:
         return replay
-    secret = _credential(credential)
+    secret = None if body.app_id == mso.APP_ID else _credential(credential)
     target = _target(db, body.app_id, body.catalog_app_id)
     if (replay := _replay_link(idem)) is not None:
         return replay
@@ -335,7 +367,7 @@ def create_link(
     _unique_target(db, body.catalog_app_id)
     link_id = uuid.uuid4()
     ref = make_ref("adapters", f"{body.app_id}.{link_id}")
-    meta = vault.put(db, ref, secret, actor=admin.actor)
+    meta = vault.put(db, ref, secret, actor=admin.actor) if secret is not None else None
     row = AdapterLink(
         id=link_id,
         app_id=body.app_id,
@@ -343,8 +375,8 @@ def create_link(
         basis_url=base,
         peer_addresses=peers,
         geheim_ref=ref,
-        laatste4=meta.last4,
-        ingevoerd_op=meta.updated_at,
+        laatste4=meta.last4 if meta else "",
+        ingevoerd_op=meta.updated_at if meta else utcnow(),
     )
     db.add(row)
     db.flush()
@@ -365,8 +397,12 @@ def update_link(
     if_match: IfMatch = None,
 ) -> JSONResponse:
     if (replay := _replay_link(idem)) is not None:
+        if credential is not None:
+            app_id = db.scalar(select(AdapterLink.app_id).where(AdapterLink.id == link_id))
+            _reject_mso_credential(app_id, credential)
         return replay
     row = _link(db, link_id, lock=True)
+    _reject_mso_credential(row.app_id, credential)
     if (replay := _replay_link(idem)) is not None:
         return replay
     _precondition(row, if_match)
@@ -376,7 +412,7 @@ def update_link(
         raise HubError(422, "validation_error", "Bevestig de nieuwe bestemming en voer een nieuw credential in.")
     if credential is None and not body.doel_bevestigd:
         raise HubError(422, "validation_error", "Geef een wijziging op.")
-    secret = _credential(credential)
+    secret = None if row.app_id == mso.APP_ID else _credential(credential)
     target = _target(db, row.app_id, catalog_app_id)
     nas = current_target(db)
     owners = _published_ports(db, settings, nas)
@@ -384,19 +420,25 @@ def update_link(
         base, peers = _destination(target, base, secret, nas, owners)
         _unique_target(db, catalog_app_id, except_id=row.id)
         row.catalog_app_id, row.basis_url, row.peer_addresses = catalog_app_id, base, peers
-    elif secret.casefold() in row.basis_url.casefold():
+    elif secret is not None and secret.casefold() in row.basis_url.casefold():
         raise HubError(422, "validation_error", "De waarde van het adaptercredential is ongeldig.")
     elif not _binding_is_current(row, target, nas, owners):
         raise _binding_conflict()
-    meta = vault.put(db, row.geheim_ref, secret, actor=admin.actor)
-    row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
+    if secret is None:
+        _delete_credential(db, row)
+        row.laatste4, row.ingevoerd_op = "", utcnow()
+    else:
+        meta = vault.put(db, row.geheim_ref, secret, actor=admin.actor)
+        row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
     row.laatste_status, row.observed_at, row.max_age_s, row.laatste_fout = None, None, None, None
     row.version += 1
     _record(db, admin, row, "updated")
     return _save_link(idem, 200, row)
 
 
-@router.post("/{link_id}/test", response_model=LinkReceipt, summary="Openbare verbinding testen (beheerder)")
+@router.post(
+    "/{link_id}/test", response_model=MsoTestReceipt | LinkReceipt, summary="Openbare verbinding testen (beheerder)"
+)
 def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: SettingsDep) -> JSONResponse:
     if (replay := _replay_link(idem)) is not None:
         return replay
@@ -407,7 +449,23 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
     nas = current_target(db)
     if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
         raise _binding_conflict()
-    measurement = basis.probe(row, settings.outbound_policy())
+    policy = settings.outbound_policy()
+    probes = None
+    if row.app_id == mso.APP_ID:
+        result = mso.public_probes(row, policy)
+        measurement, probes = result.connection, result.probes
+        for failure in result.failures:
+            emit(
+                db,
+                "monitoring.mso_probe.failed",
+                "adapter_link",
+                str(row.id),
+                {"reason_code": failure.reason_code, "correlation_id": failure.correlation_id},
+            )
+        if not result.failures:
+            emit(db, "monitoring.mso_probe.recovered", "adapter_link", str(row.id), {})
+    else:
+        measurement = basis.probe(row, policy)
     row.laatste_fout = measurement.reason_code
     if measurement.observed_at is not None:
         row.laatste_status = measurement.status
@@ -415,7 +473,7 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
         row.max_age_s = basis.MAX_AGE_S
     row.version += 1
     _record(db, admin, row, "tested")
-    return _save_link(idem, 200, row)
+    return _save_link(idem, 200, row, probes=probes)
 
 
 @router.delete("/{link_id}", response_model=Verwijderd, summary="Adapterkoppeling en kluiswaarde wissen (beheerder)")
@@ -428,9 +486,7 @@ def delete_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, if_match: 
     if row is None:
         raise HubError(404, "not_found", "Adapterkoppeling niet gevonden.")
     _precondition(row, if_match)
-    secret = db.scalar(select(VaultSecret).where(VaultSecret.ref == row.geheim_ref))
-    if secret is not None:
-        db.delete(secret)
+    _delete_credential(db, row)
     _record(db, admin, row, "deleted")
     db.delete(row)
     return idem.save(200, {"verwijderd": True})

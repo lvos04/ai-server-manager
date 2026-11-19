@@ -20,7 +20,16 @@ from hub.catalog.discovery import discover, is_inventory_fresh
 from hub.config import Settings
 from hub.inventory.collector import CollectResult, KindResult
 from hub.inventory.store import save_run
-from hub.models import AdapterLink, AuditEvent, CatalogApp, Decision, IdempotencyRecord, VaultSecret
+from hub.models import (
+    AdapterLink,
+    AuditEvent,
+    CatalogApp,
+    Decision,
+    IdempotencyRecord,
+    Incident,
+    OutboxEvent,
+    VaultSecret,
+)
 from hub.timeutil import utcnow
 from hub.truenas import normalize
 from hub.truenas.connection import current_target
@@ -55,18 +64,21 @@ def _bewaar_apps(db: Session, apps: dict[str, tuple[int, ...]]) -> None:
 
 
 @pytest.fixture
-def doel(app: Any, settings: Settings, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def doel(
+    app: Any, settings: Settings, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> dict[str, Any]:
+    app_id = getattr(request, "param", APP_ID)
     monkeypatch.setattr(outbound, "resolve_peer_addresses", lambda *_args: frozenset({PEER}))
     with app.state.sessionmaker.begin() as db:
         besluit = db.get(Decision, "D03")
         assert besluit is not None
         besluit.status = "Ingevuld"
         besluit.waarde = {"nas_adres": "adapter.example"}
-        _bewaar_apps(db, {APP_ID: (443, 8443)})
+        _bewaar_apps(db, {app_id: (443, 8443)})
         assert discover(db, settings).nieuw == 1
         row = db.scalars(select(CatalogApp)).one()
-        assert row.app_id == APP_ID
-        return {"app_id": APP_ID, "catalog_app_id": str(row.id), "basis_url": URL, "doel_bevestigd": True}
+        assert row.app_id == app_id
+        return {"app_id": app_id, "catalog_app_id": str(row.id), "basis_url": URL, "doel_bevestigd": True}
 
 
 def invoer(waarde: str) -> dict[str, str]:
@@ -224,7 +236,7 @@ def test_binding_volgt_de_laatst_vastgelegde_poorteigenaar(
         opvolger = db.scalars(select(CatalogApp).where(CatalogApp.app_id == ANDERE_APP_ID)).one()
         nieuw_doel = {**doel, "app_id": ANDERE_APP_ID, "catalog_app_id": str(opvolger.id)}
     assert admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe())).status_code == 409
-    assert admin.post(ROUTE, json=nieuw_doel, headers=invoer(secrets.token_urlsafe())).status_code == 201
+    assert admin.post(ROUTE, json=nieuw_doel, headers=idem()).status_code == 201
     transport.assert_not_called()
     contact.assert_not_called()
 
@@ -351,3 +363,151 @@ def test_downgrade_wist_alleen_adapteropslag(admin: Any, app: Any, doel: dict[st
     finally:
         migrations.upgrade(settings.database_url)
     assert "adapter_link" in inspect(app.state.engine).get_table_names()
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_mso_openbare_probes(admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    buiten_witte_lijst = secrets.token_urlsafe()
+    responses = {
+        "/healthz": {"status": "ok", "version": "1.6.0", "extra": buiten_witte_lijst},
+        "/api/v1/setup/status": {
+            "setup_required": False,
+            "completed": True,
+            "version": "1.6.0",
+            "admin_exists": True,
+            "connectors": {"voorbeeld": {"configured": True, "status": "auth_failed", "url": buiten_witte_lijst}},
+        },
+    }
+
+    def fake_mso(base: str, method: str, path: str, **options: Any) -> outbound.Response:
+        assert base == URL
+        assert method == "GET"
+        assert set(options) == {"policy", "max_bytes"}
+        assert options["policy"].allowed_peer_addresses == frozenset({PEER})
+        assert not options["policy"].allow_loopback
+        assert options["max_bytes"] == basis.MAX_RESPONSE_BYTES
+        return outbound.Response(200, json.dumps(responses[path]).encode())
+
+    transport = Mock(side_effect=fake_mso)
+    monkeypatch.setattr(outbound, "request", transport)
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    assert created.status_code == 201
+    path = f"{ROUTE}/{created.json()['id']}"
+    headers = idem()
+    tested = admin.post(f"{path}/test", headers=headers)
+    assert tested.status_code == 200
+    assert tested.json()["probes"] == {
+        "healthz": {"status": "ok", "version": "1.6.0"},
+        "setup": {"setup_required": False, "completed": True, "version": "1.6.0"},
+    }
+    replay = admin.post(f"{path}/test", headers=headers)
+    assert replay.headers["Idempotent-Replay"] == "true"
+    assert replay.json() == tested.json()
+    assert [call.args[2] for call in transport.call_args_list] == list(responses)
+    detail = admin.get(path).json()
+    assert detail["verbinding"]["status"] == "healthy"
+    assert detail["gezondheid"]["status"] == "unknown"
+    assert detail["gezondheid"]["reason_code"] == "capability_unavailable"
+    assert detail["laatste4"] == ""
+    assert detail["ingevoerd_op"] is None
+
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+        assert buiten_witte_lijst not in json.dumps(list(db.scalars(select(IdempotencyRecord.response_body))))
+        _bewaar_apps(db, {APP_ID: (443,)})
+        db.commit()
+    assert admin.post(f"{path}/test", headers=idem()).status_code == 409
+    assert transport.call_count == 2
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_mso_weigert_credentials(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: Any
+) -> None:
+    transport = Mock(side_effect=AssertionError("Een koppelverzoek hoort geen MSO-verzoek te sturen"))
+    monkeypatch.setattr(outbound, "request", transport)
+    waarde = secrets.token_urlsafe()
+    headers = idem()
+    for response in (
+        admin.post(ROUTE, json={**doel, "username": "voorbeeld", "password": waarde}, headers=headers),
+        admin.post(ROUTE, json={**doel, "scopes": ["read"]}, headers=headers),
+        admin.post(ROUTE, json=doel, headers={**headers, "X-Adapter-Credential": waarde}),
+    ):
+        assert response.status_code == 422
+        assert waarde not in response.text
+    created = admin.post(ROUTE, json=doel, headers=headers)
+    assert created.status_code == 201
+    assert admin.post(ROUTE, json=doel, headers={**headers, "X-Adapter-Credential": waarde}).status_code == 422
+    path = f"{ROUTE}/{created.json()['id']}"
+    keuze = {"doel_bevestigd": True}
+    patch_headers = idem()
+    assert admin.patch(path, json=keuze, headers=patch_headers).status_code == 200
+    geweigerd = admin.patch(path, json=keuze, headers={**patch_headers, "X-Adapter-Credential": waarde})
+    assert geweigerd.status_code == 422
+    assert waarde not in geweigerd.text
+    transport.assert_not_called()
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+        assert waarde not in json.dumps(list(db.scalars(select(AuditEvent.details))))
+    assert waarde not in caplog.text
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_mso_probeweigering_maakt_geschoond_incident(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, periodic_run: Any, caplog: Any
+) -> None:
+    brontekst = secrets.token_urlsafe()
+    correlation_id = uuid.uuid4().hex[:12]
+    responses = [
+        outbound.Response(200, b'{"status":"ok","version":"1.6.0"}'),
+        outbound.Response(
+            403, json.dumps({"detail": brontekst, "code": "forbidden", "correlation_id": correlation_id}).encode()
+        ),
+    ]
+    monkeypatch.setattr(outbound, "request", Mock(side_effect=responses))
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    path = f"{ROUTE}/{created.json()['id']}"
+    tested = admin.post(f"{path}/test", headers=idem())
+    assert tested.status_code == 200
+    assert tested.json()["probes"]["setup"] is None
+    detail = admin.get(path).json()
+    assert detail["verbinding"]["status"] == "unknown"
+    assert detail["verbinding"]["reason_code"] == "bron_credential_geweigerd"
+    periodic_run("incidenten_bijwerken")
+    with app.state.sessionmaker() as db:
+        incident = db.scalars(select(Incident).where(Incident.onderwerp_id == created.json()["id"])).one()
+        assert incident.correlatie_ids == [correlation_id]
+        assert brontekst not in json.dumps(list(db.scalars(select(OutboxEvent.payload))))
+    assert brontekst not in tested.text
+    assert brontekst not in caplog.text
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_mso_oude_kluiswaarde_is_overbodig(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    assert created.status_code == 201
+    path = f"{ROUTE}/{created.json()['id']}"
+    with app.state.sessionmaker.begin() as db:
+        link = db.scalars(select(AdapterLink)).one()
+        ref = link.geheim_ref
+        meta = app.state.vault().put(db, ref, secrets.token_urlsafe(), actor="system:test")
+        link.laatste4, link.ingevoerd_op = meta.last4, meta.updated_at
+
+    read_secret = Mock(side_effect=AssertionError("Een openbare probe leest de kluis niet"))
+    monkeypatch.setattr("hub.vault.Vault.get", read_secret)
+    transport = Mock(
+        side_effect=[
+            outbound.Response(200, b'{"status":"ok","version":"1.6.0"}'),
+            outbound.Response(200, b'{"setup_required":false,"completed":true,"version":"1.6.0"}'),
+        ]
+    )
+    monkeypatch.setattr(outbound, "request", transport)
+    assert admin.post(f"{path}/test", headers=idem()).status_code == 200
+    assert admin.get(path).json()["verbinding"]["status"] == "healthy"
+    assert admin.get(path).json()["laatste4"] == ""
+    read_secret.assert_not_called()
+    assert admin.patch(path, json={"doel_bevestigd": True}, headers=idem()).status_code == 200
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref == ref)) is None

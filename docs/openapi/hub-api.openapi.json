@@ -968,8 +968,15 @@
             "type": "string"
           },
           "ingevoerd_op": {
-            "title": "Ingevoerd Op",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingevoerd Op"
           },
           "laatste4": {
             "title": "Laatste4",
@@ -995,6 +1002,27 @@
           "version"
         ],
         "title": "LinkView",
+        "type": "object"
+      },
+      "Liveness": {
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 48,
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][a-zA-Z0-9.-]+)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "Liveness",
         "type": "object"
       },
       "LogsIn": {
@@ -1058,6 +1086,29 @@
           "status"
         ],
         "title": "Measurement",
+        "type": "object"
+      },
+      "MsoTestReceipt": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "probes": {
+            "$ref": "#/components/schemas/PublicProbes"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "probes"
+        ],
+        "title": "MsoTestReceipt",
         "type": "object"
       },
       "NoodstopIn": {
@@ -1359,6 +1410,36 @@
           "reason"
         ],
         "title": "ProposalIn",
+        "type": "object"
+      },
+      "PublicProbes": {
+        "properties": {
+          "healthz": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Liveness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "setup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "healthz",
+          "setup"
+        ],
+        "title": "PublicProbes",
         "type": "object"
       },
       "QuietHours": {
@@ -2018,6 +2099,31 @@
           "password"
         ],
         "title": "SetupIn",
+        "type": "object"
+      },
+      "SetupStatus": {
+        "properties": {
+          "completed": {
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "setup_required": {
+            "title": "Setup Required",
+            "type": "boolean"
+          },
+          "version": {
+            "maxLength": 48,
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][a-zA-Z0-9.-]+)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "setup_required",
+          "completed",
+          "version"
+        ],
+        "title": "SetupStatus",
         "type": "object"
       },
       "SourceIn": {
@@ -3292,10 +3398,10 @@
         "operationId": "create_link_api_v1_adapterkoppelingen_post",
         "parameters": [
           {
-            "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+            "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
             "in": "header",
             "name": "X-Adapter-Credential",
-            "required": true,
+            "required": false,
             "schema": {
               "anyOf": [
                 {
@@ -3307,7 +3413,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+              "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
               "title": "X-Adapter-Credential"
             }
           },
@@ -3498,7 +3604,7 @@
             }
           },
           {
-            "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+            "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
             "in": "header",
             "name": "X-Adapter-Credential",
             "required": false,
@@ -3513,7 +3619,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Alleen invoer. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+              "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
               "title": "X-Adapter-Credential"
             }
           },
@@ -3624,7 +3730,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinkReceipt"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MsoTestReceipt"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LinkReceipt"
+                    }
+                  ],
+                  "title": "Response Test Link Api V1 Adapterkoppelingen  Link Id  Test Post"
                 }
               }
             },

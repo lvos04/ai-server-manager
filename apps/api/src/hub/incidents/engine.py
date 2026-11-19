@@ -90,6 +90,7 @@ def _from_outbox(r: OutboxEvent) -> EventIn:
         classification=r.classification,
         op=r.timestamp_utc,
         trace_id=str(r.trace_id) if r.trace_id else None,
+        correlation_id=r.payload.get("correlation_id") if r.event_type == "monitoring.mso_probe.failed" else None,
         actor=f"system:{APP_ID}",
     )
 

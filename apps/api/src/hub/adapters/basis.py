@@ -19,11 +19,13 @@ type Status = Literal["healthy", "unknown", "degraded", "down"]
 
 MAX_AGE_S = 900
 MAX_RESPONSE_BYTES = 64 * 1024
+MSO_APP_ID = "media-source-optimizer"
 PUBLIC_PROBES = {
     "mediaguard": "/api/v1/health",
-    "media-source-optimizer": "/healthz",
+    MSO_APP_ID: "/healthz",
     "my_house": "/api/v1/health",
 }
+MSO_SETUP_PATH = "/api/v1/setup/status"
 
 
 class Measurement(BaseModel):
@@ -88,7 +90,7 @@ def resolve_binding(base: str) -> list[str]:
 
 def read_request(link: AdapterLink, path: str, *, policy: outbound.OutboundPolicy) -> outbound.Response:
     """Verzend de toegelaten openbare probe naar de bevestigde bestemming."""
-    if path != PUBLIC_PROBES.get(link.app_id):
+    if path != PUBLIC_PROBES.get(link.app_id) and not (link.app_id == MSO_APP_ID and path == MSO_SETUP_PATH):
         raise outbound.OutboundError("capability_unavailable")
     if not link.peer_addresses:
         raise outbound.OutboundError("doelbinding_ontbreekt")
