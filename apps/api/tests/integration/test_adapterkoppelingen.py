@@ -14,12 +14,13 @@ from conftest import idem, login_as, make_user
 from sqlalchemy import select
 
 from hub import outbound
-from hub.models import AuditEvent, CatalogApp, IdempotencyRecord, VaultSecret
+from hub.models import AdapterLink, AuditEvent, CatalogApp, Decision, IdempotencyRecord, VaultSecret
 from hub.timeutil import utcnow
 
 ROUTE = "/api/v1/adapterkoppelingen"
 APP_ID = "mediaguard"
 URL = "https://adapter.example"
+TWEEDE_BASIS = f"{URL}:8443"
 PEER = str(IPv4Address(bytes((192, 0, 2, 1))))
 
 
@@ -27,6 +28,10 @@ PEER = str(IPv4Address(bytes((192, 0, 2, 1))))
 def doel(app: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(outbound, "resolve_peer_addresses", lambda *_args: frozenset({PEER}))
     with app.state.sessionmaker() as db:
+        besluit = db.get(Decision, "D03")
+        assert besluit is not None
+        besluit.status = "Ingevuld"
+        besluit.waarde = {"nas_adres": "adapter.example"}
         row = CatalogApp(
             runtime_id="test-instantie",
             naam="Testinstantie",
@@ -34,6 +39,8 @@ def doel(app: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             adaptertype="bestaand_mediaguard",
             soort="bestaand",
             installatiewijze="custom_app",
+            portals=[{"schema": "https", "poort": poort, "pad": "/"} for poort in (443, 8443)],
+            poorten=[{"protocol": "tcp", "host_poort": poort} for poort in (443, 8443)],
         )
         db.add(row)
         db.flush()
@@ -49,8 +56,6 @@ def invoer(waarde: str) -> dict[str, str]:
 def test_beheer_kluis_replay_redactie_en_ontkoppelen(
     admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: Any
 ) -> None:
-    from hub.models import AdapterLink
-
     waarde = secrets.token_urlsafe()
     headers = invoer(waarde)
     response = admin.post(ROUTE, json=doel, headers=headers)
@@ -128,6 +133,34 @@ def test_verboden_basisadres(admin: Any, doel: dict[str, Any], adres: str) -> No
     assert response.json()["details"]["reason"] == "adres_niet_toegestaan"
 
 
+def test_strijdige_catalogusbestemming(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with app.state.sessionmaker.begin() as db:
+        db.add(
+            CatalogApp(
+                runtime_id="andere-testinstantie",
+                naam="Andere testinstantie",
+                app_id="media-source-optimizer",
+                adaptertype="bestaand_mso",
+                soort="bestaand",
+                installatiewijze="custom_app",
+                portals=[{"schema": "https", "poort": 9443, "pad": "/"}],
+                poorten=[{"protocol": "tcp", "host_poort": 9443}],
+            )
+        )
+    transport = Mock()
+    monkeypatch.setattr(outbound, "request", transport)
+    for bestemming in (f"{URL}:9443", f"{URL}/andere-app", "https://andere-instantie.example"):
+        response = admin.post(ROUTE, json={**doel, "basis_url": bestemming}, headers=invoer(secrets.token_urlsafe()))
+        assert response.status_code == 409
+        assert response.json()["details"]["reason"] == "doelbinding"
+    transport.assert_not_called()
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(AdapterLink)) is None
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+
+
 def test_doelbinding_en_onbereikbaarheid(
     admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -139,11 +172,20 @@ def test_doelbinding_en_onbereikbaarheid(
     probe = Mock(side_effect=outbound.OutboundError("tijdslimiet"))
     monkeypatch.setattr(outbound, "request", probe)
     assert admin.post(f"{path}/test", headers=idem()).status_code == 200
-    contact = admin.get(path).json()["verbinding"]
-    assert contact["status"] == "unknown"
-    assert contact["reason_code"] == "tijdslimiet"
-    ander = {"basis_url": "https://ander.example", "doel_bevestigd": True}
+    detail = admin.get(path).json()
+    assert detail["verbinding"]["status"] == "unknown"
+    assert detail["verbinding"]["reason_code"] == "tijdslimiet"
+    ander = {"basis_url": TWEEDE_BASIS, "doel_bevestigd": True}
     assert admin.patch(path, json=ander, headers=idem()).status_code == 422
+    afwijkend = {**ander, "basis_url": f"{URL}:9443"}
+    geweigerd = admin.patch(path, json=afwijkend, headers=invoer(secrets.token_urlsafe()))
+    assert geweigerd.status_code == 409
+    assert geweigerd.json()["details"]["reason"] == "doelbinding"
+    assert admin.get(path).json() == detail
+    with app.state.sessionmaker() as db:
+        link = db.scalar(select(AdapterLink))
+        assert link is not None
+        assert app.state.vault().get(db, link.geheim_ref) == headers["X-Adapter-Credential"]
     updated = admin.patch(path, json=ander, headers=invoer(secrets.token_urlsafe()))
     assert updated.status_code == 200
     assert admin.get(path).json()["basis_url"] == ander["basis_url"]
@@ -154,6 +196,48 @@ def test_doelbinding_en_onbereikbaarheid(
         db.commit()
     assert admin.post(f"{path}/test", headers=idem()).status_code == 409
     assert probe.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "wijziging",
+    [
+        {"aanwezig": False},
+        {"poorten": []},
+        {"poorten": [{"protocol": "tcp", "host_poort": 443, "host_ip": str(IPv4Address(bytes((192, 0, 2, 2))))}]},
+    ],
+    ids=["afwezig", "poort-verdwenen", "ander-netwerkadres"],
+)
+def test_weggevallen_binding_blokkeert_contact_en_toont_laatst_bekende_meting(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, wijziging: dict[str, Any]
+) -> None:
+    created = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
+    assert created.status_code == 201
+    path = f"{ROUTE}/{created.json()['id']}"
+    probe = Mock(return_value=outbound.Response(200, b'{"status":"ok"}'))
+    monkeypatch.setattr(outbound, "request", probe)
+    assert admin.post(f"{path}/test", headers=idem()).status_code == 200
+    meting = admin.get(path).json()["verbinding"]
+    assert meting["status"] == "healthy"
+
+    with app.state.sessionmaker.begin() as db:
+        instance = db.get(CatalogApp, uuid.UUID(doel["catalog_app_id"]))
+        assert instance is not None
+        for veld, waarde in wijziging.items():
+            setattr(instance, veld, waarde)
+
+    status = {
+        "status": "unknown",
+        "reason_code": "doelbinding",
+        "observed_at": meting["observed_at"],
+        "laatste_status": "healthy",
+    }
+    assert admin.get(path).json()["verbinding"] == status
+    assert admin.get(ROUTE).json()["items"][0]["verbinding"] == status
+    geweigerd = admin.post(f"{path}/test", headers=idem())
+    assert geweigerd.status_code == 409
+    assert geweigerd.json()["details"]["reason"] == "doelbinding"
+    assert admin.patch(path, json={}, headers=invoer(secrets.token_urlsafe())).status_code == 409
+    probe.assert_called_once()
 
 
 def test_my_house_koppelcode_wordt_zonder_inwisseling_geweigerd(admin: Any, app: Any, doel: dict[str, Any]) -> None:
@@ -175,7 +259,6 @@ def test_downgrade_wist_alleen_adapteropslag(admin: Any, app: Any, doel: dict[st
     from sqlalchemy import inspect
 
     from hub import migrations
-    from hub.models import AdapterLink
     from hub.vault import make_ref
 
     created = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
