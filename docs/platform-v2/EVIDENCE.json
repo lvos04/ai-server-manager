@@ -643,11 +643,11 @@
     "id": "C1.3-ASM-19",
     "status": "Niet gestart",
     "validatie": "Niet getest",
-    "bewijs": "",
+    "bewijs": "S-P3-015: docs/adr/ADR-0035-mediaguard-upgradebewijs-en-sleutelrotatie.md",
     "blokkade": "",
-    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P2; niet in deze ronde.",
+    "opmerking": "ADR upgradebewijs vastgelegd. Deze regel wacht op bouwvalidatie van C1.3-ASM-19.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-10"
+    "bijgewerkt": "2026-11-19"
   },
   {
     "id": "C1.3-ASM-20",
