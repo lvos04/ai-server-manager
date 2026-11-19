@@ -12,41 +12,61 @@ from unittest.mock import Mock
 import pytest
 from conftest import idem, login_as, make_user
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from hub import outbound
+from hub.adapters import basis
+from hub.catalog.discovery import discover, is_inventory_fresh
+from hub.config import Settings
+from hub.inventory.collector import CollectResult, KindResult
+from hub.inventory.store import save_run
 from hub.models import AdapterLink, AuditEvent, CatalogApp, Decision, IdempotencyRecord, VaultSecret
 from hub.timeutil import utcnow
+from hub.truenas import normalize
+from hub.truenas.connection import current_target
 
 ROUTE = "/api/v1/adapterkoppelingen"
 APP_ID = "mediaguard"
+ANDERE_APP_ID = "media-source-optimizer"
 URL = "https://adapter.example"
 TWEEDE_BASIS = f"{URL}:8443"
 PEER = str(IPv4Address(bytes((192, 0, 2, 1))))
 
 
+def _bewaar_apps(db: Session, apps: dict[str, tuple[int, ...]]) -> None:
+    nas = current_target(db)
+    assert nas is not None
+    data = normalize.apps(
+        [
+            {
+                "name": app_id,
+                "portals": {f"Web {port}": f"{URL}:{port}/" for port in ports},
+                "active_workloads": {
+                    "used_ports": [
+                        {"protocol": "tcp", "host_ports": [{"host_port": port, "host_ip": PEER}]} for port in ports
+                    ],
+                },
+            }
+            for app_id, ports in apps.items()
+        ]
+    )
+    meting = KindResult("apps", "ok", None, "", "app.query", data, utcnow())
+    save_run(db, CollectResult("ok", None, nas.url, kinds=[meting]), trigger="test")
+
+
 @pytest.fixture
-def doel(app: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+def doel(app: Any, settings: Settings, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(outbound, "resolve_peer_addresses", lambda *_args: frozenset({PEER}))
-    with app.state.sessionmaker() as db:
+    with app.state.sessionmaker.begin() as db:
         besluit = db.get(Decision, "D03")
         assert besluit is not None
         besluit.status = "Ingevuld"
         besluit.waarde = {"nas_adres": "adapter.example"}
-        row = CatalogApp(
-            runtime_id="test-instantie",
-            naam="Testinstantie",
-            app_id=APP_ID,
-            adaptertype="bestaand_mediaguard",
-            soort="bestaand",
-            installatiewijze="custom_app",
-            portals=[{"schema": "https", "poort": poort, "pad": "/"} for poort in (443, 8443)],
-            poorten=[{"protocol": "tcp", "host_poort": poort} for poort in (443, 8443)],
-        )
-        db.add(row)
-        db.flush()
-        body = {"app_id": APP_ID, "catalog_app_id": str(row.id), "basis_url": URL, "doel_bevestigd": True}
-        db.commit()
-    return body
+        _bewaar_apps(db, {APP_ID: (443, 8443)})
+        assert discover(db, settings).nieuw == 1
+        row = db.scalars(select(CatalogApp)).one()
+        assert row.app_id == APP_ID
+        return {"app_id": APP_ID, "catalog_app_id": str(row.id), "basis_url": URL, "doel_bevestigd": True}
 
 
 def invoer(waarde: str) -> dict[str, str]:
@@ -134,21 +154,11 @@ def test_verboden_basisadres(admin: Any, doel: dict[str, Any], adres: str) -> No
 
 
 def test_strijdige_catalogusbestemming(
-    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    admin: Any, app: Any, settings: Settings, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with app.state.sessionmaker.begin() as db:
-        db.add(
-            CatalogApp(
-                runtime_id="andere-testinstantie",
-                naam="Andere testinstantie",
-                app_id="media-source-optimizer",
-                adaptertype="bestaand_mso",
-                soort="bestaand",
-                installatiewijze="custom_app",
-                portals=[{"schema": "https", "poort": 9443, "pad": "/"}],
-                poorten=[{"protocol": "tcp", "host_poort": 9443}],
-            )
-        )
+        _bewaar_apps(db, {APP_ID: (443, 8443), ANDERE_APP_ID: (9443,)})
+        assert discover(db, settings).nieuw == 1
     transport = Mock()
     monkeypatch.setattr(outbound, "request", transport)
     for bestemming in (f"{URL}:9443", f"{URL}/andere-app", "https://andere-instantie.example"):
@@ -159,6 +169,64 @@ def test_strijdige_catalogusbestemming(
     with app.state.sessionmaker() as db:
         assert db.scalar(select(AdapterLink)) is None
         assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+
+
+def test_binding_volgt_de_laatst_vastgelegde_poorteigenaar(
+    admin: Any, app: Any, settings: Settings, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = Mock(side_effect=AssertionError("Deze proef gebruikt geen netwerktransport"))
+    contact = Mock(return_value=basis.Measurement(status="unknown", reason_code="tijdslimiet"))
+    monkeypatch.setattr(outbound, "request", transport)
+    monkeypatch.setattr(basis, "probe", contact)
+    waarde = secrets.token_urlsafe()
+    aangemaakt = admin.post(ROUTE, json=doel, headers=invoer(waarde))
+    assert aangemaakt.status_code == 201
+    pad = f"{ROUTE}/{aangemaakt.json()['id']}"
+    assert admin.post(f"{pad}/test", headers=idem()).status_code == 200
+    contact.assert_called_once()
+    contact.reset_mock()
+    versie = admin.get(pad).json()["version"]
+
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {ANDERE_APP_ID: (443,)})
+    with app.state.sessionmaker() as db:
+        inventaris = is_inventory_fresh(db, settings)
+        assert inventaris["status"] == "ok"
+        (eigenaar,) = inventaris["data"]
+        assert eigenaar["runtime_id"] == ANDERE_APP_ID
+        assert eigenaar["poorten"][0]["host_poort"] == 443
+        assert db.scalars(select(CatalogApp)).one().aanwezig
+
+    # De inventaris is vastgelegd. De catalogus bevat nog de vorige poorteigenaar.
+    geweigerd = [
+        admin.post(f"{pad}/test", headers=idem()),
+        admin.patch(pad, json={"doel_bevestigd": True}, headers=invoer(secrets.token_urlsafe())),
+        admin.patch(pad, json={}, headers=invoer(secrets.token_urlsafe())),
+    ]
+    for antwoord in geweigerd:
+        assert antwoord.status_code == 409
+        assert antwoord.json()["details"]["reason"] == "doelbinding"
+    contact.assert_not_called()
+    with app.state.sessionmaker() as db:
+        link = db.scalars(select(AdapterLink)).one()
+        assert link.version == versie
+        assert app.state.vault().get(db, link.geheim_ref) == waarde
+
+    assert admin.delete(pad, headers=idem()).status_code == 200
+    achterhaalde_koppeling = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
+    assert achterhaalde_koppeling.status_code == 409
+    assert achterhaalde_koppeling.json()["details"]["reason"] == "doelbinding"
+    with app.state.sessionmaker.begin() as db:
+        assert db.scalar(select(AdapterLink)) is None
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+        resultaat = discover(db, settings)
+        assert resultaat.nieuw == 1 and resultaat.verdwenen == 1
+        opvolger = db.scalars(select(CatalogApp).where(CatalogApp.app_id == ANDERE_APP_ID)).one()
+        nieuw_doel = {**doel, "app_id": ANDERE_APP_ID, "catalog_app_id": str(opvolger.id)}
+    assert admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe())).status_code == 409
+    assert admin.post(ROUTE, json=nieuw_doel, headers=invoer(secrets.token_urlsafe())).status_code == 201
+    transport.assert_not_called()
+    contact.assert_not_called()
 
 
 def test_doelbinding_en_onbereikbaarheid(

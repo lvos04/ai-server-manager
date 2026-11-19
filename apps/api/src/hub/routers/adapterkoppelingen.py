@@ -6,7 +6,7 @@ import json
 import re
 import uuid
 from ipaddress import ip_address
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Header, Response
@@ -16,8 +16,10 @@ from sqlalchemy import select
 
 from hub import audit
 from hub.adapters import basis
+from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, get_vault
 from hub.errors import HubError
+from hub.inventory.store import kind_state
 from hub.models import AdapterLink, CatalogApp, VaultSecret
 from hub.outbound import OutboundError
 from hub.timeutil import UtcDateTime
@@ -133,26 +135,40 @@ def _target(db: DB, app_id: str, catalog_app_id: uuid.UUID) -> CatalogApp:
     return target
 
 
-def _published_ports(db: DB) -> dict[int, set[uuid.UUID]]:
-    owners: dict[int, set[uuid.UUID]] = {}
-    for catalog_id, ports in db.execute(select(CatalogApp.id, CatalogApp.poorten).where(CatalogApp.aanwezig)):
-        for port in ports:
-            if isinstance(port, dict) and port.get("protocol") == "tcp" and type(port.get("host_poort")) is int:
-                owners.setdefault(port["host_poort"], set()).add(catalog_id)
+def _published_ports(db: DB, settings: Settings, nas: NasTarget | None) -> dict[int, list[dict[str, Any]]]:
+    inventory = kind_state(db, "apps", target=nas.url if nas else None, ttl_seconds=settings.inventory_max_age_seconds)
+    owners: dict[int, list[dict[str, Any]]] = {}
+    if inventory["status"] != "ok" or not isinstance(inventory["data"], list):
+        return owners
+    for app in inventory["data"]:
+        if not isinstance(app, dict) or not isinstance(app.get("poorten"), list):
+            continue
+        for port in {
+            binding["host_poort"]
+            for binding in app["poorten"]
+            if isinstance(binding, dict) and binding.get("protocol") == "tcp" and type(binding.get("host_poort")) is int
+        }:
+            owners.setdefault(port, []).append(app)
     return owners
 
 
 def _registered_port(
-    base: str, target: CatalogApp, nas: NasTarget | None, owners: dict[int, set[uuid.UUID]]
+    base: str, target: CatalogApp, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
 ) -> int | None:
-    # Het adres en de poort komen uit configuratie en inventaris. De portaalregistratie bevestigt het HTTPS-pad.
+    # De inventaris kan al zijn vastgelegd terwijl de worker de catalogus nog bijwerkt.
     parts = urlsplit(base)
     port = parts.port or 443
+    if nas is None or parts.hostname != nas.host.strip("[]").lower() or target.bron.get("nas", nas.url) != nas.url:
+        return None
+    port_owners = owners.get(port, [])
+    if len(port_owners) != 1:
+        return None
+    owner = port_owners[0]
     if (
-        nas is None
-        or parts.hostname != nas.host.strip("[]").lower()
-        or target.bron.get("nas", nas.url) != nas.url
-        or owners.get(port) != {target.id}
+        owner.get("runtime_id") != target.runtime_id
+        or owner.get("herkend_als") != target.app_id
+        or owner.get("poorten") != target.poorten
+        or owner.get("portals") != target.portals
     ):
         return None
     if any(
@@ -187,7 +203,7 @@ def _registered_peers(target: CatalogApp, port: int, peers: list[str]) -> bool:
 
 
 def _binding_is_current(
-    row: AdapterLink, target: CatalogApp | None, nas: NasTarget | None, owners: dict[int, set[uuid.UUID]]
+    row: AdapterLink, target: CatalogApp | None, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
 ) -> bool:
     if target is None or not _target_matches(target, row.app_id):
         return False
@@ -199,12 +215,14 @@ def _binding_is_current(
     return port is not None and _registered_peers(target, port, row.peer_addresses)
 
 
-def _destination(db: DB, target: CatalogApp, url: str, credential: str) -> tuple[str, list[str]]:
+def _destination(
+    target: CatalogApp, url: str, credential: str, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
+) -> tuple[str, list[str]]:
     try:
         base = basis.validate_base_url(url)
         if credential.casefold() in base.casefold():
             raise OutboundError("adres_ongeldig")
-        port = _registered_port(base, target, current_target(db), _published_ports(db))
+        port = _registered_port(base, target, nas, owners)
         if port is None:
             raise _binding_conflict()
         peers = basis.resolve_binding(base)
@@ -266,7 +284,7 @@ def _unique_target(db: DB, catalog_app_id: uuid.UUID, except_id: uuid.UUID | Non
 
 
 @router.get("", summary="Adapterkoppelingen lezen")
-def list_links(db: DB, _: AnyUser, cursor: Cursor = None, limit: Limit = 50) -> LinkList:
+def list_links(db: DB, _: AnyUser, settings: SettingsDep, cursor: Cursor = None, limit: Limit = 50) -> LinkList:
     query = select(AdapterLink, CatalogApp).join(CatalogApp).order_by(AdapterLink.id).limit(limit + 1)
     if cursor:
         try:
@@ -275,7 +293,8 @@ def list_links(db: DB, _: AnyUser, cursor: Cursor = None, limit: Limit = 50) -> 
             raise HubError(400, "invalid_cursor", "Ongeldige cursor.") from None
         query = query.where(AdapterLink.id > after)
     rows = db.execute(query).all()
-    nas, owners = current_target(db), _published_ports(db)
+    nas = current_target(db)
+    owners = _published_ports(db, settings, nas)
     return LinkList(
         items=[_view(row, bound=_binding_is_current(row, target, nas, owners)) for row, target in rows[:limit]],
         next_cursor=str(rows[limit - 1][0].id) if len(rows) > limit else None,
@@ -283,11 +302,12 @@ def list_links(db: DB, _: AnyUser, cursor: Cursor = None, limit: Limit = 50) -> 
 
 
 @router.get("/{link_id}", summary="Adapterkoppeling lezen")
-def get_link(link_id: uuid.UUID, response: Response, db: DB, _: AnyUser) -> LinkView:
+def get_link(link_id: uuid.UUID, response: Response, db: DB, _: AnyUser, settings: SettingsDep) -> LinkView:
     row = _link(db, link_id)
     response.headers["ETag"] = _etag(row.version)
     target = db.get(CatalogApp, row.catalog_app_id)
-    return _view(row, bound=_binding_is_current(row, target, current_target(db), _published_ports(db)))
+    nas = current_target(db)
+    return _view(row, bound=_binding_is_current(row, target, nas, _published_ports(db, settings, nas)))
 
 
 @router.post(
@@ -298,7 +318,7 @@ def get_link(link_id: uuid.UUID, response: Response, db: DB, _: AnyUser) -> Link
     responses={501: {"description": "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."}},
 )
 def create_link(
-    body: LinkIn, db: DB, admin: Admin, idem: Idem, vault: VaultDep, credential: Credential
+    body: LinkIn, db: DB, admin: Admin, idem: Idem, vault: VaultDep, credential: Credential, settings: SettingsDep
 ) -> JSONResponse:
     if (replay := _replay_link(idem)) is not None:
         return replay
@@ -310,7 +330,8 @@ def create_link(
         raise HubError(
             501, "capability_unavailable", "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."
         )
-    base, peers = _destination(db, target, body.basis_url, secret)
+    nas = current_target(db)
+    base, peers = _destination(target, body.basis_url, secret, nas, _published_ports(db, settings, nas))
     _unique_target(db, body.catalog_app_id)
     link_id = uuid.uuid4()
     ref = make_ref("adapters", f"{body.app_id}.{link_id}")
@@ -339,6 +360,7 @@ def update_link(
     admin: Admin,
     idem: Idem,
     vault: VaultDep,
+    settings: SettingsDep,
     credential: Credential = None,
     if_match: IfMatch = None,
 ) -> JSONResponse:
@@ -356,13 +378,15 @@ def update_link(
         raise HubError(422, "validation_error", "Geef een wijziging op.")
     secret = _credential(credential)
     target = _target(db, row.app_id, catalog_app_id)
+    nas = current_target(db)
+    owners = _published_ports(db, settings, nas)
     if body.doel_bevestigd:
-        base, peers = _destination(db, target, base, secret)
+        base, peers = _destination(target, base, secret, nas, owners)
         _unique_target(db, catalog_app_id, except_id=row.id)
         row.catalog_app_id, row.basis_url, row.peer_addresses = catalog_app_id, base, peers
     elif secret.casefold() in row.basis_url.casefold():
         raise HubError(422, "validation_error", "De waarde van het adaptercredential is ongeldig.")
-    elif not _binding_is_current(row, target, current_target(db), _published_ports(db)):
+    elif not _binding_is_current(row, target, nas, owners):
         raise _binding_conflict()
     meta = vault.put(db, row.geheim_ref, secret, actor=admin.actor)
     row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
@@ -380,7 +404,8 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
     if (replay := _replay_link(idem)) is not None:
         return replay
     target = _target(db, row.app_id, row.catalog_app_id)
-    if not _binding_is_current(row, target, current_target(db), _published_ports(db)):
+    nas = current_target(db)
+    if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
         raise _binding_conflict()
     measurement = basis.probe(row, settings.outbound_policy())
     row.laatste_fout = measurement.reason_code
