@@ -187,6 +187,10 @@ def _wis_waarden(req: ActionRequest) -> None:
     de audit blijft gelijk (ADR-0030 besluit 28). Sinds S-P2-040 (R-VEILIG-1) toont de preview ``labels`` en ``notes``
     mét waarde; na afloop verdwijnt die waarde ook uit de bewaarde preview (``{"waarde_gewist": true}``). De
     ``preview_hash`` blijft de hash van de preview die is voorgesteld en goedgekeurd (ADR-0030 besluit 32)."""
+    if isinstance(req.preview, dict):
+        gemaskeerd = toon_bewaarde_preview(req.preview)
+        if gemaskeerd != req.preview:
+            req.preview = gemaskeerd
     params = req.parameters if isinstance(req.parameters, dict) else {}
     ac = params.get("app_create")
     values = ac.get("values") if isinstance(ac, dict) else None

@@ -474,6 +474,7 @@ def test_compose_installatie_wordt_geweigerd(stack: Stack, wijziging: dict[str, 
     [
         ({"host_network": True}, "host_network_verboden"),
         ({"privileged": True}, "privileged_verboden"),
+        ({"envs": [{"name": "API_TOKEN", "value": "prod"}]}, "secret_in_form"),
         ({"envs": [{"name": "N8N_BASIC_AUTH_PASSWORD", "value": "proefgeheim"}]}, "account_gegevens_verboden"),
         ({"envs": [{"name": "PASSWORD", "value": "vault://app/demo-app/voorbeeld"}]}, "account_gegevens_verboden"),
         ({"envs": [{"name": "APP_KEY", "value": "vault://app/demo-app/voorbeeld"}]}, "secret_in_form"),

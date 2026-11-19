@@ -38,7 +38,7 @@ bewust rauw (S-P2-040 herstelronde 5; de reden staat bij de bewakingstest in
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from asm_policy import Policy, execreq
@@ -186,6 +186,7 @@ HEX_MET_STREEPJES_RE = re.compile(r"[0-9a-fA-F]+(?:-[0-9a-fA-F]+)+")
 PAD_RE = re.compile(r"/[^\x00-\x1f\x7f=:]+")  # één regel, met ruimte voor echte bestandsnamen
 OMGEVING_PADSLEUTELS = frozenset({"envfile", "envfiles"})
 GEHEIME_PADSLEUTELS = frozenset({"clientsecretfile", "seedpath", "tlskey", "sslkey"})
+VOLGNUMMER_RE = re.compile(r"(.+) \(([1-9][0-9]{0,8})\)", re.DOTALL)
 
 
 def _is_omgeving(sleutel: Any) -> bool:
@@ -254,10 +255,23 @@ def _zet(uit: dict[str, Any], sleutel: Any, waarde: Any) -> None:
     """Een sleutel staat als tekst in de preview: ook hij gaat door ``redact_text``. Worden twee sleutels daardoor
     gelijk, dan blijven ze allebei staan (met een volgnummer), zodat er niets ongezien verdwijnt."""
     tekst = redact_text(str(sleutel))
+    if tekst in uit and (dubbel := VOLGNUMMER_RE.fullmatch(tekst)) and dubbel[1] in uit and dubbel[2] != "1":
+        tekst = dubbel[1]
     naam, n = tekst, 2
     while naam in uit:
         naam, n = f"{tekst} ({n})", n + 1
     uit[naam] = waarde
+
+
+def _geschoonde_sleutel(sleutel: Any, object_: Mapping[str, Any], schonen: Callable[[Any], str]) -> str:
+    """Behoud een volgnummer van de toonfunctie bij opnieuw maskeren, binnen het aantal sleutels van dit object."""
+    tekst = str(sleutel)
+    volgnummer = VOLGNUMMER_RE.fullmatch(tekst)
+    if volgnummer and volgnummer[1] in object_ and 2 <= int(volgnummer[2]) <= len(object_):
+        basis = volgnummer[1]
+        if schonen(basis) == basis:
+            return tekst
+    return schonen(sleutel)
 
 
 def _omgeving(waarde: Any, diepte: int, *, padveld: bool = False) -> Any:
@@ -280,7 +294,7 @@ def _omgeving(waarde: Any, diepte: int, *, padveld: bool = False) -> Any:
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
             naam = soort is not None and _nk(k) == soort and isinstance(w, str)
-            _zet(uit, _omgevingssleutel(k), _namen(w) if naam else _verberg(w))
+            _zet(uit, _geschoonde_sleutel(k, waarde, _omgevingssleutel), _namen(w) if naam else _verberg(w))
         return uit
     return _verberg(waarde)
 
@@ -301,7 +315,7 @@ def _vorm(waarde: Any, diepte: int, *, padveld: bool = False) -> Any:
     if isinstance(waarde, Mapping):
         uit: dict[str, Any] = {}
         for k, w in waarde.items():
-            _zet(uit, _vormsleutel(k), _vorm(w, diepte + 1))
+            _zet(uit, _geschoonde_sleutel(k, waarde, _vormsleutel), _vorm(w, diepte + 1))
         return uit
     if isinstance(waarde, list | tuple):
         return [_vorm(w, diepte + 1, padveld=padveld) for w in waarde]

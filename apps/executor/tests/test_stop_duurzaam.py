@@ -648,7 +648,8 @@ def test_fouttekst_van_truenas_komt_niet_in_het_journaal(stack: Stack, caplog: p
     geheim = "GEHEIM-" + uuid.uuid4().hex
     caplog.set_level("DEBUG")
     assert (
-        execute(c, hub, approved(hub, install_prop(envs=[{"name": "API_TOKEN", "value": geheim}]))).status_code == 200
+        execute(c, hub, approved(hub, install_prop(envs=[{"name": "PROEF_INSTELLING", "value": geheim}]))).status_code
+        == 200
     )
     nas.fail["app.update"] = f"values.envs.0.value: '{geheim}' ongeldig"
     upd = approved(

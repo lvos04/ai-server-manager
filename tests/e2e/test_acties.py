@@ -354,7 +354,7 @@ def test_installatiewaarden_blijven_na_afloop_niet_in_de_hub(stack: Stack) -> No
     geheim = {"uit": "waarde-uitgevoerd-5521", "af": "waarde-afgewezen-5522", "verl": "waarde-verlopen-5523"}
 
     def voorstel(app_id: str, waarde: str) -> dict[str, Any]:
-        envs = [{"name": "APP_MODE", "value": "prod"}, {"name": "PROEF_WACHTWOORD", "value": waarde}]
+        envs = [{"name": "APP_MODE", "value": "prod"}, {"name": "PROEF_INSTELLING", "value": waarde}]
         r = stel_voor(admin, "app.install", app_target(app_id), install_params(app_id, envs=envs))
         assert r.status_code == 201, r.text
         return dict(r.json())
@@ -364,7 +364,7 @@ def test_installatiewaarden_blijven_na_afloop_niet_in_de_hub(stack: Stack) -> No
     assert keur_goed(admin, a).status_code == 200
     r = voer_uit(admin, a)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
-    assert nas.created[0]["values"]["envs"][1] == {"name": "PROEF_WACHTWOORD", "value": geheim["uit"]}
+    assert nas.created[0]["values"]["envs"][1] == {"name": "PROEF_INSTELLING", "value": geheim["uit"]}
     b = voorstel("demo-b", geheim["af"])
     r = admin.post(f"/api/v1/actions/{b['request_id']}/reject", json={"reden": "niet nu"}, headers=idem())
     assert r.status_code == 200 and r.json()["status"] == "afgewezen", r.text
@@ -409,7 +409,7 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
     def voorstel(app_id: str, w: str) -> dict[str, Any]:
         params = install_params(
             app_id,
-            envs=[{"name": "PROEF_WACHTWOORD", "value": f"{w}-env"}],
+            envs=[{"name": "PROEF_INSTELLING", "value": f"{w}-env"}],
             notes=f"notitie {w}-notes",
             labels=[{"key": "proef", "value": f"{w}-label", "containers": [app_id]}],
         )
@@ -484,12 +484,12 @@ def test_vrije_tekst_in_installatiewaarden_ook_weg_na_elke_eindstatus(
     with stack.app.state.sessionmaker() as db:
         rij = db.get(ActionRequest, uuid.UUID(e["request_id"]))
         values = rij.parameters["app_create"]["values"]
-        assert values["envs"] == [{"name": "PROEF_WACHTWOORD", "waarde_gewist": True}]
+        assert values["envs"] == [{"name": "PROEF_INSTELLING", "waarde_gewist": True}]
         assert sorted(values["vrije_tekst_gewist"]) == ["labels", "notes"]
         assert not {"labels", "notes"} & set(values)
         getoond = rij.preview["wijziging"]["waarden"]
         assert getoond["labels"] == getoond["notes"] == {"waarde_gewist": True}, getoond
-        assert getoond["envs"] == ["PROEF_WACHTWOORD"], getoond
+        assert getoond["envs"] == ["PROEF_INSTELLING"], getoond
     assert schrijfaanroepen(nas) == ["app.create"]
 
 

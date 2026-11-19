@@ -1176,7 +1176,8 @@ def c12_installatie(values: Mapping[str, Any], *, ix_app: bool) -> list[Fout]:
     codes = installatiecodes(values, ix_app=ix_app, vault_ref=VAULT_REF_RE)
     meldingen = {
         "account_gegevens_verboden": "Gegevens voor een beheerder of dienstaccount horen in de app zelf.",
-        "secret_in_form": "Een kluisverwijzing in een omgevingsvariabele vereist een toegestane geheimnaam.",
+        "secret_in_form": "Een waarde op een geheimplek vereist een kluisverwijzing. Een kluisverwijzing in een "
+        "omgevingsvariabele vereist een toegestane geheimnaam.",
     }
     return [_f("parameters.app_create.values", code, meldingen[code]) for code in sorted(codes)]
 

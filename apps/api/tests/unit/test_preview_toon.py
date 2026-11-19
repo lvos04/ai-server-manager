@@ -16,6 +16,7 @@ from asm_policy.engine import classify
 
 from hub.actions import preview
 from hub.actions.doel import Doel
+from hub.redact import redact_log_text
 
 POLICY = load_policy()
 HOST = "nas-primary"
@@ -35,9 +36,11 @@ MERK = "proefgeheim"
           "extra_vars": [{"name": "Y", "value": MERK}]},
          {"envconfig": {"MODUS": "***"}, "variables": ["X"], "vars": "***",
           "extra_vars": [{"name": "Y", "value": "***"}]}),
-        ({"url": f"https://app.invalid/?code={MERK}&mod=debug", "webhook_url": "https://app.invalid/route",
+        ({"url": f"https://app.invalid/?code={MERK}&refresh_token={MERK}&mod=debug&Code_Verifier={MERK}&api-token={MERK}",
+          "webhook_url": "https://app.invalid/route",
           "port": 30400},
-         {"url": "https://app.invalid/?code=***&mod=debug", "webhook_url": "***", "port": 30400}),
+         {"url": "https://app.invalid/?code=***&refresh_token=***&mod=debug&Code_Verifier=***&api-token=***",
+          "webhook_url": "***", "port": 30400}),
         ({"seed_ratio": 1.5, "seed": MERK, "seed_path": "/run/app cert/" + "a1" * 16},
          {"seed_ratio": 1.5, "seed": "***", "seed_path": "/run/app cert/" + "a1" * 16}),
         ({"seed_ratio": MERK, "public_token": MERK}, {"seed_ratio": "***", "public_token": "***"}),
@@ -46,6 +49,22 @@ MERK = "proefgeheim"
 )  # fmt: skip
 def test_previewregels_deel_c(waarden: dict[str, Any], verwacht: dict[str, Any]) -> None:
     assert preview._toon(waarden) == verwacht
+    if "url" in waarden:
+        assert redact_log_text(waarden["url"]) == verwacht["url"]
+
+
+def test_bewaarde_preview_behoudt_onderscheid_tussen_gemaskeerde_sleutels() -> None:
+    oud = {
+        "huidig": {
+            "envs": {"MODE": True, "MODE=voorbeeld": False},
+            "api_token": {"MixedCase=voorbeeld": True, "MixedCase=proeftekst": False},
+        }
+    }
+    verwacht = {
+        "huidig": {"envs": {"MODE": True, "MODE (2)": False}, "api_token": {"MixedCase": True, "MixedCase (2)": False}}
+    }
+    assert preview.toon_bewaarde_preview(oud) == verwacht
+    assert preview.toon_bewaarde_preview(verwacht) == verwacht
 
 
 def _g(n: int) -> str:

@@ -20,6 +20,8 @@ import time
 import typing
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
+from functools import partial
 from html import unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -1346,7 +1348,9 @@ def _zonder_formuliercode(tekst: str) -> str:
 
 
 @pytest.mark.parametrize("sleutel", ["niet_ingesteld", "ingesteld", "gestopt"])
-def test_geen_melding_uit_een_zelfgekozen_queryparameter(hub: Hub, nas: FakeTrueNAS, sleutel: str) -> None:
+def test_geen_melding_uit_een_zelfgekozen_queryparameter(
+    hub: Hub, nas: FakeTrueNAS, sleutel: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """V-093: GET / met zelfgekozen queryparameters toont geen melding en weerspiegelt niets; de pagina is (op de
     nieuwe formuliercode na) gelijk aan die zonder queryparameters."""
     if sleutel != "niet_ingesteld":
@@ -1355,6 +1359,9 @@ def test_geen_melding_uit_een_zelfgekozen_queryparameter(hub: Hub, nas: FakeTrue
         from executor.journal import Journal
 
         Journal(hub.settings.replay_db, hub.settings.secrets_dir).stop({"code": "staat_verschilt", "at": "nu"})
+    # Vergelijk de hele pagina op hetzelfde meetmoment, ook als tussen de twee verzoeken een seconde verstrijkt.
+    toon_pagina = partial(executor_app.executor_page, now=datetime(2026, 1, 1, tzinfo=UTC))
+    monkeypatch.setattr(executor_app, "executor_page", toon_pagina)
     c = hub_client(hub)
     schoon = c.get("/")
     assert schoon.status_code == 200 and code_van(schoon) is None and 'role="alert"' not in schoon.text

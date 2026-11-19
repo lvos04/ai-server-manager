@@ -28,6 +28,15 @@ REDACTED = "***"
 _BEARER_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
 # Ook een lege gebruikersnaam (``redis://:wachtwoord@host``; S-P2-040 herstelronde 5, R-VEILIG-15).
 _URL_CRED_RE = re.compile(r"(?i)(\w+://)([^:/@\s]*):([^@\s]+)@")
+_GEHEIME_VELDNAMEN = (
+    r"pass(?:word|wd)?|secret|client_secret|token|access_token|refresh_token|id_token|api[_-]?key|apikey|"
+    r"x-api-key|x-gotify-key|authorization|cookie|set-cookie|credential|session|signature|private[_-]?key|totp|"
+    r"wachtwoord|geheim|sleutel|api-sleutel|pincode|herstelcode|code_verifier"
+)
+# Preview en log herkennen dezelfde queryvelden, inclusief veldnamen met een geheim woord aan het eind (api-token).
+_QUERY_RE = re.compile(
+    rf"(?i)([?&](?:[^?&=#\s\"']*\b(?:{_GEHEIME_VELDNAMEN})|code|state|nonce|session_state|key|sig)=)([^&#\s\"']+)"
+)
 
 
 def redact_text(text: str) -> str:
@@ -58,16 +67,7 @@ def redact(value: Any, *, depth: int = 0) -> Any:
 # ------------------------------------------------------------------ strenger beleid voor logs en supportbundels
 _PEM_RE = re.compile(r"-----BEGIN [A-Z0-9 ]+-----.*?(-----END [A-Z0-9 ]+-----|$)", re.S)
 _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{0,}")
-_KV_RE = re.compile(
-    r"(?i)(\b(?:pass(?:word|wd)?|secret|client_secret|token|access_token|refresh_token|id_token|api[_-]?key|apikey|"
-    r"x-api-key|x-gotify-key|authorization|cookie|set-cookie|credential|session|signature|private[_-]?key|totp|"
-    r"wachtwoord|geheim|sleutel|api-sleutel|pincode|herstelcode|"
-    r"code_verifier)\b[\"']?\s*[:=]\s*[\"']?)([^\s\"',;&}]+)"
-)
-_QUERY_RE = re.compile(
-    r"(?i)([?&](?:code|state|nonce|session_state|token|access_token|id_token|key|api_key|apikey|secret|password|"
-    r"client_secret|sig|signature)=)([^&#\s\"']+)"
-)
+_KV_RE = re.compile(rf"(?i)(\b(?:{_GEHEIME_VELDNAMEN})\b[\"']?\s*[:=]\s*[\"']?)([^\s\"',;&}}]+)")
 _PREFIX_RE = re.compile(
     r"\b(?:svc|enr|ses|csrf|ghp|gho|ghs|ghu|github_pat|xox[abprs]|sk|rk|pk|uk\d+)_[A-Za-z0-9_-]{8,}"
     r"|\bAKIA[0-9A-Z]{16}\b"

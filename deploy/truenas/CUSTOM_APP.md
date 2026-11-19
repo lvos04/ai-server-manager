@@ -224,6 +224,9 @@ stuurt de API-documentatie van de Hub (`/api/docs`) niet mee.
   Bewaar het vorige herstelpunt minstens tot de migratie is gelukt én er een nieuwere geverifieerde
   pre-upgrade-export beschikbaar is. Zie het platformcontract §2.2 voor terugval na een schemawijziging. Een
   mislukte migratie laat de oude database ongemoeid. Een ZFS-snapshot vooraf blijft verstandig.
+  De migratie van historische actiepreviews maskeert geheime waarden in de Hub-database en behoudt de
+  goedkeuringshashes. De pre-upgrade-export bevat de oorspronkelijke gegevens. Houd deze export afgeschermd zoals
+  andere Hub-back-ups en gebruik het herstelpunt bij terugval.
 - **Terugdraaien:** een Custom App heeft geen catalogusversies: TrueNAS' *Roll Back* werkt hier niet voor een andere
   image-tag (contract 1.3 §2.2, NIET GEVALIDEERD op een echte NAS). Terugdraaien = **Edit** → de vorige tag (met
   digest) weer invullen → **Update**, alleen naar een tag met hetzelfde databaseschema; anders eerst de

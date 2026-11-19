@@ -662,6 +662,20 @@ def test_c12_variant_b_weigert_kluisverwijzing_als_naam_geen_geheimnaam_is() -> 
     assert "secret_in_form" in {f.code for f in fouten}
 
 
+@pytest.mark.parametrize(
+    ("waarde", "codes"),
+    [
+        ("prod", ["secret_in_form"]),
+        ("", []),
+        ("vault://app/demo-app/voorbeeld", []),
+    ],
+)
+def test_c12_geheimnaam_vereist_kluisverwijzing(waarde: str, codes: list[str]) -> None:
+    params = install_params(envs=[{"name": "API_TOKEN", "value": waarde}])
+    fouten = validate_parameters(POLICY, POLICY.acties["app.install"], APP, params)
+    assert [f.code for f in fouten] == codes
+
+
 HOSTPADEN_FOUT = [
     "/",
     "/etc",
@@ -2168,8 +2182,8 @@ def test_smb_opslag_van_een_catalogusapp_op_elke_plek_geweigerd(values: Any, vel
 def test_geldige_catalogusopslag_en_kluisverwijzing_blijven_geldig() -> None:
     """R-VEILIG-1, tegenproef: een lege ``cifs_config`` (afwezig, ``null`` of ``{}``, zoals bij de standaard Custom App)
     naast een ander opslagtype geeft geen fout; een kluisverwijzing buiten SMB-opslag mag nog (Hub en executor geven
-    eerlijk 501), een wachtwoord buiten ``cifs_config`` valt niet onder deze regel (KLEIN-75 A6 optie a is niet
-    gekozen) en een ongeldige kluisverwijzing houdt haar eigen code. Bij de standaard Custom App blijft SMB-opslag
+    eerlijk 501). Een letterlijk wachtwoord buiten ``cifs_config`` valt onder C-12 en een ongeldige kluisverwijzing
+    houdt haar eigen code. Bij de standaard Custom App blijft SMB-opslag
     ``opslag_verboden``; de code ``geheim_in_klare_tekst`` bestaat niet meer."""
     ixvol = {
         "type": "ix_volume",
@@ -2184,7 +2198,7 @@ def test_geldige_catalogusopslag_en_kluisverwijzing_blijven_geldig() -> None:
         ), leeg
     goed = _catalogus({"storage": {"config": ixvol}, "app": {"wachtwoord": SMB_REF}})
     assert _codes(goed) == CATALOGUS_DICHT and vault_refs(goed) == [SMB_REF]
-    assert _codes(_catalogus({"app": {"password": "nep-wachtwoord-test"}})) == CATALOGUS_DICHT
+    assert _codes(_catalogus({"app": {"password": "nep-wachtwoord-test"}})) == ["secret_in_form", *CATALOGUS_DICHT]
     ongeldig = _codes(_catalogus({"storage": {"smb": _smb({"password": "vault://ander/x"})}}))
     assert "vault_ref_ongeldig" in ongeldig and "opslag_verboden" in ongeldig, ongeldig
     for extra in ({"password": "nep-wachtwoord-test"}, {"options": ["pass=nep-wachtwoord-test"]}):

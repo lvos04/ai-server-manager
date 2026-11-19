@@ -30,12 +30,15 @@ import psycopg
 import pytest
 import sqlalchemy as sa
 from alembic.script import ScriptDirectory
+from asm_policy.canonical import canonical_sha256
 from conftest import ADMIN_URL
 from sqlalchemy.dialects import postgresql as pg
+from sqlalchemy.orm import Session
 
 from hub import migrations
 from hub.backup import selfbackup
 from hub.config import Settings
+from hub.models import ActionRequest, Approval, IdempotencyRecord
 
 pytestmark = pytest.mark.integration
 RIJEN = 3
@@ -163,6 +166,99 @@ def test_migratie_naar_head_op_een_gevulde_database_verliest_niets(lege_db: str)
         assert _meet(engine, kolommen) == voor, f"opnieuw {vorige} -> {head}: gegevens veranderd"
         with engine.connect() as c:
             assert c.execute(sa.text("SELECT version_num FROM alembic_version")).scalar() == head
+    finally:
+        engine.dispose()
+
+
+def test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring(lege_db: str, tmp_path: Path) -> None:
+    migrations.upgrade(lege_db, "0017")
+    settings = Settings(database_url=lege_db, data_dir=tmp_path)
+    oud = {
+        "schema": "asm-preview/1",
+        "huidig": {"envs": {"MODUS": "proeftekst", "MODUS=voorbeeld": False}},
+        "wijziging": {"url": "https://app.invalid/?refresh_token=proeftekst&mod=debug&code_verifier=proeftekst"},
+        "parameters_sha256": canonical_sha256({"modus": "debug"}),
+    }
+    gemaskeerd = {
+        **oud,
+        "huidig": {"envs": {"MODUS": "***", "MODUS (2)": False}},
+        "wijziging": {"url": "https://app.invalid/?refresh_token=***&mod=debug&code_verifier=***"},
+    }
+    hash_oud = canonical_sha256(oud)
+    antwoord = {"preview": oud, "preview_hash": hash_oud, "status": "afgewezen"}
+    scopes = [
+        "user:beheer:POST:/api/v1/actions",
+        "user:beheer:POST:/api/v1/actions/{request_id}/reject",
+        "user:beheer:POST:/api/v1/auth/setup",
+    ]
+    engine = sa.create_engine(lege_db)
+    try:
+        kolommen = _vul(engine)
+        with Session(engine) as db:
+            acties = db.scalars(sa.select(ActionRequest).order_by(ActionRequest.id)).all()
+            for actie, status in zip(acties, ("afgewezen", "uitgevoerd", "goedgekeurd"), strict=True):
+                actie.status, actie.preview, actie.preview_hash = status, oud, hash_oud
+            for goedkeuring in db.scalars(sa.select(Approval)):
+                goedkeuring.preview_hash = hash_oud
+            herhalingen = db.scalars(sa.select(IdempotencyRecord).order_by(IdempotencyRecord.id)).all()
+            for rec, scope in zip(herhalingen, scopes, strict=True):
+                rec.scope, rec.response_body = scope, antwoord
+            db.commit()
+        voor = _meet(engine, kolommen)
+        overige_kolommen = {
+            t: [
+                k
+                for k in cols
+                if (t, k) not in {("action_request", "preview"), ("idempotency_record", "response_body")}
+            ]
+            for t, cols in kolommen.items()
+        }
+        ongewijzigd = _meet(engine, overige_kolommen)
+        dump = tmp_path / "voor-previews.dump"
+        subprocess.run(
+            [settings.pg_dump_bin, "--format=custom", "--no-owner", "-f", dump, settings.libpq_url],
+            check=True,
+            capture_output=True,
+        )
+
+        def meet_maskering() -> dict[str, tuple[int, str]]:
+            with Session(engine) as db:
+                assert db.scalars(sa.select(ActionRequest.preview)).all() == [gemaskeerd] * RIJEN
+                assert db.scalars(sa.select(IdempotencyRecord.response_body).order_by(IdempotencyRecord.id)).all() == [
+                    {**antwoord, "preview": gemaskeerd},
+                    {**antwoord, "preview": gemaskeerd},
+                    antwoord,
+                ]
+            assert _meet(engine, overige_kolommen) == ongewijzigd
+            return _meet(engine, kolommen)
+
+        migrations.upgrade(lege_db, "0018")
+        na = meet_maskering()
+        migrations.downgrade(lege_db, "0017")
+        assert _meet(engine, kolommen) == na
+        migrations.upgrade(lege_db, "0018")
+        assert meet_maskering() == na
+
+        migrations.downgrade(lege_db, "base")
+        subprocess.run(
+            [
+                settings.pg_restore_bin,
+                "--clean",
+                "--if-exists",
+                "--exit-on-error",
+                "--single-transaction",
+                "--no-owner",
+                "-d",
+                settings.libpq_url,
+                dump,
+            ],
+            check=True,
+            capture_output=True,
+        )
+        assert migrations.pending_migrations(lege_db)
+        assert _meet(engine, kolommen) == voor
+        migrations.upgrade(lege_db, "0018")
+        assert meet_maskering() == na
     finally:
         engine.dispose()
 

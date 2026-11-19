@@ -315,6 +315,7 @@ def _catalogus_waarden(naam: str, values: Any) -> dict[str, Any]:
         ({}, "catalogusversie_niet_toegelaten"),
         ({"app": {"onbekend": None}}, "catalogusversie_niet_toegelaten"),
         ({"app": {"init": {"token": "proefgeheim"}}}, "account_gegevens_verboden"),
+        ({"app": {"api_token": "prod"}}, "secret_in_form"),
         ({"envs": [{"name": "JUPYTER_TOKEN", "value": "vault://app/huis/voorbeeld"}]}, "account_gegevens_verboden"),
         ({"storage": [{"type": "nfs", "nfs_config": {"path": "export"}}]}, "opslag_verboden"),
         ({"storage": [{"type": "cifs", "cifs_config": {}}]}, "opslag_verboden"),
@@ -340,6 +341,18 @@ def test_deel_c_ex47_weigert_ook_met_voorsteltoelichting(stack: Stack, veld: str
     assert schrijfaanroepen(stack.nas) == []
 
 
+def test_deel_c_weigert_letterlijke_omgevingswaarde_in_geheimveld(stack: Stack) -> None:
+    params = install_params("demo")
+    env = params["app_create"]["values"]["envs"][0]
+    env["name"] = "API_TOKEN"
+    logins_voor = stack.nas.logins
+    rid, r = _voorstel(stack.admin, "app.install", app_target("demo"), params)
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig"
+    assert [f["code"] for f in r.json()["details"]["fouten"]] == ["secret_in_form"]
+    assert stack.admin.get(f"/api/v1/actions/{rid}").status_code == 404
+    assert stack.nas.logins == logins_voor and schrijfaanroepen(stack.nas) == []
+
+
 def test_deel_c_oude_preview_maskeren_bij_lezen_en_herhalen(stack: Stack) -> None:
     body = {
         "action_id": "app.install",
@@ -352,9 +365,11 @@ def test_deel_c_oude_preview_maskeren_bij_lezen_en_herhalen(stack: Stack) -> Non
     r = stack.admin.post(pad, json=body, headers=headers)
     assert r.status_code == 201
     rid = uuid.UUID(r.json()["request_id"])
+    preview_hash = r.json()["preview_hash"]
     preview_oud = r.json()["preview"]
     sleutel = "a1b2c3d4-1234-4567-a123-987654321abc"
     preview_oud["wijziging"]["waarden"]["api_token"] = {sleutel: "/padvormig/geheim"}
+    preview_oud["wijziging"]["waarden"]["url"] = "https://app.invalid/?refresh_token=voorbeeld&mod=debug"
     with stack.app.state.sessionmaker() as db:
         req = db.get(ActionRequest, rid)
         rec = db.query(IdempotencyRecord).filter_by(key=rid).one()
@@ -373,6 +388,10 @@ def test_deel_c_oude_preview_maskeren_bij_lezen_en_herhalen(stack: Stack) -> Non
     with stack.app.state.sessionmaker() as db:
         rec = db.query(IdempotencyRecord).filter_by(key=rid).one()
         assert sleutel not in str(rec.response_body)
+        req = db.get(ActionRequest, rid)
+        assert req is not None and req.preview_hash == preview_hash
+        assert req.preview == rec.response_body["preview"] == detail["preview"]
+        assert req.preview["wijziging"]["waarden"]["url"] == "https://app.invalid/?refresh_token=***&mod=debug"
     assert schrijfaanroepen(stack.nas) == []
 
 
