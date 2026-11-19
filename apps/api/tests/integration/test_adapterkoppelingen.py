@@ -27,6 +27,7 @@ from hub.models import (
     Decision,
     IdempotencyRecord,
     Incident,
+    IncidentEvent,
     OutboxEvent,
     VaultSecret,
 )
@@ -320,17 +321,18 @@ def test_weggevallen_binding_blokkeert_contact_en_toont_laatst_bekende_meting(
     probe.assert_called_once()
 
 
-def test_my_house_koppelcode_wordt_zonder_inwisseling_geweigerd(admin: Any, app: Any, doel: dict[str, Any]) -> None:
-    with app.state.sessionmaker() as db:
-        instance = db.get(CatalogApp, uuid.UUID(doel["catalog_app_id"]))
-        assert instance
-        instance.app_id = "my_house"
-        db.commit()
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_koppelcode_wordt_zonder_server_id_geweigerd(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = Mock(side_effect=AssertionError("Geen transport zonder bevestigde server-ID."))
+    monkeypatch.setattr(outbound, "request", transport)
     waarde = secrets.token_urlsafe()
-    response = admin.post(ROUTE, json={**doel, "app_id": "my_house"}, headers=invoer(waarde))
-    assert response.status_code == 501
-    assert response.json()["code"] == "capability_unavailable"
+    response = admin.post(ROUTE, json=doel, headers=invoer(waarde))
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert waarde not in response.text
+    transport.assert_not_called()
     with app.state.sessionmaker() as db:
         assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
 
@@ -581,3 +583,264 @@ def test_mso_oude_kluiswaarde_is_overbodig(
     assert admin.patch(path, json={"doel_bevestigd": True}, headers=idem()).status_code == 200
     with app.state.sessionmaker() as db:
         assert db.scalar(select(VaultSecret).where(VaultSecret.ref == ref)) is None
+
+
+@pytest.fixture
+def huis_simulatie(
+    doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> tuple[str, dict[str, Any], list[tuple[str, str]]]:
+    from hmac import digest
+
+    doel["server_id"], client_id, home_id = (str(uuid.uuid4()) for _ in range(3))
+    zone_id, integration_id = (str(uuid.uuid4()) for _ in range(2))
+    tekens = [secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(8)]
+    code = "".join(tekens[:4]) + "-" + "".join(tekens[4:])
+    toestand: dict[str, Any] = {
+        "token": "shc_" + secrets.token_urlsafe(32),
+        "rol": "viewer",
+        "purpose": "hub",
+        "status": 200,
+        "server_id": doel["server_id"],
+        "renew_status": 200,
+        "extra_check": [],
+    }
+    calls: list[tuple[str, str]] = []
+
+    def transport(base: str, method: str, path: str, **options: Any) -> outbound.Response:
+        assert base == URL
+        assert options["policy"].allowed_peer_addresses == frozenset({PEER})
+        calls.append((method, path))
+        headers = options.get("headers") or {}
+        status = 200
+        if path == "/api/v1/pairing/identity":
+            assert "Authorization" not in headers
+            body: Any = {"server_id": toestand["server_id"]}
+            query = options.get("query")
+            if query:
+                assert query["client_id"] == client_id
+                message = f"shc-identity-v1\n{toestand['server_id']}\n{query['nonce']}"
+                key = hashlib.sha256(toestand["token"].encode()).hexdigest()
+                body.update(proof_alg="hmac-sha256-v1", proof=digest(key.encode(), message.encode(), "sha256").hex())
+        elif path == "/api/v1/pairing/redeem":
+            assert method == "POST" and not headers
+            assert options["json_body"] == {"code": code, "device_name": "Hub"}
+            body = {
+                "token": toestand["token"],
+                "client": {
+                    "id": client_id,
+                    "role": toestand["rol"],
+                    "purpose": toestand["purpose"],
+                    "expires_at": (utcnow() + timedelta(days=179)).isoformat(),
+                    "revoked": False,
+                    "expired": False,
+                },
+                "server": {"server_id": doel["server_id"], "lan_url": code},
+                "user": {"name": code},
+            }
+        elif path == "/api/v1/health":
+            assert method == "GET" and not headers
+            body = {"status": "ok", "version": "1.0.0", "detail": code}
+        else:
+            assert headers == {"Authorization": f"Bearer {toestand['token']}"}
+            if path == "/api/v1/clients/self/refresh":
+                assert method == "POST"
+                status = toestand["renew_status"]
+                if status == 200:
+                    toestand["token"] = "shc_" + secrets.token_urlsafe(32)
+                body = {"token": toestand["token"], "expires_at": (utcnow() + timedelta(days=180)).isoformat()}
+            else:
+                assert method == "GET"
+                status = toestand["status"]
+                body = {
+                    "/api/v1/system/status": {
+                        "version": "1.0.0",
+                        "checks": [
+                            {"key": "database", "state": "ok", "detail": code},
+                            {"key": "worker", "state": "ok"},
+                            *(
+                                [{"key": f"integration:{integration_id}", **toestand["extra_check"]}]
+                                if toestand["extra_check"]
+                                else []
+                            ),
+                        ],
+                    },
+                    "/api/v1/homes": [
+                        {"id": home_id, "name": "Proefwoning", "timezone": "Europe/Amsterdam", "active": True}
+                    ],
+                    f"/api/v1/homes/{home_id}/zones": [
+                        {
+                            "id": zone_id,
+                            "name": code,
+                            "unit_status": "not_linked",
+                            "online": False,
+                            "mode": "off",
+                            "temperature": {
+                                "value": 18.5,
+                                "unit": "°C",
+                                "at": (utcnow() - timedelta(hours=1)).isoformat(),
+                                "quality": "measured",
+                                "stale": False,
+                                "detail": toestand["token"],
+                            },
+                            "humidity": {
+                                "value": 42.5,
+                                "unit": "%",
+                                "at": utcnow().isoformat(),
+                                "quality": "measured",
+                                "stale": False,
+                            },
+                        }
+                    ],
+                    f"/api/v1/homes/{home_id}/lights": {"groups": [], "scenes": [], "lights": []},
+                    f"/api/v1/homes/{home_id}/alerts": [],
+                    f"/api/v1/homes/{home_id}/devices": [],
+                    "/api/v1/system/settings": {
+                        "lan_url": "javascript:open()",
+                        "remote_url": None,
+                        "safe_mode": False,
+                        "maintenance": False,
+                    },
+                }[path]
+        if status != 200:
+            body = {"detail": {"code": "token_expired" if status == 401 else "unavailable", "message": code}}
+        return outbound.Response(status, json.dumps(body).encode())
+
+    monkeypatch.setattr(outbound, "request", transport)
+    return code, toestand, calls
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize(("rol", "purpose"), [("admin", "hub"), ("control", "phone"), ("viewer", "phone")])
+def test_my_house_weigert_onjuist_recht(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, rol: str, purpose: str
+) -> None:
+    code, toestand, calls = huis_simulatie
+    toestand.update(rol=rol, purpose=purpose)
+    denied = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert denied.status_code == 422
+    assert denied.json()["details"]["reason"] == "bron_recht_ongeldig"
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(AdapterLink)) is None
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+    assert calls == [("GET", "/api/v1/pairing/identity"), ("POST", "/api/v1/pairing/redeem")]
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_weigert_gewisselde_server(admin: Any, doel: dict[str, Any], huis_simulatie: Any) -> None:
+    code, toestand, calls = huis_simulatie
+    toestand["server_id"] = str(uuid.uuid4())
+    denied = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert denied.status_code == 422
+    assert calls == [("GET", "/api/v1/pairing/identity")]
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_projectie_en_verlopen_token(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, periodic_run: Any, caplog: Any
+) -> None:
+    code, toestand, _ = huis_simulatie
+    headers = invoer(code)
+    created = admin.post(ROUTE, json=doel, headers=headers)
+    assert created.status_code == 201
+    assert admin.post(ROUTE, json=doel, headers=headers).headers["Idempotent-Replay"] == "true"
+    link_id = created.json()["id"]
+    path = f"{ROUTE}/{link_id}"
+    tested = admin.post(f"{path}/test", headers=idem())
+    assert tested.status_code == 200
+    data = tested.json()["my_house"]
+    assert data["systeem"]["checks"] == [{"key": "database", "state": "ok"}, {"key": "worker", "state": "ok"}]
+    assert data["instellingen"] == {"link": None, "safe_mode": False, "maintenance": False}
+    assert len(data["woningen"]) == 1
+    assert data["woningen"][0]["meldingen"]["open"] == 0
+    zone = data["woningen"][0]["zones"][0]
+    assert zone["name"] is None
+    assert zone["temperature"]["value"] is None and zone["temperature"]["stale"] is True
+    assert zone["humidity"]["value"] == 42.5
+    assert admin.get(path).json()["gezondheid"]["status"] == "healthy"
+
+    toestand["extra_check"] = {"state": "error", "details": {"checked_at": utcnow().isoformat(), "text": code}}
+    assert admin.post(f"{path}/test", headers=idem()).status_code == 200
+    assert admin.get(path).json()["gezondheid"]["status"] == "down"
+    toestand["extra_check"]["details"]["checked_at"] = (utcnow() - timedelta(hours=1)).isoformat()
+    assert admin.post(f"{path}/test", headers=idem()).status_code == 200
+    assert admin.get(path).json()["gezondheid"]["status"] == "unknown"
+
+    toestand["status"] = 401
+    failed = admin.post(f"{path}/test", headers=idem())
+    assert failed.status_code == 200
+    assert failed.json()["my_house"] is None
+    health = admin.get(path).json()["gezondheid"]
+    assert health["status"] == "unknown" and health["reason_code"] == "bron_token_verlopen"
+    periodic_run("incidenten_bijwerken")
+    with app.state.sessionmaker() as db:
+        incident = db.scalars(select(Incident).where(Incident.onderwerp_id == link_id)).one()
+        event = db.scalars(select(IncidentEvent).where(IncidentEvent.incident_id == incident.id)).one()
+        assert event.details["reason_code"] == "bron_token_verlopen"
+        row = db.scalars(select(AdapterLink)).one()
+        kluis = db.scalars(select(VaultSecret).where(VaultSecret.ref == row.geheim_ref)).one()
+        assert toestand["token"].encode() not in kluis.ciphertext
+        payloads = [
+            *db.scalars(select(AuditEvent.details)),
+            *db.scalars(select(OutboxEvent.payload)),
+            *db.scalars(select(IdempotencyRecord.response_body)),
+        ]
+    for geheim in (code, toestand["token"]):
+        assert geheim not in tested.text and geheim not in failed.text
+        assert geheim not in caplog.text and geheim not in json.dumps(payloads)
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_vernieuwing_door_worker(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, periodic_run: Any
+) -> None:
+    code, toestand, calls = huis_simulatie
+    created = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert created.status_code == 201
+    path = f"{ROUTE}/{created.json()['id']}"
+    with app.state.sessionmaker.begin() as db:
+        db.scalars(select(AdapterLink)).one().my_house_expires_at = utcnow() + timedelta(days=12)
+    toestand["renew_status"] = 503
+    periodic_run("my_house_vernieuwen")
+    assert admin.get(path).json()["gezondheid"]["reason_code"] == "bron_vernieuwing_mislukt"
+    periodic_run("incidenten_bijwerken")
+    with app.state.sessionmaker() as db:
+        assert db.scalars(select(Incident).where(Incident.onderwerp_id == created.json()["id"])).one().status == "open"
+    toestand["renew_status"] = 200
+    oud = toestand["token"]
+    periodic_run("my_house_vernieuwen")
+    assert toestand["token"] != oud
+    assert calls.count(("POST", "/api/v1/clients/self/refresh")) == 2
+    assert admin.post(f"{path}/test", headers=idem()).json()["my_house"]["systeem"]["version"] == "1.0.0"
+    assert admin.get(path).json()["laatste4"] == toestand["token"][-4:]
+    periodic_run("incidenten_bijwerken")
+    with app.state.sessionmaker() as db:
+        incident = db.scalars(select(Incident).where(Incident.onderwerp_id == created.json()["id"])).one()
+        assert incident.status == "opgelost"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_downgrade_verwijdert_eigen_kluiswaarde(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, settings: Settings
+) -> None:
+    from hub import migrations
+    from hub.vault import make_ref
+
+    code, _, _ = huis_simulatie
+    response = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert response.status_code == 201
+    ref = make_ref("adapters", f"my_house.{response.json()['id']}")
+    vault = app.state.vault()
+    other_ref = make_ref("monitoring", "andere-proef")
+    other_value = secrets.token_urlsafe()
+    with app.state.sessionmaker.begin() as db:
+        vault.put(db, other_ref, other_value, actor="test")
+        assert vault.get(db, ref) is not None
+    try:
+        migrations.downgrade(settings.database_url, "0018")
+        with app.state.sessionmaker() as db:
+            assert vault.get(db, ref) is None
+            assert vault.get(db, other_ref) == other_value
+            assert db.get(CatalogApp, uuid.UUID(doel["catalog_app_id"])) is not None
+    finally:
+        migrations.upgrade(settings.database_url)
+    assert admin.get(f"{ROUTE}/{response.json()['id']}").status_code == 404

@@ -51,6 +51,65 @@
         "title": "ActorIn",
         "type": "object"
       },
+      "Alert": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warn",
+              "warning",
+              "error",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "severity"
+        ],
+        "title": "Alert",
+        "type": "object"
+      },
+      "Alerts": {
+        "properties": {
+          "begrensd": {
+            "title": "Begrensd",
+            "type": "boolean"
+          },
+          "items": {
+            "$ref": "#/components/schemas/Rows_Alert_"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "open",
+          "begrensd"
+        ],
+        "title": "Alerts",
+        "type": "object"
+      },
       "ApiKeyIn": {
         "additionalProperties": false,
         "properties": {
@@ -362,7 +421,7 @@
         "title": "ChannelPatch",
         "type": "object"
       },
-      "Check": {
+      "Check-Input": {
         "additionalProperties": false,
         "properties": {
           "detail": {
@@ -396,6 +455,31 @@
         "title": "Check",
         "type": "object"
       },
+      "Check-Output": {
+        "properties": {
+          "key": {
+            "pattern": "^(database|worker|worker_loops|disk|backup|time|safe_mode|maintenance|restore|integration:[0-9a-f-]{36}(:mqtt|:dongle)?)$",
+            "title": "Key",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "warn",
+              "error",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "state"
+        ],
+        "title": "Check",
+        "type": "object"
+      },
       "ConfirmIn": {
         "additionalProperties": false,
         "properties": {
@@ -410,6 +494,67 @@
           "totp"
         ],
         "title": "ConfirmIn",
+        "type": "object"
+      },
+      "Device": {
+        "properties": {
+          "compatibility": {
+            "enum": [
+              "unknown",
+              "untested",
+              "tested",
+              "limited",
+              "unsupported",
+              "pairable",
+              "discovered"
+            ],
+            "title": "Compatibility",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "pattern": "^[a-z][a-z0-9_]{0,31}$",
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen"
+          },
+          "lifecycle": {
+            "enum": [
+              "active",
+              "replaced",
+              "archived"
+            ],
+            "title": "Lifecycle",
+            "type": "string"
+          },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "online",
+          "last_seen",
+          "compatibility",
+          "lifecycle"
+        ],
+        "title": "Device",
         "type": "object"
       },
       "EnrollIn": {
@@ -744,7 +889,7 @@
         "properties": {
           "checks": {
             "items": {
-              "$ref": "#/components/schemas/Check"
+              "$ref": "#/components/schemas/Check-Input"
             },
             "maxItems": 20,
             "title": "Checks",
@@ -789,6 +934,79 @@
         "title": "HeartbeatIn",
         "type": "object"
       },
+      "Home": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "active"
+        ],
+        "title": "Home",
+        "type": "object"
+      },
+      "HouseSettings": {
+        "properties": {
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "maintenance": {
+            "title": "Maintenance",
+            "type": "boolean"
+          },
+          "safe_mode": {
+            "title": "Safe Mode",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "safe_mode",
+          "maintenance",
+          "link"
+        ],
+        "title": "HouseSettings",
+        "type": "object"
+      },
       "InschakelenIn": {
         "additionalProperties": false,
         "properties": {
@@ -828,6 +1046,82 @@
         "title": "Koppeling",
         "type": "object"
       },
+      "Light": {
+        "properties": {
+          "brightness": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightness"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "on": {
+            "title": "On",
+            "type": "boolean"
+          },
+          "reachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reachable"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "on",
+          "brightness"
+        ],
+        "title": "Light",
+        "type": "object"
+      },
+      "Lights": {
+        "properties": {
+          "groups": {
+            "$ref": "#/components/schemas/Rows_Light_"
+          },
+          "lights": {
+            "$ref": "#/components/schemas/Rows_Light_"
+          },
+          "scenes": {
+            "$ref": "#/components/schemas/Rows_Scene_"
+          }
+        },
+        "required": [
+          "groups",
+          "scenes",
+          "lights"
+        ],
+        "title": "Lights",
+        "type": "object"
+      },
       "LinkIn": {
         "additionalProperties": false,
         "properties": {
@@ -849,6 +1143,18 @@
             "const": true,
             "title": "Doel Bevestigd",
             "type": "boolean"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
           }
         },
         "required": [
@@ -920,6 +1226,18 @@
             "default": false,
             "title": "Doel Bevestigd",
             "type": "boolean"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
           }
         },
         "title": "LinkPatch",
@@ -1111,6 +1429,36 @@
         "title": "MsoTestReceipt",
         "type": "object"
       },
+      "MyHouseTestReceipt": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "my_house": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Snapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "my_house"
+        ],
+        "title": "MyHouseTestReceipt",
+        "type": "object"
+      },
       "NoodstopIn": {
         "additionalProperties": false,
         "properties": {
@@ -1286,6 +1634,34 @@
           "externe_host"
         ],
         "title": "OutOfBandIn",
+        "type": "object"
+      },
+      "Overview": {
+        "properties": {
+          "apparaten": {
+            "$ref": "#/components/schemas/Rows_Device_"
+          },
+          "licht": {
+            "$ref": "#/components/schemas/Lights"
+          },
+          "meldingen": {
+            "$ref": "#/components/schemas/Alerts"
+          },
+          "woning": {
+            "$ref": "#/components/schemas/Home"
+          },
+          "zones": {
+            "$ref": "#/components/schemas/Rows_Zone_"
+          }
+        },
+        "required": [
+          "woning",
+          "zones",
+          "licht",
+          "meldingen",
+          "apparaten"
+        ],
+        "title": "Overview",
         "type": "object"
       },
       "PasswordIn": {
@@ -1700,6 +2076,41 @@
         "title": "RotateIn",
         "type": "object"
       },
+      "Rows_Alert_": {
+        "items": {
+          "$ref": "#/components/schemas/Alert"
+        },
+        "maxItems": 200,
+        "type": "array"
+      },
+      "Rows_Device_": {
+        "items": {
+          "$ref": "#/components/schemas/Device"
+        },
+        "maxItems": 200,
+        "type": "array"
+      },
+      "Rows_Light_": {
+        "items": {
+          "$ref": "#/components/schemas/Light"
+        },
+        "maxItems": 200,
+        "type": "array"
+      },
+      "Rows_Scene_": {
+        "items": {
+          "$ref": "#/components/schemas/Scene"
+        },
+        "maxItems": 200,
+        "type": "array"
+      },
+      "Rows_Zone_": {
+        "items": {
+          "$ref": "#/components/schemas/Zone"
+        },
+        "maxItems": 200,
+        "type": "array"
+      },
       "RuleIn": {
         "additionalProperties": false,
         "properties": {
@@ -1962,6 +2373,38 @@
         "title": "RulePatch",
         "type": "object"
       },
+      "Scene": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "active"
+        ],
+        "title": "Scene",
+        "type": "object"
+      },
       "SendIn": {
         "additionalProperties": false,
         "description": "Getypte parameters van ``notification.send`` (R0) met harde grenzen.",
@@ -2006,6 +2449,63 @@
           "bericht"
         ],
         "title": "SendIn",
+        "type": "object"
+      },
+      "Sensor": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "quality": {
+            "enum": [
+              "measured",
+              "estimated",
+              "derived",
+              "missing"
+            ],
+            "title": "Quality",
+            "type": "string"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "unit": {
+            "enum": [
+              "°C",
+              "%"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "unit",
+          "quality",
+          "at",
+          "stale"
+        ],
+        "title": "Sensor",
         "type": "object"
       },
       "ServiceJwtIn": {
@@ -2124,6 +2624,39 @@
           "version"
         ],
         "title": "SetupStatus",
+        "type": "object"
+      },
+      "Snapshot": {
+        "properties": {
+          "databaseprobe": {
+            "$ref": "#/components/schemas/Liveness"
+          },
+          "instellingen": {
+            "$ref": "#/components/schemas/HouseSettings"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "systeem": {
+            "$ref": "#/components/schemas/System"
+          },
+          "woningen": {
+            "items": {
+              "$ref": "#/components/schemas/Overview"
+            },
+            "title": "Woningen",
+            "type": "array"
+          }
+        },
+        "required": [
+          "observed_at",
+          "databaseprobe",
+          "systeem",
+          "woningen",
+          "instellingen"
+        ],
+        "title": "Snapshot",
         "type": "object"
       },
       "SourceIn": {
@@ -2414,6 +2947,31 @@
         "title": "StatusIn",
         "type": "object"
       },
+      "System": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/Check-Output"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Checks",
+            "type": "array"
+          },
+          "version": {
+            "maxLength": 48,
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][a-zA-Z0-9.-]+)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "checks"
+        ],
+        "title": "System",
+        "type": "object"
+      },
       "TrueNasAppIn": {
         "additionalProperties": false,
         "properties": {
@@ -2673,6 +3231,68 @@
           }
         },
         "title": "Worker",
+        "type": "object"
+      },
+      "Zone": {
+        "properties": {
+          "humidity": {
+            "$ref": "#/components/schemas/Sensor"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "off",
+              "auto",
+              "cool",
+              "heat",
+              "dry",
+              "fan"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          },
+          "temperature": {
+            "$ref": "#/components/schemas/Sensor"
+          },
+          "unit_status": {
+            "enum": [
+              "online",
+              "offline",
+              "not_linked"
+            ],
+            "title": "Unit Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "unit_status",
+          "online",
+          "mode",
+          "temperature",
+          "humidity"
+        ],
+        "title": "Zone",
         "type": "object"
       },
       "hub__routers__alerts__SnoozeIn": {
@@ -3398,7 +4018,7 @@
         "operationId": "create_link_api_v1_adapterkoppelingen_post",
         "parameters": [
           {
-            "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+            "description": "Alleen invoer. Gebruik voor my_house een Hub-koppelcode en laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
             "in": "header",
             "name": "X-Adapter-Credential",
             "required": false,
@@ -3413,7 +4033,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+              "description": "Alleen invoer. Gebruik voor my_house een Hub-koppelcode en laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
               "title": "X-Adapter-Credential"
             }
           },
@@ -3464,9 +4084,6 @@
               }
             },
             "description": "Validation Error"
-          },
-          "501": {
-            "description": "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."
           }
         },
         "summary": "Adapterkoppeling maken (beheerder)",
@@ -3604,7 +4221,7 @@
             }
           },
           {
-            "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+            "description": "Alleen invoer. Gebruik voor my_house een Hub-koppelcode en laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
             "in": "header",
             "name": "X-Adapter-Credential",
             "required": false,
@@ -3619,7 +4236,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
+              "description": "Alleen invoer. Gebruik voor my_house een Hub-koppelcode en laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging.",
               "title": "X-Adapter-Credential"
             }
           },
@@ -3735,6 +4352,9 @@
                       "$ref": "#/components/schemas/MsoTestReceipt"
                     },
                     {
+                      "$ref": "#/components/schemas/MyHouseTestReceipt"
+                    },
+                    {
                       "$ref": "#/components/schemas/LinkReceipt"
                     }
                   ],
@@ -3755,7 +4375,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Openbare verbinding testen (beheerder)",
+        "summary": "Adapterverbinding testen (beheerder)",
         "tags": [
           "adapterkoppelingen"
         ]

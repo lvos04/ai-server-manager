@@ -5,17 +5,19 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from datetime import datetime
 from ipaddress import ip_address
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
+from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, Header, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy import select
 
 from hub import audit
-from hub.adapters import basis, mso
+from hub.adapters import basis, mso, my_house
 from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, get_vault
 from hub.errors import HubError
@@ -34,7 +36,8 @@ Credential = Annotated[
     Header(
         alias="X-Adapter-Credential",
         description=(
-            "Alleen invoer. Laat weg voor openbare MSO-probes. Gebruik een nieuwe Idempotency-Key bij wijziging."
+            "Alleen invoer. Gebruik voor my_house een Hub-koppelcode en laat weg voor openbare MSO-probes. "
+            "Gebruik een nieuwe Idempotency-Key bij wijziging."
         ),
     ),
 ]
@@ -49,6 +52,7 @@ class LinkIn(BaseModel):
     catalog_app_id: uuid.UUID
     basis_url: BasisUrl
     doel_bevestigd: Literal[True]
+    server_id: uuid.UUID | None = None
 
 
 class LinkPatch(BaseModel):
@@ -57,6 +61,7 @@ class LinkPatch(BaseModel):
     catalog_app_id: uuid.UUID | None = None
     basis_url: BasisUrl | None = None
     doel_bevestigd: bool = False
+    server_id: uuid.UUID | None = None
 
 
 class LinkView(BaseModel):
@@ -85,20 +90,29 @@ class MsoTestReceipt(LinkReceipt):
     probes: mso.PublicProbes
 
 
+class MyHouseTestReceipt(LinkReceipt):
+    my_house: my_house.Snapshot | None
+
+
 class Verwijderd(BaseModel):
     verwijderd: Literal[True]
 
 
 def _view(row: AdapterLink, *, bound: bool) -> LinkView:
+    now = utcnow()
+    reason = row.laatste_fout
+    if row.app_id == my_house.APP_ID and row.my_house_expires_at is not None and row.my_house_expires_at <= now:
+        reason = "bron_token_verlopen"
     measurement = basis.Measurement(status=row.laatste_status or "unknown", observed_at=row.observed_at)
-    if row.laatste_fout:
+    if reason:
         measurement = basis.Measurement(
             status="unknown",
-            reason_code=row.laatste_fout,
+            reason_code=reason,
             observed_at=row.observed_at,
             laatste_status=measurement.status if row.observed_at else None,
         )
-    measurement = basis.fresh_measurement(measurement, max_age_s=row.max_age_s or basis.MAX_AGE_S)
+    if row.app_id != my_house.APP_ID or (bound and reason is None):
+        measurement = basis.fresh_measurement(measurement, now=now, max_age_s=row.max_age_s or basis.MAX_AGE_S)
     if not bound:
         measurement = basis.Measurement(
             status="unknown",
@@ -108,6 +122,18 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
         )
     is_mso = row.app_id == mso.APP_ID
     health = mso.health() if is_mso else basis.Measurement(status="unknown", reason_code="capability_unavailable")
+    if row.app_id == my_house.APP_ID:
+        if row.my_house_status is not None and bound and reason is None:
+            health = basis.fresh_measurement(
+                basis.Measurement(status=row.my_house_status, observed_at=row.observed_at), now=now
+            )
+        else:
+            health = basis.Measurement(
+                status="unknown",
+                reason_code=measurement.reason_code or "meting_onbekend",
+                observed_at=row.observed_at,
+                laatste_status=row.my_house_status,
+            )
     return LinkView(
         id=row.id,
         app_id=row.app_id,
@@ -284,12 +310,9 @@ def _precondition(row: AdapterLink, if_match: str | None) -> None:
         raise HubError(412, "precondition_failed", "De koppeling is gewijzigd.", {"huidige_etag": _etag(row.version)})
 
 
-def _save_link(idem: Idem, status: int, row: AdapterLink, *, probes: mso.PublicProbes | None = None) -> JSONResponse:
-    receipt: LinkReceipt
-    if probes is None:
+def _save_link(idem: Idem, status: int, row: AdapterLink, receipt: LinkReceipt | None = None) -> JSONResponse:
+    if receipt is None:
         receipt = LinkReceipt(id=row.id, version=row.version)
-    else:
-        receipt = MsoTestReceipt(id=row.id, version=row.version, probes=probes)
     response = idem.save(status, receipt.model_dump(mode="json"))
     response.headers["ETag"] = _etag(row.version)
     return response
@@ -306,6 +329,106 @@ def _unique_target(db: DB, catalog_app_id: uuid.UUID, except_id: uuid.UUID | Non
     existing = db.scalar(select(AdapterLink.id).where(AdapterLink.catalog_app_id == catalog_app_id))
     if existing is not None and existing != except_id:
         raise HubError(409, "conflict", "Deze instantie heeft al een adapterkoppeling.", {"reason": "al_gekoppeld"})
+
+
+def _house_adapter(db: DB, settings: Settings, row: AdapterLink, target: CatalogApp) -> my_house.Adapter:
+    def check_binding() -> None:
+        nas = current_target(db)
+        if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
+            raise OutboundError("doelbinding")
+
+    return my_house.Adapter(row, settings.outbound_policy(), check_binding=check_binding)
+
+
+def _house_pair(
+    db: DB, settings: Settings, row: AdapterLink, target: CatalogApp, code: str, server_id: uuid.UUID | None
+) -> str:
+    if server_id is None:
+        raise HubError(422, "validation_error", "Bevestig de server-ID uit my_house.")
+    if row.geheim_ref != make_ref("adapters", f"{my_house.APP_ID}.{row.id}"):
+        raise _binding_conflict()
+    row.my_house_server_id = server_id
+    try:
+        pairing = _house_adapter(db, settings, row, target).pair(code)
+    except OutboundError as exc:
+        raise HubError(422, "validation_error", "De my_house-koppeling is geweigerd.", {"reason": exc.reason}) from None
+    row.my_house_client_id = pairing.client_id
+    row.my_house_expires_at = pairing.credential.expires_at
+    row.my_house_status = None
+    return pairing.credential.token
+
+
+def _house_credential(db: DB, vault: Vault, row: AdapterLink, now: datetime) -> my_house.Credential:
+    expires = row.my_house_expires_at
+    if expires is None or row.geheim_ref != make_ref("adapters", f"{my_house.APP_ID}.{row.id}"):
+        raise OutboundError("bron_credential_geweigerd")
+    if expires <= now:
+        raise OutboundError("bron_token_verlopen")
+    try:
+        token = vault.get(db, row.geheim_ref)
+    except (InvalidTag, ValueError):
+        raise OutboundError("bron_credential_geweigerd") from None
+    if token is None or my_house.TOKEN.fullmatch(token) is None:
+        raise OutboundError("bron_credential_geweigerd")
+    return my_house.Credential(token, expires)
+
+
+def _house_renew(
+    db: DB, vault: Vault, row: AdapterLink, adapter: my_house.Adapter, credential: my_house.Credential, now: datetime
+) -> my_house.Credential:
+    if credential.expires_at - now > my_house.RENEW_BEFORE:
+        return credential
+    try:
+        renewed = adapter.refresh(credential, now)
+    except OutboundError as exc:
+        if exc.reason in {"bron_token_verlopen", "bron_token_ingetrokken", "doelbinding"}:
+            raise
+        raise OutboundError("bron_vernieuwing_mislukt") from None
+    meta = vault.put(db, row.geheim_ref, renewed.token, actor="my_house-vernieuwing")
+    row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
+    row.my_house_expires_at = renewed.expires_at
+    return renewed
+
+
+def _house_transition(db: DB, row: AdapterLink, reason: str | None) -> None:
+    previous = row.laatste_fout
+    if reason is not None and reason != previous:
+        emit(db, "monitoring.my_house.failed", "adapter_link", str(row.id), {"reason_code": reason})
+    elif reason is None and previous is not None:
+        emit(db, "monitoring.my_house.recovered", "adapter_link", str(row.id), {})
+    row.laatste_fout = reason
+
+
+def renew_my_house_links(db: DB, settings: Settings, vault: Vault, now: datetime) -> dict[str, int]:
+    """Vernieuw tijdig, ook zonder handmatige test. De rijvergrendeling serialiseert tokenwissels."""
+    ids = list(
+        db.scalars(
+            select(AdapterLink.id).where(
+                AdapterLink.app_id == my_house.APP_ID, AdapterLink.my_house_expires_at <= now + my_house.RENEW_BEFORE
+            )
+        )
+    )
+    renewed = failed = 0
+    for link_id in ids:
+        row = db.scalars(select(AdapterLink).where(AdapterLink.id == link_id).with_for_update(skip_locked=True)).first()
+        if row is None or row.my_house_expires_at is None or row.my_house_expires_at > now + my_house.RENEW_BEFORE:
+            continue
+        try:
+            target = db.get(CatalogApp, row.catalog_app_id)
+            if not _target_matches(target, my_house.APP_ID) or target is None:
+                raise OutboundError("doelbinding")
+            credential = _house_credential(db, vault, row, now)
+            _house_renew(db, vault, row, _house_adapter(db, settings, row, target), credential, now)
+        except OutboundError as exc:
+            if row.laatste_fout != exc.reason:
+                row.version += 1
+            _house_transition(db, row, exc.reason)
+            failed += 1
+        else:
+            row.version += 1
+            renewed += 1
+        db.commit()
+    return {"vernieuwd": renewed, "mislukt": failed}
 
 
 @router.get("", summary="Adapterkoppelingen lezen")
@@ -340,7 +463,6 @@ def get_link(link_id: uuid.UUID, response: Response, db: DB, _: AnyUser, setting
     status_code=201,
     response_model=LinkReceipt,
     summary="Adapterkoppeling maken (beheerder)",
-    responses={501: {"description": "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."}},
 )
 def create_link(
     body: LinkIn,
@@ -352,22 +474,19 @@ def create_link(
     credential: Credential = None,
 ) -> JSONResponse:
     _reject_mso_credential(body.app_id, credential)
+    if body.server_id is not None and body.app_id != my_house.APP_ID:
+        raise HubError(422, "validation_error", "Alleen my_house gebruikt een server-ID.")
     if (replay := _replay_link(idem)) is not None:
         return replay
     secret = None if body.app_id == mso.APP_ID else _credential(credential)
     target = _target(db, body.app_id, body.catalog_app_id)
     if (replay := _replay_link(idem)) is not None:
         return replay
-    if body.app_id == "my_house":
-        raise HubError(
-            501, "capability_unavailable", "De inwisseling van my_house-koppelcodes is nog niet beschikbaar."
-        )
     nas = current_target(db)
     base, peers = _destination(target, body.basis_url, secret, nas, _published_ports(db, settings, nas))
     _unique_target(db, body.catalog_app_id)
     link_id = uuid.uuid4()
     ref = make_ref("adapters", f"{body.app_id}.{link_id}")
-    meta = vault.put(db, ref, secret, actor=admin.actor) if secret is not None else None
     row = AdapterLink(
         id=link_id,
         app_id=body.app_id,
@@ -375,9 +494,14 @@ def create_link(
         basis_url=base,
         peer_addresses=peers,
         geheim_ref=ref,
-        laatste4=meta.last4 if meta else "",
-        ingevoerd_op=meta.updated_at if meta else utcnow(),
+        laatste4="",
+        ingevoerd_op=utcnow(),
     )
+    if body.app_id == my_house.APP_ID and secret is not None:
+        secret = _house_pair(db, settings, row, target, secret, body.server_id)
+    if secret is not None:
+        meta = vault.put(db, ref, secret, actor=admin.actor)
+        row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
     db.add(row)
     db.flush()
     _record(db, admin, row, "created")
@@ -406,6 +530,8 @@ def update_link(
     if (replay := _replay_link(idem)) is not None:
         return replay
     _precondition(row, if_match)
+    if body.server_id is not None and row.app_id != my_house.APP_ID:
+        raise HubError(422, "validation_error", "Alleen my_house gebruikt een server-ID.")
     catalog_app_id = body.catalog_app_id or row.catalog_app_id
     base = body.basis_url or row.basis_url
     if not body.doel_bevestigd and (catalog_app_id != row.catalog_app_id or base.rstrip("/") != row.basis_url):
@@ -429,22 +555,33 @@ def update_link(
         raise HubError(422, "validation_error", "De waarde van het adaptercredential is ongeldig.")
     elif not _binding_is_current(row, target, nas, owners):
         raise _binding_conflict()
+    if row.app_id == my_house.APP_ID and secret is not None:
+        if not body.doel_bevestigd and body.server_id not in (None, row.my_house_server_id):
+            raise HubError(422, "validation_error", "Bevestig de nieuwe server-ID.")
+        server_id = body.server_id if body.doel_bevestigd else row.my_house_server_id
+        secret = _house_pair(db, settings, row, target, secret, server_id)
     if secret is None:
         _delete_credential(db, row)
         row.laatste4, row.ingevoerd_op = "", utcnow()
     else:
         meta = vault.put(db, row.geheim_ref, secret, actor=admin.actor)
         row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
-    row.laatste_status, row.observed_at, row.max_age_s, row.laatste_fout = None, None, None, None
+    row.laatste_status, row.observed_at, row.max_age_s = None, None, None
+    if row.app_id != my_house.APP_ID:
+        row.laatste_fout = None
     row.version += 1
     _record(db, admin, row, "updated")
     return _save_link(idem, 200, row)
 
 
 @router.post(
-    "/{link_id}/test", response_model=MsoTestReceipt | LinkReceipt, summary="Openbare verbinding testen (beheerder)"
+    "/{link_id}/test",
+    response_model=MsoTestReceipt | MyHouseTestReceipt | LinkReceipt,
+    summary="Adapterverbinding testen (beheerder)",
 )
-def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: SettingsDep) -> JSONResponse:
+def test_link(
+    link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: SettingsDep, vault: VaultDep
+) -> JSONResponse:
     if (replay := _replay_link(idem)) is not None:
         return replay
     row = _link(db, link_id, lock=True)
@@ -459,7 +596,21 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
 
     policy = settings.outbound_policy()
     probes = None
-    if row.app_id == mso.APP_ID:
+    snapshot = None
+    if row.app_id == my_house.APP_ID:
+        adapter = _house_adapter(db, settings, row, target)
+        now = utcnow()
+        try:
+            credential = _house_credential(db, vault, row, now)
+            credential = _house_renew(db, vault, row, adapter, credential, now)
+            snapshot = adapter.snapshot(credential.token)
+        except OutboundError as exc:
+            measurement = basis.Measurement(status="unknown", reason_code=exc.reason)
+        else:
+            measurement = basis.Measurement(status="healthy", observed_at=snapshot.observed_at)
+            row.my_house_status = my_house.health(snapshot)
+        _house_transition(db, row, measurement.reason_code)
+    elif row.app_id == mso.APP_ID:
         result = mso.public_probes(row, policy, check_binding=check_binding)
         measurement, probes = result.connection, result.probes
         for failure in result.failures:
@@ -482,7 +633,12 @@ def test_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: Se
         row.max_age_s = basis.MAX_AGE_S
     row.version += 1
     _record(db, admin, row, "tested")
-    return _save_link(idem, 200, row, probes=probes)
+    receipt: LinkReceipt | None = None
+    if probes is not None:
+        receipt = MsoTestReceipt(id=row.id, version=row.version, probes=probes)
+    if row.app_id == my_house.APP_ID:
+        receipt = MyHouseTestReceipt(id=row.id, version=row.version, my_house=snapshot)
+    return _save_link(idem, 200, row, receipt)
 
 
 @router.delete("/{link_id}", response_model=Verwijderd, summary="Adapterkoppeling en kluiswaarde wissen (beheerder)")
@@ -495,6 +651,8 @@ def delete_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, if_match: 
     if row is None:
         raise HubError(404, "not_found", "Adapterkoppeling niet gevonden.")
     _precondition(row, if_match)
+    if row.app_id == my_house.APP_ID and row.geheim_ref != make_ref("adapters", f"{my_house.APP_ID}.{row.id}"):
+        raise _binding_conflict()
     _delete_credential(db, row)
     _record(db, admin, row, "deleted")
     db.delete(row)

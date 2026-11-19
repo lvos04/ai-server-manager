@@ -1,8 +1,7 @@
 # Koppelingen met bestaande apps
 
 S-P3-020 levert de Hub-API en opslag voor de koppelingen uit ADR-0034. S-P3-040 voegt de openbare
-MSO-probes toe. De koppelcode voor my_house vereist eerst de
-inwisseling uit S-P3-050. Tot die tijd antwoordt de Hub met `capability_unavailable` op die koppeling.
+MSO-probes toe. S-P3-050 voegt de leeskoppeling met my_house toe.
 
 - De beheerder maakt een koppeling onder `/api/v1/adapterkoppelingen` en bevestigt het HTTPS-basisadres
   en de bijbehorende instantie uit de Hub-catalogus. De app-ID moet overeenkomen met die registratie.
@@ -17,7 +16,7 @@ inwisseling uit S-P3-050. Tot die tijd antwoordt de Hub met `capability_unavaila
   nieuwe credentialinvoer vereist. De Hub verwijdert dan de vorige contactmeting. Een ingelogde
   gebruiker kan de lijst en het detail lezen.
 - De beheerder voert de contactproef uit via `POST /api/v1/adapterkoppelingen/{link_id}/test`. De Hub
-  gebruikt alleen de openbare leesprobes voor de gekozen app. Het verbonden adres moet binnen de
+  gebruikt de vastgelegde leesroutes voor de gekozen app. Het verbonden adres moet binnen de
   bevestigde adresbinding vallen en het TLS-certificaat moet bij de ingestelde hostnaam passen.
   Doorverwijzingen worden geweigerd. Bij uitval is de contacttoestand onbekend. Een contactmeting
   ouder dan 900 seconden wordt `unknown` met `meting_verouderd`. Een openbare probe stelt alleen
@@ -43,3 +42,34 @@ Een mislukte probe geeft voor dat onderdeel `null` en maakt de contactmeting `un
 bevat een vaste Hub-redencode en, bij een bekende bronfoutcode, de vormgecontroleerde broncorrelatie.
 De beschermde datasets blijven `capability_unavailable` en hun metingen `unknown`. Hiervoor is een
 afzonderlijke stap nodig met de verifieerbare rechtenverklaring uit ADR-0034.
+
+## my_house
+
+1. Maak als beheerder in my_house een koppelcode met rol `viewer` en doel `hub`. De huidige
+   my_house-versie geeft deze code uit via de beheer-API `POST /api/v1/pairing/codes`. Gebruik de
+   `server_id` uit het uitgifteantwoord om de instantie in de Hub te bevestigen.
+2. Voeg in de Hub bij het aanmaken `server_id` toe aan de gebruikelijke JSON-body en stuur de
+   code via `X-Adapter-Credential`. De Hub controleert de server-ID via de openbare identiteitsroute.
+   Na inwisseling controleert de Hub opnieuw de server-ID, de rol, het doel en de eindige
+   vervaltijd. De kluis bewaart alleen het uitgegeven token. De bevestiging bevat het
+   koppelings-ID en de versie.
+3. Test de koppeling via `POST /api/v1/adapterkoppelingen/{link_id}/test`. De Hub toetst de
+   doelbinding vóór elk uitgaand verzoek en gebruikt het serverbewijs van my_house vóór
+   tokengebruik. Het veld `my_house` bevat de databaseprobe, systeemchecks, instellingen
+   en per woning de zones, verlichting, open meldingen en apparaten. Het overzicht wordt
+   samengesteld uit deze leesroutes. Het aantal meldingen is begrensd zodra de bronlimiet
+   van honderd is bereikt. Sensorwaarden zonder verse meting zijn leeg. De gebruikerslink
+   verschijnt alleen als een LAN- of extern adres uit de instellingen overeenkomt met het
+   bevestigde HTTPS-basisadres. Een herhaalde idempotente bevestiging behoudt de oorspronkelijke
+   meettijd. De detailroute geeft de actuele beoordeling van de opgeslagen gezondheid.
+4. De worker controleert elk uur of een token binnen dertig dagen verloopt. Een mislukte
+   vernieuwing of geweigerd token maakt de status `unknown` en opent een incident. Een
+   geslaagde leesproef bevestigt het herstel. Bij een verlopen of ingetrokken koppeling maak je
+   een nieuwe Hub-koppelcode en voer je die in via `PATCH`. Bij een gewijzigde instantie
+   bevestig je ook de nieuwe `server_id` en bestemming. Intrekken van de koppeling in my_house
+   gebeurt vanuit my_house.
+
+De adapter beperkt de woninggegevens tot de leeslijst van ADR-0034. De boiler wordt uitsluitend
+gemeten en het energiedomein blijft bij home-control-hub. Migratie `0019` voegt de binding,
+vervaldatum en laatste gezondheidsstatus toe. De downgrade verwijdert de hiermee gemaakte
+my_house-koppelingen en hun kluiswaarden. Andere koppelingen en hun kluiswaarden blijven behouden.

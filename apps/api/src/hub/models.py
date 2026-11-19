@@ -457,6 +457,10 @@ class AdapterLink(Base):
     max_age_s: Mapped[int | None] = mapped_column(Integer)
     laatste_fout: Mapped[str | None] = mapped_column(String(64))
     version: Mapped[int] = mapped_column(Integer, default=1)
+    my_house_server_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    my_house_client_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    my_house_expires_at: Mapped[datetime | None] = mapped_column(TS)
+    my_house_status: Mapped[str | None] = mapped_column(String(16))
 
 
 class HealthObservation(Base):

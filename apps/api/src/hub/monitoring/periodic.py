@@ -161,6 +161,12 @@ def _task_sources(db: Session, ctx: Context) -> dict[str, Any]:
     return poll_all(db, ctx.settings, ctx.vault, ctx.keyring, now=ctx.now)
 
 
+def _task_my_house(db: Session, ctx: Context) -> dict[str, Any]:
+    from hub.routers.adapterkoppelingen import renew_my_house_links
+
+    return renew_my_house_links(db, ctx.settings, ctx.vault, ctx.now)
+
+
 def _task_alerts(db: Session, ctx: Context) -> dict[str, Any]:
     added = alerts.seed_default_rules(db)
     return {"standaardregels_toegevoegd": added, **alerts.evaluate(db, ctx.settings, now=ctx.now)}
@@ -204,6 +210,7 @@ def _task_logs(db: Session, ctx: Context) -> dict[str, Any]:
 TASKS: list[Task] = [
     Task("nas_meten", lambda s: s.nas_metrics_interval_seconds, _task_nas),
     Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
+    Task("my_house_vernieuwen", lambda _s: 3600, _task_my_house),
     Task("gezondheid_vastleggen", lambda s: s.health_record_interval_seconds, _task_health),
     Task("alerts_evalueren", lambda s: s.alert_interval_seconds, _task_alerts),
     Task("incidenten_bijwerken", lambda s: s.incident_interval_seconds, _task_incidents),

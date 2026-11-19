@@ -197,6 +197,20 @@ def _hub(ev: EventIn) -> Signaal | None:
             "Media Source Optimizer",
             details=_safe_details(ev, ("reason_code",)),
         )
+    if et in ("monitoring.my_house.failed", "monitoring.my_house.recovered"):
+        recovered = et.endswith(".recovered")
+        return Signaal(
+            "herstel" if recovered else "probleem",
+            "monitoring.my_house",
+            f"{APP_ID}:my_house:{eid}",
+            "Leeskoppeling met my_house hersteld" if recovered else "Leeskoppeling met my_house niet beschikbaar",
+            "info" if recovered else "waarschuwing",
+            "hub:monitoring",
+            "adapter_link",
+            eid,
+            "my_house",
+            details=_safe_details(ev, ("reason_code",)),
+        )
     if et in ("monitoring.source.failed", "monitoring.source.recovered"):
         naam = _s(p.get("naam"), 64) or eid
         fp = f"{APP_ID}:monitor_source:{eid}"
