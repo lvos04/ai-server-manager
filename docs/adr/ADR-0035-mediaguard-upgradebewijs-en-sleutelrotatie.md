@@ -48,14 +48,32 @@ moet de eigenaar bij een toekomstige bouwstap de geteste digest vastleggen in he
 
 ### Weigering in de Hub
 
-In P3 blijft `APP-MEDIAGUARD` in `policy/apps.yaml` van kracht, ook als een bruikbaar rapport wordt
-gevonden. Er is geen weg via het algemene appbeheer, een handmatig goedgekeurd voorstel of een
-direct `ExecutionRequest` om toch een MediaGuard-update te starten. Herken MediaGuard aan de
-huidige installatie én aan het beoogde image. Wanneer identiteit onduidelijk is, blijft de actie
-geweigerd. Dit geldt voor alle uitvoeringspaden, inclusief catalogus-upgrades, achtergronduitvoering
-en retry. Pas in een expliciete latere bouwstap mag een updatepad beschikbaar komen. Dan controleert
-de Hub vóór goedkeuring en opnieuw vóór het versturen, en weigert de executor vóór elke mutatie
-zelfstandig bij ontbrekend, ongeldig of verlopen bewijs voor de dan geldende bron en doel.
+**Bestaande bescherming en beperking.** `APP-MEDIAGUARD` in `policy/apps.yaml` weigert
+`app.update`, `app.rollback` en `app.uninstall` als de Hub of executor MediaGuard herkent.
+Ook de executor weigert bij een geldig goedgekeurd verzoek. De herkenning gebruikt de gegevens
+van de geïnstalleerde app, het expliciete doelimage van een Custom App-update en het vorige
+image bij terugzetten met een bewaard herstelrecept. Voor het doelimage van een catalogusupdate
+of -terugzetting bevat het voorstel alleen de gevraagde catalogusversie. De Hub en executor stellen
+voor die versie nog geen doelimages vast. Een gewoon catalogusdoel kan daardoor de bestaande controles
+passeren terwijl de doelimages onbekend zijn. De B12-back-upcontrole in de Hub controleert
+het herstelpunt. Behandel een catalogusactie waarvan de doelimages onbekend zijn als onbewezen
+voor MediaGuard-bescherming en voer die actie niet uit als de aanwezigheid van een beschermd
+image vooraf niet kan worden uitgesloten.
+
+**Open werk voor catalogus-appbeheer, als vervolg op S-P2-050.** Laat Hub en executor uit
+vertrouwde catalogusgegevens voor de exacte app, trein en gekozen versie alle doelimages en
+hun digests vaststellen. Bind die gegevens aan het voorstel, de goedgekeurde diff en de
+daadwerkelijk aangevraagde versie. De Hub controleert vóór goedkeuring en opnieuw vóór het versturen.
+De executor controleert vóór elke mutatie zelfstandig of de doelimages nog eenduidig vaststaan,
+overeenkomen met de goedkeuring en volgens het beleid zijn toegestaan. Ontbrekende,
+onvolledige of gewijzigde gegevens leiden tot weigering, ook bij een direct
+`ExecutionRequest`, achtergronduitvoering of een herhaalde poging.
+
+In P3 moet ieder herkend MediaGuard-doel geweigerd worden, ook met geldig releasebewijs.
+De cataloguscontrole hierboven is een voorwaarde voor de latere bouw van MediaGuard-updatebeheer.
+Die bouw mag pas uitvoering toestaan nadat de Hub en executor ook het releasebewijs uit deel A
+voor de exacte bron en het doel hebben gecontroleerd. De Hub doet dat vóór goedkeuring en opnieuw
+vóór het versturen. De executor weigert vóór mutatie bij ontbrekend, ongeldig of verlopen bewijs.
 Goedkeuring, het risicobeleid, back-upbevestiging, terugval, compatibiliteitscontroles en controles
 na de update blijven afzonderlijke voorwaarden. Ook via dat pad wordt nooit rechtstreeks in een
 database van Emby, Jelly Leon of MediaGuard geschreven.
@@ -129,12 +147,18 @@ ontvangers van de oude set stilzwijgend te passeren.
 
 ## Acceptatie bij de vervolgbouw
 
+- Meet in de lokale simulator nul muterende aanroepen bij een catalogusupdate of -terugzetting
+  met onbekende, onvolledige of sinds goedkeuring gewijzigde doelimages. Controleer dat de Hub
+  geen uitvoeringsverzoek verstuurt. Meet ook nul muterende aanroepen bij een direct verzoek aan
+  de executor met geldige, gebonden goedkeuring en bij herhaalde uitvoering. Herhaal de weigering
+  voor een herkend MediaGuard-doel. Laat een gewone catalogusapp met aantoonbaar toegelaten
+  doelimages en een geldige goedkeuring wel bijwerken en terugzetten.
 - Een lokaal gesimuleerde release met volledig, passend bewijs krijgt de bewijsstatus geldig.
-  P3 weigert ook dan de update. Ontbrekend, verlopen, teruggetrokken of niet aan de geteste
-  digest gebonden bewijs mag nooit leiden tot een muterend verzoek. Test ook een rapport uit
-  een mislukte of andere poging, een gewijzigd voorstel en een herhaling na het verstrijken
-  van de geldigheid. De proef controleert afwezigheid van elk muterend verzoek, ook bij een
-  direct verzoek aan de executor.
+  In P3 blijft het updatepad voor MediaGuard ook met geldig bewijs gesloten. Ontbrekend, verlopen,
+  teruggetrokken of niet aan de geteste digest gebonden bewijs mag nooit leiden tot een muterend
+  verzoek. Test ook een rapport uit een mislukte of andere poging, een gewijzigd voorstel en een
+  herhaling na het verstrijken van de geldigheid. De proef controleert afwezigheid van elk muterend
+  verzoek, ook bij een direct verzoek aan de executor.
 - Bevestiging van alle actieve ontvangers maakt in de latere rotatiebouw de juiste nieuwe
   sleutel activeerbaar. Beproef ook één offline app, een andere instantie, een oude volgorde,
   ontbrekende tweede policy-sleutel, ongeldige handtekening, mislukte opslag en een nieuwe

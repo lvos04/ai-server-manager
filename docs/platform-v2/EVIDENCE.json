@@ -645,7 +645,7 @@
     "validatie": "Niet getest",
     "bewijs": "S-P3-015: docs/adr/ADR-0035-mediaguard-upgradebewijs-en-sleutelrotatie.md",
     "blokkade": "",
-    "opmerking": "ADR upgradebewijs vastgelegd. Deze regel wacht op bouwvalidatie van C1.3-ASM-19.",
+    "opmerking": "ADR upgradebewijs vastgelegd. Bouwvalidatie wacht op de weigering van catalogusacties met onbewezen doelimages en op controle van het releasebewijs in Hub en executor.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-19"
   },
