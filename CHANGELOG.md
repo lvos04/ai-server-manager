@@ -6,9 +6,11 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ### Vastgelegd — Leesadapters voor bestaande apps (S-P3-010)
 - [ADR-0034](docs/adr/ADR-0034-adapters-bestaande-apps.md) legt voor MediaGuard, MSO en my_house de
-  leesroutes, veldselectie, kluiskoppeling en versheid vast. MSO en MediaGuard stappen per dataset
-  over zodra de connector aantoonbaar werkt. Het energiedomein van home-control-hub leest als enige
-  de energiecijfers van my_house en levert ze aan B01-011.
+  leesroutes, veldselectie, kluiskoppeling en versheid vast. MediaGuard-leesroutes met bijwerkingen
+  blijven uitgesloten. De connectorovergang bewaakt bronvolledigheid, vergelijkbare meetwaarden en
+  paginering per momentopname. MSO vereist vooraf bewijs van uitsluitend leesrechten en behoudt de
+  specifieke authenticatiefout bij de overgang. Het energiedomein van home-control-hub leest als
+  enige de energiecijfers van my_house en levert ze aan B01-011.
 
 ### Gerepareerd — Hub: lokale aanmelding bij ontbrekende nood-TOTP (KLEIN-110)
 - Bij een ontbrekende of onleesbare nood-TOTP-kluisrij meldt de Hub dat het noodaccount niet werkt. "OIDC verplicht"

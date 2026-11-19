@@ -665,7 +665,7 @@
     "validatie": "Niet getest",
     "bewijs": "S-P3-010: docs/adr/ADR-0034-adapters-bestaande-apps.md",
     "blokkade": "",
-    "opmerking": "besluit vastgelegd, bouw volgt",
+    "opmerking": "besluit vastgelegd en na review aangescherpt, bouw volgt vanaf S-P3-020",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-19"
   },

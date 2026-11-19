@@ -1,6 +1,6 @@
 # ADR-0034 — Leesadapters voor bestaande apps
 
-Status: ontwerp ter review · 2026-11-19 · S-P3-010 · niveau N3.
+Status: ontwerp ter review · 2026-11-19 · S-P3-010 · niveau N4.
 
 Contract 1.3 met aanvulling C-12. De Hub projecteert de bestaande API's van MediaGuard, Media Source Optimizer
 (MSO) en my_house op het leesmodel van §6. Elke app blijft eigenaar van zijn data, bestaande cliënten en
@@ -65,66 +65,135 @@ als onbeschikbaar. Noodstop uit is uitgesloten. Herzoek blijft gereserveerd tot 
 | --- | --- | --- |
 | `GET /api/v1/health` | Openbaar, zonder sleutel | `status`, `version` |
 | `GET /api/v1/auth/me` | Sleutelcontrole, exact viewer | `role`, `scopes` uitsluitend voor rechtencontrole |
-| `GET /api/v1/status` | Viewer | `version`, `time`, `emergency_stop.active`, `emergency_stop.since`, `jobs.queued`, `jobs.running`, `jobs.failed`, `unread_notifications`, `attention.count/errors/warnings`, `health.complete`, `health.encoder` |
-| `GET /api/v1/mediaserver/status` | Viewer | Per `servers[]`: `server_id`, `kind`, `label`, `connected`, `hold.active` |
-| `GET /api/v1/attention` | Viewer | `count`, `errors`, per incident `items[].key/severity/count`, oorzaakcode uit de bekende broncodes |
 | `GET /api/v1/wanted` | Viewer | `total`, per item `id` als `wanted_id`, `kind`, `reason`, `status`, `updated_at` waar aanwezig. Vaste paginering |
-| `GET /api/v1/downloads/health` | Viewer | Per tijdvak uit `sources_7d` en `sources_30d`: `grabs`, `imported`, `failed` en `success_rate`, uitgesplitst naar brontype. Uit `causes` alleen `count` en uit `paused_items` hooguit het aantal |
 | `GET /api/v1/encoding/jobs` | Viewer | `status`, `created_at`, `updated_at`; totalen per toestand met vermelding als de lijst begrensd is |
-| `GET /api/v1/backups` | Viewer | `created_at`, `verified`; datum en integriteitsstatus van het laatste bruikbare resultaat |
 | `GET /connector/v1/discover` | Viewer, na bevestiging connectorversie | `app_id`, `source_version`, `schema_version`, leesrecht, `item_types`, `limits.max_age_s`, `timestamp_utc` |
-| `GET /connector/v1/health` | Viewer, na bevestiging connectorversie | `status`, `observed_at`, `reason_code`, `checks[].name/status/observed_at` en de begrensde jobdetails uit §6 |
-| `GET /connector/v1/items` | Viewer, na bevestiging connectorversie | `type`, `status`, `reason_code`, `observed_at`, `total`, `next_cursor`; per item `id`, `observed_at` en de veldselectie hieronder |
+| `GET /connector/v1/items` | Viewer, na bevestiging connectorversie en per type volgens de voorwaarden hieronder | `type`, `status`, `reason_code`, `snapshot_id`, `observed_at`, `total`, `next_cursor`; per item `id`, `observed_at` en de veldselectie hieronder |
 
-Per server is de lijst `servers` leidend, ook bij een lege lijst. Alleen als `servers` ontbreekt gebruikt
-de adapter `kind`, `label`, `connected` en `hold.active` op het hoogste niveau als één legacy-server.
-Een ongeldige lijst wordt `unknown`. Gebruik alleen een geldige weergavenaam voor `label`. Buiten de
-projectie blijven onder meer `sessions`, `hold.reason`, `actions`, `tests` en `last`. De Hub slaat die
-velden nooit op, logt ze nooit en toont ze nooit. Kijkgedrag blijft bij de bestaande mediaservers.
+#### Uitgesloten routes
 
-**Overgang S-P3-610 en S-P3-615.** Gebruik de bestaande routes bij een bevestigde legacy-versie. Voor een
-bevestigde connectorversie neemt `health` de gelijkwaardige gezondheidschecks over. Na verificatie van
-schema, rechten, versheid en overeenstemming van de vijf datasets leest de adapter `items` voor
-`wanted` (type, reden, toestand), `status` (noodstopstatus/tijd, job- en meldingaantallen), `downloads`
-(toestand, voortgang, wacht op import), `av1_lanes` (cpu/gpu, bezetting, beschikbare en gewenste
-plaatsen, pauzestatus) en `incidents` (eigenaar, oorzaak, ernst, aantal). Dit volgt de afgebakende
-itemvormen in `connector/items.py`. Gebruik hooguit 200 items per pagina, vaste types en ondoorzichtige
-cursors. Gebruik per dataset één pad en tel vergelijkingsresultaten nooit dubbel. Op de bestaande
-mediaserverroute blijven de per-serverstatus en de veldenwitte lijst van toepassing. Houd de bestaande
-back-upmetadata en noodstoplezing waar de connector iets mist. `evidence` en events worden hier niet
-gepold. Een 401, 403, timeout, ongeldig schema of onverwacht antwoord leidt tot `unknown` voor de
-geraakte gegevens. Gebruik geen legacy-terugval om een fout of weigering op een geconfigureerde
-connector te omzeilen.
+Behandel de volgende routes bij bronversie `97410b9` als `capability_unavailable`. De tabel hierboven
+is de leeslijst voor die versie. Laat een uitgesloten route of vervangende gegevensbron pas toe bij
+positief bewijs voor de vastgestelde versie en configuratie, inclusief de bijbehorende negatieve proef.
+Ontbrekende metingen uit een uitgesloten route zijn `unknown`.
 
-Opslagprognose blijft voorlopig `capability_unavailable`. De in S-P3-030 genoemde
-`/api/v1/storage/forecast` vraagt een actuele poolmeting aan en schrijft de poolstatus terug
-(`storage_forecast.py::storage_forecast` en `record_pool`). Voor een Hub-lezer is een uitleesbaar,
-reeds gemeten resultaat zonder die bijwerking nodig.
+| Uitgesloten pad | Reden en voorwaarde voor toelating |
+| --- | --- |
+| `/api/v1/status`, `/api/v1/attention`, `/connector/v1/health` | Een viewer-verzoek kan een opgeslagen keuze om een melding te verbergen wissen. Beproef elk pad afzonderlijk met een gewijzigde melding. Ook dan blijft de opgeslagen meldingskeuze intact. Voor incidenten geldt bovendien de volledigheidsproef hieronder. |
+| `/api/v1/mediaserver/status` | Bij versleutelde gegevens zonder sleutelbestand kan de route een bestand aanmaken. Beproef dat het sleutelbestand na het verzoek afwezig blijft en dat ontbrekende contactmetingen `unknown` worden. |
+| `/api/v1/backups` | De route maakt een ontbrekende map aan. Kies een uitlezing waarbij de back-upmap na het verzoek afwezig blijft en de meting dan `unknown` is. Projecteer uitsluitend `created_at` en `verified` van de laatste bruikbare back-up. |
+| `/api/v1/downloads/health` | De route kan voor een live diagnose op de downloadclient inloggen, ook bij een beperkte Hub-projectie. Gebruik uitsluitend een bron die de reeds verzamelde statistiek uitleest zonder live diagnose of opslagwijziging. |
+| `/api/v1/storage/forecast` | De route kan een nieuwe poolmeting starten en de poolstatus wegschrijven. Gebruik uitsluitend een reeds gemeten resultaat dat zonder die bijwerking kan worden uitgelezen. |
 
-Health: `status: ok` op de openbare probe is alleen liveness. Vertaal verse bevestigde
-onderdeelfouten naar `degraded`, expliciet offline onderdelen naar `down`, en ontbrekende of
-onvolledige metingen naar `unknown`. `connected: false` is `down` voor die mediaserver. Een actieve
-noodstop is een afzonderlijke beveiligingsstatus. Zonder verse noodstopmeting blijft deze onbekend.
+#### Mediaserverstatus
+
+Zodra een veilige uitlezing is bevestigd, is `servers[]` per server leidend, ook bij een lege lijst.
+Alleen als `servers` ontbreekt gebruikt de adapter de legacy-velden op het hoogste niveau voor één
+server. Projecteer `server_id` indien beschikbaar, `kind`, een geldige weergavenaam als `label`,
+`connected` en `hold.active`. Een ongeldige lijst wordt `unknown`. De veldselectie sluit
+`sessions`, `hold.reason`, `actions`, `tests` en `last` uit van opslag, logs en weergave.
+Kijkgedrag blijft bij de bestaande mediaservers.
+
+Gebruik voor serverhealth uitsluitend een privacyveilige bron met een expliciet contactresultaat en
+een geldige brontijd voor dezelfde server, binnen de strengste versheidsgrens uit §3. Ontbrekend
+of verlopen contact wordt `unknown`, een verse expliciete contactfout wordt `down` en een vers
+expliciet succes wordt `healthy`. Het legacyveld `connected` geeft alleen de verbindingsindicatie.
+Zonder bevestigde contactmeting blijft serverhealth `unknown`, bij beide waarden van `connected`.
+
+#### Connectorovergang en gegevensbronnen
+
+S-P3-610 en S-P3-615 bevestigen per type het schema, de viewer-rechten, de neveneffectvrije uitlezing,
+de meettijd en eventuele gelijkwaardigheid. Gebruik voor B04-002 dezelfde testinstallatie, meetperiode,
+scope, filters en telling. Kies één bron per meetwaarde. Bij vergelijking blijven de testwaarden
+gescheiden en telt alleen de gekozen bron mee. Gebruik de volgende veldselectie en toewijzing.
+
+| Dataset | Vergelijking en bronkeuze |
+| --- | --- |
+| wanted | Vergelijk equivalent open wanted-bereik, het totaal, `wanted_id`, soort en reden bij gelijke filters en dezelfde meetpopulatie. Vergelijk toestand alleen bij aantoonbaar dezelfde betekenis. Schakel dan de hele wanted-meting over naar `items` van type `wanted`. Gebruik vóór die overgang de toegelaten legacy-uitlezing. |
+| status | Vergelijk noodstop actief en sinds, aantallen wachtende, actieve en onopgeloste mislukte jobs en ongelezen waarschuwingen en fouten bij dezelfde definities en peildatum. In `97410b9` is alleen het connectoritem `status` kandidaat voor deze waarden. Gebruik een onafhankelijke neveneffectvrije testreferentie voor vergelijking zolang het legacy-pad is uitgesloten. |
+| downloads | De historische uitkomsten over 7 en 30 dagen per brontype (`grabs`, `imported`, `failed`, `success_rate`) komen uitsluitend uit een toegelaten uitlezing van verzamelde statistiek en blijven tot die tijd `unknown`. Type `downloads` levert de actuele voortgang, toestand en wachten-op-import per item. Vergelijk actuele waarden alleen met een veilige referentie voor dezelfde wachtrij en peildatum. |
+| AV1 | Legacy `/api/v1/encoding/jobs` blijft bron voor jobtotalen per toestand, met vermelding van een begrensde lijst. Type `av1_lanes` levert CPU- en GPU-banen met bezetting, slotlimieten, gewenste plaatsen en pauzestatus. Vergelijk baanmetingen alleen met een veilige referentie met dezelfde baan, eenheid en meettijd. |
+| incidenten | Vergelijk bij volledige waarnemingen de incidenten over hetzelfde bronbereik per begrensde bron-ID, eigenaar, bekende oorzaakcode, ernst en aantal. Kies één volledige bron, met `incidents` als connectorbron. Legacy-incidenten zijn uitgesloten zolang de routebijwerking of het ontbreken van volledigheidsbewijs speelt. |
+
+Voor een actuele incidentenlijst is afzonderlijk bewijs van bronvolledigheid nodig, inclusief de encoder
+en de overige verwachte deelbronnen. Legacy `/api/v1/attention` kan bij een encoderfout een lege lijst
+met nultellers leveren en geeft zelf geen volledigheidssignaal. Een onvolledige incidentenmeting is
+`unknown`. Een bevestigde, verse en volledige connectorwaarneming met `status: ok` kan een lege lijst
+als nul incidenten tonen. Beproef een falende encoder en een bereikbare encoder met nul incidenten
+afzonderlijk. Geef verschillende waarden aan de historische uitkomsten, actuele downloads, jobtotalen
+en baanslots in de overgangsproef. Toets behoud en enkelvoudige telling van de beschikbare waarden
+en `unknown` voor ontbrekende of onvolledige metingen.
+
+`status: ok` op de openbare probe is alleen liveness. Gebruik connector-health pas na bewijs voor die
+route en alleen voor gelijkwaardige checks met `status`, `observed_at`, `reason_code`,
+`checks[].name/status/observed_at` en de begrensde jobdetails uit contract §6. Vertaal verse bevestigde
+onderdeelfouten naar `degraded` en expliciet offline onderdelen naar `down`. Ontbrekende of onvolledige
+metingen worden `unknown`. Geef de noodstop als afzonderlijke beveiligingsstatus uit het toegelaten
+statusitem. Zonder verse noodstopmeting blijft de stand onbekend. De leeslijst bevat geen `evidence`
+of events. Een 401, 403, time-out, ongeldig schema of onverwacht antwoord leidt tot `unknown` voor
+de geraakte gegevens. Een geconfigureerde connector blijft de enige bron na een fout of weigering.
+
+#### Connectorpaginering
+
+Vraag per type hooguit 200 items per pagina met ondoorzichtige, door de bron afgegeven cursors.
+Controleer vanaf de eerste pagina het type, de versheid, `snapshot_id`, `observed_at` en het totaal.
+Vervolgpagina’s horen bij dezelfde meting en melden dezelfde `snapshot_id`, dezelfde `observed_at`
+en hetzelfde totaal. Zonder `snapshot_id` volstaat `observed_at` alleen als de bron daarmee aantoonbaar
+eenzelfde momentopname over alle pagina’s garandeert. De uitzondering in contract §5 voor een gewone
+tabel met een stabiele sorteersleutel geldt alleen voor tabellen die geen meting voorstellen.
+Het gepinde `wanted` gebruikt een stabiele sleutel en de oudste meettijd, zonder momentopnamebinding.
+Gebruik die connectorvariant uitsluitend wanneer één verse, volledige pagina het totaal dekt.
+
+Publiceer een verzameling pas na de laatste pagina als het aantal unieke items het totaal dekt.
+Bij 409 `snapshot_changed` of verschil in momentopname, meettijd of totaal, verwerp de volledige
+deelverzameling en begin opnieuw zonder cursor. Bij uitputting van het retrybudget blijft de meting
+`unknown` en is een eerdere waarde uitsluitend laatst bekend. Beproef twee consistente pagina’s,
+herstart bij wisseling tussen pagina’s en bevestig dat pagina’s van de vervallen meting wegblijven.
 
 ### MSO
 
-Gebruik een rolvrije machine-sleutel met uitsluitend scope `read` via `X-Api-Key`. De actuele
-`mso/machine_keys.py::READ_ROUTES` en OpenAPI-export bepalen welke bestaande routes deze sleutel
-toelaten. Een oudere installatie zonder deze voorziening levert alleen openbare probes. Een gewone
-MSO-sessie, CSRF-token of gebruikerswachtwoord wordt geweigerd als koppelmethode.
+#### Openbare probes
 
 | Route | Recht | Toegestane velden |
 | --- | --- | --- |
 | `GET /healthz` | Openbaar, zonder sleutel | `status`, `version`; de router zit bewust buiten de schema-export |
 | `GET /api/v1/setup/status` | Openbaar, zonder sleutel | `setup_required`, `completed`, `version` |
+
+#### Pas na bewezen sleutelrechten
+
+Een koppeling gebruikt een rolvrije machine-sleutel via `X-Api-Key`. Vóór de eerste beschermde uitlezing
+verifieert de Hub een door MSO ondertekende rechtenverklaring met de effectieve scopes exact `{read}`
+en een geldigheidsduur. De verklaring moet verifieerbaar gebonden zijn aan de aangeboden sleutel en
+de bevestigde doelinstantie. Controleer sleutelbinding en handtekening lokaal tegen een vooraf voor
+die instantie bevestigde verificatiesleutel. Accepteer alleen een verklaring waarvan de rechten voor
+de sleutel onveranderlijk zijn gedurende de geldigheidsduur of waarvan de actuele rechten via een
+afzonderlijke, vertrouwde bevestiging kunnen worden vastgesteld vóór de beschermde uitlezing. Bij
+gewijzigde sleutel, rechten, bestemming, versie of verlopen bewijs vervalt de toelating tot
+herbevestiging. Weiger sleutels met extra of onbekende rechten zonder beschermde uitlezing. Een
+gebruikerssessie, CSRF-token of gebruikerswachtwoord wordt geweigerd.
+
+Discovery geeft geen bewijs van de effectieve scopes. Zowel een sleutel met `read`
+als een sleutel met `read` en `changes:approve` krijgt in `73d3a22` dezelfde `permissions: [read]`.
+Sleutelbeheer en `/api/v1/auth/me` zijn voor deze machine-identiteit ontoegankelijk. Gebruik bij deze
+versie alleen de openbare probes totdat MSO het benodigde bewijs levert. De beschermde datasets blijven
+`capability_unavailable` en hun metingen `unknown`. Een geslaagd leesverzoek of een door de Hub-gebruiker
+ingevulde scopenaam kan de vereiste MSO-bevestiging niet vervangen.
+
+S-P3-040 en S-P3-230 toetsen dat een bewezen sleutel met uitsluitend `read` wordt aanvaard en een
+sleutel met extra rechten vóór de eerste beschermde uitlezing wordt geweigerd. De volgende routes
+komen pas in aanmerking na die controle en bevestiging van de versie, routebevoegdheid en antwoordvorm
+volgens `mso/machine_keys.py::READ_ROUTES` en de OpenAPI-export.
+
+| Route | Recht | Toegestane velden |
+| --- | --- | --- |
 | `GET /api/v1/system/info` | Machine `read` | `version`, `schema_version`, `mode`, `paused` |
 | `GET /api/v1/system/health` | Machine `read` | `status`, `components[].name/status`; geen `message`, `label` of `disk` |
-| `GET /api/v1/overview` | Machine `read` | `mode`, `paused`, `health.status`, `generated_at`; geen `recent_audit` of kosten |
+| `GET /api/v1/overview` | Machine `read` | `mode`, `paused`, `health.status`, `generated_at`, `connectors.items[].id/configured/status/last_checked_at`; geen `recent_audit` of kosten |
 | `GET /api/v1/usenet/failure-reasons` | Machine `read` | `items[].key` voor een lokaal bekende oorzaakcode |
 | `GET /api/v1/mediaguard/compat` | Machine `read` | `checked_at` en `routes[].id/live` voor bekende capability-ID's |
 | `GET /api/v1/changes?status=preview` | Machine `read` | `items[].id/status`; uitsluitend previews en een vaste link naar MSO |
 | `GET /connector/v1/discover` | Machine `read`, na bevestiging connectorversie | `app_id`, `source_version`, `schema_version`, leesrecht, `limits.max_age_s`, `timestamp_utc` |
-| `GET /connector/v1/health` | Machine `read`, na bevestiging connectorversie | `status`, `observed_at`, `reason_code`, `checks[].name/status/observed_at` |
+| `GET /connector/v1/health` | Machine `read`, na bevestiging connectorversie | `status`, `observed_at`, `reason_code`, `checks[].name/status/observed_at`, bekende `checks[].detail.reason_code` |
 | `GET /connector/v1/items` | Machine `read`, na bevestiging connectorversie | `next_cursor`, per `connector` of `change_set`: `id`, `type`, `status`, `observed_at`, `reason_code`; toon alleen previews bij changes |
 
 **Overgang S-P3-230.** Stap over op connector-discovery, health en de beschikbare itemtypen nadat de
@@ -137,10 +206,23 @@ MSO-route-eigenaar moet een expliciet toegestane, neveneffectvrije leesroute lev
 of S-P3-150 die dataset aanzet. Gebruik geen `refresh` en leid readiness nooit af uit HTTP 200 alleen.
 De actuele bron bevat `/readyz`; compatibiliteit met oudere distribueerbare versies vereist apart bewijs.
 
-Health: `offline` wordt `down`, `auth_failed` wordt `degraded` met `reason_code: auth_failed`.
-Onbekende toestanden en ontbrekende metingen worden `unknown`. Gebruik bij een fout alleen
+Gebruik één geautoriseerde bron per check. Houd voor de contactcheck van een geconfigureerde
+MSO-connector de legacy-uitlezing uit `/api/v1/overview` aan zolang connector-health of het
+connectoritem `connector` het onderscheid tussen verse `auth_failed` en generieke `degraded`
+verliest. Gebruik daarvoor alleen bekende ID’s van geconfigureerde connectoren, hun `status` en de
+bijbehorende brontijd `connectors.items[].last_checked_at`. Bij ontbrekende bewezen sleutelrechten is ook
+de legacy-uitlezing onbeschikbaar en de check `unknown`. Voorkom dat een samenvattende
+connectorstatus de afzonderlijk gekozen contactcheck vervangt of dubbel meetelt.
+
+Vertaal verse `offline` naar `down` en verse `auth_failed` naar `degraded` met
+`reason_code: auth_failed`. Een verse generieke `degraded` blijft `degraded` zonder deze
+redencode. Vers `healthy` blijft `healthy`. Een onbekende toestand, een verouderde meting of
+ontbrekende meettijd geeft `unknown` volgens §3. Leg de overgang van deze check pas vast nadat de
+gekozen connectorvorm dezelfde code en meettijd aantoonbaar behoudt. Beproef verse `auth_failed`,
+generieke `degraded` en een verouderde meting via legacy, connector-health en het connectoritem.
+Gebruik bij een fout alleen
 `correlation_id` na vormcontrole en een bekende foutcode. Bij 401 of 403 meldt de Hub dat de
-koppeling of het leesrecht niet bruikbaar is en worden de geraakte gegevens `unknown`.
+koppeling of het leesrecht onbruikbaar is en worden de geraakte gegevens `unknown`.
 
 ### my_house
 
