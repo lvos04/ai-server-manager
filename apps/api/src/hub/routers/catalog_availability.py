@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import SQLAlchemyError
 
 from hub.catalog import availability
-from hub.deps import DB, ServiceP
+from hub.deps import DB, ServiceP, SettingsDep
 from hub.errors import HubError
 from hub.scopes import CATALOGUS_LEZEN, has_scope
 from hub.timeutil import UtcDateTime
@@ -99,6 +99,7 @@ async def _check_shape(request: Request) -> None:
 )
 def catalog_availability(
     db: DB,
+    settings: SettingsDep,
     train: Annotated[availability.Train, Query()],
     app: Annotated[str, Query(pattern=f"^{availability.APP_PATTERN}$", max_length=63)],
     version: Annotated[
@@ -120,7 +121,7 @@ def catalog_availability(
                 },
             )
     try:
-        state, measured = availability.read_pin(db, train, app, version)
-    except SQLAlchemyError as exc:
+        state, measured = availability.read_pin(db, settings, train, app, version)
+    except (OSError, SQLAlchemyError) as exc:
         raise _storage_unavailable() from exc
     return CatalogPin(train=train, app=app, version=version, beschikbaar=state, gemeten_op=measured)

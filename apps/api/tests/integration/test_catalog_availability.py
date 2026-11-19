@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import secrets
+import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import Event
 from types import SimpleNamespace
 from typing import Any
 
@@ -500,6 +504,99 @@ def test_geblokkeerde_voorraadlezing_houdt_worker_niet_vast(
         tijdig = taak.result(timeout=1.4)
     assert tijdig is None and fake_nas.calls == bron
     assert vorige_meting() == [("onbekend", None)] * 2
+
+
+def test_onbeschrijfbare_meetstart_weigert_vorige_pins(
+    vorige_meting: Any, app: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    factory, vault = app.state.sessionmaker, app.state.vault()
+    versies = fake_nas.data["catalog.get_app_details"]["stable"]["ix-app"]["versions"]
+    versies["1.4.7"] = {"version": "1.4.7"}
+    bron = list(fake_nas.calls)
+    with monkeypatch.context() as grens, factory.begin() as onderhoud:
+        grens.setattr(availability, "MEASUREMENT_TIMEOUT", 1.0)
+        onderhoud.execute(text("LOCK TABLE catalog_attempt IN SHARE MODE"))
+        availability.refresh_if_due(factory, settings, vault)
+        tijdens = vorige_meting()
+    factory.kw["bind"].dispose()
+    assert tijdens == vorige_meting() == [("onbekend", None)] * 2
+    assert fake_nas.calls == bron
+    with monkeypatch.context() as klok:
+        klok.setattr(availability, "utcnow", lambda: datetime.now(UTC) + timedelta(seconds=301))
+        availability.refresh_if_due(factory, settings, vault)
+        assert all(staat == "ja" and tijd is not None for staat, tijd in vorige_meting())
+    assert not fake_nas.mutations
+
+
+def test_onbereikbaar_startbewijs_trekt_de_momentopname_in(
+    vorige_meting: Any, app: Any, settings: Any, fake_nas: Any
+) -> None:
+    from hub.catalog import availability
+
+    bewijs = settings.data_dir / availability.MEASUREMENT_RECEIPT
+    bewaard = bewijs.rename(bewijs.with_suffix(".bewaard"))
+    bron = list(fake_nas.calls)
+    assert vorige_meting() == [("onbekend", None)] * 2
+    try:
+        bewijs.mkdir()
+        availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
+    finally:
+        bewijs.rmdir()
+        bewaard.rename(bewijs)
+    assert vorige_meting() == [("onbekend", None)] * 2
+    assert fake_nas.calls == bron and not fake_nas.mutations
+
+
+def test_klokcorrectie_laat_geen_tweede_worker_meten(
+    admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub.catalog import availability
+
+    connect(admin, fake_nas)
+    gelezen, hervat = Event(), Event()
+    call = availability.TrueNASClient.call
+
+    async def wacht_na_index(client: Any, method: str, params: Any = None) -> Any:
+        result = await call(client, method, params)
+        if method == "catalog.apps":
+            gelezen.set()
+            assert await asyncio.to_thread(hervat.wait, 12)
+        return result
+
+    monkeypatch.setattr(availability.TrueNASClient, "call", wacht_na_index)
+    tweede_worker = """
+import sys
+from datetime import UTC, datetime, timedelta
+from hub.app import create_app
+from hub.catalog import availability
+from hub.config import Settings
+
+settings = Settings.model_validate_json(sys.stdin.read())
+app = create_app(settings)
+availability.utcnow = lambda: datetime.now(UTC) + timedelta(seconds=301)
+availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
+"""
+    with ThreadPoolExecutor(max_workers=1) as worker:
+        eerste = worker.submit(availability.refresh_if_due, app.state.sessionmaker, settings, app.state.vault())
+        try:
+            assert gelezen.wait(5)
+            subprocess.run(
+                [sys.executable, "-c", tweede_worker],
+                input=settings.model_dump_json(),
+                text=True,
+                capture_output=True,
+                check=True,
+                timeout=10,
+            )
+        finally:
+            hervat.set()
+        eerste.result(timeout=5)
+    assert sum(method == "catalog.apps" for method, _ in fake_nas.calls) == 1
+    assert not fake_nas.mutations
 
 
 def test_geweigerde_publicatie_herstelt_geen_vorige_nee(

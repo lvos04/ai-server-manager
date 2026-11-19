@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import math
+import os
 import re
 import time
 import uuid
 from collections.abc import Iterator
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, suppress
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Any, BinaryIO, Literal
 
 import psycopg
 from cryptography.exceptions import InvalidTag
@@ -45,6 +47,7 @@ MEASUREMENT_TIMEOUT = 15.0
 FINISH_BUDGET = 0.1
 MEASUREMENT_INTERVAL = timedelta(seconds=300)
 MEASUREMENT_LOCK = 0x41534D4D33
+MEASUREMENT_RECEIPT = "catalogus-meetbewijs"
 DETAILS_PER_ROUND = 4
 IX_APP = ("stable", "ix-app")
 
@@ -276,10 +279,8 @@ def _measure_attempt(
     return published is not None
 
 
-def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Vault) -> None:
-    deadline = time.monotonic() + MEASUREMENT_TIMEOUT
-    work_until = deadline - min(FINISH_BUDGET, MEASUREMENT_TIMEOUT / 3)
-    started = utcnow()
+@contextmanager
+def _measurement_sessions(factory: sessionmaker[Session], deadline: float) -> Iterator[sessionmaker[Session]]:
     # Een bezette algemene workerpool mag de toelating niet dertig seconden ophouden.
     # De achtergrondmeting opent uitsluitend korte lokale transacties op dezelfde database.
     url = factory.kw["bind"].url
@@ -295,32 +296,88 @@ def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Va
         return connection
 
     engine = create_engine(url, poolclass=NullPool, creator=connect, hide_parameters=True)
-    sessions = sessionmaker(engine, expire_on_commit=False, autoflush=False)
     try:
-        attempt = _start_attempt(sessions, started, work_until)
-        if attempt is None:
-            return
-        try:
-            published = _measure_attempt(sessions, settings, vault, attempt, work_until)
-        except (DBAPIError, StorageTimeout, VaultError, InvalidTag, ValueError):
-            published = False
-        # Dit tijdstip ligt NA de commit van de momentopname. Een crash in deze tussenruimte
-        # of een late commit levert geen bewijs op. Een lezer gebruikt beide opgeslagen tijden.
-        finished = utcnow()
-        with _transaction(sessions, deadline) as db:
-            db.execute(
-                update(CatalogAttempt)
-                .where(CatalogAttempt.id == attempt.id)
-                .values(completed_at=finished if published else None, failed=not published)
-            )
-    except (DBAPIError, StorageTimeout):
-        # Een reeds vastgelegde, onafgeronde poging verloopt ook na een workerherstart.
-        return
+        yield sessionmaker(engine, expire_on_commit=False, autoflush=False)
     finally:
         engine.dispose()
 
 
-def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availability, datetime | None]:
+def _open_receipt(path: str, flags: int) -> int:
+    return os.open(path, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+
+
+def _confirmed_start(receipt: BinaryIO) -> datetime | None:
+    receipt.seek(0)
+    try:
+        started = datetime.fromisoformat(receipt.read(64).decode("ascii"))
+    except ValueError:
+        return None
+    return started if started.tzinfo is not None else None
+
+
+def _refresh(
+    sessions: sessionmaker[Session], settings: Settings, vault: Vault, receipt: BinaryIO, deadline: float
+) -> None:
+    # Alle Hub-processen delen de datamap. Het kernelslot blijft tijdens de bronlezing
+    # bestaan, ook als de systeemklok verspringt, en vervalt vanzelf bij een processtop.
+    try:
+        fcntl.flock(receipt, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return
+    started = utcnow()
+    previous = _confirmed_start(receipt)
+    if previous is not None and started - previous < MEASUREMENT_INTERVAL:
+        return
+
+    # Trek het oude bewijs in vóór de eerste databasehandeling. Ook een geweigerde
+    # INSERT of een processtop kan het oude ja/nee dan niet opnieuw geldig maken.
+    if receipt.tell():
+        receipt.truncate(0)
+        os.fsync(receipt.fileno())
+    work_until = deadline - min(FINISH_BUDGET, MEASUREMENT_TIMEOUT / 3)
+    attempt = _start_attempt(sessions, started, work_until)
+    if attempt is None:
+        return
+    # De nieuwe poging staat vast. De leesroute mag de vorige bevestigde meting
+    # tijdens die poging nog gebruiken tot de bestaande grens van 15 seconden.
+    if previous is not None:
+        receipt.write(previous.isoformat().encode("ascii"))
+    try:
+        published = _measure_attempt(sessions, settings, vault, attempt, work_until)
+    except (DBAPIError, StorageTimeout, VaultError, InvalidTag, ValueError):
+        published = False
+    # Dit tijdstip ligt na de commit van de momentopname. De leesroute toetst ook die duur.
+    finished = utcnow()
+    with _transaction(sessions, deadline) as db:
+        db.execute(
+            update(CatalogAttempt)
+            .where(CatalogAttempt.id == attempt.id)
+            .values(completed_at=finished if published else None, failed=not published)
+        )
+    receipt.truncate(0)
+    if published and time.monotonic() <= deadline:
+        receipt.write(started.isoformat().encode("ascii"))
+
+
+def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Vault) -> None:
+    deadline = time.monotonic() + MEASUREMENT_TIMEOUT
+    with _measurement_sessions(factory, deadline) as sessions, suppress(DBAPIError, StorageTimeout):
+        try:
+            with open(settings.data_dir / MEASUREMENT_RECEIPT, "a+b", buffering=0, opener=_open_receipt) as receipt:
+                _refresh(sessions, settings, vault, receipt, deadline)
+        except OSError:
+            # Trek het databasebewijs in als de worker het lokale bewijs niet kan bijwerken.
+            with _transaction(sessions, deadline) as db:
+                db.execute(
+                    update(CatalogSnapshot)
+                    .where(CatalogSnapshot.id == 1, CatalogSnapshot.observed_at.is_not(None))
+                    .values(observed_at=None)
+                )
+
+
+def read_pin(
+    db: Session, settings: Settings, train: Train, app: str, version: str
+) -> tuple[Availability, datetime | None]:
     with _statement_budget(db, time.monotonic() + MEASUREMENT_TIMEOUT):
         target, connection = current_target(db), db.get(TrueNASConnection, 1)
         if target is None or connection is None:
@@ -346,6 +403,11 @@ def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availab
             .order_by(CatalogAttempt.id.desc())
             .limit(2)
         ).all()
+    try:
+        with open(settings.data_dir / MEASUREMENT_RECEIPT, "rb", opener=_open_receipt) as receipt:
+            confirmed = _confirmed_start(receipt)
+    except FileNotFoundError:
+        confirmed = None
     now = utcnow()
     for started, completed, failed, observed, present in rows:
         if failed:
@@ -355,6 +417,8 @@ def read_pin(db: Session, train: Train, app: str, version: str) -> tuple[Availab
                 continue  # De eerdere meting kan tijdens een lopende poging nog geldig zijn.
             break
         if not 0 <= (completed - started).total_seconds() <= MEASUREMENT_TIMEOUT:
+            break
+        if confirmed != started:
             break
         if observed is not None and -120 <= (now - observed).total_seconds() <= 900 and present is not None:
             return ("ja" if present else "nee"), observed
