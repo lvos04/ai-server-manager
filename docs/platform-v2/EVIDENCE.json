@@ -663,11 +663,11 @@
     "id": "C1.3-ASM-21",
     "status": "Niet gestart",
     "validatie": "Niet getest",
-    "bewijs": "",
+    "bewijs": "S-P3-010: docs/adr/ADR-0034-adapters-bestaande-apps.md",
     "blokkade": "",
-    "opmerking": "Moment volgens CONTRACT_1.3_CONFORMITEIT.md: P3/P4-0/P4; niet in deze ronde.",
+    "opmerking": "besluit vastgelegd, bouw volgt",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-10"
+    "bijgewerkt": "2026-11-19"
   },
   {
     "id": "C1.3-ASM-22",
