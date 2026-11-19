@@ -10,8 +10,12 @@ import re
 import time
 import uuid
 from collections.abc import Iterator
+from concurrent.futures import Future
 from contextlib import closing, contextmanager, suppress
 from datetime import datetime, timedelta
+from pathlib import Path
+from threading import Lock, Thread
+from time import time_ns
 from typing import Any, BinaryIO, Literal
 
 import psycopg
@@ -48,6 +52,7 @@ FINISH_BUDGET = 0.1
 MEASUREMENT_INTERVAL = timedelta(seconds=300)
 MEASUREMENT_LOCK = 0x41534D4D33
 MEASUREMENT_RECEIPT = "catalogus-meetbewijs"
+_LOCAL_MEASUREMENT = Lock()
 DETAILS_PER_ROUND = 4
 IX_APP = ("stable", "ix-app")
 
@@ -306,73 +311,129 @@ def _open_receipt(path: str, flags: int) -> int:
     return os.open(path, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
 
 
-def _confirmed_start(receipt: BinaryIO) -> datetime | None:
+def _confirmed_start(receipt: BinaryIO, confirmation: Path) -> datetime | None:
+    """Alleen de na het schrijven aangelegde harde koppeling bevestigt deze meetbeurt."""
     receipt.seek(0)
     try:
-        started = datetime.fromisoformat(receipt.read(64).decode("ascii"))
-    except ValueError:
+        data = receipt.read(129)
+        if len(data) > 128:
+            return None
+        start, earliest, latest = data.decode("ascii").split()
+        started = datetime.fromisoformat(start)
+        stamp = confirmation.stat(follow_symlinks=False)
+        same_file = os.path.samestat(stamp, os.fstat(receipt.fileno()))
+        if not same_file or not int(earliest) <= stamp.st_ctime_ns <= int(latest):
+            return None
+    except (FileNotFoundError, ValueError):
         return None
     return started if started.tzinfo is not None else None
 
 
+def _is_due(guard: BinaryIO, confirmation: Path, now: datetime) -> bool:
+    previous = _confirmed_start(guard, confirmation)
+    return previous is None or now - previous >= MEASUREMENT_INTERVAL
+
+
 def _refresh(
-    sessions: sessionmaker[Session], settings: Settings, vault: Vault, receipt: BinaryIO, deadline: float
+    sessions: sessionmaker[Session],
+    settings: Settings,
+    vault: Vault,
+    guard: BinaryIO,
+    deadline: float,
+    wall_window: tuple[int, int],
 ) -> None:
+    path = settings.data_dir / MEASUREMENT_RECEIPT
+    confirmation = path.with_suffix(".bevestigd")
+    # Bij een gewone peiling van een verse meting blijven lezers ongehinderd.
+    if not _is_due(guard, confirmation, utcnow()):
+        return
     # Alle Hub-processen delen de datamap. Het kernelslot blijft tijdens de bronlezing
     # bestaan, ook als de systeemklok verspringt, en vervalt vanzelf bij een processtop.
     try:
-        fcntl.flock(receipt, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         return
     started = utcnow()
-    previous = _confirmed_start(receipt)
-    if previous is not None and started - previous < MEASUREMENT_INTERVAL:
+    if not _is_due(guard, confirmation, started):
         return
 
-    # Trek het oude bewijs in vóór de eerste databasehandeling. Ook een geweigerde
-    # INSERT of een processtop kan het oude ja/nee dan niet opnieuw geldig maken.
-    if receipt.tell():
-        receipt.truncate(0)
+    # Intrekken vraagt alleen schrijfrecht op de map. Een alleen-leesbaar bestand
+    # en een bezette momentopnamerij kunnen het oude bewijs dus niet behouden.
+    confirmation.unlink(missing_ok=True)
+    with open(path, "a+b", buffering=0, opener=_open_receipt) as receipt:
+        if os.fstat(receipt.fileno()).st_size:
+            receipt.truncate(0)
+            os.fsync(receipt.fileno())
+        work_until = deadline - min(FINISH_BUDGET, MEASUREMENT_TIMEOUT / 3)
+        attempt = _start_attempt(sessions, started, work_until)
+        if attempt is None:
+            return
+        try:
+            published = _measure_attempt(sessions, settings, vault, attempt, work_until)
+        except (DBAPIError, StorageTimeout, VaultError, InvalidTag, ValueError):
+            published = False
+        finished = utcnow()
+        with _transaction(sessions, deadline) as db:
+            db.execute(
+                update(CatalogAttempt)
+                .where(CatalogAttempt.id == attempt.id)
+                .values(completed_at=finished if published else None, failed=not published)
+            )
+        if not published or time.monotonic() >= deadline:
+            return
+        wall_start, wall_end = wall_window
+        data = f"{started.isoformat()} {wall_start} {wall_end}\n".encode("ascii")
+        if receipt.write(data) != len(data):
+            return
         os.fsync(receipt.fileno())
-    work_until = deadline - min(FINISH_BUDGET, MEASUREMENT_TIMEOUT / 3)
-    attempt = _start_attempt(sessions, started, work_until)
-    if attempt is None:
-        return
-    # De nieuwe poging staat vast. De leesroute mag de vorige bevestigde meting
-    # tijdens die poging nog gebruiken tot de bestaande grens van 15 seconden.
-    if previous is not None:
-        receipt.write(previous.isoformat().encode("ascii"))
-    try:
-        published = _measure_attempt(sessions, settings, vault, attempt, work_until)
-    except (DBAPIError, StorageTimeout, VaultError, InvalidTag, ValueError):
-        published = False
-    # Dit tijdstip ligt na de commit van de momentopname. De leesroute toetst ook die duur.
-    finished = utcnow()
-    with _transaction(sessions, deadline) as db:
-        db.execute(
-            update(CatalogAttempt)
-            .where(CatalogAttempt.id == attempt.id)
-            .values(completed_at=finished if published else None, failed=not published)
-        )
-    receipt.truncate(0)
-    if published and time.monotonic() <= deadline:
-        receipt.write(started.isoformat().encode("ascii"))
+        if time.monotonic() < deadline:
+            # link() publiceert atomair. De lezer toetst de door de kernel gezette
+            # ctime, ook als de koppeling zelf pas na het tijdvenster tot stand kwam.
+            os.link(path, confirmation, follow_symlinks=False)
+            if time.monotonic() > deadline:
+                confirmation.unlink(missing_ok=True)
+
+
+def _run_refresh(
+    factory: sessionmaker[Session], settings: Settings, vault: Vault, deadline: float, wall_window: tuple[int, int]
+) -> None:
+    with _measurement_sessions(factory, deadline) as sessions, suppress(DBAPIError, StorageTimeout):
+        try:
+            path = settings.data_dir / MEASUREMENT_RECEIPT
+            with os.fdopen(_open_receipt(str(path), os.O_RDONLY | os.O_CREAT), "rb", buffering=0) as guard:
+                _refresh(sessions, settings, vault, guard, deadline, wall_window)
+        except OSError:
+            # Ook als de map zelf onbeschrijfbaar is, blijft de pogingstabel
+            # onafhankelijk van de mogelijk bezette momentopnamerij.
+            with _transaction(sessions, deadline) as db:
+                db.execute(update(CatalogAttempt).where(CatalogAttempt.failed.is_(False)).values(failed=True))
 
 
 def refresh_if_due(factory: sessionmaker[Session], settings: Settings, vault: Vault) -> None:
-    deadline = time.monotonic() + MEASUREMENT_TIMEOUT
-    with _measurement_sessions(factory, deadline) as sessions, suppress(DBAPIError, StorageTimeout):
+    # Houd ook tijd over om de periodieke worker na een time-out terug te geven.
+    budget = MEASUREMENT_TIMEOUT - min(FINISH_BUDGET, MEASUREMENT_TIMEOUT / 3)
+    wall_start = time_ns()
+    deadline = time.monotonic() + budget
+    wall_window = (wall_start, wall_start + round(budget * 1_000_000_000))
+    result: Future[None] = Future()
+
+    def measure() -> None:
         try:
-            with open(settings.data_dir / MEASUREMENT_RECEIPT, "a+b", buffering=0, opener=_open_receipt) as receipt:
-                _refresh(sessions, settings, vault, receipt, deadline)
-        except OSError:
-            # Trek het databasebewijs in als de worker het lokale bewijs niet kan bijwerken.
-            with _transaction(sessions, deadline) as db:
-                db.execute(
-                    update(CatalogSnapshot)
-                    .where(CatalogSnapshot.id == 1, CatalogSnapshot.observed_at.is_not(None))
-                    .values(observed_at=None)
-                )
+            if _LOCAL_MEASUREMENT.acquire(blocking=False):
+                try:
+                    _run_refresh(factory, settings, vault, deadline, wall_window)
+                finally:
+                    _LOCAL_MEASUREMENT.release()
+        except BaseException as exc:
+            result.set_exception(exc)
+        else:
+            result.set_result(None)
+
+    # Een bestandssysteemaanroep heeft geen annulering op deadline. Laat hoogstens
+    # één meting per workerproces afwikkelen en houd de periodieke taken vrij.
+    Thread(target=measure, name="catalogusmeting", daemon=True).start()
+    with suppress(TimeoutError):
+        result.result(timeout=max(0.0, deadline - time.monotonic()))
 
 
 def read_pin(
@@ -404,8 +465,15 @@ def read_pin(
             .limit(2)
         ).all()
     try:
-        with open(settings.data_dir / MEASUREMENT_RECEIPT, "rb", opener=_open_receipt) as receipt:
-            confirmed = _confirmed_start(receipt)
+        path = settings.data_dir / MEASUREMENT_RECEIPT
+        with open(path, "rb", opener=_open_receipt) as receipt:
+            # Een koppeling kan al zichtbaar zijn terwijl de publicerende aanroep
+            # nog wacht. Pas na de laatste tijdcontrole geeft de schrijver het slot vrij.
+            try:
+                fcntl.flock(receipt, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return "onbekend", None
+            confirmed = _confirmed_start(receipt, path.with_suffix(".bevestigd"))
     except FileNotFoundError:
         confirmed = None
     now = utcnow()

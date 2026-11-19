@@ -7,8 +7,11 @@ import secrets
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from multiprocessing import get_context
 from threading import Event
 from types import SimpleNamespace
 from typing import Any
@@ -477,15 +480,190 @@ def vorige_meting(admin: Any, app: Any, fake_nas: Any, settings: Any, monkeypatc
         availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
 
     def pins() -> list[tuple[str, str | None]]:
-        antwoorden = []
-        for versie in (PIN["version"], "1.4.7"):
-            r = admin.get(PATH, params={**PIN, "version": versie}, headers=headers)
-            assert r.status_code == 200
-            antwoorden.append((r.json()["beschikbaar"], r.json()["gemeten_op"]))
-        return antwoorden
+        return _lees_pins(admin, headers)
 
     assert [staat for staat, _ in pins()] == ["ja", "nee"]
     return pins
+
+
+def _lees_pins(client: Any, headers: dict[str, str]) -> list[tuple[str, str | None]]:
+    pins = []
+    for versie in (PIN["version"], "1.4.7"):
+        response = client.get(PATH, params={**PIN, "version": versie}, headers=headers)
+        assert response.status_code == 200
+        pins.append((response.json()["beschikbaar"], response.json()["gemeten_op"]))
+    return pins
+
+
+def _lees_in_hub(settings: Any, headers: dict[str, str]) -> list[tuple[str, str | None]]:
+    from fastapi.testclient import TestClient
+
+    from hub.app import create_app
+
+    with TestClient(create_app(settings), base_url="https://testserver") as client:
+        return _lees_pins(client, headers)
+
+
+def _pins_na_herstart(settings: Any, headers: dict[str, str]) -> list[tuple[str, str | None]]:
+    with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn")) as proces:
+        return proces.submit(_lees_in_hub, settings, headers).result(timeout=15)
+
+
+def test_leesroute_weigert_onleesbaar_oud_en_onvolledig_meetbewijs(
+    vorige_meting: Any, admin: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub.catalog import availability
+
+    headers = _headers(admin, "home-control-hub")
+    bewijs = settings.data_dir / availability.MEASUREMENT_RECEIPT
+    oud_formaat = bewijs.read_bytes().split()[0]  # Alleen het ISO-tijdstip uit de vorige Hub-versie.
+    bron = list(fake_nas.calls)
+
+    def geweigerd(pad: Any, modus: str, **opties: Any) -> Any:
+        if pad == bewijs and modus == "rb":
+            raise PermissionError("Het meetbewijs is niet leesbaar.")
+        return open(pad, modus, **opties)
+
+    with monkeypatch.context() as opslag:
+        opslag.setattr(availability, "open", geweigerd, raising=False)
+        antwoord = admin.get(PATH, params=PIN, headers=headers)
+    assert antwoord.status_code == 503 and antwoord.json()["code"] == "dependency_unavailable"
+    assert int(antwoord.headers["Retry-After"]) > 0
+    for inhoud in (oud_formaat, b"onvolledig"):
+        bewijs.write_bytes(inhoud)
+        assert vorige_meting() == [("onbekend", None)] * 2
+    assert fake_nas.calls == bron and not fake_nas.mutations
+
+
+def test_alleen_leesbaar_bewijs_en_bezette_voorraad(
+    vorige_meting: Any, admin: Any, app: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    headers = _headers(admin, "home-control-hub")
+    bewijs = settings.data_dir / availability.MEASUREMENT_RECEIPT
+    versies = fake_nas.data["catalog.get_app_details"]["stable"]["ix-app"]["versions"]
+    assert "1.4.7" not in versies
+    versies["1.4.7"] = {"version": "1.4.7"}
+    bron = list(fake_nas.calls)
+    onbekend = [("onbekend", None)] * 2
+
+    def alleen_lezen(pad: Any, modus: str, **opties: Any) -> Any:
+        if pad == bewijs and modus == "a+b":
+            raise PermissionError("Het meetbewijs is alleen leesbaar.")
+        return open(pad, modus, **opties)
+
+    with monkeypatch.context() as opslag, app.state.sessionmaker.begin() as houder:
+        opslag.setattr(availability, "open", alleen_lezen, raising=False)
+        opslag.setattr(availability, "MEASUREMENT_TIMEOUT", 0.75)
+        houder.execute(text("SELECT id FROM catalog_snapshot WHERE id=1 FOR UPDATE")).scalar_one()
+        houder.execute(text("LOCK TABLE catalog_attempt IN SHARE MODE"))
+        begin = time.monotonic()
+        availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
+        time.sleep(max(0.0, begin + 0.85 - time.monotonic()))
+        tijdens = vorige_meting()
+    assert tijdens == _pins_na_herstart(settings, headers) == onbekend
+    assert fake_nas.calls == bron
+    monkeypatch.setattr(availability, "utcnow", lambda: datetime.now(UTC) + timedelta(seconds=301))
+    availability.refresh_if_due(app.state.sessionmaker, settings, app.state.vault())
+    assert all(staat == "ja" and tijd is not None for staat, tijd in vorige_meting())
+    assert not fake_nas.mutations
+
+
+@pytest.mark.parametrize("vertraging", ["voor_schrijven", "na_schrijven", "voor_koppelen", "na_koppelen"])
+def test_late_bestandsbevestiging_mag_geen_pins_vrijgeven(
+    admin: Any, app: Any, settings: Any, fake_nas: Any, monkeypatch: pytest.MonkeyPatch, vertraging: str
+) -> None:
+    from sqlalchemy import text
+
+    from hub.catalog import availability
+
+    connect(admin, fake_nas)
+    headers = _headers(admin)
+    bewijs = settings.data_dir / availability.MEASUREMENT_RECEIPT
+    schrijft, vrij, gesloten = Event(), Event(), Event()
+    grens = 1.0
+    onbekend = [("onbekend", None)] * 2
+
+    def wacht() -> None:
+        schrijft.set()
+        assert vrij.wait(8)
+
+    class TrageSchrijver:
+        def __init__(self, bestand: Any):
+            self.bestand = bestand
+
+        def __getattr__(self, naam: str) -> Any:
+            return getattr(self.bestand, naam)
+
+        def write(self, data: bytes) -> int:
+            if vertraging == "voor_schrijven":
+                wacht()
+            aantal = self.bestand.write(data)
+            if vertraging == "na_schrijven":
+                wacht()
+            return aantal
+
+    @contextmanager
+    def open_testbestand(pad: Any, modus: str, **opties: Any) -> Iterator[Any]:
+        with open(pad, modus, **opties) as bestand:
+            if pad == bewijs and modus == "a+b":
+                try:
+                    yield TrageSchrijver(bestand)
+                finally:
+                    gesloten.set()
+            else:
+                yield bestand
+
+    monkeypatch.setattr(availability, "open", open_testbestand, raising=False)
+    monkeypatch.setattr(availability, "MEASUREMENT_TIMEOUT", grens)
+    bij_publicatie = []
+    if vertraging in {"voor_koppelen", "na_koppelen"}:
+        koppel = availability.os.link
+
+        def koppel_te_laat(bron: Any, doel: Any, **opties: Any) -> None:
+            if bron != bewijs:
+                return koppel(bron, doel, **opties)
+            if vertraging == "voor_koppelen":
+                wacht()
+            koppel(bron, doel, **opties)
+            if vertraging == "na_koppelen":
+                wacht()
+            # De koppeling bestaat al. De schrijver kan haar nog niet opruimen.
+            bij_publicatie.extend(_lees_pins(admin, headers))
+
+        monkeypatch.setattr(availability.os, "link", koppel_te_laat)
+    with ThreadPoolExecutor(max_workers=1) as worker:
+        begin = time.monotonic()
+        taak = worker.submit(availability.refresh_if_due, app.state.sessionmaker, settings, app.state.vault())
+        try:
+            assert schrijft.wait(5)
+            with app.state.sessionmaker() as db:
+                assert (
+                    0
+                    <= db.scalar(text("SELECT extract(epoch FROM completed_at - started_at) FROM catalog_attempt"))
+                    <= grens
+                )
+            time.sleep(max(0.0, begin + grens + 0.2 - time.monotonic()))
+            tijdig_terug = taak.done()
+            tijdens = _lees_pins(admin, headers)
+        finally:
+            vrij.set()
+        taak.result(timeout=5)
+        assert gesloten.wait(5)
+    if vertraging == "voor_koppelen":
+        # Ook na een processtop vóór het opruimen moet de lezer de late publicatie zelf weigeren.
+        bevestiging = bewijs.with_suffix(".bevestigd")
+        if not bevestiging.exists():
+            koppel(bewijs, bevestiging)
+    na = _lees_pins(admin, headers)
+    nieuw = _pins_na_herstart(settings, headers)
+    assert tijdens == na == nieuw == onbekend
+    if vertraging in {"voor_koppelen", "na_koppelen"}:
+        assert bij_publicatie == onbekend
+    assert tijdig_terug and not fake_nas.mutations
 
 
 def test_geblokkeerde_voorraadlezing_houdt_worker_niet_vast(
