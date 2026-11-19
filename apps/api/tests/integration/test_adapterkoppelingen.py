@@ -14,13 +14,14 @@ from conftest import idem, login_as, make_user
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from hub import outbound
-from hub.adapters import basis
+from hub import migrations, outbound
+from hub.adapters import basis, my_house
 from hub.catalog.discovery import discover, is_inventory_fresh
 from hub.config import Settings
 from hub.inventory.collector import CollectResult, KindResult
 from hub.inventory.store import save_run
 from hub.models import (
+    AdapterHouseSnapshot,
     AdapterLink,
     AuditEvent,
     CatalogApp,
@@ -31,6 +32,7 @@ from hub.models import (
     OutboxEvent,
     VaultSecret,
 )
+from hub.routers import adapterkoppelingen
 from hub.timeutil import utcnow
 from hub.truenas import normalize
 from hub.truenas.connection import current_target
@@ -340,7 +342,6 @@ def test_my_house_koppelcode_wordt_zonder_server_id_geweigerd(
 def test_downgrade_wist_alleen_adapteropslag(admin: Any, app: Any, doel: dict[str, Any], settings: Any) -> None:
     from sqlalchemy import inspect
 
-    from hub import migrations
     from hub.vault import make_ref
 
     created = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
@@ -623,7 +624,7 @@ def huis_simulatie(
                 body.update(proof_alg="hmac-sha256-v1", proof=digest(key.encode(), message.encode(), "sha256").hex())
         elif path == "/api/v1/pairing/redeem":
             assert method == "POST" and not headers
-            assert options["json_body"] == {"code": code, "device_name": "Hub"}
+            assert options["json_body"] == {"code": toestand.get("code", code), "device_name": "Hub"}
             body = {
                 "token": toestand["token"],
                 "client": {
@@ -662,6 +663,7 @@ def huis_simulatie(
                                 if toestand["extra_check"]
                                 else []
                             ),
+                            *toestand.get("extra_checks", []),
                         ],
                     },
                     "/api/v1/homes": [
@@ -783,6 +785,7 @@ def test_my_house_projectie_en_verlopen_token(
             *db.scalars(select(AuditEvent.details)),
             *db.scalars(select(OutboxEvent.payload)),
             *db.scalars(select(IdempotencyRecord.response_body)),
+            *db.scalars(select(AdapterHouseSnapshot.measurement)),
         ]
     for geheim in (code, toestand["token"]):
         assert geheim not in tested.text and geheim not in failed.text
@@ -822,7 +825,6 @@ def test_my_house_vernieuwing_door_worker(
 def test_my_house_downgrade_verwijdert_eigen_kluiswaarde(
     admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, settings: Settings
 ) -> None:
-    from hub import migrations
     from hub.vault import make_ref
 
     code, _, _ = huis_simulatie
@@ -844,3 +846,161 @@ def test_my_house_downgrade_verwijdert_eigen_kluiswaarde(
     finally:
         migrations.upgrade(settings.database_url)
     assert admin.get(f"{ROUTE}/{response.json()['id']}").status_code == 404
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize("terugrol", [None, "0019", "0018"])
+def test_my_house_wist_metingen_en_behoudt_bevestigingen(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, settings: Settings, terugrol: str | None
+) -> None:
+    code, _, calls = huis_simulatie
+    link_id = admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"]
+    path = f"{ROUTE}/{link_id}"
+    eerdere_sleutel, laatste_sleutel = idem(), idem()
+    eerste = admin.post(f"{path}/test", headers=eerdere_sleutel)
+    tweede = admin.post(f"{path}/test", headers=laatste_sleutel)
+    assert eerste.json()["my_house"]["woningen"] and tweede.json()["my_house"]["woningen"]
+    calls_voor = list(calls)
+    replay = admin.post(f"{path}/test", headers=eerdere_sleutel)
+    assert replay.json() == eerste.json()
+    assert replay.headers["Idempotent-Replay"] == "true" and replay.headers["ETag"] == eerste.headers["ETag"]
+    with app.state.sessionmaker.begin() as db:
+        snapshots = db.scalars(select(AdapterHouseSnapshot).where(AdapterHouseSnapshot.link_id == uuid.UUID(link_id)))
+        assert len(snapshots.all()) == 2
+        record = db.scalar(
+            select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(eerdere_sleutel["Idempotency-Key"]))
+        )
+        assert record.response_body == {**eerste.json(), "my_house": None}
+        # Een bevestiging zoals die vóór het herstel werd opgeslagen.
+        record.response_body = eerste.json()
+    if terugrol is None:
+        assert admin.delete(path, headers=idem()).status_code == 200
+    else:
+        migrations.downgrade(settings.database_url, terugrol)
+    try:
+        with app.state.sessionmaker() as db:
+            records = db.scalars(select(IdempotencyRecord).where(IdempotencyRecord.scope.endswith("/test"))).all()
+            assert len(records) == 2 and all(record.response_body.get("my_house") is None for record in records)
+    finally:
+        if terugrol is not None:
+            migrations.upgrade(settings.database_url)
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(AdapterHouseSnapshot).where(AdapterHouseSnapshot.link_id == uuid.UUID(link_id))) is None
+    for sleutel, antwoord in ((eerdere_sleutel, eerste), (laatste_sleutel, tweede)):
+        replay = admin.post(f"{path}/test", headers=sleutel)
+        assert replay.json() == {**antwoord.json(), "my_house": None}
+        assert replay.headers["ETag"] == antwoord.headers["ETag"]
+        assert replay.headers["Idempotent-Replay"] == "true"
+    assert calls == calls_voor
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_upgrade_wist_oude_herhalingen_ook_zonder_koppeling(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, settings: Settings
+) -> None:
+    code, _, calls = huis_simulatie
+    link_id = admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"]
+    path = f"{ROUTE}/{link_id}"
+    headers = idem()
+    antwoord = admin.post(f"{path}/test", headers=headers).json()
+    assert antwoord["my_house"]["woningen"]
+    assert admin.delete(path, headers=idem()).status_code == 200
+    migrations.downgrade(settings.database_url, "0019")
+    try:
+        with app.state.sessionmaker.begin() as db:
+            record = db.scalar(
+                select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(headers["Idempotency-Key"]))
+            )
+            record.response_body = antwoord
+    finally:
+        migrations.upgrade(settings.database_url)
+    calls_voor = list(calls)
+    with app.state.sessionmaker() as db:
+        record = db.scalar(
+            select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(headers["Idempotency-Key"]))
+        )
+        assert record.response_body == {**antwoord, "my_house": None}
+    assert admin.post(f"{path}/test", headers=headers).json() == {**antwoord, "my_house": None}
+    assert calls == calls_voor
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_bronmeettijd_bepaalt_gezondheid_en_herhaling(
+    admin: Any, doel: dict[str, Any], huis_simulatie: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code, toestand, calls = huis_simulatie
+    link_id = admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"]
+    path = f"{ROUTE}/{link_id}"
+    klok = [utcnow().replace(microsecond=0)]
+    monkeypatch.setattr(my_house, "utcnow", lambda: klok[0])
+    monkeypatch.setattr(adapterkoppelingen, "utcnow", lambda: klok[0])
+    gemeten = klok[0] - timedelta(seconds=895)
+    toestand["extra_check"] = {"state": "ok", "details": {"checked_at": gemeten.isoformat()}}
+    headers = idem()
+    eerste = admin.post(f"{path}/test", headers=headers).json()
+    assert admin.get(path).json()["gezondheid"]["status"] == "healthy"
+    klok[0] += timedelta(seconds=5)
+    assert admin.get(path).json()["gezondheid"]["status"] == "healthy"
+    klok[0] += timedelta(seconds=5)
+    calls_voor = list(calls)
+    replay = admin.post(f"{path}/test", headers=headers).json()
+    assert replay["my_house"]["observed_at"] == eerste["my_house"]["observed_at"]
+    assert replay["my_house"]["systeem"]["checks"][-1]["state"] == "unknown"
+    assert calls == calls_voor
+    for _ in range(2):
+        detail = admin.get(path).json()
+        assert detail["verbinding"]["status"] == "healthy"
+        health = detail["gezondheid"]
+        assert (health["status"], health["reason_code"]) == ("unknown", "meting_verouderd")
+        assert health["observed_at"] == gemeten.isoformat().replace("+00:00", "Z")
+        assert admin.get(ROUTE).json()["items"][0]["gezondheid"] == health
+        admin.post(f"{path}/test", headers=idem()).raise_for_status()
+    toestand["extra_checks"] = [
+        {"key": f"integration:{uuid.uuid4()}", "state": "error", "details": {"checked_at": klok[0].isoformat()}}
+    ]
+    admin.post(f"{path}/test", headers=idem()).raise_for_status()
+    assert admin.get(path).json()["gezondheid"]["status"] == "down"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_nieuwe_code_herstelt_na_verloren_vernieuwingsantwoord(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, periodic_run: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code, toestand, calls = huis_simulatie
+    link_id = admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"]
+    path = f"{ROUTE}/{link_id}"
+    assert admin.post(f"{path}/test", headers=idem()).json()["my_house"] is not None
+    with app.state.sessionmaker.begin() as db:
+        db.get(AdapterLink, uuid.UUID(link_id)).my_house_expires_at = utcnow() + timedelta(days=12)
+    transport = outbound.request
+
+    def verloren_antwoord(base: str, method: str, route: str, **options: Any) -> outbound.Response:
+        response = transport(base, method, route, **options)
+        if route == my_house.Route.REFRESH:
+            raise outbound.OutboundError("tijdslimiet")
+        return response
+
+    with monkeypatch.context() as context:
+        context.setattr(outbound, "request", verloren_antwoord)
+        periodic_run("my_house_vernieuwen")
+    periodic_run("my_house_vernieuwen")
+    periodic_run("incidenten_bijwerken")
+    assert calls.count(("POST", my_house.Route.REFRESH)) == 1
+    assert admin.get(path).json()["gezondheid"]["reason_code"] == "bron_vernieuwing_mislukt"
+    with app.state.sessionmaker() as db:
+        assert db.scalars(select(Incident.status).where(Incident.onderwerp_id == link_id)).one() == "open"
+
+    toestand["code"] = ("B" if code[0] == "A" else "A") + code[1:]
+    toestand["token"] = "shc_" + secrets.token_urlsafe(32)
+    assert admin.patch(path, json={}, headers=invoer(toestand["code"])).status_code == 200
+    periodic_run("incidenten_bijwerken")
+    with app.state.sessionmaker() as db:
+        assert db.scalars(select(Incident.status).where(Incident.onderwerp_id == link_id)).one() == "open"
+    assert admin.post(f"{path}/test", headers=idem()).json()["my_house"] is not None
+    periodic_run("incidenten_bijwerken")
+    with app.state.sessionmaker() as db:
+        assert db.scalars(select(Incident.status).where(Incident.onderwerp_id == link_id)).one() == "opgelost"
+        hersteld = select(OutboxEvent).where(
+            OutboxEvent.entity_id == link_id, OutboxEvent.event_type == "monitoring.my_house.recovered"
+        )
+        assert len(db.scalars(hersteld).all()) == 1

@@ -61,15 +61,22 @@ afzonderlijke stap nodig met de verifieerbare rechtenverklaring uit ADR-0034.
    van honderd is bereikt. Sensorwaarden zonder verse meting zijn leeg. De gebruikerslink
    verschijnt alleen als een LAN- of extern adres uit de instellingen overeenkomt met het
    bevestigde HTTPS-basisadres. Een herhaalde idempotente bevestiging behoudt de oorspronkelijke
-   meettijd. De detailroute geeft de actuele beoordeling van de opgeslagen gezondheid.
+   meettijd en doet geen nieuw bronverzoek. De detailroute beoordeelt de versheid per check op
+   basis van de bronmeettijd en de geldigheidsgrens. Bij een verlopen check geeft de Hub
+   `unknown` met `meting_verouderd` als die check de gezondheid bepaalt. Het afzonderlijk gemeten
+   contact kan dan nog vers zijn.
 4. De worker controleert elk uur of een token binnen dertig dagen verloopt. Een mislukte
    vernieuwing of geweigerd token maakt de status `unknown` en opent een incident. Een
-   geslaagde leesproef bevestigt het herstel. Bij een verlopen of ingetrokken koppeling maak je
-   een nieuwe Hub-koppelcode en voer je die in via `PATCH`. Bij een gewijzigde instantie
-   bevestig je ook de nieuwe `server_id` en bestemming. Intrekken van de koppeling in my_house
-   gebeurt vanuit my_house.
+   geslaagde leesproef bevestigt het herstel en sluit het incident. Bij een verlopen of ingetrokken
+   koppeling of een aanhoudend mislukte vernieuwing maak je in my_house een nieuwe koppelcode met
+   rol `viewer` en doel `hub`. Voer die via `PATCH` in en test de koppeling daarna opnieuw. Gebruik
+   deze route ook als de bron het token heeft vernieuwd en het antwoord de Hub niet heeft bereikt.
+   Bij een gewijzigde instantie bevestig je ook de nieuwe `server_id` en bestemming. Intrekken van
+   de koppeling in my_house gebeurt vanuit my_house.
 
 De adapter beperkt de woninggegevens tot de leeslijst van ADR-0034. De boiler wordt uitsluitend
-gemeten en het energiedomein blijft bij home-control-hub. Migratie `0019` voegt de binding,
-vervaldatum en laatste gezondheidsstatus toe. De downgrade verwijdert de hiermee gemaakte
-my_house-koppelingen en hun kluiswaarden. Andere koppelingen en hun kluiswaarden blijven behouden.
+gemeten en het energiedomein blijft bij home-control-hub. Ontkoppelen wist de kluiswaarde en alle
+meetinhoud van de koppeling. Migratie `0020` scheidt de metingen van de bevestigingen en wist de
+meetinhoud uit eerder opgeslagen bevestigingen. Terugrollen van `0020` wist de metingen. Terugrollen
+van `0019` verwijdert ook de daarmee gemaakte my_house-koppelingen en kluiswaarden. Na ontkoppelen of
+terugrollen levert een herhaalde testbevestiging `my_house: null`.

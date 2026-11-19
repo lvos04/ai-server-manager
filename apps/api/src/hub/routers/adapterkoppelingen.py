@@ -14,7 +14,7 @@ from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, Header, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from hub import audit
 from hub.adapters import basis, mso, my_house
@@ -23,7 +23,7 @@ from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, Setting
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.inventory.store import kind_state
-from hub.models import AdapterLink, CatalogApp, VaultSecret
+from hub.models import AdapterHouseSnapshot, AdapterLink, CatalogApp, IdempotencyRecord, VaultSecret
 from hub.outbound import OutboundError
 from hub.timeutil import UtcDateTime, utcnow
 from hub.truenas.connection import NasTarget, current_target
@@ -123,16 +123,19 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
     is_mso = row.app_id == mso.APP_ID
     health = mso.health() if is_mso else basis.Measurement(status="unknown", reason_code="capability_unavailable")
     if row.app_id == my_house.APP_ID:
-        if row.my_house_status is not None and bound and reason is None:
-            health = basis.fresh_measurement(
-                basis.Measurement(status=row.my_house_status, observed_at=row.observed_at), now=now
-            )
+        last = (
+            my_house.health(my_house.CheckReadings.validate_python(row.my_house_checks), now)
+            if row.my_house_checks
+            else None
+        )
+        if last is not None and bound and reason is None:
+            health = last
         else:
             health = basis.Measurement(
                 status="unknown",
                 reason_code=measurement.reason_code or "meting_onbekend",
-                observed_at=row.observed_at,
-                laatste_status=row.my_house_status,
+                observed_at=last.observed_at if last is not None else row.observed_at,
+                laatste_status=(last.laatste_status or last.status) if last is not None else None,
             )
     return LinkView(
         id=row.id,
@@ -289,6 +292,19 @@ def _delete_credential(db: DB, row: AdapterLink) -> None:
         db.delete(secret)
 
 
+def _clear_legacy_house_measurements(db: DB, link_id: uuid.UUID) -> None:
+    body = IdempotencyRecord.response_body
+    db.execute(
+        update(IdempotencyRecord)
+        .where(
+            IdempotencyRecord.scope.endswith(f":POST:{router.prefix}/{{link_id}}/test", autoescape=True),
+            body["id"].astext == str(link_id),
+            body["my_house"].astext.is_not(None),
+        )
+        .values(response_body=body.op("||")({"my_house": None}))
+    )
+
+
 def _record(db: DB, principal: Principal, row: AdapterLink, action: str) -> None:
     audit.record(
         db,
@@ -325,6 +341,25 @@ def _replay_link(idem: Idem) -> JSONResponse | None:
     return replay
 
 
+def _house_test_response(response: JSONResponse, snapshot: my_house.SnapshotReading | None) -> JSONResponse:
+    body = json.loads(bytes(response.body))
+    body["my_house"] = None if snapshot is None else snapshot.project(utcnow()).model_dump(mode="json")
+    headers = dict(response.headers)
+    del headers["content-length"]
+    return JSONResponse(body, status_code=response.status_code, headers=headers)
+
+
+def _replay_test(db: DB, idem: Idem, link_id: uuid.UUID) -> JSONResponse | None:
+    replay = _replay_link(idem)
+    if replay is None or "my_house" not in json.loads(bytes(replay.body)):
+        return replay
+    stored = db.get(AdapterHouseSnapshot, (idem.scope, idem.key))
+    snapshot = (
+        my_house.SnapshotReading.model_validate(stored.measurement) if stored and stored.link_id == link_id else None
+    )
+    return _house_test_response(replay, snapshot)
+
+
 def _unique_target(db: DB, catalog_app_id: uuid.UUID, except_id: uuid.UUID | None = None) -> None:
     existing = db.scalar(select(AdapterLink.id).where(AdapterLink.catalog_app_id == catalog_app_id))
     if existing is not None and existing != except_id:
@@ -354,7 +389,6 @@ def _house_pair(
         raise HubError(422, "validation_error", "De my_house-koppeling is geweigerd.", {"reason": exc.reason}) from None
     row.my_house_client_id = pairing.client_id
     row.my_house_expires_at = pairing.credential.expires_at
-    row.my_house_status = None
     return pairing.credential.token
 
 
@@ -567,6 +601,7 @@ def update_link(
         meta = vault.put(db, row.geheim_ref, secret, actor=admin.actor)
         row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
     row.laatste_status, row.observed_at, row.max_age_s = None, None, None
+    row.my_house_checks = None
     if row.app_id != my_house.APP_ID:
         row.laatste_fout = None
     row.version += 1
@@ -582,10 +617,10 @@ def update_link(
 def test_link(
     link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, settings: SettingsDep, vault: VaultDep
 ) -> JSONResponse:
-    if (replay := _replay_link(idem)) is not None:
+    if (replay := _replay_test(db, idem, link_id)) is not None:
         return replay
     row = _link(db, link_id, lock=True)
-    if (replay := _replay_link(idem)) is not None:
+    if (replay := _replay_test(db, idem, link_id)) is not None:
         return replay
     target = _target(db, row.app_id, row.catalog_app_id)
 
@@ -603,12 +638,20 @@ def test_link(
         try:
             credential = _house_credential(db, vault, row, now)
             credential = _house_renew(db, vault, row, adapter, credential, now)
-            snapshot = adapter.snapshot(credential.token)
+            snapshot = adapter.read_snapshot(credential.token)
         except OutboundError as exc:
             measurement = basis.Measurement(status="unknown", reason_code=exc.reason)
         else:
-            measurement = basis.Measurement(status="healthy", observed_at=snapshot.observed_at)
-            row.my_house_status = my_house.health(snapshot)
+            measurement = basis.Measurement(status="healthy", observed_at=snapshot.snapshot.observed_at)
+            row.my_house_checks = my_house.CheckReadings.dump_python(snapshot.checks, mode="json")
+            db.add(
+                AdapterHouseSnapshot(
+                    receipt_scope=idem.scope,
+                    receipt_key=idem.key,
+                    link_id=row.id,
+                    measurement=snapshot.model_dump(mode="json"),
+                )
+            )
         _house_transition(db, row, measurement.reason_code)
     elif row.app_id == mso.APP_ID:
         result = mso.public_probes(row, policy, check_binding=check_binding)
@@ -637,8 +680,9 @@ def test_link(
     if probes is not None:
         receipt = MsoTestReceipt(id=row.id, version=row.version, probes=probes)
     if row.app_id == my_house.APP_ID:
-        receipt = MyHouseTestReceipt(id=row.id, version=row.version, my_house=snapshot)
-    return _save_link(idem, 200, row, receipt)
+        receipt = MyHouseTestReceipt(id=row.id, version=row.version, my_house=None)
+    response = _save_link(idem, 200, row, receipt)
+    return _house_test_response(response, snapshot) if snapshot is not None else response
 
 
 @router.delete("/{link_id}", response_model=Verwijderd, summary="Adapterkoppeling en kluiswaarde wissen (beheerder)")
@@ -651,8 +695,10 @@ def delete_link(link_id: uuid.UUID, db: DB, admin: Admin, idem: Idem, if_match: 
     if row is None:
         raise HubError(404, "not_found", "Adapterkoppeling niet gevonden.")
     _precondition(row, if_match)
-    if row.app_id == my_house.APP_ID and row.geheim_ref != make_ref("adapters", f"{my_house.APP_ID}.{row.id}"):
-        raise _binding_conflict()
+    if row.app_id == my_house.APP_ID:
+        if row.geheim_ref != make_ref("adapters", f"{my_house.APP_ID}.{row.id}"):
+            raise _binding_conflict()
+        _clear_legacy_house_measurements(db, row.id)
     _delete_credential(db, row)
     _record(db, admin, row, "deleted")
     db.delete(row)

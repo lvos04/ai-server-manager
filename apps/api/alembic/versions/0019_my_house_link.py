@@ -19,6 +19,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(
+        sa.text(
+            "UPDATE idempotency_record SET response_body = jsonb_set(response_body, '{my_house}', 'null') "
+            "WHERE right(scope, length(:test_scope)) = :test_scope "
+            "AND response_body->'my_house' <> 'null'::jsonb"
+        ).bindparams(test_scope=":POST:/api/v1/adapterkoppelingen/{link_id}/test")
+    )
     # Het oude schema kan de Hub-koppeling niet gebruiken. Verwijder haar kluiswaarde mee.
     op.execute(
         sa.text(

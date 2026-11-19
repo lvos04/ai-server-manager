@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Identity,
     Index,
     Integer,
@@ -460,7 +461,26 @@ class AdapterLink(Base):
     my_house_server_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     my_house_client_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     my_house_expires_at: Mapped[datetime | None] = mapped_column(TS)
-    my_house_status: Mapped[str | None] = mapped_column(String(16))
+    my_house_checks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+
+
+class AdapterHouseSnapshot(Base):
+    """Meetinhoud vervalt met de koppeling of de bijbehorende herhaalbevestiging."""
+
+    __tablename__ = "adapter_house_snapshot"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ("receipt_scope", "receipt_key"),
+            ("idempotency_record.scope", "idempotency_record.key"),
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+    )
+    receipt_scope: Mapped[str] = mapped_column(String(128), primary_key=True)
+    receipt_key: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    link_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("adapter_link.id", ondelete="CASCADE"), index=True)
+    measurement: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
 class HealthObservation(Base):

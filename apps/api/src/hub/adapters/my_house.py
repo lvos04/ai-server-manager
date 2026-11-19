@@ -20,11 +20,15 @@ from pydantic import BaseModel, BeforeValidator, Field, TypeAdapter, ValidationE
 from hub import outbound
 from hub.adapters import basis
 from hub.models import AdapterLink
-from hub.timeutil import UtcDateTime, utcnow
+from hub.timeutil import UtcDateTime, age_seconds, utcnow
 
 APP_ID = "my_house"
 RENEW_BEFORE = timedelta(days=30)
 TOKEN_LIFETIME = timedelta(days=180, minutes=2)
+# Grenzen uit de systeemchecks van my_house.
+ZIGBEE_MAX_AGE_S = 180
+WORKER_OK_S = 120
+BACKUP_WARN_H = 36
 TOKEN = re.compile(r"shc_[A-Za-z0-9_-]{43}")
 CODE = re.compile(r"[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}", re.IGNORECASE | re.ASCII)
 SENSITIVE_LABEL = re.compile(r"shc_|\b[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}\b", re.IGNORECASE)
@@ -97,39 +101,6 @@ def _timezone(value: Any) -> str | None:
         return None
 
 
-def _recent_check(value: Any, received_at: datetime) -> bool:
-    try:
-        age = (received_at - _timestamp(value)).total_seconds()
-    except ValueError:
-        return False
-    return 0 <= age <= basis.MAX_AGE_S
-
-
-def _system_with_freshness(data: Any, received_at: datetime) -> Any:
-    if not isinstance(data, dict) or not isinstance(data.get("checks"), list):
-        return data
-    checks = data["checks"]
-    integration_times: dict[str, Any] = {}
-    for check in checks:
-        if not isinstance(check, dict):
-            continue
-        key, details = check.get("key"), check.get("details")
-        if isinstance(key, str) and key.startswith("integration:") and isinstance(details, dict):
-            integration_times[key] = details.get("checked_at")
-    projected = []
-    for check in checks:
-        if isinstance(check, dict):
-            key = check.get("key")
-            if key == "time" or (
-                isinstance(key, str)
-                and key.startswith("integration:")
-                and not _recent_check(integration_times.get(":".join(key.split(":")[:2])), received_at)
-            ):
-                check = {**check, "state": "unknown"}
-        projected.append(check)
-    return {**data, "checks": projected}
-
-
 Identifier = Annotated[UUID, BeforeValidator(_uuid)]
 Timestamp = Annotated[UtcDateTime, BeforeValidator(_timestamp)]
 Label = Annotated[str | None, BeforeValidator(_label)]
@@ -164,6 +135,78 @@ class Check(BaseModel):
 class System(BaseModel):
     version: Version
     checks: Annotated[list[Check], Field(min_length=1, max_length=200)]
+
+
+CHECK_STATUS: dict[str, basis.Status] = {"ok": "healthy", "unknown": "unknown", "warn": "degraded", "error": "down"}
+SEVERITY = {"healthy": 0, "unknown": 1, "degraded": 2, "down": 3}
+
+
+class CheckReading(Check):
+    observed_at: datetime | None
+    max_age_s: int
+
+    def measurement(self, now: datetime) -> basis.Measurement:
+        return basis.fresh_measurement(
+            basis.Measurement(status=CHECK_STATUS[self.state], observed_at=self.observed_at),
+            now=now,
+            max_age_s=self.max_age_s,
+        )
+
+    def project(self, now: datetime) -> Check:
+        state = "unknown" if self.measurement(now).reason_code else self.state
+        return Check(key=self.key, state=state)
+
+
+CheckReadings = TypeAdapter(list[CheckReading])
+
+
+def _integration_time(raw: dict[str, Any], now: datetime) -> datetime | None:
+    details = raw.get("details")
+    try:
+        observed = _timestamp(details.get("checked_at") if isinstance(details, dict) else None)
+    except ValueError:
+        return None
+    return observed if observed <= now else None
+
+
+def _backup_max_age(age_h: Any) -> int:
+    if type(age_h) not in (int, float) or not 0 <= age_h <= BACKUP_WARN_H:
+        return 0
+    # De bron rondt op tienden van een uur af. De grens kan dus 180 s eerder vallen.
+    return max(0, min(basis.MAX_AGE_S, int((BACKUP_WARN_H - age_h) * 3600) - 180))
+
+
+def _system_readings(data: Any, received_at: datetime) -> tuple[System, list[CheckReading]]:
+    system = _validate(TypeAdapter(System), data)
+    by_key = {raw["key"]: raw for raw in data["checks"]}
+    if len(by_key) != len(system.checks):
+        raise outbound.OutboundError(INVALID)
+    readings = []
+    for check in system.checks:
+        observed: datetime | None = received_at
+        max_age = basis.MAX_AGE_S
+        if check.key.startswith("integration:"):
+            parent = ":".join(check.key.split(":")[:2])
+            raw = by_key.get(parent, {})
+            observed = _integration_time(raw, received_at)
+            if raw.get("provider") == "zigbee" or parent != check.key:
+                max_age = ZIGBEE_MAX_AGE_S
+        elif check.key in {"time", "restore"}:
+            # Deze bestaande checks bevatten geen bruikbare bronmeettijd.
+            observed = None
+        elif check.key == "worker" and check.state == "ok":
+            raw = by_key[check.key]
+            age = raw.get("age_s")
+            if type(age) is int and 0 <= age < WORKER_OK_S:
+                # De bron rondt naar beneden af. Neem de vroegste mogelijke meettijd.
+                observed = received_at - timedelta(seconds=age + 1)
+                max_age = WORKER_OK_S
+            elif "age_s" in raw:
+                observed = None
+        elif check.key == "backup" and check.state == "ok" and "age_h" in by_key[check.key]:
+            max_age = _backup_max_age(by_key[check.key]["age_h"])
+        readings.append(CheckReading(key=check.key, state=check.state, observed_at=observed, max_age_s=max_age))
+    return system, readings
 
 
 class Home(BaseModel):
@@ -261,6 +304,20 @@ class Snapshot(BaseModel):
     systeem: System
     woningen: list[Overview]
     instellingen: HouseSettings
+
+
+class SnapshotReading(BaseModel):
+    snapshot: Snapshot
+    checks: list[CheckReading]
+
+    def project(self, now: datetime) -> Snapshot:
+        snapshot = self.snapshot.model_copy(deep=True)
+        snapshot.systeem.checks = [check.project(now) for check in self.checks]
+        for home in snapshot.woningen:
+            for zone in home.zones:
+                zone.temperature = zone.temperature.met_meettijd(now, "°C")
+                zone.humidity = zone.humidity.met_meettijd(now, "%")
+        return snapshot
 
 
 class _Identity(BaseModel):
@@ -427,27 +484,31 @@ class Adapter:
         return _credential(data.get("token"), expires_at, now, old=old)
 
     def snapshot(self, token: str) -> Snapshot:
-        observed = utcnow()
+        return self.read_snapshot(token).project(utcnow())
+
+    def read_snapshot(self, token: str) -> SnapshotReading:
         liveness = _validate(TypeAdapter(Liveness), self._request(Route.HEALTH))
+        observed = utcnow()
         self._identity(token)
         system_data = self._request(Route.SYSTEM, token=token)
-        system = _validate(TypeAdapter(System), _system_with_freshness(system_data, utcnow()))
+        system, checks = _system_readings(system_data, utcnow())
         homes = _validate(TypeAdapter(Rows[Home]), self._request(Route.HOMES, token=token))
-        if len({home.id for home in homes}) != len(homes) or len({check.key for check in system.checks}) != len(
-            system.checks
-        ):
+        if len({home.id for home in homes}) != len(homes):
             raise outbound.OutboundError(INVALID)
         settings = self._request(Route.SETTINGS, token=token)
         flags = _validate(TypeAdapter(Settings), settings)
-        return Snapshot(
-            observed_at=observed,
-            databaseprobe=liveness,
-            systeem=system,
-            woningen=[self._overview(home, token) for home in homes],
-            instellingen=HouseSettings(
-                **flags.model_dump(),
-                link=user_link(self.link.basis_url, settings.get("lan_url"), settings.get("remote_url")),
+        return SnapshotReading(
+            snapshot=Snapshot(
+                observed_at=observed,
+                databaseprobe=liveness,
+                systeem=system,
+                woningen=[self._overview(home, token) for home in homes],
+                instellingen=HouseSettings(
+                    **flags.model_dump(),
+                    link=user_link(self.link.basis_url, settings.get("lan_url"), settings.get("remote_url")),
+                ),
             ),
+            checks=checks,
         )
 
     def _overview(self, home: Home, token: str) -> Overview:
@@ -468,12 +529,15 @@ class Adapter:
         )
 
 
-def health(snapshot: Snapshot) -> basis.Status:
-    states = {check.state for check in snapshot.systeem.checks}
-    if "error" in states:
-        return "down"
-    if "warn" in states:
-        return "degraded"
-    if "unknown" in states or not {"database", "worker"} <= {check.key for check in snapshot.systeem.checks}:
-        return "unknown"
-    return "healthy"
+def health(checks: list[CheckReading], now: datetime) -> basis.Measurement:
+    measurements = [check.measurement(now) for check in checks]
+    if not {"database", "worker"} <= {check.key for check in checks}:
+        measurements.append(basis.Measurement(status="unknown", reason_code="meting_onbekend"))
+    return max(
+        measurements,
+        key=lambda item: (
+            SEVERITY[item.status],
+            item.reason_code == "meting_verouderd",
+            age_seconds(item.observed_at, now) or 0,
+        ),
+    )
