@@ -3,10 +3,14 @@
 set -euo pipefail
 HUB_IMAGE="${1:?hub-image}"
 EXEC_IMAGE="${2:?executor-image}"
-WORK="$(mktemp -d)"
-cleanup() { docker rm -f asm-smoke-hub asm-smoke-exec asm-smoke-exec568 >/dev/null 2>&1 || true; rm -rf "$WORK" 2>/dev/null || sudo rm -rf "$WORK" 2>/dev/null || true; }
+WORK=$(mktemp -d)
+cleanup() {
+  for bestand in "$WORK"/*.cid; do
+    if [[ -s $bestand ]]; then docker rm -fv "$(cat "$bestand")" >/dev/null || true; fi
+  done
+  rm -rf -- "$WORK"
+}
 trap cleanup EXIT
-mkdir -p "$WORK/hub" "$WORK/exec"
 
 wait_healthy() {
   local name="$1"
@@ -15,18 +19,34 @@ wait_healthy() {
     [ "$s" = healthy ] && return 0
     sleep 2
   done
-  docker logs "$name" || true
+  docker inspect -f '{{range .State.Health.Log}}{{println .ExitCode}}{{end}}' "$name" >&2 || true
   echo "FOUT: $name werd niet healthy (status $s)" >&2
   return 1
 }
 
-docker run -d --name asm-smoke-hub -p 127.0.0.1:30400:30400 -v "$WORK/hub:/appdata" "$HUB_IMAGE" >/dev/null
-docker run -d --name asm-smoke-exec -p 127.0.0.1:30410:30410 -v "$WORK/exec:/appdata" "$EXEC_IMAGE" >/dev/null
-wait_healthy asm-smoke-hub
-wait_healthy asm-smoke-exec
+# De buildengine kan op een andere host draaien. Docker beheert de testvolumes en kent elke
+# container een eigen ID toe. De HTTP-client bereikt beide images zonder gepubliceerde hostpoorten.
+hub=$(docker run -d --cidfile "$WORK/hub.cid" --network bridge "$HUB_IMAGE")
+executor=$(docker run -d --cidfile "$WORK/executor.cid" --network bridge "$EXEC_IMAGE")
+client=$(docker run -d --cidfile "$WORK/client.cid" --network bridge --tmpfs /proef:mode=1777 \
+  --entrypoint sleep docker.io/curlimages/curl:8.20.0@sha256:b3f1fb2a51d923260350d21b8654bbc607164a987e2f7c84a0ac199a67df812a 3600)
+hub_url=http://localhost:30400
+executor_url=http://localhost:30410
+testadressen() {
+  hub_adres=$(docker inspect -f '{{.NetworkSettings.Networks.bridge.IPAddress}}' "$hub")
+  executor_adres=$(docker inspect -f '{{.NetworkSettings.Networks.bridge.IPAddress}}' "$executor")
+  test -n "$hub_adres" && test -n "$executor_adres"
+}
+rook_curl() {
+  docker exec -i "$client" curl --connect-to "localhost:30400:$hub_adres:30400" \
+    --connect-to "localhost:30410:$executor_adres:30410" "$@"
+}
+testadressen
+wait_healthy "$hub"
+wait_healthy "$executor"
 
 expect() {  # expect <omschrijving> <tekst> <patroon>  (geen grep -q in pipes: pipefail + SIGPIPE)
-  if ! printf '%s' "$2" | grep -F -- "$3" >/dev/null; then echo "FOUT: $1: '$3' niet gevonden in: $2" >&2; exit 1; fi
+  if ! printf '%s' "$2" | grep -F -- "$3" >/dev/null; then echo "FOUT: $1: '$3' niet gevonden" >&2; exit 1; fi
   echo "ok: $1"
 }
 # Beleid (ADR-0030 besluit 2; S-P2-010, R-TECH-2): de Hub-image, de executor-image en policy/ in de repo geven dezelfde
@@ -34,69 +54,70 @@ expect() {  # expect <omschrijving> <tekst> <patroon>  (geen grep -q in pipes: p
 # van de repo, dan draait er ander beleid dan wat in de repo staat (bv. een vierde yaml die de Dockerfile niet kopieert).
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HASH_PY='from asm_policy import load_policy; print(load_policy().hash)'
-hub_hash="$(docker exec -u 568 asm-smoke-hub python -c "$HASH_PY")"
-exec_hash="$(docker exec -u 568 asm-smoke-exec python -c "$HASH_PY")"
-repo_hash="$(docker run --rm --network none -v "$REPO_DIR/policy:/repo-policy:ro" "$EXEC_IMAGE" python -c \
+hub_hash="$(docker exec -u 568 "$hub" python -c "$HASH_PY")"
+exec_hash="$(docker exec -u 568 "$executor" python -c "$HASH_PY")"
+docker cp "$REPO_DIR/policy" "$executor:/repo-policy"
+repo_hash="$(docker exec -u 568 "$executor" python -c \
   'from pathlib import Path; from asm_policy import policy_hash; print(policy_hash(Path("/repo-policy")))')"
 echo "policy_hash: hub $hub_hash, executor $exec_hash, repo $repo_hash"
 [[ "$hub_hash" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FOUT: geen geldige policy_hash in de Hub-image" >&2; exit 1; }
 test "$hub_hash" = "$exec_hash" || { echo "FOUT: policy_hash van de Hub- en de executor-image verschilt" >&2; exit 1; }
 test "$hub_hash" = "$repo_hash" || { echo "FOUT: policy_hash van de images verschilt van policy/ in de repo" >&2; exit 1; }
 echo "ok: policy_hash gelijk in de Hub-image, de executor-image en policy/ in de repo"
-expect "hub healthz" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/healthz)" '"status":"ok"'
-expect "hub readyz" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/readyz)" '"status":"ready"'
-expect "setup vereist" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/setup/status)" '"setup_vereist":true'
-expect "setupcode in de log" "$(docker logs asm-smoke-hub 2>&1)" 'SETUPCODE (eenmalig'
+expect "hub healthz" "$(rook_curl -fsS --noproxy '*' "$hub_url/healthz")" '"status":"ok"'
+expect "hub readyz" "$(rook_curl -fsS --noproxy '*' "$hub_url/readyz")" '"status":"ready"'
+expect "setup vereist" "$(rook_curl -fsS --noproxy '*' "$hub_url/api/v1/setup/status")" '"setup_vereist":true'
+expect "setupcode in de log" "$(docker logs "$hub" 2>&1)" 'SETUPCODE (eenmalig'
 # Web-UI op dezelfde poort (Next.js), Nederlands, met beveiligingsheaders; API alleen via de doorgang.
-expect "web-UI eerste start" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/eerste-start)" 'lang="nl"'
-expect "web-UI CSP" "$(curl -fsS --noproxy '*' -D - -o /dev/null http://127.0.0.1:30400/inloggen)" "frame-ancestors 'none'"
-expect "PWA-manifest" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/manifest.webmanifest)" '"lang": "nl"'
+expect "web-UI eerste start" "$(rook_curl -fsS --noproxy '*' "$hub_url/eerste-start")" 'lang="nl"'
+expect "web-UI CSP" "$(rook_curl -fsS --noproxy '*' -D - -o /dev/null "$hub_url/inloggen")" "frame-ancestors 'none'"
+expect "PWA-manifest" "$(rook_curl -fsS --noproxy '*' "$hub_url/manifest.webmanifest")" '"lang": "nl"'
 # Peil (ADR-0024): productnaam, Tailwind-CSS met de Peil-tokens in de build, noodlogin-pagina publiek.
-expect "web-UI productnaam" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen)" 'TrueNAS Home Platform'
-expect "PWA-manifest productnaam" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/manifest.webmanifest)" '"short_name": "Home Platform"'
-css_pad="$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen | grep -o '/_next/static/[^"]*\.css' | head -1)"
-expect "Peil-tokens in de CSS" "$(curl -fsS --noproxy '*' "http://127.0.0.1:30400${css_pad}")" '--healthy-ink'
-expect "noodlogin-pagina" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/inloggen/nood)" 'Noodlogin'
-expect "executor-statuspagina in Peil" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/)" 'Onderdeel van TrueNAS Home Platform'
+expect "web-UI productnaam" "$(rook_curl -fsS --noproxy '*' "$hub_url/inloggen")" 'TrueNAS Home Platform'
+expect "PWA-manifest productnaam" "$(rook_curl -fsS --noproxy '*' "$hub_url/manifest.webmanifest")" '"short_name": "Home Platform"'
+css_pad="$(rook_curl -fsS --noproxy '*' "$hub_url/inloggen" | grep -o '/_next/static/[^"]*\.css' | head -1)"
+expect "Peil-tokens in de CSS" "$(rook_curl -fsS --noproxy '*' "${hub_url}${css_pad}")" '--healthy-ink'
+expect "noodlogin-pagina" "$(rook_curl -fsS --noproxy '*' "$hub_url/inloggen/nood")" 'Noodlogin'
+expect "executor-statuspagina in Peil" "$(rook_curl -fsS --noproxy '*' "$executor_url/")" 'Onderdeel van TrueNAS Home Platform'
 # ADR-0026 (N-01): same-origin, zodat de browser bij het koppelformulier de echte Origin stuurt (niet `null`).
-expect "executor-statuspagina Referrer-Policy" "$(curl -fsS --noproxy '*' -D - -o /dev/null http://127.0.0.1:30410/)" \
+expect "executor-statuspagina Referrer-Policy" "$(rook_curl -fsS --noproxy '*' -D - -o /dev/null "$executor_url/")" \
   'referrer-policy: same-origin'
-expect "API-fout via web-poort (NL)" "$(curl -sS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/me)" '"code":"unauthorized"'
-expect "executor niet gekoppeld" "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/readyz)" '"gekoppeld":false'
+expect "API-fout via web-poort (NL)" "$(rook_curl -sS --noproxy '*' "$hub_url/api/v1/auth/me")" '"code":"unauthorized"'
+expect "executor niet gekoppeld" "$(rook_curl -fsS --noproxy '*' "$executor_url/readyz")" '"gekoppeld":false'
 expect "executor weigert Hub-JWT zonder koppeling (contract 1.3 §4.7)" \
-  "$(curl -sS --noproxy '*' -H 'Authorization: Bearer a.b.c' http://127.0.0.1:30410/connector/v1/hub-link)" '"reason":"not_linked"'
-expect "enroll-schema: oud verzoek zonder verplichte velden → 422" "$(curl -sS --noproxy '*' -H 'content-type: application/json' \
-  -d '{"app_id":"home-control-hub","enrollment_token":"x"}' http://127.0.0.1:30400/api/v1/services/enroll)" '"code":"validation_error"'
-expect "sleutelrotaties: lege lijst" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/key-rotations)" '"items":[]'
+  "$(rook_curl -sS --noproxy '*' -H 'Authorization: Bearer a.b.c' "$executor_url/connector/v1/hub-link")" '"reason":"not_linked"'
+expect "enroll-schema: oud verzoek zonder verplichte velden → 422" "$(rook_curl -sS --noproxy '*' -H 'content-type: application/json' \
+  -d '{"app_id":"home-control-hub","enrollment_token":"x"}' "$hub_url/api/v1/services/enroll")" '"code":"validation_error"'
+expect "sleutelrotaties: lege lijst" "$(rook_curl -fsS --noproxy '*' "$hub_url/api/v1/auth/key-rotations")" '"items":[]'
 # Contract 1.3 §4.7: eerst authenticatie — een niet-gekoppelde executor weigert /execute met 401 not_linked.
-expect "executor: execute vraagt eerst aanmelding (contract 1.3 §4.7)" "$(curl -sS --noproxy '*' -X POST \
-  -H 'content-type: application/json' -d '{"action_id":"app.restart"}' http://127.0.0.1:30410/api/v1/execute)" \
+expect "executor: execute vraagt eerst aanmelding (contract 1.3 §4.7)" "$(rook_curl -sS --noproxy '*' -X POST \
+  -H 'content-type: application/json' -d '{"action_id":"app.restart"}' "$executor_url/api/v1/execute")" \
   '"reason":"not_linked"'
 # Contract 1.3 §5: > 1 MiB → 413 vóór routering en aanmelding, ook chunked (zonder Content-Length). Hub via de webpoort
 # (Node-doorgang → API), executor rechtstreeks; beide op een route zonder aanmelding.
 big413() {  # big413 <url> <bytes> → HTTP-status van een chunked POST van <bytes> bytes
-  head -c "$2" /dev/zero | curl -sS --noproxy '*' -o "$WORK/413.json" -w '%{http_code}' -X POST \
+  head -c "$2" /dev/zero | rook_curl -sS --noproxy '*' -o /proef/413.json -w '%{http_code}' -X POST \
     -H 'Transfer-Encoding: chunked' -H 'content-type: application/json' --data-binary @- "$1" || true
 }
 # Ook een veel grotere body, een paar keer: een vroeg 413-antwoord mag via de doorgang nooit een 502 worden.
-for url in http://127.0.0.1:30400/api/v1/services/00000000-0000-4000-8000-000000000000/rotate \
-           http://127.0.0.1:30410/connector/v1/hub-link/unlink; do
+for url in "$hub_url/api/v1/services/00000000-0000-4000-8000-000000000000/rotate" \
+           "$executor_url/connector/v1/hub-link/unlink"; do
   for size in 1048577 3000000 3000000 3000000 3000000 3000000; do
     code="$(big413 "$url" "$size")"
     test "$code" = 413 || { echo "FOUT: chunked $size bytes naar $url gaf $code i.p.v. 413" >&2; exit 1; }
-    expect "413 chunked $size bytes ($url)" "$(cat "$WORK/413.json")" '"max_bytes":1048576'
+    expect "413 chunked $size bytes ($url)" "$(docker exec "$client" cat /proef/413.json)" '"max_bytes":1048576'
   done
-  code="$(head -c 1048577 /dev/zero | curl -sS --noproxy '*' -o "$WORK/413.json" -w '%{http_code}' -X POST \
+  code="$(head -c 1048577 /dev/zero | rook_curl -sS --noproxy '*' -o /proef/413.json -w '%{http_code}' -X POST \
     -H 'content-type: application/json' --data-binary @- "$url" || true)"
   test "$code" = 413 || { echo "FOUT: Content-Length > 1 MiB naar $url gaf $code i.p.v. 413" >&2; exit 1; }
 done
 # Geen root-processen meer en de AI-runner als aparte gebruiker:
-uids="$(docker exec -u 568 asm-smoke-hub sh -c 'for p in /proc/[0-9]*; do awk "/^Uid:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' ')"
+uids="$(docker exec -u 568 "$hub" sh -c 'for p in /proc/[0-9]*; do awk "/^Uid:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' ')"
 echo "uid's in de Hub-container: $uids"
 case " $uids" in *" 0 "*) echo "FOUT: er draait nog een root-proces" >&2; exit 1;; esac
 case " $uids" in *" 569 "*) ;; *) echo "FOUT: AI-runner draait niet als aparte gebruiker 569" >&2; exit 1;; esac
 # PostgreSQL zonder TCP-poort; naar buiten alleen 30400 (web-UI), de API alleen op 127.0.0.1:8400.
-socks="$(docker exec -u 568 asm-smoke-hub sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk "NR>1 && \$4==\"0A\" {print \$2}"' | sort -u | tr '\n' ' ')"
+socks="$(docker exec -u 568 "$hub" sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk "NR>1 && \$4==\"0A\" {print \$2}"' | sort -u | tr '\n' ' ')"
 echo "luisterende sockets (hex ip:poort): $socks"
 test "$socks" = "00000000:76C0 0100007F:20D0 "
 # no-new-privileges en geen capabilities (contract 1.3 §2.2/§10; het standaardformulier zet geen no-new-privileges en
@@ -108,7 +129,7 @@ privs() {  # privs <container> <veld>: unieke waarden van <veld> in /proc/<pid>/
     awk -v f="$0:" "\$1==f{print \$2}" $p/status 2>/dev/null; done' "$2" | sort -u | tr '\n' ' '
 }
 # Contract 1.3 §2.2 (C1.3-ASM-01): ook CapPrm en CapAmb 0 en — bij een start als root — een lege bounding set.
-for c in asm-smoke-hub asm-smoke-exec; do
+for c in "$hub" "$executor"; do
   v="$(privs "$c" NoNewPrivs)"; echo "NoNewPrivs in $c: $v"
   test "$v" = "1 " || { echo "FOUT: niet alle processen in $c hebben no-new-privileges" >&2; exit 1; }
   for f in CapEff CapPrm CapAmb CapBnd; do
@@ -118,7 +139,7 @@ for c in asm-smoke-hub asm-smoke-exec; do
 done
 # De healthcheck apart (§2.2): hetzelfde commando met de controlevlag, als root gestart zoals Docker dat doet; na de
 # wissel Uid 568, geen capabilities, lege bounding set en no_new_privs.
-for pair in "asm-smoke-hub /usr/local/lib/hub/healthcheck.py" "asm-smoke-exec /usr/local/lib/executor/healthcheck.py"; do
+for pair in "$hub /usr/local/lib/hub/healthcheck.py" "$executor /usr/local/lib/executor/healthcheck.py"; do
   # shellcheck disable=SC2086
   set -- $pair
   out="$(docker exec "$1" python "$2" --controle)"
@@ -129,86 +150,85 @@ for pair in "asm-smoke-hub /usr/local/lib/hub/healthcheck.py" "asm-smoke-exec /u
 done
 # "Custom User 568" aangevinkt: geen eigenaarschapsstap en geen lege bounding set mogelijk; CapEff/CapPrm/CapAmb 0 en
 # NoNewPrivs 1 blijven verplicht (§2.2).
-mkdir -p "$WORK/exec568" && chmod 0777 "$WORK/exec568"
-docker run -d --name asm-smoke-exec568 -u 568:568 -p 127.0.0.1:30411:30410 -v "$WORK/exec568:/appdata" "$EXEC_IMAGE" >/dev/null
-wait_healthy asm-smoke-exec568
-v="$(privs asm-smoke-exec568 NoNewPrivs)"; test "$v" = "1 " || { echo "FOUT: Custom User 568 zonder no_new_privs" >&2; exit 1; }
+executor568=$(docker run -d --cidfile "$WORK/executor568.cid" --network none -u 568:568 "$EXEC_IMAGE")
+wait_healthy "$executor568"
+v="$(privs "$executor568" NoNewPrivs)"; test "$v" = "1 " || { echo "FOUT: Custom User 568 zonder no_new_privs" >&2; exit 1; }
 for f in CapEff CapPrm CapAmb; do
-  v="$(privs asm-smoke-exec568 "$f")"
+  v="$(privs "$executor568" "$f")"
   test "$v" = "0000000000000000 " || { echo "FOUT: Custom User 568: $f ≠ 0 ($v)" >&2; exit 1; }
 done
 echo "ok: executor als Custom User 568: geen capabilities, no_new_privs"
-docker rm -f asm-smoke-exec568 >/dev/null
 
 # Herstart zonder dataverlies: eerste beheerder via de setupcode uit de log, dan herstart en harde kill.
-CODE="$(docker logs asm-smoke-hub 2>&1 | awk '/SETUPCODE \(eenmalig/ {c=$NF} END {print c}')"
+CODE="$(docker logs "$hub" 2>&1 | awk '/SETUPCODE \(eenmalig/ {c=$NF} END {print c}')"
 test -n "$CODE"
 PW='Rooktest-Wachtwoord-123!'
-api() { curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' -H 'content-type: application/json' "$@"; }
+api() { rook_curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' -H 'content-type: application/json' "$@"; }
 test "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"beheerder\",\"password\":\"$PW\"}" \
-  http://127.0.0.1:30400/api/v1/setup/admin)" = 200 && echo "ok: eerste beheerder aangemaakt via de webpoort"
+  "$hub_url/api/v1/setup/admin")" = 200 && echo "ok: eerste beheerder aangemaakt via de webpoort"
 test "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"tweede\",\"password\":\"$PW\"}" \
-  http://127.0.0.1:30400/api/v1/setup/admin)" = 409 && echo "ok: setupcode is eenmalig"
-EXEC_ID="$(curl -fsS --noproxy '*' http://127.0.0.1:30410/api/v1/status | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')"
+  "$hub_url/api/v1/setup/admin")" = 409 && echo "ok: setupcode is eenmalig"
+EXEC_ID="$(rook_curl -fsS --noproxy '*' "$executor_url/api/v1/status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')"
 for how in restart kill; do
-  if [ "$how" = restart ]; then docker restart -t 30 asm-smoke-hub asm-smoke-exec >/dev/null
-  else docker kill -s KILL asm-smoke-hub asm-smoke-exec >/dev/null; docker start asm-smoke-hub asm-smoke-exec >/dev/null; fi
-  wait_healthy asm-smoke-hub
-  wait_healthy asm-smoke-exec
-  expect "na $how: setup blijft afgerond" "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/setup/status)" '"setup_vereist":false'
-  test "$(api -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" http://127.0.0.1:30400/api/v1/auth/login)" = 200 \
+  if [ "$how" = restart ]; then docker restart -t 30 "$hub" "$executor" >/dev/null
+  else docker kill -s KILL "$hub" "$executor" >/dev/null; docker start "$hub" "$executor" >/dev/null; fi
+  testadressen
+  wait_healthy "$hub"
+  wait_healthy "$executor"
+  expect "na $how: setup blijft afgerond" "$(rook_curl -fsS --noproxy '*' "$hub_url/api/v1/setup/status")" '"setup_vereist":false'
+  test "$(api -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" "$hub_url/api/v1/auth/login")" = 200 \
     && echo "ok: na $how: inloggen met het bestaande account"
-  n="$(docker logs asm-smoke-hub 2>&1 | grep -c 'SETUPCODE (eenmalig' || true)"
+  n="$(docker logs "$hub" 2>&1 | grep -c 'SETUPCODE (eenmalig' || true)"
   test "$n" = 1 || { echo "FOUT: na $how verscheen een nieuwe setupcode ($n)" >&2; exit 1; }
-  test "$(curl -fsS --noproxy '*' http://127.0.0.1:30410/api/v1/status | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')" = "$EXEC_ID" \
+  test "$(rook_curl -fsS --noproxy '*' "$executor_url/api/v1/status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')" = "$EXEC_ID" \
     && echo "ok: na $how: executor-identiteit ongewijzigd (geheimen niet overschreven)"
 done
-expect "harde kill: oude postmaster.pid opgeruimd" "$(docker logs asm-smoke-hub 2>&1)" 'oude postmaster.pid'
+expect "harde kill: oude postmaster.pid opgeruimd" "$(docker logs "$hub" 2>&1)" 'oude postmaster.pid'
 
 # P1 (ADR-0021): migraties 0003–0005 in de image, periodieke worker-taken draaien, zonder NAS alles 'unknown'.
-JAR="$WORK/cookies"
+JAR=/proef/cookies
 test "$(api -c "$JAR" -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" \
-  http://127.0.0.1:30400/api/v1/auth/login)" = 200
+  "$hub_url/api/v1/auth/login")" = 200
 for _ in $(seq 1 30); do
-  st="$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/monitoring/status)"
+  st="$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/monitoring/status")"
   case "$st" in *'"naam":"meldingen_versturen"'*'"status":"ok"'*) break ;; esac
   sleep 2
 done
 expect "worker: periodieke taken draaien" "$st" '"status":"ok"'
 expect "catalogus zonder NAS: leeg en alleen-lezen" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/apps)" '"alleen_lezen":true'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/apps")" '"alleen_lezen":true'
 expect "observability zonder NAS: unknown (geen bron)" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/observability/nas)" '"reden":"geen_bron"'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/observability/nas")" '"reden":"geen_bron"'
 expect "standaard-alertregels gezaaid" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/alerts/rules)" '"standaard_sleutel":"app-down"'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/alerts/rules")" '"standaard_sleutel":"app-down"'
 
 # P1 deel 2 (ADR-0022/0023): migraties 0006–0009, incidenten, runbooks, auditketting, out-of-band, SSO standaard uit.
 expect "incidenten-inbox bereikbaar" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/incidents/samenvatting)" '"per_status"'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/incidents/samenvatting")" '"per_status"'
 expect "runbooks: acht scenario's met hash" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/runbooks)" '"runbook_hash"'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/runbooks")" '"runbook_hash"'
 for _ in $(seq 1 15); do
-  st="$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/monitoring/status)"
+  st="$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/monitoring/status")"
   case "$st" in *'"naam":"audit_verankeren"'*) break ;; esac
   sleep 2
 done
 expect "auditketting intact" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/audit/verify)" '"status":"intact"'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/audit/verify")" '"status":"intact"'
 # Het eerste anker komt pas na het interval (15 min) na de eerste auditrij; bestaat het, dan 568 en 0600.
-if docker exec asm-smoke-hub test -f /appdata/audit/anker.jsonl; then
-  [ "$(docker exec asm-smoke-hub stat -c '%u %a' /appdata/audit/anker.jsonl)" = "568 600" ] \
+if docker exec "$hub" test -f /appdata/audit/anker.jsonl; then
+  [ "$(docker exec "$hub" stat -c '%u %a' /appdata/audit/anker.jsonl)" = "568 600" ] \
     || { echo "FOUT: auditanker niet van 568 met 0600"; exit 1; }
   echo "ok: auditanker in /appdata/audit (568, 0600)"
 else
   echo "ok: nog geen auditanker (eerste anker na het interval)"
 fi
 expect "out-of-band: Hub niet in het meldpad, NAS-uitval niet gedekt" \
-  "$(curl -fsS --noproxy '*' -b "$JAR" http://127.0.0.1:30400/api/v1/monitoring/out-of-band)" '"hub_in_meldpad":false'
+  "$(rook_curl -fsS --noproxy '*' -b "$JAR" "$hub_url/api/v1/monitoring/out-of-band")" '"hub_in_meldpad":false'
 expect "SSO standaard uit" \
-  "$(curl -fsS --noproxy '*' http://127.0.0.1:30400/api/v1/auth/oidc/beschikbaar)" '"ingeschakeld":false'
+  "$(rook_curl -fsS --noproxy '*' "$hub_url/api/v1/auth/oidc/beschikbaar")" '"ingeschakeld":false'
 expect "SSO-login uit → terug naar inloggen" \
-  "$(curl -sS --noproxy '*' -D - -o /dev/null http://127.0.0.1:30400/api/v1/auth/oidc/login)" 'sso_fout=sso_uit'
+  "$(rook_curl -sS --noproxy '*' -D - -o /dev/null "$hub_url/api/v1/auth/oidc/login")" 'sso_fout=sso_uit'
 
-docker stop -t 30 asm-smoke-hub >/dev/null
-expect "netjes gestopt" "$(docker logs asm-smoke-hub 2>&1 | tail -n 5)" '[hub] gestopt'
+docker stop -t 30 "$hub" >/dev/null
+expect "netjes gestopt" "$(docker logs "$hub" 2>&1 | tail -n 5)" '[hub] gestopt'
 echo "rooktest geslaagd"

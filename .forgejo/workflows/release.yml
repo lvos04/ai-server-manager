@@ -1,0 +1,42 @@
+name: release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  REGISTRY: git.medialeon.nl
+  IMAGE_PREFIX: git.medialeon.nl/leon/ai-server-manager
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Versietag controleren
+        run: |
+          versie=$(cat VERSION)
+          test "$GITHUB_REF" = "refs/tags/v$versie"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "$GITHUB_REF^{commit}")"
+          echo "VERSION=$versie" >> "$GITHUB_ENV"
+      - name: Beide versie-images publiceren met herkomstbewijs en SPDX
+        shell: bash
+        env:
+          REGISTRY_USER: ${{ vars.REGISTRY_USER }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: bash .forgejo/scripts/release-images.sh
+      - name: Digests en SPDX-bestanden bewaren
+        uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # Forgejo v4
+        with:
+          name: release-${{ env.VERSION }}
+          path: release/
+          if-no-files-found: error
+      - name: Forgejo-release met de drie bijlagen
+        env:
+          RELEASE_TOKEN: ${{ github.token }}
+        run: bash .forgejo/scripts/release-bijlagen.sh

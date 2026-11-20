@@ -1,0 +1,258 @@
+name: ci
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+defaults:
+  run:
+    shell: bash
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+  HUB_TEST_ADMIN_URL: postgresql://postgres@postgres:5432/postgres
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services: &postgres_service
+      postgres:
+        image: docker.io/library/postgres:16.15-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - &bron
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - &python312
+        uses: https://data.forgejo.org/actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL 16-client (pg_dump/pg_restore voor de back-uptests)
+        run: |
+          apt=(apt-get)
+          if [[ $(id -u) != 0 ]]; then apt=(sudo apt-get); fi
+          "${apt[@]}" update -q
+          "${apt[@]}" install -yq --no-install-recommends postgresql-client-16
+          /usr/lib/postgresql/16/bin/pg_dump --version
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+      - &hub_installatie
+        name: Afhankelijkheden (exact vastgezet)
+        run: |
+          python -m pip install -r apps/api/requirements.lock -r apps/api/requirements-dev.lock
+          python -m pip install --no-deps -e apps/policy -e apps/api -e apps/executor
+          python -m pip check
+      - name: ruff (lint + format)
+        run: make lint BIN="$(dirname "$(command -v python)")"
+      - name: mypy (strict)
+        run: make type BIN="$(dirname "$(command -v python)")"
+      - name: pytest (unit, integratie, dienst-E2E met fake TrueNAS)
+        run: python -m pytest -q
+      - name: alembic upgrade → downgrade → upgrade op een lege database
+        env:
+          HUB_DATABASE_URL: postgresql+psycopg://postgres@postgres:5432/asm_ci_migrate
+        run: |
+          psql -h postgres -U postgres -c "CREATE DATABASE asm_ci_migrate"
+          python -m hub migrate
+          python -m hub migrate --check
+          python -m hub migrate --down base
+          if python -m hub migrate --check; then
+            echo "FOUT: na downgrade naar base meldt migrate --check ten onrechte 'actueel'" >&2; exit 1
+          fi
+          python -m hub migrate
+          (cd apps/api && alembic -c alembic.ini check)
+      - name: OpenAPI-drift
+        run: make openapi-check BIN="$(dirname "$(command -v python)")"
+      - name: pip-audit (runtime-afhankelijkheden)
+        run: pip-audit --strict -r apps/api/requirements.lock -r apps/executor/requirements.lock
+
+  woning:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services: *postgres_service
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0  # De versieproef draait de vorige Hub uit zijn vaste commit.
+          persist-credentials: false
+      - name: Gepinde my_house-bron voor de woningproef
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          github-server-url: https://git.medialeon.nl
+          token: ${{ github.token }}
+          repository: leon/my_house
+          ref: d8826c23e0caef6890bdd65d0a1adbab335c9c60
+          path: .my-house-interop
+          fetch-depth: 0
+          persist-credentials: false
+      - *python312
+      - *hub_installatie
+      - name: Woningoverzicht bij afzonderlijke updates van Hub en my_house
+        env:
+          MY_HOUSE_SOURCE: .my-house-interop
+          SHC_TEST_PG: postgresql://postgres@postgres:5432
+        run: |
+          HUB_PYTHON="$(command -v python)"
+          export HUB_PYTHON
+          python -m venv "$RUNNER_TEMP/woningbron"
+          export MY_HOUSE_PYTHON="$RUNNER_TEMP/woningbron/bin/python"
+          grep -vE '^[./]' "$MY_HOUSE_SOURCE/apps/api/requirements.txt" > "$RUNNER_TEMP/woningbron.lock"
+          "$MY_HOUSE_PYTHON" -m pip install --require-hashes --only-binary=:all: -r "$RUNNER_TEMP/woningbron.lock"
+          "$MY_HOUSE_PYTHON" -m pip freeze > "$RUNNER_TEMP/woningbron.constraints"
+          "$MY_HOUSE_PYTHON" -m pip install -c "$RUNNER_TEMP/woningbron.constraints" \
+            -e "$MY_HOUSE_SOURCE/integrations" -e "$MY_HOUSE_SOURCE/apps/api[dev]"
+          bash tests/interop/woning/proef.sh
+
+  planner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services: *postgres_service
+    steps:
+      - *bron
+      - name: Gepinde plannerbron voor M3-interop
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          github-server-url: https://git.medialeon.nl
+          token: ${{ github.token }}
+          repository: leon/jelly-leon-platform
+          ref: 26746920e643cdbb5f9dc31b90cbcc29b65c1f1e
+          path: .jlp-interop
+          persist-credentials: false
+      - *python312
+      - *hub_installatie
+      - name: M3-interop met echte Hub en gepinde planner
+        env:
+          JLP_SOURCE: .jlp-interop
+        run: python -m pytest -q tests/interop/test_catalog_availability.py
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    services: *postgres_service
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - *bron
+      - *python312
+      - uses: https://data.forgejo.org/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.23.4"
+      - name: Hub-API en executor voor de teststack (exact vastgezet)
+        working-directory: .
+        run: |
+          python -m pip install -r apps/api/requirements.lock -r apps/executor/requirements.lock
+          python -m pip install --no-deps -e apps/policy -e apps/api -e apps/executor
+          python -m pip check
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+      - name: eslint (incl. jsx-a11y strict) en TypeScript
+        run: |
+          npx eslint --max-warnings=0 .
+          npx tsc --noEmit
+      - name: vitest (unit)
+        run: npx vitest run
+      - name: npm audit (runtime-afhankelijkheden)
+        run: npm audit --omit=dev --audit-level=high
+      - name: next build (standalone)
+        run: npx next build
+      - name: Playwright-Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright E2E (360/390/768/1440 × licht/donker, axe) tegen echte API + simulators
+        env:
+          HUB_E2E_PYTHON: python
+          CI: "true"
+        run: npx playwright test
+      - name: Peil-ontwerpreview (320–1440 × licht/donker; axe, gemeten contrast, focusdoorloop, doelen, Peil-semantiek)
+        env:
+          HUB_E2E_PYTHON: python
+          CI: "true"
+          PEIL_REVIEW_WORKERS: "2" # minder gelijktijdige browsers op 4 vCPU (zie PEIL_REVIEW N-07)
+        shell: bash # -eo pipefail: een harde bevinding laat de stap falen, ook met tee
+        run: |
+          npx playwright test -c playwright.review.config.ts
+          node review/samenvat.mjs --json review/uit/samenvatting.json --streng | tee review/uit/samenvatting.txt
+      - name: Rapport en schermafbeeldingen bewaren
+        if: always()
+        uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # Forgejo v4
+        with:
+          name: playwright-rapport
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            apps/web/review/uit/samenvatting.json
+            apps/web/review/uit/samenvatting.txt
+            apps/web/review/uit/test-results
+            docs/screenshots/p1
+          retention-days: 14
+          if-no-files-found: ignore
+
+  excel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - *bron
+      - *python312
+      - name: Afhankelijkheden Excel-bijwerker (exact vastgezet)
+        run: python -m pip install -r tools/excel/requirements-test.txt
+      - name: pytest Excel-bijwerker (klein test-werkboek + echte Excel in een tijdelijke kopie)
+        run: python -m pytest -q tools/excel/tests
+
+  manifest:
+    # De catalogus bepaalt de vaste revisie van de validator van appstore-en-fork.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - *bron
+      - name: Gedeelde validatorpin lezen
+        run: |
+          ASF_COMMIT=$(awk '$1 == "ASF_COMMIT:" { print $2 }' policy/catalogus.yaml)
+          [[ "$ASF_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          echo "ASF_COMMIT=$ASF_COMMIT" >> "$GITHUB_ENV"
+      - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          github-server-url: https://git.medialeon.nl
+          token: ${{ github.token }}
+          repository: leon/appstore-en-fork
+          ref: ${{ env.ASF_COMMIT }}
+          path: .asf
+          persist-credentials: false
+      - *python312
+      - name: Validator van appstore-en-fork (exact vastgezet)
+        run: |
+          test "$(git -C .asf rev-parse HEAD)" = "$ASF_COMMIT"
+          python tools/sync_asf_c12.py .asf --check
+          python -m pip install -r .asf/apps/api/requirements.lock
+          python -m pip install --no-deps ./.asf/apps/api
+      - name: Eigen manifesten valideren (--strict)
+        run: |
+          cd "$RUNNER_TEMP"
+          for m in ai-server-manager ai-server-manager-executor; do
+            python -I -m appstore.manifest.cli validate --strict "$GITHUB_WORKSPACE/deploy/manifest/$m.manifest.yaml"
+          done
+
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [python, web]
+    steps:
+      - *bron
+      - name: Hub en executor bouwen en de volledige rooktest uitvoeren
+        shell: bash
+        run: |
+          tag="ci-${GITHUB_SHA}-${GITHUB_RUN_ID}"
+          hub="ai-server-manager:$tag"
+          executor="ai-server-manager-executor:$tag"
+          trap 'docker image rm "$hub" "$executor" >/dev/null 2>&1 || true' EXIT
+          docker buildx build --load --build-arg REVISION="$GITHUB_SHA" -f deploy/allinone/Dockerfile -t "$hub" .
+          docker buildx build --load --build-arg REVISION="$GITHUB_SHA" -f deploy/executor/Dockerfile -t "$executor" .
+          bash deploy/smoke.sh "$hub" "$executor"
