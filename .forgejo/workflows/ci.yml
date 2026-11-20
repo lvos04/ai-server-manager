@@ -192,21 +192,21 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: eslint (incl. jsx-a11y strict) en TypeScript
         run: |
-          npx eslint --max-warnings=0 .
-          npx tsc --noEmit
+          node node_modules/eslint/bin/eslint.js --max-warnings=0 .
+          node node_modules/typescript/bin/tsc --noEmit
       - name: vitest (unit)
-        run: npx vitest run
+        run: node node_modules/vitest/vitest.mjs run
       - name: npm audit (runtime-afhankelijkheden)
         run: npm audit --omit=dev --audit-level=high
       - name: next build (standalone)
-        run: npx next build
+        run: node node_modules/next/dist/bin/next build
       - name: Playwright-Chromium
-        run: npx playwright install --with-deps chromium
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
       - name: Playwright E2E (360/390/768/1440 × licht/donker, axe) tegen echte API + simulators
         env:
           HUB_E2E_PYTHON: python
           CI: "true"
-        run: npx playwright test
+        run: node node_modules/@playwright/test/cli.js test
       - name: Peil-ontwerpreview (320–1440 × licht/donker; axe, gemeten contrast, focusdoorloop, doelen, Peil-semantiek)
         env:
           HUB_E2E_PYTHON: python
@@ -214,7 +214,7 @@ jobs:
           PEIL_REVIEW_WORKERS: "2" # minder gelijktijdige browsers op 4 vCPU (zie PEIL_REVIEW N-07)
         shell: bash # -eo pipefail: een harde bevinding laat de stap falen, ook met tee
         run: |
-          npx playwright test -c playwright.review.config.ts
+          node node_modules/@playwright/test/cli.js test -c playwright.review.config.ts
           node review/samenvat.mjs --json review/uit/samenvatting.json --streng | tee review/uit/samenvatting.txt
       - name: Rapport en schermafbeeldingen bewaren
         if: always()
