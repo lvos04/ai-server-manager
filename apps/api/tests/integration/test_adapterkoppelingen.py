@@ -1100,6 +1100,80 @@ def test_my_house_workeruitval_heeft_eigen_vervalgrens(
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize(
+    ("bronleeftijd", "tweede_uitval"),
+    [(421, False), (120, True)],
+    ids=["doorlopend", "tweede_uitval"],
+)
+def test_my_house_herkent_volgende_uitval_aan_de_hartslag(
+    admin: Any,
+    doel: dict[str, Any],
+    huis_simulatie: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    bronleeftijd: int,
+    tweede_uitval: bool,
+) -> None:
+    code, toestand, oproepen = huis_simulatie
+    koppeling = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert koppeling.status_code == 201
+    path = f"{ROUTE}/{koppeling.json()['id']}"
+    begin = utcnow().replace(microsecond=0)
+    klok = begin - timedelta(milliseconds=2500)
+    monkeypatch.setattr(my_house, "utcnow", lambda: klok)
+    monkeypatch.setattr(adapterkoppelingen, "utcnow", lambda: klok)
+
+    def workerstatus(antwoord: Any) -> str:
+        assert antwoord.status_code == 200
+        checks = antwoord.json()["my_house"]["systeem"]["checks"]
+        return next(check["state"] for check in checks if check["key"] == "worker")
+
+    worker = toestand["worker"]
+    worker.update(state="ok", age_s=118)
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "ok"
+    assert admin.get(path).json()["gezondheid"]["status"] == "healthy"
+
+    klok = begin
+    worker.update(state="error", age_s=120)
+    eerste_sleutel = idem()
+    assert workerstatus(admin.post(f"{path}/test", headers=eerste_sleutel)) == "error"
+    eerste = admin.get(path).json()["gezondheid"]
+    assert eerste["status"] == "down"
+
+    # De Hub pollt tussendoor niet. Bij de tweede uitval meldt de bron de
+    # leeftijd van een hartslag die 180 s na de eerste uitval is gemeten.
+    klok += timedelta(milliseconds=300500)
+    worker["age_s"] = bronleeftijd
+    laatste_sleutel = idem()
+    laatste = admin.post(f"{path}/test", headers=laatste_sleutel)
+    assert laatste.headers.get("Idempotent-Replay") != "true"
+    nieuw = workerstatus(laatste)
+    assert oproepen.count(("GET", my_house.Route.SYSTEM)) == 3
+    aantal = len(oproepen)
+    detail = admin.get(path).json()["gezondheid"]
+    assert admin.get(ROUTE).json()["items"][0]["gezondheid"] == detail
+
+    oude_herhaling = admin.post(f"{path}/test", headers=eerste_sleutel)
+    assert oude_herhaling.headers["Idempotent-Replay"] == "true"
+    assert workerstatus(oude_herhaling) == "unknown"
+    herhaling = admin.post(f"{path}/test", headers=laatste_sleutel)
+    assert herhaling.headers["Idempotent-Replay"] == "true"
+    herhaald = workerstatus(herhaling)
+    assert len(oproepen) == aantal
+    if tweede_uitval:
+        assert (nieuw, detail["status"], detail["reason_code"], herhaald) == ("error", "down", None, "error")
+        assert detail["observed_at"] == klok.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    else:
+        assert (nieuw, detail["status"], detail["reason_code"], herhaald) == (
+            "unknown",
+            "unknown",
+            "meting_verouderd",
+            "unknown",
+        )
+        assert detail["observed_at"] == eerste["observed_at"]
+        assert detail["laatste_status"] == "down"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
 def test_my_house_nieuwe_code_herstelt_na_verloren_vernieuwingsantwoord(
     admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, periodic_run: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
