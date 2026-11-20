@@ -3,22 +3,24 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  workflow_dispatch:
 defaults:
   run:
     shell: bash
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'workflow_dispatch' && 'bronproeven' || 'lokaal' }}-${{ github.ref }}
   cancel-in-progress: true
 env:
   PYTHONDONTWRITEBYTECODE: "1"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   NEXT_TELEMETRY_DISABLED: "1"
-  HUB_TEST_ADMIN_URL: postgresql://postgres@postgres:5432/postgres
+  TESTDATABASE: asm_${{ github.run_id }}_${{ github.job }}
 
 jobs:
   python:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services: &postgres_service
@@ -26,8 +28,16 @@ jobs:
         image: docker.io/library/postgres:16.15-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: asm_${{ github.run_id }}_${{ github.job }}
+        # Deze runner deelt het hostnetwerk. Elke job gebruikt een eigen lokale poort en herkenbare database.
+        entrypoint: [bash, -ec]
+        cmd:
+          - |
+            sleutel=$(printf '%s' "$POSTGRES_DB" | cksum)
+            export PGPORT=$((20000 + ${sleutel%% *} % 30000))
+            exec docker-entrypoint.sh postgres -p "$PGPORT" -c listen_addresses=localhost
         options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+          --health-cmd 'pg_isready -h /var/run/postgresql -p "$(sed -n 4p "$PGDATA/postmaster.pid")" -U postgres' --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - &bron
         uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -51,17 +61,33 @@ jobs:
           python -m pip install -r apps/api/requirements.lock -r apps/api/requirements-dev.lock
           python -m pip install --no-deps -e apps/policy -e apps/api -e apps/executor
           python -m pip check
+      - &testdatabase
+        name: Eigen PostgreSQL-instantie op het runnernetwerk controleren
+        run: |
+          sleutel=$(printf '%s' "$TESTDATABASE" | cksum)
+          poort=$((20000 + ${sleutel%% *} % 30000))
+          basis="postgresql://postgres@localhost:$poort"
+          python -c 'import psycopg, sys; psycopg.connect(sys.argv[1], connect_timeout=5).close()' "$basis/$TESTDATABASE"
+          echo "PGPORT=$poort" >> "$GITHUB_ENV"
+          echo "HUB_TEST_ADMIN_URL=$basis/postgres" >> "$GITHUB_ENV"
+          echo "SHC_TEST_PG=$basis" >> "$GITHUB_ENV"
       - name: ruff (lint + format)
         run: make lint BIN="$(dirname "$(command -v python)")"
       - name: mypy (strict)
         run: make type BIN="$(dirname "$(command -v python)")"
       - name: pytest (unit, integratie, dienst-E2E met fake TrueNAS)
-        run: python -m pytest -q
-      - name: alembic upgrade → downgrade → upgrade op een lege database
-        env:
-          HUB_DATABASE_URL: postgresql+psycopg://postgres@postgres:5432/asm_ci_migrate
         run: |
-          psql -h postgres -U postgres -c "CREATE DATABASE asm_ci_migrate"
+          if [[ $(id -u) == 0 ]]; then
+            testmap=$(mktemp -d "$RUNNER_TEMP/pytest.XXXXXXXX")
+            chown nobody "$testmap"
+            runuser -u nobody -- env HOME="$testmap" TMPDIR="$testmap" PATH="$PATH" "$(command -v python)" -m pytest -q
+          else
+            python -m pytest -q
+          fi
+      - name: alembic upgrade → downgrade → upgrade op een lege database
+        run: |
+          export HUB_DATABASE_URL="postgresql+psycopg://postgres@localhost:$PGPORT/asm_ci_migrate"
+          psql -h localhost -U postgres -c "CREATE DATABASE asm_ci_migrate"
           python -m hub migrate
           python -m hub migrate --check
           python -m hub migrate --down base
@@ -76,6 +102,7 @@ jobs:
         run: pip-audit --strict -r apps/api/requirements.lock -r apps/executor/requirements.lock
 
   woning:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services: *postgres_service
@@ -88,7 +115,7 @@ jobs:
         uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           github-server-url: https://git.medialeon.nl
-          token: ${{ github.token }}
+          token: ${{ secrets.CI_BRONNEN_LEZEN || github.token }}
           repository: leon/my_house
           ref: d8826c23e0caef6890bdd65d0a1adbab335c9c60
           path: .my-house-interop
@@ -96,10 +123,10 @@ jobs:
           persist-credentials: false
       - *python312
       - *hub_installatie
+      - *testdatabase
       - name: Woningoverzicht bij afzonderlijke updates van Hub en my_house
         env:
           MY_HOUSE_SOURCE: .my-house-interop
-          SHC_TEST_PG: postgresql://postgres@postgres:5432
         run: |
           HUB_PYTHON="$(command -v python)"
           export HUB_PYTHON
@@ -113,6 +140,7 @@ jobs:
           bash tests/interop/woning/proef.sh
 
   planner:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services: *postgres_service
@@ -122,19 +150,21 @@ jobs:
         uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           github-server-url: https://git.medialeon.nl
-          token: ${{ github.token }}
+          token: ${{ secrets.CI_BRONNEN_LEZEN || github.token }}
           repository: leon/jelly-leon-platform
           ref: 26746920e643cdbb5f9dc31b90cbcc29b65c1f1e
           path: .jlp-interop
           persist-credentials: false
       - *python312
       - *hub_installatie
+      - *testdatabase
       - name: M3-interop met echte Hub en gepinde planner
         env:
           JLP_SOURCE: .jlp-interop
         run: python -m pytest -q tests/interop/test_catalog_availability.py
 
   web:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 70
     services: *postgres_service
@@ -153,6 +183,7 @@ jobs:
           python -m pip install -r apps/api/requirements.lock -r apps/executor/requirements.lock
           python -m pip install --no-deps -e apps/policy -e apps/api -e apps/executor
           python -m pip check
+      - *testdatabase
       - name: npm ci
         run: npm ci --no-audit --no-fund
       - name: eslint (incl. jsx-a11y strict) en TypeScript
@@ -197,6 +228,7 @@ jobs:
           if-no-files-found: ignore
 
   excel:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -208,6 +240,7 @@ jobs:
         run: python -m pytest -q tools/excel/tests
 
   manifest:
+    if: github.event_name == 'workflow_dispatch'
     # De catalogus bepaalt de vaste revisie van de validator van appstore-en-fork.
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -221,7 +254,7 @@ jobs:
       - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           github-server-url: https://git.medialeon.nl
-          token: ${{ github.token }}
+          token: ${{ secrets.CI_BRONNEN_LEZEN || github.token }}
           repository: leon/appstore-en-fork
           ref: ${{ env.ASF_COMMIT }}
           path: .asf
@@ -241,6 +274,7 @@ jobs:
           done
 
   images:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [python, web]

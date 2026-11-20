@@ -3,7 +3,7 @@
 set -euo pipefail
 HUB_IMAGE="${1:?hub-image}"
 EXEC_IMAGE="${2:?executor-image}"
-WORK=$(mktemp -d)
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/asm-smoke.XXXXXXXX")
 cleanup() {
   for bestand in "$WORK"/*.cid; do
     if [[ -s $bestand ]]; then docker rm -fv "$(cat "$bestand")" >/dev/null || true; fi
@@ -26,8 +26,8 @@ wait_healthy() {
 
 # De buildengine kan op een andere host draaien. Docker beheert de testvolumes en kent elke
 # container een eigen ID toe. De HTTP-client bereikt beide images zonder gepubliceerde hostpoorten.
-hub=$(docker run -d --cidfile "$WORK/hub.cid" --network bridge "$HUB_IMAGE")
-executor=$(docker run -d --cidfile "$WORK/executor.cid" --network bridge "$EXEC_IMAGE")
+hub=$(docker run -d --name "asm-smoke-hub-${WORK##*.}" --cidfile "$WORK/hub.cid" --network bridge "$HUB_IMAGE")
+executor=$(docker run -d --name "asm-smoke-exec-${WORK##*.}" --cidfile "$WORK/executor.cid" --network bridge "$EXEC_IMAGE")
 client=$(docker run -d --cidfile "$WORK/client.cid" --network bridge --tmpfs /proef:mode=1777 \
   --entrypoint sleep docker.io/curlimages/curl:8.20.0@sha256:b3f1fb2a51d923260350d21b8654bbc607164a987e2f7c84a0ac199a67df812a 3600)
 hub_url=http://localhost:30400
