@@ -545,7 +545,7 @@ class Adapter:
                 policy=policy,
                 headers={"Authorization": f"Bearer {token}"} if token else None,
                 json_body={"code": code, "device_name": "Hub"} if route == Route.REDEEM else None,
-                query=challenge,
+                query={"light_state_version": "2"} if route == Route.LIGHTS else challenge,
                 max_bytes=basis.MAX_RESPONSE_BYTES,
             )
         except (OSError, ValueError, RecursionError):

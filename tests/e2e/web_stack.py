@@ -102,6 +102,7 @@ def log(msg: str) -> None:
 
 class _Control(BaseHTTPRequestHandler):
     nas: Any = None
+    unlink_mode = "weigering"
     tokens: ClassVar[dict[str, str]] = {}  # app_id → service-token van de simulator-dienst
 
     def _reply(self, body: dict[str, Any], status: int = 200) -> None:
@@ -137,6 +138,20 @@ class _Control(BaseHTTPRequestHandler):
                 "/appdata",
             )
             self.nas.data["app.query"].append(app)
+        elif self.path == "/dienst/ontkoppelproef":
+            mode = self._body().get("uitkomst")
+            if mode not in ("verbindingsfout", "weigering"):
+                self._reply({"fout": "onbekende ontkoppelproef"}, 400)
+                return
+            type(self).unlink_mode = mode
+        elif self.path == "/connector/v1/hub-link/unlink":
+            self._body()
+            if self.unlink_mode == "verbindingsfout":
+                # Verbreek de verbinding vóór het HTTP-antwoord.
+                self.close_connection = True
+            else:
+                self._reply({"code": "forbidden"}, 403)
+            return
         elif self.path == "/dienst/koppel":
             # Simulator-dienst koppelt met een koppelcode via de echte API (contract 1.2 §3.3).
             b = self._body()

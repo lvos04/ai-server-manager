@@ -155,7 +155,7 @@ test("monitoring: Kuma uitgelezen, Beszel met fout wachtwoord opgeslagen + ‘Ui
   await expectAccessible(page, "instellingen monitoring");
 });
 
-test("diensten (H5): koppelcode + vingerafdruk + aftellen; simulator koppelt → ‘Gekoppeld’ (neutraal); rotatie; ontkoppelen onbereikbaar → niets ingetrokken", async ({ page }) => {
+test("diensten (H5): koppelcode + vingerafdruk + aftellen; simulator koppelt → ‘Gekoppeld’ (neutraal); rotatie", async ({ page }) => {
   await page.goto("/instellingen/diensten");
   await ready(page);
   const vingerafdruk = await page.getByTestId("vingerafdruk-hub").locator("code").first().textContent();
@@ -199,17 +199,37 @@ test("diensten (H5): koppelcode + vingerafdruk + aftellen; simulator koppelt →
   await dienst.getByRole("button", { name: /Rotatie aanvragen/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Rotatie aanvragen" }).click();
   await expect(dienst.getByTestId("rotatie-aangevraagd")).toContainText("Rotatie aangevraagd");
-
-  // Eigen dienst als app op de NAS, maar op een poort waar niets luistert → ontkoppelen faalt eerlijk.
-  await control("/nas/app", { naam: "home-control-hub", image: "ghcr.io/lvos04/home-control-hub:0.1.0", poort: 39599, container_poort: 30420 });
-  await refreshInventory(page);
-  await page.goto("/instellingen/diensten");
-  await ready(page);
-  await page.getByTestId("dienst-home-control-hub").getByRole("button", { name: /Ontkoppelen/ }).click();
-  await page.getByTestId("ontkoppelen-bevestigen").click();
-  await expect(page.getByTestId("dienst-home-control-hub").getByTestId("error-panel")).toHaveAttribute("data-code", "service_unreachable");
-  await expect(page.getByTestId("dienst-home-control-hub")).toContainText("Gekoppeld");
 });
+
+for (const [uitkomst, code, details] of [
+  ["verbindingsfout", "service_unreachable", { reason: "niet_bereikbaar" }],
+  ["weigering", "unlink_refused", { status: 403, code: "forbidden" }],
+] as const) {
+  test(`diensten (H5): ontkoppelen bij ${uitkomst} geeft ook bij herhaling ${code}`, async ({ page }) => {
+    expect((await control("/dienst/ontkoppelproef", { uitkomst })).status).toBe(200);
+    const poort = Number(new URL(stackState().control_url).port);
+    const registratie = await control("/nas/app", {
+      naam: "home-control-hub", image: "ghcr.io/lvos04/home-control-hub:0.1.0", poort, container_poort: 30420,
+    });
+    expect(registratie.status).toBe(200);
+    await refreshInventory(page);
+    await page.goto("/instellingen/diensten");
+    await ready(page);
+    const dienst = page.getByTestId("dienst-home-control-hub");
+    await dienst.getByRole("button", { name: /Ontkoppelen/ }).click();
+    for (let poging = 0; poging < 2; poging++) {
+      const antwoord = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname.endsWith("/unlink"));
+      await dienst.getByTestId("ontkoppelen-bevestigen").click();
+      const res = await antwoord;
+      expect(res.status()).toBe(502);
+      expect(await res.json()).toMatchObject({ code, details });
+      await expect(dienst.getByTestId("error-panel")).toHaveAttribute("data-code", code);
+    }
+    await page.reload();
+    await ready(page);
+    await expect(dienst).toContainText("Gekoppeld");
+  });
+}
 
 test("problemen: 100 identieke events → één incident ×100; hypothese als woord; herstelvoorstel zonder uitvoerknop; oplossen bij actieve bron geweigerd", async ({ page }) => {
   const sent = await control("/dienst/events", { app_id: "home-control-hub", aantal: 100 });

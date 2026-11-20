@@ -36,6 +36,8 @@ jobs:
       HUB_TEST_ADMIN_URL: postgresql://postgres@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # De versieproef draait de vorige Hub uit zijn vaste commit.
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
@@ -55,6 +57,29 @@ jobs:
         run: make type BIN="$(dirname "$(command -v python)")"
       - name: pytest (unit, integratie, dienst-E2E met fake TrueNAS)
         run: python -m pytest -q
+      - name: Gepinde my_house-bron voor de woningproef
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lvos04/my_house
+          ref: d8826c23e0caef6890bdd65d0a1adbab335c9c60
+          path: .my-house-interop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Woningoverzicht bij afzonderlijke updates van Hub en my_house
+        env:
+          MY_HOUSE_SOURCE: .my-house-interop
+          SHC_TEST_PG: postgresql://postgres@localhost:5432
+        run: |
+          HUB_PYTHON="$(command -v python)"
+          export HUB_PYTHON
+          python -m venv "$RUNNER_TEMP/woningbron"
+          export MY_HOUSE_PYTHON="$RUNNER_TEMP/woningbron/bin/python"
+          grep -vE '^[./]' "$MY_HOUSE_SOURCE/apps/api/requirements.txt" > "$RUNNER_TEMP/woningbron.lock"
+          "$MY_HOUSE_PYTHON" -m pip install --require-hashes --only-binary=:all: -r "$RUNNER_TEMP/woningbron.lock"
+          "$MY_HOUSE_PYTHON" -m pip freeze > "$RUNNER_TEMP/woningbron.constraints"
+          "$MY_HOUSE_PYTHON" -m pip install -c "$RUNNER_TEMP/woningbron.constraints" \
+            -e "$MY_HOUSE_SOURCE/integrations" -e "$MY_HOUSE_SOURCE/apps/api[dev]"
+          bash tests/interop/woning/proef.sh
       - name: Gepinde plannerbron voor M3-interop
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

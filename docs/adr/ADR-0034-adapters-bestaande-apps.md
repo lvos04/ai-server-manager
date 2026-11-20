@@ -239,7 +239,7 @@ vervaldatum. Een verlopen of ingetrokken token of mislukte vernieuwing geeft een
 | `GET /api/v1/system/status` | Viewer-token | `version`, `checks[].key/state`; bij de back-upcheck de gemeten leeftijd `age_h`; geen vrije details |
 | `GET /api/v1/homes` | Viewer-token | `id`, `name`, `timezone`, `active` |
 | `GET /api/v1/homes/{home_id}/zones` | Viewer-token | `id`, `name`, `unit_status`, `online`, `mode`, `temperature.value/unit/quality/at/stale`, dezelfde selectie voor `humidity`, de versheidsgrens `policy.stale_after_s` en de gemeten doeltemperatuur `target_c` met `target_at` |
-| `GET /api/v1/homes/{home_id}/lights` | Viewer-token | Per groep/lamp `id`, `name`, `on`, `brightness`, `reachable`; voor een groep ook de meettijd `on_at`; per scène `id`, `active`, `group_id` |
+| `GET /api/v1/homes/{home_id}/lights?light_state_version=2` | Viewer-token | Per groep/lamp `id`, `name`, `on`, `brightness`, `reachable`; voor een groep ook de meettijd `on_at`; per scène `id`, `active`, `group_id` |
 | `GET /api/v1/homes/{home_id}/alerts` | Viewer-token | `id`, `severity`, `created_at` indien beschikbaar, aantal open meldingen |
 | `GET /api/v1/homes/{home_id}/devices` | Viewer-token | `id`, `kind`, `online`, `last_seen`, `compatibility`, `lifecycle` |
 | `GET /api/v1/system/settings` | Viewer-token | `lan_url`, `remote_url` alleen als kandidaat voor een gevalideerde gebruikerslink; `safe_mode`, `maintenance` |
@@ -257,6 +257,36 @@ P3-05 voor ondertekende acties en bewijs, en het terugkeerpad uit C1.3-MH-05, bl
 leesadapter. Zie de my_house-delta-matrix §11.6. Health: `ok` wordt `healthy`, `warn` wordt
 `degraded`, `error` wordt `down` voor het onderdeel en ontbrekende of onbekende toestanden worden
 `unknown`. Vertaal bij fouten alleen bekende `detail.code`-waarden naar vaste Hub-redencodes.
+
+#### Afzonderlijke updates van de lichtgroepen
+
+De Hub vraagt op de lichtgroepenroute `light_state_version=2`. De nieuwe bron laat zonder die
+versie uitsluitend de groepen met onbekende stand weg. Een oude bron negeert de queryparameter.
+Die bron levert geen schakelmeettijd. Daardoor kan de nieuwe Hub de stand ook bij een werkende
+verbinding alleen als onbekend tonen.
+
+Elke rij van de versieproef leest als kijker één zone, de proefgroep en een tweede groep met een
+gemeten aanstand. De laatste twee kolommen geven de standen in het Hub-antwoord weer. Elke rij
+vereist HTTP 200 en behoud van de zone.
+
+| Hub | my_house | Meting proefgroep | Proefgroep in de Hub | Tweede groep |
+|---|---|---|---|---|
+| oud | oud | aan | Aan | Aan |
+| oud | oud | uit | Uit | Aan |
+| oud | oud | onbekend | Uit¹ | Aan |
+| oud | nieuw | aan | Aan | Aan |
+| oud | nieuw | uit | Uit | Aan |
+| oud | nieuw | onbekend | weggelaten | Aan |
+| nieuw | oud | aan | Onbekend | Onbekend |
+| nieuw | oud | uit | Onbekend | Onbekend |
+| nieuw | oud | onbekend | Onbekend | Onbekend |
+| nieuw | nieuw | aan | Aan | Aan |
+| nieuw | nieuw | uit | Uit | Aan |
+| nieuw | nieuw | onbekend | Onbekend | Aan |
+
+¹ De historische combinatie van Hub `63e2b13` en my_house `c296859` gaf een ontbrekende meting
+ten onrechte als uit door. De proef draait beide historische versies en beide herstelversies
+via `tests/interop/woning/proef.sh`.
 
 ## 3. Versheid en onbereikbaarheid
 
