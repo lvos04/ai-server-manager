@@ -206,6 +206,18 @@ def test_onbekende_adapter_wint_van_andere_binnenkant_en_behoudt_meettijd() -> N
     assert (r["status"], r["reason_code"], r["observed_at"]) == ("unknown", "meting_verouderd", "2026-11-09T11:44:59Z")
 
 
+def test_adapter_zonder_meettijd_behoudt_bij_offline_inventaris_de_laatst_bekende_inventaristijd() -> None:
+    inventory = C("truenas", "unknown", age_s=900, reason="inventaris_verouderd")
+    adapter = Component("binnenkant", "adapter_p3", "unknown", "adapter_niet_gekoppeld", None)
+    r = _ev([inventory, adapter], vereist=True, bron="adapter_p3")
+    assert (r["status"], r["reason_code"], r["observed_at"]) == (
+        "unknown",
+        "adapter_niet_gekoppeld",
+        "2026-11-09T11:45:00Z",
+    )
+    assert r["componenten"][1]["observed_at"] is None
+
+
 @pytest.mark.parametrize(
     ("stamp", "status", "reason"),
     [

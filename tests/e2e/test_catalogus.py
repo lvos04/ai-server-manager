@@ -45,8 +45,9 @@ def test_catalogus_ontdekt_bestaande_apps_zonder_mutatie(admin: Any, fake_nas: F
         "tag": "1.2.2",
         "digest": _digest("ghcr.io/lvos04/mediaguard:1.2.2"),
     }
-    # RUNNING in TrueNAS is geen bewijs van gezond; de binnenkant van MediaGuard volgt in P3.
-    assert mg["gezondheid"]["status"] == "unknown" and mg["gezondheid"]["reason_code"] == "binnenkant_niet_gebouwd"
+    # Zonder adapterkoppeling blijft de binnenkant onbekend, ook als TrueNAS RUNNING meldt.
+    assert mg["gezondheid"]["status"] == "unknown" and mg["gezondheid"]["reason_code"] == "adapter_niet_gekoppeld"
+    assert "Instellingen → Diensten" in mg["gezondheid"]["melding"]
     assert mg["deep_link"] == "http://127.0.0.1:30101/"
     assert apps["my-house"]["app_id"] == "my_house" and apps["my-house"]["adaptertype"] == "bestaand_my_house"
     jf = apps["jellyfin"]
@@ -66,6 +67,7 @@ def test_catalogus_ontdekt_bestaande_apps_zonder_mutatie(admin: Any, fake_nas: F
     assert d["appstore"]["status"] == "unknown" and d["appstore"]["reden"] == "appstore_niet_gekoppeld"
     comps = {c["soort"]: c for c in d["gezondheid"]["componenten"]}
     assert comps["truenas"]["status"] == "healthy" and comps["truenas"]["staat"] == "RUNNING"
+    assert comps["binnenkant"]["status"] == "unknown" and comps["binnenkant"]["observed_at"] is None
 
     # Zoeken en filteren.
     assert set(_apps(admin, q="optimizer")) == {"media-source-optimizer"}

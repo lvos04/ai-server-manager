@@ -159,6 +159,9 @@ def evaluate(
                 if cause is not None
                 else min((c.observed_at for c in components if c.observed_at is not None), default=None)
             )
+            if status == "unknown" and observed is None and t is not None and t.reason_code == "inventaris_verouderd":
+                # Houd de laatst bekende inventaristijd zichtbaar als de adapter geen eigen meettijd heeft.
+                observed = t.observed_at
         else:
             observed = max((c.observed_at for c in (t, b, i) if c is not None and c.observed_at), default=None)
         return {

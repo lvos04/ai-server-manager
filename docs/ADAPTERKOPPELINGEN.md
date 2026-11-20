@@ -122,7 +122,8 @@ De catalogus gebruikt de slechtste toestand in de volgorde `down`, `degraded`, `
 `healthy`. Een ontbrekende buitenkantmonitor telt niet mee. Een gekoppelde monitor met een
 onbekende meting telt wel mee. Bij gelijke toestand krijgt de adapterreden voorrang. Bij
 `healthy` geeft het totaal de oudste gebruikte meettijd. Anders geeft het de tijd van de
-component die de toestand bepaalt.
+component die de toestand bepaalt. Bij een inventaris die niet beschikbaar is, blijft de laatst
+bekende inventaristijd zichtbaar als de bepalende component zelf geen meettijd heeft.
 
 | Buitenkant | Binnenkantmeting | Totaal bij draaiende app | Geval in `test_samenstelling_adapterprofiel` |
 | --- | --- | --- | --- |
