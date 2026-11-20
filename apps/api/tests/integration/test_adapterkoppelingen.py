@@ -968,6 +968,7 @@ def test_my_house_bronmeettijd_bepaalt_gezondheid_en_herhaling(
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+# Vaste regressiegevallen uit de werkerversheidsproef van R-VEILIG-2.
 @pytest.mark.parametrize(
     ("bronleeftijd", "transport_ms", "na_ontvangst_ms"),
     [(118, 0, 2500), (None, 0, 121_000), (118, 1750, 750)],
@@ -1024,6 +1025,78 @@ def test_my_house_workerhartslag_vervalt_bij_detail_lijst_en_herhaling(
     assert detail["gezondheid"] == lijst["gezondheid"]
     reden = "meting_verouderd" if bronleeftijd is not None else "meettijd_onbekend"
     assert (detail["gezondheid"]["status"], detail["gezondheid"]["reason_code"]) == ("unknown", reden)
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_my_house_workeruitval_heeft_eigen_vervalgrens(
+    admin: Any, doel: dict[str, Any], huis_simulatie: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code, toestand, calls = huis_simulatie
+    koppeling = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert koppeling.status_code == 201
+    path = f"{ROUTE}/{koppeling.json()['id']}"
+    klok = utcnow().replace(microsecond=0)
+    monkeypatch.setattr(my_house, "utcnow", lambda: klok)
+    monkeypatch.setattr(adapterkoppelingen, "utcnow", lambda: klok)
+
+    def gezondheid(status: str, reden: str | None = None) -> dict[str, Any]:
+        detail = admin.get(path).json()["gezondheid"]
+        assert (detail["status"], detail["reason_code"]) == (status, reden)
+        assert admin.get(ROUTE).json()["items"][0]["gezondheid"] == detail
+        return detail
+
+    def workerstatus(antwoord: Any) -> str:
+        antwoord.raise_for_status()
+        checks = antwoord.json()["my_house"]["systeem"]["checks"]
+        return next(check["state"] for check in checks if check["key"] == "worker")
+
+    # De bronproef in R-VEILIG-3 mat dezelfde hartslag op 118 en 120,5 seconden.
+    worker = toestand["worker"]
+    worker.update(state="ok", age_s=118)
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "ok"
+    gezondheid("healthy")
+    klok += timedelta(milliseconds=2500)
+    gezondheid("unknown", "meting_verouderd")
+
+    worker.update(state="error", age_s=120)
+    headers = idem()
+    assert workerstatus(admin.post(f"{path}/test", headers=headers)) == "error"
+    fout = gezondheid("down")
+    assert fout["observed_at"] == klok.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+    klok += timedelta(seconds=120)
+    worker["age_s"] += 120
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "error"
+    assert gezondheid("down") == fout
+    aantal = len(calls)
+    replay = admin.post(f"{path}/test", headers=headers)
+    assert replay.headers["Idempotent-Replay"] == "true" and workerstatus(replay) == "error"
+    assert len(calls) == aantal
+
+    klok += timedelta(microseconds=1)
+    verlopen = gezondheid("unknown", "meting_verouderd")
+    assert verlopen["observed_at"] == fout["observed_at"] and verlopen["laatste_status"] == "down"
+    replay = admin.post(f"{path}/test", headers=headers)
+    assert replay.headers["Idempotent-Replay"] == "true" and workerstatus(replay) == "unknown"
+    assert len(calls) == aantal
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "unknown"
+    assert gezondheid("unknown", "meting_verouderd") == verlopen
+
+    del worker["age_s"]
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "unknown"
+    gezondheid("unknown", "meettijd_onbekend")
+    worker["age_s"] = 240
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "unknown"
+    assert gezondheid("unknown", "meting_verouderd") == verlopen
+
+    worker.update(state="ok", age_s=0)
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "ok"
+    gezondheid("healthy")
+    klok += timedelta(seconds=120)
+    worker.update(state="error", age_s=120)
+    assert workerstatus(admin.post(f"{path}/test", headers=idem())) == "error"
+    assert gezondheid("down")["observed_at"] != fout["observed_at"]
+    assert workerstatus(admin.post(f"{path}/test", headers=headers)) == "unknown"
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)

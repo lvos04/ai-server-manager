@@ -80,10 +80,14 @@ def test_gezondheid_gebruikt_de_kortere_brongrens(bron: str) -> None:
         ]
 
 
-@pytest.mark.parametrize("age_s", [None, True, "118", 118.0, -1, 120, 2**64])
-def test_ongeldige_workerleeftijd_is_onbekend(age_s: Any) -> None:
+@pytest.mark.parametrize(
+    ("state", "age_s"),
+    [("ok", age_s) for age_s in (None, True, "118", 118.0, -1, 120, 2**64)]
+    + [("error", age_s) for age_s in (None, True, "120", 120.0, -1, 119, 2**64)],
+)
+def test_ongeldige_workerleeftijd_is_onbekend(state: str, age_s: Any) -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
-    checks = [{"key": "database", "state": "ok"}, {"key": "worker", "state": "ok", "age_s": age_s}]
+    checks = [{"key": "database", "state": "ok"}, {"key": "worker", "state": state, "age_s": age_s}]
     _, readings = my_house._system_readings({"version": "1.0.0", "checks": checks}, now, now)
     assert readings[1].project(now).state == "unknown"
     health = my_house.health(readings, now)
@@ -101,6 +105,18 @@ def test_worker_118_seconden_is_nog_een_seconde_vers_vanaf_verzoekstart() -> Non
     assert health.observed_at == now - timedelta(seconds=119)
 
 
+def test_workeruitval_bewaart_hartslag_en_foutmeting_apart() -> None:
+    verzoek = datetime(2026, 1, 1, tzinfo=UTC)
+    ontvangst = verzoek + timedelta(seconds=2)
+    checks = [{"key": "database", "state": "ok"}, {"key": "worker", "state": "error", "age_s": 241}]
+    _, readings = my_house._system_readings({"version": "1.0.0", "checks": checks}, verzoek, ontvangst)
+    fout = readings[1]
+    assert fout.worker_observed_at == verzoek - timedelta(seconds=242)
+    assert fout.worker_error_observed_at == verzoek
+    assert fout.measurement(ontvangst).status == "down"
+    assert fout.measurement(ontvangst).observed_at == verzoek
+
+
 def test_opgeslagen_workercheck_zonder_bronmeettijd_is_onbekend() -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     readings = my_house.CheckReadings.validate_python(
@@ -110,6 +126,25 @@ def test_opgeslagen_workercheck_zonder_bronmeettijd_is_onbekend() -> None:
         ]
     )
     assert readings[0].project(now).state == "ok"
+    assert readings[1].project(now).state == "unknown"
+    health = my_house.health(readings, now)
+    assert (health.status, health.reason_code) == ("unknown", "meettijd_onbekend")
+
+
+def test_oude_workeruitval_zonder_foutmeettijd_is_onbekend() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    readings = my_house.CheckReadings.validate_python(
+        [
+            {"key": "database", "state": "ok", "observed_at": now, "max_age_s": 900},
+            {
+                "key": "worker",
+                "state": "error",
+                "observed_at": now,
+                "worker_observed_at": now - timedelta(seconds=121),
+                "max_age_s": 120,
+            },
+        ]
+    )
     assert readings[1].project(now).state == "unknown"
     health = my_house.health(readings, now)
     assert (health.status, health.reason_code) == ("unknown", "meettijd_onbekend")

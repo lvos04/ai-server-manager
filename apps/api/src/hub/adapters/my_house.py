@@ -142,13 +142,28 @@ SEVERITY = {"healthy": 0, "unknown": 1, "degraded": 2, "down": 3}
 
 
 class CheckReading(Check):
+    """Versheid van de workercheck, vanaf de gekozen meettijd.
+
+    Bron en meettijd                             | Uitkomst
+    ok, hartslag binnen de grens                 | healthy
+    error, eigen bevestiging binnen de grens     | down
+    meettijd voorbij de grens                   | unknown (meting_verouderd)
+    meettijd ontbreekt of is ongeldig            | unknown (meettijd_onbekend)
+    idempotente herhaling                        | dezelfde meettijd en vervalgrens
+    """
+
     observed_at: datetime | None
     max_age_s: int
     # Oudere werkermetingen gebruikten de ontvangsttijd en mogen niet meer als vers tellen.
     worker_observed_at: datetime | None = None
+    worker_error_observed_at: datetime | None = None
 
     def measurement(self, now: datetime) -> basis.Measurement:
-        observed_at = self.worker_observed_at if self.key == "worker" else self.observed_at
+        observed_at = self.observed_at
+        if self.key == "worker":
+            observed_at = self.worker_observed_at
+            if self.state == "error" and observed_at is not None:
+                observed_at = self.worker_error_observed_at
         return basis.fresh_measurement(
             basis.Measurement(status=CHECK_STATUS[self.state], observed_at=observed_at),
             now=now,
@@ -180,7 +195,9 @@ def _backup_max_age(age_h: Any) -> int:
 
 
 def _worker_time(age_s: Any, state: str, requested_at: datetime) -> datetime | None:
-    if type(age_s) is not int or age_s < 0 or (state == "ok" and age_s >= WORKER_OK_S):
+    if type(age_s) is not int or age_s < 0:
+        return None
+    if (state == "ok" and age_s >= WORKER_OK_S) or (state == "error" and age_s < WORKER_OK_S):
         return None
     # De bron rondt naar beneden af en meet pas na de start van het verzoek.
     try:
@@ -189,7 +206,9 @@ def _worker_time(age_s: Any, state: str, requested_at: datetime) -> datetime | N
         return None
 
 
-def _system_readings(data: Any, requested_at: datetime, received_at: datetime) -> tuple[System, list[CheckReading]]:
+def _system_readings(
+    data: Any, requested_at: datetime, received_at: datetime, *, previous_worker_error_at: datetime | None = None
+) -> tuple[System, list[CheckReading]]:
     system = _validate(TypeAdapter(System), data)
     by_key = {raw["key"]: raw for raw in data["checks"]}
     if len(by_key) != len(system.checks):
@@ -198,6 +217,7 @@ def _system_readings(data: Any, requested_at: datetime, received_at: datetime) -
     for check in system.checks:
         observed: datetime | None = received_at
         worker_observed = None
+        worker_error_observed = None
         max_age = basis.MAX_AGE_S
         if check.key.startswith("integration:"):
             parent = ":".join(check.key.split(":")[:2])
@@ -212,6 +232,12 @@ def _system_readings(data: Any, requested_at: datetime, received_at: datetime) -
             observed = None
             worker_observed = _worker_time(by_key[check.key].get("age_s"), check.state, requested_at)
             max_age = WORKER_OK_S
+            if check.state == "error":
+                # De bron beoordeelt de hartslag tijdens het verzoek. De verzoekstart
+                # begrenst de versheid bij vertraging. Dezelfde storing behoudt die tijd.
+                worker_error_observed = previous_worker_error_at
+                if worker_error_observed is None and worker_observed is not None:
+                    worker_error_observed = requested_at
         elif check.key == "backup" and check.state == "ok" and "age_h" in by_key[check.key]:
             max_age = _backup_max_age(by_key[check.key]["age_h"])
         readings.append(
@@ -221,6 +247,7 @@ def _system_readings(data: Any, requested_at: datetime, received_at: datetime) -
                 observed_at=observed,
                 max_age_s=max_age,
                 worker_observed_at=worker_observed,
+                worker_error_observed_at=worker_error_observed,
             )
         )
     return system, readings
@@ -507,9 +534,20 @@ class Adapter:
         liveness = _validate(TypeAdapter(Liveness), self._request(Route.HEALTH))
         observed = utcnow()
         self._identity(token)
+        previous_checks = CheckReadings.validate_python(self.link.my_house_checks or [])
+        previous_worker_error_at = next(
+            (
+                check.worker_error_observed_at
+                for check in previous_checks
+                if check.key == "worker" and check.state == "error"
+            ),
+            None,
+        )
         requested_at = utcnow()
         system_data = self._request(Route.SYSTEM, token=token)
-        system, checks = _system_readings(system_data, requested_at, utcnow())
+        system, checks = _system_readings(
+            system_data, requested_at, utcnow(), previous_worker_error_at=previous_worker_error_at
+        )
         homes = _validate(TypeAdapter(Rows[Home]), self._request(Route.HOMES, token=token))
         if len({home.id for home in homes}) != len(homes):
             raise outbound.OutboundError(INVALID)
