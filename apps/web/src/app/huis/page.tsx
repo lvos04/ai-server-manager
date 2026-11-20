@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import { NotYetAvailable } from "@/components/NotYetAvailable";
-import { PLANNED } from "@/lib/nav";
+import { HuisScreen } from "./HuisScreen";
 
-const screen = PLANNED["huis"]!;
-
-export const metadata: Metadata = { title: screen.titel };
+export const metadata: Metadata = { title: "Huis" };
 
 export default function Page() {
-  return <NotYetAvailable screen={screen} />;
+  return <HuisScreen />;
 }

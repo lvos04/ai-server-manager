@@ -242,7 +242,6 @@ function alertsPart(inp: HomeInputs): Part {
 
 const NOT_YET: Part[] = [
   { id: "media", label: "Media", href: "/media", view: v("not_yet", "Nog niet beschikbaar"), detail: "Volgt in fase P3 (MediaGuard, MSO) en P4 (Jelly Leon)." },
-  { id: "huis", label: "Huis", href: "/huis", view: v("not_yet", "Nog niet beschikbaar"), detail: "Volgt in fase P3 (my_house)." },
   { id: "netwerk", label: "Netwerk", href: "/netwerk", view: v("not_yet", "Nog niet beschikbaar"), detail: "Volgt in fase P5." },
 ];
 
@@ -258,6 +257,7 @@ export function homeSummary(inp: HomeInputs): { overall: StatusView & { tone: "h
     channelsPart(inp),
     alertsPart(inp),
     backupPart(inp),
+    { id: "huis", label: "Huis", href: "/huis", view: v("neutral", "Bekijk in Huis"), detail: "Woninggegevens van my_house." },
     ...NOT_YET,
   ];
   const actions: Action[] = [];

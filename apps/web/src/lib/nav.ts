@@ -109,12 +109,6 @@ export const PLANNED: Record<string, PlannedScreen> = {
     wat: "Film, serie, anime, muziek en Live TV met verder kijken, kwaliteit, downloads en verzoekstatus.",
     bron: "MediaGuard en Media Source Optimizer (P3), Jelly Leon / Jellyfin (P4).",
   },
-  huis: {
-    titel: "Huis",
-    fase: "P3",
-    wat: "Per kamer verlichting, temperatuur, luchtvochtigheid, doelen, energie en versheid van sensoren. De boiler wordt alleen gemeten, nooit geschakeld.",
-    bron: "my_house (eigenaar van fysieke apparaten en readback).",
-  },
   netwerk: {
     titel: "Netwerk",
     fase: "P5",

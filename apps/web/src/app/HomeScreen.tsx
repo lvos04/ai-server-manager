@@ -336,11 +336,11 @@ export function HomeScreen() {
           title="Huiscomfort en energie"
           icon={Sofa}
           value={null}
-          status={NOT_YET}
-          bron="my_house — nog niet gekoppeld (fase P3)"
+          status={UNKNOWN}
+          bron="my_house"
           observedAt={null}
-          reden="Nog niet beschikbaar — volgt in fase P3 (my_house)."
-          action={{ href: "/huis", label: "Wat komt er bij Huis?" }}
+          reden="Bekijk de meetwaarden en meldingen bij Huis."
+          action={{ href: "/huis", label: "Huis bekijken" }}
         />
       </div>
     </>

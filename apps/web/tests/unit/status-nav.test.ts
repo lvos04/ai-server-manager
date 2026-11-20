@@ -54,11 +54,11 @@ describe("navigatie exact volgens 08_UI", () => {
     expect(PUBLIC_PATHS).toContain("/inloggen/nood");
   });
 
-  it("latere fasen volgens 06_FASERING (Problemen is in P1 echt)", () => {
+  it("latere fasen volgens 06_FASERING (Problemen en Huis zijn beschikbaar)", () => {
     expect(PLANNED.problemen).toBeUndefined();
     expect(PLANNED.ai?.fase).toBe("P2");
     expect(PLANNED.automatisering?.fase).toBe("P2");
-    expect(PLANNED.huis?.fase).toBe("P3");
+    expect(PLANNED.huis).toBeUndefined();
     expect(PLANNED.netwerk?.fase).toBe("P5");
     expect(PLANNED.kosten?.fase).toBe("P5");
   });

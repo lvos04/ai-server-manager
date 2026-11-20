@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import re
 import secrets
 from collections.abc import Callable
@@ -15,7 +16,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, BeforeValidator, Field, TypeAdapter, ValidationError, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, TypeAdapter, ValidationError, field_validator, model_validator
 
 from hub import outbound
 from hub.adapters import basis
@@ -27,6 +28,8 @@ RENEW_BEFORE = timedelta(days=30)
 TOKEN_LIFETIME = timedelta(days=180, minutes=2)
 # Grenzen uit de systeemchecks van my_house.
 ZIGBEE_MAX_AGE_S = 180
+SENSOR_MIN_AGE_S = 300
+SENSOR_MAX_AGE_S = 7200
 WORKER_OK_S = 120
 BACKUP_WARN_H = 36
 TOKEN = re.compile(r"shc_[A-Za-z0-9_-]{43}")
@@ -270,10 +273,11 @@ class Sensor(BaseModel):
     quality: Literal["measured", "estimated", "derived", "missing"]
     at: Timestamp | None
     stale: bool
+    max_age_s: Annotated[int, Field(ge=SENSOR_MIN_AGE_S, le=basis.MAX_AGE_S)] = SENSOR_MIN_AGE_S
 
     def met_meettijd(self, now: datetime, unit: Literal["°C", "%"]) -> Sensor:
         age = (now - self.at).total_seconds() if self.at is not None else -1
-        if self.stale or not 0 <= age <= basis.MAX_AGE_S or self.unit != unit or self.quality == "missing":
+        if self.stale or not 0 <= age <= self.max_age_s or self.unit != unit or self.quality == "missing":
             return self.model_copy(update={"value": None, "stale": True, "unit": unit})
         return self
 
@@ -286,6 +290,12 @@ class Zone(BaseModel):
     mode: Literal["off", "auto", "cool", "heat", "dry", "fan"]
     temperature: Sensor
     humidity: Sensor
+    target_c: float | None = None
+
+    @field_validator("target_c", mode="before")
+    @classmethod
+    def _target_c(cls, value: Any) -> float | None:
+        return float(value) if type(value) in (float, int) and 5 <= value <= 35 else None
 
 
 class Light(BaseModel):
@@ -318,6 +328,7 @@ class Alerts(BaseModel):
     items: Rows[Alert]
     open: int
     begrensd: bool
+    observed_at: UtcDateTime | None = None
 
 
 class Device(BaseModel):
@@ -336,6 +347,12 @@ class Settings(BaseModel):
 
 class HouseSettings(Settings):
     link: str | None
+    observed_at: UtcDateTime | None = None
+
+
+class BackupReading(BaseModel):
+    age_h: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    observed_at: UtcDateTime
 
 
 class Overview(BaseModel):
@@ -352,6 +369,7 @@ class Snapshot(BaseModel):
     systeem: System
     woningen: list[Overview]
     instellingen: HouseSettings
+    laatste_backup: BackupReading | None = None
 
 
 class SnapshotReading(BaseModel):
@@ -552,9 +570,14 @@ class Adapter:
         system, checks = _system_readings(
             system_data, requested_at, utcnow(), previous_worker_error_at=previous_worker_error_at
         )
+        backup_age = next((check.get("age_h") for check in system_data["checks"] if check["key"] == "backup"), None)
+        backup = None
+        if isinstance(backup_age, (int, float)) and not isinstance(backup_age, bool) and 0 <= backup_age < math.inf:
+            backup = BackupReading(age_h=backup_age, observed_at=requested_at)
         homes = _validate(TypeAdapter(Rows[Home]), self._request(Route.HOMES, token=token))
         if len({home.id for home in homes}) != len(homes):
             raise outbound.OutboundError(INVALID)
+        settings_observed_at = utcnow()
         settings = self._request(Route.SETTINGS, token=token)
         flags = _validate(TypeAdapter(Settings), settings)
         return SnapshotReading(
@@ -566,25 +589,36 @@ class Adapter:
                 instellingen=HouseSettings(
                     **flags.model_dump(),
                     link=user_link(self.link.basis_url, settings.get("lan_url"), settings.get("remote_url")),
+                    observed_at=settings_observed_at,
                 ),
+                laatste_backup=backup,
             ),
             checks=checks,
         )
 
     def _overview(self, home: Home, token: str) -> Overview:
-        zones = _validate(TypeAdapter(Rows[Zone]), self._request(Route.ZONES, token=token, home_id=home.id))
+        zone_data = self._request(Route.ZONES, token=token, home_id=home.id)
+        zones = _validate(TypeAdapter(Rows[Zone]), zone_data)
         observed = utcnow()
-        for zone in zones:
-            zone.temperature = zone.temperature.met_meettijd(observed, "°C")
-            zone.humidity = zone.humidity.met_meettijd(observed, "%")
+        for zone, raw in zip(zones, zone_data, strict=True):
+            policy = raw.get("policy")
+            source_age = policy.get("stale_after_s") if isinstance(policy, dict) else None
+            max_age = SENSOR_MIN_AGE_S
+            if isinstance(source_age, int) and SENSOR_MIN_AGE_S <= source_age <= SENSOR_MAX_AGE_S:
+                max_age = min(source_age, basis.MAX_AGE_S)
+            zone.temperature = zone.temperature.model_copy(update={"max_age_s": max_age}).met_meettijd(observed, "°C")
+            zone.humidity = zone.humidity.model_copy(update={"max_age_s": max_age}).met_meettijd(observed, "%")
         lights = _validate(TypeAdapter(Lights), self._request(Route.LIGHTS, token=token, home_id=home.id))
+        alerts_observed_at = utcnow()
         alerts = _validate(TypeAdapter(Rows[Alert]), self._request(Route.ALERTS, token=token, home_id=home.id))
         devices = _validate(TypeAdapter(Rows[Device]), self._request(Route.DEVICES, token=token, home_id=home.id))
         return Overview(
             woning=home,
             zones=zones,
             licht=lights,
-            meldingen=Alerts(items=alerts, open=len(alerts), begrensd=len(alerts) >= 100),
+            meldingen=Alerts(
+                items=alerts, open=len(alerts), begrensd=len(alerts) >= 100, observed_at=alerts_observed_at
+            ),
             apparaten=devices,
         )
 

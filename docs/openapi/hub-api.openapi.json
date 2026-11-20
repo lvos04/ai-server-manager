@@ -97,6 +97,17 @@
           "items": {
             "$ref": "#/components/schemas/Rows_Alert_"
           },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
           "open": {
             "title": "Open",
             "type": "integer"
@@ -161,6 +172,25 @@
           "policy_hash"
         ],
         "title": "ApproveIn",
+        "type": "object"
+      },
+      "BackupReading": {
+        "properties": {
+          "age_h": {
+            "minimum": 0.0,
+            "title": "Age H",
+            "type": "number"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "age_h",
+          "observed_at"
+        ],
+        "title": "BackupReading",
         "type": "object"
       },
       "CatalogPin": {
@@ -977,6 +1007,35 @@
         "title": "Home",
         "type": "object"
       },
+      "HouseLinks": {
+        "properties": {
+          "items": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "HouseLinks",
+        "type": "object"
+      },
       "HouseSettings": {
         "properties": {
           "link": {
@@ -993,6 +1052,17 @@
           "maintenance": {
             "title": "Maintenance",
             "type": "boolean"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
           },
           "safe_mode": {
             "title": "Safe Mode",
@@ -2613,6 +2683,13 @@
             ],
             "title": "At"
           },
+          "max_age_s": {
+            "default": 300,
+            "maximum": 900.0,
+            "minimum": 300.0,
+            "title": "Max Age S",
+            "type": "integer"
+          },
           "quality": {
             "enum": [
               "measured",
@@ -2782,6 +2859,16 @@
           },
           "instellingen": {
             "$ref": "#/components/schemas/HouseSettings"
+          },
+          "laatste_backup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackupReading"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "observed_at": {
             "title": "Observed At",
@@ -3446,6 +3533,17 @@
           "online": {
             "title": "Online",
             "type": "boolean"
+          },
+          "target_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target C"
           },
           "temperature": {
             "$ref": "#/components/schemas/Sensor"
@@ -4269,6 +4367,71 @@
         ]
       }
     },
+    "/api/v1/adapterkoppelingen/my-house": {
+      "get": {
+        "operationId": "list_house_links_api_v1_adapterkoppelingen_my_house_get",
+        "parameters": [
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseLinks"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Koppelingen voor het woningoverzicht lezen",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      }
+    },
     "/api/v1/adapterkoppelingen/{link_id}": {
       "delete": {
         "operationId": "delete_link_api_v1_adapterkoppelingen__link_id__delete",
@@ -4491,6 +4654,49 @@
           }
         },
         "summary": "Adapterkoppeling wijzigen (beheerder)",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      }
+    },
+    "/api/v1/adapterkoppelingen/{link_id}/huis": {
+      "get": {
+        "operationId": "read_house_api_v1_adapterkoppelingen__link_id__huis_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Woningoverzicht lezen",
         "tags": [
           "adapterkoppelingen"
         ]

@@ -432,7 +432,8 @@ per onderdeel in P1:**
 | Systeemstatus · Monitoring | `GET /api/v1/monitoring/sources`, `/monitoring/status` | bron mislukt = Storing ("Beszel: inloggen geweigerd"); geen bron = Onbekend "Geen monitoringbron ingesteld" |
 | Systeemstatus · Meldingen | `GET /api/v1/notifications/channels` | kanaal gestopt (token geweigerd) = Storing; geen kanaal = Onbekend; anders **niet** groen maar neutraal "Aan" (een kanaal is geen gezondheid) — telt niet mee in de totaalstatus |
 | Systeemstatus · Back-ups | `GET /api/v1/gates`, `/backups/coverage` | gate dicht door invulwerk = **gate-rij** (neutraal, telt niet als storing); gemeten falen = Storing |
-| Systeemstatus · Media, Huis, Netwerk | — | **Nog niet beschikbaar** (P3/P5), telt niet mee |
+| Systeemstatus · Media, Netwerk | — | **Nog niet beschikbaar** (P3/P5), telt niet mee |
+| Systeemstatus · Huis | woningoverzicht | Neutrale verwijzing naar Huis |
 | Wat actie nodig heeft | incidenten (actief, kritiek eerst) > (P2: goedkeuringen) > gates dicht > onboarding open | per item as-label (ErnstLabel / Gate / Onboarding) + werkwoordknop "Incident bekijken" / "Invullen" / "Onboarding verder" |
 | Kaart Apps en uptime | `/apps` + Kuma (uptime 30 d alleen als gemeten) | "13 van 14 apps gezond · gemeten"; Onbekend telt niet als gezond |
 | Kaart GPU en AV1 | `/observability/nas` (gpus) | gebruik per GPU (A310 en UHD 770 apart); **temperatuur altijd Onbekend** ("geen bron, nooit 0 °C"); AV1-wachtrij = Nog niet beschikbaar (MediaGuard, P3) |
@@ -440,7 +441,7 @@ per onderdeel in P1:**
 | Kaart Problemen (nieuw) | `/incidents/samenvatting` | "2 actief · 1 kritiek"; vervolglink "Problemen bekijken" |
 | Kaart Nieuwste acties | `/audit?limit=3` (beheerder) | kijker: "alleen voor beheerders" als Onbekend-reden, geen waarde |
 | Kaart Onboarding | `/decisions` | voortgangsbalk (`chart-1` op `chart-meter-track`, `role=progressbar`) — nooit groen |
-| Kaarten Downloads, Huis, Kosten | — | NogNietBeschikbaar (P3/P5) |
+| Kaarten Downloads en Kosten | — | NogNietBeschikbaar (P3/P5) |
 
 Vernieuwen elke 60 s zonder skeletflits; bij een fout **blijft de laatst bekende waarde staan als verouderd** (O-03).
 Testids `kaart-*`, `waarde-*`, `totaalstatus`, `systeemstatus`, `acties` blijven.
@@ -720,3 +721,29 @@ op 360/390/768/1440 × licht/donker (Peil §12). Geen pixel-baselines.
 **Ontwerp:** na de webbouw een **ontwerpreview** (contract §13) op de echte schermen (360/390/768/1440, licht/donker,
 axe, Tab-doorloop), en `ONTWERPTAAL.md` §0/§12 bijwerken naar 18 prototypes en 144 afdrukken (dat bestand valt buiten
 deze stap). P2: `appdetail.html` (ActiePreview) en `goedkeuring-r3.html` worden dan de bron voor de acties.
+
+## Huis (S-P3-090)
+
+Op `/huis` toont de Hub het woningoverzicht uit de bevestigde my_house-koppelingen. Boven elke groep woningen staan
+veilige modus en de laatste back-up van die my_house-installatie. Per woning volgen zones, lichtgroepen, open
+meldingen en de Boilerkaart. Op 360 px staan de kaarten onder elkaar. Vanaf 768 px staan verwante kaarten naast
+elkaar. Op 1440 px blijft de leesvolgorde gelijk. Appnamen en woningnamen mogen omlopen.
+
+| Toestand | Weergave |
+|---|---|
+| Bezig | Het bestaande laadskelet met een tekstmelding voor de schermlezer. |
+| Leeg | Meld of er geen koppeling, geen woning of geen items bij een onderdeel zijn. Een bevestigde lege meldingenlijst telt als nul. |
+| Fout | Foutpaneel met reden en een herhaalactie die alleen leest. Bij verlopen of ingetrokken koppeling verwijst de Hub naar Instellingen → Diensten. |
+| Verouderd | De sensor zelf krijgt het label Verouderd. Bij bronuitval blijven bekende waarden uit die koppeling gedempt staan met hun meettijd. |
+| Gevuld | Per onderdeel de bron en meettijd. Alleen een door de adapter bevestigde gebruikerslink krijgt het label Open in my_house. |
+
+Licht en veilige modus zijn tekstlabels. De temperatuur heeft een eenheid en meetkwaliteit. De Boilerkaart meldt
+dat het om een meting gaat. Zonder B14-bron blijft het vermogen onbekend. Het temperatuurdoel uit de zoneweergave staat als laatst bekend bij een ontbrekende meettijd.
+Een ontbrekende doelwaarde staat als onbekend. Voor sensoren geldt de kleinste grens van my_house en
+de Hub. Als de bron geen bruikbare sensorgrens levert geldt 300 seconden, de kleinste instelbare waarde in my_house.
+Een lichtgroep zonder bruikbare tijd bij het bijbehorende apparaat wordt als laatst bekend getoond.
+De laatste back-up wordt bij benadering afgeleid uit
+`checks[].age_h` van `GET /api/v1/system/status`. De bron rondt de leeftijd af op tienden van een uur.
+
+De link naar koppelbeheer opent Instellingen → Diensten. Invoer en beheer van de koppeling vallen onder S-P3-070.
+De browserproef controleert overloop, foutmelding en herhalen met het toetsenbord op de vier Hub-breedtes.

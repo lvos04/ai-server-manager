@@ -13,6 +13,7 @@ export function Freshness({
   verouderd,
   geprobeerd,
   label = "Bijgewerkt",
+  onbekendeTijd = "Nog nooit gemeten",
   extra,
 }: {
   observedAt: string | null | undefined;
@@ -20,6 +21,7 @@ export function Freshness({
   verouderd?: boolean;
   geprobeerd?: { op: string | null | undefined; uitkomst: string } | null;
   label?: string;
+  onbekendeTijd?: string;
   extra?: [string, string][];
 }) {
   const now = useNow(60_000);
@@ -37,7 +39,7 @@ export function Freshness({
               {formatTime(observedAt, now)} ({formatRelative(observedAt, now)})
             </time>
           ) : (
-            "Nog nooit gemeten"
+            onbekendeTijd
           )}
           {verouderd ? " · verouderd" : ""}
         </dd>

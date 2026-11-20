@@ -19,7 +19,7 @@ from sqlalchemy import select, update
 from hub import audit
 from hub.adapters import basis, mediaguard, mso, my_house
 from hub.config import Settings
-from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, get_vault
+from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, Viewer, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.inventory.store import kind_state
@@ -82,6 +82,11 @@ class MediaGuardLinkView(LinkView):
 
 class LinkList(BaseModel):
     items: list[MediaGuardLinkView | LinkView]
+    next_cursor: str | None
+
+
+class HouseLinks(BaseModel):
+    items: list[uuid.UUID]
     next_cursor: str | None
 
 
@@ -492,6 +497,57 @@ def list_links(db: DB, _: AnyUser, settings: SettingsDep, cursor: Cursor = None,
         items=[_view(row, bound=_binding_is_current(row, target, nas, owners)) for row, target in rows[:limit]],
         next_cursor=str(rows[limit - 1][0].id) if len(rows) > limit else None,
     )
+
+
+@router.get("/my-house", summary="Koppelingen voor het woningoverzicht lezen")
+def list_house_links(db: DB, _: Viewer, response: Response, cursor: Cursor = None, limit: Limit = 50) -> HouseLinks:
+    response.headers["Cache-Control"] = "no-store"
+    query = (
+        select(AdapterLink.id).where(AdapterLink.app_id == my_house.APP_ID).order_by(AdapterLink.id).limit(limit + 1)
+    )
+    if cursor:
+        try:
+            after = uuid.UUID(cursor)
+        except ValueError:
+            raise HubError(400, "invalid_cursor", "Ongeldige cursor.") from None
+        query = query.where(AdapterLink.id > after)
+    ids = db.scalars(query).all()
+    return HouseLinks(items=list(ids[:limit]), next_cursor=str(ids[limit - 1]) if len(ids) > limit else None)
+
+
+@router.get("/{link_id}/huis", summary="Woningoverzicht lezen")
+def read_house(
+    link_id: uuid.UUID, db: DB, _: Viewer, response: Response, settings: SettingsDep, vault: VaultDep
+) -> my_house.Snapshot:
+    row = _link(db, link_id)
+    if row.app_id != my_house.APP_ID:
+        raise HubError(404, "not_found", "Geen my_house-koppeling gevonden.")
+    target = db.get(CatalogApp, row.catalog_app_id)
+    if target is None or not _target_matches(target, my_house.APP_ID):
+        raise HubError(409, "doelbinding", "De gekoppelde my_house-installatie kan niet worden bevestigd.")
+    try:
+        credential = _house_credential(db, vault, row, utcnow())
+        snapshot = _house_adapter(db, settings, row, target).snapshot(credential.token)
+    except OutboundError as exc:
+        if exc.reason in {"bron_token_verlopen", "bron_token_ingetrokken"}:
+            raise HubError(409, exc.reason, "Een beheerder kan de leesverbinding opnieuw koppelen.") from None
+        if exc.reason in {
+            "doelbinding",
+            "bron_identiteit_onbekend",
+            "bron_identiteit_gewijzigd",
+            "bron_identiteit_onbewezen",
+            "bron_credential_geweigerd",
+            "bron_recht_geweigerd",
+        }:
+            raise HubError(409, exc.reason, "De Hub kan de leesverbinding met my_house niet bevestigen.") from None
+        raise HubError(
+            503,
+            "my_house_unavailable",
+            "De Hub kon de gegevens van my_house niet ophalen.",
+            headers={"Retry-After": "1"},
+        ) from None
+    response.headers["Cache-Control"] = "no-store"
+    return snapshot
 
 
 @router.get("/{link_id}", summary="Adapterkoppeling lezen")

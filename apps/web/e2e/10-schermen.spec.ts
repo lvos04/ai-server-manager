@@ -174,7 +174,6 @@ test("nog niet beschikbare schermen tonen eerlijk de fase en geen gegevens", asy
   const expected: Record<string, string> = {
     "/ai": "P2",
     "/media": "P3 en P4",
-    "/huis": "P3",
     "/netwerk": "P5",
     "/automatisering": "P2",
     "/kosten": "P5",

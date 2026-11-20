@@ -751,6 +751,8 @@ def huis_simulatie(
                             "unit_status": "not_linked",
                             "online": False,
                             "mode": "off",
+                            "policy": {"stale_after_s": 420},
+                            "target_c": 21,
                             "temperature": {
                                 "value": 18.5,
                                 "unit": "°C",
@@ -773,7 +775,7 @@ def huis_simulatie(
                     f"/api/v1/homes/{home_id}/devices": [],
                     "/api/v1/system/settings": {
                         "lan_url": "javascript:open()",
-                        "remote_url": None,
+                        "remote_url": toestand.get("app_link"),
                         "safe_mode": False,
                         "maintenance": False,
                     },
@@ -826,7 +828,14 @@ def test_my_house_projectie_en_verlopen_token(
     assert tested.status_code == 200
     data = tested.json()["my_house"]
     assert data["systeem"]["checks"] == [{"key": "database", "state": "ok"}, {"key": "worker", "state": "ok"}]
-    assert data["instellingen"] == {"link": None, "safe_mode": False, "maintenance": False}
+    instellingen = data["instellingen"]
+    assert instellingen["observed_at"] is not None
+    assert instellingen == {
+        "link": None,
+        "safe_mode": False,
+        "maintenance": False,
+        "observed_at": instellingen["observed_at"],
+    }
     assert len(data["woningen"]) == 1
     assert data["woningen"][0]["meldingen"]["open"] == 0
     zone = data["woningen"][0]["zones"][0]
@@ -1289,3 +1298,53 @@ def test_my_house_nieuwe_code_herstelt_na_verloren_vernieuwingsantwoord(
             OutboxEvent.entity_id == link_id, OutboxEvent.event_type == "monitoring.my_house.recovered"
         )
         assert len(db.scalars(hersteld).all()) == 1
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_huis_overzicht_leest_als_kijker_zonder_bronmutaties(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any
+) -> None:
+    code, toestand, calls = huis_simulatie
+    toestand["app_link"] = URL
+    toestand["extra_checks"] = [{"key": "backup", "state": "ok", "age_h": 2.5, "detail": code}]
+    created = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert created.status_code == 201
+    link_id = created.json()["id"]
+    path = f"{ROUTE}/{link_id}/huis"
+    make_user(admin, "huiskijker", "viewer")
+    make_user(admin, "huiskind", "kind")
+    viewer = login_as(app, "huiskijker")
+    child = login_as(app, "huiskind")
+    calls.clear()
+    assert child.get(f"{ROUTE}/my-house").status_code == 403
+    assert child.get(path).status_code == 403
+    assert viewer.get(f"{ROUTE}/my-house").json() == {"items": [link_id], "next_cursor": None}
+    assert viewer.get(f"{ROUTE}/my-house", params={"cursor": link_id}).json() == {"items": [], "next_cursor": None}
+    assert viewer.get(f"{ROUTE}/my-house", params={"cursor": "ongeldig"}).status_code == 400
+    assert viewer.post(path, headers=idem()).status_code == 405
+    assert calls == []
+
+    # De bestaande achtergrondtaak beheert vernieuwing. De schermroute leest ook nabij de vernieuwingsgrens alleen.
+    with app.state.sessionmaker.begin() as db:
+        row = db.get(AdapterLink, uuid.UUID(link_id))
+        row.my_house_expires_at = utcnow() + timedelta(days=1)
+    response = viewer.get(path)
+    assert response.status_code == 200
+    assert response.json()["laatste_backup"]["age_h"] == 2.5
+    assert response.json()["instellingen"]["link"] == URL
+    assert response.headers["Cache-Control"] == "no-store"
+    zone = response.json()["woningen"][0]["zones"][0]
+    assert zone["temperature"]["value"] is None
+    assert zone["temperature"]["max_age_s"] == 420
+    assert zone["target_c"] == 21
+    assert "policy" not in zone
+    assert code not in response.text and toestand["token"] not in response.text
+    assert calls and {method for method, _ in calls} == {"GET"}
+
+    calls.clear()
+    with app.state.sessionmaker.begin() as db:
+        db.get(AdapterLink, uuid.UUID(link_id)).my_house_expires_at = utcnow() - timedelta(seconds=1)
+    response = viewer.get(path)
+    assert response.status_code == 409
+    assert response.json()["code"] == "bron_token_verlopen"
+    assert calls == []
