@@ -490,14 +490,7 @@ def read_house(
     except OutboundError as exc:
         if exc.reason in {"bron_token_verlopen", "bron_token_ingetrokken"}:
             raise HubError(409, exc.reason, "Een beheerder kan de leesverbinding opnieuw koppelen.") from None
-        if exc.reason in {
-            "doelbinding",
-            "bron_identiteit_onbekend",
-            "bron_identiteit_gewijzigd",
-            "bron_identiteit_onbewezen",
-            "bron_credential_geweigerd",
-            "bron_recht_geweigerd",
-        }:
+        if exc.reason not in my_house.CONNECTION_ERRORS:
             raise HubError(409, exc.reason, "De Hub kan de leesverbinding met my_house niet bevestigen.") from None
         raise HubError(
             503,

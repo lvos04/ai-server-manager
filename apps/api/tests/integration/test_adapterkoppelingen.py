@@ -12,6 +12,7 @@ from unittest.mock import Mock
 import pytest
 from conftest import idem, login_as, make_user
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
@@ -761,6 +762,7 @@ def huis_simulatie(
                             "mode": "off",
                             "policy": {"stale_after_s": 420},
                             "target_c": 21,
+                            "target_at": utcnow().isoformat(),
                             "temperature": {
                                 "value": 18.5,
                                 "unit": "°C",
@@ -1413,6 +1415,83 @@ def test_huis_overzicht_leest_als_kijker_zonder_bronmutaties(
     assert response.status_code == 409
     assert response.json()["code"] == "bron_token_verlopen"
     assert calls == []
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_huis_deeluitval_en_weigering(
+    admin: Any, doel: dict[str, Any], huis_simulatie: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code, _, _ = huis_simulatie
+    link_id = admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"]
+    path = f"{ROUTE}/{link_id}/huis"
+    transport = outbound.request
+
+    def opvragen(onderdeel: str, status: int) -> Response:
+        def met_storing(base: str, method: str, route: str, **kwargs: Any) -> outbound.Response:
+            assert method == "GET"
+            if route.rsplit("/", 1)[-1] == onderdeel:
+                return outbound.Response(status, b"")
+            return transport(base, method, route, **kwargs)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(outbound, "request", met_storing)
+            return admin.get(path)
+
+    for onderdeel, veld in (
+        ("health", "databaseprobe"),
+        ("status", "systeem"),
+        ("homes", "woningen"),
+        ("settings", "instellingen"),
+        ("zones", "zones"),
+        ("lights", "licht"),
+        ("alerts", "meldingen"),
+        ("devices", "apparaten"),
+    ):
+        response = opvragen(onderdeel, 503)
+        assert response.status_code == 200
+        body = response.json()
+        deel = body["woningen"][0] if onderdeel in {"zones", "lights", "alerts", "devices"} else body
+        assert deel[veld] is None
+        if onderdeel != "settings":
+            assert body["instellingen"]["safe_mode"] is False
+        if onderdeel != "status":
+            assert body["systeem"]["checks"]
+        for status in (401, 403):
+            response = opvragen(onderdeel, status)
+            assert response.status_code == 409
+            assert "woningen" not in response.json() and "instellingen" not in response.json()
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize(("status", "body", "verwacht"), [(503, b"", 503), (200, b"{}", 409)])
+def test_huis_zonder_bronverbinding_of_identiteitsbewijs(
+    admin: Any,
+    doel: dict[str, Any],
+    huis_simulatie: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    status: int,
+    body: bytes,
+    verwacht: int,
+) -> None:
+    code, _, _ = huis_simulatie
+    link_id = admin.post(ROUTE, json=doel, headers=invoer(code)).json()["id"]
+    path = f"{ROUTE}/{link_id}/huis"
+    transport = outbound.request
+    gezien: list[str] = []
+
+    def ontbrekende_bron(base: str, method: str, route: str, **kwargs: Any) -> outbound.Response:
+        assert method == "GET" and not (kwargs.get("headers") or {}).get("Authorization")
+        gezien.append(route)
+        if route == my_house.Route.HEALTH:
+            return transport(base, method, route, **kwargs)
+        assert route == my_house.Route.IDENTITY
+        return outbound.Response(status, body)
+
+    monkeypatch.setattr(outbound, "request", ontbrekende_bron)
+    antwoord = admin.get(path)
+    assert antwoord.status_code == verwacht
+    assert "woningen" not in antwoord.json() and "instellingen" not in antwoord.json()
+    assert gezien == [my_house.Route.HEALTH, my_house.Route.IDENTITY]
 
 
 def inventariseer(app: Any, settings: Settings, staat: str, *, werk_catalogus_bij: bool) -> str | None:

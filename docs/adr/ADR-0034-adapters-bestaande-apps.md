@@ -236,10 +236,10 @@ vervaldatum. Een verlopen of ingetrokken token of mislukte vernieuwing geeft een
 | Route | Recht | Toegestane velden |
 | --- | --- | --- |
 | `GET /api/v1/health` | Openbaar, zonder token | `status`, `version`; dit is de databaseprobe |
-| `GET /api/v1/system/status` | Viewer-token | `version`, `checks[].key/state`; geen vrije details |
+| `GET /api/v1/system/status` | Viewer-token | `version`, `checks[].key/state`; bij de back-upcheck de gemeten leeftijd `age_h`; geen vrije details |
 | `GET /api/v1/homes` | Viewer-token | `id`, `name`, `timezone`, `active` |
-| `GET /api/v1/homes/{home_id}/zones` | Viewer-token | `id`, `name`, `unit_status`, `online`, `mode`, `temperature.value/unit/quality/at/stale`, dezelfde selectie voor `humidity` |
-| `GET /api/v1/homes/{home_id}/lights` | Viewer-token | Per groep/lamp `id`, `name`, `on`, `brightness`, `reachable`; per scène `id`, `active`, `group_id` |
+| `GET /api/v1/homes/{home_id}/zones` | Viewer-token | `id`, `name`, `unit_status`, `online`, `mode`, `temperature.value/unit/quality/at/stale`, dezelfde selectie voor `humidity`, de versheidsgrens `policy.stale_after_s` en de gemeten doeltemperatuur `target_c` met `target_at` |
+| `GET /api/v1/homes/{home_id}/lights` | Viewer-token | Per groep/lamp `id`, `name`, `on`, `brightness`, `reachable`; voor een groep ook de meettijd `on_at`; per scène `id`, `active`, `group_id` |
 | `GET /api/v1/homes/{home_id}/alerts` | Viewer-token | `id`, `severity`, `created_at` indien beschikbaar, aantal open meldingen |
 | `GET /api/v1/homes/{home_id}/devices` | Viewer-token | `id`, `kind`, `online`, `last_seen`, `compatibility`, `lifecycle` |
 | `GET /api/v1/system/settings` | Viewer-token | `lan_url`, `remote_url` alleen als kandidaat voor een gevalideerde gebruikerslink; `safe_mode`, `maintenance` |

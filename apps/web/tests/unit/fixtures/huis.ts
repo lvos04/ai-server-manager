@@ -8,17 +8,21 @@ export function huisMeting(observedAt = new Date().toISOString()) {
       zones: [{
         id: "woonkamer",
         name: "Woonkamer",
+        online: true,
         target_c: 21,
+        target_at: new Date(Date.parse(observedAt) - 3_600_000).toISOString(),
         temperature: { value: 20.5, unit: "°C", at: observedAt, quality: "measured", max_age_s: 300, stale: false },
       }, {
         id: "slaapkamer",
         name: "Slaapkamer",
+        online: false,
         target_c: null,
+        target_at: null,
         temperature: { value: null, unit: "°C", at: observedAt, quality: "measured", max_age_s: 300, stale: true },
       }],
       licht: { groups: [
-        { id: "plafond", name: "Plafondlamp", on: true, reachable: true },
-        { id: "leeslamp", name: "Leeslamp", on: false, reachable: true },
+        { id: "plafond", name: "Plafondlamp", on: true, on_at: observedAt, reachable: true },
+        { id: "leeslamp", name: "Leeslamp", on: false, on_at: observedAt, reachable: true },
       ] },
       apparaten: [{ id: "plafond", kind: "light_group", online: true, last_seen: observedAt },
         { id: "leeslamp", kind: "light_group", online: true, last_seen: observedAt }],

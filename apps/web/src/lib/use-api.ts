@@ -20,7 +20,7 @@ export interface ApiState<T> {
  * maar gemarkeerd als verouderd (`stale`) met de fout erbij — de UI toont hem gedempt met "Laatst bekend · 10:12" en
  * status Onbekend, nooit als actueel en nooit groen. Optioneel periodiek vernieuwen.
  */
-export function useApi<T>(path: string | null, refreshMs?: number): ApiState<T> {
+export function useApi<T>(path: string | null, refreshMs?: number, keepOnError?: (error: HubApiError) => boolean): ApiState<T> {
   // Gegevens horen bij één pad: na een padwissel tellen oude gegevens niet (ook niet als "laatst bekend").
   const [entry, setEntry] = useState<{ path: string | null; value: T } | undefined>(undefined);
   const [error, setError] = useState<HubApiError | undefined>(undefined);
@@ -48,12 +48,17 @@ export function useApi<T>(path: string | null, refreshMs?: number): ApiState<T> 
       })
       .catch((e: unknown) => {
         if ((e instanceof DOMException && e.name === "AbortError") || c.signal.aborted) return;
-        // Laatst bekende waarde bewaren (O-03); hij is vanaf nu verouderd.
+        const failure = e instanceof HubApiError ? e : new HubApiError(0, "onbekend", String(e));
+        if (keepOnError && !keepOnError(failure)) {
+          setEntry(undefined);
+          setEtag(null);
+          setLastOk(null);
+        }
         setStale(true);
-        setError(e instanceof HubApiError ? e : new HubApiError(0, "onbekend", String(e)));
+        setError(failure);
         setLoading(false);
       });
-  }, [path]);
+  }, [path, keepOnError]);
 
   const reload = useCallback(async () => {
     setLoading(true);

@@ -84,4 +84,65 @@ describe("Huis", () => {
     scenario.lijst = { data: { items: [] } };
     expect(renderToStaticMarkup(<Page />)).toContain("my_house is nog niet gekoppeld");
   });
+
+  it.each([401, 403, 409, 500])("verbergt alle kaartgegevens bij lijststatus %i, ook als details wegvallen", (status) => {
+    scenario.lijst = { ...scenario.lijst, error: new HubApiError(status, "geweigerd", "Lezen geweigerd."), stale: true };
+    scenario.bron = { ...scenario.bron, error: new HubApiError(0, "network_error", "Geen verbinding."), stale: true };
+    const html = renderToStaticMarkup(<Page />);
+    expect(html).toContain("Lezen geweigerd.");
+    expect(html).not.toMatch(/Proefwoning|20,5|Veilige modus|Plafondlamp|Open in my_house|Laatst bekend/);
+  });
+
+  it("bewaart bij gewone lijstuitval de meting met haar oorspronkelijke tijd", () => {
+    const tijd = new Date(Date.now() - 60_000).toISOString();
+    scenario.lijst = { ...scenario.lijst, error: new HubApiError(0, "network_error", "Geen verbinding."), stale: true };
+    scenario.bron = { data: huisMeting(tijd) };
+    const html = renderToStaticMarkup(<Page />);
+    expect(html).toContain("Laatst bekend · 20,5 °C");
+    expect(html).toContain(`dateTime="${tijd}"`);
+  });
+
+  it.each([
+    [false, 0, "Uit"], [true, 0, "Aan"], [null, 0, "Onbekend"], [undefined, 0, "Onbekend"],
+    ["false", 0, "Onbekend"], [0, 0, "Onbekend"], [true, null, "Onbekend"], [false, "ongeldig", "Onbekend"],
+    [true, 60_000, "Onbekend"], [false, -960_000, "Laatst bekend · Uit"],
+  ] as const)("lichtveld %s en meettijd %s geven %s", (on, verschil, verwacht) => {
+    const data = huisMeting();
+    const woning = data.woningen[0]!;
+    Object.assign(woning.licht.groups[0]!, { on });
+    const last_seen = typeof verschil === "number" ? new Date(Date.now() + verschil).toISOString() : verschil;
+    Object.assign(woning.apparaten[0]!, { last_seen });
+    scenario.bron = { data };
+    const kaart = renderToStaticMarkup(<Page />).split("Plafondlamp</dt>")[1]!.split("<dl")[0]!;
+    expect(kaart.replace(/<[^>]+>/g, "")).toBe(verwacht);
+  });
+
+  it("toont onbekende deelmetingen zonder een lege lijst, nul of uit te suggereren", () => {
+    const data = huisMeting();
+    Object.assign(data.woningen[0]!, { licht: null, meldingen: null });
+    Object.assign(data.woningen[0]!.zones[0]!, { target_at: null });
+    Object.assign(data.instellingen, { safe_mode: null });
+    scenario.bron = { data };
+    const html = renderToStaticMarkup(<Page />);
+    expect(html).toContain("20,5 °C");
+    expect(html).toMatch(/Lichtgroepen<\/h3><p>Onbekend/);
+    expect(html).toMatch(/Open meldingen<\/h3><p[^>]*>Onbekend/);
+    expect(html).toMatch(/Veilige modus<\/h3><p>Onbekend/);
+    expect(html).toMatch(/Temperatuurdoel<\/p><p>Onbekend/);
+  });
+
+  it.each([null, "ongeldig", "2099-01-01T00:00:00Z"])("een apparaatwaarneming vervangt de ontbrekende of ongeldige lichtmeettijd %s niet", (on_at) => {
+    const data = huisMeting();
+    Object.assign(data.woningen[0]!.licht.groups[0]!, { on_at });
+    scenario.bron = { data };
+    const kaart = renderToStaticMarkup(<Page />).split("Plafondlamp</dt>")[1]!.split("<dl")[0]!;
+    expect(kaart.replace(/<[^>]+>/g, "")).toBe("Onbekend");
+  });
+
+  it("toont de doeltemperatuur als actueel bij een recente doelmeting van de gekoppelde unit", () => {
+    const data = huisMeting();
+    data.woningen[0]!.zones[0]!.target_at = data.observed_at;
+    scenario.bron = { data };
+    expect(renderToStaticMarkup(<Page />)).toMatch(/Temperatuurdoel<\/p><p>21 °C<\/p>/);
+  });
 });

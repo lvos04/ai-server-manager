@@ -5,6 +5,37 @@ import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, ready, 
 const koppelingen = "/api/v1/adapterkoppelingen";
 const overzicht = `${koppelingen}/proef/huis`;
 
+test("een lijstweigering wist eerder gelezen woningen tot de lijst opnieuw leesbaar is", async ({ page }) => {
+  await page.clock.install();
+  const meting = huisMeting();
+  let toestand: "verbonden" | "geweigerd" | "offline" = "verbonden";
+  await page.route(`**${koppelingen}/**`, async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/my-house")) {
+      if (toestand === "geweigerd") return route.fulfill({ status: 403, json: { code: "forbidden", message: "Leesrecht geweigerd." } });
+      if (toestand === "offline") return route.abort();
+      return route.fulfill({ json: { items: ["proef"], next_cursor: null } });
+    }
+    return toestand === "verbonden" ? route.fulfill({ json: meting }) : route.abort();
+  });
+  await page.goto("/huis");
+  const main = page.locator("main");
+  const woning = main.getByRole("heading", { name: "Proefwoning" });
+  await expect(woning).toBeVisible();
+  toestand = "geweigerd";
+  await page.clock.fastForward(61_000);
+  await expect(main.getByRole("alert")).toContainText("Leesrecht geweigerd.");
+  await expect(woning).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Veilige modus" })).toHaveCount(0);
+  toestand = "offline";
+  await main.getByRole("button", { name: "Opnieuw proberen" }).click();
+  await expect(main.getByRole("alert")).toContainText("niet bereikbaar");
+  await expect(woning).toHaveCount(0);
+  await expect(main.getByText(/20,5 °C/)).toHaveCount(0);
+  toestand = "verbonden";
+  await main.getByRole("button", { name: "Opnieuw proberen" }).click();
+  await expect(woning).toBeVisible();
+});
+
 test("Huis leest, markeert verouderde sensoren en herstelt met het toetsenbord", async ({ page }) => {
   const meting = huisMeting();
   let status = 503;

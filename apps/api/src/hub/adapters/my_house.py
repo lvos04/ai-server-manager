@@ -37,6 +37,7 @@ CODE = re.compile(r"[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}", re.IGNORECASE | re.AS
 SENSITIVE_LABEL = re.compile(r"shc_|\b[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}\b", re.IGNORECASE)
 RAW_CODE = re.compile(r"\b[A-HJ-NP-Z2-9]{8}\b")
 INVALID = "antwoord_ongeldig"
+CONNECTION_ERRORS = {"niet_bereikbaar", "tijdslimiet"}
 
 
 class Route(StrEnum):
@@ -83,6 +84,17 @@ def _timestamp(value: Any) -> datetime:
     return result
 
 
+def _reading_time(value: Any) -> datetime | None:
+    try:
+        return _timestamp(value)
+    except ValueError:
+        return None
+
+
+def _switch(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
 def _label(value: Any) -> str | None:
     if (
         not isinstance(value, str)
@@ -106,6 +118,8 @@ def _timezone(value: Any) -> str | None:
 
 Identifier = Annotated[UUID, BeforeValidator(_uuid)]
 Timestamp = Annotated[UtcDateTime, BeforeValidator(_timestamp)]
+ReadingTime = Annotated[UtcDateTime | None, BeforeValidator(_reading_time)]
+Switch = Annotated[bool | None, BeforeValidator(_switch)]
 Label = Annotated[str | None, BeforeValidator(_label)]
 Timezone = Annotated[str | None, BeforeValidator(_timezone)]
 Version = Annotated[str, Field(max_length=48, pattern=r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][a-zA-Z0-9.-]+)?$")]
@@ -293,6 +307,20 @@ class Zone(BaseModel):
     temperature: Sensor
     humidity: Sensor
     target_c: float | None = None
+    target_at: ReadingTime = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sensors(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        fields = value.copy()
+        for key, unit in (("temperature", "°C"), ("humidity", "%")):
+            try:
+                fields[key] = Sensor.model_validate(fields.get(key), strict=True)
+            except ValidationError:
+                fields[key] = {"value": None, "unit": unit, "quality": "missing", "at": None, "stale": True}
+        return fields
 
     @field_validator("target_c", mode="before")
     @classmethod
@@ -303,9 +331,10 @@ class Zone(BaseModel):
 class Light(BaseModel):
     id: Identifier
     name: Label
-    on: bool
-    brightness: Annotated[float, Field(ge=0, le=100)] | None
-    reachable: bool | None = None
+    on: Switch = None
+    on_at: ReadingTime = None
+    brightness: Annotated[float, Field(ge=0, le=100)] | None = None
+    reachable: Switch = None
 
 
 class Scene(BaseModel):
@@ -337,14 +366,14 @@ class Device(BaseModel):
     id: Identifier
     kind: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
     online: bool
-    last_seen: Timestamp | None
+    last_seen: ReadingTime = None
     compatibility: Literal["unknown", "untested", "tested", "limited", "unsupported", "pairable", "discovered"]
     lifecycle: Literal["active", "replaced", "archived"]
 
 
 class Settings(BaseModel):
-    safe_mode: bool
-    maintenance: bool
+    safe_mode: Switch = None
+    maintenance: Switch = None
 
 
 class HouseSettings(Settings):
@@ -359,18 +388,18 @@ class BackupReading(BaseModel):
 
 class Overview(BaseModel):
     woning: Home
-    zones: Rows[Zone]
-    licht: Lights
-    meldingen: Alerts
-    apparaten: Rows[Device]
+    zones: Rows[Zone] | None
+    licht: Lights | None
+    meldingen: Alerts | None
+    apparaten: Rows[Device] | None
 
 
 class Snapshot(BaseModel):
     observed_at: UtcDateTime
-    databaseprobe: Liveness
-    systeem: System
-    woningen: list[Overview]
-    instellingen: HouseSettings
+    databaseprobe: Liveness | None
+    systeem: System | None
+    woningen: list[Overview] | None
+    instellingen: HouseSettings | None
     laatste_backup: BackupReading | None = None
 
 
@@ -380,11 +409,21 @@ class SnapshotReading(BaseModel):
 
     def project(self, now: datetime) -> Snapshot:
         snapshot = self.snapshot.model_copy(deep=True)
-        snapshot.systeem.checks = [check.project(now) for check in self.checks]
-        for home in snapshot.woningen:
-            for zone in home.zones:
+        if snapshot.systeem is not None:
+            snapshot.systeem.checks = [check.project(now) for check in self.checks]
+        for home in snapshot.woningen or []:
+            for zone in home.zones or []:
                 zone.temperature = zone.temperature.met_meettijd(now, "°C")
                 zone.humidity = zone.humidity.met_meettijd(now, "%")
+                if zone.target_at is None or zone.target_at > now:
+                    zone.target_c = None
+            if home.licht is not None:
+                measured = {
+                    d.id for d in home.apparaten or [] if d.kind == "light_group" and d.last_seen and d.last_seen <= now
+                }
+                for group in home.licht.groups:
+                    if group.id not in measured or group.on_at is None or group.on_at > now:
+                        group.on = None
         return snapshot
 
 
@@ -436,8 +475,22 @@ def _validate[T](model: TypeAdapter[T], data: Any, *, reason: str = INVALID) -> 
 def _error(response_status: int, data: Any) -> str:
     detail = data.get("detail") if isinstance(data, dict) else None
     code = detail.get("code") if isinstance(detail, dict) else None
-    fallback = "bron_credential_geweigerd" if response_status in (401, 403) else "onverwachte_statuscode"
+    fallback = "onverwachte_statuscode"
+    if response_status in (401, 403):
+        fallback = "bron_credential_geweigerd"
+    elif 500 <= response_status < 600:
+        fallback = "niet_bereikbaar"
     return ERROR_REASONS.get((response_status, code), fallback) if isinstance(code, str) else fallback
+
+
+def _part[T](partial: bool, read: Callable[[], T]) -> T | None:
+    """Alleen de kijkroute mag een ontbrekende deelmeting overslaan."""
+    try:
+        return read()
+    except outbound.OutboundError as exc:
+        if partial and (exc.reason in CONNECTION_ERRORS or exc.reason == INVALID):
+            return None
+        raise
 
 
 def _credential(token: Any, expires_at: datetime, now: datetime, *, old: Credential | None = None) -> Credential:
@@ -495,9 +548,14 @@ class Adapter:
                 query=challenge,
                 max_bytes=basis.MAX_RESPONSE_BYTES,
             )
-            data = response.json()
         except (OSError, ValueError, RecursionError):
             raise outbound.OutboundError(INVALID) from None
+        try:
+            data = response.json()
+        except (ValueError, RecursionError):
+            if response.status == 200:
+                raise outbound.OutboundError(INVALID) from None
+            data = None
         if response.status != 200:
             raise outbound.OutboundError(_error(response.status, data))
         return data
@@ -552,12 +610,30 @@ class Adapter:
         return _credential(data.get("token"), expires_at, now, old=old)
 
     def snapshot(self, token: str) -> Snapshot:
-        return self.read_snapshot(token).project(utcnow())
+        return self.read_snapshot(token, partial=True).project(utcnow())
 
-    def read_snapshot(self, token: str) -> SnapshotReading:
-        liveness = _validate(TypeAdapter(Liveness), self._request(Route.HEALTH))
+    def read_snapshot(self, token: str, *, partial: bool = False) -> SnapshotReading:
+        liveness = _part(partial, lambda: _validate(TypeAdapter(Liveness), self._request(Route.HEALTH)))
         observed = utcnow()
         self._identity(token)
+        system = _part(partial, lambda: self._system(token))
+        homes = _part(partial, lambda: self._homes(token))
+        settings = _part(partial, lambda: self._settings(token))
+        return SnapshotReading(
+            snapshot=Snapshot(
+                observed_at=observed,
+                databaseprobe=liveness,
+                systeem=system[0] if system else None,
+                woningen=[self._overview(home, token, partial=partial) for home in homes]
+                if homes is not None
+                else None,
+                instellingen=settings,
+                laatste_backup=system[2] if system else None,
+            ),
+            checks=system[1] if system else [],
+        )
+
+    def _system(self, token: str) -> tuple[System, list[CheckReading], BackupReading | None]:
         previous_checks = CheckReadings.validate_python(self.link.my_house_checks or [])
         previous_worker_error_at = next(
             (
@@ -576,29 +652,25 @@ class Adapter:
         backup = None
         if isinstance(backup_age, (int, float)) and not isinstance(backup_age, bool) and 0 <= backup_age < math.inf:
             backup = BackupReading(age_h=backup_age, observed_at=requested_at)
+        return system, checks, backup
+
+    def _homes(self, token: str) -> list[Home]:
         homes = _validate(TypeAdapter(Rows[Home]), self._request(Route.HOMES, token=token))
         if len({home.id for home in homes}) != len(homes):
             raise outbound.OutboundError(INVALID)
+        return homes
+
+    def _settings(self, token: str) -> HouseSettings:
         settings_observed_at = utcnow()
         settings = self._request(Route.SETTINGS, token=token)
         flags = _validate(TypeAdapter(Settings), settings)
-        return SnapshotReading(
-            snapshot=Snapshot(
-                observed_at=observed,
-                databaseprobe=liveness,
-                systeem=system,
-                woningen=[self._overview(home, token) for home in homes],
-                instellingen=HouseSettings(
-                    **flags.model_dump(),
-                    link=user_link(self.link.basis_url, settings.get("lan_url"), settings.get("remote_url")),
-                    observed_at=settings_observed_at,
-                ),
-                laatste_backup=backup,
-            ),
-            checks=checks,
+        return HouseSettings(
+            **flags.model_dump(),
+            link=user_link(self.link.basis_url, settings.get("lan_url"), settings.get("remote_url")),
+            observed_at=settings_observed_at,
         )
 
-    def _overview(self, home: Home, token: str) -> Overview:
+    def _zones(self, home: Home, token: str) -> list[Zone]:
         zone_data = self._request(Route.ZONES, token=token, home_id=home.id)
         zones = _validate(TypeAdapter(Rows[Zone]), zone_data)
         observed = utcnow()
@@ -610,18 +682,23 @@ class Adapter:
                 max_age = min(source_age, basis.MAX_AGE_S)
             zone.temperature = zone.temperature.model_copy(update={"max_age_s": max_age}).met_meettijd(observed, "°C")
             zone.humidity = zone.humidity.model_copy(update={"max_age_s": max_age}).met_meettijd(observed, "%")
-        lights = _validate(TypeAdapter(Lights), self._request(Route.LIGHTS, token=token, home_id=home.id))
+        return zones
+
+    def _alerts(self, home: Home, token: str) -> Alerts:
         alerts_observed_at = utcnow()
         alerts = _validate(TypeAdapter(Rows[Alert]), self._request(Route.ALERTS, token=token, home_id=home.id))
-        devices = _validate(TypeAdapter(Rows[Device]), self._request(Route.DEVICES, token=token, home_id=home.id))
+        return Alerts(items=alerts, open=len(alerts), begrensd=len(alerts) >= 100, observed_at=alerts_observed_at)
+
+    def _overview(self, home: Home, token: str, *, partial: bool) -> Overview:
+        def read[T](route: Route, schema: TypeAdapter[T]) -> T:
+            return _validate(schema, self._request(route, token=token, home_id=home.id))
+
         return Overview(
             woning=home,
-            zones=zones,
-            licht=lights,
-            meldingen=Alerts(
-                items=alerts, open=len(alerts), begrensd=len(alerts) >= 100, observed_at=alerts_observed_at
-            ),
-            apparaten=devices,
+            zones=_part(partial, lambda: self._zones(home, token)),
+            licht=_part(partial, lambda: read(Route.LIGHTS, TypeAdapter(Lights))),
+            meldingen=_part(partial, lambda: self._alerts(home, token)),
+            apparaten=_part(partial, lambda: read(Route.DEVICES, TypeAdapter(Rows[Device]))),
         )
 
 

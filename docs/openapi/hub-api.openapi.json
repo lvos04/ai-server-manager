@@ -580,7 +580,6 @@
           "id",
           "kind",
           "online",
-          "last_seen",
           "compatibility",
           "lifecycle"
         ],
@@ -1050,8 +1049,15 @@
             "title": "Link"
           },
           "maintenance": {
-            "title": "Maintenance",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maintenance"
           },
           "observed_at": {
             "anyOf": [
@@ -1065,13 +1071,18 @@
             "title": "Observed At"
           },
           "safe_mode": {
-            "title": "Safe Mode",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe Mode"
           }
         },
         "required": [
-          "safe_mode",
-          "maintenance",
           "link"
         ],
         "title": "HouseSettings",
@@ -1148,8 +1159,26 @@
             "title": "Name"
           },
           "on": {
-            "title": "On",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          },
+          "on_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On At"
           },
           "reachable": {
             "anyOf": [
@@ -1165,9 +1194,7 @@
         },
         "required": [
           "id",
-          "name",
-          "on",
-          "brightness"
+          "name"
         ],
         "title": "Light",
         "type": "object"
@@ -1780,19 +1807,47 @@
       "Overview": {
         "properties": {
           "apparaten": {
-            "$ref": "#/components/schemas/Rows_Device_"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rows_Device_"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "licht": {
-            "$ref": "#/components/schemas/Lights"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Lights"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "meldingen": {
-            "$ref": "#/components/schemas/Alerts"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Alerts"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "woning": {
             "$ref": "#/components/schemas/Home"
           },
           "zones": {
-            "$ref": "#/components/schemas/Rows_Zone_"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rows_Zone_"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2855,10 +2910,24 @@
       "Snapshot": {
         "properties": {
           "databaseprobe": {
-            "$ref": "#/components/schemas/Liveness"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Liveness"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "instellingen": {
-            "$ref": "#/components/schemas/HouseSettings"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HouseSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "laatste_backup": {
             "anyOf": [
@@ -2875,14 +2944,28 @@
             "type": "string"
           },
           "systeem": {
-            "$ref": "#/components/schemas/System"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/System"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "woningen": {
-            "items": {
-              "$ref": "#/components/schemas/Overview"
-            },
-            "title": "Woningen",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Overview"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Woningen"
           }
         },
         "required": [
@@ -3533,6 +3616,17 @@
           "online": {
             "title": "Online",
             "type": "boolean"
+          },
+          "target_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target At"
           },
           "target_c": {
             "anyOf": [

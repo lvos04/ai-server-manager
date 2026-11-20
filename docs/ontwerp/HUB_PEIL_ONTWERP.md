@@ -736,14 +736,19 @@ elkaar. Op 1440 px blijft de leesvolgorde gelijk. Appnamen en woningnamen mogen 
 | Bezig | Het bestaande laadskelet met een tekstmelding voor de schermlezer. |
 | Leeg | Meld of er geen koppeling, geen woning of geen items bij een onderdeel zijn. Een bevestigde lege meldingenlijst telt als nul. |
 | Fout | Foutpaneel met reden en een herhaalactie die alleen leest. Bij verlopen of ingetrokken koppeling verwijst de Hub naar Instellingen → Diensten. |
-| Verouderd | De sensor zelf krijgt het label Verouderd. Bij bronuitval blijven bekende waarden uit die koppeling gedempt staan met hun meettijd. |
+| Lijst of detail weigert het leesrecht | Wis de eerder getoonde waarden voor die lijst of koppeling. Ook bij een daaropvolgende verbindingsfout blijven de woningkaarten verborgen tot een nieuwe toegestane lezing. |
+| Verbindingsuitval | Eerder gemeten waarden blijven gedempt staan als Laatst bekend, met hun oorspronkelijke meettijd. |
+| Eén deelbron valt uit | Toon Onbekend bij dat onderdeel. De overige kaarten houden hun eigen metingen en meettijden. |
+| Verouderd | De sensor zelf krijgt het label Verouderd. Een oudere lichtmeting houdt haar oorspronkelijke meettijd. |
 | Gevuld | Per onderdeel de bron en meettijd. Alleen een door de adapter bevestigde gebruikerslink krijgt het label Open in my_house. |
 
 Licht en veilige modus zijn tekstlabels. De temperatuur heeft een eenheid en meetkwaliteit. De Boilerkaart meldt
-dat het om een meting gaat. Zonder B14-bron blijft het vermogen onbekend. Het temperatuurdoel uit de zoneweergave staat als laatst bekend bij een ontbrekende meettijd.
-Een ontbrekende doelwaarde staat als onbekend. Voor sensoren geldt de kleinste grens van my_house en
+dat het om een meting gaat. Zonder B14-bron blijft het vermogen onbekend. Het temperatuurdoel heeft een eigen meettijd.
+Een oudere doelmeting staat als laatst bekend. Een ontbrekende doelwaarde of meettijd geeft Onbekend.
+Voor sensoren geldt de kleinste grens van my_house en
 de Hub. Als de bron geen bruikbare sensorgrens levert geldt 300 seconden, de kleinste instelbare waarde in my_house.
-Een lichtgroep zonder bruikbare tijd bij het bijbehorende apparaat wordt als laatst bekend getoond.
+Een expliciete schakelmeting met geldige meettijd en apparaatwaarneming geeft Aan of Uit.
+Een ontbrekend of ongeldig veld geeft Onbekend. Bij een verlopen meettijd of onbereikbare groep staat er Laatst bekend.
 De laatste back-up wordt bij benadering afgeleid uit
 `checks[].age_h` van `GET /api/v1/system/status`. De bron rondt de leeftijd af op tienden van een uur.
 

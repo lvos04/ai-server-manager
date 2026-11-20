@@ -12,6 +12,49 @@ import pytest
 from hub.adapters import my_house
 
 
+@pytest.mark.parametrize(
+    ("veld", "verwacht"),
+    [
+        ({}, None),
+        ({"on": None}, None),
+        ({"on": "false"}, None),
+        ({"on": 0}, None),
+        ({"on": False}, False),
+        ({"on": True}, True),
+    ],
+)
+def test_lichtstand_is_alleen_een_expliciete_boolean(veld: dict[str, Any], verwacht: bool | None) -> None:
+    light = my_house.Light.model_validate({"id": str(uuid4()), "name": "Proeflicht", **veld}, strict=True)
+    assert light.on is verwacht
+
+
+@pytest.mark.parametrize("temperatuur", [None, {}, {"value": 0, "at": "ongeldig"}])
+def test_ongeldige_sensor_laat_andere_zonemetingen_staan(temperatuur: Any) -> None:
+    nu = datetime.now(UTC)
+    zone = my_house.Zone.model_validate(
+        {
+            "id": str(uuid4()),
+            "name": "Proefzone",
+            "unit_status": "online",
+            "online": True,
+            "mode": "heat",
+            "temperature": temperatuur,
+            "humidity": {
+                "value": 42,
+                "unit": "%",
+                "quality": "measured",
+                "at": nu.isoformat(),
+                "stale": False,
+            },
+            "target_c": 21,
+            "target_at": nu.isoformat(),
+        },
+        strict=True,
+    )
+    assert zone.temperature.value is None and zone.temperature.quality == "missing"
+    assert zone.humidity.value == 42 and zone.target_at == nu
+
+
 def test_module_bevat_uitsluitend_toegelaten_routes() -> None:
     source = Path(my_house.__file__).read_text()
     assert not re.search(r"/(?:command|resume|ack|audit|diagnostics|backups?|users)(?:\b|/)|/lights/groups", source)
