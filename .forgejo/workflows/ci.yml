@@ -48,7 +48,8 @@ jobs:
         uses: https://data.forgejo.org/actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
-      - name: PostgreSQL 16-client (pg_dump/pg_restore voor de back-uptests)
+      - &postgres_client
+        name: PostgreSQL 16-client (psql, pg_dump en pg_restore)
         run: |
           apt=(apt-get)
           if [[ $(id -u) != 0 ]]; then apt=(sudo apt-get); fi
@@ -125,6 +126,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - *python312
+      - *postgres_client
       - *hub_installatie
       - *testdatabase
       - name: Woningoverzicht bij afzonderlijke updates van Hub en my_house
