@@ -9,6 +9,7 @@ import pytest
 
 from hub.monitoring import beszel, heartbeat, kuma, prometheus
 from hub.monitoring.sources import judge_connector_health
+from hub.timeutil import iso
 
 NOW = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
 GPUS = [
@@ -160,6 +161,32 @@ def test_connector_health_beoordeling() -> None:
     )  # uit de toekomst: de klok van de dienst niet vertrouwen
     assert judge_connector_health({"status": "groen"}, NOW)[:2] == ("unknown", "antwoord_ongeldig")
     assert judge_connector_health(None, NOW)[:2] == ("unknown", "antwoord_ongeldig")
+
+
+@pytest.mark.parametrize(("workerstatus", "reden"), [("healthy", None), ("down", "jobs_staan_stil")])
+def test_connector_toestand_en_kortste_termijn_op_elke_positie(workerstatus: str, reden: str | None) -> None:
+    limieten = {"max_age_s": {"health": 120, "worker": 5}}
+    # De worker is al twee seconden oud; de termijn loopt vanaf zijn eigen meettijd.
+    worker = {"name": "worker", "status": workerstatus, "observed_at": iso(NOW - timedelta(seconds=2))}
+    grens = iso(NOW + timedelta(seconds=3))
+    for lengte in range(1, 42):
+        overige = [{"name": f"controle_{i}", "status": "healthy", "observed_at": iso(NOW)} for i in range(lengte - 1)]
+        for positie in range(lengte):
+            controles = [*overige[:positie], worker, *overige[positie:]]
+            body = {"status": "healthy", "observed_at": iso(NOW), "checks": controles}
+            status, reden_nu, _, detail = judge_connector_health(body, NOW, limieten)
+            assert (status, reden_nu, detail["geldig_tot"]) == (workerstatus, reden, grens), (lengte, positie)
+            assert detail["aantal_controles"] == lengte
+            assert [c["name"] for c in detail["checks"]] == [c["name"] for c in controles[:20]]
+            status, reden_later, _, detail = judge_connector_health(body, NOW + timedelta(seconds=4), limieten)
+            assert (status, reden_later, detail["geldig_tot"]) == ("unknown", "meting_verouderd", grens)
+
+
+def test_ongeldige_connectorcontrole_na_de_weergavegrens_telt_mee() -> None:
+    gezond = {"name": "database", "status": "healthy", "observed_at": iso(NOW)}
+    body = {"status": "healthy", "observed_at": iso(NOW), "checks": [gezond] * 20 + [None]}
+    assert judge_connector_health(body, NOW)[:2] == ("unknown", "meting_verouderd")
+    assert judge_connector_health({**body, "checks": {}}, NOW)[:2] == ("unknown", "antwoord_ongeldig")
 
 
 def test_max_age_van_de_bron_nooit_soepeler() -> None:

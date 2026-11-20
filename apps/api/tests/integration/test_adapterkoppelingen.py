@@ -4,13 +4,13 @@ import hashlib
 import json
 import secrets
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from ipaddress import IPv4Address
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
-from conftest import idem, login_as, make_user
+from conftest import enroll_body, idem, login_as, make_user
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import select, text, update
@@ -23,7 +23,7 @@ from hub.config import Settings
 from hub.deps import get_db
 from hub.incidents.rules import ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED
 from hub.inventory.collector import CollectResult, KindResult
-from hub.inventory.store import save_run
+from hub.inventory.store import prune_runs, save_run
 from hub.models import (
     AdapterHouseSnapshot,
     AdapterLink,
@@ -34,13 +34,17 @@ from hub.models import (
     IdempotencyRecord,
     Incident,
     IncidentEvent,
+    InventoryRun,
+    InventorySnapshot,
     OutboxEvent,
     VaultSecret,
     WebSession,
 )
-from hub.monitoring import kuma, timeseries
+from hub.monitoring import kuma, sources, timeseries
 from hub.monitoring.sources import upsert_observation
+from hub.registry import expected_repository
 from hub.routers import adapterkoppelingen, catalog
+from hub.servicecalls import CallResult
 from hub.timeutil import iso, utcnow
 from hub.truenas import normalize
 from hub.truenas.connection import current_target
@@ -1768,9 +1772,124 @@ def test_catalogus_toestandstabel(
         assert toestanden(admin, doel) == ("healthy", "healthy")
 
 
-def bewaar_inventaris(db: Session, data: list[dict[str, Any]]) -> None:
-    meting = KindResult("apps", "ok", None, "", "app.query", data, utcnow())
-    save_run(db, CollectResult("ok", None, current_target(db).url, kinds=[meting]), trigger="test")
+def bewaar_inventaris(db: Session, data: list[dict[str, Any]], *, gestart: datetime | None = None) -> None:
+    meting = KindResult("apps", "ok", None, "", "app.query", data, gestart or utcnow())
+    save_run(db, CollectResult("ok", None, current_target(db).url, kinds=[meting]), trigger="test", started_at=gestart)
+
+
+@pytest.mark.parametrize("doel", ["home-control-hub"], indirect=True)
+@pytest.mark.parametrize("positie", [1, 21])
+@pytest.mark.parametrize("status", ["healthy", "down"])
+def test_connector_vervalt_op_lijst_en_detail(admin, app, settings, doel, monkeypatch, positie, status):
+    naam = doel["app_id"]
+    uitgifte = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": naam})
+    assert uitgifte.status_code == 201
+    inschrijving = enroll_body(naam, token=uitgifte.json()["enrollment_token"])
+    assert admin.post("/api/v1/services/enroll", json=inschrijving).status_code == 200
+    with app.state.sessionmaker.begin() as db:
+        (item,) = is_inventory_fresh(db, settings)["data"]
+        bewaar_inventaris(db, [{**item, "images": [{"repository": expected_repository(naam), "tag": "test"}]}])
+        assert discover(db, settings).status == "ok"
+
+    op = utcnow()
+    namen = [f"controle_{i}" for i in range(20)]
+    namen.insert(positie - 1, "worker")
+    controles = [{"name": n, "status": "healthy", "observed_at": iso(op), "detail": ""} for n in namen]
+
+    def lees_bron(_basis, methode, pad, **_opties):
+        assert methode == "GET"
+        if pad == "/connector/v1/discover":
+            return CallResult(200, {"app_id": naam, "limits": {"max_age_s": {"health": 120, "worker": 5}}})
+        assert pad == "/connector/v1/health"
+        return CallResult(200, {"status": "healthy", "observed_at": iso(op), "reason_code": None, "checks": controles})
+
+    monkeypatch.setattr(sources, "call", lees_bron)
+    poll = admin.post("/api/v1/monitoring/poll", headers=idem())
+    assert poll.status_code == 200 and poll.json()["diensten"]["diensten"] == 1
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    if status == "down":
+        controles[positie - 1]["status"] = "down"
+        assert admin.post("/api/v1/monitoring/poll", headers=idem()).status_code == 200
+    assert toestanden(admin, doel) == (status, status)
+    detail = admin.get("/api/v1/apps/" + doel["catalog_app_id"]).json()["gezondheid"]
+    (bron,) = [c for c in detail["componenten"] if c["bron"].startswith("connector:")]
+    assert bron["geldig_tot"] == iso(op + timedelta(seconds=5))
+    with monkeypatch.context() as klok:
+        klok.setattr(catalog, "utcnow", lambda: op + timedelta(seconds=6))
+        assert toestanden(admin, doel) == ("unknown", "unknown")
+
+    # De oude opslag bevatte slechts twintig details en kon de workertermijn hebben gemist.
+    with app.state.sessionmaker.begin() as db:
+        obs = db.scalars(select(HealthObservation).where(HealthObservation.bron_type == "connector")).one()
+        oud = {k: v for k, v in obs.details.items() if k != "aantal_controles"}
+        obs.details = {**oud, "geldig_tot": iso(op + timedelta(seconds=120))}
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    assert admin.post("/api/v1/monitoring/poll", headers=idem()).status_code == 200
+    assert toestanden(admin, doel) == (status, status)
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize("omgekeerd", [False, True], ids=["op-volgorde", "vertraagd"])
+@pytest.mark.parametrize("eerste_meting", ["gelijk", "afwezig", "andere_bestemming"])
+def test_inventarisvolgorde_behoudt_de_juiste_bevestiging(
+    admin, app, settings, doel, huis_simulatie, omgekeerd, eerste_meting
+):
+    code, _, _ = huis_simulatie
+    pad = maak_koppeling(admin, doel, code)
+    meet(admin, pad)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    with app.state.sessionmaker() as db:
+        (origineel,) = is_inventory_fresh(db, settings)["data"]
+    eerste = {
+        "gelijk": [origineel],
+        "afwezig": [],
+        "andere_bestemming": [{**origineel, "portals": [], "poorten": []}],
+    }[eerste_meting]
+    laatste = utcnow()
+    pogingen = [(eerste, laatste - timedelta(milliseconds=1)), ([origineel], laatste)]
+    if omgekeerd:
+        pogingen.reverse()
+    for data, start in pogingen:
+        with app.state.sessionmaker.begin() as db:
+            bewaar_inventaris(db, data, gestart=start)
+
+    verwacht = "healthy" if eerste_meting == "gelijk" else "unknown"
+    assert toestanden(admin, doel) == (verwacht, verwacht)
+    with app.state.sessionmaker.begin() as db:
+        inventaris = is_inventory_fresh(db, settings)
+        assert (inventaris["observed_at"], inventaris["data"]) == (iso(laatste), [origineel])
+        prune_runs(db, keep=1)
+    assert toestanden(admin, doel) == (verwacht, verwacht)
+    meet(admin, pad)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize("zelfde_doel", [True, False])
+def test_oude_identiteitsopslag_vereist_dezelfde_inventaris_en_hetzelfde_doel(
+    admin, app, settings, doel, huis_simulatie, zelfde_doel
+):
+    code, _, _ = huis_simulatie
+    meet(admin, maak_koppeling(admin, doel, code))
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    with app.state.sessionmaker.begin() as db:
+        huidig = is_inventory_fresh(db, settings)
+        gestart = utcnow() - timedelta(minutes=1)
+        doel_url = current_target(db).url if zelfde_doel else "https://ander.example"
+        # In de vorige opslag had ook het late antwoord een eigen identiteitsrij.
+        laat = InventoryRun(started_at=gestart, status="ok", target_url=doel_url, trigger="test")
+        db.add(laat)
+        db.flush()
+        for soort, data, tijd in (
+            ("apps", huidig["data"], gestart),
+            ("catalogus_identiteit", huidig["identiteit_sinds"], utcnow()),
+        ):
+            db.add(InventorySnapshot(run_id=laat.id, kind=soort, status="ok", message="", data=data, observed_at=tijd))
+    verwacht = "healthy" if zelfde_doel else "unknown"
+    assert toestanden(admin, doel) == (verwacht, verwacht)
+    with app.state.sessionmaker.begin() as db:
+        prune_runs(db, keep=1)
+    assert toestanden(admin, doel) == (verwacht, verwacht)
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)

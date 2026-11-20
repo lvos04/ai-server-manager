@@ -318,42 +318,58 @@ def judge_connector_health(
         return "unknown", "meting_verouderd", now, detail
     if (now - observed).total_seconds() > top_age:
         return "unknown", "meting_verouderd", observed, {"laatst_bekend": stated, "max_age_s": top_age}
-    checks = [c for c in body.get("checks") or [] if isinstance(c, dict)][:20]
+    checks = body.get("checks", [])
+    if not isinstance(checks, list):
+        return "unknown", "antwoord_ongeldig", observed, {}
     # De catalogus krijgt uitsluitend een door de bron begrensde geldigheid.
     table = limits.get("max_age_s") if isinstance(limits, dict) else None
     source_age = table.get("health") if isinstance(table, dict) else None
     deadline = observed + timedelta(seconds=top_age) if type(source_age) is int and source_age > 0 else None
     clean: list[dict[str, Any]] = []
-    for c in checks:
-        name = str(c.get("name") or "")[:64]
+    statuses: set[str] = set()
+    job_names = (*JOB_CHECKS, *JOB_CHECKS_OVERGANG)
+    job_failed = False
+    stale = False
+    for check in checks:
+        c = check if isinstance(check, dict) else {}
+        name = str(c.get("name") or "")
         st = str(c.get("status") or "")
         st = st if st in HEALTH_RANK else "unknown"
         c_obs = _ts(c.get("observed_at"))
         age = max_age_for(limits, name)
         fresh = c_obs is not None and (now - c_obs).total_seconds() <= age and (c_obs - now).total_seconds() <= 300
-        if deadline is not None and c_obs is not None:
+        if deadline is not None and c_obs is not None and c_obs < deadline:
             deadline = min(deadline, c_obs + timedelta(seconds=age))
-        clean.append(
-            {
-                "name": name if CHECK_NAME.match(name) else "ongeldig",
-                "status": st if fresh else "unknown",
-                "observed_at": c.get("observed_at") if isinstance(c.get("observed_at"), str) else None,
-                **({} if fresh else {"reason_code": "meting_verouderd", "laatst_bekend": st}),
-            }
-        )
-    total = worst([stated, *[c["status"] for c in clean]])
+        status = st if fresh else "unknown"
+        statuses.add(status)
+        if not fresh:
+            stale = True
+        if status in ("down", "degraded") and name in job_names:
+            job_failed = True
+        # Alleen de getoonde details zijn begrensd. Elke controle telt hierboven mee.
+        if len(clean) < 20:
+            clean.append(
+                {
+                    "name": name if CHECK_NAME.fullmatch(name) else "ongeldig",
+                    "status": status,
+                    "observed_at": c.get("observed_at") if isinstance(c.get("observed_at"), str) else None,
+                    **({} if fresh else {"reason_code": "meting_verouderd", "laatst_bekend": st}),
+                }
+            )
+    total = worst([stated, *statuses])
     if total != stated or (total != "healthy" and reason is None):
-        job_names = (*JOB_CHECKS, *JOB_CHECKS_OVERGANG)
-        jobs = [c for c in clean if c["name"] in job_names and c["status"] in ("down", "degraded")]
-        stale = [c for c in clean if c.get("reason_code") == "meting_verouderd"]
-        bad = [c for c in clean if c["status"] == total]
-        if jobs and total in ("down", "degraded"):
+        if job_failed and total in ("down", "degraded"):
             reason = "jobs_staan_stil"
         elif total == "unknown" and stale:
             reason = "meting_verouderd"
-        elif bad:
+        elif total in statuses:
             reason = "controle_faalt"
-    return total, reason, observed, {"checks": clean, "gemeld": stated, "geldig_tot": iso(deadline)}
+    return (
+        total,
+        reason,
+        observed,
+        {"checks": clean, "aantal_controles": len(checks), "gemeld": stated, "geldig_tot": iso(deadline)},
+    )
 
 
 def _fail(row: HealthObservation | None, threshold: int) -> tuple[str, str, int]:

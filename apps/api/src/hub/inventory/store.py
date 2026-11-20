@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -22,43 +23,76 @@ from hub.truenas.messages import advice, message
 # Interne momentopname naast app.query. De cataloguscontrole vergrendelt geen catalogusrij:
 # een lopende adapterproef moet een nieuw opgeslagen poorteigenaar direct kunnen lezen.
 _IDENTITY_KIND = "catalogus_identiteit"
+_IDENTITY_LOCK = text("SELECT pg_advisory_xact_lock(hashtext('hub.catalogus_identiteit'))")
 
 
-def _last_identity(db: Session) -> InventorySnapshot | None:
+def _last_identity(db: Session, *, exclude_runs: list[UUID] | None = None) -> InventorySnapshot | None:
+    query = select(InventorySnapshot).where(InventorySnapshot.kind == _IDENTITY_KIND)
+    if exclude_runs:
+        query = query.where(InventorySnapshot.run_id.not_in(exclude_runs))
     return db.scalar(
-        select(InventorySnapshot)
-        .where(InventorySnapshot.kind == _IDENTITY_KIND)
-        .order_by(InventorySnapshot.observed_at.desc(), InventorySnapshot.id.desc())
+        query.order_by(InventorySnapshot.observed_at.desc(), InventorySnapshot.id.desc())
         .limit(1)
+        .execution_options(populate_existing=True)
     )
 
 
+def _apps_for_identity(db: Session, identity: InventorySnapshot, target: str) -> InventorySnapshot | None:
+    return db.scalar(
+        select(InventorySnapshot)
+        .join(InventoryRun, InventoryRun.id == InventorySnapshot.run_id)
+        .where(
+            InventorySnapshot.run_id == identity.run_id,
+            InventorySnapshot.kind == "apps",
+            InventoryRun.target_url == target,
+        )
+    )
+
+
+def _boundaries_for(
+    db: Session, identity: InventorySnapshot | None, apps: InventorySnapshot | None, target: str
+) -> dict[str, str | None]:
+    if identity is None or apps is None:
+        return {}
+    if identity.run_id != apps.run_id:
+        # Eerdere versies koppelden een laat antwoord aan de oudere poging.
+        earlier = _apps_for_identity(db, identity, target)
+        if earlier is None or not isinstance(apps.data, list) or earlier.data != apps.data:
+            return {}
+    return dict(identity.data)
+
+
 def _save_identity(db: Session, run: InventoryRun, data: Any) -> None:
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('hub.catalogus_identiteit'))"))
-    # Ook een vertraagde inventaris ziet een reeds vastgelegde onderbreking.
-    # De grenstijd daarvan mag nooit terugschuiven naar een oudere bronmeting.
+    db.execute(_IDENTITY_LOCK)
+    db.flush()
+    selected = _latest(db, "apps", run.target_url, only_ok=True)
+    assert selected is not None  # De zojuist opgeslagen app-meting is geslaagd.
     recorded = utcnow()
     previous = _last_identity(db)
-    earlier = None
-    boundaries = {}
-    if previous is not None:
-        previous_run = db.get(InventoryRun, previous.run_id)
-        if previous_run is not None and previous_run.target_url == run.target_url:
-            earlier = db.scalar(
-                select(InventorySnapshot.data).where(
-                    InventorySnapshot.run_id == previous.run_id, InventorySnapshot.kind == "apps"
-                )
-            )
-            boundaries = previous.data
+    earlier = _apps_for_identity(db, previous, run.target_url) if previous is not None else None
     known = set(db.scalars(select(CatalogApp.runtime_id)))
+    boundaries = continuity(earlier.data if earlier else None, previous.data if previous else {}, data, known, recorded)
+    if selected.run_id != run.id:
+        # Verwerk ook een laat antwoord, maar bewaar de grens bij de inventaris die de catalogus leest.
+        # Een onderbreking trekt zo ook na het opruimen van de oudere poging de oude bevestiging in.
+        boundaries = continuity(data, boundaries, selected.data, known, recorded)
+        identity = db.scalar(
+            select(InventorySnapshot).where(
+                InventorySnapshot.run_id == selected.run_id, InventorySnapshot.kind == _IDENTITY_KIND
+            )
+        )
+        if identity is not None:
+            identity.observed_at = recorded
+            identity.data = boundaries
+            return
     db.add(
         InventorySnapshot(
-            run_id=run.id,
+            run_id=selected.run_id,
             kind=_IDENTITY_KIND,
             status="ok",
             method="app.query",
             message="",
-            data=continuity(earlier, boundaries, data, known, recorded),
+            data=boundaries,
             observed_at=recorded,
         )
     )
@@ -80,8 +114,6 @@ def save_run(db: Session, result: CollectResult, *, trigger: str, started_at: da
     db.add(run)
     db.flush()
     for k in result.kinds:
-        if k.kind == "apps" and k.status == "ok":
-            _save_identity(db, run, k.data)
         db.add(
             InventorySnapshot(
                 run_id=run.id,
@@ -94,6 +126,8 @@ def save_run(db: Session, result: CollectResult, *, trigger: str, started_at: da
                 observed_at=k.observed_at,
             )
         )
+        if k.kind == "apps" and k.status == "ok":
+            _save_identity(db, run, k.data)
     db.flush()
     return run
 
@@ -152,9 +186,7 @@ def kind_state(
         base["data"] = last_ok.data
         base["bron"] = {"methode": last_ok.method, "nas": target}
         if include_identity:
-            identity = _last_identity(db)
-            if identity is not None and identity.run_id == last_ok.run_id:
-                base["identiteit_sinds"] = identity.data
+            base["identiteit_sinds"] = _boundaries_for(db, _last_identity(db), last_ok, target)
     if attempt.status != "ok":
         base.update(
             reason_code=attempt.reason_code,
@@ -192,8 +224,20 @@ def latest_run(db: Session, target: str | None = None) -> InventoryRun | None:
 
 def prune_runs(db: Session, keep: int = 50) -> int:
     ids = list(db.scalars(select(InventoryRun.id).order_by(InventoryRun.started_at.desc()).offset(keep)))
+    if not ids:
+        return 0
+    db.execute(_IDENTITY_LOCK)
+    last = _last_identity(db)
+    if last is not None and last.run_id in ids:
+        # Bij een laat antwoord (ook van een ander doel) mag retentie geen oudere bevestiging herstellen.
+        kept = _last_identity(db, exclude_runs=ids)
+        if kept is not None:
+            target = db.get_one(InventoryRun, kept.run_id).target_url
+            kept.data = _boundaries_for(db, last, _apps_for_identity(db, kept, target), target)
+            kept.observed_at = last.observed_at
     for run_id in ids:
         run = db.get(InventoryRun, run_id)
         if run is not None:
             db.delete(run)
+    db.flush()
     return len(ids)
