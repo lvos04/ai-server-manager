@@ -27,6 +27,8 @@ def stored_health(link: AdapterLink, now: datetime, *, bound: bool) -> basis.Mea
     if not bound:
         reason = "doelbinding"
     if last is not None and reason is None:
+        if last.geldig_tot is not None and link.my_house_expires_at is not None:
+            last.geldig_tot = min(last.geldig_tot, link.my_house_expires_at)
         return last
     return basis.Measurement(
         status="unknown",

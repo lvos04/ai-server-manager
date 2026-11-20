@@ -20,29 +20,39 @@ from hub.timeutil import utcnow
 from hub.truenas.connection import current_target
 
 
-def _parse(ts: str | None) -> datetime | None:
-    return datetime.fromisoformat(ts.replace("Z", "+00:00")) if ts else None
-
-
-def truenas_component(row: CatalogApp, inv_state: dict[str, Any]) -> Component:
-    if inv_state.get("status") == "ok" and row.aanwezig:
-        status, reason = TRUENAS_STATE.get(str(row.runtime_staat or ""), ("unknown", "status_onbekend"))
-        return Component(
-            "truenas",
-            "truenas.app.query",
-            status,
-            reason,
-            _parse(inv_state.get("observed_at")),
-            extra={"staat": row.runtime_staat},
-        )
-    return Component(
-        "truenas",
-        "truenas.app.query",
-        "unknown",
-        "inventaris_verouderd",
-        row.laatst_gezien,
-        extra={"staat": row.runtime_staat, "verouderd": True},
-    )
+def truenas_component(row: CatalogApp, inv: dict[str, Any], now: datetime, ttl: int) -> Component:
+    unknown = Component("truenas", "truenas.app.query", "unknown", "inventaris_verouderd", None)
+    if not isinstance(inv.get("data"), list):
+        return unknown
+    source = (inv.get("bron") or {}).get("nas")
+    matches = inv["per_runtime_id"].get(row.runtime_id, [])
+    if not matches:
+        unknown.reason_code = "niet_meer_in_inventaris"
+        return unknown
+    if (
+        not source
+        or source != (row.bron or {}).get("nas")
+        or len(matches) != 1
+        or matches[0].get("herkend_als") != row.app_id
+    ):
+        unknown.reason_code = "doelbinding"
+        return unknown
+    try:
+        observed = datetime.fromisoformat(inv["observed_at"])
+    except (TypeError, ValueError, KeyError):
+        unknown.reason_code = "meettijd_onbekend"
+        return unknown
+    app = matches[0]
+    state = app.get("staat")
+    status, reason = TRUENAS_STATE.get(str(state), ("unknown", "status_onbekend"))
+    c = freshen(Component("truenas", unknown.bron, status, reason, observed, extra={"staat": state}), ttl, now)
+    if inv["status"] != "ok":
+        return c.last_known("inventaris_verouderd")
+    if not row.aanwezig or (
+        status != "down" and (app.get("poorten") != row.poorten or app.get("portals") != row.portals)
+    ):
+        return c.last_known("doelbinding")
+    return c
 
 
 def hub_worker_component(db: Session, settings: Settings, now: datetime) -> Component:
@@ -55,7 +65,7 @@ def hub_worker_component(db: Session, settings: Settings, now: datetime) -> Comp
         return Component(
             "binnenkant", "hub_worker", "degraded", "worker_staat_stil", hb.beat_at, extra={"grace_seconden": grace}
         )
-    return Component("binnenkant", "hub_worker", "healthy", None, hb.beat_at)
+    return freshen(Component("binnenkant", "hub_worker", "healthy", None, hb.beat_at), grace, now)
 
 
 def observation_components(db: Session, row: CatalogApp, now: datetime) -> list[Component]:
@@ -78,7 +88,10 @@ def observation_components(db: Session, row: CatalogApp, now: datetime) -> list[
             obs.observed_at,
             extra={k: v for k, v in (obs.details or {}).items() if k in _PUBLIC_DETAILS},
         )
-        out.append(freshen(c, obs.ttl_seconds, now))
+        c = freshen(c, obs.ttl_seconds, now)
+        if (obs.details or {}).get("bron_fout") and c.status != "unknown":
+            c = c.last_known("bron_onbereikbaar")
+        out.append(c)
     return out
 
 
@@ -97,7 +110,13 @@ def adapter_component(db: Session, row: CatalogApp, inv_state: dict[str, Any], n
     if measurement.reason_code == "meting_verouderd":
         extra["verouderd"] = True
     return Component(
-        "binnenkant", BINNENKANT_P3, measurement.status, measurement.reason_code, measurement.observed_at, extra=extra
+        "binnenkant",
+        BINNENKANT_P3,
+        measurement.status,
+        measurement.reason_code,
+        measurement.observed_at,
+        extra=extra,
+        geldig_tot=measurement.geldig_tot,
     )
 
 
@@ -106,12 +125,31 @@ def app_health(
 ) -> dict[str, Any]:
     now = now or utcnow()
     prof = profile_for(row.app_id)
-    comps = [truenas_component(row, inv_state)]
+    runtime = truenas_component(row, inv_state, now, settings.inventory_max_age_seconds)
+    comps = []
     if prof.binnenkant == BINNENKANT_HUB:
         comps.append(hub_worker_component(db, settings, now))
     elif prof.binnenkant == BINNENKANT_P3:
         comps.append(adapter_component(db, row, inv_state, now))
     comps.extend(observation_components(db, row, now))
+    confirmed_since = (row.bron or {}).get("identiteit_sinds")
+    for index, component in enumerate(comps):
+        if component.status == "unknown":
+            continue
+        if not row.aanwezig or runtime.status in ("down", "unknown"):
+            comps[index] = component.last_known(runtime.reason_code or "doelbinding")
+        elif (
+            confirmed_since
+            and component.observed_at
+            and component.observed_at < datetime.fromisoformat(confirmed_since)
+        ):
+            comps[index] = component.last_known("doelbinding")
+        elif runtime.geldig_tot is not None:
+            # Ook een verse broncontrole verliest haar bevestigde instantie zodra de inventaris verloopt.
+            component.geldig_tot = min(component.geldig_tot or runtime.geldig_tot, runtime.geldig_tot)
     return evaluate(
-        comps, aanwezig=row.aanwezig, binnenkant_vereist=prof.binnenkant_vereist, binnenkant_bron=prof.binnenkant
+        [runtime, *comps],
+        aanwezig=row.aanwezig,
+        binnenkant_vereist=prof.binnenkant_vereist,
+        binnenkant_bron=prof.binnenkant,
     )

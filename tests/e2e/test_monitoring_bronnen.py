@@ -125,6 +125,8 @@ def test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_inget
     # Kuma onbereikbaar: waarnemingen verouderen → unknown met laatst bekende status, nooit 'nog gezond'.
     kuma.offline()
     admin.post("/api/v1/monitoring/poll", headers=idem()).raise_for_status()
+    p = _apps(admin)["prowlarr"]["gezondheid"]
+    assert (p["status"], p["reason_code"], p["laatste_status"]) == ("unknown", "bron_onbereikbaar", "healthy")
     _age_observations(clean_db, 10)
     p = admin.get(f"/api/v1/apps/{_apps(admin)['prowlarr']['id']}").json()["gezondheid"]
     assert p["status"] == "unknown" and p["reason_code"] == "meting_verouderd"

@@ -11,13 +11,16 @@ from unittest.mock import Mock
 
 import pytest
 from conftest import idem, login_as, make_user
-from sqlalchemy import select, text
+from fastapi.testclient import TestClient
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from hub import migrations, outbound
 from hub.adapters import basis, my_house
 from hub.catalog.discovery import discover, is_inventory_fresh
 from hub.config import Settings
+from hub.deps import get_db
+from hub.incidents.rules import ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED
 from hub.inventory.collector import CollectResult, KindResult
 from hub.inventory.store import save_run
 from hub.models import (
@@ -26,16 +29,20 @@ from hub.models import (
     AuditEvent,
     CatalogApp,
     Decision,
+    HealthObservation,
     IdempotencyRecord,
     Incident,
     IncidentEvent,
     OutboxEvent,
     VaultSecret,
+    WebSession,
 )
-from hub.routers import adapterkoppelingen
-from hub.timeutil import utcnow
+from hub.monitoring.sources import upsert_observation
+from hub.routers import adapterkoppelingen, catalog
+from hub.timeutil import iso, utcnow
 from hub.truenas import normalize
 from hub.truenas.connection import current_target
+from hub.vault import Vault
 
 ROUTE = "/api/v1/adapterkoppelingen"
 APP_ID = "mediaguard"
@@ -52,6 +59,7 @@ def _bewaar_apps(db: Session, apps: dict[str, tuple[int, ...]]) -> None:
         [
             {
                 "name": app_id,
+                "state": "RUNNING",
                 "portals": {f"Web {port}": f"{URL}:{port}/" for port in ports},
                 "active_workloads": {
                     "used_ports": [
@@ -883,8 +891,6 @@ def test_catalogus_leest_adaptergezondheid_en_incident_volgt_op_derde_meting(
     code, toestand, _ = huis_simulatie
     app_id = doel["catalog_app_id"]
     path = f"/api/v1/apps/{app_id}"
-    with app.state.sessionmaker.begin() as db:
-        db.scalars(select(CatalogApp)).one().runtime_staat = "RUNNING"
 
     health = admin.get(path).json()["gezondheid"]
     assert health["status"] == "unknown" and health["reason_code"] == "adapter_niet_gekoppeld"
@@ -1407,3 +1413,276 @@ def test_huis_overzicht_leest_als_kijker_zonder_bronmutaties(
     assert response.status_code == 409
     assert response.json()["code"] == "bron_token_verlopen"
     assert calls == []
+
+
+def inventariseer(app: Any, settings: Settings, staat: str, *, werk_catalogus_bij: bool) -> str | None:
+    with app.state.sessionmaker.begin() as db:
+        eerdere = is_inventory_fresh(db, settings)
+        assert eerdere["status"] == "ok" and len(eerdere["data"]) == 1
+        data = [{**eerdere["data"][0], "staat": staat}]
+        nu = utcnow()
+        snapshot = KindResult("apps", "ok", None, "", "app.query", data, nu)
+        save_run(db, CollectResult("ok", None, current_target(db).url, kinds=[snapshot]), trigger="test")
+        if werk_catalogus_bij:
+            assert discover(db, settings).status == "ok"
+        assert is_inventory_fresh(db, settings)["data"][0]["staat"] == staat
+        return iso(nu)
+
+
+def toestanden(client: TestClient, doel: dict[str, Any]) -> tuple[str, str]:
+    detail = client.get("/api/v1/apps/" + doel["catalog_app_id"])
+    lijst = client.get("/api/v1/apps")
+    assert detail.status_code == lijst.status_code == 200
+    (item,) = lijst.json()["items"]
+    assert lijst.json()["per_status"][item["gezondheid"]["status"]] == 1
+    assert item["runtime_staat"] == detail.json()["runtime_staat"]
+    return detail.json()["gezondheid"]["status"], item["gezondheid"]["status"]
+
+
+def maak_koppeling(admin: TestClient, doel: dict[str, Any], code: str) -> str:
+    antwoord = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert antwoord.status_code == 201
+    return f"{ROUTE}/{antwoord.json()['id']}"
+
+
+def meet(admin: TestClient, koppeling: str) -> None:
+    assert admin.post(f"{koppeling}/test", headers=idem()).status_code == 200
+
+
+@pytest.mark.parametrize("doel", ["emby", "my_house", "mediaguard"], indirect=True)
+def test_crash_gaat_meteen_voor_op_eerdere_meting(
+    admin: TestClient, app: Any, settings: Settings, doel: dict[str, Any], huis_simulatie: Any
+) -> None:
+    code, _, _ = huis_simulatie
+    naam = doel["app_id"]
+    inventariseer(app, settings, "RUNNING", werk_catalogus_bij=True)
+    if naam == "my_house":
+        meet(admin, maak_koppeling(admin, doel, code))
+    nu = utcnow()
+    with app.state.sessionmaker.begin() as db:
+        row = db.scalars(select(CatalogApp)).one()
+        upsert_observation(
+            db,
+            bron_type="uptime_kuma",
+            bron_id="proef",
+            naam="Buitenkant",
+            status="healthy",
+            observed_at=nu,
+            ttl_seconds=300,
+            details={},
+            reason_code=None,
+            subject_app_id=row.id,
+            now=nu,
+        )
+    verwacht = "unknown" if naam == "mediaguard" else "healthy"
+    assert toestanden(admin, doel) == (verwacht, verwacht)
+    meettijd = inventariseer(app, settings, "CRASHED", werk_catalogus_bij=False)
+    tijdens = toestanden(admin, doel)
+    detail = admin.get("/api/v1/apps/" + doel["catalog_app_id"]).json()
+    assert detail["runtime_staat"] == "CRASHED"
+    assert detail["gezondheid"]["observed_at"] == meettijd
+    assert all(c["status"] != "healthy" for c in detail["gezondheid"]["componenten"])
+    with app.state.sessionmaker.begin() as db:
+        assert discover(db, settings).status == "ok"
+    na = toestanden(admin, doel)
+    assert na == ("down", "down")
+    assert tijdens == ("down", "down")
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize("al_verwerkt", [True, False], ids=["open", "nog_in_outbox"])
+def test_eerste_gezonde_meting_na_herkoppeling_sluit_incident(
+    admin: TestClient,
+    app: Any,
+    settings: Settings,
+    doel: dict[str, Any],
+    huis_simulatie: Any,
+    periodic_run: Any,
+    al_verwerkt: bool,
+) -> None:
+    code, simulator, _ = huis_simulatie
+    inventariseer(app, settings, "RUNNING", werk_catalogus_bij=True)
+    koppeling = maak_koppeling(admin, doel, code)
+    simulator["worker"] = {"key": "worker", "state": "error", "age_s": my_house.WORKER_OK_S + 5}
+    for _ in range(3):
+        meet(admin, koppeling)
+    assert toestanden(admin, doel) == ("down", "down")
+
+    def incidentstatus() -> tuple[str, str]:
+        periodic_run("incidenten_bijwerken")
+        with app.state.sessionmaker() as db:
+            incident = db.scalars(select(Incident).where(Incident.soort == "monitoring.adapter_health")).one()
+            return incident.onderwerp_id, incident.status
+
+    if al_verwerkt:
+        assert incidentstatus() == (doel["catalog_app_id"], "open")
+    assert admin.delete(koppeling, headers=idem()).status_code == 200
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    # Nieuwe synthetische koppelcode via dezelfde simulator, voor dezelfde catalogusinstantie.
+    simulator["code"] = code[5:] + "-" + code[:4]
+    opnieuw = maak_koppeling(admin, doel, simulator["code"])
+    assert opnieuw != koppeling
+    if not al_verwerkt:
+        for _ in range(3):
+            meet(admin, opnieuw)
+    simulator["worker"] = {"key": "worker", "state": "ok", "age_s": 0}
+    meet(admin, opnieuw)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    meet(admin, opnieuw)
+    onderwerp, status = incidentstatus()
+    with app.state.sessionmaker() as db:
+        events = list(
+            db.scalars(
+                select(OutboxEvent.event_type)
+                .where(
+                    OutboxEvent.entity_id == doel["catalog_app_id"],
+                    OutboxEvent.event_type.in_((ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED)),
+                )
+                .order_by(OutboxEvent.seq)
+            )
+        )
+        assert events == [ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED]
+    assert onderwerp == doel["catalog_app_id"] and status == "opgelost"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_verlopen_storing_behoudt_bronmeettijd_zonder_bronverkeer(
+    admin: TestClient,
+    app: Any,
+    settings: Settings,
+    doel: dict[str, Any],
+    huis_simulatie: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    code, simulator, aanvragen = huis_simulatie
+    inventariseer(app, settings, "RUNNING", werk_catalogus_bij=True)
+    koppeling = maak_koppeling(admin, doel, code)
+    simulator["worker"] = {"key": "worker", "state": "error", "age_s": my_house.WORKER_OK_S + 5}
+    meet(admin, koppeling)
+    aantal = len(aanvragen)
+
+    def kluis_gesloten(*args, **kwargs):
+        pytest.fail("De catalogus probeert de kluis te openen.")
+
+    monkeypatch.setattr(Vault, "get", kluis_gesloten)
+    pad = "/api/v1/apps/" + doel["catalog_app_id"]
+    assert toestanden(admin, doel) == ("down", "down")
+    meettijd = admin.get(pad).json()["gezondheid"]["observed_at"]
+    assert meettijd
+    later = utcnow() + timedelta(seconds=my_house.WORKER_OK_S + 1)
+    monkeypatch.setattr(catalog, "utcnow", lambda: later)
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    uitkomst = admin.get(pad).json()["gezondheid"]
+    (adapter,) = [c for c in uitkomst["componenten"] if c["bron"] == "adapter_p3"]
+    assert adapter["observed_at"] == uitkomst["observed_at"] == meettijd
+    assert adapter["laatste_status"] == "down" and adapter["reason_code"] == "meting_verouderd"
+    for antwoord in (admin.get(pad), admin.get("/api/v1/apps")):
+        assert code not in antwoord.text and simulator["token"] not in antwoord.text
+    assert len(aanvragen) == aantal
+
+
+def test_rechten_en_onbeschikbare_database(
+    admin: TestClient, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pad = "/api/v1/apps/" + doel["catalog_app_id"]
+    paden = ["/api/v1/apps", pad]
+    uitgaand = []
+    monkeypatch.setattr(outbound, "request", lambda *args, **kwargs: uitgaand.append(True))
+    with TestClient(app, base_url="https://testserver") as anoniem:
+        assert [anoniem.get(p).status_code for p in paden] == [401, 401]
+    for rol, verwacht in [("kind", 403), ("viewer", 200)]:
+        make_user(admin, "proef-" + rol, rol)
+        with login_as(app, "proef-" + rol) as gebruiker:
+            assert [gebruiker.get(p).status_code for p in paden] == [verwacht, verwacht]
+            assert gebruiker.post("/api/v1/apps/discover", headers=idem()).status_code == 403
+
+    def database_weg():
+        raise ConnectionError("Lokale testdatabase niet beschikbaar")
+
+    assert [admin.get(p).status_code for p in paden] == [200, 200]
+    with monkeypatch.context() as lokaal:
+        lokaal.setitem(app.dependency_overrides, get_db, database_weg)
+        with TestClient(app, base_url="https://testserver", raise_server_exceptions=False) as los:
+            los.cookies.update(admin.cookies)
+            fouten = [los.get(p) for p in paden]
+            assert all(r.status_code >= 500 and "gezondheid" not in r.text for r in fouten)
+    with app.state.sessionmaker.begin() as db:
+        db.execute(update(WebSession).values(expires_at=utcnow() - timedelta(seconds=1)))
+    assert [admin.get(p).status_code for p in paden] == [401, 401]
+    assert not uitgaand
+
+
+@pytest.mark.parametrize("doel", ["emby"], indirect=True)
+@pytest.mark.parametrize(
+    "geval",
+    [
+        "vers",
+        "verversing_mislukt",
+        "verlopen",
+        "verdwenen",
+        "dubbel",
+        "ander_profiel",
+        "andere_instantie",
+        "ander_doel",
+        "nieuwe_poort",
+    ],
+)
+def test_catalogus_toestandstabel(
+    admin: TestClient, app: Any, settings: Settings, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, geval: str
+) -> None:
+    with app.state.sessionmaker.begin() as db:
+        inv = is_inventory_fresh(db, settings)
+        (origineel,) = inv["data"]
+        row = db.scalars(select(CatalogApp)).one()
+        nu = utcnow()
+        upsert_observation(
+            db,
+            bron_type="uptime_kuma",
+            bron_id="proef",
+            naam="Buitenkant",
+            status="healthy",
+            observed_at=nu,
+            ttl_seconds=300,
+            details={},
+            reason_code=None,
+            subject_app_id=row.id,
+            now=nu,
+        )
+        data = [origineel]
+        if geval == "dubbel":
+            data = [origineel, origineel]
+        if geval == "verdwenen":
+            data = []
+        if geval == "ander_profiel":
+            data = [{**origineel, "herkend_als": "my_house"}]
+        if geval == "ander_doel":
+            row.bron = {**row.bron, "nas": "https://vorige.example"}
+        if geval == "nieuwe_poort":
+            data = [{**origineel, "poorten": []}]
+        if geval == "andere_instantie":
+            data = [{**origineel, "runtime_id": "andere-instantie"}]
+        mislukt = geval == "verversing_mislukt"
+        status = "unknown" if mislukt else "ok"
+        reden = "unreachable" if mislukt else None
+        snapshot = KindResult("apps", status, reden, "", "app.query", None if mislukt else data, nu)
+        save_run(db, CollectResult(status, reden, current_target(db).url, kinds=[snapshot]), trigger="test")
+    if geval == "verlopen":
+        monkeypatch.setattr(catalog, "utcnow", lambda: nu + timedelta(seconds=settings.inventory_max_age_seconds + 1))
+    verwacht = "healthy" if geval == "vers" else "unknown"
+    assert toestanden(admin, doel) == (verwacht, verwacht)
+    detail = admin.get("/api/v1/apps/" + doel["catalog_app_id"]).json()
+    (runtime,) = [c for c in detail["gezondheid"]["componenten"] if c["soort"] == "truenas"]
+    if geval in ("vers", "verlopen", "verversing_mislukt", "nieuwe_poort"):
+        assert runtime["observed_at"] == (inv["observed_at"] if mislukt else iso(nu))
+    else:
+        assert runtime["observed_at"] is None
+    if geval != "vers":
+        assert all(c["status"] != "healthy" for c in detail["gezondheid"]["componenten"])
+    if geval in ("ander_doel", "nieuwe_poort"):
+        with app.state.sessionmaker.begin() as db:
+            assert discover(db, settings).status == "ok"
+        assert toestanden(admin, doel) == ("unknown", "unknown")
+        with app.state.sessionmaker.begin() as db:
+            obs = db.scalars(select(HealthObservation)).one()
+            obs.observed_at = utcnow()
+        assert toestanden(admin, doel) == ("healthy", "healthy")

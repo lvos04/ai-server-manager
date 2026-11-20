@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from hub import outbound
 from hub.models import AdapterLink
@@ -33,6 +33,8 @@ class Measurement(BaseModel):
     observed_at: UtcDateTime | None = None
     reason_code: str | None = None
     laatste_status: Status | None = None
+    # Interne vervalgrens voor de catalogus, afgeleid van de TTL van de bron.
+    geldig_tot: datetime | None = Field(default=None, exclude=True)
 
 
 class ReadAdapter(Protocol):
@@ -49,16 +51,17 @@ def fresh_measurement(
     measurement: Measurement, *, now: datetime | None = None, max_age_s: int = MAX_AGE_S
 ) -> Measurement:
     age = age_seconds(measurement.observed_at, now)
-    if age is None or age < 0:
+    if measurement.observed_at is None or age is None or age < 0:
         return Measurement(status="unknown", reason_code=measurement.reason_code or "meettijd_onbekend")
-    if age > min(max_age_s, MAX_AGE_S):
+    ttl = min(max_age_s, MAX_AGE_S)
+    if age > ttl:
         return Measurement(
             status="unknown",
             observed_at=measurement.observed_at,
             reason_code="meting_verouderd",
             laatste_status=measurement.laatste_status or measurement.status,
         )
-    return measurement
+    return measurement.model_copy(update={"geldig_tot": measurement.observed_at + timedelta(seconds=ttl)})
 
 
 def validate_base_url(url: str) -> str:

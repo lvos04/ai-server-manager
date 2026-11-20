@@ -177,9 +177,9 @@ ADAPTER_HEALTH_FAILED = "monitoring.adapter_health.failed"
 ADAPTER_HEALTH_RECOVERED = "monitoring.adapter_health.recovered"
 
 
-def adapter_health_transition(previous: int, status: str) -> tuple[int, str | None]:
+def adapter_health_transition(previous: int, status: str, *, incident_active: bool = False) -> tuple[int, str | None]:
     """Open bij de derde slechte meting. Een open incident wacht op een gezonde meting."""
-    if previous == 3:
+    if previous == 3 or incident_active:
         return (0, "herstel") if status == "healthy" else (3, None)
     if status in ("unknown", "down"):
         count = previous + 1

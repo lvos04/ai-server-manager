@@ -312,3 +312,11 @@ def test_adapterincident_signaal_herstel_en_probleem_hebben_dezelfde_vingerafdru
     assert recovery is not None and recovery.rol == "herstel"
     assert problem.vingerafdruk == recovery.vingerafdruk
     assert classify(ev(APP_ID, "monitoring.adapter_health.failed", {}, ("service", "x"), "outbox")) is None
+
+
+@pytest.mark.parametrize("status", ["healthy", "degraded", "unknown", "down"])
+def test_bestaand_adapterincident_na_herkoppeling_wacht_op_gezonde_meting(status: str) -> None:
+    from hub.incidents import rules
+
+    verwacht = (0, "herstel") if status == "healthy" else (3, None)
+    assert rules.adapter_health_transition(0, status, incident_active=True) == verwacht

@@ -120,7 +120,8 @@ MSO-probes meten bereikbaarheid. Voor beide adapters blijft de binnenkant onbeke
 
 De catalogus gebruikt de slechtste toestand in de volgorde `down`, `degraded`, `unknown`,
 `healthy`. Een ontbrekende buitenkantmonitor telt niet mee. Een gekoppelde monitor met een
-onbekende meting telt wel mee. Bij gelijke toestand krijgt de adapterreden voorrang. Bij
+onbekende meting telt wel mee. Een gemeten stop of crash bepaalt de totaalstatus. Bij
+andere gelijke toestanden krijgt de adapterreden voorrang. Bij
 `healthy` geeft het totaal de oudste gebruikte meettijd. Anders geeft het de tijd van de
 component die de toestand bepaalt. Bij een inventaris die niet beschikbaar is, blijft de laatst
 bekende inventaristijd zichtbaar als de bepalende component zelf geen meettijd heeft.
@@ -136,10 +137,32 @@ bekende inventaristijd zichtbaar als de bepalende component zelf geen meettijd h
 
 Een ontbrekende, ongeldige of toekomstige meettijd geeft `unknown`. Een meting ouder dan haar
 `max_age` geeft `unknown` met `meting_verouderd` en behoudt haar meettijd. Appdetail gebruikt de
-bestaande statusrij en vermeldt een laatst bekende storing of beperking alleen in de toelichting.
+bestaande statusrij en vermeldt een laatst bekende storing of beperking in de toelichting.
+
+De catalogus leest de runtime-toestand en de meettijd uit dezelfde opgeslagen inventarismeting.
+De instantie moet op dezelfde NAS precies één keer voorkomen met hetzelfde runtime-ID en
+hetzelfde app-profiel. Bij een gewijzigde bestemming moeten de controles opnieuw meten.
+De bron met de kortste resterende geldigheid bepaalt wanneer een gezonde status verloopt.
+Lijstfilters, tellingen en detail gebruiken die grens ook tussen twee ophaalacties.
+
+| Laatste meting of ophaalpoging | Lijst, detail en onderdelen | Vaste regressieproef |
+| --- | --- | --- |
+| Dezelfde draaiende instantie, vereiste controles vers en gezond | Gezond met de oudste gebruikte bronmeettijd | `test_catalogus_toestandstabel[vers-emby]`, `test_samenstelling_adapterprofiel` |
+| De bronvervalgrens is verstreken | Onbekend of Laatst bekend met de oorspronkelijke meettijd, ook op een open scherm | `test_catalogus_toestandstabel[verlopen-emby]`, `10-catalogus-gezondheid.spec.ts` |
+| De laatste inventaris- of monitorpoging is mislukt | Onbekend, de vorige meting houdt haar tijd | `test_catalogus_toestandstabel[verversing_mislukt-emby]`, `test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_ingetrokken_key` |
+| De schermverversing is mislukt, met gegevens in het geheugen | Laatst bekend vanaf de bronmeettijd. De apps tellen als onbekend | `catalogus-gezondheid.test.tsx` (503 bij een verse en een verlopen meting) |
+| De eerste schermophaling loopt of mislukt | Laadtoestand of fout met een knop om opnieuw te proberen | `catalogus-gezondheid.test.tsx` (laden en initiële fout) |
+| De nieuwste inventaris bevat een crash | Storing vanaf de crashmeting, ook vóór catalogusvernieuwing. Eerdere broncontroles zijn historisch | `test_crash_gaat_meteen_voor_op_eerdere_meting` |
+| De instantie ontbreekt, heeft een dubbel runtime-ID of hoort bij een ander doel | Onbekend. De meting van de andere instantie telt nergens mee | `test_catalogus_toestandstabel` (verdwenen, dubbel, ander profiel en andere instantie) |
+| De bronmeettijd ontbreekt, is ongeldig of ligt in de toekomst | Onbekend | `test_versheid_van_opgeslagen_adaptermeting`, `test_ongeldige_brontijd_geeft_geen_actuele_meting` |
+| Een storing is verlopen | De laatst bekende storing en haar meettijd blijven zichtbaar | `test_verlopen_storing_behoudt_bronmeettijd_zonder_bronverkeer`, `catalogus-gezondheid.test.tsx` |
 
 Een my_house-contactproef telt één nieuwe gezondheidsmeting. Drie opeenvolgende metingen met
 `unknown` of `down` openen één incident. Een gezonde meting sluit het. Een beperkte meting
 onderbreekt een reeks vóór opening. Cataloguslezingen en idempotente herhalingen tellen niet mee.
 Migratie `0021` bewaart de reeks per koppeling. Bestaande koppelingen beginnen op nul. Terugrollen
 van `0021` verwijdert alleen de teller.
+Na herkoppeling zoekt de Hub het open probleem voor dezelfde catalogusinstantie op.
+Dat omvat ook een storing die de incidentenworker nog moet verwerken. De eerste verse
+gezonde meting sluit dat incident. De regressieproef is
+`test_eerste_gezonde_meting_na_herkoppeling_sluit_incident`.

@@ -17,8 +17,8 @@ Regels:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from hub.catalog.profiles import BINNENKANT_P3
@@ -86,6 +86,13 @@ class Component:
     observed_at: datetime | None
     detail: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    geldig_tot: datetime | None = None
+
+    def last_known(self, reason: str) -> Component:
+        extra = {**self.extra, "verouderd": True}
+        if self.status != "unknown":
+            extra["laatste_status"] = self.status
+        return replace(self, status="unknown", reason_code=reason, extra=extra, geldig_tot=None)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -95,6 +102,7 @@ class Component:
             "reason_code": self.reason_code,
             "melding": MELDINGEN.get(self.reason_code or "", "") if self.reason_code else "",
             "observed_at": iso(self.observed_at),
+            "geldig_tot": iso(self.geldig_tot),
             "detail": self.detail,
             **self.extra,
         }
@@ -105,28 +113,12 @@ def freshen(c: Component, ttl_seconds: float, now: datetime | None = None) -> Co
     blijft zichtbaar als "laatst bekend". Was hij
     al ``unknown`` met een eigen reden (bv. een geweigerde key), dan blijft die reden staan."""
     now = now or utcnow()
-    stale = c.observed_at is None or (now - c.observed_at).total_seconds() > ttl_seconds
-    if not stale:
-        return c
-    if c.status == "unknown":
-        return Component(
-            c.soort,
-            c.bron,
-            "unknown",
-            c.reason_code or "meting_verouderd",
-            c.observed_at,
-            c.detail,
-            {**c.extra, "verouderd": True},
-        )
-    return Component(
-        c.soort,
-        c.bron,
-        "unknown",
-        "meting_verouderd",
-        c.observed_at,
-        c.detail,
-        {**c.extra, "laatste_status": c.status, "verouderd": True},
-    )
+    if c.observed_at is None or c.observed_at.tzinfo is None or c.observed_at > now:
+        return replace(c, status="unknown", reason_code=c.reason_code or "meettijd_onbekend", observed_at=None)
+    deadline = c.observed_at + timedelta(seconds=ttl_seconds)
+    if now > deadline:
+        return c.last_known((c.reason_code if c.status == "unknown" else None) or "meting_verouderd")
+    return replace(c, geldig_tot=deadline)
 
 
 def _aggregate(components: list[Component]) -> Component | None:
@@ -153,22 +145,20 @@ def evaluate(
     laatst_getest = max((c.observed_at for c in checked if c.observed_at), default=None)
 
     def result(status: str, reason: str | None, cause: Component | None = None) -> dict[str, Any]:
-        if binnenkant_bron == BINNENKANT_P3 and aanwezig:
-            observed = (
-                cause.observed_at
-                if cause is not None
-                else min((c.observed_at for c in components if c.observed_at is not None), default=None)
-            )
-            if status == "unknown" and observed is None and t is not None and t.reason_code == "inventaris_verouderd":
-                # Houd de laatst bekende inventaristijd zichtbaar als de adapter geen eigen meettijd heeft.
-                observed = t.observed_at
-        else:
-            observed = max((c.observed_at for c in (t, b, i) if c is not None and c.observed_at), default=None)
+        used = [cause] if cause is not None else [c for c in components if c.status == status]
+        observed = min((c.observed_at for c in used if c.observed_at is not None), default=None)
+        if status == "unknown" and observed is None and t is not None and t.reason_code == "inventaris_verouderd":
+            observed = t.observed_at
+        deadline = min((c.geldig_tot for c in used if c.geldig_tot is not None), default=None)
+        if deadline is not None and t is not None and t.geldig_tot is not None:
+            deadline = min(deadline, t.geldig_tot)
         return {
             "status": status,
             "reason_code": reason,
             "melding": MELDINGEN.get(reason or "", "") if reason else "",
             "observed_at": iso(observed),
+            "geldig_tot": iso(deadline),
+            "laatste_status": cause.extra.get("laatste_status") if cause is not None else None,
             "laatst_getest": iso(laatst_getest),
             "oorzaak": cause.bron if cause is not None else None,
             "binnenkant_vereist": binnenkant_vereist,
@@ -177,6 +167,8 @@ def evaluate(
 
     if not aanwezig:
         return result("unknown", "niet_meer_in_inventaris")
+    if t is not None and t.status == "down":
+        return result("down", t.reason_code, t)
     if binnenkant_bron == BINNENKANT_P3:
         adapter = next((c for c in by_kind.get("binnenkant", []) if c.bron == BINNENKANT_P3), None)
         if adapter is None:
@@ -188,6 +180,8 @@ def evaluate(
                 if candidate.status == wanted:
                     return result(wanted, candidate.reason_code, candidate)
         return result("healthy", None)
+    if t is not None and t.status == "unknown":
+        return result("unknown", t.reason_code or "inventaris_verouderd", t)
     for wanted in ("down", "degraded"):
         for comp in (t, b, i):
             if comp is not None and comp.status == wanted:
@@ -202,9 +196,9 @@ def evaluate(
         stale = next((c for c in (b, i) if c is not None), None)
         if stale is not None:
             return result("unknown", stale.reason_code or "meting_verouderd", stale)
-        if t is not None and t.status == "unknown":
-            return result("unknown", t.reason_code or "inventaris_verouderd", t)
         return result("unknown", "geen_gezondheidsbron")
+    if t is None:
+        return result("unknown", "inventaris_verouderd")
     return result("healthy", None)
 
 

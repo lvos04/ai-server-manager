@@ -250,6 +250,34 @@ def test_versheid_van_opgeslagen_adaptermeting(stamp: str | None, status: str, r
         assert reading.laatste_status == "healthy"
 
 
+def test_oudste_bronmeettijd_en_eerste_vervalgrens_zijn_onafhankelijk() -> None:
+    oud = NOW - timedelta(seconds=60)
+    link = AdapterLink(
+        app_id="my_house",
+        my_house_checks=[
+            {"key": "database", "state": "ok", "observed_at": oud.isoformat(), "max_age_s": 900},
+            {
+                "key": "worker",
+                "state": "ok",
+                "observed_at": NOW.isoformat(),
+                "worker_observed_at": NOW.isoformat(),
+                "max_age_s": 120,
+            },
+        ],
+    )
+    meting = stored_health(link, NOW, bound=True)
+    assert (meting.status, meting.observed_at, meting.geldig_tot) == ("healthy", oud, NOW + timedelta(seconds=120))
+    link.my_house_expires_at = NOW + timedelta(seconds=10)
+    assert stored_health(link, NOW, bound=True).geldig_tot == link.my_house_expires_at
+    assert stored_health(link, link.my_house_expires_at, bound=True).status == "unknown"
+
+
+@pytest.mark.parametrize("tijd", [None, NOW + timedelta(seconds=1), NOW.replace(tzinfo=None)])
+def test_ongeldige_brontijd_geeft_geen_actuele_meting(tijd: datetime | None) -> None:
+    meting = freshen(Component("buitenkant", "test", "healthy", None, tijd), ttl_seconds=300, now=NOW)
+    assert (meting.status, meting.observed_at, meting.geldig_tot) == ("unknown", None, None)
+
+
 @pytest.mark.parametrize(
     ("app_id", "reason"),
     [("mediaguard", "geen_alleen_lezen_bron"), ("media-source-optimizer", "capability_unavailable")],

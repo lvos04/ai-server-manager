@@ -15,6 +15,7 @@ import base64
 import hashlib
 import json
 import uuid
+from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -131,12 +132,17 @@ def list_apps(
         )
     page = items[offset : offset + limit]
     counts: dict[str, int] = dict.fromkeys(("healthy", "degraded", "down", "unknown"), 0)
-    for it in items:
-        counts[it["gezondheid"]["status"]] += 1
+    other_deadlines = []
+    for index, it in enumerate(items):
+        health = it["gezondheid"]
+        counts[health["status"]] += 1
+        if not offset <= index < offset + limit and health["status"] != "unknown" and health["geldig_tot"]:
+            other_deadlines.append(datetime.fromisoformat(health["geldig_tot"]))
     return {
         "items": page,
         "totaal": len(items),
         "per_status": counts,
+        "overige_geldig_tot": iso(min(other_deadlines, default=None)),
         "snapshot_id": snapshot,
         "meting_observed_at": inv.get("observed_at"),
         "next_cursor": _encode(offset + limit, snapshot) if offset + limit < len(items) else None,

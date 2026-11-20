@@ -16,21 +16,22 @@ import { RolMelding } from "@/components/RolMelding";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { appHealth, COMPONENT_LABEL, EIGENAAR, INSTALLATIE, REDEN, type CatalogDetail, type Component } from "@/lib/catalog";
+import { actueleMeting, appHealth, COMPONENT_LABEL, EIGENAAR, INSTALLATIE, meetToelichting, REDEN, vervalgrens, type CatalogDetail, type Component } from "@/lib/catalog";
 import { formatDateTime, formatTime } from "@/lib/format";
 import type { IncidentList } from "@/lib/incidents";
 import { PERIODES, queryPath, RESOLUTIE_LABEL, toRows, type Periode, type QueryResult, type Series } from "@/lib/metrics";
 import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
 import { appState, healthView, type StatusView } from "@/lib/status";
 import { useApi } from "@/lib/use-api";
+import { useCatalogClock } from "@/lib/use-catalog-clock";
 
 const TABS = ["status", "metrieken", "logs", "versies", "acties"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = { status: "Status", metrieken: "Metrieken", logs: "Logs", versies: "Versies", acties: "Acties" };
 
 function componentView(c: Component): StatusView {
+  if (c.status === "unknown") return appHealth(c);
   if (c.soort === "truenas" && c.status !== "down") {
-    if (c.verouderd) return { tone: "stale", label: "Verouderd" };
     return appState(c.staat ?? undefined);
   }
   return healthView(c.status, Boolean(c.verouderd));
@@ -61,10 +62,7 @@ function Onderdelen({ app }: { app: CatalogDetail }) {
             r.c ? (
               <span className="flex flex-col text-sm">
                 <span>
-                  {r.c.melding}
-                  {r.c.bron === "adapter_p3" && r.c.verouderd && (r.c.laatste_status === "down" || r.c.laatste_status === "degraded")
-                    ? ` Laatst bekend: ${healthView(r.c.laatste_status).label}.`
-                    : ""}
+                  {meetToelichting(r.c)}
                   {r.soort === "truenas" ? `${r.c.melding ? " " : ""}Draaien alleen is geen bewijs van gezond.` : ""}
                 </span>
                 <span className="text-muted-foreground">
@@ -221,6 +219,8 @@ function Acties({ app }: { app: CatalogDetail }) {
 
 export function AppDetail({ id }: { id: string }) {
   const app = useApi<CatalogDetail>(`/api/v1/apps/${id}`, 60_000);
+  const gezondheid = app.data?.gezondheid;
+  const nu = useCatalogClock(gezondheid ? [gezondheid, ...gezondheid.componenten].map(vervalgrens) : []);
   const incidents = useApi<IncidentList>(app.data ? `/api/v1/incidents?status=alle&limit=5&q=${encodeURIComponent(app.data.naam)}` : null);
   const router = useRouter();
   const pathname = usePathname();
@@ -237,7 +237,16 @@ export function AppDetail({ id }: { id: string }) {
     );
   }
   if (!app.data) return <Loading regels={6} />;
-  const a = app.data;
+  const ophaalfout = app.stale || Boolean(app.error);
+  const bron = app.data.gezondheid;
+  const a = {
+    ...app.data,
+    gezondheid: {
+      ...actueleMeting(bron, ophaalfout, nu),
+      componenten: bron.componenten.map((c) => actueleMeting(c, ophaalfout, nu)),
+    },
+  };
+  const truenas = a.gezondheid.componenten.find((c) => c.soort === "truenas");
   const link = a.deep_link_detail;
   return (
     <>
@@ -265,7 +274,7 @@ export function AppDetail({ id }: { id: string }) {
           )
         }
       />
-      {app.stale ? <Melding soort="onbekend" titel="Verouderd">Laatst bekende stand van {formatTime(app.lastOk)}; vernieuwen is mislukt.</Melding> : null}
+      {ophaalfout ? <Melding soort="onbekend" titel="Verouderd">Het vernieuwen is mislukt.</Melding> : null}
 
       <section className="mb-6 flex flex-col gap-3 rounded-lg border border-border bg-card p-4" aria-labelledby="gezondheid-titel" data-testid="app-gezondheid">
         <h2 id="gezondheid-titel" className="sr-only">
@@ -273,7 +282,7 @@ export function AppDetail({ id }: { id: string }) {
         </h2>
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge view={appHealth(a.gezondheid)} groot />
-          <span>{a.gezondheid.melding}</span>
+          <span>{meetToelichting(a.gezondheid)}</span>
         </div>
         <Onderdelen app={a} />
         <div className="grid gap-4 md:grid-cols-2">
@@ -301,7 +310,7 @@ export function AppDetail({ id }: { id: string }) {
             </div>
           </dl>
         </div>
-        <Freshness observedAt={a.bron?.observed_at ?? a.laatst_gezien} bron={a.bron ? `TrueNAS ${a.bron.methode}` : "TrueNAS app.query"} />
+        <Freshness observedAt={truenas?.observed_at} verouderd={truenas?.verouderd} bron="TrueNAS app.query" />
       </section>
 
       <Tabs value={tab} onValueChange={(v) => router.push(`${pathname}?tab=${v}`, { scroll: false })}>
@@ -336,7 +345,7 @@ export function AppDetail({ id }: { id: string }) {
             <dd>{formatDateTime(a.eerst_gezien)}</dd>
             <dt>TrueNAS-staat</dt>
             <dd>
-              <StatusBadge view={a.runtime_staat ? appState(a.runtime_staat) : { tone: "unknown", label: "Onbekend" }} />
+              <StatusBadge view={truenas ? componentView(truenas) : healthView("unknown")} />
             </dd>
           </dl>
           <p className="flex items-start gap-2 text-sm">

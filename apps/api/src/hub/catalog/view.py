@@ -66,6 +66,7 @@ def summary(
 ) -> dict[str, Any]:
     prof = profile_for(row.app_id)
     health = health or app_health(db, settings, row, inv_state, now)
+    runtime = next(c for c in health["componenten"] if c["soort"] == "truenas")
     link = deep_link(row, nas)
     return {
         "id": str(row.id),
@@ -78,7 +79,7 @@ def summary(
         "installatiewijze": row.installatiewijze,
         "image": {"repository": row.image_repository, "tag": row.image_tag, "digest": row.image_digest},
         "versie": (row.catalogus or {}).get("app_versie"),
-        "runtime_staat": row.runtime_staat,
+        "runtime_staat": runtime.get("staat") if runtime["status"] != "unknown" else None,
         "gezondheid": {k: v for k, v in health.items() if k != "componenten"},
         "deep_link": link.get("url"),
         "eigenaar": {"repo": prof.eigenaar_repo, "soort": prof.soort},
@@ -127,7 +128,7 @@ def detail(
             if svc is None
             else {"id": str(svc.id), "app_id": svc.app_id, "status": svc.status, "versie": svc.version},
             "appstore": row.appstore or {"status": "unknown", "reden": "nog_niet_gesynchroniseerd"},
-            "bron": row.bron,
+            "bron": {k: v for k, v in row.bron.items() if k != "identiteit_sinds"},
             "acties": actions(link, role),
             "alleen_lezen": True,
         }

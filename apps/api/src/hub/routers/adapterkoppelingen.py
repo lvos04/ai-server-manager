@@ -24,7 +24,15 @@ from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.incidents.rules import ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED, adapter_health_transition
 from hub.inventory.store import kind_state
-from hub.models import AdapterHouseSnapshot, AdapterLink, CatalogApp, IdempotencyRecord, VaultSecret
+from hub.models import (
+    AdapterHouseSnapshot,
+    AdapterLink,
+    CatalogApp,
+    IdempotencyRecord,
+    Incident,
+    OutboxEvent,
+    VaultSecret,
+)
 from hub.outbound import OutboundError
 from hub.timeutil import UtcDateTime, utcnow
 from hub.truenas.connection import NasTarget, current_target
@@ -352,10 +360,43 @@ def _house_transition(db: DB, row: AdapterLink, reason: str | None) -> None:
     row.laatste_fout = reason
 
 
+def _adapter_problem_active(db: DB, catalog_id: str) -> bool:
+    # De incidentenworker kan de storing of het herstel nog in de outbox hebben staan.
+    pending = db.scalar(
+        select(OutboxEvent.event_type)
+        .where(
+            OutboxEvent.entity_type == "catalog_app",
+            OutboxEvent.entity_id == catalog_id,
+            OutboxEvent.event_type.in_((ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED)),
+            OutboxEvent.incident_verwerkt_op.is_(None),
+        )
+        .order_by(OutboxEvent.seq.desc())
+        .limit(1)
+    )
+    if pending is not None:
+        return pending == ADAPTER_HEALTH_FAILED
+    return (
+        db.scalar(
+            select(Incident.id)
+            .where(
+                Incident.soort == "monitoring.adapter_health",
+                Incident.onderwerp_type == "catalog_app",
+                Incident.onderwerp_id == catalog_id,
+                Incident.status != "opgelost",
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
 def _record_health_measurement(db: DB, row: AdapterLink, now: datetime) -> None:
     # De contactproef vergrendelt de koppeling; een idempotente herhaling komt hier niet.
     health = stored_health(row, now, bound=True)
-    row.health_failures, transition = adapter_health_transition(row.health_failures, health.status)
+    incident_active = row.health_failures < 3 and _adapter_problem_active(db, str(row.catalog_app_id))
+    row.health_failures, transition = adapter_health_transition(
+        row.health_failures, health.status, incident_active=incident_active
+    )
     if transition is not None:
         emit(
             db,

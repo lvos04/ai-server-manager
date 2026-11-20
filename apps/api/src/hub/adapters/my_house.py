@@ -629,7 +629,7 @@ def health(checks: list[CheckReading], now: datetime) -> basis.Measurement:
     measurements = [check.measurement(now) for check in checks]
     if not {"database", "worker"} <= {check.key for check in checks}:
         measurements.append(basis.Measurement(status="unknown", reason_code="meting_onbekend"))
-    return max(
+    worst = max(
         measurements,
         key=lambda item: (
             SEVERITY[item.status],
@@ -637,3 +637,7 @@ def health(checks: list[CheckReading], now: datetime) -> basis.Measurement:
             age_seconds(item.observed_at, now) or 0,
         ),
     )
+    if worst.status == "healthy":
+        # De oudste meettijd en de eerst verlopende check kunnen bij verschillende bronnen horen.
+        worst.geldig_tot = min(m.geldig_tot for m in measurements if m.geldig_tot is not None)
+    return worst

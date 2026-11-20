@@ -12,11 +12,12 @@ import { ResponsiveList } from "@/components/ResponsiveList";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SERVER_SUBNAV, Subnav } from "@/components/Subnav";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { appHealth, EIGENAAR, INSTALLATIE, sortApps, type CatalogApp, type CatalogList } from "@/lib/catalog";
+import { actueleMeting, appHealth, catalogusTellingen, EIGENAAR, INSTALLATIE, meetToelichting, sortApps, vervalgrens, type CatalogApp, type CatalogList } from "@/lib/catalog";
 import { formatDate, formatTime } from "@/lib/format";
 import { hasRole, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
 import { useApi } from "@/lib/use-api";
+import { useCatalogClock } from "@/lib/use-catalog-clock";
 
 type Filter = "alle" | "down" | "degraded" | "unknown" | "healthy";
 const CHIPS: { id: Filter; label: string }[] = [
@@ -64,7 +65,7 @@ function Gezondheid({ app }: { app: CatalogApp }) {
   return (
     <span className="flex flex-col gap-1">
       <StatusBadge view={appHealth(app.gezondheid)} />
-      <span className="text-sm">{app.gezondheid.melding}</span>
+      <span className="text-sm">{meetToelichting(app.gezondheid)}</span>
       {!app.aanwezig && app.verdwenen_sinds ? (
         <span className="w-fit rounded-sm border border-border-strong px-1.5 text-sm font-semibold">Verdwenen sinds {formatDate(app.verdwenen_sinds)}</span>
       ) : null}
@@ -80,9 +81,13 @@ export function AppsScreen() {
   const [filter, setFilter] = useState<Filter>("alle");
   const [q, setQ] = useState("");
   const d = list.data;
+  const nu = useCatalogClock([...(d?.items ?? []).map((a) => vervalgrens(a.gezondheid)), Date.parse(d?.overige_geldig_tot ?? "")]);
+  const ophaalfout = list.stale || Boolean(list.error);
+  const stand = (d?.items ?? []).map((a) => ({ ...a, gezondheid: actueleMeting(a.gezondheid, ophaalfout, nu) }));
+  const telling = d && catalogusTellingen(d, stand, ophaalfout, nu);
   const meer = Boolean(d?.next_cursor);
   const needle = q.trim().toLowerCase();
-  const items = sortApps(d?.items ?? [], meer).filter(
+  const items = sortApps(stand, meer).filter(
     (a) =>
       (filter === "alle" || a.gezondheid.status === filter) &&
       (!needle || [a.titel, a.naam, a.app_id, a.runtime_id, a.image.repository].some((v) => (v ?? "").toLowerCase().includes(needle))),
@@ -131,7 +136,7 @@ export function AppsScreen() {
           </div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filter op gezondheid">
             {CHIPS.map((c) => {
-              const n = c.id === "alle" ? (d?.totaal ?? 0) : (d?.per_status[c.id] ?? 0);
+              const n = c.id === "alle" ? (d?.totaal ?? 0) : (telling?.[c.id] ?? 0);
               return (
                 <Button key={c.id} size="klein" variant={filter === c.id ? "primair" : "secundair"} aria-pressed={filter === c.id} onClick={() => setFilter(c.id)}>
                   {c.label} <span className="font-mono">({n})</span>

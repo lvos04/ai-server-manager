@@ -255,7 +255,12 @@ def discover(db: Session, settings: Settings, *, now: datetime | None = None) ->
         for k, v in changed.items():
             setattr(row, k, v)
         row.laatst_gezien = observed
-        row.bron = bron
+        # Een oude controle voor dit runtime-ID kan bij een eerder doel of eerdere poorteigenaar horen.
+        identity_since = (row.bron or {}).get("identiteit_sinds")
+        identity_fields = {"aanwezig", "app_id", "service_id", "poorten", "portals"}
+        if (row.bron or {}).get("nas") != url or identity_fields.intersection(changed):
+            identity_since = now.isoformat()
+        row.bron = {**bron, "identiteit_sinds": identity_since} if identity_since else bron
         if changed:
             row.version += 1
             row.updated_at = now
@@ -304,9 +309,16 @@ def deep_link(row: CatalogApp, nas_address: str | None) -> dict[str, Any]:
 
 def is_inventory_fresh(db: Session, settings: Settings, now: datetime | None = None) -> dict[str, Any]:
     target = current_target(db)
-    return kind_state(
+    state = kind_state(
         db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds, now=now
     )
+    # Indexeer dezelfde momentopname één keer voor de hele lijst. Een dubbel ID blijft herkenbaar.
+    by_id: dict[str, list[dict[str, Any]]] = {}
+    if isinstance(state["data"], list):
+        for app in state["data"]:
+            if isinstance(app, dict) and isinstance(app.get("runtime_id"), str):
+                by_id.setdefault(app["runtime_id"], []).append(app)
+    return {**state, "per_runtime_id": by_id}
 
 
 __all__ = ["DiscoveryResult", "deep_link", "discover", "image_info", "install_method"]
