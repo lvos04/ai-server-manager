@@ -24,7 +24,7 @@ for app in ai-server-manager ai-server-manager-executor; do
   repository="$REGISTRY/leon/$app"
   docker buildx build --builder "$bouwer" --platform linux/amd64 --push \
     --sbom=true --provenance=mode=max --metadata-file "$werk/$app.json" \
-    --build-arg VERSION="$VERSION" --build-arg REVISION="$GITHUB_SHA" \
+    --build-arg VERSION="$VERSION" --build-arg REVISION="$RELEASE_COMMIT" \
     -f "deploy/$map/Dockerfile" -t "$repository:$VERSION" .
   digest=$(jq -er '.["containerimage.digest"] | select(test("^sha256:[0-9a-f]{64}$"))' "$werk/$app.json")
   docker buildx imagetools inspect "$repository@$digest" --format '{{json .SBOM}}' |
@@ -33,5 +33,5 @@ for app in ai-server-manager ai-server-manager-executor; do
   jq -n --arg app "$app" --arg repository "$repository" --arg tag "$VERSION" --arg digest "$digest" \
     '{($app): {$repository, $tag, $digest}}' > "$werk/image-$app.json"
 done
-jq -s --arg version "$VERSION" --arg commit "$GITHUB_SHA" \
+jq -s --arg version "$VERSION" --arg commit "$RELEASE_COMMIT" \
   '{version:$version, commit:$commit, images:add}' "$werk"/image-*.json > release/digests.json

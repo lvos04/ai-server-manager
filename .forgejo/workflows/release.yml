@@ -18,25 +18,35 @@ jobs:
       - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - name: Versietag controleren
+      - name: Versietag en bestaande release controleren
+        id: versie
+        env:
+          RELEASE_TOKEN: ${{ github.token }}
         run: |
           versie=$(cat VERSION)
           test "$GITHUB_REF" = "refs/tags/v$versie"
-          test "$(git rev-parse HEAD)" = "$(git rev-parse "$GITHUB_REF^{commit}")"
+          export RELEASE_COMMIT
+          RELEASE_COMMIT=$(git rev-parse HEAD)
+          test "$RELEASE_COMMIT" = "$(git rev-parse "$GITHUB_REF^{commit}")"
+          echo "RELEASE_COMMIT=$RELEASE_COMMIT" >> "$GITHUB_ENV"
+          bash .forgejo/scripts/release-bijlagen.sh --controle
           echo "VERSION=$versie" >> "$GITHUB_ENV"
       - name: Beide versie-images publiceren met herkomstbewijs en SPDX
+        if: steps.versie.outputs.publiceren == 'true'
         shell: bash
         env:
           REGISTRY_USER: ${{ vars.REGISTRY_USER }}
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: bash .forgejo/scripts/release-images.sh
       - name: Digests en SPDX-bestanden bewaren
+        if: steps.versie.outputs.publiceren == 'true'
         uses: https://code.forgejo.org/forgejo/upload-artifact@16871d9e8cfcf27ff31822cac382bbb5450f1e1e # Forgejo v4
         with:
           name: release-${{ env.VERSION }}
           path: release/
           if-no-files-found: error
       - name: Forgejo-release met de drie bijlagen
+        if: steps.versie.outputs.publiceren == 'true'
         env:
           RELEASE_TOKEN: ${{ github.token }}
         run: bash .forgejo/scripts/release-bijlagen.sh

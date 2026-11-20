@@ -48,6 +48,11 @@ eerste beheerdersaccount, waarna de onboarding-wizard volgt.
 
 ## Ontwikkelen
 
+Bij iedere branchpush en pull request draait Forgejo de Python-, web-, Excel- en imagecontroles. Start de workflow
+`ci` handmatig voor de woningproef, de plannerproef en de strikte manifestvalidatie. Deze drie jobs lezen de
+gepinde broncode uit `my_house`, `jelly-leon-platform` en `appstore-en-fork`. Als het jobtoken daar geen leesrechten heeft,
+gebruikt de workflow het Actions-secret `CI_BRONNEN_LEZEN` voor alleen-leestoegang.
+
 ```sh
 make venv          # .venv met exact vastgezette versies + editable pakketten
 make lint type     # ruff + mypy (strict)

@@ -68,9 +68,11 @@ jobs:
           poort=$((20000 + ${sleutel%% *} % 30000))
           basis="postgresql://postgres@localhost:$poort"
           python -c 'import psycopg, sys; psycopg.connect(sys.argv[1], connect_timeout=5).close()' "$basis/$TESTDATABASE"
-          echo "PGPORT=$poort" >> "$GITHUB_ENV"
-          echo "HUB_TEST_ADMIN_URL=$basis/postgres" >> "$GITHUB_ENV"
-          echo "SHC_TEST_PG=$basis" >> "$GITHUB_ENV"
+          {
+            echo "PGPORT=$poort"
+            echo "HUB_TEST_ADMIN_URL=$basis/postgres"
+            echo "SHC_TEST_PG=$basis"
+          } >> "$GITHUB_ENV"
       - name: ruff (lint + format)
         run: make lint BIN="$(dirname "$(command -v python)")"
       - name: mypy (strict)
@@ -79,6 +81,7 @@ jobs:
         run: |
           if [[ $(id -u) == 0 ]]; then
             testmap=$(mktemp -d "$RUNNER_TEMP/pytest.XXXXXXXX")
+            trap 'rm -rf -- "$testmap"' EXIT
             chown nobody "$testmap"
             runuser -u nobody -- env HOME="$testmap" TMPDIR="$testmap" PATH="$PATH" "$(command -v python)" -m pytest -q
           else
