@@ -30,8 +30,9 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: asm_${{ github.run_id }}_${{ github.job }}
         # Deze runner deelt het hostnetwerk. Elke job gebruikt een eigen lokale poort en herkenbare database.
-        entrypoint: [bash, -ec]
         cmd:
+          - bash
+          - -ec
           - |
             sleutel=$(printf '%s' "$POSTGRES_DB" | cksum)
             export PGPORT=$((20000 + ${sleutel%% *} % 30000))
@@ -277,7 +278,7 @@ jobs:
           done
 
   images:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' && needs.python.result == 'success' && needs.web.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [python, web]
