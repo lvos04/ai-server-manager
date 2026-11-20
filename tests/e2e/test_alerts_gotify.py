@@ -192,13 +192,18 @@ def test_keten_truenas_naar_gotify_app_down_en_dempen(
     settings.inventory_ttl_seconds = 7200
     _channel(admin, gotify)
     connect(admin, fake_nas)
-    refresh(admin, worker_once)
+    inventaris = refresh(admin, worker_once)
     series = admin.get("/api/v1/metrics/series", params={"onderwerp_type": "pool"}).json()["items"]
     assert {s["metriek"] for s in series} == {"pool.gebruik", "pool.vrij", "pool.gezond"}
     assert next(s for s in series if s["metriek"] == "pool.gebruik")["laatste_waarde"] == 25.0
 
-    t0 = datetime.now(UTC).replace(microsecond=0)
-    periodic_run("gezondheid_vastleggen", "alerts_evalueren", now=t0)
+    # De proefklok volgt de bronmeting. Vóór die meting mag ook de gestopte app nog geen statuspunt leveren.
+    bron_op = datetime.fromisoformat(inventaris["catalogus"]["observed_at"])
+    voor = periodic_run("gezondheid_vastleggen", now=bron_op - timedelta(milliseconds=1))
+    assert voor["gezondheid_vastleggen"]["opgeslagen"] == 0
+    t0 = bron_op + timedelta(seconds=1)
+    eerste = periodic_run("gezondheid_vastleggen", "alerts_evalueren", now=t0)
+    assert eerste["gezondheid_vastleggen"]["opgeslagen"] == 1
     periodic_run("gezondheid_vastleggen", "alerts_evalueren", "meldingen_versturen", now=t0 + timedelta(seconds=310))
     titles = [m["title"] for m in gotify.messages]
     assert titles == ["App onbereikbaar"], titles  # alleen de gestopte Jellyfin; MediaGuard is 'unknown', niet down
