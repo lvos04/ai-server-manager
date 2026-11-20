@@ -54,9 +54,9 @@ def tls_for(row: TrueNASConnection, target: NasTarget, settings: Settings) -> TL
     return TLSSettings(pinned_fingerprint=pinned, extra_ca_file=settings.truenas_extra_ca_file)
 
 
-def not_configured(kinds: tuple[str, ...], detail: str, url: str = "") -> CollectResult:
-    res = CollectResult(status="unknown", reason_code="not_configured", target_url=url)
-    res.kinds = [KindResult(k, "unknown", "not_configured", detail, None, None, utcnow()) for k in kinds]
+def failed_collection(kinds: tuple[str, ...], reason: str, detail: str, url: str = "") -> CollectResult:
+    res = CollectResult(status="unknown", reason_code=reason, target_url=url)
+    res.kinds = [KindResult(k, "unknown", reason, detail, None, None, utcnow()) for k in kinds]
     return res
 
 
@@ -65,10 +65,10 @@ async def run_collect(
 ) -> CollectResult:
     target = current_target(db)
     if target is None:
-        return not_configured(kinds, "Besluit D03 (NAS-adres) is nog niet ingevuld.")
+        return failed_collection(kinds, "not_configured", "Besluit D03 (NAS-adres) is nog niet ingevuld.")
     api_key = vault.get(db, API_KEY_REF)
     if not api_key:
-        return not_configured(kinds, "Er is nog geen alleen-lezen-API-key ingesteld.", target.url)
+        return failed_collection(kinds, "not_configured", "Er is nog geen alleen-lezen-API-key ingesteld.", target.url)
     row = connection_row(db)
     return await collect(
         target.url,

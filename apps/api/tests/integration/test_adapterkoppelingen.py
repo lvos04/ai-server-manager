@@ -38,12 +38,13 @@ from hub.models import (
     VaultSecret,
     WebSession,
 )
+from hub.monitoring import kuma, timeseries
 from hub.monitoring.sources import upsert_observation
 from hub.routers import adapterkoppelingen, catalog
 from hub.timeutil import iso, utcnow
 from hub.truenas import normalize
 from hub.truenas.connection import current_target
-from hub.vault import Vault
+from hub.vault import Vault, VaultError
 
 ROUTE = "/api/v1/adapterkoppelingen"
 APP_ID = "mediaguard"
@@ -1508,9 +1509,9 @@ def inventariseer(app: Any, settings: Settings, staat: str, *, werk_catalogus_bi
         return iso(nu)
 
 
-def toestanden(client: TestClient, doel: dict[str, Any]) -> tuple[str, str]:
+def toestanden(client: TestClient, doel: dict[str, Any], *, alleen_aanwezig: bool = True) -> tuple[str, str]:
     detail = client.get("/api/v1/apps/" + doel["catalog_app_id"])
-    lijst = client.get("/api/v1/apps")
+    lijst = client.get("/api/v1/apps", params={"alleen_aanwezig": alleen_aanwezig})
     assert detail.status_code == lijst.status_code == 200
     (item,) = lijst.json()["items"]
     assert lijst.json()["per_status"][item["gezondheid"]["status"]] == 1
@@ -1765,3 +1766,193 @@ def test_catalogus_toestandstabel(
             obs = db.scalars(select(HealthObservation)).one()
             obs.observed_at = utcnow()
         assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+def bewaar_inventaris(db: Session, data: list[dict[str, Any]]) -> None:
+    meting = KindResult("apps", "ok", None, "", "app.query", data, utcnow())
+    save_run(db, CollectResult("ok", None, current_target(db).url, kinds=[meting]), trigger="test")
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize("tussenupdate", [True, False], ids=["bijgewerkt", "overgeslagen"])
+@pytest.mark.parametrize("onderbreking", ["afwezig", "bestemming"])
+def test_terugkeer_andere_instantie(admin, app, settings, doel, huis_simulatie, tussenupdate, onderbreking):
+    code, simulator, aanvragen = huis_simulatie
+    pad = maak_koppeling(admin, doel, code)
+    meet(admin, pad)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    with app.state.sessionmaker.begin() as db:
+        origineel = is_inventory_fresh(db, settings)["data"]
+        if onderbreking == "afwezig":
+            bewaar_inventaris(db, [])
+        else:
+            _bewaar_apps(db, {"my_house": (9443,)})
+        if tussenupdate:
+            assert discover(db, settings).status == "ok"
+    assert toestanden(admin, doel, alleen_aanwezig=False) == ("unknown", "unknown")
+    with app.state.sessionmaker.begin() as db:
+        bewaar_inventaris(db, origineel)
+        assert discover(db, settings).status == "ok"
+    aantal = len(aanvragen)
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    inventariseer(app, settings, "CRASHED", werk_catalogus_bij=False)
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    inventariseer(app, settings, "RUNNING", werk_catalogus_bij=False)
+    assert len(aanvragen) == aantal
+    server_id = simulator["server_id"]
+    simulator["server_id"] = str(uuid.uuid4())
+    meet(admin, pad)
+    gezondheid = admin.get("/api/v1/apps/" + doel["catalog_app_id"]).json()["gezondheid"]
+    assert (gezondheid["status"], gezondheid["reason_code"]) == ("unknown", "bron_identiteit_gewijzigd")
+    simulator["server_id"] = server_id
+    meet(admin, pad)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+@pytest.mark.parametrize("doel", ["emby"], indirect=True)
+@pytest.mark.parametrize("staat", ["RUNNING", "CRASHED"])
+def test_gewijzigde_bestemming_voor_catalogusupdate(admin, app, settings, doel, staat):
+    with app.state.sessionmaker.begin() as db:
+        row = db.scalars(select(CatalogApp)).one()
+        nu = utcnow()
+        upsert_observation(
+            db,
+            bron_type="uptime_kuma",
+            bron_id="proef",
+            naam="Buitenkant",
+            status="healthy",
+            observed_at=nu,
+            ttl_seconds=300,
+            details={},
+            reason_code=None,
+            subject_app_id=row.id,
+            now=nu,
+        )
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {"emby": (9443,)})
+        (andere,) = is_inventory_fresh(db, settings)["data"]
+        assert andere["poorten"] and andere["portals"]
+        bewaar_inventaris(db, [{**andere, "staat": staat}])
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+
+
+@pytest.fixture
+def catalogusmonitor(admin, doel, settings, monkeypatch):
+    aangemaakt = admin.post(
+        "/api/v1/monitoring/sources",
+        json={
+            "soort": "uptime_kuma",
+            "naam": "Testmonitor",
+            "basis_url": "https://monitor.example",
+            "api_key": uuid.uuid4().hex,
+        },
+        headers=idem(),
+    )
+    assert aangemaakt.status_code == 201
+    pad = "/api/v1/monitoring/sources/" + aangemaakt.json()["id"] + "/test"
+
+    def peil(*args, now, **kwargs):
+        monitor = kuma.KumaMonitor("id:1", "Buitenkant", url=doel["basis_url"], status="healthy", observed_at=now)
+        return kuma.KumaResult(ok=True, monitors={monitor.sleutel: monitor})
+
+    monkeypatch.setattr(kuma, "fetch", peil)
+    monkeypatch.setattr(settings, "monitor_ttl_seconds", 30)
+    assert admin.post(pad, headers=idem()).json()["resultaat"]["gekoppeld"] == 1
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+    return pad
+
+
+def kluis_gesloten(*args):
+    raise VaultError("De testkluis is onbeschikbaar.")
+
+
+@pytest.mark.parametrize("doel", ["emby"], indirect=True)
+def test_vertraagde_inventaris_herstelt_geen_oude_bevestiging(admin, app, settings, doel, catalogusmonitor):
+    with app.state.sessionmaker.begin() as db:
+        origineel = is_inventory_fresh(db, settings)["data"]
+        bewaar_inventaris(db, [])
+        eerder = utcnow() - timedelta(seconds=5)
+        vertraagd = KindResult("apps", "ok", None, "", "app.query", origineel, eerder)
+        save_run(
+            db, CollectResult("ok", None, current_target(db).url, kinds=[vertraagd]), trigger="test", started_at=eerder
+        )
+        bewaar_inventaris(db, origineel)
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    assert admin.post(catalogusmonitor, headers=idem()).json()["resultaat"]["status"] == "ok"
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+@pytest.mark.parametrize("doel", ["emby"], indirect=True)
+@pytest.mark.parametrize("poging_ok", [False, True], ids=["kluisfout", "poging-ok"])
+@pytest.mark.parametrize("vers", [False, True], ids=["verlopen", "vers"])
+@pytest.mark.parametrize("bevestigd", [False, True], ids=["onderbroken", "bevestigd"])
+def test_groen_vereist_drie_bewijzen(
+    admin, app, settings, doel, monkeypatch, catalogusmonitor, poging_ok, vers, bevestigd
+):
+    pad = catalogusmonitor
+    if not poging_ok:
+        with monkeypatch.context() as fout:
+            fout.setattr(Vault, "get", kluis_gesloten)
+            assert admin.post(pad, headers=idem()).json()["resultaat"]["status"] == "fout"
+    if not bevestigd:
+        with app.state.sessionmaker.begin() as db:
+            origineel = is_inventory_fresh(db, settings)["data"]
+            bewaar_inventaris(db, [])
+            bewaar_inventaris(db, origineel)
+    with monkeypatch.context() as klok:
+        if not vers:
+            later = utcnow() + timedelta(seconds=31)
+            klok.setattr(catalog, "utcnow", lambda: later)
+        verwacht = "healthy" if poging_ok and vers and bevestigd else "unknown"
+        assert toestanden(admin, doel) == (verwacht, verwacht)
+    assert admin.post(pad, headers=idem()).json()["resultaat"]["status"] == "ok"
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize("bron", ["inventaris", "adapter"])
+def test_kluisfout_na_gezonde_adapter_of_inventaris(admin, app, doel, huis_simulatie, monkeypatch, worker_once, bron):
+    code, _, _ = huis_simulatie
+    pad = maak_koppeling(admin, doel, code)
+    meet(admin, pad)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+
+    with monkeypatch.context() as fout:
+        fout.setattr(Vault, "get", kluis_gesloten)
+        if bron == "inventaris":
+            assert admin.post("/api/v1/inventory/refresh", headers=idem()).status_code == 202
+            assert len(worker_once()) == 1
+        else:
+            meet(admin, pad)
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    if bron == "inventaris":
+        with app.state.sessionmaker.begin() as db:
+            _bewaar_apps(db, {"my_house": (443, 8443)})
+    else:
+        meet(admin, pad)
+    assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+@pytest.mark.parametrize("doel", ["emby"], indirect=True)
+@pytest.mark.parametrize("fout", ["onbereikbaar", "kluis", "na_opslag"])
+def test_mislukte_laatste_monitorpoging(admin, app, doel, catalogusmonitor, monkeypatch, fout):
+    with app.state.sessionmaker.begin() as db:
+        tijd = db.scalars(select(HealthObservation)).one().observed_at
+    with monkeypatch.context() as storing:
+        if fout == "kluis":
+            storing.setattr(Vault, "get", kluis_gesloten)
+        elif fout == "onbereikbaar":
+            storing.setattr(kuma, "fetch", lambda *a, **kw: kuma.KumaResult(ok=False, reden="niet_bereikbaar"))
+        else:
+            storing.setattr(timeseries, "record", Mock(side_effect=RuntimeError("Tijdreeksopslag onbeschikbaar")))
+        resultaat = admin.post(catalogusmonitor, headers=idem()).json()
+        assert resultaat["resultaat"]["status"] == "fout"
+        bronstatus = resultaat["bron"]["status"]
+        assert bronstatus["laatste_poging"] and bronstatus["status"] == "fout"
+    assert toestanden(admin, doel) == ("unknown", "unknown")
+    with app.state.sessionmaker.begin() as db:
+        obs = db.scalars(select(HealthObservation)).one()
+        assert obs.observed_at == tijd and obs.details["bron_fout"]
+    assert admin.post(catalogusmonitor, headers=idem()).json()["resultaat"]["status"] == "ok"
+    assert toestanden(admin, doel) == ("healthy", "healthy")

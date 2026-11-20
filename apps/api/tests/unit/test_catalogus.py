@@ -132,11 +132,19 @@ def test_profielen_hebben_geldige_typen_en_bestaande_documentatie() -> None:
 
 # ------------------------------------------------------------------ gezondheidsmodel
 def C(soort: str, status: str, age_s: float = 0, reason: str | None = None) -> Component:
-    return Component(soort, f"test:{soort}", status, reason, NOW - timedelta(seconds=age_s))
+    return Component(
+        soort,
+        f"test:{soort}",
+        status,
+        reason,
+        NOW - timedelta(seconds=age_s),
+        geldig_tot=NOW + timedelta(seconds=30),
+        bevestigd_op=NOW - timedelta(seconds=age_s),
+    )
 
 
 def _ev(comps: list[Component], vereist: bool = False, bron: str | None = None, aanwezig: bool = True) -> Any:
-    return evaluate(comps, aanwezig=aanwezig, binnenkant_vereist=vereist, binnenkant_bron=bron)
+    return evaluate(comps, aanwezig=aanwezig, binnenkant_vereist=vereist, binnenkant_bron=bron, now=NOW)
 
 
 def test_truenas_running_alleen_is_nooit_gezond() -> None:
@@ -175,8 +183,16 @@ def test_verouderde_component_is_onbekend_nooit_laatst_bekend() -> None:
     assert fresh.status == "healthy"
     r = _ev([C("truenas", "healthy"), old])
     assert r["status"] == "unknown" and r["reason_code"] == "meting_verouderd"
-    # Een monitor die wél vers is, telt; een verouderde ernaast maakt de app niet onbekend.
-    assert _ev([C("truenas", "healthy"), old, C("buitenkant", "healthy")])["status"] == "healthy"
+    # Elke gekoppelde bron moet vers zijn, ook als een tweede monitor nog gezond is.
+    assert _ev([C("truenas", "healthy"), old, C("buitenkant", "healthy")])["status"] == "unknown"
+
+
+@pytest.mark.parametrize("grens", [None, NOW - timedelta(microseconds=1), NOW.replace(tzinfo=None)])
+def test_ontbrekende_of_ongeldige_bronvervalgrens(grens: datetime | None) -> None:
+    monitor = Component("buitenkant", "monitor", "healthy", None, NOW, geldig_tot=grens)
+    resultaat = _ev([C("truenas", "healthy"), monitor])
+    assert resultaat["status"] == "unknown"
+    assert resultaat["componenten"][1]["laatste_status"] == "healthy"
 
 
 @pytest.mark.parametrize(
@@ -191,7 +207,15 @@ def test_verouderde_component_is_onbekend_nooit_laatst_bekend() -> None:
     ],
 )
 def test_samenstelling_adapterprofiel(buitenstatus: str | None, adapterstatus: str, verwacht: str) -> None:
-    adapter = Component("binnenkant", "adapter_p3", adapterstatus, None, NOW - timedelta(seconds=30))
+    adapter = Component(
+        "binnenkant",
+        "adapter_p3",
+        adapterstatus,
+        None,
+        NOW - timedelta(seconds=30),
+        geldig_tot=NOW + timedelta(seconds=20),
+        bevestigd_op=NOW,
+    )
     comps = [C("truenas", "healthy", age_s=10), adapter]
     if buitenstatus is not None:
         comps.append(C("buitenkant", buitenstatus, age_s=20))

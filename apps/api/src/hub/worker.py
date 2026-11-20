@@ -23,6 +23,7 @@ from hub.catalog.availability import refresh_if_due
 from hub.catalog.discovery import discover
 from hub.config import Settings
 from hub.events.envelope import emit
+from hub.inventory.collector import ALL_KINDS
 from hub.inventory.store import latest_run, prune_runs, save_run
 from hub.keys import KeyRing
 from hub.logfilter import db_error_text
@@ -38,7 +39,7 @@ from hub.models import (
 )
 from hub.monitoring import periodic
 from hub.timeutil import iso, utcnow
-from hub.truenas.connection import current_target, run_collect
+from hub.truenas.connection import current_target, failed_collection, run_collect
 from hub.vault import Vault
 
 log = logging.getLogger("hub.worker")
@@ -133,8 +134,16 @@ def _catalog_after_inventory(db: Session, settings: Settings, keyring: KeyRing |
 def _run_job(db: Session, settings: Settings, vault: Vault, job: Job, keyring: KeyRing | None = None) -> dict[str, Any]:
     if job.kind == "inventory_refresh":
         started = utcnow()
-        res = asyncio.run(run_collect(db, vault, settings))
-        if res.reason_code == "not_configured":
+        target = current_target(db)
+        try:
+            with db.begin_nested():
+                res = asyncio.run(run_collect(db, vault, settings))
+        except Exception as exc:
+            if target is None:
+                raise
+            log.warning("Inventaris ophalen mislukt (%s)", type(exc).__name__)
+            res = failed_collection(ALL_KINDS, "unreachable", "De inventaris kon niet worden opgehaald.", target.url)
+        if not res.target_url and res.reason_code == "not_configured":
             return {"status": "unknown", "reason_code": "not_configured"}
         run = save_run(db, res, trigger=str(job.params.get("trigger") or "manual"), started_at=started)
         emit(

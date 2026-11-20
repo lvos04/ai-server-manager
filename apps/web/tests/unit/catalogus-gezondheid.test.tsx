@@ -7,7 +7,7 @@ import { HubApiError } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 
 // Alleen de gegevensgrens en de router zijn nagebootst. Beide schermen renderen hun eigen statuscomponenten.
-const proef = vi.hoisted(() => ({ uitval: false, eersteOphaling: false, app: "my_house", verlopenStoring: false, nieuweMeting: false }));
+const proef = vi.hoisted(() => ({ uitval: false, eersteOphaling: false, app: "my_house", verlopenStoring: false, nieuweMeting: false, zonderVervalgrens: false }));
 const meettijd = "2026-11-18T12:00:00Z";
 const ophaaltijd = "2026-11-18T12:01:00Z";
 vi.mock("next/navigation", () => ({
@@ -28,7 +28,7 @@ vi.mock("@/lib/use-api", () => ({
     if (proef.eersteOphaling) return { ...antwoord, data: undefined, loading: !proef.uitval, stale: false, lastOk: null };
     const oud = proef.verlopenStoring;
     const gezondheid = {
-      geldig_tot: proef.nieuweMeting ? "2026-11-18T12:23:00Z" : "2026-11-18T12:02:00Z",
+      ...(proef.zonderVervalgrens ? {} : { geldig_tot: proef.nieuweMeting ? "2026-11-18T12:23:00Z" : "2026-11-18T12:02:00Z" }),
       status: oud ? "unknown" : "healthy", reason_code: oud ? "meting_verouderd" : null,
       melding: oud ? "De laatste meting is ouder dan toegestaan en geldt daarom als onbekend." : "",
       observed_at: proef.nieuweMeting ? "2026-11-18T12:21:00Z" : meettijd, laatst_getest: meettijd, oorzaak: oud ? "adapter_p3" : null,
@@ -63,6 +63,7 @@ beforeEach(() => {
   proef.eersteOphaling = false;
   proef.verlopenStoring = false;
   proef.nieuweMeting = false;
+  proef.zonderVervalgrens = false;
   proef.app = "my_house";
   vi.setSystemTime(new Date(ophaaltijd));
 });
@@ -135,3 +136,24 @@ it("laat ook buiten de geladen pagina geen gezonde telling door na uitval of ver
   expect(catalogusTellingen(lijst, [onbekend], true, nu)).toEqual({ healthy: 0, down: 0, degraded: 0, unknown: 3 });
   expect(catalogusTellingen(lijst, [app], false, nu + 1)).toEqual({ healthy: 1, down: 0, degraded: 0, unknown: 2 });
 });
+
+it.each([undefined, null, "geen tijdstip", "2026-11-18T12:02:00"])("toont zonder geldige bronvervalgrens alleen de vorige meting (%s)", (geldig_tot) => {
+  const m = { status: "healthy", observed_at: meettijd, geldig_tot, reason_code: null, melding: "" };
+  for (const tijd of [ophaaltijd, "2026-11-18T12:01:12Z"]) {
+    expect(actueleMeting(m, false, Date.parse(tijd))).toMatchObject({ status: "unknown", laatste_status: "healthy", observed_at: meettijd });
+  }
+});
+
+for (const scherm of ["lijst", "detail"]) {
+  it(`${scherm} houdt een ouder API-antwoord zonder vervaltijd vanaf ontvangst historisch`, () => {
+    proef.zonderVervalgrens = true;
+    for (const tijd of [ophaaltijd, "2026-11-18T12:01:12Z"]) {
+      vi.setSystemTime(new Date(tijd));
+      const html = weergave(scherm);
+      expect(html).not.toContain('data-status="healthy"');
+      expect(html).toContain("Laatst bekend");
+      expect(html).toContain(formatTime(meettijd));
+      if (scherm === "lijst") expect(html.replace(/<[^>]*>/g, "")).toContain("Gezond (0)");
+    }
+  });
+}

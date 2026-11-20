@@ -293,6 +293,11 @@ def test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded(
         admin.post("/api/v1/monitoring/poll", headers=idem()).raise_for_status()
         assert dienst.rejected == []
         assert _apps(admin)["home-control-hub"]["gezondheid"]["status"] == "healthy"
+        # Een tweede bron mag de ontbrekende geldigheidsgrens van de connector niet aanvullen.
+        dienst.limits = {}
+        admin.post("/api/v1/monitoring/poll", headers=idem()).raise_for_status()
+        assert _apps(admin)["home-control-hub"]["gezondheid"]["status"] == "unknown"
+        dienst.limits = {"max_age_s": {"health": 120}}
 
         # 200 maar de worker-controle faalt (B09-002). Contract 1.3 §6: het totaal is de slechtste check, dus een
         # worker die down is maakt de dienst down; een beperkte jobs-check maakt hem beperkt.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -36,8 +37,9 @@ from hub.models import (
 from hub.outbound import OutboundError
 from hub.timeutil import UtcDateTime, utcnow
 from hub.truenas.connection import NasTarget, current_target
-from hub.vault import Vault, make_ref
+from hub.vault import Vault, VaultError, make_ref
 
+log = logging.getLogger("hub.adapters")
 router = APIRouter(prefix="/api/v1/adapterkoppelingen", tags=["adapterkoppelingen"])
 VaultDep = Annotated[Vault, Depends(get_vault)]
 Credential = Annotated[
@@ -327,7 +329,7 @@ def _house_credential(db: DB, vault: Vault, row: AdapterLink, now: datetime) -> 
         raise OutboundError("bron_token_verlopen")
     try:
         token = vault.get(db, row.geheim_ref)
-    except (InvalidTag, ValueError):
+    except (InvalidTag, ValueError, VaultError):
         raise OutboundError("bron_credential_geweigerd") from None
     if token is None or my_house.TOKEN.fullmatch(token) is None:
         raise OutboundError("bron_credential_geweigerd")
@@ -345,7 +347,10 @@ def _house_renew(
         if exc.reason in {"bron_token_verlopen", "bron_token_ingetrokken", "doelbinding"}:
             raise
         raise OutboundError("bron_vernieuwing_mislukt") from None
-    meta = vault.put(db, row.geheim_ref, renewed.token, actor="my_house-vernieuwing")
+    try:
+        meta = vault.put(db, row.geheim_ref, renewed.token, actor="my_house-vernieuwing")
+    except VaultError:
+        raise OutboundError("bron_vernieuwing_mislukt") from None
     row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
     row.my_house_expires_at = renewed.expires_at
     return renewed
@@ -660,22 +665,29 @@ def test_link(
         adapter = _house_adapter(db, settings, row, target)
         now = utcnow()
         try:
-            credential = _house_credential(db, vault, row, now)
-            credential = _house_renew(db, vault, row, adapter, credential, now)
-            snapshot = adapter.read_snapshot(credential.token)
+            # Behoud een vernieuwd token als de daaropvolgende gezondheidslezing faalt.
+            with db.begin_nested():
+                credential = _house_credential(db, vault, row, now)
+                credential = _house_renew(db, vault, row, adapter, credential, now)
+            with db.begin_nested():
+                reading = adapter.read_snapshot(credential.token)
+                row.my_house_checks = my_house.CheckReadings.dump_python(reading.checks, mode="json")
+                db.add(
+                    AdapterHouseSnapshot(
+                        receipt_scope=idem.scope,
+                        receipt_key=idem.key,
+                        link_id=row.id,
+                        measurement=reading.model_dump(mode="json"),
+                    )
+                )
         except OutboundError as exc:
             measurement = basis.Measurement(status="unknown", reason_code=exc.reason)
+        except Exception as exc:
+            log.warning("Adaptercontrole mislukt (%s)", type(exc).__name__)
+            measurement = basis.Measurement(status="unknown", reason_code="bron_onbereikbaar")
         else:
-            measurement = basis.Measurement(status="healthy", observed_at=snapshot.snapshot.observed_at)
-            row.my_house_checks = my_house.CheckReadings.dump_python(snapshot.checks, mode="json")
-            db.add(
-                AdapterHouseSnapshot(
-                    receipt_scope=idem.scope,
-                    receipt_key=idem.key,
-                    link_id=row.id,
-                    measurement=snapshot.model_dump(mode="json"),
-                )
-            )
+            snapshot = reading
+            measurement = basis.Measurement(status="healthy", observed_at=reading.snapshot.observed_at)
         _house_transition(db, row, measurement.reason_code)
     elif row.app_id == mso.APP_ID:
         result = mso.public_probes(row, policy, check_binding=check_binding)

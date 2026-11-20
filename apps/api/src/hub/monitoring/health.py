@@ -9,23 +9,22 @@ Componentsoorten:
 Regels:
 1. Een component ouder dan zijn TTL is ``unknown`` (``verouderd``), nooit de laatst bekende status.
 2. ``down`` wint, dan ``degraded``.
-3. ``healthy`` vraagt een verse gezonde buiten- óf binnenkant-controle; heeft het profiel ``binnenkant_vereist``, dan
-   bovendien een verse gezonde binnenkant (anders ``unknown``: een app die 200 geeft maar geen jobs uitvoert mag
-   nooit groen worden).
+3. Voor ``healthy`` zijn de inventaris en alle gekoppelde controles gezond, vers en aan de huidige instantie
+   gebonden. Er is ten minste één controle en bij ``binnenkant_vereist`` ook de voorgeschreven binnenkant.
 4. Een app die niet meer in een verse inventaris staat, is ``unknown`` (``niet_meer_in_inventaris``).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from hub.catalog.profiles import BINNENKANT_P3
 from hub.timeutil import iso, utcnow
 
 STATUSES: tuple[str, ...] = ("healthy", "degraded", "down", "unknown")
-_SEVERITY = {"down": 3, "degraded": 2, "healthy": 1, "unknown": 0}
+_SEVERITY = {"down": 3, "degraded": 2, "unknown": 1, "healthy": 0}
 
 TRUENAS_STATE = {
     "RUNNING": ("healthy", None),
@@ -87,6 +86,7 @@ class Component:
     detail: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
     geldig_tot: datetime | None = None
+    bevestigd_op: datetime | None = None
 
     def last_known(self, reason: str) -> Component:
         extra = {**self.extra, "verouderd": True}
@@ -121,37 +121,73 @@ def freshen(c: Component, ttl_seconds: float, now: datetime | None = None) -> Co
     return replace(c, geldig_tot=deadline)
 
 
-def _aggregate(components: list[Component]) -> Component | None:
-    """Binnen één soort: down > degraded > healthy > unknown (unknown alleen als niets anders bekend is)."""
-    if not components:
-        return None
-    return max(components, key=lambda c: (_SEVERITY[c.status], c.observed_at or datetime.min.replace(tzinfo=UTC)))
-
-
 def evaluate(
     components: list[Component],
     *,
     aanwezig: bool,
     binnenkant_vereist: bool,
     binnenkant_bron: str | None,
+    now: datetime,
+    identiteit_gevolgd: bool = True,
+    identiteit_sinds: datetime | None = None,
 ) -> dict[str, Any]:
-    by_kind: dict[str, list[Component]] = {}
-    for c in components:
-        by_kind.setdefault(c.soort, []).append(c)
-    t = _aggregate(by_kind.get("truenas", []))
-    b = _aggregate(by_kind.get("buitenkant", []))
-    i = _aggregate(by_kind.get("binnenkant", []))
-    checked = [c for c in (b, i) if c is not None and c.observed_at is not None]
-    laatst_getest = max((c.observed_at for c in checked if c.observed_at), default=None)
+    """Beslis voor lijst, detail en componenten op de laatste poging, de brongrens en de bevestigde instantie."""
+
+    def bevestigd(c: Component) -> bool:
+        return (
+            identiteit_gevolgd
+            and c.bevestigd_op is not None
+            and c.bevestigd_op.tzinfo is not None
+            and c.bevestigd_op <= now
+            and (identiteit_sinds is None or c.bevestigd_op > identiteit_sinds)
+        )
+
+    def current(c: Component) -> Component:
+        if c.status not in STATUSES:
+            return replace(c, status="unknown", reason_code="status_onbekend", geldig_tot=None)
+        if c.status != "healthy":
+            return c
+        if c.observed_at is None or c.observed_at.tzinfo is None or c.observed_at > now:
+            return replace(c.last_known("meettijd_onbekend"), observed_at=None)
+        if c.geldig_tot is None or c.geldig_tot.tzinfo is None or c.geldig_tot < now:
+            return c.last_known("meting_verouderd")
+        return c
+
+    runtime = next((current(c) for c in components if c.soort == "truenas"), None)
+    checks = [current(c) for c in components if c.soort != "truenas"]
+    if (
+        runtime is not None
+        and runtime.status != "unknown"
+        and (not identiteit_gevolgd or (identiteit_sinds is not None and not any(bevestigd(c) for c in checks)))
+    ):
+        runtime = runtime.last_known("doelbinding")
+
+    for index, c in enumerate(checks):
+        if c.status == "unknown":
+            continue
+        if not aanwezig or runtime is None or runtime.status in ("down", "unknown"):
+            checks[index] = c.last_known((runtime.reason_code if runtime else None) or "doelbinding")
+        elif (c.status == "healthy" or identiteit_sinds is not None) and not bevestigd(c):
+            checks[index] = c.last_known("doelbinding")
+        elif c.geldig_tot is not None and runtime.geldig_tot is not None:
+            checks[index] = replace(c, geldig_tot=min(c.geldig_tot, runtime.geldig_tot))
+
+    components = ([runtime] if runtime is not None else []) + checks
+    laatst_getest = max((c.observed_at for c in checks if c.observed_at is not None), default=None)
 
     def result(status: str, reason: str | None, cause: Component | None = None) -> dict[str, Any]:
         used = [cause] if cause is not None else [c for c in components if c.status == status]
         observed = min((c.observed_at for c in used if c.observed_at is not None), default=None)
-        if status == "unknown" and observed is None and t is not None and t.reason_code == "inventaris_verouderd":
-            observed = t.observed_at
+        if (
+            status == "unknown"
+            and observed is None
+            and runtime is not None
+            and runtime.reason_code == "inventaris_verouderd"
+        ):
+            observed = runtime.observed_at
         deadline = min((c.geldig_tot for c in used if c.geldig_tot is not None), default=None)
-        if deadline is not None and t is not None and t.geldig_tot is not None:
-            deadline = min(deadline, t.geldig_tot)
+        if deadline is not None and runtime is not None and runtime.geldig_tot is not None:
+            deadline = min(deadline, runtime.geldig_tot)
         return {
             "status": status,
             "reason_code": reason,
@@ -167,39 +203,30 @@ def evaluate(
 
     if not aanwezig:
         return result("unknown", "niet_meer_in_inventaris")
-    if t is not None and t.status == "down":
-        return result("down", t.reason_code, t)
-    if binnenkant_bron == BINNENKANT_P3:
-        adapter = next((c for c in by_kind.get("binnenkant", []) if c.bron == BINNENKANT_P3), None)
-        if adapter is None:
-            adapter = Component("binnenkant", BINNENKANT_P3, "unknown", "adapter_niet_gekoppeld", None)
-        # Contract §6: een onbekende controle weegt zwaarder dan een gezonde.
-        # Bij gelijke toestand houdt de uitkomst de adapterreden en de bijbehorende meettijd.
-        for wanted in ("down", "degraded", "unknown"):
-            for candidate in (adapter, *components):
-                if candidate.status == wanted:
-                    return result(wanted, candidate.reason_code, candidate)
-        return result("healthy", None)
-    if t is not None and t.status == "unknown":
-        return result("unknown", t.reason_code or "inventaris_verouderd", t)
-    for wanted in ("down", "degraded"):
-        for comp in (t, b, i):
-            if comp is not None and comp.status == wanted:
-                return result(wanted, comp.reason_code, comp)
-    healthy_b = b is not None and b.status == "healthy"
-    healthy_i = i is not None and i.status == "healthy"
-    if binnenkant_vereist and not healthy_i:
-        if i is None:
-            return result("unknown", "binnenkant_ontbreekt")
-        return result("unknown", i.reason_code or "meting_verouderd", i)
-    if not (healthy_b or healthy_i):
-        stale = next((c for c in (b, i) if c is not None), None)
-        if stale is not None:
-            return result("unknown", stale.reason_code or "meting_verouderd", stale)
-        return result("unknown", "geen_gezondheidsbron")
-    if t is None:
+    if runtime is None:
         return result("unknown", "inventaris_verouderd")
-    return result("healthy", None)
+    if runtime.status == "down":
+        return result("down", runtime.reason_code, runtime)
+
+    # De adapter bepaalt de reden bij gelijke toestand. Een ontbrekende vereiste
+    # controle doet mee als onbekend, ook als een andere bron wel gezond is.
+    candidates = list(components)
+    if binnenkant_bron == BINNENKANT_P3:
+        adapter = next((c for c in checks if c.bron == BINNENKANT_P3), None)
+        candidates.insert(
+            0, adapter or Component("binnenkant", BINNENKANT_P3, "unknown", "adapter_niet_gekoppeld", None)
+        )
+    elif binnenkant_vereist and not any(c.soort == "binnenkant" for c in checks):
+        candidates.append(
+            Component("binnenkant", binnenkant_bron or "binnenkant", "unknown", "binnenkant_ontbreekt", None)
+        )
+    elif not checks and runtime.status == "healthy":
+        return result("unknown", "geen_gezondheidsbron")
+
+    cause = max(candidates, key=lambda c: _SEVERITY[c.status])
+    if cause.status == "healthy":
+        return result("healthy", None)
+    return result(cause.status, cause.reason_code, cause)
 
 
 def status_value(status: str) -> float | None:

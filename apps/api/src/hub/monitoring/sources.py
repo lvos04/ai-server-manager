@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -70,6 +70,10 @@ def upsert_observation(
     if row is None:
         row = HealthObservation(bron_type=bron_type, bron_id=bron_id, sleutel=sleutel, fouten_op_rij=0)
         db.add(row)
+    if status == "healthy" and observed_at is not None:
+        details = {**details, "bevestigd_op": observed_at.isoformat()}
+    elif row.subject_app_id == subject_app_id and (row.details or {}).get("bevestigd_op"):
+        details = {**details, "bevestigd_op": row.details["bevestigd_op"]}
     row.naam = naam[:200]
     row.status, row.reason_code, row.observed_at = status, reason_code, observed_at
     row.ttl_seconds, row.details, row.updated_at = ttl_seconds, details, now
@@ -80,6 +84,7 @@ def upsert_observation(
 
 def _source_state(db: Session, src: MonitorSource, ok: bool, reason: str | None, now: datetime) -> None:
     """Status van de bron bijwerken; alleen bij een overgang (ok ↔ fout of een andere reden) een outbox-event."""
+    src.laatste_poging = now
     before = (src.laatste_status, src.laatste_reden)
     src.laatste_status, src.laatste_reden = ("ok" if ok else "fout"), reason
     if ok:
@@ -92,6 +97,20 @@ def _source_state(db: Session, src: MonitorSource, ok: bool, reason: str | None,
             str(src.id),
             {"soort": src.soort, "naam": src.naam, "reden": reason, "vorige": before[1]},
         )
+
+
+def _source_failed(db: Session, src: MonitorSource, reason: str, now: datetime) -> dict[str, Any]:
+    _source_state(db, src, False, reason, now)
+    for row in db.scalars(
+        select(HealthObservation).where(
+            HealthObservation.bron_type == src.soort, HealthObservation.bron_id == str(src.id)
+        )
+    ):
+        row.details = {**(row.details or {}), "bron_fout": reason}
+        if reason == "api_key_geweigerd":
+            row.status, row.reason_code = "unknown", "bron_credential_geweigerd"
+    db.flush()
+    return {"status": "fout", "reden": reason}
 
 
 # ------------------------------------------------------------------ Uptime Kuma
@@ -144,21 +163,9 @@ def poll_kuma(db: Session, settings: Settings, vault: Vault, src: MonitorSource,
         policy=settings.outbound_policy(),
         now=now,
     )
-    src.laatste_poging = now
     if not res.ok:
-        _source_state(db, src, False, res.reden, now)
         src.laatste_detail = {**(src.laatste_detail or {}), "fouten": res.fouten}
-        revoked = res.reden == "api_key_geweigerd"
-        for row in db.scalars(
-            select(HealthObservation).where(
-                HealthObservation.bron_type == "uptime_kuma", HealthObservation.bron_id == str(src.id)
-            )
-        ):
-            row.details = {**(row.details or {}), "bron_fout": res.reden}
-            if revoked:  # fail-closed: een geweigerde key maakt de monitors direct onbekend (EX16)
-                row.status, row.reason_code = "unknown", "bron_credential_geweigerd"
-        db.flush()
-        return {"status": "fout", "reden": res.reden}
+        return _source_failed(db, src, res.reden or "bron_onbereikbaar", now)
     _source_state(db, src, True, None, now)
     src.laatste_versie = res.versie
     endpoints = _app_endpoints(db)
@@ -227,7 +234,6 @@ def _gpus(db: Session, settings: Settings) -> list[dict[str, Any]]:
 
 def poll_beszel(db: Session, settings: Settings, vault: Vault, src: MonitorSource, now: datetime) -> dict[str, Any]:
     password = vault.get(db, src.geheim_ref) if src.geheim_ref else None
-    src.laatste_poging = now
     if not password or not src.identiteit:
         _source_state(db, src, False, "inloggegevens_ontbreken", now)
         db.flush()
@@ -313,6 +319,10 @@ def judge_connector_health(
     if (now - observed).total_seconds() > top_age:
         return "unknown", "meting_verouderd", observed, {"laatst_bekend": stated, "max_age_s": top_age}
     checks = [c for c in body.get("checks") or [] if isinstance(c, dict)][:20]
+    # De catalogus krijgt uitsluitend een door de bron begrensde geldigheid.
+    table = limits.get("max_age_s") if isinstance(limits, dict) else None
+    source_age = table.get("health") if isinstance(table, dict) else None
+    deadline = observed + timedelta(seconds=top_age) if type(source_age) is int and source_age > 0 else None
     clean: list[dict[str, Any]] = []
     for c in checks:
         name = str(c.get("name") or "")[:64]
@@ -321,6 +331,8 @@ def judge_connector_health(
         c_obs = _ts(c.get("observed_at"))
         age = max_age_for(limits, name)
         fresh = c_obs is not None and (now - c_obs).total_seconds() <= age and (c_obs - now).total_seconds() <= 300
+        if deadline is not None and c_obs is not None:
+            deadline = min(deadline, c_obs + timedelta(seconds=age))
         clean.append(
             {
                 "name": name if CHECK_NAME.match(name) else "ongeldig",
@@ -341,7 +353,7 @@ def judge_connector_health(
             reason = "meting_verouderd"
         elif bad:
             reason = "controle_faalt"
-    return total, reason, observed, {"checks": clean, "gemeld": stated}
+    return total, reason, observed, {"checks": clean, "gemeld": stated, "geldig_tot": iso(deadline)}
 
 
 def _fail(row: HealthObservation | None, threshold: int) -> tuple[str, str, int]:
@@ -351,82 +363,102 @@ def _fail(row: HealthObservation | None, threshold: int) -> tuple[str, str, int]
     return "unknown", "eerste_fout_grace", fails
 
 
+def _poll_connector(db: Session, settings: Settings, keyring: KeyRing | None, svc: Service, now: datetime) -> str:
+    ttl = settings.monitoring_interval_seconds * 3
+    row = _obs(db, "connector", str(svc.id))
+    base, why = service_base_url(db, settings, svc)
+
+    def save(status: str, reason: str | None, observed: datetime, details: dict[str, Any]) -> None:
+        upsert_observation(
+            db,
+            bron_type="connector",
+            bron_id=str(svc.id),
+            naam=svc.app_id,
+            status=status,
+            reason_code=reason,
+            observed_at=observed,
+            ttl_seconds=ttl,
+            details=details,
+            now=now,
+        )
+
+    if base is None or keyring is None:
+        save("unknown", "dienst_adres_onbekend", now, {"reden": why})
+        return "unknown"
+    bearer, _ = keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))
+    fails = 0
+    status: str
+    reason: str | None
+    limits: Any = None
+    try:
+        # §6.2: de bron mag in discover een strengere max_age per capability opgeven; zonder antwoord geldt 900 s.
+        disc = call(
+            base,
+            "GET",
+            "/connector/v1/discover",
+            bearer=keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))[0],
+            connect_timeout=settings.service_call_connect_timeout,
+            read_timeout=settings.service_call_read_timeout,
+        )
+        if disc.status == 200 and isinstance(disc.body, dict):
+            limits = disc.body.get("limits")
+    except ServiceCallError:
+        limits = None
+    try:
+        res = call(
+            base,
+            "GET",
+            "/connector/v1/health",
+            bearer=bearer,
+            connect_timeout=settings.service_call_connect_timeout,
+            read_timeout=settings.service_call_read_timeout,
+        )
+    except ServiceCallError as exc:
+        status, reason, fails = _fail(row, settings.connector_fail_threshold)
+        save(status, reason, now, {"fout": exc.reason})
+    else:
+        details: dict[str, Any]
+        if res.status in (401, 403):
+            status, reason, observed, details = "unknown", "dienst_weigerde", now, {"http": res.status}
+        elif res.status == 404:
+            status, reason, observed, details = "unknown", "capability_unavailable", now, {"http": 404}
+        elif res.body is not None and res.status in (200, 503):
+            status, reason, observed, details = judge_connector_health(res.body, now, limits)
+        else:
+            status, reason, fails = _fail(row, settings.connector_fail_threshold)
+            observed, details = now, {"http": res.status}
+        save(status, reason, observed, details)
+    new = _obs(db, "connector", str(svc.id))
+    if new is not None:
+        new.fouten_op_rij = fails
+    return status
+
+
 def poll_connectors(db: Session, settings: Settings, keyring: KeyRing | None, now: datetime) -> dict[str, Any]:
     stats = {"diensten": 0, "healthy": 0, "niet_gezond": 0}
-    ttl = settings.monitoring_interval_seconds * 3
-    for svc in db.scalars(select(Service).where(Service.status == "active")):
+    for svc in db.scalars(select(Service).where(Service.status == "active").order_by(Service.id).with_for_update()):
         if profile_for(svc.app_id).binnenkant != BINNENKANT_DIENST:
             continue
         stats["diensten"] += 1
-        row = _obs(db, "connector", str(svc.id))
-        base, why = service_base_url(db, settings, svc)
-
-        def save(
-            status: str, reason: str | None, observed: datetime, details: dict[str, Any], svc: Service = svc
-        ) -> None:
+        try:
+            with db.begin_nested():
+                status = _poll_connector(db, settings, keyring, svc, now)
+        except Exception as exc:
+            log.warning("Gezondheidscontrole van dienst %s mislukt (%s)", svc.id, type(exc).__name__)
+            old = _obs(db, "connector", str(svc.id))
             upsert_observation(
                 db,
                 bron_type="connector",
                 bron_id=str(svc.id),
                 naam=svc.app_id,
-                status=status,
-                reason_code=reason,
-                observed_at=observed,
-                ttl_seconds=ttl,
-                details=details,
+                status="unknown",
+                reason_code="bron_onbereikbaar",
+                observed_at=old.observed_at if old else None,
+                ttl_seconds=settings.monitoring_interval_seconds * 3,
+                details={"bron_fout": "bron_onbereikbaar"},
                 now=now,
             )
-
-        if base is None or keyring is None:
-            save("unknown", "dienst_adres_onbekend", now, {"reden": why})
-            stats["niet_gezond"] += 1
-            continue
-        bearer, _ = keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))
-        fails = 0
-        status: str
-        reason: str | None
-        limits: Any = None
-        try:
-            # §6.2: de bron mag in discover een strengere max_age per capability opgeven; zonder antwoord geldt 900 s.
-            disc = call(
-                base,
-                "GET",
-                "/connector/v1/discover",
-                bearer=keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))[0],
-                connect_timeout=settings.service_call_connect_timeout,
-                read_timeout=settings.service_call_read_timeout,
-            )
-            if disc.status == 200 and isinstance(disc.body, dict):
-                limits = disc.body.get("limits")
-        except ServiceCallError:
-            limits = None
-        try:
-            res = call(
-                base,
-                "GET",
-                "/connector/v1/health",
-                bearer=bearer,
-                connect_timeout=settings.service_call_connect_timeout,
-                read_timeout=settings.service_call_read_timeout,
-            )
-        except ServiceCallError as exc:
-            status, reason, fails = _fail(row, settings.connector_fail_threshold)
-            save(status, reason, now, {"fout": exc.reason})
-        else:
-            details: dict[str, Any]
-            if res.status in (401, 403):
-                status, reason, observed, details = "unknown", "dienst_weigerde", now, {"http": res.status}
-            elif res.status == 404:
-                status, reason, observed, details = "unknown", "capability_unavailable", now, {"http": 404}
-            elif res.body is not None and res.status in (200, 503):
-                status, reason, observed, details = judge_connector_health(res.body, now, limits)
-            else:
-                status, reason, fails = _fail(row, settings.connector_fail_threshold)
-                observed, details = now, {"http": res.status}
-            save(status, reason, observed, details)
-        new = _obs(db, "connector", str(svc.id))
-        if new is not None:
-            new.fouten_op_rij = fails
+            status = "unknown"
         stats["healthy" if status == "healthy" else "niet_gezond"] += 1
     db.flush()
     return stats
@@ -442,24 +474,35 @@ def poll_all(
     now: datetime | None = None,
     only: MonitorSource | None = None,
 ) -> dict[str, Any]:
-    now = now or utcnow()
     out: dict[str, Any] = {"bronnen": {}}
-    sources = (
-        [only]
+    source_ids = (
+        [only.id]
         if only is not None
-        else list(db.scalars(select(MonitorSource).where(MonitorSource.ingeschakeld.is_(True))))
+        else list(db.scalars(select(MonitorSource.id).where(MonitorSource.ingeschakeld.is_(True))))
     )
-    for src in sources:
+    for source_id in source_ids:
+        src = db.get(MonitorSource, source_id, with_for_update=True, populate_existing=True)
+        if src is None:
+            continue
+        attempted = now or utcnow()
+        previous_attempt = src.laatste_poging
         try:
             if src.soort == "uptime_kuma":
-                out["bronnen"][str(src.id)] = poll_kuma(db, settings, vault, src, now)
+                out["bronnen"][str(source_id)] = poll_kuma(db, settings, vault, src, attempted)
             elif src.soort == "beszel":
-                out["bronnen"][str(src.id)] = poll_beszel(db, settings, vault, src, now)
+                out["bronnen"][str(source_id)] = poll_beszel(db, settings, vault, src, attempted)
             db.commit()
         except Exception as exc:
             db.rollback()
-            log.exception("bron %s pollen mislukt", src.id)
-            out["bronnen"][str(src.id)] = {"status": "fout", "reden": type(exc).__name__}
+            reason = type(exc).__name__
+            log.warning("Monitoringbron %s pollen mislukt (%s)", source_id, reason)
+            # De gedeeltelijke meting is teruggedraaid. Bewaar de fout in een nieuwe
+            # transactie, tenzij een volgende poll intussen zelf een resultaat vastlegde.
+            src = db.get(MonitorSource, source_id, with_for_update=True, populate_existing=True)
+            if src is not None and src.laatste_poging in (previous_attempt, attempted):
+                _source_failed(db, src, reason, attempted)
+            db.commit()
+            out["bronnen"][str(source_id)] = {"status": "fout", "reden": reason}
     if only is None:
-        out["diensten"] = poll_connectors(db, settings, keyring, now)
+        out["diensten"] = poll_connectors(db, settings, keyring, now or utcnow())
     return out

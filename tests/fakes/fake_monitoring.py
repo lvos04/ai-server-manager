@@ -230,10 +230,11 @@ class FakeDienst(FakeHTTP):
         super().__init__()
         self.public_key, self.app_id, self.service_id = public_key, app_id, service_id
         self.health: dict[str, Any] = {"status": "healthy", "reason_code": None, "checks": []}
+        self.limits: dict[str, Any] = {"max_age_s": {"health": 120}}
         self.rejected: list[str] = []
 
     def handle(self, seen: Seen) -> Reply:
-        if seen.path != "/connector/v1/health":
+        if seen.path not in ("/connector/v1/health", "/connector/v1/discover"):
             return Reply(404, {"code": "not_found", "message": "Niet gevonden.", "details": {}, "trace_id": "x"})
         auth = seen.headers.get("authorization", "")
         try:
@@ -248,6 +249,8 @@ class FakeDienst(FakeHTTP):
         ):
             self.rejected.append("token_use")
             return Reply(401, {"code": "unauthorized", "message": "Nee.", "details": {"reason": "token_use_invalid"}})
+        if seen.path == "/connector/v1/discover":
+            return Reply(200, {"limits": self.limits})
         now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         body = {**self.health, "observed_at": now}
         body["checks"] = [{**c, "observed_at": now} for c in self.health.get("checks", [])]

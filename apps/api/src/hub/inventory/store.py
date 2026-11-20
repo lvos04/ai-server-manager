@@ -10,13 +10,58 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from hub.catalog.identity import continuity
 from hub.inventory.collector import CollectResult
-from hub.models import InventoryRun, InventorySnapshot
+from hub.models import CatalogApp, InventoryRun, InventorySnapshot
 from hub.timeutil import iso, utcnow
 from hub.truenas.messages import advice, message
+
+# Interne momentopname naast app.query. De cataloguscontrole vergrendelt geen catalogusrij:
+# een lopende adapterproef moet een nieuw opgeslagen poorteigenaar direct kunnen lezen.
+_IDENTITY_KIND = "catalogus_identiteit"
+
+
+def _last_identity(db: Session) -> InventorySnapshot | None:
+    return db.scalar(
+        select(InventorySnapshot)
+        .where(InventorySnapshot.kind == _IDENTITY_KIND)
+        .order_by(InventorySnapshot.observed_at.desc(), InventorySnapshot.id.desc())
+        .limit(1)
+    )
+
+
+def _save_identity(db: Session, run: InventoryRun, data: Any) -> None:
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('hub.catalogus_identiteit'))"))
+    # Ook een vertraagde inventaris ziet een reeds vastgelegde onderbreking.
+    # De grenstijd daarvan mag nooit terugschuiven naar een oudere bronmeting.
+    recorded = utcnow()
+    previous = _last_identity(db)
+    earlier = None
+    boundaries = {}
+    if previous is not None:
+        previous_run = db.get(InventoryRun, previous.run_id)
+        if previous_run is not None and previous_run.target_url == run.target_url:
+            earlier = db.scalar(
+                select(InventorySnapshot.data).where(
+                    InventorySnapshot.run_id == previous.run_id, InventorySnapshot.kind == "apps"
+                )
+            )
+            boundaries = previous.data
+    known = set(db.scalars(select(CatalogApp.runtime_id)))
+    db.add(
+        InventorySnapshot(
+            run_id=run.id,
+            kind=_IDENTITY_KIND,
+            status="ok",
+            method="app.query",
+            message="",
+            data=continuity(earlier, boundaries, data, known, recorded),
+            observed_at=recorded,
+        )
+    )
 
 
 def save_run(db: Session, result: CollectResult, *, trigger: str, started_at: datetime | None = None) -> InventoryRun:
@@ -35,6 +80,8 @@ def save_run(db: Session, result: CollectResult, *, trigger: str, started_at: da
     db.add(run)
     db.flush()
     for k in result.kinds:
+        if k.kind == "apps" and k.status == "ok":
+            _save_identity(db, run, k.data)
         db.add(
             InventorySnapshot(
                 run_id=run.id,
@@ -59,11 +106,22 @@ def _latest(db: Session, kind: str, target: str, only_ok: bool) -> InventorySnap
     )
     if only_ok:
         q = q.where(InventorySnapshot.status == "ok")
-    return db.scalars(q.order_by(InventorySnapshot.observed_at.desc()).limit(1)).first()
+    # Een traag antwoord op een oudere poging mag een nieuwere mislukking niet uitwissen.
+    return db.scalars(
+        q.order_by(
+            InventoryRun.started_at.desc(), InventorySnapshot.observed_at.desc(), InventorySnapshot.id.desc()
+        ).limit(1)
+    ).first()
 
 
 def kind_state(
-    db: Session, kind: str, *, target: str | None, ttl_seconds: int, now: datetime | None = None
+    db: Session,
+    kind: str,
+    *,
+    target: str | None,
+    ttl_seconds: int,
+    now: datetime | None = None,
+    include_identity: bool = False,
 ) -> dict[str, Any]:
     now = now or utcnow()
     base: dict[str, Any] = {
@@ -73,11 +131,14 @@ def kind_state(
         "melding": message("not_configured"),
         "advies": advice("not_configured"),
         "observed_at": None,
+        "geldig_tot": None,
         "laatste_poging": None,
         "verouderd": False,
         "bron": None,
         "data": None,
     }
+    if include_identity:
+        base["identiteit_sinds"] = {}
     if target is None:
         return base
     attempt = _latest(db, kind, target, only_ok=False)
@@ -90,6 +151,10 @@ def kind_state(
         base["observed_at"] = iso(last_ok.observed_at)
         base["data"] = last_ok.data
         base["bron"] = {"methode": last_ok.method, "nas": target}
+        if include_identity:
+            identity = _last_identity(db)
+            if identity is not None and identity.run_id == last_ok.run_id:
+                base["identiteit_sinds"] = identity.data
     if attempt.status != "ok":
         base.update(
             reason_code=attempt.reason_code,
@@ -107,7 +172,14 @@ def kind_state(
             verouderd=True,
         )
         return base
-    base.update(status="ok", reason_code=None, melding="", advies="", verouderd=False)
+    base.update(
+        status="ok",
+        reason_code=None,
+        melding="",
+        advies="",
+        verouderd=False,
+        geldig_tot=iso(attempt.observed_at + timedelta(seconds=ttl_seconds)),
+    )
     return base
 
 

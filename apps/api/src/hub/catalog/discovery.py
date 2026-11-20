@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from hub.catalog.identity import by_runtime_id, same_destination
 from hub.catalog.profiles import profile_for
 from hub.config import Settings
 from hub.inventory.store import kind_state, latest_run
@@ -252,13 +253,14 @@ def discover(db: Session, settings: Settings, *, now: datetime | None = None) ->
             changed["verdwenen_sinds"] = None
         if any(k in changed for k in ("image_repository", "image_tag", "image_digest")):
             row.image_historie = [*(row.image_historie or []), _history_entry(fields, observed)][-HISTORY_MAX:]
+        destination_changed = not same_destination(row.poorten, row.portals, app)
         for k, v in changed.items():
             setattr(row, k, v)
         row.laatst_gezien = observed
         # Een oude controle voor dit runtime-ID kan bij een eerder doel of eerdere poorteigenaar horen.
         identity_since = (row.bron or {}).get("identiteit_sinds")
-        identity_fields = {"aanwezig", "app_id", "service_id", "poorten", "portals"}
-        if (row.bron or {}).get("nas") != url or identity_fields.intersection(changed):
+        identity_fields = {"aanwezig", "app_id", "service_id"}
+        if (row.bron or {}).get("nas") != url or identity_fields.intersection(changed) or destination_changed:
             identity_since = now.isoformat()
         row.bron = {**bron, "identiteit_sinds": identity_since} if identity_since else bron
         if changed:
@@ -310,15 +312,14 @@ def deep_link(row: CatalogApp, nas_address: str | None) -> dict[str, Any]:
 def is_inventory_fresh(db: Session, settings: Settings, now: datetime | None = None) -> dict[str, Any]:
     target = current_target(db)
     state = kind_state(
-        db, "apps", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds, now=now
+        db,
+        "apps",
+        target=target.url if target else None,
+        ttl_seconds=settings.inventory_max_age_seconds,
+        now=now,
+        include_identity=True,
     )
-    # Indexeer dezelfde momentopname één keer voor de hele lijst. Een dubbel ID blijft herkenbaar.
-    by_id: dict[str, list[dict[str, Any]]] = {}
-    if isinstance(state["data"], list):
-        for app in state["data"]:
-            if isinstance(app, dict) and isinstance(app.get("runtime_id"), str):
-                by_id.setdefault(app["runtime_id"], []).append(app)
-    return {**state, "per_runtime_id": by_id}
+    return {**state, "per_runtime_id": by_runtime_id(state["data"])}
 
 
 __all__ = ["DiscoveryResult", "deep_link", "discover", "image_info", "install_method"]

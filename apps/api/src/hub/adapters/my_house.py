@@ -716,5 +716,13 @@ def health(checks: list[CheckReading], now: datetime) -> basis.Measurement:
     )
     if worst.status == "healthy":
         # De oudste meettijd en de eerst verlopende check kunnen bij verschillende bronnen horen.
-        worst.geldig_tot = min(m.geldig_tot for m in measurements if m.geldig_tot is not None)
+        deadlines = [m.geldig_tot for m in measurements if m.geldig_tot is not None]
+        if len(deadlines) != len(measurements):
+            return basis.Measurement(
+                status="unknown",
+                reason_code="meting_verouderd",
+                observed_at=worst.observed_at,
+                laatste_status="healthy",
+            )
+        worst.geldig_tot = min(deadlines)
     return worst

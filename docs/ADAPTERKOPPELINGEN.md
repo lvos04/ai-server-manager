@@ -145,11 +145,38 @@ hetzelfde app-profiel. Bij een gewijzigde bestemming moeten de controles opnieuw
 De bron met de kortste resterende geldigheid bepaalt wanneer een gezonde status verloopt.
 Lijstfilters, tellingen en detail gebruiken die grens ook tussen twee ophaalacties.
 
+De API beslist in `hub.monitoring.health.evaluate` over de catalogusstatus. De tabel hieronder
+geldt voor een draaiende app met gezonde meetwaarden. De drie voorwaarden gelden voor elke
+gekoppelde bron. Alle rijen worden op lijst en detail getoetst door `test_groen_vereist_drie_bewijzen`.
+
+| Laatste poging gelukt | Bronvervalgrens geldig | Instantie bevestigd | Catalogusstatus |
+| --- | --- | --- | --- |
+| Nee | Nee | Nee | Onbekend |
+| Nee | Nee | Ja | Onbekend |
+| Nee | Ja | Nee | Onbekend |
+| Nee | Ja | Ja | Onbekend |
+| Ja | Nee | Nee | Onbekend |
+| Ja | Nee | Ja | Onbekend |
+| Ja | Ja | Nee | Onbekend |
+| Ja | Ja | Ja | Gezond |
+
+De inventaris legt een onderbreking vast in dezelfde transactie als de momentopname.
+Na afwezigheid of een bestemmingswijziging is een nieuwe broncontrole nodig. Bij my_house
+bevestigt die controle de identiteit van de gekoppelde server. Oudere catalogusrijen krijgen
+bij de eerstvolgende inventaris een nieuwe grens voor die bevestiging. Een monitorfout na
+gedeeltelijke opslag laat de oude bronmeettijd intact. Het scherm neemt de status uit het
+API-antwoord over en trekt groen in bij een ophaalfout of een ontbrekende of verlopen `geldig_tot`.
+
 | Laatste meting of ophaalpoging | Lijst, detail en onderdelen | Vaste regressieproef |
 | --- | --- | --- |
 | Dezelfde draaiende instantie, vereiste controles vers en gezond | Gezond met de oudste gebruikte bronmeettijd | `test_catalogus_toestandstabel[vers-emby]`, `test_samenstelling_adapterprofiel` |
 | De bronvervalgrens is verstreken | Onbekend of Laatst bekend met de oorspronkelijke meettijd, ook op een open scherm | `test_catalogus_toestandstabel[verlopen-emby]`, `10-catalogus-gezondheid.spec.ts` |
 | De laatste inventaris- of monitorpoging is mislukt | Onbekend, de vorige meting houdt haar tijd | `test_catalogus_toestandstabel[verversing_mislukt-emby]`, `test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_ingetrokken_key` |
+| Testkluis onbeschikbaar of fout na gedeeltelijke monitoropslag | Onbekend tot een geslaagde nieuwe poging | `test_mislukte_laatste_monitorpoging`, `test_kluisfout_na_gezonde_adapter_of_inventaris` |
+| Instantie terug op hetzelfde adres na onderbreking, met of zonder catalogusupdate | Onbekend tot de bron de instantie opnieuw bevestigt | `test_terugkeer_andere_instantie` |
+| Een oudere inventarismeting komt binnen na een vastgelegde afwezigheid | De oude meting kan een eerdere bevestiging niet herstellen | `test_vertraagde_inventaris_herstelt_geen_oude_bevestiging` |
+| Gewijzigde gevulde poort of portal bij een draaiende of gecrashte app | Onbekend wanneer de bestemming strijdig is met de catalogus | `test_gewijzigde_bestemming_voor_catalogusupdate` |
+| Een vereiste bron levert geen geldigheidsgrens, of een oud API-antwoord mist deze grens | Vanaf ontvangst Onbekend of Laatst bekend | `test_ontbrekende_of_ongeldige_bronvervalgrens`, `catalogus-gezondheid.test.tsx` |
 | De schermverversing is mislukt, met gegevens in het geheugen | Laatst bekend vanaf de bronmeettijd. De apps tellen als onbekend | `catalogus-gezondheid.test.tsx` (503 bij een verse en een verlopen meting) |
 | De eerste schermophaling loopt of mislukt | Laadtoestand of fout met een knop om opnieuw te proberen | `catalogus-gezondheid.test.tsx` (laden en initiële fout) |
 | De nieuwste inventaris bevat een crash | Storing vanaf de crashmeting, ook vóór catalogusvernieuwing. Eerdere broncontroles zijn historisch | `test_crash_gaat_meteen_voor_op_eerdere_meting` |

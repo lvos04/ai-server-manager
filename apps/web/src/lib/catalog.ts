@@ -100,15 +100,21 @@ export function sortApps(items: CatalogApp[], opNaam = false): CatalogApp[] {
   );
 }
 
-/** Oudere catalogusantwoorden kennen alleen de standaard-max_age van contract §6.2. */
+function brontijd(tijd: string | null | undefined): number {
+  if (!tijd || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(tijd)) return NaN;
+  const datum = tijd.slice(0, 10);
+  const dag = new Date(datum + "T00:00:00Z");
+  return Number.isFinite(dag.getTime()) && dag.toISOString().startsWith(datum) ? Date.parse(tijd) : NaN;
+}
+
+/** De API levert de kortste geldigheidsduur van de bronnen voor deze status. */
 export function vervalgrens(m: Meting): number {
-  if (m.status === "unknown") return NaN;
-  return m.geldig_tot === undefined ? Date.parse(m.observed_at ?? "") + 900_000 : Date.parse(m.geldig_tot ?? "");
+  return m.status === "unknown" ? NaN : brontijd(m.geldig_tot);
 }
 
 export function actueleMeting<T extends Meting>(m: T, ophaalfout: boolean, nu: number): T {
   if (m.status === "unknown") return m;
-  const op = Date.parse(m.observed_at ?? "");
+  const op = brontijd(m.observed_at);
   if (!Number.isFinite(op) || op > nu) {
     return { ...m, status: "unknown", observed_at: null, reason_code: "meettijd_onbekend", melding: "De meettijd ontbreekt of is ongeldig." };
   }
@@ -141,7 +147,7 @@ export function meetToelichting(m: Meting): string {
 export function catalogusTellingen(d: CatalogList, getoond: CatalogApp[], ophaalfout: boolean, nu: number): CatalogList["per_status"] {
   const counts = { healthy: 0, degraded: 0, down: 0, unknown: 0 };
   if (d.totaal > d.items.length) {
-    if (!ophaalfout && nu <= Date.parse(d.overige_geldig_tot ?? "")) {
+    if (!ophaalfout && nu <= brontijd(d.overige_geldig_tot)) {
       Object.assign(counts, d.per_status);
       for (const a of d.items) counts[a.gezondheid.status as keyof typeof counts]--;
     } else {
