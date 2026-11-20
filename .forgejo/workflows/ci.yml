@@ -106,7 +106,6 @@ jobs:
         run: pip-audit --strict -r apps/api/requirements.lock -r apps/executor/requirements.lock
 
   woning:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services: *postgres_service
@@ -119,7 +118,7 @@ jobs:
         uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           github-server-url: https://git.medialeon.nl
-          token: ${{ secrets.CI_BRONNEN_LEZEN || github.token }}
+          token: ${{ secrets.BRON_LEESTOKEN }}
           repository: leon/my_house
           ref: d8826c23e0caef6890bdd65d0a1adbab335c9c60
           path: .my-house-interop
@@ -144,7 +143,6 @@ jobs:
           bash tests/interop/woning/proef.sh
 
   planner:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services: *postgres_service
@@ -154,7 +152,7 @@ jobs:
         uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           github-server-url: https://git.medialeon.nl
-          token: ${{ secrets.CI_BRONNEN_LEZEN || github.token }}
+          token: ${{ secrets.BRON_LEESTOKEN }}
           repository: leon/jelly-leon-platform
           ref: 26746920e643cdbb5f9dc31b90cbcc29b65c1f1e
           path: .jlp-interop
@@ -244,7 +242,6 @@ jobs:
         run: python -m pytest -q tools/excel/tests
 
   manifest:
-    if: github.event_name == 'workflow_dispatch'
     # De catalogus bepaalt de vaste revisie van de validator van appstore-en-fork.
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -258,7 +255,7 @@ jobs:
       - uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           github-server-url: https://git.medialeon.nl
-          token: ${{ secrets.CI_BRONNEN_LEZEN || github.token }}
+          token: ${{ secrets.BRON_LEESTOKEN }}
           repository: leon/appstore-en-fork
           ref: ${{ env.ASF_COMMIT }}
           path: .asf
@@ -278,10 +275,9 @@ jobs:
           done
 
   images:
-    if: github.event_name != 'workflow_dispatch' && needs.python.result == 'success' && needs.web.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: [python, web]
+    needs: [python, woning, planner, web]
     steps:
       - *bron
       - name: Hub en executor bouwen en de volledige rooktest uitvoeren
