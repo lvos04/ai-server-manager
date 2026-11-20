@@ -230,6 +230,13 @@ def test_onbekende_adapter_wint_van_andere_binnenkant_en_behoudt_meettijd() -> N
     assert (r["status"], r["reason_code"], r["observed_at"]) == ("unknown", "meting_verouderd", "2026-11-09T11:44:59Z")
 
 
+def test_gewijzigde_serveridentiteit_blokkeert_toeschrijving_van_crash() -> None:
+    adapter = Component("binnenkant", "adapter_p3", "unknown", "bron_identiteit_gewijzigd", NOW)
+    r = _ev([C("truenas", "down", reason="app_gecrasht"), C("buitenkant", "healthy"), adapter], True, "adapter_p3")
+    assert (r["status"], r["reason_code"]) == ("unknown", "bron_identiteit_gewijzigd")
+    assert all(c["status"] == "unknown" for c in r["componenten"])
+
+
 def test_adapter_zonder_meettijd_behoudt_bij_offline_inventaris_de_laatst_bekende_inventaristijd() -> None:
     inventory = C("truenas", "unknown", age_s=900, reason="inventaris_verouderd")
     adapter = Component("binnenkant", "adapter_p3", "unknown", "adapter_niet_gekoppeld", None)

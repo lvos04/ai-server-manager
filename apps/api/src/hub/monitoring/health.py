@@ -155,11 +155,16 @@ def evaluate(
 
     runtime = next((current(c) for c in components if c.soort == "truenas"), None)
     checks = [current(c) for c in components if c.soort != "truenas"]
-    if (
-        runtime is not None
-        and runtime.status != "unknown"
-        and (not identiteit_gevolgd or (identiteit_sinds is not None and not any(bevestigd(c) for c in checks)))
-    ):
+    if binnenkant_bron == BINNENKANT_P3:
+        identity_sources = [c for c in checks if c.bron == BINNENKANT_P3]
+    else:
+        identity_sources = [c for c in checks if not binnenkant_vereist or c.soort == "binnenkant"]
+    uncertain = (
+        not identiteit_gevolgd
+        or (identiteit_sinds is not None and not any(bevestigd(c) for c in identity_sources))
+        or any(c.reason_code == "bron_identiteit_gewijzigd" for c in identity_sources)
+    )
+    if runtime is not None and runtime.status != "unknown" and uncertain:
         runtime = runtime.last_known("doelbinding")
 
     for index, c in enumerate(checks):

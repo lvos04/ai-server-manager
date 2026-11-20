@@ -1795,6 +1795,23 @@ def test_terugkeer_andere_instantie(admin, app, settings, doel, huis_simulatie, 
         assert discover(db, settings).status == "ok"
     aantal = len(aanvragen)
     assert toestanden(admin, doel) == ("unknown", "unknown")
+    # De buitenkant kan op het teruggekeerde adres al een andere server bereiken.
+    with app.state.sessionmaker.begin() as db:
+        row = db.scalars(select(CatalogApp)).one()
+        nu = utcnow()
+        upsert_observation(
+            db,
+            bron_type="uptime_kuma",
+            bron_id="proef",
+            naam="Buitenkant",
+            status="healthy",
+            observed_at=nu,
+            ttl_seconds=300,
+            details={},
+            reason_code=None,
+            subject_app_id=row.id,
+            now=nu,
+        )
     inventariseer(app, settings, "CRASHED", werk_catalogus_bij=False)
     assert toestanden(admin, doel) == ("unknown", "unknown")
     inventariseer(app, settings, "RUNNING", werk_catalogus_bij=False)

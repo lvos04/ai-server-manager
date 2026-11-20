@@ -162,7 +162,8 @@ gekoppelde bron. Alle rijen worden op lijst en detail getoetst door `test_groen_
 
 De inventaris legt een onderbreking vast in dezelfde transactie als de momentopname.
 Na afwezigheid of een bestemmingswijziging is een nieuwe broncontrole nodig. Bij my_house
-bevestigt die controle de identiteit van de gekoppelde server. Oudere catalogusrijen krijgen
+bevestigt de adapter de identiteit van de gekoppelde server. Ook bij een verse bereikbaarheidsmeting
+blijft een crash onbekend totdat de adapter de server kan bevestigen. Oudere catalogusrijen krijgen
 bij de eerstvolgende inventaris een nieuwe grens voor die bevestiging. Een monitorfout na
 gedeeltelijke opslag laat de oude bronmeettijd intact. Het scherm neemt de status uit het
 API-antwoord over en trekt groen in bij een ophaalfout of een ontbrekende of verlopen `geldig_tot`.
