@@ -9,8 +9,10 @@ from typing import Any
 
 import pytest
 
+from hub.adapters.health import stored_health
 from hub.catalog.discovery import deep_link, image_info, install_method, readback_digests, storage
 from hub.catalog.profiles import ADAPTER_TYPES, PROFILES, SOORTEN, profile_for
+from hub.models import AdapterLink
 from hub.monitoring.health import Component, evaluate, freshen, status_value
 from hub.outbound import OutboundError, validate_base_url
 from hub.truenas import normalize as norm
@@ -154,7 +156,7 @@ def test_200_zonder_jobs_is_degraded_en_zonder_binnenkant_onbekend() -> None:
     r = _ev([C("truenas", "healthy"), C("buitenkant", "healthy")], vereist=True, bron="heartbeat_of_connector")
     assert r["status"] == "unknown" and r["reason_code"] == "binnenkant_ontbreekt"
     r = _ev([C("truenas", "healthy"), C("buitenkant", "healthy")], vereist=True, bron="adapter_p3")
-    assert r["status"] == "unknown" and r["reason_code"] == "binnenkant_niet_gebouwd"
+    assert r["status"] == "unknown" and r["reason_code"] == "adapter_niet_gekoppeld"
     ok = [C("truenas", "healthy"), C("buitenkant", "healthy"), C("binnenkant", "healthy")]
     assert _ev(ok, vereist=True, bron="heartbeat_of_connector")["status"] == "healthy"
 
@@ -175,6 +177,75 @@ def test_verouderde_component_is_onbekend_nooit_laatst_bekend() -> None:
     assert r["status"] == "unknown" and r["reason_code"] == "meting_verouderd"
     # Een monitor die wél vers is, telt; een verouderde ernaast maakt de app niet onbekend.
     assert _ev([C("truenas", "healthy"), old, C("buitenkant", "healthy")])["status"] == "healthy"
+
+
+@pytest.mark.parametrize(
+    ("buitenstatus", "adapterstatus", "verwacht"),
+    [
+        (None, "healthy", "healthy"),
+        ("healthy", "healthy", "healthy"),
+        ("healthy", "unknown", "unknown"),
+        ("unknown", "healthy", "unknown"),
+        ("degraded", "unknown", "degraded"),
+        ("down", "degraded", "down"),
+    ],
+)
+def test_samenstelling_adapterprofiel(buitenstatus: str | None, adapterstatus: str, verwacht: str) -> None:
+    adapter = Component("binnenkant", "adapter_p3", adapterstatus, None, NOW - timedelta(seconds=30))
+    comps = [C("truenas", "healthy", age_s=10), adapter]
+    if buitenstatus is not None:
+        comps.append(C("buitenkant", buitenstatus, age_s=20))
+    assert _ev(comps, vereist=True, bron="adapter_p3")["status"] == verwacht
+    if verwacht == "healthy":
+        assert _ev(comps, vereist=True, bron="adapter_p3")["observed_at"] == "2026-11-09T11:59:30Z"
+
+
+def test_onbekende_adapter_wint_van_andere_binnenkant_en_behoudt_meettijd() -> None:
+    adapter = Component("binnenkant", "adapter_p3", "unknown", "meting_verouderd", NOW - timedelta(seconds=901))
+    r = _ev([C("truenas", "healthy"), C("binnenkant", "healthy"), adapter], vereist=True, bron="adapter_p3")
+    assert (r["status"], r["reason_code"], r["observed_at"]) == ("unknown", "meting_verouderd", "2026-11-09T11:44:59Z")
+
+
+@pytest.mark.parametrize(
+    ("stamp", "status", "reason"),
+    [
+        (NOW.isoformat(), "healthy", None),
+        ((NOW - timedelta(seconds=301)).isoformat(), "unknown", "meting_verouderd"),
+        ((NOW + timedelta(seconds=1)).isoformat(), "unknown", "meettijd_onbekend"),
+        (None, "unknown", "meettijd_onbekend"),
+        (NOW.replace(tzinfo=None).isoformat(), "unknown", "meettijd_onbekend"),
+        ("geen tijdstip", "unknown", "meting_onbekend"),
+    ],
+)
+def test_versheid_van_opgeslagen_adaptermeting(stamp: str | None, status: str, reason: str | None) -> None:
+    link = AdapterLink(
+        app_id="my_house",
+        my_house_checks=[
+            {"key": "database", "state": "ok", "observed_at": stamp, "max_age_s": 300},
+            {
+                "key": "worker",
+                "state": "ok",
+                "observed_at": NOW.isoformat(),
+                "worker_observed_at": NOW.isoformat(),
+                "max_age_s": 300,
+            },
+        ],
+    )
+    reading = stored_health(link, NOW, bound=True)
+    assert (reading.status, reading.reason_code) == (status, reason)
+    if reason == "meting_verouderd":
+        assert reading.observed_at == NOW - timedelta(seconds=301)
+        assert reading.laatste_status == "healthy"
+
+
+@pytest.mark.parametrize(
+    ("app_id", "reason"),
+    [("mediaguard", "geen_alleen_lezen_bron"), ("media-source-optimizer", "capability_unavailable")],
+)
+def test_openbare_bereikbaarheid_is_geen_binnenkantmeting(app_id: str, reason: str) -> None:
+    link = AdapterLink(app_id=app_id, laatste_status="healthy", observed_at=NOW)
+    reading = stored_health(link, NOW, bound=True)
+    assert (reading.status, reading.reason_code, reading.observed_at) == ("unknown", reason, None)
 
 
 def test_statuswaarde_voor_tijdreeks() -> None:

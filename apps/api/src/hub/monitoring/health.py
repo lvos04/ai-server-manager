@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from hub.catalog.profiles import BINNENKANT_P3
 from hub.timeutil import iso, utcnow
 
 STATUSES: tuple[str, ...] = ("healthy", "degraded", "down", "unknown")
@@ -44,8 +45,13 @@ MELDINGEN: dict[str, str] = {
     "geen_gezondheidsbron": "Er is geen verse controle van buitenaf of van binnenuit gekoppeld.",
     "binnenkant_ontbreekt": "De app voert zelf taken uit; zonder verse binnenkant-controle (heartbeat of "
     "connector-health) is gezond niet vast te stellen.",
-    "binnenkant_niet_gebouwd": "De Hub-adapter voor de binnenkant van deze bestaande app (read-model met gescopete "
-    "sleutel) volgt in fase P3; gezond is daarom nog niet vast te stellen.",
+    "adapter_niet_gekoppeld": "Deze app is nog niet gekoppeld. Ga naar Instellingen → Diensten.",
+    "geen_alleen_lezen_bron": "Deze app biedt nog geen bewezen alleen-lezen gezondheidsbron.",
+    "meting_onbekend": "De adapter heeft nog geen gezondheidsmeting.",
+    "meettijd_onbekend": "De meettijd ontbreekt of is ongeldig.",
+    "doelbinding": "De Hub kan de gekoppelde app niet bevestigen.",
+    "bron_token_verlopen": "De leesverbinding is verlopen. Ga naar Instellingen → Diensten.",
+    "bron_token_ingetrokken": "De leesverbinding is ingetrokken. Ga naar Instellingen → Diensten.",
     # Contract 1.3 §6.2: een meting ouder dan haar max_age is unknown met reason_code meting_verouderd.
     "meting_verouderd": "De laatste meting is ouder dan toegestaan en geldt daarom als onbekend.",
     "verouderd": "De laatste meting is ouder dan toegestaan en geldt daarom als onbekend.",
@@ -147,7 +153,14 @@ def evaluate(
     laatst_getest = max((c.observed_at for c in checked if c.observed_at), default=None)
 
     def result(status: str, reason: str | None, cause: Component | None = None) -> dict[str, Any]:
-        observed = max((c.observed_at for c in (t, b, i) if c is not None and c.observed_at), default=None)
+        if binnenkant_bron == BINNENKANT_P3 and aanwezig:
+            observed = (
+                cause.observed_at
+                if cause is not None
+                else min((c.observed_at for c in components if c.observed_at is not None), default=None)
+            )
+        else:
+            observed = max((c.observed_at for c in (t, b, i) if c is not None and c.observed_at), default=None)
         return {
             "status": status,
             "reason_code": reason,
@@ -161,6 +174,17 @@ def evaluate(
 
     if not aanwezig:
         return result("unknown", "niet_meer_in_inventaris")
+    if binnenkant_bron == BINNENKANT_P3:
+        adapter = next((c for c in by_kind.get("binnenkant", []) if c.bron == BINNENKANT_P3), None)
+        if adapter is None:
+            adapter = Component("binnenkant", BINNENKANT_P3, "unknown", "adapter_niet_gekoppeld", None)
+        # Contract §6: een onbekende controle weegt zwaarder dan een gezonde.
+        # Bij gelijke toestand houdt de uitkomst de adapterreden en de bijbehorende meettijd.
+        for wanted in ("down", "degraded", "unknown"):
+            for candidate in (adapter, *components):
+                if candidate.status == wanted:
+                    return result(wanted, candidate.reason_code, candidate)
+        return result("healthy", None)
     for wanted in ("down", "degraded"):
         for comp in (t, b, i):
             if comp is not None and comp.status == wanted:
@@ -168,8 +192,6 @@ def evaluate(
     healthy_b = b is not None and b.status == "healthy"
     healthy_i = i is not None and i.status == "healthy"
     if binnenkant_vereist and not healthy_i:
-        if binnenkant_bron == "adapter_p3":
-            return result("unknown", "binnenkant_niet_gebouwd")
         if i is None:
             return result("unknown", "binnenkant_ontbreekt")
         return result("unknown", i.reason_code or "meting_verouderd", i)

@@ -34,7 +34,7 @@ SOORTEN: tuple[str, ...] = ("eigen", "bestaand", "derde", "onbekend")
 # Waar de binnenkant-controle vandaan komt.
 BINNENKANT_HUB = "hub_worker"
 BINNENKANT_DIENST = "heartbeat_of_connector"
-BINNENKANT_P3 = "adapter_p3"  # bestaande app: read-model met gescopete sleutel volgt in P3 (nog niet gebouwd)
+BINNENKANT_P3 = "adapter_p3"  # bestaande app: gezondheid uit de opgeslagen adaptermetingen
 
 
 @dataclass(frozen=True)

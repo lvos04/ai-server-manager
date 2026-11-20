@@ -87,6 +87,7 @@ test("appcatalogus: slechtste status eerst, ‘Draait’ is nooit gezond, acties
   await expect(page.locator("main h1")).toHaveText("MediaGuard");
   const gezond = page.getByTestId("app-gezondheid");
   await expect(gezond.locator("[data-status]").first()).not.toHaveAttribute("data-status", "healthy");
+  await expect(gezond).toContainText("Deze app is nog niet gekoppeld. Ga naar Instellingen → Diensten.");
   await expect(gezond).toContainText("Draait");
   await expect(gezond).toContainText("Draaien alleen is geen bewijs van gezond.");
   await expect(gezond).toContainText("Resourcegrenzen");

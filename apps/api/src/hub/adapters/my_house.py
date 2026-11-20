@@ -168,6 +168,8 @@ class CheckReading(Check):
             observed_at = self.worker_observed_at
             if self.state == "error" and observed_at is not None:
                 observed_at = self.worker_error_observed_at
+        if observed_at is not None and observed_at.tzinfo is None:
+            observed_at = None
         return basis.fresh_measurement(
             basis.Measurement(status=CHECK_STATUS[self.state], observed_at=observed_at),
             now=now,

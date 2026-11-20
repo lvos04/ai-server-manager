@@ -877,6 +877,65 @@ def test_my_house_projectie_en_verlopen_token(
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_catalogus_leest_adaptergezondheid_en_incident_volgt_op_derde_meting(
+    admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, periodic_run: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code, toestand, _ = huis_simulatie
+    app_id = doel["catalog_app_id"]
+    path = f"/api/v1/apps/{app_id}"
+    with app.state.sessionmaker.begin() as db:
+        db.scalars(select(CatalogApp)).one().runtime_staat = "RUNNING"
+
+    health = admin.get(path).json()["gezondheid"]
+    assert health["status"] == "unknown" and health["reason_code"] == "adapter_niet_gekoppeld"
+    assert "Instellingen → Diensten" in health["melding"]
+
+    response = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert response.status_code == 201
+    link = f"{ROUTE}/{response.json()['id']}"
+    assert admin.post(f"{link}/test", headers=idem()).status_code == 200
+
+    with monkeypatch.context() as isolated:
+        call = Mock(side_effect=AssertionError("De appcatalogus mag de adapterbron niet aanroepen."))
+        isolated.setattr(outbound, "request", call)
+        view = admin.get(path).json()["gezondheid"]
+        assert view["status"] == "healthy"
+        assert admin.get("/api/v1/apps").json()["items"][0]["gezondheid"]["status"] == "healthy"
+        assert view["observed_at"] == admin.get(link).json()["gezondheid"]["observed_at"]
+        call.assert_not_called()
+
+    toestand["extra_check"] = {"state": "error", "details": {"checked_at": (utcnow() - timedelta(hours=1)).isoformat()}}
+    first = idem()
+    assert admin.post(f"{link}/test", headers=first).status_code == 200
+    assert admin.post(f"{link}/test", headers=first).headers["Idempotent-Replay"] == "true"
+    health = admin.get(path).json()["gezondheid"]
+    assert (health["status"], health["reason_code"]) == ("unknown", "meting_verouderd")
+    assert health["observed_at"] == admin.get(link).json()["gezondheid"]["observed_at"]
+
+    def incidents() -> list[Incident]:
+        periodic_run("incidenten_bijwerken")
+        with app.state.sessionmaker() as db:
+            return list(db.scalars(select(Incident).where(Incident.soort == "monitoring.adapter_health")))
+
+    assert incidents() == []
+    toestand["extra_check"]["details"]["checked_at"] = utcnow().isoformat()
+    assert admin.post(f"{link}/test", headers=idem()).status_code == 200
+    assert admin.get(path).json()["gezondheid"]["status"] == "down"
+    assert incidents() == []
+    assert admin.post(f"{link}/test", headers=idem()).status_code == 200
+    [incident] = incidents()
+    assert (incident.status, incident.onderwerp_id) == ("open", app_id)
+    assert admin.post(f"{link}/test", headers=idem()).status_code == 200
+    [incident] = incidents()
+    assert incident.aantal == 1
+
+    toestand["extra_check"] = None
+    assert admin.post(f"{link}/test", headers=idem()).status_code == 200
+    [incident] = incidents()
+    assert incident.status == "opgelost"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
 def test_my_house_vernieuwing_door_worker(
     admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, periodic_run: Any
 ) -> None:

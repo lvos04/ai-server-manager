@@ -23,6 +23,7 @@ export interface Component {
   detail?: string;
   staat?: string | null;
   verouderd?: boolean;
+  laatste_status?: string | null;
   latency_ms?: number;
   uptime_24u?: number;
 }
@@ -113,7 +114,6 @@ export const COMPONENT_LABEL: Record<string, string> = {
 
 /** Uitleg bij een ontbrekende of onbekende component (reason_code → NL). */
 export const REDEN: Record<string, string> = {
-  binnenkant_niet_gebouwd: "Binnenkant volgt in fase P3 (koppeling met de app via zijn bestaande routes).",
   binnenkant_ontbreekt: "Geen controle van binnenuit.",
   geen_monitor: "Geen Uptime Kuma-monitor gekoppeld.",
   inventaris_verouderd: "De inventaris is verouderd.",

@@ -62,6 +62,9 @@ function Onderdelen({ app }: { app: CatalogDetail }) {
               <span className="flex flex-col text-sm">
                 <span>
                   {r.c.melding}
+                  {r.c.bron === "adapter_p3" && r.c.verouderd && (r.c.laatste_status === "down" || r.c.laatste_status === "degraded")
+                    ? ` Laatst bekend: ${healthView(r.c.laatste_status).label}.`
+                    : ""}
                   {r.soort === "truenas" ? `${r.c.melding ? " " : ""}Draaien alleen is geen bewijs van gezond.` : ""}
                 </span>
                 <span className="text-muted-foreground">
@@ -75,7 +78,7 @@ function Onderdelen({ app }: { app: CatalogDetail }) {
                 {r.soort === "buitenkant"
                   ? REDEN.geen_monitor
                   : app.gezondheidsprofiel.binnenkant === "adapter_p3"
-                    ? REDEN.binnenkant_niet_gebouwd
+                    ? app.gezondheid.melding || "De adapter heeft nog geen gezondheidsmeting."
                     : app.gezondheidsprofiel.binnenkant_vereist
                       ? "Geen controle van binnenuit; deze app heeft eigen taken, dus zonder binnenkant is hij nooit gezond."
                       : "Geen controle van binnenuit (niet vereist voor deze app)."}

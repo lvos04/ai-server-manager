@@ -368,9 +368,11 @@ Probeer het over <n> minuten opnieuw." Na inloggen: vaste balk boven de kop (`st
 - **Gezondheidskaart** boven de tabs (`data-testid="app-gezondheid"`): StatusBadge groot + reden in één zin + link
   naar het incident; daaronder **Gezondheid per onderdeel** (ResponsieveLijst): TrueNAS-staat (neutrale pil `power`
   "Draait", met de zin "Draaien alleen is geen bewijs van gezond.") · Buitenkant (Uptime Kuma; StatusBadge + latency +
-  tijd) · Binnenkant (connector-health / heartbeat / worker; StatusBadge + naam van de controle + tijd). Ontbreekt een
-  onderdeel: Onbekend met reden ("Geen Uptime Kuma-monitor gekoppeld", "Binnenkant volgt in fase P3 (koppeling met
-  MediaGuard)"). Daarnaast KopieerVeld Image-digest en Versheid met Image, Data-dataset(s) (paden met `<wbr>`) en
+  tijd) · Binnenkant (connector-health, heartbeat, worker of adaptermeting; StatusBadge + naam van de controle + tijd).
+  Ontbreekt een onderdeel: Onbekend met reden ("Geen Uptime Kuma-monitor gekoppeld" of "Deze app is nog niet
+  gekoppeld. Ga naar Instellingen → Diensten."). Als de adaptermeting is verlopen, staat een laatst bekende
+  storing of beperking met de meettijd in de toelichting. Daarnaast KopieerVeld Image-digest en Versheid met Image,
+  Data-dataset(s) (paden met `<wbr>`) en
   **Resourcegrenzen: "Onbekend — de Hub leest de app-configuratie niet (kan geheimen bevatten)."**
 - **Tabs** (shadcn Tabs volgens COMPONENTEN §21; < 768 omlopende knoppen):
   - *Status:* controles per onderdeel met historie (laatste 24 u), uptime 30 d (alleen als Kuma levert), laatste

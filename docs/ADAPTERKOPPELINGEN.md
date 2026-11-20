@@ -109,3 +109,36 @@ meetinhoud van de koppeling. Migratie `0020` scheidt de metingen van de bevestig
 meetinhoud uit eerder opgeslagen bevestigingen. Terugrollen van `0020` wist de metingen. Terugrollen
 van `0019` verwijdert ook de daarmee gemaakte my_house-koppelingen en kluiswaarden. Na ontkoppelen of
 terugrollen levert een herhaalde testbevestiging `my_house: null`.
+
+## Gezondheid van de binnenkant in de catalogus (S-P3-060)
+
+De lijst en het detail lezen de opgeslagen adaptermeting voor de gekoppelde catalogusinstantie.
+Ze gebruiken de bronmeettijd, de toestand en de redencode. Ze sturen hiervoor geen verzoek naar
+de app. Zonder koppeling is de binnenkant onbekend. De toelichting verwijst naar Instellingen →
+Diensten. MediaGuard heeft nog geen bewezen alleen-lezen gezondheidsbron. De openbare
+MSO-probes meten bereikbaarheid. Voor beide adapters blijft de binnenkant onbekend.
+
+De catalogus gebruikt de slechtste toestand in de volgorde `down`, `degraded`, `unknown`,
+`healthy`. Een ontbrekende buitenkantmonitor telt niet mee. Een gekoppelde monitor met een
+onbekende meting telt wel mee. Bij gelijke toestand krijgt de adapterreden voorrang. Bij
+`healthy` geeft het totaal de oudste gebruikte meettijd. Anders geeft het de tijd van de
+component die de toestand bepaalt.
+
+| Buitenkant | Binnenkantmeting | Totaal bij draaiende app | Geval in `test_samenstelling_adapterprofiel` |
+| --- | --- | --- | --- |
+| Geen monitor | `healthy` | `healthy` | `None-healthy-healthy` |
+| `healthy` | `healthy` | `healthy` | `healthy-healthy-healthy` |
+| `healthy` | `unknown` | `unknown` | `healthy-unknown-unknown` |
+| `unknown` | `healthy` | `unknown` | `unknown-healthy-unknown` |
+| `degraded` | `unknown` | `degraded` | `degraded-unknown-degraded` |
+| `down` | `degraded` | `down` | `down-degraded-down` |
+
+Een ontbrekende, ongeldige of toekomstige meettijd geeft `unknown`. Een meting ouder dan haar
+`max_age` geeft `unknown` met `meting_verouderd` en behoudt haar meettijd. Appdetail gebruikt de
+bestaande statusrij en vermeldt een laatst bekende storing of beperking alleen in de toelichting.
+
+Een my_house-contactproef telt één nieuwe gezondheidsmeting. Drie opeenvolgende metingen met
+`unknown` of `down` openen één incident. Een gezonde meting sluit het. Een beperkte meting
+onderbreekt een reeks vóór opening. Cataloguslezingen en idempotente herhalingen tellen niet mee.
+Migratie `0021` bewaart de reeks per koppeling. Bestaande koppelingen beginnen op nul. Terugrollen
+van `0021` verwijdert alleen de teller.

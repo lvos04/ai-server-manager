@@ -6,9 +6,7 @@ import json
 import re
 import uuid
 from datetime import datetime
-from ipaddress import ip_address
 from typing import Annotated, Any, Literal
-from urllib.parse import urlsplit
 
 from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, Header, Response
@@ -18,10 +16,13 @@ from sqlalchemy import select, update
 
 from hub import audit
 from hub.adapters import basis, mediaguard, mso, my_house
+from hub.adapters.binding import binding_is_current, published_ports, registered_peers, registered_port, target_matches
+from hub.adapters.health import stored_health
 from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, Viewer, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
+from hub.incidents.rules import ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED, adapter_health_transition
 from hub.inventory.store import kind_state
 from hub.models import AdapterHouseSnapshot, AdapterLink, CatalogApp, IdempotencyRecord, VaultSecret
 from hub.outbound import OutboundError
@@ -131,25 +132,6 @@ def _view(row: AdapterLink, *, bound: bool) -> MediaGuardLinkView | LinkView:
             laatste_status=row.laatste_status if row.observed_at else None,
         )
     is_mso = row.app_id == mso.APP_ID
-    if is_mediaguard:
-        health = mediaguard.health()
-    else:
-        health = mso.health() if is_mso else basis.Measurement(status="unknown", reason_code="capability_unavailable")
-    if row.app_id == my_house.APP_ID:
-        last = (
-            my_house.health(my_house.CheckReadings.validate_python(row.my_house_checks), now)
-            if row.my_house_checks
-            else None
-        )
-        if last is not None and bound and reason is None:
-            health = last
-        else:
-            health = basis.Measurement(
-                status="unknown",
-                reason_code=measurement.reason_code or "meting_onbekend",
-                observed_at=last.observed_at if last is not None else row.observed_at,
-                laatste_status=(last.laatste_status or last.status) if last is not None else None,
-            )
     view = LinkView(
         id=row.id,
         app_id=row.app_id,
@@ -158,7 +140,7 @@ def _view(row: AdapterLink, *, bound: bool) -> MediaGuardLinkView | LinkView:
         laatste4="" if is_mso else row.laatste4,
         ingevoerd_op=None if is_mso else row.ingevoerd_op,
         verbinding=measurement,
-        gezondheid=health,
+        gezondheid=stored_health(row, now, bound=bound),
         version=row.version,
     )
     if is_mediaguard:
@@ -173,10 +155,6 @@ def _link(db: DB, link_id: uuid.UUID, *, lock: bool = False) -> AdapterLink:
     return row
 
 
-def _target_matches(target: CatalogApp | None, app_id: str) -> bool:
-    return target is not None and target.aanwezig and target.app_id == app_id and target.soort == "bestaand"
-
-
 def _binding_conflict() -> HubError:
     return HubError(
         409, "conflict", "De bestemming is niet geregistreerd voor deze app-instantie.", {"reason": "doelbinding"}
@@ -185,89 +163,14 @@ def _binding_conflict() -> HubError:
 
 def _target(db: DB, app_id: str, catalog_app_id: uuid.UUID) -> CatalogApp:
     target = db.get(CatalogApp, catalog_app_id, with_for_update=True)
-    if target is None or not _target_matches(target, app_id):
+    if target is None or not target_matches(target, app_id):
         raise _binding_conflict()
     return target
 
 
 def _published_ports(db: DB, settings: Settings, nas: NasTarget | None) -> dict[int, list[dict[str, Any]]]:
     inventory = kind_state(db, "apps", target=nas.url if nas else None, ttl_seconds=settings.inventory_max_age_seconds)
-    owners: dict[int, list[dict[str, Any]]] = {}
-    if inventory["status"] != "ok" or not isinstance(inventory["data"], list):
-        return owners
-    for app in inventory["data"]:
-        if not isinstance(app, dict) or not isinstance(app.get("poorten"), list):
-            continue
-        for port in {
-            binding["host_poort"]
-            for binding in app["poorten"]
-            if isinstance(binding, dict) and binding.get("protocol") == "tcp" and type(binding.get("host_poort")) is int
-        }:
-            owners.setdefault(port, []).append(app)
-    return owners
-
-
-def _registered_port(
-    base: str, target: CatalogApp, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
-) -> int | None:
-    # De inventaris kan al zijn vastgelegd terwijl de worker de catalogus nog bijwerkt.
-    parts = urlsplit(base)
-    port = parts.port or 443
-    if nas is None or parts.hostname != nas.host.strip("[]").lower() or target.bron.get("nas", nas.url) != nas.url:
-        return None
-    port_owners = owners.get(port, [])
-    if len(port_owners) != 1:
-        return None
-    owner = port_owners[0]
-    if (
-        owner.get("runtime_id") != target.runtime_id
-        or owner.get("herkend_als") != target.app_id
-        or owner.get("poorten") != target.poorten
-        or owner.get("portals") != target.portals
-    ):
-        return None
-    if any(
-        isinstance(portal, dict)
-        and portal.get("schema") == "https"
-        and portal.get("poort") == port
-        and str(portal.get("pad") or "/").rstrip("/") == parts.path
-        for portal in target.portals
-    ):
-        return port
-    return None
-
-
-def _registered_peers(target: CatalogApp, port: int, peers: list[str]) -> bool:
-    interfaces = [
-        binding.get("host_ip")
-        for binding in target.poorten
-        if isinstance(binding, dict) and binding.get("protocol") == "tcp" and binding.get("host_poort") == port
-    ]
-    if not peers:
-        return False
-    if None in interfaces or "" in interfaces:
-        return True
-    try:
-        addresses = {ip_address(str(interface)) for interface in interfaces}
-        return all(
-            peer in addresses or any(addr.is_unspecified and addr.version == peer.version for addr in addresses)
-            for peer in map(ip_address, peers)
-        )
-    except ValueError:
-        return False
-
-
-def _binding_is_current(
-    row: AdapterLink, target: CatalogApp | None, nas: NasTarget | None, owners: dict[int, list[dict[str, Any]]]
-) -> bool:
-    if target is None or not _target_matches(target, row.app_id):
-        return False
-    try:
-        base = basis.validate_base_url(row.basis_url)
-    except OutboundError:
-        return False
-    port = _registered_port(base, target, nas, owners)
-    return port is not None and _registered_peers(target, port, row.peer_addresses)
+    return published_ports(inventory)
 
 
 def _destination(
@@ -277,11 +180,11 @@ def _destination(
         base = basis.validate_base_url(url)
         if credential is not None and credential.casefold() in base.casefold():
             raise OutboundError("adres_ongeldig")
-        port = _registered_port(base, target, nas, owners)
+        port = registered_port(base, target, nas, owners)
         if port is None:
             raise _binding_conflict()
         peers = basis.resolve_binding(base)
-        if not _registered_peers(target, port, peers):
+        if not registered_peers(target, port, peers):
             raise _binding_conflict()
         return base, peers
     except OutboundError as exc:
@@ -385,7 +288,7 @@ def _unique_target(db: DB, catalog_app_id: uuid.UUID, except_id: uuid.UUID | Non
 def _house_adapter(db: DB, settings: Settings, row: AdapterLink, target: CatalogApp) -> my_house.Adapter:
     def check_binding() -> None:
         nas = current_target(db)
-        if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
+        if not binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
             raise OutboundError("doelbinding")
 
     return my_house.Adapter(row, settings.outbound_policy(), check_binding=check_binding)
@@ -449,6 +352,21 @@ def _house_transition(db: DB, row: AdapterLink, reason: str | None) -> None:
     row.laatste_fout = reason
 
 
+def _record_health_measurement(db: DB, row: AdapterLink, now: datetime) -> None:
+    # De contactproef vergrendelt de koppeling; een idempotente herhaling komt hier niet.
+    health = stored_health(row, now, bound=True)
+    row.health_failures, transition = adapter_health_transition(row.health_failures, health.status)
+    if transition is not None:
+        emit(
+            db,
+            ADAPTER_HEALTH_FAILED if transition == "probleem" else ADAPTER_HEALTH_RECOVERED,
+            "catalog_app",
+            str(row.catalog_app_id),
+            {"app_id": row.app_id, "status": health.status, "reason_code": health.reason_code},
+            timestamp=now,
+        )
+
+
 def renew_my_house_links(db: DB, settings: Settings, vault: Vault, now: datetime) -> dict[str, int]:
     """Vernieuw tijdig, ook zonder handmatige test. De rijvergrendeling serialiseert tokenwissels."""
     ids = list(
@@ -465,7 +383,7 @@ def renew_my_house_links(db: DB, settings: Settings, vault: Vault, now: datetime
             continue
         try:
             target = db.get(CatalogApp, row.catalog_app_id)
-            if not _target_matches(target, my_house.APP_ID) or target is None:
+            if not target_matches(target, my_house.APP_ID) or target is None:
                 raise OutboundError("doelbinding")
             credential = _house_credential(db, vault, row, now)
             _house_renew(db, vault, row, _house_adapter(db, settings, row, target), credential, now)
@@ -494,7 +412,7 @@ def list_links(db: DB, _: AnyUser, settings: SettingsDep, cursor: Cursor = None,
     nas = current_target(db)
     owners = _published_ports(db, settings, nas)
     return LinkList(
-        items=[_view(row, bound=_binding_is_current(row, target, nas, owners)) for row, target in rows[:limit]],
+        items=[_view(row, bound=binding_is_current(row, target, nas, owners)) for row, target in rows[:limit]],
         next_cursor=str(rows[limit - 1][0].id) if len(rows) > limit else None,
     )
 
@@ -523,7 +441,7 @@ def read_house(
     if row.app_id != my_house.APP_ID:
         raise HubError(404, "not_found", "Geen my_house-koppeling gevonden.")
     target = db.get(CatalogApp, row.catalog_app_id)
-    if target is None or not _target_matches(target, my_house.APP_ID):
+    if target is None or not target_matches(target, my_house.APP_ID):
         raise HubError(409, "doelbinding", "De gekoppelde my_house-installatie kan niet worden bevestigd.")
     try:
         credential = _house_credential(db, vault, row, utcnow())
@@ -558,7 +476,7 @@ def get_link(
     response.headers["ETag"] = _etag(row.version)
     target = db.get(CatalogApp, row.catalog_app_id)
     nas = current_target(db)
-    return _view(row, bound=_binding_is_current(row, target, nas, _published_ports(db, settings, nas)))
+    return _view(row, bound=binding_is_current(row, target, nas, _published_ports(db, settings, nas)))
 
 
 @router.post(
@@ -656,7 +574,7 @@ def update_link(
         row.catalog_app_id, row.basis_url, row.peer_addresses = catalog_app_id, base, peers
     elif secret is not None and secret.casefold() in row.basis_url.casefold():
         raise HubError(422, "validation_error", "De waarde van het adaptercredential is ongeldig.")
-    elif not _binding_is_current(row, target, nas, owners):
+    elif not binding_is_current(row, target, nas, owners):
         raise _binding_conflict()
     if row.app_id == my_house.APP_ID and secret is not None:
         if not body.doel_bevestigd and body.server_id not in (None, row.my_house_server_id):
@@ -671,6 +589,9 @@ def update_link(
         row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
     row.laatste_status, row.observed_at, row.max_age_s = None, None, None
     row.my_house_checks = None
+    # Een nieuwe koppeling begint met een schone reeks; een open incident vereist nog steeds herstel.
+    if row.health_failures < 3:
+        row.health_failures = 0
     if row.app_id != my_house.APP_ID:
         row.laatste_fout = None
     row.version += 1
@@ -695,7 +616,7 @@ def test_link(
 
     def check_binding() -> None:
         nas = current_target(db)
-        if not _binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
+        if not binding_is_current(row, target, nas, _published_ports(db, settings, nas)):
             raise _binding_conflict()
 
     policy = settings.outbound_policy()
@@ -744,6 +665,8 @@ def test_link(
         row.observed_at = measurement.observed_at
         row.max_age_s = basis.MAX_AGE_S
     row.version += 1
+    if row.app_id == my_house.APP_ID:
+        _record_health_measurement(db, row, utcnow())
     _record(db, admin, row, "tested")
     receipt: LinkReceipt | None = None
     if probes is not None:

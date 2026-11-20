@@ -283,3 +283,32 @@ def test_actie_afwijking_noemt_de_stop_alleen_als_de_executor_hem_meldt() -> Non
         assert s and s.titel == f"Afwijking na app.restart op {doel}", (meer, s)
         assert "gestopt" not in s.titel and tekst in s.samenvatting, (meer, s.samenvatting)
         assert (s.soort, s.ernst, s.vingerafdruk) == ("actie.afwijking", "kritiek", gestopt.vingerafdruk), s
+
+
+@pytest.mark.parametrize(
+    ("status", "vorige", "reeks", "rol"),
+    [
+        ("unknown", 0, 1, None),
+        ("down", 1, 2, None),
+        ("unknown", 2, 3, "probleem"),
+        ("down", 2, 3, "probleem"),
+        ("down", 3, 3, None),
+        ("healthy", 2, 0, None),
+        ("healthy", 3, 0, "herstel"),
+        ("degraded", 2, 0, None),
+    ],
+)
+def test_adapterincident_na_drie_opeenvolgende_metingen(status: str, vorige: int, reeks: int, rol: str | None) -> None:
+    from hub.incidents import rules
+
+    assert rules.adapter_health_transition(vorige, status) == (reeks, rol)
+
+
+def test_adapterincident_signaal_herstel_en_probleem_hebben_dezelfde_vingerafdruk() -> None:
+    entity = ("catalog_app", "app-instantie")
+    problem = classify(ev(APP_ID, "monitoring.adapter_health.failed", {"app_id": "my_house"}, entity, "outbox"))
+    recovery = classify(ev(APP_ID, "monitoring.adapter_health.recovered", {"app_id": "my_house"}, entity, "outbox"))
+    assert problem is not None and problem.rol == "probleem"
+    assert recovery is not None and recovery.rol == "herstel"
+    assert problem.vingerafdruk == recovery.vingerafdruk
+    assert classify(ev(APP_ID, "monitoring.adapter_health.failed", {}, ("service", "x"), "outbox")) is None

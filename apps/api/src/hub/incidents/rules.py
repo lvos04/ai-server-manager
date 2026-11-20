@@ -173,10 +173,41 @@ def _safe_details(ev: EventIn, keys: tuple[str, ...] | None = None) -> dict[str,
     return redact_log_value(p)  # type: ignore[no-any-return]
 
 
+ADAPTER_HEALTH_FAILED = "monitoring.adapter_health.failed"
+ADAPTER_HEALTH_RECOVERED = "monitoring.adapter_health.recovered"
+
+
+def adapter_health_transition(previous: int, status: str) -> tuple[int, str | None]:
+    """Open bij de derde slechte meting. Een open incident wacht op een gezonde meting."""
+    if previous == 3:
+        return (0, "herstel") if status == "healthy" else (3, None)
+    if status in ("unknown", "down"):
+        count = previous + 1
+        return count, "probleem" if count == 3 else None
+    return 0, None
+
+
 # ------------------------------------------------------------------ eigen outbox van de Hub
 def _hub(ev: EventIn) -> Signaal | None:
     p = ev.payload or {}
     et, eid = ev.event_type, ev.entity_id
+    if et in (ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED) and ev.entity_type == "catalog_app":
+        recovered = et == ADAPTER_HEALTH_RECOVERED
+        app_id = _s(p.get("app_id"), 64)
+        return Signaal(
+            "herstel" if recovered else "probleem",
+            "monitoring.adapter_health",
+            f"{APP_ID}:adapter_health:{eid}",
+            f"Binnenkantcontrole hersteld ({app_id})"
+            if recovered
+            else f"Binnenkantcontrole drie keer onbekend of in storing ({app_id})",
+            "info" if recovered else "waarschuwing",
+            "hub:monitoring",
+            "catalog_app",
+            eid,
+            app_id,
+            details=_safe_details(ev, ("status", "reason_code")),
+        )
     if et in ("monitoring.mso_probe.failed", "monitoring.mso_probe.recovered"):
         recovered = et.endswith(".recovered")
         if recovered:
