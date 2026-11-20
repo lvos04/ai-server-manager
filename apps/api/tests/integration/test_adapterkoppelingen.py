@@ -603,6 +603,7 @@ def huis_simulatie(
         "status": 200,
         "server_id": doel["server_id"],
         "renew_status": 200,
+        "worker": {"key": "worker", "state": "ok", "age_s": 0},
         "extra_check": [],
     }
     calls: list[tuple[str, str]] = []
@@ -657,7 +658,7 @@ def huis_simulatie(
                         "version": "1.0.0",
                         "checks": [
                             {"key": "database", "state": "ok", "detail": code},
-                            {"key": "worker", "state": "ok"},
+                            toestand["worker"],
                             *(
                                 [{"key": f"integration:{integration_id}", **toestand["extra_check"]}]
                                 if toestand["extra_check"]
@@ -964,6 +965,65 @@ def test_my_house_bronmeettijd_bepaalt_gezondheid_en_herhaling(
     ]
     admin.post(f"{path}/test", headers=idem()).raise_for_status()
     assert admin.get(path).json()["gezondheid"]["status"] == "down"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize(
+    ("bronleeftijd", "transport_ms", "na_ontvangst_ms"),
+    [(118, 0, 2500), (None, 0, 121_000), (118, 1750, 750)],
+    ids=["direct", "zonder_leeftijd", "vertraagd"],
+)
+def test_my_house_workerhartslag_vervalt_bij_detail_lijst_en_herhaling(
+    admin: Any,
+    doel: dict[str, Any],
+    huis_simulatie: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    bronleeftijd: int | None,
+    transport_ms: int,
+    na_ontvangst_ms: int,
+) -> None:
+    code, toestand, calls = huis_simulatie
+    koppeling = admin.post(ROUTE, json=doel, headers=invoer(code))
+    assert koppeling.status_code == 201
+    path = f"{ROUTE}/{koppeling.json()['id']}"
+    klok = utcnow().replace(microsecond=0)
+    monkeypatch.setattr(my_house, "utcnow", lambda: klok)
+    monkeypatch.setattr(adapterkoppelingen, "utcnow", lambda: klok)
+    if bronleeftijd is None:
+        del toestand["worker"]["age_s"]
+    else:
+        toestand["worker"]["age_s"] = bronleeftijd
+    transport = outbound.request
+
+    def vertraagd_antwoord(base: str, method: str, route: str, **options: Any) -> outbound.Response:
+        nonlocal klok
+        antwoord = transport(base, method, route, **options)
+        if route == my_house.Route.SYSTEM:
+            klok += timedelta(milliseconds=transport_ms)
+        return antwoord
+
+    monkeypatch.setattr(outbound, "request", vertraagd_antwoord)
+    headers = idem()
+    eerste = admin.post(f"{path}/test", headers=headers)
+    assert eerste.status_code == 200
+    if bronleeftijd is not None and transport_ms == 0:
+        assert eerste.json()["my_house"]["systeem"]["checks"][1]["state"] == "ok"
+        detail = admin.get(path).json()["gezondheid"]
+        assert detail["status"] == "healthy"
+        assert admin.get(ROUTE).json()["items"][0]["gezondheid"] == detail
+
+    aantal = len(calls)
+    klok += timedelta(milliseconds=na_ontvangst_ms)
+    detail = admin.get(path).json()
+    lijst = admin.get(ROUTE).json()["items"][0]
+    herhaling = admin.post(f"{path}/test", headers=headers)
+    assert herhaling.status_code == 200 and herhaling.headers["Idempotent-Replay"] == "true"
+    assert herhaling.json()["my_house"]["systeem"]["checks"][1] == {"key": "worker", "state": "unknown"}
+    assert len(calls) == aantal
+    assert detail["verbinding"]["status"] == "healthy"
+    assert detail["gezondheid"] == lijst["gezondheid"]
+    reden = "meting_verouderd" if bronleeftijd is not None else "meettijd_onbekend"
+    assert (detail["gezondheid"]["status"], detail["gezondheid"]["reason_code"]) == ("unknown", reden)
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)

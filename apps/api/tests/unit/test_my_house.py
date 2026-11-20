@@ -4,6 +4,7 @@ import ast
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -46,7 +47,7 @@ def test_link_vereist_geldig_schema_en_bevestigde_bestemming() -> None:
 @pytest.mark.parametrize("bron", ["zigbee", "worker", "backup"])
 def test_gezondheid_gebruikt_de_kortere_brongrens(bron: str) -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
-    worker = {"key": "worker", "state": "ok"}
+    worker = {"key": "worker", "state": "ok", "age_s": 0}
     checks = [{"key": "database", "state": "ok"}, worker]
     if bron == "zigbee":
         integration = f"integration:{uuid4()}"
@@ -68,7 +69,7 @@ def test_gezondheid_gebruikt_de_kortere_brongrens(bron: str) -> None:
     else:
         checks.append({"key": "backup", "state": "ok", "age_h": 35.9})
         seconds = 181
-    _, readings = my_house._system_readings({"version": "1.0.0", "checks": checks}, now)
+    _, readings = my_house._system_readings({"version": "1.0.0", "checks": checks}, now, now)
     assert my_house.health(readings, now).status == "healthy"
     expired = my_house.health(readings, now + timedelta(seconds=seconds))
     assert (expired.status, expired.reason_code) == ("unknown", "meting_verouderd")
@@ -77,3 +78,38 @@ def test_gezondheid_gebruikt_de_kortere_brongrens(bron: str) -> None:
             "unknown",
             "unknown",
         ]
+
+
+@pytest.mark.parametrize("age_s", [None, True, "118", 118.0, -1, 120, 2**64])
+def test_ongeldige_workerleeftijd_is_onbekend(age_s: Any) -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    checks = [{"key": "database", "state": "ok"}, {"key": "worker", "state": "ok", "age_s": age_s}]
+    _, readings = my_house._system_readings({"version": "1.0.0", "checks": checks}, now, now)
+    assert readings[1].project(now).state == "unknown"
+    health = my_house.health(readings, now)
+    assert (health.status, health.reason_code) == ("unknown", "meettijd_onbekend")
+
+
+def test_worker_118_seconden_is_nog_een_seconde_vers_vanaf_verzoekstart() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    grens = now + timedelta(seconds=1)
+    checks = [{"key": "database", "state": "ok"}, {"key": "worker", "state": "ok", "age_s": 118}]
+    _, readings = my_house._system_readings({"version": "1.0.0", "checks": checks}, now, grens)
+    assert readings[1].project(grens).state == "ok"
+    health = my_house.health(readings, grens + timedelta(microseconds=1))
+    assert (health.status, health.reason_code) == ("unknown", "meting_verouderd")
+    assert health.observed_at == now - timedelta(seconds=119)
+
+
+def test_opgeslagen_workercheck_zonder_bronmeettijd_is_onbekend() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    readings = my_house.CheckReadings.validate_python(
+        [
+            {"key": "database", "state": "ok", "observed_at": now, "max_age_s": 900},
+            {"key": "worker", "state": "ok", "observed_at": now, "max_age_s": 120},
+        ]
+    )
+    assert readings[0].project(now).state == "ok"
+    assert readings[1].project(now).state == "unknown"
+    health = my_house.health(readings, now)
+    assert (health.status, health.reason_code) == ("unknown", "meettijd_onbekend")

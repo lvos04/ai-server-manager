@@ -144,10 +144,13 @@ SEVERITY = {"healthy": 0, "unknown": 1, "degraded": 2, "down": 3}
 class CheckReading(Check):
     observed_at: datetime | None
     max_age_s: int
+    # Oudere werkermetingen gebruikten de ontvangsttijd en mogen niet meer als vers tellen.
+    worker_observed_at: datetime | None = None
 
     def measurement(self, now: datetime) -> basis.Measurement:
+        observed_at = self.worker_observed_at if self.key == "worker" else self.observed_at
         return basis.fresh_measurement(
-            basis.Measurement(status=CHECK_STATUS[self.state], observed_at=self.observed_at),
+            basis.Measurement(status=CHECK_STATUS[self.state], observed_at=observed_at),
             now=now,
             max_age_s=self.max_age_s,
         )
@@ -176,7 +179,17 @@ def _backup_max_age(age_h: Any) -> int:
     return max(0, min(basis.MAX_AGE_S, int((BACKUP_WARN_H - age_h) * 3600) - 180))
 
 
-def _system_readings(data: Any, received_at: datetime) -> tuple[System, list[CheckReading]]:
+def _worker_time(age_s: Any, state: str, requested_at: datetime) -> datetime | None:
+    if type(age_s) is not int or age_s < 0 or (state == "ok" and age_s >= WORKER_OK_S):
+        return None
+    # De bron rondt naar beneden af en meet pas na de start van het verzoek.
+    try:
+        return requested_at - timedelta(seconds=age_s + 1)
+    except OverflowError:
+        return None
+
+
+def _system_readings(data: Any, requested_at: datetime, received_at: datetime) -> tuple[System, list[CheckReading]]:
     system = _validate(TypeAdapter(System), data)
     by_key = {raw["key"]: raw for raw in data["checks"]}
     if len(by_key) != len(system.checks):
@@ -184,6 +197,7 @@ def _system_readings(data: Any, received_at: datetime) -> tuple[System, list[Che
     readings = []
     for check in system.checks:
         observed: datetime | None = received_at
+        worker_observed = None
         max_age = basis.MAX_AGE_S
         if check.key.startswith("integration:"):
             parent = ":".join(check.key.split(":")[:2])
@@ -194,18 +208,21 @@ def _system_readings(data: Any, received_at: datetime) -> tuple[System, list[Che
         elif check.key in {"time", "restore"}:
             # Deze bestaande checks bevatten geen bruikbare bronmeettijd.
             observed = None
-        elif check.key == "worker" and check.state == "ok":
-            raw = by_key[check.key]
-            age = raw.get("age_s")
-            if type(age) is int and 0 <= age < WORKER_OK_S:
-                # De bron rondt naar beneden af. Neem de vroegste mogelijke meettijd.
-                observed = received_at - timedelta(seconds=age + 1)
-                max_age = WORKER_OK_S
-            elif "age_s" in raw:
-                observed = None
+        elif check.key == "worker":
+            observed = None
+            worker_observed = _worker_time(by_key[check.key].get("age_s"), check.state, requested_at)
+            max_age = WORKER_OK_S
         elif check.key == "backup" and check.state == "ok" and "age_h" in by_key[check.key]:
             max_age = _backup_max_age(by_key[check.key]["age_h"])
-        readings.append(CheckReading(key=check.key, state=check.state, observed_at=observed, max_age_s=max_age))
+        readings.append(
+            CheckReading(
+                key=check.key,
+                state=check.state,
+                observed_at=observed,
+                max_age_s=max_age,
+                worker_observed_at=worker_observed,
+            )
+        )
     return system, readings
 
 
@@ -490,8 +507,9 @@ class Adapter:
         liveness = _validate(TypeAdapter(Liveness), self._request(Route.HEALTH))
         observed = utcnow()
         self._identity(token)
+        requested_at = utcnow()
         system_data = self._request(Route.SYSTEM, token=token)
-        system, checks = _system_readings(system_data, utcnow())
+        system, checks = _system_readings(system_data, requested_at, utcnow())
         homes = _validate(TypeAdapter(Rows[Home]), self._request(Route.HOMES, token=token))
         if len({home.id for home in homes}) != len(homes):
             raise outbound.OutboundError(INVALID)
