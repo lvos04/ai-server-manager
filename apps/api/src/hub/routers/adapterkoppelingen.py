@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy import select, update
 
 from hub import audit
-from hub.adapters import basis, mso, my_house
+from hub.adapters import basis, mediaguard, mso, my_house
 from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, get_vault
 from hub.errors import HubError
@@ -76,8 +76,12 @@ class LinkView(BaseModel):
     version: int
 
 
+class MediaGuardLinkView(LinkView):
+    mediaguard: mediaguard.Readings
+
+
 class LinkList(BaseModel):
-    items: list[LinkView]
+    items: list[MediaGuardLinkView | LinkView]
     next_cursor: str | None
 
 
@@ -98,9 +102,10 @@ class Verwijderd(BaseModel):
     verwijderd: Literal[True]
 
 
-def _view(row: AdapterLink, *, bound: bool) -> LinkView:
+def _view(row: AdapterLink, *, bound: bool) -> MediaGuardLinkView | LinkView:
     now = utcnow()
-    reason = row.laatste_fout
+    is_mediaguard = row.app_id == mediaguard.APP_ID
+    reason = mediaguard.REASON_CODE if is_mediaguard else row.laatste_fout
     if row.app_id == my_house.APP_ID and row.my_house_expires_at is not None and row.my_house_expires_at <= now:
         reason = "bron_token_verlopen"
     measurement = basis.Measurement(status=row.laatste_status or "unknown", observed_at=row.observed_at)
@@ -111,7 +116,7 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
             observed_at=row.observed_at,
             laatste_status=measurement.status if row.observed_at else None,
         )
-    if row.app_id != my_house.APP_ID or (bound and reason is None):
+    if not is_mediaguard and (row.app_id != my_house.APP_ID or (bound and reason is None)):
         measurement = basis.fresh_measurement(measurement, now=now, max_age_s=row.max_age_s or basis.MAX_AGE_S)
     if not bound:
         measurement = basis.Measurement(
@@ -121,7 +126,10 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
             laatste_status=row.laatste_status if row.observed_at else None,
         )
     is_mso = row.app_id == mso.APP_ID
-    health = mso.health() if is_mso else basis.Measurement(status="unknown", reason_code="capability_unavailable")
+    if is_mediaguard:
+        health = mediaguard.health()
+    else:
+        health = mso.health() if is_mso else basis.Measurement(status="unknown", reason_code="capability_unavailable")
     if row.app_id == my_house.APP_ID:
         last = (
             my_house.health(my_house.CheckReadings.validate_python(row.my_house_checks), now)
@@ -137,7 +145,7 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
                 observed_at=last.observed_at if last is not None else row.observed_at,
                 laatste_status=(last.laatste_status or last.status) if last is not None else None,
             )
-    return LinkView(
+    view = LinkView(
         id=row.id,
         app_id=row.app_id,
         catalog_app_id=row.catalog_app_id,
@@ -148,6 +156,9 @@ def _view(row: AdapterLink, *, bound: bool) -> LinkView:
         gezondheid=health,
         version=row.version,
     )
+    if is_mediaguard:
+        return MediaGuardLinkView(**view.model_dump(), mediaguard=mediaguard.Readings())
+    return view
 
 
 def _link(db: DB, link_id: uuid.UUID, *, lock: bool = False) -> AdapterLink:
@@ -484,7 +495,9 @@ def list_links(db: DB, _: AnyUser, settings: SettingsDep, cursor: Cursor = None,
 
 
 @router.get("/{link_id}", summary="Adapterkoppeling lezen")
-def get_link(link_id: uuid.UUID, response: Response, db: DB, _: AnyUser, settings: SettingsDep) -> LinkView:
+def get_link(
+    link_id: uuid.UUID, response: Response, db: DB, _: AnyUser, settings: SettingsDep
+) -> MediaGuardLinkView | LinkView:
     row = _link(db, link_id)
     response.headers["ETag"] = _etag(row.version)
     target = db.get(CatalogApp, row.catalog_app_id)
@@ -668,7 +681,7 @@ def test_link(
             emit(db, "monitoring.mso_probe.recovered", "adapter_link", str(row.id), {})
     else:
         check_binding()
-        measurement = basis.probe(row, policy)
+        measurement = mediaguard.health()
     row.laatste_fout = measurement.reason_code
     if measurement.observed_at is not None:
         row.laatste_status = measurement.status

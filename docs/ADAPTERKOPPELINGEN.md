@@ -1,7 +1,8 @@
 # Koppelingen met bestaande apps
 
 S-P3-020 levert de Hub-API en opslag voor de koppelingen uit ADR-0034. S-P3-040 voegt de openbare
-MSO-probes toe. S-P3-050 voegt de leeskoppeling met my_house toe.
+MSO-probes toe. S-P3-050 voegt de leeskoppeling met my_house toe. S-P3-030 toont welke
+MediaGuard-metingen ontbreken zolang de onderzochte bronnen bijwerkingen hebben.
 
 - De beheerder maakt een koppeling onder `/api/v1/adapterkoppelingen` en bevestigt het HTTPS-basisadres
   en de bijbehorende instantie uit de Hub-catalogus. De app-ID moet overeenkomen met die registratie.
@@ -27,6 +28,34 @@ MSO-probes toe. S-P3-050 voegt de leeskoppeling met my_house toe.
 
 Migratie `0017` voegt de tabel `adapter_link` toe. De downgrade wist de gekoppelde kluiswaarden
 en de nieuwe tabel. De bestaande Hub-gegevens blijven behouden.
+
+## MediaGuard
+
+De bronkeuze volgt optie 1 van het regisseursbesluit van 20 november 2026. De adapter gebruikt
+uitsluitend bewezen alleen-lezen bronnen. De lijst voor de onderzochte versie is leeg. De
+Hub doet daarom voor MediaGuard geen bronverzoeken. De koppeling en het ontkoppelen blijven
+beschikbaar in de Hub. Een ingevoerde sleutel blijft ongebruikt in de Hub-kluis. De bronrol en
+de geldigheid van de sleutel zijn onbekend.
+
+Lijst en detail tonen onder `mediaguard` de datasets `wanted`, `status`, `downloads`, `av1`
+en `incidenten`, en de metingen `mediaservers`, `noodstop`, `opslagprognose` en `backups`.
+Elk veld heeft status `unknown`, zonder meettijd, met reden `geen alleen-lezen bron`
+(`geen_alleen_lezen_bron`). De contactproef geeft de gebruikelijke bevestiging. De
+contacttoestand en gezondheid zijn `unknown`. Een oude contactmeting uit een eerdere Hub-versie
+verschijnt uitsluitend als laatst bekende status met de oude meettijd. Een weggevallen
+doelbinding geeft voor het contact de reden `doelbinding`.
+
+Broninspectie van MediaGuard-commit `e1c121d4a29bff7228f56bd6ede5f9548ac00ae5`:
+
+| Pad | Bijwerking in de bron |
+| --- | --- |
+| `/api/v1/health`, `/healthz`, `/readyz` | `app.py::SchemaRecovery` roept vóór de routes `db.py::Database.check_schema` aan. `schema.py::applied_versions` kan bij een aanwezige WAL het ontbrekende SQLite-hulpbestand aanmaken. Een lokale proef op een tijdelijke database bevestigt dit. |
+| `/api/v1/auth/me`, `/api/v1/wanted`, `/api/v1/encoding/jobs`, `/connector/v1/discover`, `/connector/v1/health`, `/connector/v1/items` | `auth.py::principal_from_request` gebruikt `apikeys.py::authenticate`. `_touch` werkt de gebruiktijd bij en `_reject` schrijft een auditregel bij een ongeldige of ingetrokken sleutel. |
+| `/api/v1/status`, `/api/v1/attention` | `attention.py::_hidden` kan via `forget` een eerder opgeslagen meldingskeuze wissen. |
+| `/api/v1/mediaserver/status` | `mediaserver/api.py::status` gebruikt `_top` en `server_entry`. Het pad via `secrets_store.py::SecretStore._cipher` kan een ontbrekend sleutelbestand aanmaken. |
+| `/api/v1/downloads/health` | `downloads/failures.py::downloads_health` gebruikt `downloads/failure_lookup.py::recent_client_errors`, dat bij qBittorrent kan inloggen. |
+| `/api/v1/storage/forecast` | `storage_forecast.py::storage_forecast` kan via `_measure_pool` een poolmeting starten en opslaan. |
+| `/api/v1/backups` | `maintenance/api.py::list_backups` gebruikt `_backup_dir`, dat een ontbrekende map aanmaakt. |
 
 ## MSO
 

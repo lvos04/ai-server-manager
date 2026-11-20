@@ -121,16 +121,15 @@ def test_beheer_kluis_replay_redactie_en_ontkoppelen(
     assert invalid.status_code == 422
     assert waarde not in invalid.text
 
-    probe = Mock(return_value=outbound.Response(200, json.dumps({"status": "ok", "extra": waarde}).encode()))
+    probe = Mock(side_effect=AssertionError("MediaGuard heeft een verzoek ontvangen."))
     monkeypatch.setattr(outbound, "request", probe)
     getest = admin.post(f"{path}/test", headers=idem())
     assert getest.status_code == 200
     contact = admin.get(path)
-    assert contact.json()["verbinding"]["status"] == "healthy"
+    assert contact.json()["verbinding"]["status"] == "unknown"
+    assert contact.json()["verbinding"]["reason_code"] == "geen_alleen_lezen_bron"
     assert contact.json()["gezondheid"]["status"] == "unknown"
     assert waarde not in contact.text
-    assert probe.call_args.args == (URL, "GET", "/api/v1/health")
-    assert "headers" not in probe.call_args.kwargs
 
     with app.state.sessionmaker() as db:
         opgeslagen = db.scalar(select(AdapterLink))
@@ -144,14 +143,21 @@ def test_beheer_kluis_replay_redactie_en_ontkoppelen(
         canonical = json.dumps(doel, sort_keys=True, separators=(",", ":"))
         assert rec.request_hash == hashlib.sha256(f"{ROUTE}\n{canonical}".encode()).hexdigest()
         assert rec.response_body == receipt
+        assert opgeslagen.observed_at is None
+        assert opgeslagen.laatste_status is None
         opgeslagen.observed_at = utcnow() - timedelta(seconds=901)
+        opgeslagen.laatste_status = "healthy"
         db.commit()
     assert waarde not in caplog.text
-    assert admin.get(path).json()["verbinding"]["reason_code"] == "meting_verouderd"
+    verouderd = admin.get(path).json()["verbinding"]
+    assert verouderd["status"] == "unknown"
+    assert verouderd["reason_code"] == "geen_alleen_lezen_bron"
+    assert verouderd["laatste_status"] == "healthy"
+    assert verouderd["observed_at"] is not None
 
     assert admin.delete(path, headers=idem()).status_code == 200
     assert admin.get(path).status_code == 404
-    assert probe.call_count == 1
+    probe.assert_not_called()
     with app.state.sessionmaker() as db:
         assert db.scalar(select(AdapterLink)) is None
         assert db.scalar(select(VaultSecret).where(VaultSecret.ref == ref)) is None
@@ -190,16 +196,12 @@ def test_binding_volgt_de_laatst_vastgelegde_poorteigenaar(
     admin: Any, app: Any, settings: Settings, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     transport = Mock(side_effect=AssertionError("Deze proef gebruikt geen netwerktransport"))
-    contact = Mock(return_value=basis.Measurement(status="unknown", reason_code="tijdslimiet"))
     monkeypatch.setattr(outbound, "request", transport)
-    monkeypatch.setattr(basis, "probe", contact)
     waarde = secrets.token_urlsafe()
     aangemaakt = admin.post(ROUTE, json=doel, headers=invoer(waarde))
     assert aangemaakt.status_code == 201
     pad = f"{ROUTE}/{aangemaakt.json()['id']}"
     assert admin.post(f"{pad}/test", headers=idem()).status_code == 200
-    contact.assert_called_once()
-    contact.reset_mock()
     versie = admin.get(pad).json()["version"]
 
     with app.state.sessionmaker.begin() as db:
@@ -221,7 +223,6 @@ def test_binding_volgt_de_laatst_vastgelegde_poorteigenaar(
     for antwoord in geweigerd:
         assert antwoord.status_code == 409
         assert antwoord.json()["details"]["reason"] == "doelbinding"
-    contact.assert_not_called()
     with app.state.sessionmaker() as db:
         link = db.scalars(select(AdapterLink)).one()
         assert link.version == versie
@@ -241,10 +242,9 @@ def test_binding_volgt_de_laatst_vastgelegde_poorteigenaar(
     assert admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe())).status_code == 409
     assert admin.post(ROUTE, json=nieuw_doel, headers=idem()).status_code == 201
     transport.assert_not_called()
-    contact.assert_not_called()
 
 
-def test_doelbinding_en_onbereikbaarheid(
+def test_herbevestiging_en_wijziging_van_de_catalogusinstantie(
     admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     headers = invoer(secrets.token_urlsafe())
@@ -252,12 +252,12 @@ def test_doelbinding_en_onbereikbaarheid(
     created = admin.post(ROUTE, json=doel, headers=headers)
     assert created.status_code == 201
     path = f"{ROUTE}/{created.json()['id']}"
-    probe = Mock(side_effect=outbound.OutboundError("tijdslimiet"))
+    probe = Mock(side_effect=AssertionError("MediaGuard heeft een verzoek ontvangen."))
     monkeypatch.setattr(outbound, "request", probe)
     assert admin.post(f"{path}/test", headers=idem()).status_code == 200
     detail = admin.get(path).json()
     assert detail["verbinding"]["status"] == "unknown"
-    assert detail["verbinding"]["reason_code"] == "tijdslimiet"
+    assert detail["verbinding"]["reason_code"] == "geen_alleen_lezen_bron"
     ander = {"basis_url": TWEEDE_BASIS, "doel_bevestigd": True}
     assert admin.patch(path, json=ander, headers=idem()).status_code == 422
     afwijkend = {**ander, "basis_url": f"{URL}:9443"}
@@ -278,7 +278,7 @@ def test_doelbinding_en_onbereikbaarheid(
         instance.app_id = "my_house"
         db.commit()
     assert admin.post(f"{path}/test", headers=idem()).status_code == 409
-    assert probe.call_count == 1
+    probe.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -296,11 +296,16 @@ def test_weggevallen_binding_blokkeert_contact_en_toont_laatst_bekende_meting(
     created = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
     assert created.status_code == 201
     path = f"{ROUTE}/{created.json()['id']}"
-    probe = Mock(return_value=outbound.Response(200, b'{"status":"ok"}'))
+    probe = Mock(side_effect=AssertionError("MediaGuard heeft een verzoek ontvangen."))
     monkeypatch.setattr(outbound, "request", probe)
-    assert admin.post(f"{path}/test", headers=idem()).status_code == 200
+
+    with app.state.sessionmaker.begin() as db:
+        link = db.scalars(select(AdapterLink)).one()
+        link.observed_at = utcnow()
+        link.laatste_status = "healthy"
     meting = admin.get(path).json()["verbinding"]
-    assert meting["status"] == "healthy"
+    assert meting["status"] == "unknown"
+    assert meting["laatste_status"] == "healthy"
 
     with app.state.sessionmaker.begin() as db:
         instance = db.get(CatalogApp, uuid.UUID(doel["catalog_app_id"]))
@@ -320,7 +325,43 @@ def test_weggevallen_binding_blokkeert_contact_en_toont_laatst_bekende_meting(
     assert geweigerd.status_code == 409
     assert geweigerd.json()["details"]["reason"] == "doelbinding"
     assert admin.patch(path, json={}, headers=invoer(secrets.token_urlsafe())).status_code == 409
-    probe.assert_called_once()
+    probe.assert_not_called()
+
+
+def test_mediaguard_toont_alle_metingen_als_onbekend_zonder_bronverkeer(
+    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = Mock(side_effect=AssertionError("MediaGuard heeft een verzoek ontvangen."))
+    monkeypatch.setattr(outbound, "request", transport)
+    gemaakt = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
+    assert gemaakt.status_code == 201
+    pad = f"{ROUTE}/{gemaakt.json()['id']}"
+    headers = idem()
+    getest = admin.post(f"{pad}/test", headers=headers)
+    assert getest.status_code == 200
+    assert set(getest.json()) == {"id", "version"}
+    assert admin.post(f"{pad}/test", headers=headers).json() == getest.json()
+
+    detail = admin.get(pad).json()
+    assert admin.get(ROUTE).json()["items"] == [detail]
+    assert detail["verbinding"]["observed_at"] is None
+    assert detail["gezondheid"]["status"] == "unknown"
+    onbekend = {
+        "status": "unknown",
+        "observed_at": None,
+        "reason_code": "geen_alleen_lezen_bron",
+        "reason": "geen alleen-lezen bron",
+    }
+    assert detail["mediaguard"] == dict.fromkeys(
+        ("wanted", "status", "downloads", "av1", "incidenten", "mediaservers", "noodstop", "opslagprognose", "backups"),
+        onbekend,
+    )
+    assert admin.delete(pad, headers=idem()).status_code == 200
+    assert admin.get(pad).status_code == 404
+    transport.assert_not_called()
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(AdapterLink)) is None
+        assert db.scalar(select(VaultSecret).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
@@ -411,6 +452,7 @@ def test_mso_openbare_probes(admin: Any, app: Any, doel: dict[str, Any], monkeyp
     assert detail["verbinding"]["status"] == "healthy"
     assert detail["gezondheid"]["status"] == "unknown"
     assert detail["gezondheid"]["reason_code"] == "capability_unavailable"
+    assert "mediaguard" not in detail
     assert detail["laatste4"] == ""
     assert detail["ingevoerd_op"] is None
 
@@ -421,6 +463,38 @@ def test_mso_openbare_probes(admin: Any, app: Any, doel: dict[str, Any], monkeyp
         db.commit()
     assert admin.post(f"{path}/test", headers=idem()).status_code == 409
     assert transport.call_count == 2
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_timeout_na_succes_toont_laatst_bekende_contactmeting(
+    admin: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = Mock(
+        side_effect=[
+            outbound.Response(200, b'{"status":"ok","version":"1.6.0"}'),
+            outbound.Response(200, b'{"setup_required":false,"completed":true,"version":"1.6.0"}'),
+            outbound.OutboundError("tijdslimiet"),
+            outbound.OutboundError("tijdslimiet"),
+        ]
+    )
+    monkeypatch.setattr(outbound, "request", transport)
+    gemaakt = admin.post(ROUTE, json=doel, headers=idem())
+    assert gemaakt.status_code == 201
+    pad = f"{ROUTE}/{gemaakt.json()['id']}"
+    assert admin.post(f"{pad}/test", headers=idem()).status_code == 200
+    bekend = admin.get(pad).json()["verbinding"]
+    assert bekend["status"] == "healthy"
+    assert bekend["observed_at"] is not None
+
+    assert admin.post(f"{pad}/test", headers=idem()).status_code == 200
+    detail = admin.get(pad).json()
+    assert detail["verbinding"] == {
+        "status": "unknown",
+        "reason_code": "tijdslimiet",
+        "observed_at": bekend["observed_at"],
+        "laatste_status": "healthy",
+    }
+    assert admin.get(ROUTE).json()["items"] == [detail]
 
 
 @pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)

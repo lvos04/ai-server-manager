@@ -1170,7 +1170,14 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/LinkView"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MediaGuardLinkView"
+                },
+                {
+                  "$ref": "#/components/schemas/LinkView"
+                }
+              ]
             },
             "title": "Items",
             "type": "array"
@@ -1404,6 +1411,70 @@
           "status"
         ],
         "title": "Measurement",
+        "type": "object"
+      },
+      "MediaGuardLinkView": {
+        "properties": {
+          "app_id": {
+            "title": "App Id",
+            "type": "string"
+          },
+          "basis_url": {
+            "title": "Basis Url",
+            "type": "string"
+          },
+          "catalog_app_id": {
+            "format": "uuid",
+            "title": "Catalog App Id",
+            "type": "string"
+          },
+          "gezondheid": {
+            "$ref": "#/components/schemas/Measurement"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingevoerd_op": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingevoerd Op"
+          },
+          "laatste4": {
+            "title": "Laatste4",
+            "type": "string"
+          },
+          "mediaguard": {
+            "$ref": "#/components/schemas/Readings"
+          },
+          "verbinding": {
+            "$ref": "#/components/schemas/Measurement"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "app_id",
+          "catalog_app_id",
+          "basis_url",
+          "laatste4",
+          "ingevoerd_op",
+          "verbinding",
+          "gezondheid",
+          "version",
+          "mediaguard"
+        ],
+        "title": "MediaGuardLinkView",
         "type": "object"
       },
       "MsoTestReceipt": {
@@ -1844,6 +1915,84 @@
           "tijdzone"
         ],
         "title": "QuietHours",
+        "type": "object"
+      },
+      "Readings": {
+        "properties": {
+          "av1": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "backups": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "downloads": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "incidenten": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "mediaservers": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "noodstop": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "opslagprognose": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          },
+          "wanted": {
+            "$ref": "#/components/schemas/UnavailableMeasurement",
+            "default": {
+              "reason": "geen alleen-lezen bron",
+              "reason_code": "geen_alleen_lezen_bron",
+              "status": "unknown"
+            }
+          }
+        },
+        "title": "Readings",
         "type": "object"
       },
       "RegelIn": {
@@ -3003,6 +3152,34 @@
           "fingerprint_sha256"
         ],
         "title": "TrustIn",
+        "type": "object"
+      },
+      "UnavailableMeasurement": {
+        "properties": {
+          "observed_at": {
+            "title": "Observed At",
+            "type": "null"
+          },
+          "reason": {
+            "const": "geen alleen-lezen bron",
+            "default": "geen alleen-lezen bron",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "const": "geen_alleen_lezen_bron",
+            "default": "geen_alleen_lezen_bron",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unknown",
+            "default": "unknown",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "UnavailableMeasurement",
         "type": "object"
       },
       "UserIn": {
@@ -4185,7 +4362,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinkView"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MediaGuardLinkView"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LinkView"
+                    }
+                  ],
+                  "title": "Response Get Link Api V1 Adapterkoppelingen  Link Id  Get"
                 }
               }
             },

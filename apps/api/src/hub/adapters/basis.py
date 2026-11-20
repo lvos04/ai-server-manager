@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from hub import outbound
 from hub.models import AdapterLink
-from hub.timeutil import UtcDateTime, age_seconds, utcnow
+from hub.timeutil import UtcDateTime, age_seconds
 
 type AppId = Literal["mediaguard", "media-source-optimizer", "my_house"]
 type Status = Literal["healthy", "unknown", "degraded", "down"]
@@ -21,7 +21,7 @@ MAX_AGE_S = 900
 MAX_RESPONSE_BYTES = 64 * 1024
 MSO_APP_ID = "media-source-optimizer"
 PUBLIC_PROBES = {
-    "mediaguard": "/api/v1/health",
+    # MediaGuard heeft hier geen toelating. Ook de openbare health-route voert een schemacontrole uit.
     MSO_APP_ID: "/healthz",
     "my_house": "/api/v1/health",
 }
@@ -90,24 +90,11 @@ def resolve_binding(base: str) -> list[str]:
 
 def read_request(link: AdapterLink, path: str, *, policy: outbound.OutboundPolicy) -> outbound.Response:
     """Verzend de toegelaten openbare probe naar de bevestigde bestemming."""
-    if path != PUBLIC_PROBES.get(link.app_id) and not (link.app_id == MSO_APP_ID and path == MSO_SETUP_PATH):
+    public_probe = PUBLIC_PROBES.get(link.app_id)
+    if public_probe is None or (path != public_probe and not (link.app_id == MSO_APP_ID and path == MSO_SETUP_PATH)):
         raise outbound.OutboundError("capability_unavailable")
     if not link.peer_addresses:
         raise outbound.OutboundError("doelbinding_ontbreekt")
     base = validate_base_url(link.basis_url)
     bound = replace(policy, allow_loopback=False, allowed_peer_addresses=frozenset(link.peer_addresses))
     return outbound.request(base, "GET", path, policy=bound, max_bytes=MAX_RESPONSE_BYTES)
-
-
-def probe(link: AdapterLink, policy: outbound.OutboundPolicy) -> Measurement:
-    """Een verse openbare respons bewijst contact. De appgezondheid vereist een afzonderlijke adapter."""
-    try:
-        response = read_request(link, PUBLIC_PROBES.get(link.app_id, ""), policy=policy)
-    except outbound.OutboundError as exc:
-        return Measurement(status="unknown", reason_code=exc.reason)
-    if response.status in (401, 403):
-        return Measurement(status="unknown", reason_code="bron_credential_geweigerd")
-    body = response.json()
-    if response.status != 200 or not isinstance(body, dict) or body.get("status") != "ok":
-        return Measurement(status="unknown", reason_code="antwoord_ongeldig")
-    return Measurement(status="healthy", observed_at=utcnow())
