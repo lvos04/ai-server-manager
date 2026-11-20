@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "AI Server Manager — Hub-web-UI (Next.js PWA, Nederlands). Draait in de alles-in-één image op poort 30400.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://git.medialeon.nl/leon/ai-server-manager.git",
+    "directory": "apps/web"
+  },
   "engines": {
     "node": ">=22.12.0 <23"
   },

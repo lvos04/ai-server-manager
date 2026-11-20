@@ -1,5 +1,7 @@
 # ai-server-manager — centrale Hub van TrueNAS Home Platform V2
 
+[Broncode op Forgejo](https://git.medialeon.nl/leon/ai-server-manager) · [![CI](https://git.medialeon.nl/leon/ai-server-manager/badges/workflows/ci.yml/badge.svg)](https://git.medialeon.nl/leon/ai-server-manager/actions?workflow=ci.yml)
+
 De Hub van het platform: **B01** (centrale web-UI en beheer-API), **B02** (AI-beheer met risicobeleid en executor),
 **B09** (monitoring/incidenten) en **B12** (back-up en herstel). Taal: Nederlands. Bron van waarheid voor de
 platformcontracten: [`docs/platform-v2/PLATFORM_CONTRACTEN.md`](docs/platform-v2/PLATFORM_CONTRACTEN.md) (versie 1.3,

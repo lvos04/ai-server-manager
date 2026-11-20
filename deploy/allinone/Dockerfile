@@ -10,7 +10,7 @@
 # De web-UI (Next.js, Node 22) luistert op 30400 en zet /api/*, /connector/*, /healthz en /readyz door naar de API, die
 # dan alleen op 127.0.0.1:8400 luistert. Eén poort naar buiten.
 # Base-images op exacte versie én @sha256-digest (nooit latest). De optionele BuildKit-secret 'ca_bundle' is alleen
-# nodig achter een TLS-onderscheppende proxy; in GitHub Actions wordt hij niet meegegeven.
+# nodig achter een TLS-onderscheppende proxy; in de CI op Forgejo wordt hij niet meegegeven.
 
 ARG PYTHON_IMAGE=docker.io/library/python:3.12.16-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
 ARG POSTGRES_IMAGE=docker.io/library/postgres:16.15-bookworm@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
@@ -71,7 +71,7 @@ ARG VERSION=0.1.0
 ARG REVISION=onbekend
 LABEL org.opencontainers.image.title="ai-server-manager" \
       org.opencontainers.image.description="AI Server Manager — Hub, alles-in-één (web-UI, database, API, worker, AI-runner)" \
-      org.opencontainers.image.source="https://github.com/lvos04/ai-server-manager" \
+      org.opencontainers.image.source="https://git.medialeon.nl/leon/ai-server-manager" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 COPY --from=pg /out/pg/lib /usr/lib/postgresql/16

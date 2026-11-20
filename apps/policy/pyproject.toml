@@ -13,6 +13,9 @@ dependencies = [
   "cryptography==50.0.2",
 ]
 
+[project.urls]
+Repository = "https://git.medialeon.nl/leon/ai-server-manager"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/asm_policy"]
 

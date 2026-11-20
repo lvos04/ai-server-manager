@@ -18,6 +18,9 @@ dependencies = [
   "PyYAML==6.0.3",
 ]
 
+[project.urls]
+Repository = "https://git.medialeon.nl/leon/ai-server-manager"
+
 [project.scripts]
 executor = "executor.__main__:main"
 
