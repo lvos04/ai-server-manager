@@ -146,7 +146,7 @@ def approval_for(
 CAT_APP = "demo-app"
 CAT_COMMIT = "c" * 40
 CAT_SCHEMA = "sha256:" + "5" * 64
-CAT_VALIDATOR = "0.9.0"
+CAT_VALIDATOR = "0.1.0"  # de versie die de gepinde validator (hub.catalog.asf) rapporteert
 CAT_URL = "https://forge.test/leon/demo-catalogus"
 CAT_PUBLISHER = "sha256:" + "7" * 64
 CAT_SOURCE_ID = "33333333-3333-4333-8333-333333333333"

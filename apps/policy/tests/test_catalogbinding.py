@@ -256,6 +256,37 @@ def test_readback_digest(naam: str, refs: list[str], images: list[dict[str, Any]
     assert (afw or {}).get("code") == code, naam
 
 
+# R-VEILIG-7 (derde ronde): de release laat twee digests toe; alleen precies één image met één digest per actieve
+# referentie is eenduidig.
+EENDUIDIG: list[tuple[str, list[str], list[dict[str, Any]], str | None]] = [
+    ("twee images met toegelaten digests voor één tag", [REF],
+     [{"id": "een", "repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]},
+      {"id": "twee", "repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST_B}"]}],
+     "digest_niet_bevestigd"),
+    ("één image met twee toegelaten digests", [REF],
+     [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}",
+                                            f"ghcr.io/voorbeeld/demo-app@{DIGEST_B}"]}], "digest_niet_bevestigd"),
+    ("één image, dezelfde digest onder twee repo's", [REF],
+     [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}",
+                                            f"docker.invalid/voorbeeld/demo-app@{DIGEST}"]}], None),
+    ("twee afzonderlijke tags, elk eenduidig", [REF, "ghcr.io/voorbeeld/hulp:1"],
+     [{"id": "een", "repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]},
+      {"id": "twee", "repo_tags": ["ghcr.io/voorbeeld/hulp:1"],
+       "repo_digests": [f"ghcr.io/voorbeeld/hulp@{DIGEST_B}"]}],
+     None),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("naam", "refs", "images", "code"), EENDUIDIG, ids=[r[0] for r in EENDUIDIG])
+def test_readback_alleen_eenduidig_bewijs(
+    naam: str, refs: list[str], images: list[dict[str, Any]], code: str | None
+) -> None:
+    params = _params()
+    params["catalog_binding"]["release"]["image_digests"] = [DIGEST, DIGEST_B]
+    afw = readback_digest_afwijking(params, refs, images)
+    assert (afw or {}).get("code") == code, naam
+
+
 def test_readback_zonder_binding_verandert_niets() -> None:
     assert readback_digest_afwijking(install_params("demo-app"), [], []) is None
     assert copy.deepcopy(install_params("demo-app")) == install_params("demo-app")

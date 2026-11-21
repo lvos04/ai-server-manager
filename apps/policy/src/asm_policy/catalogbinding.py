@@ -292,7 +292,23 @@ def readback_digest_afwijking(
     params: Mapping[str, Any], refs: Sequence[str], images: Sequence[Mapping[str, Any]]
 ) -> dict[str, Any] | None:
     """Na ``app.install`` met binding: elke image van de app moet volgens ``app.image.query`` (``repo_digests``, niet de
-    tag) een digest uit de release hebben. Ontbreekt dat bewijs, dan is het een afwijking (onbekend is geen succes)."""
+    tag) een digest uit de release hebben. Ontbreekt dat bewijs of is het niet eenduidig (meer images of digests voor
+    één actieve referentie), dan is het een afwijking (onbekend is geen succes).
+
+    Toestandstabel per actieve referentie (rijen = imagerijen uit ``app.image.query`` met die tag):
+
+    ==========================================================  ========================
+    meting                                                      uitkomst
+    ==========================================================  ========================
+    geen referentie, geen rij of een rij zonder digest          digest_niet_bevestigd
+    een digest buiten de release, of de referentie zelf noemt   digest_verschilt
+    een digest buiten release of meting
+    twee of meer rijen (image-ID's), ook met toegelaten digests digest_niet_bevestigd
+    één rij met twee of meer verschillende digests              digest_niet_bevestigd
+    precies één rij met precies één toegelaten digest           in orde (None)
+    twee afzonderlijke referenties, elk precies zo bewezen      in orde (None)
+    ==========================================================  ========================
+    """
     b = params.get("catalog_binding")
     if not isinstance(b, Mapping):
         return None
@@ -316,4 +332,8 @@ def readback_digest_afwijking(
                 "verwacht": sorted(toegelaten),
                 "gevonden": sorted(digests | {eigen} - {""}),
             }
+        # Alleen precies één image (rij) met precies één digest is eenduidig: anders is niet vast te stellen welke
+        # image draait, ook als alle digests in de release staan (R-VEILIG-7).
+        if len(rijen) != 1 or len(digests) != 1:
+            return {"code": "digest_niet_bevestigd", "verwacht": sorted(toegelaten), "gevonden": sorted(digests)}
     return None

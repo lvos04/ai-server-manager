@@ -38,8 +38,8 @@ from sqlalchemy.orm import Session
 from hub.actions import service
 from hub.actions.beleid import get_policy
 from hub.catalog.appstore import APPSTORE_APP_ID
-from hub.catalog.asf.manifest.model import Parameter
-from hub.catalog.asf.manifest.translate import _check_value, is_secret
+from hub.catalog.asf.manifest.model import Parameter, PostInstallCheck
+from hub.catalog.asf.manifest.translate import Target, _check_value, is_secret, translate
 from hub.catalog.asf.manifest.validator import schema_sha256, validate_data
 from hub.config import Settings
 from hub.deps import Principal
@@ -143,13 +143,27 @@ def _weiger(reden: str) -> HubError:
 def manifest_fouten(regel: Mapping[str, Any], manifest: Any) -> int:
     """Aantal fouten van de gepinde validator (schema én regels) voor het oorspronkelijke manifest (§8.1, R-VEILIG-2).
 
-    Een ander schema dan de pin telt als fout (fail-closed)."""
+    Een ander schema dan de pin telt als fout (fail-closed), net als een validatorversie in regel (en dus record) die
+    afwijkt van de versie die de gepinde validator zelf rapporteert. Samen met :func:`vertaling_fouten`:
+
+    ===========================================================  ===============================================
+    geval                                                        uitkomst vóór de planner (nul planneroproepen)
+    ===========================================================  ===============================================
+    schema of validatorversie van regel/record wijkt af van pin  409 bewijs_ongeldig (manifest_schema)
+    manifest met een fout van schema of regels                   409 bewijs_ongeldig (manifest_schema)
+    verplichte parameter (zoals de datasetkeuze) ontbreekt       422 parameters_ongeldig (parameter_value_missing)
+    andere blokkerende vertaalmelding van de validator           422 parameters_ongeldig (die code)
+    alles ingevuld, alleen waarschuwingen                        planner; status volgt de planner
+    ===========================================================  ===============================================
+    """
     if regel.get("schema_sha256") != SCHEMA_SHA256 or schema_sha256() != SCHEMA_SHA256:
         return 1
     if not isinstance(manifest, Mapping):
         return 1
     rapport, model = validate_data(copy.deepcopy(dict(manifest)))
-    return rapport.errors if model is not None else max(rapport.errors, 1)
+    # Regel en record noemen de validator die het manifest beoordeelde; een andere dan de gepinde telt als fout.
+    versie = int(regel.get("validator_version") != rapport.validator_version)
+    return (rapport.errors if model is not None else max(rapport.errors, 1)) + versie
 
 
 def parameters_fouten(manifest: Mapping[str, Any], parameters: Mapping[str, Any]) -> list[str]:
@@ -172,6 +186,23 @@ def parameters_fouten(manifest: Mapping[str, Any], parameters: Mapping[str, Any]
         elif isinstance(waarde, str) and secret_text_reasons(waarde, settings=True):
             codes.add("geheim_in_waarde")
     return sorted(codes)
+
+
+def vertaling_fouten(
+    manifest: Mapping[str, Any], parameters: Mapping[str, Any], doel: Mapping[str, Any], app_name: str
+) -> list[str]:
+    """Blokkerende codes van de vertaling door de gepinde validator, met dezelfde invoer als de planner (§8.1).
+
+    Zo geldt de uitkomst van de producent zelf, zoals ``parameter_value_missing`` bij een ontbrekende datasetkeuze."""
+    _, model = validate_data(copy.deepcopy(dict(manifest)))
+    if model is None:
+        return ["manifest_schema"]
+    try:
+        doelsysteem = Target.model_validate(dict(doel))
+    except ValueError:
+        return ["doel_ongeldig"]
+    uitslag = translate(model, dict(parameters), doelsysteem, app_name, trusted_app_id=True)
+    return sorted({f.code for f in uitslag.blocking()})
 
 
 def bewijs(db: Session, settings: Settings, keyring: KeyRing, *, app_id: str, version_id: str) -> dict[str, Any]:
@@ -281,7 +312,9 @@ def maak_plan(
     doel: dict[str, Any],
 ) -> dict[str, Any]:
     m1 = bewijs(db, settings, keyring, app_id=app_id, version_id=version_id)
-    codes = parameters_fouten(m1["manifest"], parameters)
+    codes = parameters_fouten(m1["manifest"], parameters) or vertaling_fouten(
+        m1["manifest"], parameters, doel, app_name
+    )
     if codes:
         # Geen namen of waarden terug: die kunnen van de aanvrager komen.
         raise _fout(
@@ -406,8 +439,17 @@ def plan_dict(plan: CatalogPlan) -> dict[str, Any]:
 
 
 def openbare_controles(controles: Any) -> list[dict[str, Any]]:
-    """Alleen de openbare velden, ook uit rijen en antwoorden van vóór het herstel (R-VEILIG-1)."""
-    return [{k: c.get(k) for k in CONTROLE_KEYS} for c in controles or [] if isinstance(c, Mapping)]
+    """Elke controle opnieuw opgebouwd uit alleen de openbare velden volgens het openbare schema, ook uit rijen en
+    antwoorden van vóór het herstel (R-VEILIG-1). Een controle die daar niet aan voldoet, valt weg."""
+    uit: list[dict[str, Any]] = []
+    for c in controles if isinstance(controles, list) else []:
+        if not isinstance(c, Mapping):
+            continue
+        try:
+            uit.append(PostInstallCheck.model_validate({k: c.get(k) for k in CONTROLE_KEYS}).model_dump())
+        except ValueError:
+            continue
+    return uit
 
 
 def idempotency_response(body: Any) -> Any:

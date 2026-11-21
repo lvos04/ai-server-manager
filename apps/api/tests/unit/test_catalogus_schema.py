@@ -7,10 +7,20 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
+import pytest
 import yaml
 
-from hub.catalog.plannen import SCHEMA_SHA256, manifest_fouten, parameters_fouten
+from hub.catalog import asf
+from hub.catalog.plannen import (
+    SCHEMA_SHA256,
+    idempotency_response,
+    manifest_fouten,
+    openbare_controles,
+    parameters_fouten,
+    vertaling_fouten,
+)
 
 ASF = Path(__file__).resolve().parents[2] / "src/hub/catalog/asf"
 REPO = Path(__file__).resolve().parents[4]
@@ -45,7 +55,7 @@ GELDIG = {
     "docs": ["B08_APPSTORE_LIFECYCLE"],
     "validation_status": "unvalidated",
 }  # fmt: skip
-REGEL = {"schema_sha256": SCHEMA_SHA256}
+REGEL = {"schema_sha256": SCHEMA_SHA256, "validator_version": asf.__version__}
 
 
 def test_schemakopie_past_bij_de_pin_en_weigert_een_onvolledig_manifest() -> None:
@@ -56,6 +66,35 @@ def test_schemakopie_past_bij_de_pin_en_weigert_een_onvolledig_manifest() -> Non
     assert manifest_fouten(REGEL, {"schema_version": 1, "app_id": "demo-app", "version": "1.2.3"}) > 0
     # Een regel met een ander schema dan de eigen kopie: nooit goed.
     assert manifest_fouten({"schema_sha256": "sha256:" + "5" * 64}, GELDIG) == 1
+    # R-VEILIG-2: regel en record noemen een andere validatorversie dan de gepinde validator rapporteert.
+    assert manifest_fouten(dict(REGEL, validator_version="0.9.0"), GELDIG) == 1
+    assert manifest_fouten({"schema_sha256": SCHEMA_SHA256}, GELDIG) == 1
+
+
+CONTROLE = {"id": "http_bereikbaar", "soort": "http", "beschrijving_nl": "De webinterface antwoordt."}
+
+
+@pytest.mark.parametrize(
+    "historisch",
+    [
+        dict(CONTROLE, beschrijving_nl={"oude_notitie": "x"}),
+        dict(CONTROLE, soort="shell"),
+        dict(CONTROLE, id="Niet Geldig"),
+        {"soort": "http", "beschrijving_nl": "Zonder id."},
+        "tekst",
+    ],
+)
+def test_openbare_controles_volgen_het_openbare_schema(historisch: Any) -> None:
+    """R-VEILIG-1: een historische controle buiten het openbare schema valt weg, in lees- en herhaalprojectie."""
+    oud = [dict(CONTROLE, oude_notitie="x"), historisch]
+    assert openbare_controles(oud) == [CONTROLE]
+    assert idempotency_response({"controles_na_installatie": oud})["controles_na_installatie"] == [CONTROLE]
+    assert openbare_controles({"id": "x"}) == [] and openbare_controles(None) == []
+
+
+def test_vertaling_met_een_onbekend_doelsysteem_is_nooit_goed() -> None:
+    assert vertaling_fouten(GELDIG, {}, {"onbekend": "x"}, "demo-app") == ["doel_ongeldig"]
+    assert vertaling_fouten({"app_id": "demo-app"}, {}, {}, "demo-app") == ["manifest_schema"]
 
 
 def test_alleen_gedeclareerde_niet_geheime_parameters() -> None:

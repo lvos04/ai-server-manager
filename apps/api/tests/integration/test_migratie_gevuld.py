@@ -220,13 +220,22 @@ def test_plannen_uit_de_oorspronkelijke_0022_blijven_leesbaar(lege_db: str) -> N
         tabel = sa.Table("catalog_plan", sa.MetaData(), autoload_with=engine)
         registratie = {"app_name": "demo-app", "digests": ["sha256:" + "a" * 64]}
         controle = {"id": "http_bereikbaar", "soort": "http", "beschrijving_nl": "Antwoordt.", "oude_notitie": "x"}
+        ongeldig = {"id": "oud", "soort": "http", "beschrijving_nl": {"oude_notitie": "x"}}  # buiten het schema
+        openbaar = [{k: controle[k] for k in plannen.CONTROLE_KEYS}]
         ids = {"bevestigd": uuid.uuid4(), "open": uuid.uuid4()}
+        cache = sa.Table("idempotency_record", sa.MetaData(), autoload_with=engine)
+        with engine.begin() as c:
+            c.execute(cache.insert().values(
+                scope="user:test:POST:/api/v1/catalog/plans/install", key=uuid.uuid4(), request_hash="c" * 64,
+                status_code=201, created_at=utcnow(),
+                response_body={"plan_id": str(ids["open"]), "controles_na_installatie": [controle, ongeldig]},
+            ))  # fmt: skip
         with engine.begin() as c:
             for soort, pid in ids.items():
                 c.execute(tabel.insert().values(
                     id=pid, soort="install", app_id="demo-app", app_name=f"demo-{soort}", instance_id=uuid.uuid4(),
                     planner_service_id=uuid.uuid4(), binding={"plan_id": str(pid)}, plan_etag='"plan-v1"',
-                    step_id="installeren", controles_na_installatie=[controle], expires_at=utcnow(),
+                    step_id="installeren", controles_na_installatie=[controle, ongeldig], expires_at=utcnow(),
                     status="geinstalleerd_controles_open" if soort == "bevestigd" else "klaar_voor_voorstel",
                     request_id=uuid.uuid4() if soort == "bevestigd" else None,
                     registratie=registratie if soort == "bevestigd" else None,
@@ -242,9 +251,11 @@ def test_plannen_uit_de_oorspronkelijke_0022_blijven_leesbaar(lege_db: str) -> N
                 bevestigd = plannen.haal_plan(db, ids["bevestigd"])
                 assert bevestigd.registratie == registratie and bevestigd.status == "geinstalleerd_controles_open"
                 assert bevestigd.stap_sha256 is None
-                assert bevestigd.controles_na_installatie == [{k: controle[k] for k in plannen.CONTROLE_KEYS}]
+                assert bevestigd.controles_na_installatie == openbaar
                 open_plan = plannen.haal_plan(db, ids["open"])
                 assert (open_plan.status, open_plan.reden) == ("geblokkeerd", "opnieuw_voorvertonen")
+                # R-VEILIG-1: ook het bewaarde planantwoord is opgeschoond, vóór enige herhaling.
+                assert db.execute(sa.select(cache.c.response_body)).scalar_one()["controles_na_installatie"] == openbaar
     finally:
         engine.dispose()
 

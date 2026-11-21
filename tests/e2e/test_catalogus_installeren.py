@@ -262,12 +262,15 @@ def keten(
     beleid._geladen.cache_clear()
 
 
+VOLLEDIG = {"public_url": "https://demo.test/", "data_path": "/mnt/testpool/apps/demo"}  # alles wat de vertaling vraagt
+
+
 def _plan(admin: Any, **wijzig: Any) -> Any:
     body: dict[str, Any] = {
         "app_id": "demo-app",
         "version_id": VERSION_ID,
         "app_name": "demo-app",
-        "parameters": {},
+        "parameters": dict(VOLLEDIG),
         "doel": {"truenas_version": "25.04.2", "ix_app_version": "1.4.8"},
     }
     body.update(wijzig)
@@ -455,7 +458,28 @@ def test_niet_gedeclareerde_of_geheime_parameter_bereikt_de_planner_niet(
         assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
         assert marker not in r.text
     assert keten.planner.requests == [] and keten.planner.plans == {}
-    assert _plan(keten.stack.admin, parameters={"public_url": "https://demo.test/"}).status_code == 201
+    assert _plan(keten.stack.admin).status_code == 201
+
+
+@pytest.mark.parametrize("weg", ["data_path", "public_url"])
+def test_ontbrekende_verplichte_parameter_bereikt_de_planner_niet(keten: Keten, weg: str) -> None:
+    """R-VEILIG-2: de vertaling van de gepinde validator meldt parameter_value_missing; de Hub plant dan niets."""
+    parameters = {k: v for k, v in VOLLEDIG.items() if k != weg}
+    r = _plan(keten.stack.admin, parameters=parameters)
+    assert r.status_code == 422 and r.json()["details"]["codes"] == ["parameter_value_missing"], r.text
+    assert keten.planner.requests == [] and not schrijfaanroepen(keten.stack.nas)
+
+
+def test_andere_validatorversie_dan_de_pin_bereikt_de_planner_niet(
+    keten: Keten, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R-VEILIG-2: regel en record noemen een andere validatorversie dan de gepinde validator rapporteert."""
+    import hub.catalog.asf.manifest.validator as validator
+
+    monkeypatch.setattr(validator, "__version__", "9.9.9")
+    r = _plan(keten.stack.admin)
+    assert r.status_code == 409 and r.json()["details"] == {"reden": "manifest_schema"}, r.text
+    assert keten.planner.requests == [] and not schrijfaanroepen(keten.stack.nas)
 
 
 @pytest.mark.parametrize("waarde", ["voorbeeldmap", "/mnt/testpool/../etc", "/etc/demo"])
