@@ -259,6 +259,7 @@ KOP_M2 = "### 8.3 Afzonderlijke geheime overdracht (M2)"
         (KOP_M2, ("Geen `last4`", "Alleen de SHA-256", "Pas bij de afgifte gemaakt")),
         (KOP_M2, ("POST /api/v1/executor/secret-claims", "request_sha256", "geen gedeeltelijke afgifte")),
         (KOP_M2, ("RFC 9180", "Geen trust on first use", "policy-sleutel wordt hiervoor nooit gebruikt")),
+        (KOP_M2, ("`asm-kluis-afgifte-v1:` gevolgd door de tekst van `claim_sha256`", "met `-` of `_` begint")),
         (KOP_M2, ("kluis_vorm_ongeldig", "koppeling_past_niet", "kluisplekken_recept_ontbreekt")),
         (KOP_M2, ("heft de markering niet op", "tokenplek blijft leeg", "geheimvrij")),
     ],

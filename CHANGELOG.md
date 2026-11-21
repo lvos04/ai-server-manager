@@ -11,6 +11,9 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   versleuteld (HPKE) en ondertekend met de bij het koppelen gepinde sleutels. De executor vult `HUB_*` in, niet de
   vertaling (§3.2). Een instantie met ingevulde plekken krijgt geen bijwerking of terugzetting via `app.config` tot
   het recept met alleen verwijzingen bestaat. ADR-0032 legt M2 vast.
+- Correctie bij de bouw van 050e: de HPKE-afgifte bindt `claim_sha256` in de info (`asm-kluis-afgifte-v1:` plus de
+  hash), omdat de enkelvoudige HPKE-API geen aad kent; een appgeheim dat met `-` of `_` begint, maakt de Hub opnieuw
+  (dat volgt al uit de vorm).
 
 ### Toegevoegd — Catalogusinstallatie via een eigen plannerplan (S-P2-050d, deel D)
 

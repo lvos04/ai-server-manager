@@ -320,7 +320,7 @@ De verplichte volgorde voor de latere implementatie:
    Er zijn precies twee gebonden typen, elk met een eigen vaste vorm en eigen opslag- en hashregels:
    - **appgeheim** (contract §3.1 a en de tweede uitzondering, C-12), op een toegelaten kluisplek van de eigen
      witte-lijstregel (besluit 6). Vorm `^[A-Za-z0-9][A-Za-z0-9_-]{42}$`: 43 tekens, 32 willekeurige bytes als
-     base64url zonder opvulling; een waarde die met `-` begint wordt verworpen en opnieuw gemaakt. Opslag
+     base64url zonder opvulling; een waarde die met `-` of `_` begint wordt verworpen en opnieuw gemaakt. Opslag
      versleuteld in de eigen app-opslag van besluit 2, op te halen met ref en revisie. Die opslag bewaart geen
      `last4` of ander deel of afgeleide van de waarde (anders dan `Vault.put`, dat `last4` vult), alleen
      "gegenereerd" met datum en revisie (contract §3.1 a); nergens staat een hash van de waarde.
