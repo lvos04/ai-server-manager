@@ -150,6 +150,35 @@ deelverzameling en begin opnieuw zonder cursor. Bij uitputting van het retrybudg
 `unknown` en is een eerdere waarde uitsluitend laatst bekend. Beproef twee consistente pagina’s,
 herstart bij wisseling tussen pagina’s en bevestig dat pagina’s van de vervallen meting wegblijven.
 
+### Incident- en downloadketen (S-P3-075, versie 1)
+
+De kijkroute in de Hub leest de opgeslagen diagnose voor één `wanted_id`. Voor deze
+keten staat het regisseursbesluit van 21 november 2026 twee MediaGuard-gegevensroutes toe.
+De Hub controleert vooraf via `GET /api/v1/auth/me` dat de bevestigde sleutel bij
+`apikey:hub` hoort, de rol `viewer` heeft en geen aanvullende scopes heeft. MediaGuard
+werkt bij een geldige sleutelcontrole `api_keys.last_used_at` bij. De regisseur heeft dit
+als sleutelboekhouding van de bron aanvaard.
+
+| Eigenaar en gegevensroute | Betekenis voor deze aflevering |
+| --- | --- |
+| MediaGuard `GET /api/v1/wanted/{wanted_id}/diagnosis?cached=true` | De Hub toetst het teruggegeven `wanted_id`, de bekende `primary_code` en de bronmeettijd `ts`. Een lege cache, een vreemde code of een meting ouder dan 900 seconden geeft `onbekend`. De oorspronkelijke tijd blijft bij een verouderde meting zichtbaar. |
+| MediaGuard `GET /api/v1/downloads/failures` | De bron groepeert downloadfouten over afleveringen heen. De schakel verwijst naar Downloads en meldt dat de groepen geen verwijzing naar deze aflevering bevatten. |
+| MSO `GET /api/v1/usenet/failure-reasons` | De bron beschrijft mogelijke oorzaakcodes. Voor deze beschermde route geldt de rechtencontrole hieronder. |
+| MSO `GET /api/v1/usenet/categories/diagnosis` | MSO weigert het machinerecht `read` met 403. De schakel toont `onbekend`, de reden `geen leesrecht` en de link naar Usenet-providers. Een afzonderlijke leesroute is voorzien voor versie 2. |
+| MSO `GET /api/v1/mediaguard/compat` | Bij een bevestigde liveprobe voor `wanted_diagnosis` projecteert de Hub `routes[].live` in `bronstatus` met de originele `checked_at`. De routestatus geeft geen oorzaakcode voor de aflevering. Dezelfde rechtencontrole geldt. |
+
+De huidige MSO-koppeling heeft uitsluitend openbare probes. Bij uitval van de openbare
+`/healthz`-probe meldt de keten de uitval voor foutredenen en compatibiliteit. Bij een
+bereikbare bron en ontbrekende rechtenverklaring meldt zij `leesrecht niet bevestigd`.
+Beide beschermde routes wachten op het bewijs onder **Pas na bewezen sleutelrechten**.
+De categoriediagnose blijft op `geen leesrecht` zolang de koppeling vaststaat.
+
+De Hub gebruikt tijdens één uitlezing dezelfde `X-Correlation-Id` voor de sleutelcontrole
+en alle gegevens- en contactverzoeken. De doelbinding wordt vóór ieder verzoek opnieuw
+getoetst. De keten schrijft geen bronstatistieken in de Hub. Een leeg diagnoseantwoord
+leidt uitsluitend tot het tonen van het bronresultaat of van `onbekend`. Eventueel
+cachevulgedrag bij een lege cache ligt bij de broneigenaar. Het mediascherm volgt in S-P3-080.
+
 ### MSO
 
 #### Openbare probes

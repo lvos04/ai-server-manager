@@ -586,6 +586,52 @@
         "title": "Device",
         "type": "object"
       },
+      "Downloadketen": {
+        "properties": {
+          "correlation_id": {
+            "format": "uuid",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "mso_change_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mso Change Id"
+          },
+          "schakels": {
+            "items": {
+              "$ref": "#/components/schemas/Schakel"
+            },
+            "title": "Schakels",
+            "type": "array"
+          },
+          "wanted_id": {
+            "title": "Wanted Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "wanted_id",
+          "mso_change_id",
+          "correlation_id",
+          "schakels"
+        ],
+        "title": "Downloadketen",
+        "type": "object"
+      },
+      "Eigenaar": {
+        "enum": [
+          "mediaguard",
+          "media-source-optimizer"
+        ],
+        "type": "string"
+      },
       "EnrollIn": {
         "additionalProperties": false,
         "description": "Exact schema van contract 1.3 §3.3; onbekende velden → 422. ``base_url`` alleen op type (string of null).",
@@ -1749,6 +1795,16 @@
         "title": "OidcIn",
         "type": "object"
       },
+      "Onderdeel": {
+        "enum": [
+          "wanted_diagnose",
+          "downloadfouten",
+          "foutredenen",
+          "categoriediagnose",
+          "compatibiliteit"
+        ],
+        "type": "string"
+      },
       "OplosIn": {
         "additionalProperties": false,
         "properties": {
@@ -2677,6 +2733,84 @@
           "active"
         ],
         "title": "Scene",
+        "type": "object"
+      },
+      "Schakel": {
+        "properties": {
+          "bronstatus": {
+            "anyOf": [
+              {
+                "enum": [
+                  "aanwezig",
+                  "ontbreekt"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bronstatus"
+          },
+          "eigenaar": {
+            "$ref": "#/components/schemas/Eigenaar"
+          },
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "onderdeel": {
+            "$ref": "#/components/schemas/Onderdeel"
+          },
+          "oorzaakcode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oorzaakcode"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          },
+          "status": {
+            "enum": [
+              "bekend",
+              "onbekend"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "onderdeel",
+          "eigenaar",
+          "href",
+          "status"
+        ],
+        "title": "Schakel",
         "type": "object"
       },
       "SendIn": {
@@ -7718,6 +7852,141 @@
           }
         },
         "summary": "Incidenten-inbox per prioriteit (actief eerst, dan ernst en laatste gebeurtenis)",
+        "tags": [
+          "incidenten"
+        ]
+      }
+    },
+    "/api/v1/incidents/downloadketen/{wanted_id}": {
+      "get": {
+        "operationId": "downloadketen_lezen_api_v1_incidents_downloadketen__wanted_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wanted_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 9223372036854775807,
+              "title": "Wanted Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Meegegeven MSO-verwijzing",
+            "in": "query",
+            "name": "mso_change_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9223372036854775807,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Meegegeven MSO-verwijzing",
+              "title": "Mso Change Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mediaguard_link_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mediaguard Link Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mso_link_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mso Link Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Correlation-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Downloadketen"
+                }
+              }
+            },
+            "description": "Vijf schakels met hun eigenaar, ook bij deeluitval.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "X-Correlation-Id": {
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Een gebruikerssessie is vereist."
+          },
+          "403": {
+            "description": "De aanmelder heeft geen kijkrecht als gebruiker."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Waarom ontbreekt deze aflevering? Lees de schakels bij de eigenaren.",
         "tags": [
           "incidenten"
         ]

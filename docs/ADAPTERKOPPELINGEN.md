@@ -53,11 +53,10 @@ my_house de toegang van de Hub in de lijst met gekoppelde clients in.
 
 ## MediaGuard
 
-De bronkeuze volgt optie 1 van het regisseursbesluit van 20 november 2026. De adapter gebruikt
-uitsluitend bewezen alleen-lezen bronnen. De lijst voor de onderzochte versie is leeg. De
-Hub doet daarom voor MediaGuard geen bronverzoeken. De koppeling en het ontkoppelen blijven
-beschikbaar in de Hub. Een ingevoerde sleutel blijft ongebruikt in de Hub-kluis. De bronrol en
-de geldigheid van de sleutel zijn onbekend.
+Het besluit van 20 november 2026 geldt voor de algemene contactproef en de metingen
+hieronder. De sleutel blijft in de Hub-kluis. Koppelen en contact testen
+vergen voor deze metingen geen bronverzoek. De incidentketen controleert de bronrol bij het uitlezen,
+volgens het aanvullende besluit van 21 november.
 
 Lijst en detail tonen onder `mediaguard` de datasets `wanted`, `status`, `downloads`, `av1`
 en `incidenten`, en de metingen `mediaservers`, `noodstop`, `opslagprognose` en `backups`.
@@ -93,6 +92,27 @@ Een mislukte probe geeft voor dat onderdeel `null` en maakt de contactmeting `un
 bevat een vaste Hub-redencode en, bij een bekende bronfoutcode, de vormgecontroleerde broncorrelatie.
 De beschermde datasets blijven `capability_unavailable` en hun metingen `unknown`. Hiervoor is een
 afzonderlijke stap nodig met de verifieerbare rechtenverklaring uit ADR-0034.
+
+## Waarom ontbreekt een aflevering?
+
+Een ingelogde kijker kan de vijf schakels opvragen via
+`GET /api/v1/incidents/downloadketen/{wanted_id}`. Bij meerdere koppelingen van dezelfde app
+kiest de aanroeper de instantie met `mediaguard_link_id` of `mso_link_id`. Een optionele
+`mso_change_id` is een meegegeven verwijzing. De route legt geen verband tussen die wijziging
+en de oorzaak. Dezelfde lees-URL kan opnieuw worden geopend.
+
+Elke schakel vermeldt de eigenaar, de oorzaakcode en meettijd voor zover bekend, de reden
+bij `onbekend` en een schermlink. De link gaat naar de bevestigde eigenaar. Bij een ontbrekende
+of vervallen koppeling verwijst hij naar **Instellingen → Diensten**. Een storing bij de ene
+eigenaar laat de beschikbare schakels van de andere eigenaar zichtbaar. De respons heeft
+`Cache-Control: no-store`. De aanroeper kan een UUID meegeven in `X-Correlation-Id`. Zonder
+die kop geeft de Hub een nieuwe UUID uit. De UUID staat ook in het antwoord.
+
+MediaGuard levert de laatst opgeslagen diagnose. Een oude diagnose houdt haar oorspronkelijke
+meettijd en krijgt de reden `meting verouderd`. Downloadgroepen en MSO-woordenlijsten
+bevatten geen vastgestelde oorzaak voor een individuele aflevering. MSO heeft voor de
+categorieën een eigen scherm. De bronrechten en de bekende sleutelboekhouding staan in
+[ADR-0034, Incident- en downloadketen](adr/ADR-0034-adapters-bestaande-apps.md#incident--en-downloadketen-s-p3-075-versie-1).
 
 ## my_house
 

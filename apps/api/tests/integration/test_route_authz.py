@@ -60,6 +60,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/audit/verify"): "admin",
     ("GET", "/api/v1/incidents"): "viewer",
     ("GET", "/api/v1/incidents/samenvatting"): "viewer",
+    ("GET", "/api/v1/incidents/downloadketen/{wanted_id}"): "viewer",
     ("GET", "/api/v1/policy"): "viewer",
     ("GET", "/api/v1/actions/noodstop"): "viewer",
     ("PUT", "/api/v1/actions/noodstop"): "admin",
@@ -178,6 +179,7 @@ MATRIX: dict[tuple[str, str], str] = {
 }
 
 PATH_VALUES = {
+    "wanted_id": "42",
     "decision_id": "D03",
     "soort": "pools",
     "gate_id": "deploy",

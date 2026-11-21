@@ -13,7 +13,7 @@ import uuid
 from datetime import timedelta
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, Path, Query, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import case, func, or_, select
@@ -26,6 +26,7 @@ from hub.deps import (
     Limit,
     Operator,
     Principal,
+    ReadableVault,
     SettingsDep,
     Viewer,
     decode_cursor,
@@ -33,7 +34,7 @@ from hub.deps import (
     get_vault,
 )
 from hub.errors import HubError
-from hub.incidents import readback
+from hub.incidents import downloadketen, readback
 from hub.incidents.engine import ACTIEF, add_event
 from hub.incidents.view import etag, event_dict, incident_dict
 from hub.logsink import MATCHERS
@@ -174,6 +175,39 @@ def summary(db: DB, _: Viewer) -> dict[str, Any]:
         "groepen": [{"oorzaak": k, "aantal": int(n), "laatste": iso(last)} for k, n, last in groups],
         "bijgewerkt_op": iso(utcnow()),
     }
+
+
+@router.get(
+    "/downloadketen/{wanted_id}",
+    summary="Waarom ontbreekt deze aflevering? Lees de schakels bij de eigenaren.",
+    responses={
+        200: {
+            "description": "Vijf schakels met hun eigenaar, ook bij deeluitval.",
+            "headers": {
+                "X-Correlation-Id": {"schema": {"type": "string", "format": "uuid"}},
+                "Cache-Control": {"schema": {"type": "string", "const": "no-store"}},
+            },
+        },
+        401: {"description": "Een gebruikerssessie is vereist."},
+        403: {"description": "De aanmelder heeft geen kijkrecht als gebruiker."},
+    },
+)
+def downloadketen_lezen(
+    wanted_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    db: DB,
+    settings: SettingsDep,
+    vault: ReadableVault,
+    _: Viewer,
+    response: Response,
+    mso_change_id: Annotated[int | None, Query(gt=0, le=2**63 - 1, description="Meegegeven MSO-verwijzing")] = None,
+    mediaguard_link_id: uuid.UUID | None = None,
+    mso_link_id: uuid.UUID | None = None,
+    correlation_id: Annotated[uuid.UUID | None, Header(alias="X-Correlation-Id")] = None,
+) -> downloadketen.Downloadketen:
+    cid = correlation_id or uuid.uuid4()
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Correlation-Id"] = str(cid)
+    return downloadketen.lees_keten(db, settings, vault, wanted_id, mso_change_id, mediaguard_link_id, mso_link_id, cid)
 
 
 @router.get("/{incident_id}", summary="Incident met hypothese, readback en de laatste gebeurtenissen (ETag)")

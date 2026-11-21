@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Literal, Protocol
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -91,13 +92,23 @@ def resolve_binding(base: str) -> list[str]:
     return sorted(outbound.resolve_peer_addresses(parts.hostname or "", parts.port or 443, False))
 
 
-def read_request(link: AdapterLink, path: str, *, policy: outbound.OutboundPolicy) -> outbound.Response:
+def read_request(
+    link: AdapterLink, path: str, *, policy: outbound.OutboundPolicy, correlation_id: UUID | None = None
+) -> outbound.Response:
     """Verzend de toegelaten openbare probe naar de bevestigde bestemming."""
     public_probe = PUBLIC_PROBES.get(link.app_id)
     if public_probe is None or (path != public_probe and not (link.app_id == MSO_APP_ID and path == MSO_SETUP_PATH)):
         raise outbound.OutboundError("capability_unavailable")
+    base = validate_base_url(link.basis_url)
+    bound = bound_policy(link, policy)
+    if correlation_id is None:
+        return outbound.request(base, "GET", path, policy=bound, max_bytes=MAX_RESPONSE_BYTES)
+    return outbound.request(
+        base, "GET", path, policy=bound, headers={"X-Correlation-Id": str(correlation_id)}, max_bytes=MAX_RESPONSE_BYTES
+    )
+
+
+def bound_policy(link: AdapterLink, policy: outbound.OutboundPolicy) -> outbound.OutboundPolicy:
     if not link.peer_addresses:
         raise outbound.OutboundError("doelbinding_ontbreekt")
-    base = validate_base_url(link.basis_url)
-    bound = replace(policy, allow_loopback=False, allowed_peer_addresses=frozenset(link.peer_addresses))
-    return outbound.request(base, "GET", path, policy=bound, max_bytes=MAX_RESPONSE_BYTES)
+    return replace(policy, allow_loopback=False, allowed_peer_addresses=frozenset(link.peer_addresses))

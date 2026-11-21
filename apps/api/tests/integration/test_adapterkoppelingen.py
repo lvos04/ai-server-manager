@@ -13,7 +13,7 @@ import pytest
 from conftest import enroll_body, idem, login_as, make_user
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import select, text, update
+from sqlalchemy import event, select, text, update
 from sqlalchemy.orm import Session
 
 from hub import migrations, outbound
@@ -2092,3 +2092,207 @@ def test_mislukte_laatste_monitorpoging(admin, app, doel, catalogusmonitor, monk
         assert obs.observed_at == tijd and obs.details["bron_fout"]
     assert admin.post(catalogusmonitor, headers=idem()).json()["resultaat"]["status"] == "ok"
     assert toestanden(admin, doel) == ("healthy", "healthy")
+
+
+# Incidentketen over dezelfde lokale MediaGuard- en MSO-installaties als de adapterproeven.
+KETEN = "/api/v1/incidents/downloadketen/17"
+
+
+@pytest.fixture
+def ketenbronnen(admin, app, settings, doel, monkeypatch):
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {APP_ID: (443,), ANDERE_APP_ID: (8443,)})
+        discover(db, settings)
+        mso_id = db.scalars(select(CatalogApp.id).where(CatalogApp.app_id == ANDERE_APP_ID)).one()
+    sleutel = "mgk_" + secrets.token_urlsafe(32)
+    assert admin.post(ROUTE, json=doel, headers=invoer(sleutel)).status_code == 201
+    mso = {**doel, "app_id": ANDERE_APP_ID, "catalog_app_id": str(mso_id), "basis_url": TWEEDE_BASIS}
+    assert admin.post(ROUTE, json=mso, headers=idem()).status_code == 201
+
+    spoor = []
+    tijd = iso(utcnow())
+    prive = secrets.token_urlsafe()
+    verboden = dict.fromkeys(("sessions", "actions", "tests", "last"), prive) | {"hold": {"reason": prive}}
+    antwoorden = {
+        "/api/v1/auth/me": {"username": "apikey:hub", "role": "viewer", "scopes": None},
+        "/api/v1/wanted/17/diagnosis": {"wanted_id": 17, "primary_code": "import-failed", "ts": tijd, **verboden},
+        "/api/v1/downloads/failures": {"groups": [{"reason_nl": prive, "count": 7}], "by_source": {}, **verboden},
+        "/healthz": {"status": "ok", "version": "1.6.0"},
+    }
+
+    def transport(base, method, path, *, headers, policy, query=None, **options):
+        assert policy.allowed_peer_addresses == frozenset({PEER})
+        assert not policy.allow_loopback and method == "GET" and "json_body" not in options
+        assert query == ({"cached": "true"} if path.endswith("/diagnosis") else None)
+        assert set(headers) == ({"X-Api-Key", "X-Correlation-Id"} if base == URL else {"X-Correlation-Id"})
+        if base == URL:
+            assert headers["X-Api-Key"] == sleutel
+        else:
+            assert base == TWEEDE_BASIS and path == "/healthz"
+        spoor.append((path, uuid.UUID(headers["X-Correlation-Id"])))
+        body = antwoorden[path]
+        if isinstance(body, Exception):
+            raise body
+        if isinstance(body, outbound.Response):
+            return body
+        return outbound.Response(200, json.dumps(body).encode())
+
+    monkeypatch.setattr(outbound, "request", transport)
+    return antwoorden, spoor, tijd, prive
+
+
+@pytest.mark.parametrize("mso_uit", [False, True], ids=["mso-bereikbaar", "mso-onbereikbaar"])
+def test_downloadketen_als_kijker(admin, app, ketenbronnen, caplog, mso_uit):
+    antwoorden, spoor, tijd, prive = ketenbronnen
+    if mso_uit:
+        antwoorden["/healthz"] = outbound.OutboundError("tijdslimiet", prive)
+    make_user(admin, "ketenkijker", "viewer")
+    viewer = login_as(app, "ketenkijker")
+    correlatie = uuid.uuid4()
+    sql = []
+
+    def noteer_opdracht(conn, cursor, statement, parameters, context, executemany):
+        sql.append(statement.lstrip().split(maxsplit=1)[0].upper())
+
+    event.listen(app.state.engine, "before_cursor_execute", noteer_opdracht)
+    try:
+        response = viewer.get(KETEN, params={"mso_change_id": 23}, headers={"X-Correlation-Id": str(correlatie)})
+    finally:
+        event.remove(app.state.engine, "before_cursor_execute", noteer_opdracht)
+    assert set(sql) == {"SELECT"}
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["X-Correlation-Id"] == str(correlatie)
+    body = response.json()
+    assert set(body) == {"wanted_id", "mso_change_id", "correlation_id", "schakels"}
+    assert (body["wanted_id"], body["mso_change_id"], body["correlation_id"]) == (17, 23, str(correlatie))
+    schakels = body["schakels"]
+    assert len(schakels) == 5
+    for schakel in schakels:
+        assert set(schakel) == {
+            "onderdeel",
+            "eigenaar",
+            "href",
+            "status",
+            "oorzaakcode",
+            "bronstatus",
+            "observed_at",
+            "reden",
+        }
+    assert schakels[0] == {
+        "onderdeel": "wanted_diagnose",
+        "eigenaar": APP_ID,
+        "href": f"{URL}/ontbrekend",
+        "status": "bekend",
+        "bronstatus": None,
+        "oorzaakcode": "import-failed",
+        "observed_at": tijd,
+        "reden": None,
+    }
+    assert schakels[1]["status"] == "onbekend"
+    assert schakels[1]["reden"] == "downloadgroepen zonder verwijzing naar deze aflevering"
+    assert schakels[1]["href"] == f"{URL}/downloads"
+    assert [s["onderdeel"] for s in schakels[2:]] == ["foutredenen", "categoriediagnose", "compatibiliteit"]
+    for s in schakels[2:]:
+        assert s["eigenaar"] == ANDERE_APP_ID and s["href"].startswith(TWEEDE_BASIS + "/")
+        assert s["status"] == "onbekend" and s["oorzaakcode"] is None and s["observed_at"] is None
+    assert schakels[2]["reden"] == ("bron onbereikbaar" if mso_uit else "leesrecht niet bevestigd")
+    assert schakels[3]["reden"] == "geen leesrecht"
+    assert schakels[4]["reden"] == schakels[2]["reden"]
+    assert [p for p, _ in spoor] == list(antwoorden)
+    assert {i for _, i in spoor} == {correlatie}
+    assert prive not in response.text and prive not in caplog.text
+    with app.state.sessionmaker() as db:
+        for column in (AuditEvent.details, IdempotencyRecord.response_body, IncidentEvent.details, OutboxEvent.payload):
+            assert prive not in json.dumps(list(db.scalars(select(column))))
+        assert all(r.observed_at is None for r in db.scalars(select(AdapterLink)))
+
+
+@pytest.mark.parametrize(
+    ("pad", "antwoord", "verwacht", "overgeslagen"),
+    [
+        ("/api/v1/auth/me", {"role": "admin"}, "geen leesrecht", True),
+        (
+            "/api/v1/auth/me",
+            {"username": "apikey:hub", "role": "viewer", "scopes": ["emergency_stop:on"]},
+            "geen leesrecht",
+            True,
+        ),
+        ("/api/v1/auth/me", outbound.Response(401, b"{}"), "sleutel geweigerd", True),
+        ("/api/v1/wanted/17/diagnosis", outbound.Response(404, b"{}"), "geen gecachte diagnose", False),
+        ("/api/v1/wanted/17/diagnosis", outbound.Response(200, b"[]"), "ongeldig bronantwoord", False),
+    ],
+)
+def test_downloadketen_weigering_en_lege_cache(admin, ketenbronnen, pad, antwoord, verwacht, overgeslagen):
+    antwoorden, spoor, _, _ = ketenbronnen
+    antwoorden[pad] = antwoord
+    response = admin.get(KETEN)
+    assert response.status_code == 200
+    schakel = response.json()["schakels"][0]
+    assert (schakel["status"], schakel["oorzaakcode"], schakel["reden"]) == ("onbekend", None, verwacht)
+    assert ("/api/v1/downloads/failures" not in [p for p, _ in spoor]) == overgeslagen
+    assert {i for _, i in spoor} == {uuid.UUID(response.headers["X-Correlation-Id"])}
+
+
+def test_downloadketen_geen_koppeling_of_aanmelding(app, admin, monkeypatch):
+    transport = Mock(side_effect=AssertionError("Zonder koppeling hoort de Hub geen bron te benaderen."))
+    monkeypatch.setattr(outbound, "request", transport)
+    with TestClient(app, base_url="https://testserver") as gast:
+        assert gast.get(KETEN).status_code == 401
+    make_user(admin, "ketenkind", "kind")
+    assert login_as(app, "ketenkind").get(KETEN).status_code == 403
+    assert admin.post(KETEN, headers=idem()).status_code == 405
+    assert admin.get(KETEN.replace("/17", "/0")).status_code == 422
+    assert admin.get(KETEN, params={"mso_change_id": -1}).status_code == 422
+    assert admin.get(KETEN, headers={"X-Correlation-Id": "geen-uuid"}).status_code == 422
+    response = admin.get(KETEN)
+    assert response.status_code == 200 and response.json()["mso_change_id"] is None
+    for s in response.json()["schakels"]:
+        assert s["status"] == "onbekend" and s["reden"] == "geen koppeling"
+        assert s["href"] == "/instellingen/diensten"
+    transport.assert_not_called()
+
+
+@pytest.mark.parametrize("omslag", ["/api/v1/auth/me", "/api/v1/wanted/17/diagnosis"])
+def test_downloadketen_hercontroleert_doel_per_verzoek(admin, app, ketenbronnen, monkeypatch, omslag):
+    _, spoor, _, _ = ketenbronnen
+    fake = outbound.request
+
+    def wissel(base, method, path, **opties):
+        response = fake(base, method, path, **opties)
+        if path == omslag:
+            with app.state.sessionmaker.begin() as db:
+                _bewaar_apps(db, {ANDERE_APP_ID: (443, 8443)})
+        return response
+
+    monkeypatch.setattr(outbound, "request", wissel)
+    r = admin.get(KETEN)
+    assert r.status_code == 200
+    for s in r.json()["schakels"][:2]:
+        assert (s["reden"], s["href"]) == ("doelbinding vervallen", "/instellingen/diensten")
+        assert s["oorzaakcode"] is None and s["observed_at"] is None
+    verwacht = ["/api/v1/auth/me", "/api/v1/wanted/17/diagnosis"]
+    assert [p for p, _ in spoor] == verwacht[: verwacht.index(omslag) + 1]
+
+
+def test_downloadketen_gewijzigde_peer_verbergt_oude_eigenaarslink(admin, ketenbronnen):
+    antwoorden, _, _, _ = ketenbronnen
+    antwoorden["/api/v1/downloads/failures"] = outbound.OutboundError("doelbinding_gewijzigd")
+    response = admin.get(KETEN)
+    assert response.status_code == 200
+    for s in response.json()["schakels"][:2]:
+        assert (s["reden"], s["href"]) == ("doelbinding vervallen", "/instellingen/diensten")
+        assert s["oorzaakcode"] is None and s["observed_at"] is None
+
+
+def test_downloadketen_selecteert_uitsluitend_de_opgegeven_eigenaar(admin, app, ketenbronnen):
+    _, spoor, _, _ = ketenbronnen
+    with app.state.sessionmaker() as db:
+        links = {r.app_id: str(r.id) for r in db.scalars(select(AdapterLink))}
+    r = admin.get(KETEN, params={"mediaguard_link_id": links[ANDERE_APP_ID], "mso_link_id": links[APP_ID]})
+    assert r.status_code == 200
+    assert {s["reden"] for s in r.json()["schakels"]} == {"geen koppeling"}
+    assert not spoor
+    r = admin.get(KETEN, params={"mediaguard_link_id": links[APP_ID], "mso_link_id": links[ANDERE_APP_ID]})
+    assert r.status_code == 200
+    assert r.json()["schakels"][0]["oorzaakcode"] == "import-failed"
