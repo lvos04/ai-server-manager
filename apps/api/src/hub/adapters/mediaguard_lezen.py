@@ -205,6 +205,9 @@ def status_cijfer(
             onbekend = Cijfer(status="onbekend", observed_at=gemeten_op, reden=tijdfout)
         else:
             actief = item.emergency_stop_active
+            # De uitspraak verloopt met de oudste van pagina en statusitem (beide hier vers en met dezelfde termijn).
+            assert gemeten_op is not None and cijfer.observed_at is not None  # beide hierboven vers getoetst
+            gemeten_op = min(gemeten_op, cijfer.observed_at)
             stop = Noodstop(
                 status="gemeten", actief=actief, sinds=sinds_tijd if actief else None, observed_at=gemeten_op
             )

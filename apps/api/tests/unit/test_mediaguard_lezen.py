@@ -206,6 +206,28 @@ def test_kortere_brontermijn_geldt_voor_pagina_en_statusitem():
     assert stop.observed_at == datetime.fromisoformat(tijd)
 
 
+@pytest.mark.parametrize(
+    ("pagina_s", "item_s"),
+    [(30, 0), (0, 30), (30, 30)],
+    ids=["pagina-oudste", "item-oudste", "gelijk"],
+)
+def test_verse_status_draagt_oudste_bronmeettijd(pagina_s, item_s):
+    # R-VEILIG-4: het scherm laat de meting verlopen op de oudste van pagina en statusitem.
+    pagina_tijd, item_tijd = NU - timedelta(seconds=pagina_s), NU - timedelta(seconds=item_s)
+    data = bron(
+        "status",
+        total=1,
+        next_cursor=None,
+        items=[SYSTEEM | {"observed_at": item_tijd.isoformat()}],
+        observed_at=pagina_tijd.isoformat(),
+    )
+    cijfer, items = pagina("status", data, NU, 60)
+    cijfer, stop = status_cijfer(cijfer, data, items, NU, 60)
+    oudste = min(pagina_tijd, item_tijd)
+    assert (cijfer.status, cijfer.observed_at) == ("gemeten", oudste)
+    assert (stop.status, stop.observed_at) == ("gemeten", oudste)
+
+
 AANBOD = {
     "app_id": "media-guard-ultimate",
     "schema_version": "1.0",

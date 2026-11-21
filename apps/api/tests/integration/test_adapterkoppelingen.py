@@ -2564,6 +2564,26 @@ def test_mediaguard_overzicht_oud_statusitem_op_verse_pagina(admin, mgbron):
     }
 
 
+@pytest.mark.parametrize("oudste", ["pagina", "item"])
+def test_mediaguard_overzicht_verse_status_met_oudste_meettijd(admin, mgbron, oudste):
+    # R-VEILIG-4: het scherm laat noodstop en nul verlopen zodra de eerste van beide bronmetingen verloopt.
+    route, antwoorden, _, tijd, _ = mgbron
+    oud = iso(datetime.fromisoformat(tijd) - timedelta(seconds=30))
+    antwoorden["/connector/v1/discover"]["limits"] = {"max_age_s": {"status": 60}}
+    antwoorden["status"]["observed_at"] = oud if oudste == "pagina" else tijd
+    antwoorden["status"]["items"][0].update(
+        observed_at=tijd if oudste == "pagina" else oud, emergency_stop_active=False, emergency_stop_since=None
+    )
+    body = admin.get(route).json()
+    assert (body["status"]["status"], body["status"]["observed_at"]) == ("gemeten", oud)
+    assert (body["noodstop"]["status"], body["noodstop"]["actief"], body["noodstop"]["observed_at"]) == (
+        "gemeten",
+        False,
+        oud,
+    )
+    assert body["max_age_s"]["status"] == 60
+
+
 def test_mediaguard_overzicht_toegang_en_doel(app, admin, mgbron, monkeypatch):
     route, _, spoor, _, _ = mgbron
     with TestClient(app, base_url="https://testserver") as gast:

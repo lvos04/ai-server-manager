@@ -161,6 +161,19 @@ describe("Media: toestanden van het scherm", () => {
     expect(mg.cijfers.find((c) => c.id === "wanted")!.verouderd).toBe(false);
   });
 
+  it.each([
+    ["59 s na de oudste bronmeting: nog actueel", 59_000, true],
+    ["61 s na de oudste bronmeting: noodstop en nul ingetrokken", 61_000, false],
+  ])("R-VEILIG-4 %s", (_naam, na, actueel) => {
+    // De Hub levert de meettijd van de oudste van pagina en statusitem; het scherm verloopt daarop zonder nieuwe peiling.
+    const o = overzicht({ max_age_s: { status: 60 } });
+    const mg = mediaguardWeergave(MG, o, Date.parse(VERS) + na, false, "x");
+    const status = mg.cijfers.find((c) => c.id === "status")!;
+    const html = renderToStaticMarkup(<MediaGuardKaart mg={mg} />);
+    expect(status.zekerheid === "gemeten" && status.waarde === 0 && !status.verouderd).toBe(actueel);
+    expect(html.includes("Noodstop · uit · gemeten")).toBe(actueel);
+  });
+
   it("nooit gemeten: zonder bronmeettijd blijft 'Nog nooit gemeten' staan", () => {
     const html = inhoud([MG]);
     expect(html.split('data-testid="cijfer-wanted"')[1]!.split("</dl>")[0]).toContain("Nog nooit gemeten");
