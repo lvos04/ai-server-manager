@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from hub.adapters.mediaguard_lezen import av1_cijfer, grens, pagina, status_cijfer
+from hub.adapters.mediaguard_lezen import aanbod, av1_cijfer, grens, pagina, status_cijfer
 
 NU = datetime(2026, 1, 3, 12, tzinfo=UTC)
 TIJD = NU.isoformat()
@@ -66,10 +66,6 @@ def bron(kind: str = "wanted", **wijziging: object) -> dict[str, object]:
         ({"status": "unknown", "reason_code": "vrije brontekst"}, "onbekend", None, "onbekende bronreden", True),
         ({"status": "ok", "reason_code": "meting_verouderd"}, "onbekend", None, "meting verouderd", True),
         ({"total": None}, "onbekend", None, "ongeldig bronantwoord", True),
-        ({"total": -1}, "onbekend", None, "ongeldig bronantwoord", True),
-        ({"total": True}, "onbekend", None, "ongeldig bronantwoord", True),
-        ({"total": "42"}, "onbekend", None, "ongeldig bronantwoord", True),
-        ({"items": None}, "onbekend", None, "ongeldig bronantwoord", True),
         ({"type": "status"}, "onbekend", None, "ongeldig bronantwoord", False),
     ],
 )
@@ -77,6 +73,49 @@ def test_pagina(wijziging, status, waarde, reden, heeft_tijd):
     cijfer, _ = pagina("wanted", bron(**wijziging), NU)
     assert (cijfer.status, cijfer.waarde, cijfer.reden) == (status, waarde, reden)
     assert (cijfer.observed_at is not None) == heeft_tijd
+
+
+# Toestandstabel ongeldige vormen (R-VEILIG-3): elk veld van ItemPage is verplicht en exact getypeerd;
+# ontbrekend is geen null en een booleaan is geen getal of cursor. Uitkomst altijd onbekend, zonder getal of meettijd.
+ONGELDIGE_PAGINA = [
+    *({"weg": veld} for veld in ("type", "items", "status", "reason_code", "snapshot_id", "observed_at", "total")),
+    {"weg": "next_cursor"},
+    {"next_cursor": False},
+    {"next_cursor": True},
+    {"next_cursor": 0},
+    {"next_cursor": None, "total": 0, "weg": "next_cursor"},
+    {"total": -1},
+    {"total": True},
+    {"total": False},
+    {"total": "42"},
+    {"total": 42.0},
+    {"items": None},
+    {"items": {}},
+    {"items": [1]},
+    {"items": ["x"]},
+    {"type": None},
+    {"status": True},
+    {"reason_code": 0},
+    {"snapshot_id": False},
+    {"observed_at": 0},
+]
+
+
+@pytest.mark.parametrize("vorm", ONGELDIGE_PAGINA, ids=str)
+def test_pagina_ongeldige_vorm(vorm):
+    vorm = dict(vorm)
+    body = bron(total=0, next_cursor=None) | {k: v for k, v in vorm.items() if k != "weg"}
+    body.pop(vorm.get("weg", ""), None)
+    cijfer, items = pagina("wanted", body, NU)
+    assert (cijfer.status, cijfer.waarde, cijfer.observed_at, cijfer.reden, items) == (
+        "onbekend",
+        None,
+        None,
+        "ongeldig bronantwoord",
+        [],
+    )
+    # Ook geen pagina die geen object is.
+    assert pagina("wanted", [body], NU)[0].reden == "ongeldig bronantwoord"
 
 
 SYSTEEM = {
@@ -129,6 +168,32 @@ def test_status_en_noodstop(item, body, mislukt, actief, sinds, reden):
     assert (stop.status == "gemeten") == (reden is None)
 
 
+@pytest.mark.parametrize(
+    "vorm",
+    [
+        *({"weg": v} for v in ("observed_at", "emergency_stop_active", "emergency_stop_since", "jobs_failed")),
+        {"emergency_stop_active": 0},
+        {"emergency_stop_active": 1},
+        {"jobs_failed": True},
+        {"jobs_failed": False},
+        {"jobs_failed": -1},
+        {"jobs_failed": 3.0},
+        {"emergency_stop_since": False},
+        {"observed_at": 0},
+    ],
+    ids=str,
+)
+def test_statusitem_ongeldige_vorm(vorm):
+    # Ontbrekend is geen null en een booleaan geen getal: nooit 'noodstop uit' of 0 mislukte jobs.
+    item = SYSTEEM | {k: v for k, v in vorm.items() if k != "weg"}
+    item.pop(vorm.get("weg", ""), None)
+    data = bron("status", total=1, next_cursor=None, items=[item])
+    cijfer, items = pagina("status", data, NU)
+    cijfer, stop = status_cijfer(cijfer, data, items, NU)
+    assert (cijfer.status, cijfer.waarde, cijfer.reden) == ("onbekend", None, "ongeldig bronantwoord")
+    assert (stop.status, stop.actief, stop.sinds) == ("onbekend", None, None)
+
+
 def test_kortere_brontermijn_geldt_voor_pagina_en_statusitem():
     tijd = (NU - timedelta(seconds=120)).isoformat()
     data = bron("status", total=1, next_cursor=None, items=[SYSTEEM | {"observed_at": TIJD}], observed_at=tijd)
@@ -141,6 +206,15 @@ def test_kortere_brontermijn_geldt_voor_pagina_en_statusitem():
     assert stop.observed_at == datetime.fromisoformat(tijd)
 
 
+AANBOD = {
+    "app_id": "media-guard-ultimate",
+    "schema_version": "1.0",
+    "capabilities": ["read"],
+    "item_types": ["wanted", "status"],
+    "limits": {"max_age_s": {"status": 60}, "max_page_size": 200},
+}
+
+
 @pytest.mark.parametrize(
     ("limits", "verwacht"),
     [
@@ -148,14 +222,64 @@ def test_kortere_brontermijn_geldt_voor_pagina_en_statusitem():
         ({"max_age_s": {"status": 60}}, 60),
         ({"max_age_s": {"status": 3600}}, 900),
         ({"max_age_s": {"wanted": 60}}, 900),
-        # Twijfel aan de bronwaarde: nooit soepeler, dus direct verouderd.
-        ({"max_age_s": {"status": "60"}}, 0),
-        ({"max_age_s": {"status": -1}}, 0),
-        ({"max_age_s": {"status": True}}, 0),
+        ({"max_age_s": {"status": 0}}, 0),
     ],
 )
 def test_grens(limits, verwacht):
-    assert grens({"limits": limits} if limits is not None else {}, "status") == verwacht
+    termijnen = aanbod(
+        AANBOD | {"limits": limits} if limits is not None else {k: v for k, v in AANBOD.items() if k != "limits"}
+    )
+    assert termijnen is not None
+    assert grens(termijnen[1], "status") == verwacht
+
+
+# Toestandstabel ongeldig aanbod (R-VEILIG-2, R-VEILIG-4): twijfel aan rechten of termijn = geen leesbare bron.
+@pytest.mark.parametrize(
+    "wijziging",
+    [
+        {"capabilities": ["read", False]},
+        {"capabilities": ["read", None]},
+        {"capabilities": ["read", 1]},
+        {"capabilities": [["read"]]},
+        {"capabilities": {"read": True}},
+        {"capabilities": "read"},
+        {"capabilities": True},
+        {"capabilities": None},
+        {"capabilities": []},
+        {"capabilities": ["propose"]},
+        {"item_types": None},
+        {"item_types": ["wanted", 1]},
+        {"item_types": "wanted"},
+        {"app_id": "andere-app"},
+        {"schema_version": 1.0},
+        {"limits": None},
+        {"limits": []},
+        {"limits": {"max_age_s": 60}},
+        {"limits": {"max_age_s": None}},
+        {"limits": {"max_age_s": [60]}},
+        {"limits": {"max_age_s": {"status": "60"}}},
+        {"limits": {"max_age_s": {"status": -1}}},
+        {"limits": {"max_age_s": {"status": True}}},
+        {"limits": {"max_age_s": {"status": 60.0}}},
+        {"limits": {"max_age_s": {"status": None}}},
+    ],
+    ids=str,
+)
+def test_aanbod_ongeldige_vorm(wijziging):
+    assert aanbod(AANBOD | wijziging) is None
+
+
+@pytest.mark.parametrize("veld", ["app_id", "schema_version", "capabilities", "item_types"])
+def test_aanbod_verplicht_veld(veld):
+    assert aanbod({k: v for k, v in AANBOD.items() if k != veld}) is None
+    assert aanbod(None) is None and aanbod([AANBOD]) is None
+
+
+def test_aanbod_geldig():
+    assert aanbod(AANBOD | {"capabilities": ["read", "stream"], "extra": {"geheim": "x"}}) == (
+        ["wanted", "status"],
+        {"status": 60},
+    )
 
 
 def baan(lane: str, running: object) -> dict[str, object]:
@@ -170,6 +294,10 @@ def baan(lane: str, running: object) -> dict[str, object]:
         ([baan("cpu", 1)], None, "tegenstrijdige bronpagina"),
         ([baan("cpu", 1), baan("cpu", 2)], None, "ongeldig bronantwoord"),
         ([baan("cpu", None), baan("gpu", 2)], None, "ongeldig bronantwoord"),
+        ([baan("cpu", True), baan("gpu", 2)], None, "ongeldig bronantwoord"),
+        ([baan("cpu", 1.0), baan("gpu", 2)], None, "ongeldig bronantwoord"),
+        ([baan("cpu", -1), baan("gpu", 2)], None, "ongeldig bronantwoord"),
+        ([{"id": "cpu", "running": 1}, baan("gpu", 2)], None, "ongeldig bronantwoord"),
     ],
 )
 def test_av1_lopende_encodes(banen, waarde, reden):

@@ -21,9 +21,18 @@ export interface MediaGuardOverzicht {
   incidenten: BronCijfer;
   noodstop: { status: "gemeten" | "onbekend"; actief: boolean | null; sinds: string | null; observed_at: string | null; reden: string | null };
   mediaservers: { status: "onbekend"; servers: null; reden: string };
+  /** Strengste geldigheid per gegeven in seconden (bron, nooit ruimer dan 900 s); de noodstop volgt `status`. */
+  max_age_s?: Partial<Record<"wanted" | "status" | "av1" | "incidenten", number>>;
 }
 
 export const MAX_AGE_MS = 900_000;
+
+/** Grens in ms; ontbreekt (oudere Hub) = 900 s, een ongeldige waarde = direct verouderd, nooit ruimer dan 900 s. */
+function grensMs(o: MediaGuardOverzicht | null, id: string): number {
+  const s = (o?.max_age_s as Record<string, unknown> | undefined)?.[id];
+  if (s === undefined) return MAX_AGE_MS;
+  return typeof s === "number" && Number.isInteger(s) && s >= 0 ? Math.min(s * 1000, MAX_AGE_MS) : 0;
+}
 
 export interface Cijfer {
   id: string;
@@ -79,7 +88,8 @@ function meettijd(t: string | null, nu: number): number | null {
 }
 
 /**
- * Alleen een `gemeten` waarde met geldige meettijd wordt een getal. Ouder dan 15 minuten of een lijst die niet meer
+ * Alleen een `gemeten` waarde met geldige meettijd wordt een getal. Ouder dan de door de Hub geleverde grens
+ * (zelf meegerekend in de browser, ook tussen twee peilingen; standaard 15 minuten) of een lijst die niet meer
  * ververst (`oud`) blijft zichtbaar als verouderd, nooit als actueel. Zonder overzicht is alles onbekend met `fout`.
  */
 export function mediaguardWeergave(k: Koppeling, o: MediaGuardOverzicht | null, nu: number, oud: boolean, fout: string): MediaGuardWeergave {
@@ -91,12 +101,12 @@ export function mediaguardWeergave(k: Koppeling, o: MediaGuardOverzicht | null, 
       // Een bekende bronmeettijd blijft zichtbaar als "laatst gemeten" (grijs), zonder getal.
       return { id, titel, waarde: null, zekerheid: "onbekend", observedAt: t === null ? null : c!.observed_at, verouderd: t !== null, reden: c?.reden ?? fout };
     }
-    const verouderd = oud || nu - t > MAX_AGE_MS;
+    const verouderd = oud || nu - t > grensMs(o, id);
     return { id, titel, waarde: c.waarde, zekerheid: "gemeten", observedAt: c.observed_at, verouderd, reden: verouderd ? (oud ? nietActueel : "meting verouderd") : null };
   });
   const n = o?.noodstop;
   const nt = n ? meettijd(n.observed_at, nu) : null;
-  const noodstopVers = n?.status === "gemeten" && typeof n.actief === "boolean" && nt !== null && !oud && nu - nt <= MAX_AGE_MS;
+  const noodstopVers = n?.status === "gemeten" && typeof n.actief === "boolean" && nt !== null && !oud && nu - nt <= grensMs(o, "status");
   return {
     id: k.id,
     installatie: installatie(k),

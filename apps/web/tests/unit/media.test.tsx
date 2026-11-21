@@ -131,6 +131,36 @@ describe("Media: toestanden van het scherm", () => {
     expect(html).toContain(`<time dateTime="${OUD}">`);
   });
 
+  // R-VEILIG-4: het scherm rekent de ouderdom zelf mee tegen de door de Hub geleverde grens, ook tussen twee peilingen.
+  // VERS is 60 s oud op NU. Rij: [grens uit de Hub, nul en noodstop uit nog actueel?]
+  it.each([
+    ["grens 61 s", { status: 61 }, true],
+    ["grens 60 s (precies op de grens)", { status: 60 }, true],
+    ["grens 59 s", { status: 59 }, false],
+    ["grens 0 s", { status: 0 }, false],
+    ["grens ontbreekt (oudere Hub): 900 s", {}, true],
+    ["grens ruimer dan 900 s telt als 900 s", { status: 3600 }, true],
+    ["ongeldige grens: tekst", { status: "60" }, false],
+    ["ongeldige grens: booleaan", { status: true }, false],
+    ["ongeldige grens: null", { status: null }, false],
+    ["ongeldige grens: negatief", { status: -1 }, false],
+    ["ongeldige grens: breuk", { status: 59.5 }, false],
+  ])("brontermijn %s", (_naam, grens, actueel) => {
+    const o = overzicht({ max_age_s: grens as MediaGuardOverzicht["max_age_s"] });
+    const mg = mediaguardWeergave(MG, o, NU, false, "x");
+    const status = mg.cijfers.find((c) => c.id === "status")!;
+    const html = renderToStaticMarkup(<MediaGuardKaart mg={mg} />);
+    expect(status.zekerheid === "gemeten" && status.waarde === 0 && !status.verouderd).toBe(actueel);
+    expect(mg.noodstop.actief === false).toBe(actueel);
+    expect(html.includes("Noodstop · uit · gemeten")).toBe(actueel);
+    if (!actueel) {
+      expect(tekst(html)).toContain("Noodstop · onbekend: meting verouderd · laatst gemeten");
+      expect(status.observedAt).toBe(VERS);
+    }
+    // Andere gegevens houden hun eigen (standaard) grens.
+    expect(mg.cijfers.find((c) => c.id === "wanted")!.verouderd).toBe(false);
+  });
+
   it("nooit gemeten: zonder bronmeettijd blijft 'Nog nooit gemeten' staan", () => {
     const html = inhoud([MG]);
     expect(html.split('data-testid="cijfer-wanted"')[1]!.split("</dl>")[0]).toContain("Nog nooit gemeten");

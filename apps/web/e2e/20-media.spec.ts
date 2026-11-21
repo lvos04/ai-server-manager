@@ -20,7 +20,7 @@ function mediaguard() {
  * Vorm van hub/adapters/mediaguard_lezen.py::Overzicht. `verouderd`: zoals de Hub een te oude bronmeting teruggeeft,
  * onbekend zonder waarde maar met de oorspronkelijke meettijd. Downloads vraagt de Hub nooit op (bijwerkingen in MediaGuard).
  */
-function overzicht(tijd: string | null, noodstopAan = false, verouderd = false) {
+function overzicht(tijd: string | null, noodstopAan = false, verouderd = false, statusGrens = 900) {
   const waarden = [17, 0, null, 3, 6];
   const cijfers = Object.fromEntries(CIJFERS.map((k, i) => [k, k === "downloads"
     ? { status: "onbekend", waarde: null, observed_at: null, reden: DOWNLOADS }
@@ -31,7 +31,8 @@ function overzicht(tijd: string | null, noodstopAan = false, verouderd = false) 
     ? { status: "onbekend", actief: null, sinds: null, observed_at: tijd, reden: "meting verouderd" }
     : tijd ? { status: "gemeten", actief: noodstopAan, sinds: noodstopAan ? tijd : null, observed_at: tijd, reden: null }
     : { status: "onbekend", actief: null, sinds: null, observed_at: null, reden: "geen leesrecht" };
-  return { correlation_id: randomUUID(), ...cijfers, noodstop, mediaservers: SERVERS };
+  const max_age_s = tijd ? { wanted: 900, status: statusGrens, av1: 900, incidenten: 900 } : {};
+  return { correlation_id: randomUUID(), ...cijfers, noodstop, mediaservers: SERVERS, max_age_s };
 }
 function mso(observedAt: string) {
   return { id: randomUUID(), app_id: "media-source-optimizer", catalog_app_id: randomUUID(), basis_url: "https://mso.example", laatste4: "",
@@ -150,4 +151,27 @@ test("verouderd: metingen ouder dan vijftien minuten staan grijs als laatst geme
   await expect(page.locator("main")).toContainText("Noodstop · onbekend: meting verouderd · laatst gemeten");
   await controleer(page, "media verouderd");
   await afdruk(page, info, "verouderd");
+});
+
+test("brontermijn van de Hub: het scherm trekt noodstop uit en de nul zelf in zodra de grens tussen twee peilingen verstrijkt", async ({ page }) => {
+  // R-VEILIG-4: Hub-grens 60 s voor status; de meting is 59 s oud bij het laden en raakt in de browser verouderd.
+  const meting = Date.now() - 120_000;
+  const tijd = new Date(meting).toISOString();
+  await page.clock.install({ time: new Date(meting) });
+  await page.clock.pauseAt(new Date(meting + 59_000));
+  await page.route(route, (r) => r.fulfill({ json: { items: [mediaguard(), mso(tijd)], next_cursor: null } }));
+  await page.route(overzichtRoute, (r) => r.fulfill({ json: overzicht(tijd, false, false, 60) }));
+  await page.goto("/media");
+  await ready(page);
+  const status = page.getByTestId("cijfer-status");
+  await expect(page.getByTestId("noodstop-uit")).toHaveText("Noodstop · uit · gemeten");
+  await expect(status).toContainText("0 · gemeten");
+  await page.clock.runFor(2_000);
+  await expect(page.getByTestId("noodstop-uit")).toHaveCount(0);
+  await expect(page.locator("main")).toContainText("Noodstop · onbekend: meting verouderd · laatst gemeten");
+  await expect(status.locator(".text-2xl")).not.toHaveText(/^0\s*· gemeten/);
+  await expect(status).toContainText("Verouderd");
+  await expect(status.locator(`time[datetime="${tijd}"]`)).toBeVisible();
+  // Gegevens met de standaardgrens blijven actueel.
+  await expect(page.getByTestId("cijfer-wanted")).toContainText("17 · gemeten");
 });

@@ -2127,6 +2127,14 @@
           "incidenten": {
             "$ref": "#/components/schemas/Cijfer"
           },
+          "max_age_s": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Max Age S",
+            "type": "object"
+          },
           "mediaservers": {
             "$ref": "#/components/schemas/Mediaservers",
             "default": {

@@ -2464,7 +2464,9 @@ def test_mediaguard_overzicht_per_gegeven_onbekend(admin, mgbron):
     assert body["incidenten"]["waarde"] == 6
 
 
-@pytest.mark.parametrize("capaciteiten", [{"read": False}, {"read": True}, True, "read", None, []])
+@pytest.mark.parametrize(
+    "capaciteiten", [{"read": False}, {"read": True}, True, "read", None, [], ["read", False], ["read", None]]
+)
 def test_mediaguard_overzicht_leesrecht_alleen_als_lijst(app, admin, mgbron, capaciteiten):
     # R-VEILIG-2: alleen een lijst met 'read' telt; elke andere vorm geeft onbekend, nooit HTTP 500 of itemverzoeken.
     route, antwoorden, spoor, _, _ = mgbron
@@ -2491,6 +2493,41 @@ def test_mediaguard_overzicht_tegenstrijdige_pagina_en_geldige_nul(admin, mgbron
         "observed_at": tijd,
         "reden": None,
     }
+
+
+@pytest.mark.parametrize("cursor", ["ontbrekend", False, True, 0])
+def test_mediaguard_overzicht_ongeldige_vervolgcursor(admin, mgbron, cursor):
+    # R-VEILIG-3: ontbrekend is geen null en een booleaan geen cursor; nooit een gemeten aantal.
+    route, antwoorden, _, _, _ = mgbron
+    antwoorden["incidents"].update(total=1, next_cursor=cursor)
+    if cursor == "ontbrekend":
+        del antwoorden["incidents"]["next_cursor"]
+    response = admin.get(route)
+    assert response.status_code == 200
+    cijfer = response.json()["incidenten"]
+    assert (cijfer["status"], cijfer["waarde"], cijfer["reden"]) == ("onbekend", None, "ongeldig bronantwoord")
+
+
+@pytest.mark.parametrize("termijnen", [60, None, [60], {"status": "60"}, {"status": True}, {"status": -1}])
+def test_mediaguard_overzicht_ongeldige_brontermijn(admin, mgbron, termijnen):
+    # R-VEILIG-4: een verkeerd gevormde termijn wordt niet genegeerd; geen itemverzoeken, nooit 'noodstop uit'.
+    route, antwoorden, spoor, _, _ = mgbron
+    oud = iso(utcnow() - timedelta(seconds=120))
+    antwoorden["/connector/v1/discover"]["limits"] = {"max_age_s": termijnen}
+    antwoorden["status"]["observed_at"] = oud
+    antwoorden["status"]["items"][0].update(observed_at=oud, emergency_stop_active=False, emergency_stop_since=None)
+    response = admin.get(route)
+    assert response.status_code == 200
+    _alles_onbekend(response.json(), "connectorversie niet bevestigd")
+    assert response.json()["max_age_s"] == {}
+    assert "/connector/v1/items" not in [p for p, _, _ in spoor]
+
+
+def test_mediaguard_overzicht_levert_brontermijn_aan_scherm(admin, mgbron):
+    # Het scherm rekent de ouderdom zelf mee; daarvoor levert de Hub per gegeven de strengste termijn.
+    route, antwoorden, _, _, _ = mgbron
+    antwoorden["/connector/v1/discover"]["limits"] = {"max_age_s": {"status": 60, "wanted": 3600}}
+    assert admin.get(route).json()["max_age_s"] == {"wanted": 900, "status": 60, "av1": 900, "incidenten": 900}
 
 
 def test_mediaguard_overzicht_kortere_brontermijn_noodstop(admin, mgbron):

@@ -86,7 +86,9 @@ metingen hierboven. Het overzicht doet uitsluitend GET-verzoeken met de kijkersl
 
 1. `GET /api/v1/auth/me` met dezelfde controle als de downloadketen: `apikey:hub`, rol `viewer`, geen scopes.
 2. `GET /connector/v1/discover`: `app_id` `media-guard-ultimate`, `schema_version` `1.0`, `capabilities` als lijst
-   met `read`, en de itemtypen. Elke andere vorm geeft alle cijfers `onbekend` en geen itemverzoek.
+   van uitsluitend tekenreeksen met `read`, de itemtypen als lijst van tekenreeksen en, indien aanwezig, `limits` als
+   object met `max_age_s` als object van gehele getallen van minstens 0. Elke andere vorm (ook `["read", false]`,
+   `limits: null` of `max_age_s: 60`) geeft alle cijfers `onbekend` en geen itemverzoek.
 3. `GET /connector/v1/items` voor `wanted`, `status`, `av1_lanes` en `incidents`.
 
 | Cijfer | Bron | Waarde |
@@ -100,14 +102,19 @@ metingen hierboven. Het overzicht doet uitsluitend GET-verzoeken met de kijkersl
 De noodstop komt uit hetzelfde statusitem (`emergency_stop_active`, `emergency_stop_since`). Een cijfer is alleen
 `gemeten` bij een bronpagina van het gevraagde type met `status: ok`, zonder `reason_code`, met een geheel `total`
 van minstens 0 en een meettijd met tijdzone die niet in de toekomst ligt en niet ouder is dan de strengste termijn:
-900 seconden of de kortere `limits.max_age_s` van dat itemtype uit discover (contract §6.2; een ongeldige waarde
-telt als 0). Totaal, aantal items en vervolgcursor moeten kloppen: zonder cursor precies `total` items, met cursor
+900 seconden of de kortere `limits.max_age_s` van dat itemtype uit discover (contract §6.2). Het hele antwoord
+wordt op één plek tegen een strikt schema getoetst (`hub/adapters/mediaguard_lezen.py`, vorm van `ItemPage`,
+`SystemItem` en `LaneItem`): exacte typen, een booleaan is geen getal of cursor en een ontbrekend verplicht veld
+(zoals `next_cursor`) is geen `null`; zo'n pagina is `onbekend` ("ongeldig bronantwoord") zonder meettijd. Totaal, aantal items en vervolgcursor moeten kloppen: zonder cursor precies `total` items, met cursor
 minder; anders is het cijfer `onbekend` ("tegenstrijdige bronpagina"). Status en AV1 vragen bovendien één volledige
 pagina; het statusitem moet een eigen verse meettijd hebben, anders zijn mislukte jobs en noodstop `onbekend` met
 die meettijd (nooit "noodstop uit"). Anders is het cijfer `onbekend` met een vaste reden en, waar bekend,
 de bronmeettijd. Een 401, 403, time-out, andere rol, vervallen doelbinding of onbevestigde connector maakt alle
 cijfers en de noodstop `onbekend`. Een storing bij één type laat de andere cijfers staan. Alle verzoeken van één
 overzicht delen één `X-Correlation-Id`. De Hub bouwt elk veld zelf op en geeft geen ander bronveld door.
+Het antwoord bevat `max_age_s` met de gehanteerde termijn per gevraagd cijfer (`wanted`, `status`, `av1`,
+`incidenten`; de noodstop volgt `status`). Het scherm rekent de ouderdom daartegen zelf mee, zodat een meting die
+tussen twee peilingen verloopt in de browser direct als verouderd staat en nooit als "noodstop uit" blijft staan.
 
 Downloads blijven `onbekend` met de reden "MediaGuard heeft nog geen bijwerkingsvrije downloadbron". Het
 connectoritem `downloads` werkt in MediaGuard `9d2b1cf` een index van download-ID's bij en kan bij een lege cache
