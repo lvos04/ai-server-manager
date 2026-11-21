@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from hub.adapters.mediaguard_lezen import av1_cijfer, pagina, status_cijfer
+from hub.adapters.mediaguard_lezen import av1_cijfer, grens, pagina, status_cijfer
 
 NU = datetime(2026, 1, 3, 12, tzinfo=UTC)
 TIJD = NU.isoformat()
@@ -28,7 +28,14 @@ def bron(kind: str = "wanted", **wijziging: object) -> dict[str, object]:
     ("wijziging", "status", "waarde", "reden", "heeft_tijd"),
     [
         ({}, "gemeten", 42, None, True),
-        ({"total": 0}, "gemeten", 0, None, True),
+        ({"total": 0, "next_cursor": None}, "gemeten", 0, None, True),
+        ({"total": 1, "next_cursor": None, "items": [{}]}, "gemeten", 1, None, True),
+        # Tegenstrijdige pagina (R-VEILIG-3): totaal, items en cursor bevestigen elkaar niet.
+        ({"total": 0, "next_cursor": None, "items": [{}]}, "onbekend", None, "tegenstrijdige bronpagina", True),
+        ({"total": 0}, "onbekend", None, "tegenstrijdige bronpagina", True),
+        ({"total": 1, "items": [{}]}, "onbekend", None, "tegenstrijdige bronpagina", True),
+        ({"total": 1, "items": [{}, {}]}, "onbekend", None, "tegenstrijdige bronpagina", True),
+        ({"total": 3, "next_cursor": None, "items": [{}]}, "onbekend", None, "tegenstrijdige bronpagina", True),
         ({"observed_at": (NU - timedelta(seconds=900)).isoformat()}, "gemeten", 42, None, True),
         # Negatieve rijen: nooit 0 of een oude waarde als actueel.
         ({"observed_at": OUD}, "onbekend", None, "meting verouderd", True),
@@ -74,6 +81,7 @@ def test_pagina(wijziging, status, waarde, reden, heeft_tijd):
 
 SYSTEEM = {
     "id": "status:installation",
+    "observed_at": TIJD,
     "emergency_stop_active": False,
     "emergency_stop_since": None,
     "jobs_queued": 1,
@@ -101,8 +109,12 @@ SYSTEEM = {
             "ongeldig bronantwoord",
         ),
         ({"jobs_failed": None}, {}, None, None, None, "ongeldig bronantwoord"),
-        ({}, {"next_cursor": "x"}, None, None, None, "onvolledige bronpagina"),
-        ({}, {"total": 2}, None, None, None, "onvolledige bronpagina"),
+        ({}, {"next_cursor": "x"}, None, None, None, "tegenstrijdige bronpagina"),
+        ({}, {"next_cursor": "x", "total": 2}, None, None, None, "onvolledige bronpagina"),
+        ({}, {"total": 2}, None, None, None, "tegenstrijdige bronpagina"),
+        # R-VEILIG-4: een oud of ontbrekend statusitem op een verse pagina is nooit 'noodstop uit'.
+        ({"observed_at": OUD}, {}, None, None, None, "meting verouderd"),
+        ({"observed_at": None}, {}, None, None, None, "ongeldige bronmeettijd"),
         ({}, {"observed_at": OUD}, None, None, None, "meting verouderd"),
         ({}, {"status": "unknown", "reason_code": "bron_onbereikbaar"}, None, None, None, "bron onbereikbaar"),
     ],
@@ -117,6 +129,35 @@ def test_status_en_noodstop(item, body, mislukt, actief, sinds, reden):
     assert (stop.status == "gemeten") == (reden is None)
 
 
+def test_kortere_brontermijn_geldt_voor_pagina_en_statusitem():
+    tijd = (NU - timedelta(seconds=120)).isoformat()
+    data = bron("status", total=1, next_cursor=None, items=[SYSTEEM | {"observed_at": TIJD}], observed_at=tijd)
+    cijfer, items = pagina("status", data, NU, 60)
+    assert (cijfer.status, cijfer.reden) == ("onbekend", "meting verouderd")
+    data = bron("status", total=1, next_cursor=None, items=[SYSTEEM | {"observed_at": tijd}])
+    cijfer, items = pagina("status", data, NU, 60)
+    cijfer, stop = status_cijfer(cijfer, data, items, NU, 60)
+    assert (stop.status, stop.actief, stop.reden) == ("onbekend", None, "meting verouderd")
+    assert stop.observed_at == datetime.fromisoformat(tijd)
+
+
+@pytest.mark.parametrize(
+    ("limits", "verwacht"),
+    [
+        (None, 900),
+        ({"max_age_s": {"status": 60}}, 60),
+        ({"max_age_s": {"status": 3600}}, 900),
+        ({"max_age_s": {"wanted": 60}}, 900),
+        # Twijfel aan de bronwaarde: nooit soepeler, dus direct verouderd.
+        ({"max_age_s": {"status": "60"}}, 0),
+        ({"max_age_s": {"status": -1}}, 0),
+        ({"max_age_s": {"status": True}}, 0),
+    ],
+)
+def test_grens(limits, verwacht):
+    assert grens({"limits": limits} if limits is not None else {}, "status") == verwacht
+
+
 def baan(lane: str, running: object) -> dict[str, object]:
     return {"id": lane, "lane": lane, "running": running, "slots": 2, "desired_slots": 2, "paused": False}
 
@@ -126,7 +167,7 @@ def baan(lane: str, running: object) -> dict[str, object]:
     [
         ([baan("cpu", 1), baan("gpu", 2)], 3, None),
         ([baan("cpu", 0), baan("gpu", 0)], 0, None),
-        ([baan("cpu", 1)], None, "onvolledige bronpagina"),
+        ([baan("cpu", 1)], None, "tegenstrijdige bronpagina"),
         ([baan("cpu", 1), baan("cpu", 2)], None, "ongeldig bronantwoord"),
         ([baan("cpu", None), baan("gpu", 2)], None, "ongeldig bronantwoord"),
     ],

@@ -85,25 +85,33 @@ Een ingelogde kijker leest per MediaGuard-koppeling `GET /api/v1/adapterkoppelin
 metingen hierboven. Het overzicht doet uitsluitend GET-verzoeken met de kijkersleutel uit de kluis:
 
 1. `GET /api/v1/auth/me` met dezelfde controle als de downloadketen: `apikey:hub`, rol `viewer`, geen scopes.
-2. `GET /connector/v1/discover`: `app_id` `media-guard-ultimate`, `schema_version` `1.0`, `read` en de itemtypen.
-3. `GET /connector/v1/items` voor `wanted`, `status`, `downloads`, `av1_lanes` en `incidents`. De connector leest
-   onder `observation_read` zonder opslag (S-P3-615).
+2. `GET /connector/v1/discover`: `app_id` `media-guard-ultimate`, `schema_version` `1.0`, `capabilities` als lijst
+   met `read`, en de itemtypen. Elke andere vorm geeft alle cijfers `onbekend` en geen itemverzoek.
+3. `GET /connector/v1/items` voor `wanted`, `status`, `av1_lanes` en `incidents`.
 
 | Cijfer | Bron | Waarde |
 | --- | --- | --- |
 | Wanted · open | `wanted` | `total` |
 | Status · mislukte jobs | `status` | `jobs_failed` van het ene statusitem |
-| Downloads · in de wachtrij | `downloads` | `total` |
+| Downloads · in de wachtrij | geen (zie hieronder) | altijd `onbekend` |
 | AV1 · lopende encodes | `av1_lanes` | som van `running` over precies de banen `cpu` en `gpu` |
 | Incidenten · open | `incidents` | `total` |
 
 De noodstop komt uit hetzelfde statusitem (`emergency_stop_active`, `emergency_stop_since`). Een cijfer is alleen
 `gemeten` bij een bronpagina van het gevraagde type met `status: ok`, zonder `reason_code`, met een geheel `total`
-van minstens 0 en een meettijd met tijdzone die niet in de toekomst ligt en hooguit 900 seconden oud is. Status en
-AV1 vragen bovendien één volledige pagina. Anders is het cijfer `onbekend` met een vaste reden en, waar bekend,
+van minstens 0 en een meettijd met tijdzone die niet in de toekomst ligt en niet ouder is dan de strengste termijn:
+900 seconden of de kortere `limits.max_age_s` van dat itemtype uit discover (contract §6.2; een ongeldige waarde
+telt als 0). Totaal, aantal items en vervolgcursor moeten kloppen: zonder cursor precies `total` items, met cursor
+minder; anders is het cijfer `onbekend` ("tegenstrijdige bronpagina"). Status en AV1 vragen bovendien één volledige
+pagina; het statusitem moet een eigen verse meettijd hebben, anders zijn mislukte jobs en noodstop `onbekend` met
+die meettijd (nooit "noodstop uit"). Anders is het cijfer `onbekend` met een vaste reden en, waar bekend,
 de bronmeettijd. Een 401, 403, time-out, andere rol, vervallen doelbinding of onbevestigde connector maakt alle
 cijfers en de noodstop `onbekend`. Een storing bij één type laat de andere cijfers staan. Alle verzoeken van één
 overzicht delen één `X-Correlation-Id`. De Hub bouwt elk veld zelf op en geeft geen ander bronveld door.
+
+Downloads blijven `onbekend` met de reden "MediaGuard heeft nog geen bijwerkingsvrije downloadbron". Het
+connectoritem `downloads` werkt in MediaGuard `9d2b1cf` een index van download-ID's bij en kan bij een lege cache
+de downloadclient aanmelden (`connector/download_ids.py`, `downloads/live.py`); de Hub vraagt het daarom niet op.
 
 Mediaservers blijven `onbekend` met de reden "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron".
 De enige bron, `/api/v1/mediaserver/status`, staat onder de uitgesloten routes van ADR-0034. In MediaGuard

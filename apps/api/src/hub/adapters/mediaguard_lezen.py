@@ -1,7 +1,8 @@
 """Alleen-lezen MediaGuard-overzicht voor het scherm Media (S-P3-082).
 
-Bron: `GET /connector/v1/discover` en `GET /connector/v1/items` (S-P3-610/615, leest onder `observation_read`
-zonder opslag). De Hub neemt uitsluitend aantallen, de noodstopstand en meettijden over en bouwt elk veld zelf op.
+Bron: `GET /connector/v1/discover` en `GET /connector/v1/items` (S-P3-610/615, leest onder `observation_read`).
+De Hub neemt uitsluitend aantallen, de noodstopstand en meettijden over en bouwt elk veld zelf op. Het item `downloads`
+wordt niet opgevraagd: MediaGuard werkt daarbij een index bij en kan de downloadclient aanmelden (geen alleen-lezen).
 """
 
 from __future__ import annotations
@@ -25,7 +26,6 @@ from hub.vault import Vault
 TYPES: dict[str, tuple[str, int]] = {
     "wanted": ("wanted", 1),
     "status": ("status", 200),
-    "downloads": ("downloads", 1),
     "av1": ("av1_lanes", 200),
     "incidenten": ("incidents", 1),
 }
@@ -37,6 +37,7 @@ BRONREDENEN = {
     "bron_onbereikbaar": "bron onbereikbaar",
 }
 MEDIASERVERS_REDEN = "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron"
+DOWNLOADS_REDEN = "MediaGuard heeft nog geen bijwerkingsvrije downloadbron"
 
 
 class Cijfer(BaseModel):
@@ -82,11 +83,21 @@ def _moment(value: object, now: datetime) -> datetime | None:
     return moment.astimezone(UTC)
 
 
-def _tijd(value: object, now: datetime) -> tuple[datetime | None, str | None]:
+def grens(aanbod: dict[str, Any], kind: str) -> int:
+    """Strengste geldigheid (contract §6.2): de bronwaarde per itemtype, nooit ruimer dan 900 s; ongeldig = 0."""
+    limits = aanbod.get("limits")
+    termijnen = limits.get("max_age_s") if isinstance(limits, dict) else None
+    if not isinstance(termijnen, dict) or kind not in termijnen:
+        return basis.MAX_AGE_S
+    waarde = termijnen[kind]
+    return min(waarde, basis.MAX_AGE_S) if type(waarde) is int and waarde >= 0 else 0
+
+
+def _tijd(value: object, now: datetime, max_age_s: int = basis.MAX_AGE_S) -> tuple[datetime | None, str | None]:
     observed = _moment(value, now)
     if observed is None:
         return None, "ongeldige bronmeettijd"
-    if (now - observed).total_seconds() > basis.MAX_AGE_S:
+    if (now - observed).total_seconds() > max_age_s:
         return observed, "meting verouderd"
     return observed, None
 
@@ -95,11 +106,13 @@ def _int(value: object) -> int | None:
     return value if type(value) is int and value >= 0 else None
 
 
-def pagina(kind: str, body: dict[str, Any], now: datetime) -> tuple[Cijfer, list[dict[str, Any]]]:
+def pagina(
+    kind: str, body: dict[str, Any], now: datetime, max_age_s: int = basis.MAX_AGE_S
+) -> tuple[Cijfer, list[dict[str, Any]]]:
     """Toets één connectorpagina; geeft een cijfer met het totaal en de items voor verdere telling."""
     if body.get("type") != kind:
         return Cijfer(status="onbekend", reden="ongeldig bronantwoord"), []
-    observed, fout = _tijd(body.get("observed_at"), now)
+    observed, fout = _tijd(body.get("observed_at"), now, max_age_s)
     if body.get("status") != "ok" or body.get("reason_code") is not None:
         code = body.get("reason_code")
         reden = BRONREDENEN.get(code, "onbekende bronreden") if isinstance(code, str) else "onbekende bronreden"
@@ -109,6 +122,10 @@ def pagina(kind: str, body: dict[str, Any], now: datetime) -> tuple[Cijfer, list
     total, items = _int(body.get("total")), body.get("items")
     if total is None or not isinstance(items, list) or not all(isinstance(i, dict) for i in items):
         return Cijfer(status="onbekend", observed_at=observed, reden="ongeldig bronantwoord"), []
+    # Totaal, ontvangen items en vervolgcursor moeten elkaar bevestigen; anders is het totaal niet te vertrouwen.
+    n, verder = len(items), body.get("next_cursor") is not None
+    if n > total or (n == total) == verder:
+        return Cijfer(status="onbekend", observed_at=observed, reden="tegenstrijdige bronpagina"), []
     return Cijfer(status="gemeten", waarde=total, observed_at=observed), items
 
 
@@ -119,7 +136,7 @@ def _volledig(cijfer: Cijfer, body: dict[str, Any]) -> Cijfer | None:
 
 
 def status_cijfer(
-    cijfer: Cijfer, body: dict[str, Any], items: list[dict[str, Any]], now: datetime
+    cijfer: Cijfer, body: dict[str, Any], items: list[dict[str, Any]], now: datetime, max_age_s: int = basis.MAX_AGE_S
 ) -> tuple[Cijfer, Noodstop]:
     """Status = mislukte jobs; de noodstop komt uit hetzelfde statusitem."""
     onbekend = _volledig(cijfer, body) if cijfer.status == "gemeten" else cijfer
@@ -127,16 +144,20 @@ def status_cijfer(
         onbekend = Cijfer(status="onbekend", observed_at=cijfer.observed_at, reden="ongeldig bronantwoord")
     if onbekend is None:
         item = items[0]
+        # Het statusitem heeft een eigen meettijd; een verse pagina maakt een oude noodstopstand niet actueel.
+        gemeten_op, tijdfout = _tijd(item.get("observed_at"), now, max_age_s)
         actief, mislukt = item.get("emergency_stop_active"), _int(item.get("jobs_failed"))
         sinds = item.get("emergency_stop_since")
         sinds_tijd = _moment(sinds, now)
-        if type(actief) is not bool or mislukt is None or (sinds is not None and sinds_tijd is None):
+        if tijdfout:
+            onbekend = Cijfer(status="onbekend", observed_at=gemeten_op, reden=tijdfout)
+        elif type(actief) is not bool or mislukt is None or (sinds is not None and sinds_tijd is None):
             onbekend = Cijfer(status="onbekend", observed_at=cijfer.observed_at, reden="ongeldig bronantwoord")
         else:
             stop = Noodstop(
-                status="gemeten", actief=actief, sinds=sinds_tijd if actief else None, observed_at=cijfer.observed_at
+                status="gemeten", actief=actief, sinds=sinds_tijd if actief else None, observed_at=gemeten_op
             )
-            return Cijfer(status="gemeten", waarde=mislukt, observed_at=cijfer.observed_at), stop
+            return Cijfer(status="gemeten", waarde=mislukt, observed_at=gemeten_op), stop
     return onbekend, Noodstop(status="onbekend", observed_at=onbekend.observed_at, reden=onbekend.reden)
 
 
@@ -168,7 +189,8 @@ def lees_overzicht(db: Session, settings: Settings, vault: Vault | None, row: Ad
             aanbod.get("app_id") != "media-guard-ultimate"
             or aanbod.get("schema_version") != "1.0"
             or not isinstance(typen, list)
-            or "read" not in (aanbod.get("capabilities") or [])
+            or not isinstance(capaciteiten := aanbod.get("capabilities"), list)
+            or "read" not in capaciteiten
         ):
             raise Bronfout("connectorversie niet bevestigd")
     except (Bronfout, outbound.OutboundError) as exc:
@@ -185,13 +207,14 @@ def lees_overzicht(db: Session, settings: Settings, vault: Vault | None, row: Ad
             except (Bronfout, outbound.OutboundError) as exc:
                 cijfers[naam] = fout(exc)
                 continue
-            now = utcnow()
-            cijfer, items = pagina(kind, body, now)
+            now, termijn = utcnow(), grens(aanbod, kind)
+            cijfer, items = pagina(kind, body, now, termijn)
             if naam == "status":
-                cijfer, noodstop = status_cijfer(cijfer, body, items, now)
+                cijfer, noodstop = status_cijfer(cijfer, body, items, now, termijn)
             elif naam == "av1":
                 cijfer = av1_cijfer(cijfer, body, items)
             cijfers[naam] = cijfer
         if noodstop is None:
             noodstop = Noodstop(status="onbekend", reden=cijfers["status"].reden)
+    cijfers["downloads"] = Cijfer(status="onbekend", reden=DOWNLOADS_REDEN)
     return Overzicht(correlation_id=cid, noodstop=noodstop, **cijfers)

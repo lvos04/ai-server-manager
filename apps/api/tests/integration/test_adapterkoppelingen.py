@@ -2346,7 +2346,6 @@ def mgbron(admin, app, doel, monkeypatch):
         },
         "wanted": _mg_pagina("wanted", [{"id": "wanted:1", **verboden}], tijd, total=17, next_cursor="c"),
         "status": _mg_pagina("status", [systeem], tijd, **verboden),
-        "downloads": _mg_pagina("downloads", [{"id": "d1"}], tijd, total=4, next_cursor="c"),
         "av1_lanes": _mg_pagina("av1_lanes", banen, tijd),
         "incidents": _mg_pagina("incidents", [{"id": "i1"}], tijd, total=6, next_cursor="c"),
     }
@@ -2393,7 +2392,8 @@ def test_mediaguard_overzicht_als_kijker(admin, app, mgbron, caplog):
     gemeten = {"status": "gemeten", "observed_at": tijd, "reden": None}
     assert body["wanted"] == {**gemeten, "waarde": 17}
     assert body["status"] == {**gemeten, "waarde": 2}
-    assert body["downloads"] == {**gemeten, "waarde": 4}
+    # R-VEILIG-1: het item downloads heeft bijwerkingen in MediaGuard en wordt nooit opgevraagd.
+    assert body["downloads"] == {"status": "onbekend", "waarde": None, "observed_at": None, "reden": DOWNLOADS}
     assert body["av1"] == {**gemeten, "waarde": 4}
     assert body["incidenten"] == {**gemeten, "waarde": 6}
     assert body["noodstop"] == {**gemeten, "actief": True, "sinds": tijd}
@@ -2402,8 +2402,8 @@ def test_mediaguard_overzicht_als_kijker(admin, app, mgbron, caplog):
         "servers": None,
         "reden": "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron",
     }
-    assert [p for p, _, _ in spoor] == ["/api/v1/auth/me", "/connector/v1/discover"] + ["/connector/v1/items"] * 5
-    assert [q["type"] for _, q, _ in spoor[2:]] == ["wanted", "status", "downloads", "av1_lanes", "incidents"]
+    assert [p for p, _, _ in spoor] == ["/api/v1/auth/me", "/connector/v1/discover"] + ["/connector/v1/items"] * 4
+    assert [q["type"] for _, q, _ in spoor[2:]] == ["wanted", "status", "av1_lanes", "incidents"]
     assert {c for _, _, c in spoor} == {uuid.UUID(body["correlation_id"])}
     # Veldenwitte lijst (S-P3-030 a): niets uit sessions, hold.reason, actions, tests of last komt door.
     assert prive not in response.text and prive not in caplog.text
@@ -2412,10 +2412,14 @@ def test_mediaguard_overzicht_als_kijker(admin, app, mgbron, caplog):
             assert prive not in json.dumps(list(db.scalars(select(column))))
 
 
+DOWNLOADS = "MediaGuard heeft nog geen bijwerkingsvrije downloadbron"
+
+
 def _alles_onbekend(body: dict[str, Any], reden: str) -> None:
-    for naam in ("wanted", "status", "downloads", "av1", "incidenten", "noodstop"):
+    for naam in ("wanted", "status", "av1", "incidenten", "noodstop"):
         assert body[naam]["status"] == "onbekend" and body[naam]["reden"] == reden, naam
         assert body[naam].get("waarde") is None and body[naam].get("actief") is None
+    assert body["downloads"]["status"] == "onbekend" and body["downloads"]["reden"] == DOWNLOADS
 
 
 @pytest.mark.parametrize(
@@ -2450,15 +2454,77 @@ def test_mediaguard_overzicht_per_gegeven_onbekend(admin, mgbron):
     route, antwoorden, _, tijd, _ = mgbron
     antwoorden["wanted"] = outbound.OutboundError("tijdslimiet")
     antwoorden["status"] = _mg_pagina("status", [], tijd, status="unknown", reason_code="bron_onbereikbaar", total=None)
-    antwoorden["downloads"] = outbound.Response(500, b"{}")
     antwoorden["/connector/v1/discover"]["item_types"] = ["wanted", "status", "downloads", "incidents"]
     body = admin.get(route).json()
     assert (body["wanted"]["status"], body["wanted"]["reden"]) == ("onbekend", "bron onbereikbaar")
     assert body["status"] == {"status": "onbekend", "waarde": None, "observed_at": tijd, "reden": "bron onbereikbaar"}
     assert body["noodstop"]["actief"] is None and body["noodstop"]["reden"] == "bron onbereikbaar"
-    assert body["downloads"]["reden"] == "bron onbereikbaar"
+    assert body["downloads"]["reden"] == DOWNLOADS
     assert body["av1"]["reden"] == "bron levert dit gegeven niet"
     assert body["incidenten"]["waarde"] == 6
+
+
+@pytest.mark.parametrize("capaciteiten", [{"read": False}, {"read": True}, True, "read", None, []])
+def test_mediaguard_overzicht_leesrecht_alleen_als_lijst(app, admin, mgbron, capaciteiten):
+    # R-VEILIG-2: alleen een lijst met 'read' telt; elke andere vorm geeft onbekend, nooit HTTP 500 of itemverzoeken.
+    route, antwoorden, spoor, _, _ = mgbron
+    antwoorden["/connector/v1/discover"]["capabilities"] = capaciteiten
+    with TestClient(app, base_url="https://testserver", raise_server_exceptions=False) as client:
+        client.cookies.update(admin.cookies)
+        response = client.get(route)
+    assert response.status_code == 200
+    _alles_onbekend(response.json(), "connectorversie niet bevestigd")
+    assert "/connector/v1/items" not in [p for p, _, _ in spoor]
+
+
+def test_mediaguard_overzicht_tegenstrijdige_pagina_en_geldige_nul(admin, mgbron):
+    # R-VEILIG-3: één incident bij totaal nul is tegenstrijdig; een lege, volledige pagina is een gemeten nul.
+    route, antwoorden, _, tijd, _ = mgbron
+    antwoorden["incidents"].update(total=0, next_cursor=None)
+    assert len(antwoorden["incidents"]["items"]) == 1
+    cijfer = admin.get(route).json()["incidenten"]
+    assert cijfer == {"status": "onbekend", "waarde": None, "observed_at": tijd, "reden": "tegenstrijdige bronpagina"}
+    antwoorden["incidents"].update(items=[])
+    assert admin.get(route).json()["incidenten"] == {
+        "status": "gemeten",
+        "waarde": 0,
+        "observed_at": tijd,
+        "reden": None,
+    }
+
+
+def test_mediaguard_overzicht_kortere_brontermijn_noodstop(admin, mgbron):
+    # R-VEILIG-4: de kortere bronwaarde uit discover (§6.2) geldt; verouderd is nooit 'noodstop uit'.
+    route, antwoorden, _, _, _ = mgbron
+    oud = iso(utcnow() - timedelta(seconds=120))
+    antwoorden["/connector/v1/discover"]["limits"] = {"max_age_s": {"status": 60}}
+    antwoorden["status"]["observed_at"] = oud
+    antwoorden["status"]["items"][0].update(observed_at=oud, emergency_stop_active=False, emergency_stop_since=None)
+    body = admin.get(route).json()
+    assert body["wanted"]["status"] == "gemeten"
+    assert body["noodstop"] == {
+        "status": "onbekend",
+        "actief": None,
+        "sinds": None,
+        "observed_at": oud,
+        "reden": "meting verouderd",
+    }
+    assert body["status"]["status"] == "onbekend" and body["status"]["waarde"] is None
+
+
+def test_mediaguard_overzicht_oud_statusitem_op_verse_pagina(admin, mgbron):
+    # R-VEILIG-4: de eigen meettijd van het statusitem telt, niet alleen die van de pagina.
+    route, antwoorden, _, _, _ = mgbron
+    oud = iso(utcnow() - timedelta(minutes=20))
+    antwoorden["status"]["items"][0].update(observed_at=oud, emergency_stop_active=False, emergency_stop_since=None)
+    stop = admin.get(route).json()["noodstop"]
+    assert stop == {
+        "status": "onbekend",
+        "actief": None,
+        "sinds": None,
+        "observed_at": oud,
+        "reden": "meting verouderd",
+    }
 
 
 def test_mediaguard_overzicht_toegang_en_doel(app, admin, mgbron, monkeypatch):
