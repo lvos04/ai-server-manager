@@ -308,7 +308,8 @@ uitgewisseld via een door een beheerder bevestigde koppeling. Privésleutels bli
 geheimenmaprechten, buiten de AI-runner. Intrekken/ontkoppelen blokkeert de ophaalverbinding onmiddellijk;
 een gewijzigde pin wordt nooit via dezelfde onbevestigde verbinding vertrouwd. Geen trust-on-first-use.
 Het exacte koppel-/rotatieprotocol, het strikte berichtschema en de endpointvorm moeten vóór E als M2 worden
-vastgesteld en interoperabel getest. Dit ADR verzint daarvoor geen reeds bestaand endpoint of extra envelopeveld.
+vastgesteld en interoperabel getest. M2 is vastgelegd in contract §8.3; de transportvorm daar vervangt de TLS-verbinding hierboven
+(zie 'Open contractmeldingen en tekstvoorstellen'). Dit ADR verzint daarvoor geen reeds bestaand endpoint of extra envelopeveld.
 
 De verplichte volgorde voor de latere implementatie:
 
@@ -976,10 +977,28 @@ leggen de keuze voor de kleinste werkende vorm vast. Bronstand bij het besluit:
   manifest en koppelt de gecontroleerde bron en het doel aan het plan. De Hub controleert het geretourneerde plan
   tegen zijn eigen gegevens. Acceptatie volgt met T1–T3 en de directe executorproeven.
 
+**M2 afzonderlijke geheime overdracht · 2026-11-21 · BESLOTEN door regisseur.**
+[§8.3 Afzonderlijke geheime overdracht](../platform-v2/PLATFORM_CONTRACTEN.md#83-afzonderlijke-geheime-overdracht-m2)
+neemt het tekstvoorstel letterlijk over en legt afgifte, sleutels, claim/crash, markering en ref-only recept vast.
+De kleinste werkende vorm zonder nieuwe cryptografie of PKI vervangt de TLS-1.3-verbinding met wederzijdse
+certificaten uit besluit 4. Die vroeg om nieuwe transportsleutels, certificaten en een eigen koppel- en
+rotatieprotocol. De eigenschappen uit besluit 4 blijven gelden. Beide kanten zijn wederzijds geauthenticeerd met de
+identiteiten die bij het koppelen door een beheerder zijn bevestigd: de executoridentiteit (§3.9) ondertekent de
+opvraag, de gepinde JWT-sleutel van de Hub (§4.5) ondertekent de afgifte. Er is geen trust on first use en de
+policy-sleutel wordt niet gebruikt. De waarden zijn versleuteld met HPKE (RFC 9180) uit de al gepinde
+`cryptography`-bibliotheek, naar een sleutel die alleen voor die ene opvraag bestaat. Een HTTP-drager of proxy ziet
+dus nooit klare tekst. Ontkoppelen of intrekken sluit de afgifte meteen. Bronstand bij het besluit:
+
+- `ai-server-manager@267f5b2`, `hub/vault.py::Vault` (AES-256-GCM, vult `last4`; daarom een eigen app-opslag
+  zonder `last4`), `hub/security.py::new_token` en `models.py::EnrollmentGrant` (alleen SHA-256),
+  `executor/firststart.py` (identiteit) en `executor/hublink.py::verify_hub_jwt` (gepinde Hub-sleutels).
+- `appstore-en-fork`: `manifest/translate.py` zet alleen `vault://app/<app_id>/<parameter>` en voegt nooit `HUB_*`
+  toe; manifest en `accounts` blijven geheimvrij (C-12). Daar is geen wijziging voor nodig.
+
 | Melding | Eigenaar en bron | Tekstvoorstel / benodigde vastlegging | Blokkeert |
 |---|---|---|---|
 | M1 bron- en identiteitsbinding | ai-server-manager en appstore-en-fork | Vastgelegd in §8.1. De appstore levert het complete catalogusbewijs. Hub en executor vergelijken bron, autorisatie en doel met hun eigen ankers. | D vereist de implementatie en de bewijstests. |
-| M2 afzonderlijke geheime overdracht | ai-server-manager; contract §3.1 en §8; 070 bouwpunt 2; `docs/EXECUTION_REQUEST.md`. | "ExecutionRequest, hashes en duurzame uitvoerregistraties bevatten uitsluitend verwijzingen en onveranderlijke revisies. Na eigen verificatie haalt alleen de bedoelde executor waarden eenmalig op via afzonderlijk wederzijds geauthenticeerd, versleuteld en gepind transport, gebonden aan verzoek, approval, doel, methode en vervaltijd. Geen gedeelde database of hoofdsleutel; geen geheimwaarde in foutpaden, journaal of recept." Leg protocol, sleutellevenscyclus, claim-/crashgedrag en ref-only herstel vast vóór uitvoering. Leg ook opslag en moment van uitgifte van het enrollment-token vast (besluit 4, koppelvelden: pas bij de claim, gebonden, alleen de hash bewaard, contract §3.1). Contract §3.2 zegt nu "de vertaling voegt ze bij `app.install`/`app.update` toe als de Hub koppelt"; appstore `translate.py` (`_Resolver.hub_at`) zegt dat de vertaling dat nu nooit doet; dit ADR legt het invullen bij de executor. De contracttekst moet daarop worden afgestemd. | E en geheim-afhankelijke update/rollback in F. |
+| M2 afzonderlijke geheime overdracht | ai-server-manager; contract §3.1, §3.2 en §8 | Vastgelegd in §8.3 (hieronder). Twee gebonden typen, afgifte na eigen verificatie, markering en ref-only recept. §3.1 en §3.2 zijn afgestemd: de executor vult `HUB_*` in, niet de vertaling. | E vereist de implementatie en de bewijstests. Het recept met alleen verwijzingen en de geheim-afhankelijke update/rollback horen bij F. |
 | M3 vertrouwde plannerinvoer | ai-server-manager en jelly-leon-platform | Vastgelegd in §8.2. De Hub authenticeert de bron en de aanvraag. De planner bewaart de gecontroleerde binding bij het eigen plan. §4.4 bepaalt de catalogusbeschikbaarheid. | D vereist de implementatie en de bewijstests. De afzonderlijke kluisdoorgifte hoort bij E. |
 | M4 eigenaarsregels C-12 | appstore-en-fork; contract §9/ASF-15; `manifest/rules.py::ACCOUNT_WORDS` en ADR-0016 W2/W3. | "De uitgebreide woordenlijst en contextregels uit ADR-0031 zijn één gepinde bron voor validator, Hub en executor. Accountgegevens worden vóór en na invulling in alle vormen geweigerd, ook via generated, value_from en vault_refs; ontbrekende of verouderde regels geven geen vrijgave." Lever reproduceerbare gedeelde testmatrix en regelset; leg pin-/driftcontrole vast. Geen eigen Hub-woordenlijst. Bronstand: de regels staan sinds `a994c2a` in de bron (ADR-0023, besluit 5 hierboven); `ASF_COMMIT` in `ci.yml` wijst nog naar een oudere commit. Hub en executor nemen in C dezelfde gepinde toets over als de validator in de CI en meten de bron dan opnieuw. | C en daarmee E/G. |
 | M5 bewijsgrens imagepaden | ai-server-manager, afstemmen met manifeststandaardeigenaar; ADR-0030 besluit 6 en "Engine-regels buiten de policy_hash". | "Een toegelaten padtekst of gepinde image bewijst geen afwezigheid van symlinks. Nieuwe opslagtoestemming vereist controleerbaar digest- en mountgebonden bewijs voor elk padonderdeel en runtime-mutatie; ontbreekt dat, dan capability niet beschikbaar. Geen shell of Docker-socket als omweg." Het algemeen bruikbare bewijsmechanisme is ONBEKEND; eerst bronnen/capabilities vaststellen met `rg -n 'symlink|rootfs|mount_path' apps/executor/src apps/policy/src` in de repo en beoordeling van gepinde imagefixtures. | Verruiming van catalogusmounts in C/D; geen algemene veiligheidsclaim in G. |

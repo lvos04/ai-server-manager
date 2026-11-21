@@ -185,8 +185,8 @@ def test_reviewcorrecties_staan_in_het_wijzigingslog() -> None:
         ("### 2.3", "de Hub-adapter volgt op deze route dezelfde veldenwitte lijst"),
         # RV4: de Jelly Leon-plugin pint een service_id voor §4.3.
         ("### 2.3", "ook een `service_id`"),
-        # RV5: bij my_house zet de vertaling alleen HUB_URL.
-        ("### 3.2", "voegt de vertaling alleen `HUB_URL` toe"),
+        # RV5: bij my_house komt alleen HUB_URL (M2: de executor vult in, niet de vertaling).
+        ("### 3.2", "daar komt alleen `HUB_URL`"),
         # RV6: vervangen bij de eerste schrijfactie van de poging, vóór het verzoek.
         ("### 3.5", "Dat gebeurt bij de eerste schrijfactie van die poging"),
         # RV7: ook een al gekoppelde dienst telt als poging.
@@ -239,6 +239,7 @@ def test_versieregel_blijft_letterlijk_staan() -> None:
 
 KOP_M1 = "### 8.1 Bron- en doelbinding van appplannen (M1)"
 KOP_M3 = "### 8.2 Vertrouwde plannerinvoer (M3)"
+KOP_M2 = "### 8.3 Afzonderlijke geheime overdracht (M2)"
 
 
 @pytest.mark.parametrize(
@@ -253,12 +254,29 @@ KOP_M3 = "### 8.2 Vertrouwde plannerinvoer (M3)"
         (KOP_M3, ("plan_id", "step_id", "ETag", "instance_id")),
         (KOP_M3, ("manifest_yaml", "geen uitvoerbare stap", "geen kluisvertaling")),
         (KOP_M3, ("report_step", "eigen readback", "levende bevoegde gebruikerssessie")),
+        (KOP_M2, ("uitsluitend verwijzingen en onveranderlijke revisies", "eenmalig", "Geen gedeelde database")),
+        (KOP_M2, ("`appgeheim`", "`enrollment-token`", "^[A-Za-z0-9][A-Za-z0-9_-]{42}$", "^enr_[A-Za-z0-9_-]{43}$")),
+        (KOP_M2, ("Geen `last4`", "Alleen de SHA-256", "Pas bij de afgifte gemaakt")),
+        (KOP_M2, ("POST /api/v1/executor/secret-claims", "request_sha256", "geen gedeeltelijke afgifte")),
+        (KOP_M2, ("RFC 9180", "Geen trust on first use", "policy-sleutel wordt hiervoor nooit gebruikt")),
+        (KOP_M2, ("kluis_vorm_ongeldig", "koppeling_past_niet", "kluisplekken_recept_ontbreekt")),
+        (KOP_M2, ("heft de markering niet op", "tokenplek blijft leeg", "geheimvrij")),
     ],
 )
 def test_appplan_contract(kop: str, verplicht: tuple[str, ...]) -> None:
     tekst = _paragraaf(kop)
     for onderdeel in verplicht:
         assert onderdeel in tekst
+
+
+def test_m2_staat_in_het_wijzigingslog_en_de_koppelvelden_vult_de_executor() -> None:
+    """M2 (S-P2-050e): eigen kop in het 1.3-wijzigingslog; §3.2 legt het invullen van ``HUB_*`` bij de executor."""
+    log = _wijzigingslog()
+    assert "### Aanvulling M2 (2026-11-21, blijft `contracts 1.3`)" in log
+    assert log.index("### Aanvulling M2") > log.index("### Aanvulling M1 en M3")
+    p32 = _paragraaf("### 3.2 Overzicht enrollment (eigen nieuwe diensten)")
+    assert "De vertaling voegt ze nooit toe." in p32 and "de executor deze env in (§8.3)" in p32
+    assert "de vertaling voegt ze bij" not in p32
 
 
 def test_aanvulling_c12_staat_in_het_wijzigingslog_en_in_de_kop() -> None:

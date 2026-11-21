@@ -4,6 +4,14 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Vastgelegd — Afzonderlijke geheime overdracht (S-P2-050e, M2)
+
+- Platformcontract 1.3 §8.3 legt de overdracht van appgeheimen en het enrollment-token vast. Het ondertekende
+  verzoek bevat alleen verwijzingen. De executor haalt de waarden na zijn eigen controles eenmalig bij de Hub op,
+  versleuteld (HPKE) en ondertekend met de bij het koppelen gepinde sleutels. De executor vult `HUB_*` in, niet de
+  vertaling (§3.2). Een instantie met ingevulde plekken krijgt geen bijwerking of terugzetting via `app.config` tot
+  het recept met alleen verwijzingen bestaat. ADR-0032 legt M2 vast.
+
 ### Toegevoegd — Catalogusinstallatie via een eigen plannerplan (S-P2-050d, deel D)
 
 - De Hub verifieert het catalogusbewijs zelf bij de appstore (handtekening, manifesthash, Git-pin, uitgever) en
