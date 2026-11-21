@@ -23,21 +23,21 @@
     "id": "B01-003",
     "status": "Bezig",
     "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)",
-    "bewijs": "S-P2-050c: apps/api/tests/unit/test_preview_toon.py::test_previewregels_deel_c toetst V1–V6, voor V5 ook de logmaskering. apps/api/tests/integration/test_acties.py toetst opslag na afwijzing, weigering van letterlijke waarden in geheimvelden en de negatieve catalogus- en opslagproeven. apps/policy/tests/test_policy.py toetst C-12 en variant B. apps/executor/tests/test_uitvoeren.py::test_deel_c_weigert_ondertekende_installatiewaarden toetst de directe executor. apps/api/tests/integration/test_migratie_gevuld.py::test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring vergelijkt de actierijen en herhalingsrecords zonder API-herhaling en controleert terugzetten en opnieuw migreren.",
-    "blokkade": "deel c zonder witte-lijstregel en positieve V7; volgt zodra een echte gepinde catalogusrelease met uitgeversbewijs bestaat. De volledige planner- en installatieketen valt onder volgende deelstappen. NIET GEVALIDEERD (echte NAS).",
-    "opmerking": "De witte lijst is leeg. Een onbekende catalogusrelease wordt voor uitvoering geweigerd. NFS en SMB blijven gesloten. V1–V6 zijn getest met synthetische invoer. De toets van alle productievormen met bronbewijs blijft open (V7).",
+    "bewijs": "S-P2-050c: apps/api/tests/unit/test_preview_toon.py::test_previewregels_deel_c toetst V1–V6, voor V5 ook de logmaskering. apps/api/tests/integration/test_acties.py toetst opslag na afwijzing, weigering van letterlijke waarden in geheimvelden en de negatieve catalogus- en opslagproeven. apps/policy/tests/test_policy.py toetst C-12 en variant B. apps/executor/tests/test_uitvoeren.py::test_deel_c_weigert_ondertekende_installatiewaarden toetst de directe executor. apps/api/tests/integration/test_migratie_gevuld.py::test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring vergelijkt de actierijen en herhalingsrecords zonder API-herhaling en controleert terugzetten en opnieuw migreren. S-P2-050d: apps/policy/tests/test_catalogbinding.py (toestandstabel bron, uitgever, manifesthash, digest, schema, validator, release, instantie, kluisplekken, witte lijst); apps/executor/tests/test_catalogbinding_executor.py (direct verzoek met afwijkende binding: nul schrijfaanroepen; andere digest in app.image.query: afwijking); tests/e2e/test_catalogus_installeren.py (eigen plannerplan met catalog_request_sha256, voorstel, goedkeuring, uitvoering, stapmelding, registratie; afwijkend bewijs, gewijzigde plan-ETag, verdwenen versie en verlopen plan blokkeren; verwijderen laat datasets en snapshots staan).",
+    "blokkade": "De echte appstore levert de §8.1-recordvelden en -routes nog niet en de echte planner weigert catalog_binding (extra=forbid): de echte keten blijft dicht. De productiewitte lijst is leeg. Kluisplekken volgen in deel E. NIET GEVALIDEERD (echte NAS).",
+    "opmerking": "Deel D bouwt de Hub-orkestratie en de controles in Hub en executor tegen contractconforme fakes (Sim-getest). Controles na installatie blijven open; de app is daarmee nooit gezond.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-19"
+    "bijgewerkt": "2026-11-21"
   },
   {
     "id": "EX47",
     "status": "Bezig",
     "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)",
-    "bewijs": "S-P2-050c: apps/api/tests/integration/test_acties.py::test_deel_c_ex47_weigert_ook_met_voorsteltoelichting en apps/executor/tests/test_uitvoeren.py::test_deel_c_weigert_ondertekende_installatiewaarden controleren weigering vóór schrijven. Appstore-en-fork op ASF_COMMIT: apps/api/tests/unit/test_ex47.py; beide eigen manifesten met --strict.",
+    "bewijs": "S-P2-050c: apps/api/tests/integration/test_acties.py::test_deel_c_ex47_weigert_ook_met_voorsteltoelichting en apps/executor/tests/test_uitvoeren.py::test_deel_c_weigert_ondertekende_installatiewaarden controleren weigering vóór schrijven. Appstore-en-fork op ASF_COMMIT: apps/api/tests/unit/test_ex47.py; beide eigen manifesten met --strict. S-P2-050d: apps/policy/tests/test_catalogbinding.py::test_ex47_blijft_gelden_met_een_geldige_binding; een catalogusbinding heft de weigering niet op.",
     "blokkade": "De volledige manifest-/plannerketen volgt in volgende deelstappen. NIET GEVALIDEERD (echte NAS).",
     "opmerking": "Hub en executor weigeren installatiewaarden met host-netwerk of privileged. Een toelichting verleent geen toestemming.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-19"
+    "bijgewerkt": "2026-11-21"
   },
   {
     "id": "B01-006",

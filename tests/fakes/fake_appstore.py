@@ -38,6 +38,8 @@ class FakeAppstore(FakeHTTP):
         self.entries: list[dict[str, Any]] = []
         self.page_size = 200
         self.rejected: list[str] = []
+        # Extra leesroutes (item, versie, bron) voor de catalogusinstallatie: pad → body, of een HTTP-status.
+        self.routes: dict[str, Any] = {}
 
     def _auth(self, seen: Seen) -> str | None:
         auth = seen.headers.get("authorization", "")
@@ -54,6 +56,15 @@ class FakeAppstore(FakeHTTP):
         return None
 
     def handle(self, seen: Seen) -> Reply:
+        if seen.method == "GET" and seen.path in self.routes:
+            problem = self._auth(seen)
+            if problem:
+                self.rejected.append(problem)
+                return Reply(401, {"code": "unauthorized", "message": "Nee.", "details": {"reason": problem}})
+            body = self.routes[seen.path]
+            if isinstance(body, int):
+                return Reply(body, {"code": "not_found", "message": "Niet gevonden.", "details": {}, "trace_id": "x"})
+            return Reply(200, body)
         if seen.path != "/catalog/v1/entries" or seen.method != "GET":
             return Reply(404, {"code": "not_found", "message": "Niet gevonden.", "details": {}, "trace_id": "x"})
         problem = self._auth(seen)

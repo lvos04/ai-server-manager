@@ -4,6 +4,15 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Catalogusinstallatie via een eigen plannerplan (S-P2-050d, deel D)
+
+- De Hub verifieert het catalogusbewijs zelf bij de appstore (handtekening, manifesthash, Git-pin, uitgever) en
+  maakt het installatieplan zelf bij de planner met `catalog_request_sha256` (contract 1.3 §8.1/§8.2). Nieuwe
+  routes onder `/api/v1/catalog/plans`; migratie 0022 voegt `catalog_plan` toe.
+- Hub en executor toetsen `catalog_binding` aan de witte lijst in `policy/catalogus.yaml`; de executor eist na
+  installatie een passende digest uit `app.image.query`. De productielijst blijft leeg, dus er wordt nog niets
+  vrijgegeven. Sim-getest tegen contractconforme fakes; NIET GEVALIDEERD (echte NAS).
+
 ### Vastgelegd — Bron en doel van uitvoerbare appplannen (S-P2-050d)
 
 - Platformcontract 1.3 §8.1 bindt catalogusitem, versie, manifesthash, Git-pin en uitgeversbewijs aan één

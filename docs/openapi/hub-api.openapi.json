@@ -586,6 +586,29 @@
         "title": "Device",
         "type": "object"
       },
+      "DoelIn": {
+        "additionalProperties": false,
+        "properties": {
+          "ix_app_version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Ix App Version",
+            "type": "string"
+          },
+          "truenas_version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Truenas Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "truenas_version",
+          "ix_app_version"
+        ],
+        "title": "DoelIn",
+        "type": "object"
+      },
       "Downloadketen": {
         "properties": {
           "correlation_id": {
@@ -1151,6 +1174,46 @@
           "ingeschakeld"
         ],
         "title": "InschakelenIn",
+        "type": "object"
+      },
+      "InstallPlanIn": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "description": "Vaste catalogus-app_id.",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+            "title": "App Id",
+            "type": "string"
+          },
+          "app_name": {
+            "description": "Runtime-appnaam op de NAS.",
+            "pattern": "^[a-z]([a-z0-9-]{0,38}[a-z0-9])?$",
+            "title": "App Name",
+            "type": "string"
+          },
+          "doel": {
+            "$ref": "#/components/schemas/DoelIn"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "description": "Invulling van de manifestparameters.",
+            "title": "Parameters",
+            "type": "object"
+          },
+          "version_id": {
+            "description": "ID van de gekozen versie bij de appstore.",
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id",
+          "version_id",
+          "app_name",
+          "doel"
+        ],
+        "title": "InstallPlanIn",
         "type": "object"
       },
       "Koppeling": {
@@ -7096,6 +7159,175 @@
         "summary": "Beschikbaarheid van één vastgezette TrueNAS-catalogusversie (dienstscope catalogus.lezen)",
         "tags": [
           "appcatalogus"
+        ]
+      }
+    },
+    "/api/v1/catalog/plans/install": {
+      "post": {
+        "operationId": "maak_api_v1_catalog_plans_install_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallPlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Installatieplan maken bij de planner na eigen bronverificatie",
+        "tags": [
+          "catalogusinstallatie"
+        ]
+      }
+    },
+    "/api/v1/catalog/plans/{plan_id}": {
+      "get": {
+        "operationId": "toon_api_v1_catalog_plans__plan_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Toon Api V1 Catalog Plans  Plan Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén eigen plan met status, registratie en open controles",
+        "tags": [
+          "catalogusinstallatie"
+        ]
+      }
+    },
+    "/api/v1/catalog/plans/{plan_id}/steps/{step_id}/propose": {
+      "post": {
+        "operationId": "stel_voor_api_v1_catalog_plans__plan_id__steps__step_id__propose_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "step_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "title": "Step Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Actievoorstel maken voor de vrijgegeven installatiestap (eigen plan, na hercontrole)",
+        "tags": [
+          "catalogusinstallatie"
         ]
       }
     },

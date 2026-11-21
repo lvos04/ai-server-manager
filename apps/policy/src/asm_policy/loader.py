@@ -112,6 +112,8 @@ class Policy:
     beschermd: tuple[Beschermd, ...]
     sandbox_dataset: str
     bron: Path = field(default=Path("."))
+    # Witte lijst van uitvoerbare catalogusversies (catalogus.yaml, contract §8.1; ADR-0032 besluit 6).
+    catalogus: tuple[dict[str, Any], ...] = ()
 
     def actie(self, action_id: str) -> ActieDef | None:
         return self.acties.get(action_id)
@@ -290,8 +292,12 @@ def load_policy(path: Path | None = None) -> Policy:
         raise PolicyError("catalogus.yaml: verwacht een volledige validatorcommit")
     if catalogus["ASF_COMMIT"] != BRONCOMMIT:
         raise PolicyError("catalogus.yaml: validatorcommit wijkt af van de ingebakken C-12-regels")
-    if catalogus["installaties"] != []:
-        raise PolicyError("catalogus.yaml: een schema voor goedgekeurde installaties ontbreekt")
+    from asm_policy.catalogbinding import RegelFout, laad_regels  # hier: catalogbinding leunt op params → loader
+
+    try:
+        catalogusregels = laad_regels(catalogus["installaties"])
+    except RegelFout as exc:
+        raise PolicyError(f"catalogus.yaml: {exc}") from None
     acties_doc = _keys(_schema(docs["acties.yaml"], "acties.yaml"), "acties.yaml", {"schema", "acties"})
     if not isinstance(acties_doc["acties"], dict) or not acties_doc["acties"]:
         raise PolicyError("acties.yaml: acties ontbreekt")
@@ -381,6 +387,7 @@ def load_policy(path: Path | None = None) -> Policy:
         beschermd=tuple(beschermd),
         sandbox_dataset=sandbox_naam,
         bron=path,
+        catalogus=catalogusregels,
     )
 
 

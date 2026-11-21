@@ -368,7 +368,7 @@ def validate_parameters(policy: Policy, actie: ActieDef, target: Mapping[str, An
     if schema == "app_rollback":
         return _app_rollback(params)
     if schema == "app_install":
-        return validate_install(params, target) + catalogusinstallatie(params)
+        return validate_install(params, target) + catalogusinstallatie(policy, params, target)
     return [_f("parameters", "schema_onbekend", "onbekend parameterschema")]  # pragma: no cover
 
 
@@ -1118,7 +1118,12 @@ def validate_manifest_meta(manifest: Any) -> list[Fout]:
 
 
 def validate_install(params: Mapping[str, Any], target: Mapping[str, Any]) -> list[Fout]:
-    out = _only(params, "parameters", {"app_create", "manifest", "appstore_preview_hash"}, {"app_create", "manifest"})
+    out = _only(
+        params,
+        "parameters",
+        {"app_create", "manifest", "appstore_preview_hash", "catalog_binding"},
+        {"app_create", "manifest"},
+    )
     manifest = params.get("manifest")
     out += validate_manifest_meta(manifest)
     manifest = manifest if isinstance(manifest, Mapping) else {}
@@ -1182,8 +1187,15 @@ def c12_installatie(values: Mapping[str, Any], *, ix_app: bool) -> list[Fout]:
     return [_f("parameters.app_create.values", code, meldingen[code]) for code in sorted(codes)]
 
 
-def catalogusinstallatie(params: Mapping[str, Any]) -> list[Fout]:
-    """De witte lijst in het beleid bevat nog geen geverifieerde app en versie."""
+def catalogusinstallatie(policy: Policy, params: Mapping[str, Any], target: Mapping[str, Any]) -> list[Fout]:
+    """Met ``catalog_binding``: precies één regel uit de witte lijst en een passende payload (contract §8.1). Zonder
+    binding blijft een catalogusapp geweigerd; de standaard Custom App zonder binding is de bestaande handmatige weg."""
+    if "catalog_binding" in params:
+        from asm_policy.catalogbinding import (
+            controleer,  # hier: catalogbinding gebruikt de hulpfuncties van dit bestand
+        )
+
+        return controleer(policy.catalogus, params, target)
     if verwachte_catalogus(params) is None:
         return []
     return [

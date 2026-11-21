@@ -251,7 +251,7 @@ def test_een_tweede_emby_installeren_onder_een_andere_naam_wordt_geweigerd(
     assert haal(stack.admin, key)["status"] == "geweigerd"
     from asm_policy import params
 
-    monkeypatch.setattr(params, "catalogusinstallatie", lambda _params: [])
+    monkeypatch.setattr(params, "catalogusinstallatie", lambda *_a: [])
     r = stel_voor(stack.admin, "app.install", app_target("fotos"), _catalogus_install("fotos", "immich"))
     assert r.status_code == 201 and r.json()["risk_class"] == "R2", r.text
     assert r.json()["status"] == "wacht_op_goedkeuring" and r.json()["preview"]["herkend_als"] == "immich"
@@ -401,7 +401,7 @@ def oude_cataloguspreview(monkeypatch: pytest.MonkeyPatch) -> None:
     from asm_policy import params
 
     c12 = params.c12_installatie
-    monkeypatch.setattr(params, "catalogusinstallatie", lambda _params: [])
+    monkeypatch.setattr(params, "catalogusinstallatie", lambda *_a: [])
     monkeypatch.setattr(params, "c12_installatie", lambda values, *, ix_app: c12(values, ix_app=True) if ix_app else [])
 
 

@@ -36,6 +36,7 @@ from typing import Any
 
 from asm_policy import etag as etags
 from asm_policy.canonical import canonical_sha256
+from asm_policy.catalogbinding import readback_digest_afwijking
 from asm_policy.engine import herken_app, recognize_all
 from asm_policy.execreq import iso
 from asm_policy.loader import ActieDef, Policy
@@ -399,6 +400,10 @@ class Uitvoerder:
                         afw.append({"code": "digest_verschilt", "verwacht": f"{repo}@{digest}", "gevonden": gevonden})
                     elif not rijen and "@sha256:" not in tag:
                         waarsch.append("digest_niet_bevestigd")
+            # Met een catalogusbinding (§8.1) telt alleen een digest uit app.image.query die in de release staat.
+            binding = readback_digest_afwijking(prop["parameters"], etags.app_images(na.app), na.images)
+            if binding is not None:
+                afw.append(binding)
             return afw, waarsch
         if not na.extra_bestaat:
             afw.append({"code": "niet_aanwezig", "verwacht": "aanwezig", "gevonden": "afwezig"})

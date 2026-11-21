@@ -904,6 +904,32 @@ Hub door een stand-in of verwijder een vereiste ketenschakel/negatief scenario. 
 expliciete controles op geladen productiecomponenten en verplichte scenario's moeten rood worden. Accepteer een
 beheerdersbevestiging van `export` als checkpointbewijs: de negatieve `app_native`/`pg_dump`-update wordt rood.
 
+## Uitvoering deel D (S-P2-050d, 2026-11-21, niveau N5)
+
+Status: gebouwd en Sim-getest tegen contractconforme fakes. NIET GEVALIDEERD (echte NAS). De echte keten blijft
+dicht zolang appstore en planner de §8.1/§8.2-aanvullingen niet leveren (zie meldingen hieronder).
+
+- **Gedeelde controle.** `apps/policy/src/asm_policy/catalogbinding.py` leest de witte lijst `installaties` in
+  `policy/catalogus.yaml` streng (onbekend veld, `..`, korte commit, lege digests of kluisplekken: geen beleid) en
+  toetst `parameters.catalog_binding` van `app.install`: precies één regel voor bron, uitgever, app, versie,
+  manifesthash, schema en validator; release, payload, digest en instantie moeten erbij passen; `vault_refs` leeg.
+  Hub en executor gebruiken dezelfde toets; de executor ankert op zijn eigen `policy_hash`. Na uitvoering eist de
+  executor een digest uit `app.image.query` (`repo_digests`) die in de release staat, anders een afwijking.
+  De productielijst blijft leeg; de `policy_hash` verandert niet.
+- **Hub.** `hub/catalog/plannen.py` verifieert zelf versie, item en bron bij de appstore en de recordhandtekening
+  met de gepinde appstoresleutel, rekent de manifesthash na en zoekt de regel. Daarna maakt de Hub zelf het plan
+  bij de planner met `catalog_request_sha256` en registreert plan-ID, ETag, binding en vervaltijd (tabel
+  `catalog_plan`, migratie 0022). Routes: `POST /api/v1/catalog/plans/install`, `GET /api/v1/catalog/plans/{id}`
+  en `POST /api/v1/catalog/plans/{id}/steps/{step}/propose`, alleen voor gebruikerssessies. Vóór voorstel,
+  goedkeuring en uitvoering controleert de Hub plan en bewijs opnieuw. `POST /api/v1/actions` weigert een eigen
+  `catalog_binding`. Na uitvoering meldt de Hub het stapresultaat met de eigen readback en registreert naam en
+  digest; de status is `geinstalleerd_controles_open`, nooit gezond.
+- **VERSIE 2.** Een aparte beheerdersselectie van bron en uitgever met eigen revisie (nu: de witte lijst onder de
+  `policy_hash`). Volledige hervalidatie van het manifest met de gepinde validator in de Hub (nu: de regel pint de
+  manifesthash). Een appstore-previewaanroep naast de planner. Kommagetallen in manifest of parameters (nu
+  geweigerd door de canonieke JSON). Hostpoort in de registratie uit de volgende inventaris (nu `null` met reden).
+  Bevestigingsroute voor de controles na installatie. Koppeling van latere acties aan de registratie (F/G).
+
 ## Open contractmeldingen en tekstvoorstellen
 
 De regisseur laat de eigenaar de open meldingen in eigen opdrachten vaststellen en waar nodig de contractkopieën

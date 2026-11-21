@@ -19,9 +19,10 @@ de Hub- en executor-image. Manifest-CI haalt die commit van `appstore-en-fork` o
 `python tools/sync_asf_c12.py .asf --check` de letterlijk overgenomen C-12-declaraties en valideert vervolgens de
 eigen manifesten. Gebruik bij een pinwijziging hetzelfde commando zonder `--check` om de kopie te vernieuwen.
 
-De lijst voor catalogusinstallaties is leeg. Een niet-lege configuratie wordt bij het laden van het beleid geweigerd
-totdat er een schema voor gepinde releases met uitgeversbewijs is. De vaste waardenlijst voor de standaard Custom App
-blijft van toepassing. Host-netwerk, `privileged`, NFS en SMB blijven gesloten. Zie ADR-0032, besluiten 5–7.
+De lijst voor catalogusinstallaties is leeg. Een regel heeft precies de velden uit `catalogbinding.REGEL_KEYS`
+(gepinde Git-bron, uitgeversvingerafdruk, manifesthash, release en digests); elke afwijking geeft geen beleid.
+`catalogbinding.controleer` toetst `catalog_binding` aan precies één regel (S-P2-050d, ADR-0032 deel D).
+De vaste waardenlijst voor de standaard Custom App blijft van toepassing. Host-netwerk, `privileged`, NFS en SMB blijven gesloten. Zie ADR-0032, besluiten 5–7.
 
 Het beleid zelf staat in [`policy/`](../../policy/README.md) en is in beide images read-only ingebakken onder
 `/usr/local/share/asm/policy`. Er is geen route en geen `action_id` waarmee het beleid kan worden gewijzigd.

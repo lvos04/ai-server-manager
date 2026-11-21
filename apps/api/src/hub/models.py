@@ -932,3 +932,32 @@ class Approval(Base):
     used_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     vervallen_op: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     vervallen_reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class CatalogPlan(Base):
+    """Een plan dat de Hub zelf bij de planner aanmaakte (contract 1.3 §8.2; ADR-0032 besluit 3; S-P2-050d).
+
+    ``id`` is het plan-ID van de planner. ``binding`` is precies wat de Hub meestuurde (M1-bewijs plus instantie);
+    ``plan_etag`` en ``expires_at`` komen uit het eigen aanmaakantwoord. Alleen zo'n eigen plan levert een voorstel op.
+    ``registratie`` bevestigt pas na passende readback de appnaam, digest en (gemeten) hostpoort."""
+
+    __tablename__ = "catalog_plan"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    soort: Mapped[str] = mapped_column(String(16))
+    app_id: Mapped[str] = mapped_column(String(64))
+    app_name: Mapped[str] = mapped_column(String(40))
+    instance_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True)
+    planner_service_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    binding: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    plan_etag: Mapped[str] = mapped_column(String(122))
+    step_id: Mapped[str | None] = mapped_column(String(64))
+    controles_na_installatie: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    expires_at: Mapped[datetime] = mapped_column(TS)
+    status: Mapped[str] = mapped_column(String(32))
+    reden: Mapped[str | None] = mapped_column(String(64))
+    request_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, unique=True)
+    registratie: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    melding: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    created_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)

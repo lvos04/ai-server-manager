@@ -166,7 +166,13 @@ class KeyRing:
         return self._sign(claims), expires
 
     def issue_hub_service_jwt(
-        self, *, audience: str, service_id: str, ttl_seconds: int = 60, now: datetime | None = None
+        self,
+        *,
+        audience: str,
+        service_id: str,
+        ttl_seconds: int = 60,
+        now: datetime | None = None,
+        catalog_request_sha256: str | None = None,
     ) -> tuple[str, datetime]:
         """Dienst-JWT waarmee de Hub zich bij een eigen dienst meldt (contract 1.2 §4.3); per aanroep een nieuwe.
 
@@ -182,6 +188,9 @@ class KeyRing:
                 "service_id": str(uuid.UUID(service_id)),
             }
         )
+        if catalog_request_sha256 is not None:
+            # Contract §8.2: de enige extra claim, gebonden aan methode, pad, Idempotency-Key en de hele body.
+            claims["catalog_request_sha256"] = catalog_request_sha256
         return self._sign(claims), expires
 
     def verify_user_jwt(self, token: str, *, audience: str) -> dict[str, Any]:

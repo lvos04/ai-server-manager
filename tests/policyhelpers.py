@@ -118,3 +118,101 @@ def approval_for(
     }
     out.update(change)
     return out
+
+
+# ---------------------------------------------------------------------- catalogusbinding (contract §8.1; S-P2-050d)
+# Testwaarden voor één toegelaten catalogusversie: een gegenereerde testuitgever, geen echte bron of release.
+CAT_APP = "demo-app"
+CAT_COMMIT = "c" * 40
+CAT_SCHEMA = "sha256:" + "5" * 64
+CAT_VALIDATOR = "0.9.0"
+CAT_URL = "https://forge.test/leon/demo-catalogus"
+CAT_PUBLISHER = "sha256:" + "7" * 64
+
+
+def catalogus_regel(manifest_sha256: str = "sha256:" + "6" * 64, **change: Any) -> dict[str, Any]:
+    regel: dict[str, Any] = {
+        "app_id": CAT_APP,
+        "version": "1.2.3",
+        "catalog": {"train": "stable", "app": "ix-app", "version": "1.4.8"},
+        "manifest_sha256": manifest_sha256,
+        "image_digests": [DIGEST],
+        "schema_sha256": CAT_SCHEMA,
+        "validator_version": CAT_VALIDATOR,
+        "source": {"url": CAT_URL, "subpath": "apps", "path": "demo-app/manifest.yaml", "commit": CAT_COMMIT},
+        "publisher_key_sha256": CAT_PUBLISHER,
+        "kluisplekken": [],
+    }
+    regel.update(change)
+    return regel
+
+
+def provenance_record(regel: dict[str, Any], **change: Any) -> dict[str, Any]:
+    rec: dict[str, Any] = {
+        "app_id": regel["app_id"],
+        "version": regel["version"],
+        "entry_id": "11111111-1111-4111-8111-111111111111",
+        "version_id": "22222222-2222-4222-8222-222222222222",
+        "manifest_sha256": regel["manifest_sha256"],
+        "schema_sha256": regel["schema_sha256"],
+        "validator_version": regel["validator_version"],
+        "source": {
+            "source_id": "33333333-3333-4333-8333-333333333333",
+            "kind": "git",
+            "url": regel["source"]["url"],
+            "ref": "main",
+            "commit": regel["source"]["commit"],
+            "path": regel["source"]["path"],
+            "subpath": regel["source"]["subpath"],
+        },
+        "fetched_at": "2026-11-21T10:00:00Z",
+        "publisher_signature": "verified",
+        "publisher_key_id": regel["publisher_key_sha256"][7:23],
+        "publisher_key_sha256": regel["publisher_key_sha256"],
+        "valid": True,
+        "errors": 0,
+        "warnings": 0,
+    }
+    rec.update(change)
+    return rec
+
+
+def catalog_binding(regel: dict[str, Any], app: str = CAT_APP, **change: Any) -> dict[str, Any]:
+    b: dict[str, Any] = {
+        "appstore_service_id": "44444444-4444-4444-8444-444444444444",
+        "source_approval_revision": "sha256:" + "8" * 64,
+        "provenance": {
+            "record": provenance_record(regel),
+            "signature": "A" * 86 + "==",
+            "key_id": "0123456789abcdef",
+            "alg": "EdDSA",
+        },
+        "release": {"catalog": dict(regel["catalog"]), "image_digests": list(regel["image_digests"])},
+        "plan_id": "55555555-5555-4555-8555-555555555555",
+        "step_id": "installeren",
+        "plan_etag": '"plan-55555555-5555-4555-8555-555555555555-v1"',
+        "instance": {
+            "host_id": HOST,
+            "instance_id": "66666666-6666-4666-8666-666666666666",
+            "registry_revision": "inventaris:1",
+            "app_name": app,
+            "expected_version": "absent",
+        },
+        "vault_refs": [],
+    }
+    b.update(change)
+    return b
+
+
+def policy_met_regels(doel: Path, regels: list[dict[str, Any]]) -> Path:
+    """Kopie van het beleid met deze witte lijst (alleen tests; het echte beleid blijft leeg)."""
+    import shutil
+
+    import yaml
+
+    shutil.copytree(POLICY_DIR, doel)
+    pad = doel / "catalogus.yaml"
+    doc = yaml.safe_load(pad.read_text(encoding="utf-8"))
+    doc["installaties"] = regels
+    pad.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return doel

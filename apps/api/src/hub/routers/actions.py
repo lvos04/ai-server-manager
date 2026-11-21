@@ -27,6 +27,7 @@ from sqlalchemy import select
 from hub import audit
 from hub.actions import beleid, service
 from hub.actions import blokkades as blok_mod
+from hub.catalog import plannen
 from hub.deps import (
     DB,
     Admin,
@@ -192,6 +193,13 @@ def propose(
     if body.actor is not None and (body.actor.type != "user" or body.actor.id != principal.name):
         # Een voorstel namens iemand anders bestaat hier niet: de actor is altijd de aangemelde gebruiker.
         raise HubError(422, "actor_past_niet", "actor in het voorstel past niet bij de aangemelde gebruiker.")
+    if "catalog_binding" in body.parameters:
+        # Een catalogusbinding komt alleen uit een eigen plan van de Hub (§8.2), nooit van de aanvrager.
+        raise HubError(
+            422,
+            "catalog_binding_alleen_via_plan",
+            "Een catalogusinstallatie loopt via /api/v1/catalog/plans; een eigen catalog_binding wordt geweigerd.",
+        )
 
     def werk() -> tuple[int, dict[str, Any]]:
         return 201, service.stel_voor(
@@ -264,16 +272,19 @@ def approve(
     db: DB,
     settings: SettingsDep,
     vault: VaultDep,
+    keyring: KeyRingDep,
     principal: Admin,
     idem: Idem,
 ) -> JSONResponse:
     def werk() -> tuple[int, dict[str, Any]]:
+        req = service.haal(db, request_id, vergrendel=True)
+        plannen.hercontroleer(db, settings, keyring, req)
         return 200, service.keur_goed(
             db,
             settings,
             vault,
             principal,
-            service.haal(db, request_id, vergrendel=True),
+            req,
             preview_hash=body.preview_hash,
             resource_etag=body.resource_etag,
             policy_hash=body.policy_hash,
@@ -314,15 +325,12 @@ def execute(
     idem: Idem,
 ) -> JSONResponse:
     def werk() -> tuple[int, dict[str, Any]]:
-        return service.voer_uit(
-            db,
-            settings,
-            vault,
-            keyring,
-            principal,
-            service.haal(db, request_id, vergrendel=True),
-            trace_id=trace_id_of(request),
-        )
+        req = service.haal(db, request_id, vergrendel=True)
+        plannen.hercontroleer(db, settings, keyring, req)
+        try:
+            return service.voer_uit(db, settings, vault, keyring, principal, req, trace_id=trace_id_of(request))
+        finally:
+            plannen.na_uitvoering(db, settings, keyring, req)
 
     return _afhandelen(request, idem, werk)
 

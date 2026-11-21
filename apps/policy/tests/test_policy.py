@@ -67,7 +67,7 @@ def test_deel_c_pin_afwijkend_of_cataloguslijst_gevuld_geeft_geen_beleid(tmp_pat
     with pytest.raises(PolicyError, match="validatorcommit wijkt af"):
         load_policy(pad.parent)
     pad.write_text(inhoud.replace("installaties: []", "installaties: [{}]"))
-    with pytest.raises(PolicyError, match="schema voor goedgekeurde installaties ontbreekt"):
+    with pytest.raises(PolicyError, match=r"installaties\[0\]: verwacht precies de velden"):
         load_policy(pad.parent)
 
 
