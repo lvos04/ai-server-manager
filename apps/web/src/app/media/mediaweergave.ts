@@ -5,15 +5,25 @@ export const KOPPELSCHERM = "/instellingen/diensten";
 /** Meetkwaliteit inline bij het getal (Peil C-07). Onbekend is nooit een getal en nooit 0. */
 export type Zekerheid = "gemeten" | "geschat" | "onbekend";
 
-export interface Meting {
-  status: string;
+/** Antwoord van `GET /api/v1/adapterkoppelingen/{id}/mediaguard` (hub/adapters/mediaguard_lezen.py). */
+export interface BronCijfer {
+  status: "gemeten" | "onbekend";
+  waarde: number | null;
   observed_at: string | null;
-  reason_code: string | null;
+  reden: string | null;
 }
 
-export interface MediaKoppeling extends Koppeling {
-  mediaguard?: Partial<Record<string, Meting>>;
+export interface MediaGuardOverzicht {
+  wanted: BronCijfer;
+  status: BronCijfer;
+  downloads: BronCijfer;
+  av1: BronCijfer;
+  incidenten: BronCijfer;
+  noodstop: { status: "gemeten" | "onbekend"; actief: boolean | null; sinds: string | null; observed_at: string | null; reden: string | null };
+  mediaservers: { status: "onbekend"; servers: null; reden: string };
 }
+
+export const MAX_AGE_MS = 900_000;
 
 export interface Cijfer {
   id: string;
@@ -48,42 +58,53 @@ export interface MsoWeergave {
 }
 
 const CIJFERS = [
-  ["wanted", "Wanted"],
-  ["status", "Status"],
-  ["downloads", "Downloads"],
-  ["av1", "AV1"],
-  ["incidenten", "Incidenten"],
+  ["wanted", "Wanted · open"],
+  ["status", "Status · mislukte jobs"],
+  ["downloads", "Downloads · in de wachtrij"],
+  ["av1", "AV1 · lopende encodes"],
+  ["incidenten", "Incidenten · open"],
 ] as const;
 
 /** BESLOTEN: MSO-onderdelen zonder bewezen leesrecht (MSO-leesbewijs volgt in versie 2). */
 export const MSO_ONBEKEND = "onbekend: leesrecht niet bevestigd";
 
-export function reden(code: string | null | undefined): string {
-  if (code === "geen_alleen_lezen_bron") return "geen alleen-lezen bron: MediaGuard biedt nog geen veilige leescontrole";
-  if (code === "doelbinding") return "de bestemming is niet meer bevestigd";
-  return "geen bevestigde meting";
-}
-
 function installatie(k: Koppeling) {
   return veiligAdres(k.basis_url) ? new URL(k.basis_url).host : "Installatie zonder geldig adres";
 }
 
+/** Een meettijd die te lezen is en niet in de toekomst ligt; anders null. */
+function meettijd(t: string | null, nu: number): number | null {
+  const ms = t === null ? NaN : Date.parse(t);
+  return Number.isFinite(ms) && ms <= nu ? ms : null;
+}
+
 /**
- * De Hub-API levert voor MediaGuard alleen `unknown` met een reden (S-P3-030: geen alleen-lezen bron). Daarom wordt
- * elk cijfer hier onbekend; een waarde komt pas uit de API zodra die bron er is.
- * shortcut: geen pad voor gemeten MediaGuard-waarden, uitbreiden zodra de Hub-API ze levert (VERSIE 2).
+ * Alleen een `gemeten` waarde met geldige meettijd wordt een getal. Ouder dan 15 minuten of een lijst die niet meer
+ * ververst (`oud`) blijft zichtbaar als verouderd, nooit als actueel. Zonder overzicht is alles onbekend met `fout`.
  */
-export function mediaguardWeergave(k: MediaKoppeling): MediaGuardWeergave {
-  const r = k.mediaguard ?? {};
+export function mediaguardWeergave(k: Koppeling, o: MediaGuardOverzicht | null, nu: number, oud: boolean, fout: string): MediaGuardWeergave {
+  const nietActueel = "De Hub kon MediaGuard niet opnieuw lezen.";
+  const cijfers: Cijfer[] = CIJFERS.map(([id, titel]) => {
+    const c = o?.[id];
+    const t = c ? meettijd(c.observed_at, nu) : null;
+    if (!c || c.status !== "gemeten" || typeof c.waarde !== "number" || t === null) {
+      return { id, titel, waarde: null, zekerheid: "onbekend", observedAt: null, verouderd: false, reden: c?.reden ?? fout };
+    }
+    const verouderd = oud || nu - t > MAX_AGE_MS;
+    return { id, titel, waarde: c.waarde, zekerheid: "gemeten", observedAt: c.observed_at, verouderd, reden: verouderd ? (oud ? nietActueel : "meting verouderd") : null };
+  });
+  const n = o?.noodstop;
+  const nt = n ? meettijd(n.observed_at, nu) : null;
+  const noodstopVers = n?.status === "gemeten" && typeof n.actief === "boolean" && nt !== null && !oud && nu - nt <= MAX_AGE_MS;
   return {
     id: k.id,
     installatie: installatie(k),
     servers: null,
-    serversReden: reden(r.mediaservers?.reason_code),
-    noodstop: { actief: null, sinds: null, reden: reden(r.noodstop?.reason_code) },
-    cijfers: CIJFERS.map(([id, titel]) => ({
-      id, titel, waarde: null, zekerheid: "onbekend", observedAt: null, verouderd: false, reden: reden(r[id]?.reason_code),
-    })),
+    serversReden: o?.mediaservers.reden ?? fout,
+    noodstop: noodstopVers
+      ? { actief: n.actief, sinds: n.sinds, reden: null }
+      : { actief: null, sinds: null, reden: n?.status === "gemeten" ? (oud ? nietActueel : "meting verouderd") : n?.reden ?? fout },
+    cijfers,
   };
 }
 

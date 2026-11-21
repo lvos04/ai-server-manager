@@ -2,31 +2,47 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CijferTegel, MediaGuardKaart, MediaInhoud, MediaScreen } from "@/app/media/MediaScreen";
-import { ketenLink, mediaguardWeergave, type MediaGuardWeergave, type MediaKoppeling } from "@/app/media/mediaweergave";
+import type { Koppeling } from "@/app/instellingen/diensten/adapterweergave";
+import { ketenLink, mediaguardWeergave, type BronCijfer, type MediaGuardOverzicht, type MediaGuardWeergave } from "@/app/media/mediaweergave";
 import { HubApiError } from "@/lib/api";
 import { PLANNED } from "@/lib/nav";
 import type { ApiState } from "@/lib/use-api";
 
-const proef = vi.hoisted(() => ({ lijst: {} as Partial<ApiState<unknown>> }));
-vi.mock("@/lib/use-api", () => ({ useApi: () => ({ reload: vi.fn(), ...proef.lijst }) }));
+const proef = vi.hoisted(() => ({ lijst: {} as Partial<ApiState<unknown>>, mg: {} as Partial<ApiState<unknown>> }));
+vi.mock("@/lib/use-api", () => ({
+  useApi: (pad: string) => ({ reload: vi.fn(), ...(pad.endsWith("/mediaguard") ? proef.mg : proef.lijst) }),
+}));
 
 const NU = Date.parse("2026-11-21T12:00:00Z");
 const onbekend = { status: "unknown", observed_at: null, reason_code: "geen_alleen_lezen_bron" };
-const MG: MediaKoppeling = {
+const MG: Koppeling = {
   id: "mg-1", app_id: "mediaguard", catalog_app_id: "c-mg", basis_url: "https://media.example", laatste4: "ABCD",
   ingevoerd_op: null, version: 1, verbinding: { ...onbekend },
-  mediaguard: Object.fromEntries(["wanted", "status", "downloads", "av1", "incidenten", "mediaservers", "noodstop"].map((k) => [k, onbekend])),
 };
-function mso(verbinding: MediaKoppeling["verbinding"], extra: Partial<MediaKoppeling> = {}): MediaKoppeling {
+const VERS = "2026-11-21T11:59:00Z";
+const OUD = "2026-11-21T11:40:00Z";
+const SERVERS = { status: "onbekend", servers: null, reden: "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron" } as const;
+const gemeten = (waarde: number, observed_at = VERS): BronCijfer => ({ status: "gemeten", waarde, observed_at, reden: null });
+const weg = (reden: string): BronCijfer => ({ status: "onbekend", waarde: null, observed_at: null, reden });
+function overzicht(extra: Partial<MediaGuardOverzicht> = {}): MediaGuardOverzicht {
+  return {
+    wanted: gemeten(17), status: gemeten(0), downloads: gemeten(4), av1: gemeten(3), incidenten: gemeten(6),
+    noodstop: { status: "gemeten", actief: false, sinds: null, observed_at: VERS, reden: null }, mediaservers: SERVERS, ...extra,
+  };
+}
+const ONBEKEND = overzicht(Object.fromEntries(["wanted", "status", "downloads", "av1", "incidenten"].map((k) => [k, weg("geen leesrecht")])));
+ONBEKEND.noodstop = { status: "onbekend", actief: null, sinds: null, observed_at: null, reden: "geen leesrecht" };
+const tegel = (html: string, id: string) => tekst(html.split(`data-testid="cijfer-${id}"`)[1]!.split("</div>")[0]!);
+function mso(verbinding: Koppeling["verbinding"], extra: Partial<Koppeling> = {}): Koppeling {
   return { id: "mso-1", app_id: "media-source-optimizer", catalog_app_id: "c-mso", basis_url: "https://mso.example", laatste4: "",
     ingevoerd_op: null, version: 1, verbinding, ...extra };
 }
 const vers = { status: "healthy", observed_at: "2026-11-21T11:58:00Z", reason_code: null };
-const inhoud = (k: MediaKoppeling[], verouderd = false) => renderToStaticMarkup(<MediaInhoud koppelingen={k} verouderd={verouderd} nu={NU} />);
+const inhoud = (k: Koppeling[], verouderd = false) => renderToStaticMarkup(<MediaInhoud koppelingen={k} verouderd={verouderd} nu={NU} />);
 const tekst = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 describe("Media: toestanden van het scherm", () => {
-  beforeEach(() => { proef.lijst = {}; });
+  beforeEach(() => { proef.lijst = {}; proef.mg = { data: ONBEKEND }; });
 
   it("(c) leeg: geen koppeling verwijst naar het koppelscherm en toont geen cijfers", () => {
     const html = inhoud([]);
@@ -56,31 +72,84 @@ describe("Media: toestanden van het scherm", () => {
     expect(html).toContain("Laatst gemeten");
   });
 
-  it("(a) adapter unknown: elk MediaGuard-cijfer is onbekend met reden, nooit nul", () => {
+  it("(a) bron onbekend: elk MediaGuard-cijfer is onbekend met reden, nooit nul", () => {
     const html = inhoud([MG]);
     for (const id of ["wanted", "status", "downloads", "av1", "incidenten"]) {
-      const tegel = tekst(html.split(`data-testid="cijfer-${id}"`)[1]!.split("</div>")[0]!);
-      expect(tegel).toContain("Onbekend");
-      expect(tegel).not.toMatch(/\b0\b/);
+      expect(tegel(html, id)).toContain("Onbekend: geen leesrecht");
+      expect(tegel(html, id)).not.toMatch(/\b0\b/);
     }
-    expect(tekst(html)).toContain("geen alleen-lezen bron");
-    expect(tekst(html)).toContain("Mediaservers Onbekend:");
-    expect(tekst(html)).toContain("Noodstop · onbekend:");
+    expect(tekst(html)).toContain("Mediaservers Onbekend: MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron");
+    expect(tekst(html)).toContain("Noodstop · onbekend: geen leesrecht");
     expect(html).not.toContain("pauzebalk");
   });
 
-  it("(b) noodstop aan: de balk staat er met sinds wanneer en er is geen knop om hem uit te zetten", () => {
-    const mg: MediaGuardWeergave = { ...mediaguardWeergave(MG), noodstop: { actief: true, sinds: "2026-11-21T09:30:00Z", reden: null } };
-    const html = renderToStaticMarkup(<MediaGuardKaart mg={mg} />);
+  it("gevuld: vijf gemeten cijfers met meettijd, ook een gemeten nul, en de noodstop uit", () => {
+    proef.mg = { data: overzicht() };
+    const html = inhoud([MG]);
+    expect(tegel(html, "wanted")).toContain("17 · gemeten");
+    expect(tegel(html, "status")).toContain("0 · gemeten");
+    expect(tegel(html, "av1")).toContain("AV1 · lopende encodes 3 · gemeten");
+    expect(html).toContain('dateTime="2026-11-21T11:59:00Z"');
+    expect(html).toContain('data-testid="noodstop-uit"');
+    expect(html).not.toContain("pauzebalk");
+    expect(tekst(html)).toContain("Mediaservers Onbekend:");
+  });
+
+  it("(b) noodstop aan uit de bron: de balk staat er met sinds en er is geen knop om hem uit te zetten", () => {
+    proef.mg = { data: overzicht({ noodstop: { status: "gemeten", actief: true, sinds: "2026-11-21T09:30:00Z", observed_at: VERS, reden: null } }) };
+    const html = inhoud([MG]);
     expect(html).toContain('data-testid="pauzebalk"');
-    expect(tekst(html)).toContain("gepauzeerd (noodstop)");
     expect(html).toContain('dateTime="2026-11-21T09:30:00Z"');
+    expect(html).not.toContain("<button");
+  });
+
+  it("verouderd: een meting ouder dan vijftien minuten staat grijs en de noodstop is dan onbekend", () => {
+    proef.mg = { data: overzicht({ wanted: gemeten(17, OUD), noodstop: { status: "gemeten", actief: true, sinds: OUD, observed_at: OUD, reden: null } }) };
+    const html = inhoud([MG]);
+    expect(tegel(html, "wanted")).toContain("Laatst gemeten");
+    expect(tegel(html, "wanted")).toContain("meting verouderd");
+    expect(tegel(html, "wanted")).not.toContain("17 · gemeten");
+    expect(html).not.toContain("pauzebalk");
+    expect(tekst(html)).toContain("Noodstop · onbekend: meting verouderd");
+  });
+
+  it("verbindingsuitval: het laatste overzicht blijft grijs staan, nooit als actueel", () => {
+    proef.mg = { data: overzicht(), error: new HubApiError(503, "api_unavailable", "Niet bereikbaar."), stale: true };
+    const html = inhoud([MG]);
+    expect(tegel(html, "downloads")).toContain("Laatst gemeten");
+    expect(tegel(html, "downloads")).toContain("De Hub kon MediaGuard niet opnieuw lezen.");
+    expect(tekst(html)).toContain("Noodstop · onbekend: De Hub kon MediaGuard niet opnieuw lezen.");
+  });
+
+  it("weigering: geen eerdere meting, wel de reden", () => {
+    proef.mg = { data: overzicht(), error: new HubApiError(403, "forbidden", "Geen toegang.") };
+    const html = inhoud([MG]);
+    expect(tegel(html, "wanted")).toContain("Onbekend: Geen toegang.");
+    expect(tekst(html)).not.toMatch(/\b17\b/);
+  });
+
+  it("bezig: zolang het overzicht wordt opgehaald is elk cijfer onbekend, nooit nul", () => {
+    proef.mg = { loading: true };
+    expect(tegel(inhoud([MG]), "status")).toContain("Onbekend: wordt opgehaald");
+  });
+
+  it("ongeldige meettijd of onbekend met waarde: geen getal", () => {
+    const o = overzicht({ wanted: gemeten(17, "2026-11-21T13:00:00Z"), status: { status: "onbekend", waarde: 5, observed_at: VERS, reden: "bron onbereikbaar" } });
+    const mg = mediaguardWeergave(MG, o, NU, false, "x");
+    expect(mg.cijfers[0]).toMatchObject({ waarde: null, zekerheid: "onbekend" });
+    expect(mg.cijfers[1]).toMatchObject({ waarde: null, zekerheid: "onbekend", reden: "bron onbereikbaar" });
+  });
+
+  it("noodstop aan: de kaart zelf heeft geen knop", () => {
+    const mg: MediaGuardWeergave = { ...mediaguardWeergave(MG, ONBEKEND, NU, false, "x"), noodstop: { actief: true, sinds: "2026-11-21T09:30:00Z", reden: null } };
+    const html = renderToStaticMarkup(<MediaGuardKaart mg={mg} />);
+    expect(tekst(html)).toContain("gepauzeerd (noodstop)");
     expect(html).not.toContain("<button");
     expect(tekst(html)).not.toContain("Noodstop · onbekend");
   });
 
   it("mediaservers: label, verbonden en kijkpauze als ja/nee/onbekend", () => {
-    const mg: MediaGuardWeergave = { ...mediaguardWeergave(MG), servers: [
+    const mg: MediaGuardWeergave = { ...mediaguardWeergave(MG, ONBEKEND, NU, false, "x"), servers: [
       { label: "Emby", verbonden: true, kijkpauze: false }, { label: "Tweede", verbonden: null, kijkpauze: null },
     ] };
     const t = tekst(renderToStaticMarkup(<MediaGuardKaart mg={mg} />));

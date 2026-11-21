@@ -8,13 +8,13 @@ import { Loading } from "@/components/Loading";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
-import { ADAPTERS, allePaginas, type Pagina } from "@/app/instellingen/diensten/adapterweergave";
+import { ADAPTERS, allePaginas, type Koppeling, type Pagina } from "@/app/instellingen/diensten/adapterweergave";
 import type { HubApiError } from "@/lib/api";
 import { formatDateTime, formatNumber, formatTime } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import {
   KETEN, KOPPELSCHERM, MSO_ONBEKEND, ketenLink, mediaguardWeergave, msoWeergave,
-  type Cijfer, type MediaGuardWeergave, type MediaKoppeling, type MsoWeergave,
+  type Cijfer, type MediaGuardOverzicht, type MediaGuardWeergave, type MsoWeergave,
 } from "./mediaweergave";
 
 const EIGENAAR = { mediaguard: "MediaGuard", "media-source-optimizer": "MSO" };
@@ -93,6 +93,7 @@ export function MediaGuardKaart({ mg }: { mg: MediaGuardWeergave }) {
         )}
       </section>
       {mg.noodstop.actief === null ? <p>Noodstop · onbekend: {mg.noodstop.reden}</p> : null}
+      {mg.noodstop.actief === false ? <p data-testid="noodstop-uit">Noodstop · uit · gemeten</p> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {mg.cijfers.map((c) => <CijferTegel key={c.id} cijfer={c} bron="MediaGuard" />)}
       </div>
@@ -135,6 +136,17 @@ export function MsoKaart({ mso }: { mso: MsoWeergave }) {
   );
 }
 
+/** Leest het alleen-lezen overzicht van één MediaGuard-installatie; een fout of twijfel blijft zichtbaar onbekend. */
+export function MediaGuardBron({ koppeling, oudeLijst, nu }: { koppeling: Koppeling; oudeLijst: boolean; nu: number }) {
+  const { data, error, loading, stale } = useApi<MediaGuardOverzicht>(
+    `${ADAPTERS}/${encodeURIComponent(koppeling.id)}/mediaguard`, 60_000, verbindingsuitval,
+  );
+  // Een weigering mag geen eerdere meting blijven tonen; bij verbindingsuitval blijft die grijs staan.
+  const overzicht = data && (!error || verbindingsuitval(error)) ? data : null;
+  const fout = loading && !data ? "wordt opgehaald" : error ? error.message : "geen bevestigde meting";
+  return <MediaGuardKaart mg={mediaguardWeergave(koppeling, overzicht, nu, oudeLijst || stale, fout)} />;
+}
+
 function NietGekoppeld({ app }: { app: string }) {
   return (
     <section className="card">
@@ -145,8 +157,8 @@ function NietGekoppeld({ app }: { app: string }) {
   );
 }
 
-export function MediaInhoud({ koppelingen, verouderd, nu }: { koppelingen: MediaKoppeling[]; verouderd: boolean; nu: number }) {
-  const mg = koppelingen.filter((k) => k.app_id === "mediaguard").map(mediaguardWeergave);
+export function MediaInhoud({ koppelingen, verouderd, nu }: { koppelingen: Koppeling[]; verouderd: boolean; nu: number }) {
+  const mg = koppelingen.filter((k) => k.app_id === "mediaguard");
   const mso = koppelingen.filter((k) => k.app_id === "media-source-optimizer").map((k) => msoWeergave(k, nu, verouderd));
   if (!mg.length && !mso.length) {
     return (
@@ -162,7 +174,7 @@ export function MediaInhoud({ koppelingen, verouderd, nu }: { koppelingen: Media
       {verouderd ? <StatusBadge view={{ tone: "stale", label: "Verouderde mediagegevens" }} /> : null}
       <section aria-labelledby="media-mediaguard" className="flex flex-col gap-3">
         <h2 id="media-mediaguard" className="text-xl font-semibold">MediaGuard</h2>
-        {mg.length ? mg.map((m) => <MediaGuardKaart key={m.id} mg={m} />) : <NietGekoppeld app="MediaGuard" />}
+        {mg.length ? mg.map((k) => <MediaGuardBron key={k.id} koppeling={k} oudeLijst={verouderd} nu={nu} />) : <NietGekoppeld app="MediaGuard" />}
       </section>
       <section aria-labelledby="media-mso" className="flex flex-col gap-3">
         <h2 id="media-mso" className="text-xl font-semibold">Media Source Optimizer</h2>
@@ -193,7 +205,7 @@ export function MediaInhoud({ koppelingen, verouderd, nu }: { koppelingen: Media
 }
 
 export function MediaScreen() {
-  const { data, error, loading, stale, reload } = useApi<Pagina<MediaKoppeling>>(ADAPTERS + "?limit=200", 60_000, verbindingsuitval, allePaginas);
+  const { data, error, loading, stale, reload } = useApi<Pagina<Koppeling>>(ADAPTERS + "?limit=200", 60_000, verbindingsuitval, allePaginas);
   const nu = useNow(1000).getTime();
   return (
     <>

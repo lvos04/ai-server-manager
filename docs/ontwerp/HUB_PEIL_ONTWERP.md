@@ -802,8 +802,13 @@ de cijfertegels onder elkaar. Vanaf `sm` staan er twee naast elkaar en vanaf `xl
 
 Elk cijfer draagt zijn meetkwaliteit inline (Peil C-07): `· gemeten`, `≈ … · geschat` of **Onbekend** met reden.
 Het Peil-onderdeel ZekerheidLabel (T-24) is voor AI-zekerheid bedoeld. Daarom gebruikt dit scherm voor meetwaarden
-het kwaliteitswoord van de StatKaart. Zolang MediaGuard geen alleen-lezen bron heeft (S-P3-030), is elk
-MediaGuard-cijfer **Onbekend: geen alleen-lezen bron** en nooit 0. Open wijzigingen en kosten van MSO zijn
+het kwaliteitswoord van de StatKaart. Sinds S-P3-082 leest elke MediaGuard-kaart haar eigen alleen-lezen overzicht.
+De tegels heten **Wanted · open**, **Status · mislukte jobs**, **Downloads · in de wachtrij**, **AV1 · lopende
+encodes** en **Incidenten · open**. Een gemeten waarde, ook 0, staat er met `· gemeten` en de meettijd. Twijfel
+geeft **Onbekend** met de reden van de Hub en nooit 0. Een meting ouder dan vijftien minuten of een overzicht dat
+niet meer ververst, staat grijs als **Laatst gemeten**. Een verouderde noodstop is **onbekend**, ook als die eerder
+aan stond. Een gemeten noodstop die uit staat, verschijnt als **Noodstop · uit · gemeten**. Mediaservers blijven
+**Onbekend** tot MediaGuard een bijwerkingsvrije bron heeft. Open wijzigingen en kosten van MSO zijn
 **onbekend: leesrecht niet bevestigd** totdat het MSO-leesbewijs er is (versie 2).
 
 Staat de noodstop aan, dan verschijnt in de MediaGuard-kaart de balk **MediaGuard is gepauzeerd (noodstop)**
