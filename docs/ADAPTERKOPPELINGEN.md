@@ -29,6 +29,28 @@ MediaGuard-metingen ontbreken zolang de onderzochte bronnen bijwerkingen hebben.
 Migratie `0017` voegt de tabel `adapter_link` toe. De downgrade wist de gekoppelde kluiswaarden
 en de nieuwe tabel. De bestaande Hub-gegevens blijven behouden.
 
+## Koppelen in de Hub
+
+Open **Instellingen → Diensten → Bestaande apps**. De kaart vermeldt de installatienaam uit
+de catalogus. Als beheerder controleer je het HTTPS-adres en de poort voordat je de bestemming
+bevestigt en **Opslaan** kiest. Ontbreekt de installatie, vernieuw dan eerst de inventaris en
+werk de appcatalogus bij. Een kijker of operator kan de koppelstatus en de laatste contactmeting lezen.
+
+| App | Wat je in de app doet | Wat de Hub bewaart |
+| --- | --- | --- |
+| MediaGuard | Open als beheerder **Instellingen → API-sleutels**. Maak een kijker-sleutel zonder extra rechten. | De sleutel in de kluis. De geldigheid en de rol blijven onbekend zolang een veilige leescontrole ontbreekt. |
+| Media Source Optimizer (MSO) | Het sleutelbeheer staat voor beheerders onder **Instellingen → Gebruikers**. Een machinesleutel voor de Hub mag uitsluitend het recht `read` hebben. | Alleen de bestemming voor de openbare verbindingstest. Sleutelinvoer is uitgeschakeld zolang de Hub het leesrecht niet kan verifiëren. |
+| my_house | Open als beheerder de API-documentatie in de app onder `/api/v1/docs`. Kies bij de koppelcodes **POST /api/v1/pairing/codes**, zet de rol op `viewer` en het doel op `hub`. Neem de eenmalige code en de server-ID samen over. | Het kijker-token uit de inwisseling. De laatste vier tekens en de datum horen bij dat token. |
+
+Na opslaan is het invoerveld leeg. **Testen** haalt de contactmeting op. **Ingesteld** betekent
+dat de bestemming is bewaard. **Gekoppeld** vereist bevestigd contact met een bruikbare meettijd.
+Bij een verlopen meting zie je **Verouderd** en de oorspronkelijke meettijd. Bij een weigering
+of storing staat er een herstelactie bij de kaart. Een openbare MSO-test toont bereikbaarheid.
+
+Met **Ontkoppelen** kun je eerst de gevolgen lezen en annuleren. Na bevestigen wist de Hub de
+koppeling en de kluiswaarde. Trek bij MediaGuard de sleutel ook in de app zelf in. Trek bij
+my_house de toegang van de Hub in de lijst met gekoppelde clients in.
+
 ## MediaGuard
 
 De bronkeuze volgt optie 1 van het regisseursbesluit van 20 november 2026. De adapter gebruikt

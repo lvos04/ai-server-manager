@@ -106,6 +106,9 @@ test("rolrechten: beheerder maakt een kijker; de kijker kan niets invullen, mete
   await ready(v);
   await expect(v.getByTestId("rolmelding")).toBeVisible();
   await expect(v.getByTestId("dienst-koppelen")).toHaveCount(0);
+  const bestaandeApps = v.getByRole("region", { name: "Bestaande apps" });
+  await expect(bestaandeApps.getByRole("heading", { name: "MediaGuard" })).toBeVisible();
+  await expect(bestaandeApps.locator("input, form")).toHaveCount(0);
   await expect(v.getByRole("button", { name: /Intrekken|Ontkoppelen|Rotatie/ })).toHaveCount(0);
   await v.goto("/instellingen/noodaccount");
   await ready(v);

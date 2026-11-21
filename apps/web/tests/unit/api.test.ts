@@ -5,7 +5,7 @@ import { uuidv4 } from "@/lib/uuid";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function fakeFetch(status: number, body: string, headers: Record<string, string> = {}) {
-  return vi.fn(async (...args: [string, RequestInit?]) => {
+  return vi.fn(async (...args: Parameters<typeof fetch>) => {
     void args;
     return new Response(body, { status, headers });
   });
@@ -122,4 +122,26 @@ describe("401: alleen een verlopen sessie meldt af", () => {
       g.window = prev;
     }
   });
+});
+
+describe("invoer voor een adapterkoppeling", () => {
+  it("verstuurt de invoer alleen als kopregel rechtstreeks naar de Hub", async () => {
+    const f = fakeFetch(201, "{}");
+    const invoer = uuidv4();
+    await apiRequest("/api/v1/adapterkoppelingen", {
+      method: "POST", body: { doel_bevestigd: true }, adapterCredential: invoer, fetchImpl: f,
+    });
+    const init = f.mock.calls[0]![1]!;
+    expect(new Headers(init.headers).get("X-Adapter-Credential") === invoer).toBe(true);
+    expect(init.body).not.toContain(invoer);
+    expect(init.redirect).toBe("error");
+    expect(init.mode).toBe("same-origin");
+  });
+  it.each(["/api/v1/services", "https://ander.example/api/v1/adapterkoppelingen"])(
+    "weigert invoer voor een andere bestemming", async (pad) => {
+      const f = fakeFetch(201, "{}");
+      await expect(apiRequest(pad, { method: "POST", adapterCredential: uuidv4(), fetchImpl: f })).rejects.toThrow();
+      expect(f).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -28,7 +28,7 @@ const viewports: { name: string; width: number; height: number; mobile: boolean 
 const viewportProjects: Project[] = viewports.map((v) => ({
   name: v.name,
   dependencies: ["opzet"],
-  testMatch: /10-.*\.spec\.ts/,
+  testMatch: /[1-8][0-9]-.*\.spec\.ts/,
   use: {
     viewport: { width: v.width, height: v.height },
     isMobile: v.mobile && v.width < 700,

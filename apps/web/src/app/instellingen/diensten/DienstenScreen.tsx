@@ -19,6 +19,7 @@ import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
 import { useApi } from "@/lib/use-api";
 import { InstellingenKop } from "../delen";
+import { BestaandeApps } from "./BestaandeApps";
 
 const EXECUTOR = "ai-server-manager-executor";
 const EIGEN_DIENSTEN = [
@@ -587,7 +588,7 @@ export function DienstenScreen() {
     <>
       <InstellingenKop
         titel="Diensten"
-        intro="Eigen diensten koppelen aan de Hub: elke dienst krijgt een eigen sleutel. Het register toont alleen de laatste 4 tekens van een token."
+        intro="Beheer de koppelingen met bestaande apps en de diensten die zich bij de Hub aanmelden."
         actions={
           admin ? (
             <a href="#dienst-koppelen" className={buttonVariants({ variant: "primair" })}>
@@ -600,6 +601,7 @@ export function DienstenScreen() {
       <div className="stack">
         {keyset.data ? <Vingerafdruk ks={keyset.data} /> : keyset.error ? <ErrorPanel error={keyset.error} alert={false} /> : <Loading />}
         {!admin ? <RolMelding>Je kijkt als {ROLE_LABEL[role ?? "viewer"]}: koppelen, rotatie, ontkoppelen en intrekken kan alleen een beheerder.</RolMelding> : null}
+        {hasRole(role, "viewer") ? <BestaandeApps beheer={admin} /> : null}
         {admin ? <Koppelen onNieuw={reload} diensten={items} registry={registry.data?.items ?? []} /> : null}
         <section aria-labelledby="register-titel" className="flex flex-col gap-3" data-testid="dienstenregister">
           <h2 id="register-titel">Gekoppelde diensten</h2>

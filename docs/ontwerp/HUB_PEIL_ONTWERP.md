@@ -754,3 +754,33 @@ De laatste back-up wordt bij benadering afgeleid uit
 
 De link naar koppelbeheer opent Instellingen → Diensten. Invoer en beheer van de koppeling vallen onder S-P3-070.
 De browserproef controleert overloop, foutmelding en herhalen met het toetsenbord op de vier Hub-breedtes.
+
+## Bestaande apps koppelen (S-P3-070)
+
+Onder **Instellingen → Diensten → Bestaande apps** krijgt elke installatie van MediaGuard,
+Media Source Optimizer (MSO) en my_house een eigen dienstkaart. Zonder installatie blijft
+per app een kaart met uitleg staan. De verticale leesvolgorde is appnaam, koppeltoestand,
+laatste contactmeting, sleutelkenmerk en beheer. Op brede schermen passen twee kaarten naast elkaar.
+
+| Toestand | Wat de gebruiker ziet en kan doen |
+| --- | --- |
+| Leeg | **Niet gekoppeld** na het ophalen van de lijst. De beheerder controleert de installatie en het HTTPS-adres, bevestigt de bestemming en kiest **Opslaan**. |
+| Bezig | De actieve knop en een statusbericht vermelden welke handeling loopt. Een tweede druk verstuurt de handeling één keer. |
+| Fout | Een melding noemt de oorzaak en een herstelactie. Een invoerfout verwijst naar het betreffende veld. Bij een mislukte lijstlezing kan de gebruiker opnieuw laden. |
+| Verouderd | De laatste contactmeting houdt haar brontijd. Na het verlopen van de meting toont de kaart **Verouderd** en kan de beheerder opnieuw testen. |
+| Gekoppeld | Na bevestigd contact verschijnt **Gekoppeld** met de neutrale koppelpil. Alleen opslag geeft **Ingesteld**. De datum en de laatste vier tekens identificeren de opgeslagen sleutel. |
+
+De kaart gebruikt DienstKaart, StatusBadge, Field, Freshness, Button, Melding en BevestigDialoog
+uit Peil. Gewone gebruikers zien de koppelstatus. Alleen een beheerder krijgt de invoer en
+de acties. Het geheime veld begint leeg en wordt na opslaan gewist. Bij my_house neemt de
+beheerder ook de server-ID over die bij de Hub-koppelcode hoort. MSO gebruikt de openbare
+verbindingstest zolang de Hub het leesrecht van een machinesleutel niet kan vaststellen.
+Bij MediaGuard vermeldt de kaart dat de Hub de opgeslagen sleutel nog niet kan testen.
+
+**Ontkoppelen** opent een bevestiging met de gevolgen voor de Hub en de afzonderlijke stap
+om de toegang in de bronapp in te trekken. Annuleren is de eerste keuze. De toetsenbordvolgorde
+volgt de kaart en foutmeldingen zijn via het invoerveld voorleesbaar.
+
+De browserproef legt de vijf toestanden van dezelfde my_house-kaart vast met een gesimuleerde
+installatie. [Leeg](review/diensten-leeg.png) · [Bezig](review/diensten-bezig.png) ·
+[Fout](review/diensten-fout.png) · [Verouderd](review/diensten-verouderd.png) · [Gekoppeld](review/diensten-gekoppeld.png)

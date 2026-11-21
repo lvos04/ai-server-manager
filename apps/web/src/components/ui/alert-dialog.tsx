@@ -1,7 +1,7 @@
 "use client";
 
 import * as AD from "@radix-ui/react-alert-dialog";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactNode, RefObject } from "react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "./button";
 
@@ -15,6 +15,7 @@ export function BevestigDialoog({
   annuleer = "Annuleren",
   onBevestig,
   gevaar,
+  terugNaar,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -24,12 +25,14 @@ export function BevestigDialoog({
   annuleer?: string;
   onBevestig: () => void;
   gevaar?: boolean;
+  terugNaar?: RefObject<HTMLElement | null>;
 }) {
   return (
     <AD.Root open={open} onOpenChange={onOpenChange}>
       <AD.Portal>
         <AD.Overlay className="fixed inset-0 z-overlay bg-black/50" />
         <AD.Content
+          onCloseAutoFocus={terugNaar ? (event) => { event.preventDefault(); terugNaar.current?.focus(); } : undefined}
           className={cn(
             "fixed top-1/2 left-1/2 z-overlay flex w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border border-border-strong bg-popover p-6 text-popover-foreground shadow-lg",
           )}

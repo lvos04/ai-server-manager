@@ -25,6 +25,8 @@ export interface ApiOptions {
   /** Hergebruik dezelfde key bij een herhaalde poging van dezelfde handeling (geen dubbele uitvoering). */
   idempotencyKey?: string;
   ifMatch?: string | null;
+  /** Eenmalige invoer voor het aanmaken of wijzigen van een bestaande-appkoppeling. */
+  adapterCredential?: string;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
   cookieString?: string;
@@ -57,6 +59,12 @@ function isErrorBody(v: unknown): v is { code: string; message: string; details?
 export async function apiRequest<T>(path: string, opts: ApiOptions = {}): Promise<ApiResult<T>> {
   const method = opts.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
+  if (opts.adapterCredential !== undefined) {
+    const aanmaken = method === "POST" && path === "/api/v1/adapterkoppelingen";
+    const wijzigen = method === "PATCH" && /^\/api\/v1\/adapterkoppelingen\/[a-f0-9-]{36}$/.test(path);
+    if (!aanmaken && !wijzigen) throw new Error("Ongeldige bestemming voor de koppeling.");
+    headers["X-Adapter-Credential"] = opts.adapterCredential;
+  }
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   if (method !== "GET") {
     const csrf = readCookie(CSRF_COOKIE, opts.cookieString);
@@ -72,6 +80,7 @@ export async function apiRequest<T>(path: string, opts: ApiOptions = {}): Promis
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       credentials: "same-origin",
+      ...(opts.adapterCredential !== undefined ? { mode: "same-origin", redirect: "error" } : {}),
       cache: "no-store",
       signal: opts.signal,
     });
