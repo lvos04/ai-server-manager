@@ -179,6 +179,18 @@ getoetst. De keten schrijft geen bronstatistieken in de Hub. Een leeg diagnosean
 leidt uitsluitend tot het tonen van het bronresultaat of van `onbekend`. Eventueel
 cachevulgedrag bij een lege cache ligt bij de broneigenaar. Het mediascherm volgt in S-P3-080.
 
+### Overzicht voor het scherm Media (S-P3-082, versie 1)
+
+Op wens van de gebruiker van 21 november 2026 leest de Hub voor het scherm Media de connectorroutes uit de
+leeslijst hierboven: `/connector/v1/discover` en `/connector/v1/items` voor `wanted`, `status`, `downloads`,
+`av1_lanes` en `incidents`. S-P3-610 en S-P3-615 zijn afgerond. Daar leest `items` onder `observation_read`
+zonder opslag. Vooraf gaat dezelfde sleutelcontrole als bij de downloadketen, met dezelfde aanvaarde
+sleutelboekhouding (`api_keys.last_used_at`). De Hub neemt alleen totalen, `jobs_failed`, de som van `running`
+per AV1-baan, de noodstop met `since` en de meettijden over. De bronvalidatie en de uitkomsten staan in
+[ADAPTERKOPPELINGEN.md](../ADAPTERKOPPELINGEN.md#overzicht-voor-het-scherm-media-s-p3-082). De uitsluiting van
+`/api/v1/mediaserver/status` blijft gelden. Mediaservers blijven daarom `unknown` tot MediaGuard een
+bijwerkingsvrije bron levert.
+
 ### MSO
 
 #### Openbare probes

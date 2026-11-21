@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -226,8 +227,12 @@ def _sleutel(db: Session, row: AdapterLink, vault: Vault | None) -> str:
     return key
 
 
-def _mediaguard(bron: Bron, vault: Vault | None, wanted_id: int, cid: UUID) -> list[Schakel]:
-    def lees(pad: str, *, cache: bool = False) -> dict[str, Any]:
+def mediaguard_lezer(bron: Bron, vault: Vault | None, cid: UUID) -> Callable[..., dict[str, Any]]:
+    """Controleer sleutel en exacte kijkersrol; geef daarna een lezer voor uitsluitend GET-verzoeken."""
+
+    def lees(
+        pad: str, *, query: dict[str, str] | None = None, ontbreekt: str = "bronroute ontbreekt"
+    ) -> dict[str, Any]:
         row = bron.controleer()
         response = outbound.request(
             row.basis_url,
@@ -235,26 +240,33 @@ def _mediaguard(bron: Bron, vault: Vault | None, wanted_id: int, cid: UUID) -> l
             pad,
             policy=basis.bound_policy(row, bron.settings.outbound_policy()),
             headers={"X-Api-Key": sleutel, "X-Correlation-Id": str(cid)},
-            query={"cached": "true"} if cache else None,
+            query=query,
             max_bytes=basis.MAX_RESPONSE_BYTES,
         )
-        return _body(response, ontbreekt="geen gecachte diagnose" if cache else "bronroute ontbreekt")
+        return _body(response, ontbreekt=ontbreekt)
 
+    sleutel = _sleutel(bron.db, bron.controleer(), vault)
+    identiteit = lees("/api/v1/auth/me")
+    if (
+        identiteit.get("username") != "apikey:hub"
+        or identiteit.get("role") != "viewer"
+        or "scopes" not in identiteit
+        or identiteit["scopes"] not in (None, [])
+    ):
+        raise Bronfout("geen leesrecht")
+    return lees
+
+
+def _mediaguard(bron: Bron, vault: Vault | None, wanted_id: int, cid: UUID) -> list[Schakel]:
     try:
-        sleutel = _sleutel(bron.db, bron.controleer(), vault)
-        identiteit = lees("/api/v1/auth/me")
-        if (
-            identiteit.get("username") != "apikey:hub"
-            or identiteit.get("role") != "viewer"
-            or "scopes" not in identiteit
-            or identiteit["scopes"] not in (None, [])
-        ):
-            raise Bronfout("geen leesrecht")
+        lees = mediaguard_lezer(bron, vault, cid)
     except (Bronfout, outbound.OutboundError) as exc:
         diagnosemeting = downloadmeting = bron.leesfout(exc)
     else:
         try:
-            data = lees(f"/api/v1/wanted/{wanted_id}/diagnosis", cache=True)
+            data = lees(
+                f"/api/v1/wanted/{wanted_id}/diagnosis", query={"cached": "true"}, ontbreekt="geen gecachte diagnose"
+            )
             diagnosemeting = diagnose(wanted_id, data, utcnow())
         except (Bronfout, outbound.OutboundError) as exc:
             diagnosemeting = bron.leesfout(exc)

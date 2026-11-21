@@ -78,6 +78,38 @@ Broninspectie van MediaGuard-commit `e1c121d4a29bff7228f56bd6ede5f9548ac00ae5`:
 | `/api/v1/storage/forecast` | `storage_forecast.py::storage_forecast` kan via `_measure_pool` een poolmeting starten en opslaan. |
 | `/api/v1/backups` | `maintenance/api.py::list_backups` gebruikt `_backup_dir`, dat een ontbrekende map aanmaakt. |
 
+### Overzicht voor het scherm Media (S-P3-082)
+
+Een ingelogde kijker leest per MediaGuard-koppeling `GET /api/v1/adapterkoppelingen/{link_id}/mediaguard`
+(`Cache-Control: no-store`). De lijst en het detail van de koppeling doen zelf geen bronverzoek en houden de
+metingen hierboven. Het overzicht doet uitsluitend GET-verzoeken met de kijkersleutel uit de kluis:
+
+1. `GET /api/v1/auth/me` met dezelfde controle als de downloadketen: `apikey:hub`, rol `viewer`, geen scopes.
+2. `GET /connector/v1/discover`: `app_id` `media-guard-ultimate`, `schema_version` `1.0`, `read` en de itemtypen.
+3. `GET /connector/v1/items` voor `wanted`, `status`, `downloads`, `av1_lanes` en `incidents`. De connector leest
+   onder `observation_read` zonder opslag (S-P3-615).
+
+| Cijfer | Bron | Waarde |
+| --- | --- | --- |
+| Wanted · open | `wanted` | `total` |
+| Status · mislukte jobs | `status` | `jobs_failed` van het ene statusitem |
+| Downloads · in de wachtrij | `downloads` | `total` |
+| AV1 · lopende encodes | `av1_lanes` | som van `running` over precies de banen `cpu` en `gpu` |
+| Incidenten · open | `incidents` | `total` |
+
+De noodstop komt uit hetzelfde statusitem (`emergency_stop_active`, `emergency_stop_since`). Een cijfer is alleen
+`gemeten` bij een bronpagina van het gevraagde type met `status: ok`, zonder `reason_code`, met een geheel `total`
+van minstens 0 en een meettijd met tijdzone die niet in de toekomst ligt en hooguit 900 seconden oud is. Status en
+AV1 vragen bovendien één volledige pagina. Anders is het cijfer `onbekend` met een vaste reden en, waar bekend,
+de bronmeettijd. Een 401, 403, time-out, andere rol, vervallen doelbinding of onbevestigde connector maakt alle
+cijfers en de noodstop `onbekend`. Een storing bij één type laat de andere cijfers staan. Alle verzoeken van één
+overzicht delen één `X-Correlation-Id`. De Hub bouwt elk veld zelf op en geeft geen ander bronveld door.
+
+Mediaservers blijven `onbekend` met de reden "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron".
+De enige bron, `/api/v1/mediaserver/status`, staat onder de uitgesloten routes van ADR-0034. In MediaGuard
+`e1c121d` en de huidige `9d2b1cf` leest die route geheimen buiten `observation_read`. Daarbij kan een ontbrekend
+sleutelbestand worden aangemaakt. Zo'n bron moet MediaGuard eerst leveren, bijvoorbeeld als connectoritem.
+
 ## MSO
 
 Bevestig bij aanmaken of herbevestigen de catalogusinstantie en laat `X-Adapter-Credential` weg.

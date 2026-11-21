@@ -2296,3 +2296,194 @@ def test_downloadketen_selecteert_uitsluitend_de_opgegeven_eigenaar(admin, app, 
     r = admin.get(KETEN, params={"mediaguard_link_id": links[APP_ID], "mso_link_id": links[ANDERE_APP_ID]})
     assert r.status_code == 200
     assert r.json()["schakels"][0]["oorzaakcode"] == "import-failed"
+
+
+# MediaGuard-overzicht (S-P3-082): nagebootste connector in de vorm van mediaguard.openapi.json (/connector/v1).
+def _mg_pagina(kind: str, items: list[dict[str, Any]], tijd: str, **extra: Any) -> dict[str, Any]:
+    return {
+        "type": kind,
+        "items": items,
+        "status": "ok",
+        "reason_code": None,
+        "snapshot_id": "s1",
+        "observed_at": tijd,
+        "total": len(items),
+        "next_cursor": None,
+    } | extra
+
+
+@pytest.fixture
+def mgbron(admin, app, doel, monkeypatch):
+    sleutel = "mgk_" + secrets.token_urlsafe(32)
+    link = admin.post(ROUTE, json=doel, headers=invoer(sleutel)).json()["id"]
+    tijd = iso(utcnow())
+    prive = secrets.token_urlsafe()
+    verboden = dict.fromkeys(("sessions", "actions", "tests", "last"), prive) | {"hold": {"reason": prive}}
+    systeem = {
+        "id": "status:installation",
+        "observed_at": tijd,
+        "deep_link": "/",
+        "emergency_stop_active": True,
+        "emergency_stop_since": tijd,
+        "jobs_queued": 5,
+        "jobs_running": 1,
+        "jobs_failed": 2,
+        "unread_notifications": 9,
+        **verboden,
+    }
+    banen = [
+        {"id": b, "lane": b, "running": n, "slots": 2, "desired_slots": 2, "paused": False, "deep_link": "/av1"}
+        for b, n in (("cpu", 1), ("gpu", 3))
+    ]
+    antwoorden: dict[str, Any] = {
+        "/api/v1/auth/me": {"username": "apikey:hub", "role": "viewer", "scopes": None},
+        "/connector/v1/discover": {
+            "app_id": "media-guard-ultimate",
+            "schema_version": "1.0",
+            "capabilities": ["read"],
+            "item_types": ["wanted", "status", "downloads", "av1_lanes", "incidents", "backups"],
+            "actions": [],
+        },
+        "wanted": _mg_pagina("wanted", [{"id": "wanted:1", **verboden}], tijd, total=17, next_cursor="c"),
+        "status": _mg_pagina("status", [systeem], tijd, **verboden),
+        "downloads": _mg_pagina("downloads", [{"id": "d1"}], tijd, total=4, next_cursor="c"),
+        "av1_lanes": _mg_pagina("av1_lanes", banen, tijd),
+        "incidents": _mg_pagina("incidents", [{"id": "i1"}], tijd, total=6, next_cursor="c"),
+    }
+    spoor: list[tuple[str, Any, uuid.UUID]] = []
+
+    def transport(base, method, path, *, headers, policy, query=None, **options):
+        assert base == URL and method == "GET" and "json_body" not in options
+        assert policy.allowed_peer_addresses == frozenset({PEER}) and not policy.allow_loopback
+        assert set(headers) == {"X-Api-Key", "X-Correlation-Id"} and headers["X-Api-Key"] == sleutel
+        spoor.append((path, query, uuid.UUID(headers["X-Correlation-Id"])))
+        if path == "/connector/v1/items":
+            assert set(query) == {"type", "limit"}
+            body = antwoorden[query["type"]]
+        else:
+            assert query is None
+            body = antwoorden[path]
+        if isinstance(body, Exception):
+            raise body
+        if isinstance(body, outbound.Response):
+            return body
+        return outbound.Response(200, json.dumps(body).encode())
+
+    monkeypatch.setattr(outbound, "request", transport)
+    return f"{ROUTE}/{link}/mediaguard", antwoorden, spoor, tijd, prive
+
+
+def test_mediaguard_overzicht_als_kijker(admin, app, mgbron, caplog):
+    pad, _, spoor, tijd, prive = mgbron
+    make_user(admin, "mgkijker", "viewer")
+    viewer = login_as(app, "mgkijker")
+    sql = []
+
+    def noteer(conn, cursor, statement, parameters, context, executemany):
+        sql.append(statement.lstrip().split(maxsplit=1)[0].upper())
+
+    event.listen(app.state.engine, "before_cursor_execute", noteer)
+    try:
+        response = viewer.get(pad)
+    finally:
+        event.remove(app.state.engine, "before_cursor_execute", noteer)
+    assert set(sql) == {"SELECT"}
+    assert response.status_code == 200 and response.headers["Cache-Control"] == "no-store"
+    body = response.json()
+    gemeten = {"status": "gemeten", "observed_at": tijd, "reden": None}
+    assert body["wanted"] == {**gemeten, "waarde": 17}
+    assert body["status"] == {**gemeten, "waarde": 2}
+    assert body["downloads"] == {**gemeten, "waarde": 4}
+    assert body["av1"] == {**gemeten, "waarde": 4}
+    assert body["incidenten"] == {**gemeten, "waarde": 6}
+    assert body["noodstop"] == {**gemeten, "actief": True, "sinds": tijd}
+    assert body["mediaservers"] == {
+        "status": "onbekend",
+        "servers": None,
+        "reden": "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron",
+    }
+    assert [p for p, _, _ in spoor] == ["/api/v1/auth/me", "/connector/v1/discover"] + ["/connector/v1/items"] * 5
+    assert [q["type"] for _, q, _ in spoor[2:]] == ["wanted", "status", "downloads", "av1_lanes", "incidents"]
+    assert {c for _, _, c in spoor} == {uuid.UUID(body["correlation_id"])}
+    # Veldenwitte lijst (S-P3-030 a): niets uit sessions, hold.reason, actions, tests of last komt door.
+    assert prive not in response.text and prive not in caplog.text
+    with app.state.sessionmaker() as db:
+        for column in (AuditEvent.details, IdempotencyRecord.response_body, IncidentEvent.details, OutboxEvent.payload):
+            assert prive not in json.dumps(list(db.scalars(select(column))))
+
+
+def _alles_onbekend(body: dict[str, Any], reden: str) -> None:
+    for naam in ("wanted", "status", "downloads", "av1", "incidenten", "noodstop"):
+        assert body[naam]["status"] == "onbekend" and body[naam]["reden"] == reden, naam
+        assert body[naam].get("waarde") is None and body[naam].get("actief") is None
+
+
+@pytest.mark.parametrize(
+    ("pad", "antwoord", "reden"),
+    [
+        ("/api/v1/auth/me", {"username": "apikey:hub", "role": "operator", "scopes": None}, "geen leesrecht"),
+        (
+            "/api/v1/auth/me",
+            {"username": "apikey:hub", "role": "viewer", "scopes": ["emergency_stop:on"]},
+            "geen leesrecht",
+        ),
+        ("/api/v1/auth/me", outbound.Response(401, b"{}"), "sleutel geweigerd"),
+        ("/api/v1/auth/me", outbound.OutboundError("tijdslimiet"), "bron onbereikbaar"),
+        ("/connector/v1/discover", outbound.Response(404, b"{}"), "bronroute ontbreekt"),
+        (
+            "/connector/v1/discover",
+            {"app_id": "iets-anders", "schema_version": "1.0"},
+            "connectorversie niet bevestigd",
+        ),
+    ],
+)
+def test_mediaguard_overzicht_zonder_bevestigde_bron(admin, mgbron, pad, antwoord, reden):
+    route, antwoorden, spoor, _, _ = mgbron
+    antwoorden[pad] = antwoord
+    response = admin.get(route)
+    assert response.status_code == 200
+    _alles_onbekend(response.json(), reden)
+    assert "/connector/v1/items" not in [p for p, _, _ in spoor]
+
+
+def test_mediaguard_overzicht_per_gegeven_onbekend(admin, mgbron):
+    route, antwoorden, _, tijd, _ = mgbron
+    antwoorden["wanted"] = outbound.OutboundError("tijdslimiet")
+    antwoorden["status"] = _mg_pagina("status", [], tijd, status="unknown", reason_code="bron_onbereikbaar", total=None)
+    antwoorden["downloads"] = outbound.Response(500, b"{}")
+    antwoorden["/connector/v1/discover"]["item_types"] = ["wanted", "status", "downloads", "incidents"]
+    body = admin.get(route).json()
+    assert (body["wanted"]["status"], body["wanted"]["reden"]) == ("onbekend", "bron onbereikbaar")
+    assert body["status"] == {"status": "onbekend", "waarde": None, "observed_at": tijd, "reden": "bron onbereikbaar"}
+    assert body["noodstop"]["actief"] is None and body["noodstop"]["reden"] == "bron onbereikbaar"
+    assert body["downloads"]["reden"] == "bron onbereikbaar"
+    assert body["av1"]["reden"] == "bron levert dit gegeven niet"
+    assert body["incidenten"]["waarde"] == 6
+
+
+def test_mediaguard_overzicht_toegang_en_doel(app, admin, mgbron, monkeypatch):
+    route, _, spoor, _, _ = mgbron
+    with TestClient(app, base_url="https://testserver") as gast:
+        assert gast.get(route).status_code == 401
+    make_user(admin, "mgkind", "kind")
+    assert login_as(app, "mgkind").get(route).status_code == 403
+    assert admin.post(route, headers=idem()).status_code == 405
+    assert admin.get(f"{ROUTE}/{uuid.uuid4()}/mediaguard").status_code == 404
+    assert not spoor
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {ANDERE_APP_ID: (443, 8443)})
+    response = admin.get(route)
+    assert response.status_code == 200
+    _alles_onbekend(response.json(), "doelbinding vervallen")
+    assert not spoor
+
+
+def test_mediaguard_overzicht_alleen_voor_mediaguard(admin, app, settings, doel, monkeypatch):
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {APP_ID: (443,), ANDERE_APP_ID: (8443,)})
+        discover(db, settings)
+        mso_id = db.scalars(select(CatalogApp.id).where(CatalogApp.app_id == ANDERE_APP_ID)).one()
+    mso = {**doel, "app_id": ANDERE_APP_ID, "catalog_app_id": str(mso_id), "basis_url": TWEEDE_BASIS}
+    link = admin.post(ROUTE, json=mso, headers=idem()).json()["id"]
+    monkeypatch.setattr(outbound, "request", Mock(side_effect=AssertionError("geen bronverzoek")))
+    assert admin.get(f"{ROUTE}/{link}/mediaguard").status_code == 404

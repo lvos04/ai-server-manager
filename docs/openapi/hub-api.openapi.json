@@ -510,6 +510,56 @@
         "title": "Check",
         "type": "object"
       },
+      "Cijfer": {
+        "properties": {
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          },
+          "status": {
+            "enum": [
+              "gemeten",
+              "onbekend"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "waarde": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waarde"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Cijfer",
+        "type": "object"
+      },
       "ConfirmIn": {
         "additionalProperties": false,
         "properties": {
@@ -1683,6 +1733,27 @@
         "title": "MediaGuardLinkView",
         "type": "object"
       },
+      "Mediaservers": {
+        "properties": {
+          "reden": {
+            "default": "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron",
+            "title": "Reden",
+            "type": "string"
+          },
+          "servers": {
+            "title": "Servers",
+            "type": "null"
+          },
+          "status": {
+            "const": "onbekend",
+            "default": "onbekend",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "Mediaservers",
+        "type": "object"
+      },
       "MsoTestReceipt": {
         "properties": {
           "id": {
@@ -1734,6 +1805,67 @@
           "my_house"
         ],
         "title": "MyHouseTestReceipt",
+        "type": "object"
+      },
+      "Noodstop": {
+        "properties": {
+          "actief": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actief"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          },
+          "sinds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sinds"
+          },
+          "status": {
+            "enum": [
+              "gemeten",
+              "onbekend"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Noodstop",
         "type": "object"
       },
       "NoodstopIn": {
@@ -1977,6 +2109,51 @@
           "apparaten"
         ],
         "title": "Overview",
+        "type": "object"
+      },
+      "Overzicht": {
+        "properties": {
+          "av1": {
+            "$ref": "#/components/schemas/Cijfer"
+          },
+          "correlation_id": {
+            "format": "uuid",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "downloads": {
+            "$ref": "#/components/schemas/Cijfer"
+          },
+          "incidenten": {
+            "$ref": "#/components/schemas/Cijfer"
+          },
+          "mediaservers": {
+            "$ref": "#/components/schemas/Mediaservers",
+            "default": {
+              "reden": "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron",
+              "status": "onbekend"
+            }
+          },
+          "noodstop": {
+            "$ref": "#/components/schemas/Noodstop"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Cijfer"
+          },
+          "wanted": {
+            "$ref": "#/components/schemas/Cijfer"
+          }
+        },
+        "required": [
+          "correlation_id",
+          "wanted",
+          "status",
+          "downloads",
+          "av1",
+          "incidenten",
+          "noodstop"
+        ],
+        "title": "Overzicht",
         "type": "object"
       },
       "PasswordIn": {
@@ -4988,6 +5165,50 @@
           }
         },
         "summary": "Woningoverzicht lezen",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      }
+    },
+    "/api/v1/adapterkoppelingen/{link_id}/mediaguard": {
+      "get": {
+        "description": "Vijf cijfers en de noodstop uit de MediaGuard-connector; bij twijfel `onbekend` met reden, nooit 0.",
+        "operationId": "read_mediaguard_api_v1_adapterkoppelingen__link_id__mediaguard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overzicht"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "MediaGuard-overzicht lezen (alleen lezen)",
         "tags": [
           "adapterkoppelingen"
         ]

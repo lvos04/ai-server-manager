@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy import select, update
 
 from hub import audit
-from hub.adapters import basis, mediaguard, mso, my_house
+from hub.adapters import basis, mediaguard, mediaguard_lezen, mso, my_house
 from hub.adapters.binding import binding_is_current, published_ports, registered_peers, registered_port, target_matches
 from hub.adapters.health import stored_health
 from hub.config import Settings
@@ -505,6 +505,18 @@ def read_house(
         ) from None
     response.headers["Cache-Control"] = "no-store"
     return snapshot
+
+
+@router.get("/{link_id}/mediaguard", summary="MediaGuard-overzicht lezen (alleen lezen)")
+def read_mediaguard(
+    link_id: uuid.UUID, db: DB, _: Viewer, response: Response, settings: SettingsDep, vault: VaultDep
+) -> mediaguard_lezen.Overzicht:
+    """Vijf cijfers en de noodstop uit de MediaGuard-connector; bij twijfel `onbekend` met reden, nooit 0."""
+    row = _link(db, link_id)
+    if row.app_id != mediaguard.APP_ID:
+        raise HubError(404, "not_found", "Geen MediaGuard-koppeling gevonden.")
+    response.headers["Cache-Control"] = "no-store"
+    return mediaguard_lezen.lees_overzicht(db, settings, vault, row, uuid.uuid4())
 
 
 @router.get("/{link_id}", summary="Adapterkoppeling lezen")

@@ -99,6 +99,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/adapterkoppelingen"): "admin",
     ("GET", "/api/v1/adapterkoppelingen/{link_id}"): "kind",
     ("GET", "/api/v1/adapterkoppelingen/{link_id}/huis"): "viewer",
+    ("GET", "/api/v1/adapterkoppelingen/{link_id}/mediaguard"): "viewer",
     ("PATCH", "/api/v1/adapterkoppelingen/{link_id}"): "admin",
     ("DELETE", "/api/v1/adapterkoppelingen/{link_id}"): "admin",
     ("POST", "/api/v1/adapterkoppelingen/{link_id}/test"): "admin",
