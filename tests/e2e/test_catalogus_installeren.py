@@ -7,6 +7,7 @@ echte diensten kennen de §8.1-velden en ``catalog_binding`` nog niet). Alleen t
 from __future__ import annotations
 
 import base64
+import contextlib
 import copy
 import hashlib
 import uuid
@@ -204,9 +205,25 @@ def keten(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[Keten]:
+    with maak_keten(admin, app, nas, worker_once, tmp_path, monkeypatch) as k:
+        yield k
+
+
+@contextlib.contextmanager
+def maak_keten(
+    admin: Any,
+    app: Any,
+    nas: FakeTrueNAS,
+    worker_once: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    regel: dict[str, Any] = REGEL,
+    stap: dict[str, Any] | None = None,
+) -> Iterator[Keten]:
+    """Echte Hub en executor met fake appstore en planner; ``regel``/``stap``: witte-lijstregel en plannerstap."""
     from hub.actions import beleid
 
-    monkeypatch.setenv("ASM_POLICY_DIR", str(policy_met_regels(tmp_path / "policy", [REGEL])))
+    monkeypatch.setenv("ASM_POLICY_DIR", str(policy_met_regels(tmp_path / "policy", [regel])))
     beleid._geladen.cache_clear()
     stack = bouw_stack(
         admin=admin,
@@ -246,7 +263,7 @@ def keten(
             "trusted_key_id": REGEL["publisher_key_sha256"][7:23],
         },
     }
-    stap = install_params("demo-app")
+    stap = copy.deepcopy(stap) if stap is not None else install_params("demo-app")
     stap["manifest"]["manifest_sha256"] = REGEL["manifest_sha256"]  # zoals de planner uit zijn validatierapport
     planner = FakePlanner(hub_key, stap).start()
     urls = {"appstore-en-fork": store.url, "jelly-leon-platform": planner.url}
@@ -255,14 +272,19 @@ def keten(
         "hub.catalog.plannen.service_base_url",
         lambda db, s, svc: (urls[svc.app_id], None),
     )
-    yield Keten(stack, store, planner)
-    store.stop()
-    planner.stop()
-    stack.stop()
-    beleid._geladen.cache_clear()
+    try:
+        yield Keten(stack, store, planner)
+    finally:
+        store.stop()
+        planner.stop()
+        stack.stop()
+        beleid._geladen.cache_clear()
 
 
-VOLLEDIG = {"public_url": "https://demo.test/", "data_path": "/mnt/testpool/apps/demo"}  # alles wat de vertaling vraagt
+VOLLEDIG = {
+    "public_url": "https://demo.test/",
+    "data_path": "/mnt/testpool/apps/demo",
+}  # alles wat de vertaling vraagt
 
 
 def _plan(admin: Any, **wijzig: Any) -> Any:
@@ -513,7 +535,9 @@ def test_bewaarde_oude_antwoordvorm_lekt_niet_bij_lezen_of_herhalen(keten: Keten
     with login_as(app, "lezer-oud") as lezer:
         gelezen = lezer.get(f"/api/v1/catalog/plans/{plan_id}")
     herhaald = admin.post(
-        gemaakt.request.url.path, json=json.loads(gemaakt.request.content), headers={"Idempotency-Key": sleutel}
+        gemaakt.request.url.path,
+        json=json.loads(gemaakt.request.content),
+        headers={"Idempotency-Key": sleutel},
     )
     assert gelezen.status_code == 200 and herhaald.headers.get("Idempotent-Replay") == "true"
     for antwoord in (gelezen.json(), herhaald.json()):

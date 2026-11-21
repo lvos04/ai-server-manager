@@ -173,6 +173,7 @@ class KeyRing:
         ttl_seconds: int = 60,
         now: datetime | None = None,
         catalog_request_sha256: str | None = None,
+        kluis_afgifte: dict[str, str] | None = None,
     ) -> tuple[str, datetime]:
         """Dienst-JWT waarmee de Hub zich bij een eigen dienst meldt (contract 1.2 §4.3); per aanroep een nieuwe.
 
@@ -191,6 +192,9 @@ class KeyRing:
         if catalog_request_sha256 is not None:
             # Contract §8.2: de enige extra claim, gebonden aan methode, pad, Idempotency-Key en de hele body.
             claims["catalog_request_sha256"] = catalog_request_sha256
+        if kluis_afgifte is not None:
+            # Contract §8.3: de versleutelde afgifte aan de executor, gebonden aan verzoek en opvraag.
+            claims["kluis_afgifte"] = kluis_afgifte
         return self._sign(claims), expires
 
     def verify_user_jwt(self, token: str, *, audience: str) -> dict[str, Any]:

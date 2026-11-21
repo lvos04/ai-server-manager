@@ -572,3 +572,43 @@ def test_opstartmigratie_wacht_op_geverifieerde_backup(
         }
     finally:
         engine.dispose()
+
+
+def test_appgeheimen_en_afgiften_overleven_terugmigratie_onder_0024(lege_db: str) -> None:
+    """HARDE EIS (S-P2-050e): een versleuteld appgeheim en een afgifte blijven bij 0024 -> 0023 -> 0024 bewaard."""
+    from hub.models import AppGeheim, KluisAfgifte
+    from hub.timeutil import utcnow
+
+    migrations.upgrade(lege_db, "0024")
+    gid, rid = uuid.uuid4(), uuid.uuid4()
+    engine = sa.create_engine(lege_db)
+    try:
+        with Session(engine) as db:
+            db.add(
+                AppGeheim(
+                    id=gid,
+                    instance_id=uuid.uuid4(),
+                    ref="vault://app/demo-app/app_secret_key",
+                    revision=uuid.uuid4(),
+                    nonce=b"n" * 12,
+                    ciphertext=b"c" * 48,
+                    created_at=utcnow(),
+                )
+            )
+            db.add(KluisAfgifte(request_id=rid, request_sha256="sha256:" + "a" * 64, expires_at=utcnow(),
+                                created_at=utcnow()))  # fmt: skip
+            db.commit()
+        migrations.downgrade(lege_db, "0023")
+        assert {"app_geheim_bewaard", "kluis_afgifte_bewaard"} <= set(sa.inspect(engine).get_table_names())
+        migrations.upgrade(lege_db, "0024")
+        with Session(engine) as db:
+            geheim = db.get(AppGeheim, gid)
+            assert geheim is not None and geheim.ciphertext == b"c" * 48 and db.get(KluisAfgifte, rid) is not None
+            db.execute(sa.delete(AppGeheim))
+            db.execute(sa.delete(KluisAfgifte))
+            db.commit()
+        migrations.downgrade(lege_db, "0023")
+        assert not {"app_geheim", "app_geheim_bewaard"} & set(sa.inspect(engine).get_table_names())
+        migrations.upgrade(lege_db, "0024")
+    finally:
+        engine.dispose()

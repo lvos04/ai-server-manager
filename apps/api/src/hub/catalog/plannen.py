@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 from asm_policy._asf_c12 import is_secret_name, secret_text_reasons
 from asm_policy.canonical import CanonicalError, canonical_json, canonical_sha256
-from asm_policy.catalogbinding import regels_voor_record
+from asm_policy.catalogbinding import koppelbaar, regels_voor_record
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from hub.actions import service
 from hub.actions.beleid import get_policy
+from hub.catalog import kluis
 from hub.catalog.appstore import APPSTORE_APP_ID
 from hub.catalog.asf.manifest.model import Parameter, PostInstallCheck
 from hub.catalog.asf.manifest.translate import Target, _check_value, is_secret, translate
@@ -371,6 +372,8 @@ def maak_plan(
         status, reden = "klaar_voor_voorstel", None
     else:
         status, reden = "geblokkeerd", "planner_niet_klaar"
+    # Een koppelbare eigen dienst (§8.3): adres en vingerafdruk staan vast in de binding en in de preview.
+    koppeling = kluis.koppeling(db, settings, keyring) if koppelbaar(regel) else None
     now = utcnow()
     plan = CatalogPlan(
         id=plan_id,
@@ -379,7 +382,14 @@ def maak_plan(
         app_name=app_name,
         instance_id=uuid.UUID(vijf["instance"]["instance_id"]),
         planner_service_id=svc.id,
-        binding={**vijf, "plan_id": str(plan_id), "step_id": stap["id"], "plan_etag": view["etag"], "vault_refs": []},
+        binding={
+            **vijf,
+            "plan_id": str(plan_id),
+            "step_id": stap["id"],
+            "plan_etag": view["etag"],
+            "vault_refs": [],
+            "koppeling": koppeling,
+        },
         plan_etag=view["etag"],
         step_id=stap["id"],
         stap_sha256=_stap_sha(stap),
@@ -432,6 +442,8 @@ def plan_dict(plan: CatalogPlan) -> dict[str, Any]:
         "expires_at": iso(plan.expires_at),
         "request_id": str(plan.request_id) if plan.request_id else None,
         "release": plan.binding.get("release"),
+        # Niet geheim: "koppelt met de Hub" met adres en vingerafdruk (§8.3); nooit het token.
+        "koppeling": plan.binding.get("koppeling"),
         "registratie": plan.registratie,
         "melding": plan.melding,
         "controles_na_installatie": openbare_controles(plan.controles_na_installatie),
@@ -532,8 +544,13 @@ def stel_stap_voor(
             {"status": plan.status},
         )
     voorstel = _plan_nu(db, settings, keyring, plan)
-    parameters = {**dict(voorstel["parameters"]), "catalog_binding": plan.binding}
     rec = plan.binding["provenance"]["record"]
+    [regel] = regels_voor_record(get_policy().catalogus, rec)  # _plan_nu toetste de witte lijst al
+    if any(p["type"] == "appgeheim" for p in regel["kluisplekken"]):
+        # §8.3: revisies en waarden ontstaan bij het voorstel; alleen verwijzingen gaan het verzoek in.
+        values = ((voorstel.get("parameters") or {}).get("app_create") or {}).get("values")
+        plan.binding = {**plan.binding, "vault_refs": kluis.bind_geheimen(db, vault, plan, regel, values)}
+    parameters = {**dict(voorstel["parameters"]), "catalog_binding": plan.binding}
     uit = service.stel_voor(
         db,
         settings,

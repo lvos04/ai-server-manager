@@ -231,6 +231,7 @@ def catalog_binding(regel: dict[str, Any], app: str = CAT_APP, **change: Any) ->
             "expected_version": "absent",
         },
         "vault_refs": [],
+        "koppeling": None,
     }
     b.update(change)
     return b

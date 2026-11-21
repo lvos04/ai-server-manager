@@ -22,6 +22,7 @@ EXEMPT: dict[str, str] = {
     "services.py:create_enrollment_token": "enrollment-token maken (contract 1.3 §5)",
     "services.py:create_pairing_code": "koppelcode maken (contract 1.3 §5)",
     "services.py:enroll": "services/enroll (contract 1.3 §3.3, §5)",
+    "kluis.py:secret_claim": "eenmalige claim per request_id, nooit een tweede afgifte (contract 1.3 §8.3)",
     "services.py:rotate_self": "services/self/rotate (contract 1.3 §5)",
     # Noodaccount instellen, roteren en bevestigen: geeft een geheim één keer terug of bevestigt een eenmalige TOTP.
     "breakglass.py:setup": "noodaccount instellen: TOTP-geheim één keer (contract 1.3 §5)",

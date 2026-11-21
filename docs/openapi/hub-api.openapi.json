@@ -2424,6 +2424,33 @@
         "title": "Readings",
         "type": "object"
       },
+      "RefIn": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "pattern": "^values\\.envs\\[[0-9]{1,3}\\]\\.value$",
+            "title": "Path",
+            "type": "string"
+          },
+          "ref": {
+            "pattern": "^vault://app/[a-z0-9][a-z0-9_-]{0,63}/[a-z0-9_.-]{1,128}$",
+            "title": "Ref",
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "ref",
+          "revision"
+        ],
+        "title": "RefIn",
+        "type": "object"
+      },
       "RegelIn": {
         "additionalProperties": false,
         "description": "Contract 1.3 §6.1 (RV11): ``op`` een tijd met tijdzone, ``trace_id`` een UUID; invoer ``bericht`` 1–8000 tekens\n(langer → 422, nooit eerst afkappen); opslag daarna hooguit 2000 tekens, gemarkeerd als ingekort.",
@@ -3059,6 +3086,83 @@
           "status"
         ],
         "title": "Schakel",
+        "type": "object"
+      },
+      "SecretClaimIn": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "handtekening": {
+            "description": "Ed25519, executor-identiteit.",
+            "maxLength": 86,
+            "minLength": 86,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Handtekening",
+            "type": "string"
+          },
+          "instance_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "issued_at": {
+            "maxLength": 32,
+            "title": "Issued At",
+            "type": "string"
+          },
+          "nonce": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Nonce",
+            "type": "string"
+          },
+          "ontvanger": {
+            "description": "Publieke X25519-sleutel.",
+            "maxLength": 43,
+            "minLength": 43,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Ontvanger",
+            "type": "string"
+          },
+          "refs": {
+            "items": {
+              "$ref": "#/components/schemas/RefIn"
+            },
+            "maxItems": 20,
+            "title": "Refs",
+            "type": "array"
+          },
+          "request_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "request_sha256": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Request Sha256",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "request_id",
+          "request_sha256",
+          "nonce",
+          "approval_id",
+          "instance_id",
+          "refs",
+          "token",
+          "ontvanger",
+          "issued_at",
+          "handtekening"
+        ],
+        "title": "SecretClaimIn",
         "type": "object"
       },
       "SendIn": {
@@ -8051,6 +8155,58 @@
         "summary": "Event ontvangen (service-token); dedupe op event_id en bron-id",
         "tags": [
           "events en connector"
+        ]
+      }
+    },
+    "/api/v1/executor/secret-claims": {
+      "post": {
+        "operationId": "secret_claim_api_v1_executor_secret_claims_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretClaimIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Secret Claim Api V1 Executor Secret Claims Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "afgifte_geweigerd"
+          },
+          "409": {
+            "description": "afgifte_past_niet of afgifte_al_geclaimd"
+          },
+          "410": {
+            "description": "afgifte_verlopen"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eenmalige afgifte van kluiswaarden aan de gekoppelde executor (service-token + gepinde identiteit)",
+        "tags": [
+          "kluisafgifte"
         ]
       }
     },

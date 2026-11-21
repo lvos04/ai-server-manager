@@ -15,7 +15,7 @@ import pytest
 
 PV2 = Path(__file__).resolve().parents[4] / "docs" / "platform-v2"
 # Contract 1.3 bevat C-12 (ADR-0031), catalogusbeschikbaarheid, bron- en doelbinding en de geheime overdracht (M2).
-BRON_COMMIT = "contracttekst S-P2-050e (M2, correctie bij de bouw)"
+BRON_COMMIT = "d392f5277490ba391c346b4b72e7f7a6d9546bc0 (M2 met correctie, S-P2-050e)"
 PINS = {
     "PLATFORM_CONTRACTEN.md": "5dbb601184f58d9f3af0cd76b1b23f516454768ec17ca70b26cfc00ee6631102",
     "CONTRACT_1.3_CONFORMITEIT.md": "b5ebba073a8fe8beb715d58e6760feae38e33ad445956d107e64840133dd7924",

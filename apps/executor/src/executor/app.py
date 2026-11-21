@@ -70,6 +70,7 @@ from executor.hublink import (
     verify_hub_authorization,
 )
 from executor.journal import Journal, JournalUnavailable
+from executor.kluis import Kluis
 from executor.naslink import MAX_KEY_LEN, NasLinkConflict, NasLinkOnleesbaar, NasLinkStore
 from executor.replay import ReplayCache, ReplayUnavailable
 from executor.statuspagina import HERSTEL, executor_page, onleesbaar_melding, vingerafdruk_melding
@@ -328,6 +329,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settle_seconds=settings.readback_wait_seconds,
             poll_seconds=settings.readback_poll_seconds,
             timeout=settings.truenas_timeout_seconds,
+            kluis=Kluis(store, settings.secrets_dir, allow_loopback=settings.allow_loopback_hub),
         )
         if policy is not None
         else None

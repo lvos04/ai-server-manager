@@ -57,6 +57,9 @@ SCHEMA = (
     "CREATE TABLE IF NOT EXISTS app_values ("
     " request_id TEXT PRIMARY KEY, app TEXT NOT NULL, box TEXT NOT NULL, created_at INTEGER NOT NULL)",
     "CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS kluismarkering ("
+    " request_id TEXT PRIMARY KEY, app TEXT NOT NULL, nas_fingerprint TEXT NOT NULL, plekken TEXT NOT NULL,"
+    " created_at INTEGER NOT NULL)",
 )
 
 
@@ -227,6 +230,21 @@ class Journal:
         except (NasLinkOnleesbaar, ValueError):
             raise JournalUnavailable("app_values") from None
         return str(row[0]), values if isinstance(values, dict) else {}
+
+    # ------------------------------------------------------------------ kluismarkering (contract 1.3 §8.3)
+    def markeer_kluis(self, request_id: str, app: str, nas_fingerprint: str, plekken: list[dict[str, str]]) -> None:
+        """Vóór de schrijfaanroep: deze instantie krijgt plekken uit de kluis. Nooit een waarde of hash."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO kluismarkering (request_id, app, nas_fingerprint, plekken, created_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (request_id, app, nas_fingerprint, json.dumps(plekken, sort_keys=True), int(time.time())),
+            )
+
+    def kluis_gemarkeerd(self, app: str) -> bool:
+        """Onleesbaar journaal: :class:`JournalUnavailable` (de aanroeper weigert dan, §8.3)."""
+        with self._connect() as conn:
+            return conn.execute("SELECT 1 FROM kluismarkering WHERE app = ?", (app,)).fetchone() is not None
 
     # ------------------------------------------------------------------ gestopt na een afwijking
     @staticmethod

@@ -44,6 +44,7 @@ from asm_policy.params import IX_APP, expected_image, validate_parameters, vault
 from asm_policy.verify import Weigering, check_decision, check_envelope
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from executor import kluis as kluismod
 from executor.journal import Journal, JournalUnavailable
 from executor.naslink import NasLinkOnleesbaar, NasLinkStore
 from executor.truenas import NasClient, NasFout
@@ -178,8 +179,9 @@ class Uitvoerder:
         settle_seconds: float = 60.0,
         poll_seconds: float = 1.0,
         timeout: float = 15.0,
+        kluis: kluismod.Kluis | None = None,
     ) -> None:
-        self.policy, self.journal, self.naslink = policy, journal, naslink
+        self.policy, self.journal, self.naslink, self.kluis = policy, journal, naslink, kluis
         self.settle_seconds, self.poll_seconds, self.timeout = settle_seconds, poll_seconds, timeout
         self.write_methods = frozenset(
             m for a in policy.acties.values() if a.uitvoerder == "executor" for m in a.truenas
@@ -274,7 +276,8 @@ class Uitvoerder:
                     if wil_ix
                     else "Deze app is een Custom App; een catalogusversie kiezen kan alleen bij een catalogusapp.",
                 )
-        if aid == "app.install" and vault_refs(params):
+        if aid == "app.install" and vault_refs(params) and "catalog_binding" not in params:
+            # Zonder binding geen kluisplekken; met binding toetst catalogbinding ze tegen de eigen regel (§8.3).
             return "", fout(
                 501,
                 "capability_unavailable",
@@ -293,7 +296,14 @@ class Uitvoerder:
         return nodig[0], None
 
     def _voer_uit(
-        self, nas: NasClient, methode: str, actie: ActieDef, prop: Mapping[str, Any], doel: Doel, request_id: str
+        self,
+        nas: NasClient,
+        methode: str,
+        actie: ActieDef,
+        prop: Mapping[str, Any],
+        doel: Doel,
+        request_id: str,
+        gevuld: Mapping[str, Any] | None = None,
     ) -> None:
         params, name = prop["parameters"], doel.naam
         t = float(actie.timeout_seconden)
@@ -309,7 +319,8 @@ class Uitvoerder:
                 "catalog_app": ac["catalog_app"],
                 "train": ac["train"],
                 "version": ac["version"],
-                "values": ac["values"],
+                # De ingevulde tijdelijke kopie (§8.3) gaat alleen hierheen, nooit naar log of journaal.
+                "values": ac["values"] if gevuld is None else gevuld,
             }
             nas.job(methode, body, timeout=t, poll=self.poll_seconds)
         elif aid == "app.uninstall":
@@ -486,6 +497,21 @@ class Uitvoerder:
             return _weiger(w)
         if actie is None:  # pragma: no cover - check_decision geeft dan altijd een weigering
             return fout(403, "actie_niet_toegestaan", "Deze actie staat niet op de allowlist.")
+        params = prop["parameters"]
+        if (actie.action_id == "app.update" and "image" in params) or (
+            actie.action_id == "app.rollback" and "herstel_van" in params
+        ):
+            try:
+                gemarkeerd = self.journal.kluis_gemarkeerd(str(doelnaam))
+            except JournalUnavailable:
+                gemarkeerd = True  # een onleesbare lijst weigert elke actie over dit pad (§8.3)
+            if gemarkeerd:
+                return fout(
+                    409,
+                    "kluisplekken_recept_ontbreekt",
+                    "Deze app kreeg bij de installatie geheimen uit de kluis. Bijwerken of terugzetten via de waarden "
+                    "kan pas met het recept met alleen verwijzingen; er is niets uitgevoerd.",
+                )
         link = self.naslink.read()
         if link.get("_onleesbaar"):
             # Onleesbare sleutelopslag (rechten, eigenaar, symlink, schema): dezelfde code als een sleutel die niet te
@@ -632,6 +658,23 @@ class Uitvoerder:
                 str(approval["one_time_nonce"]), str(approval["approval_id"])
             ):
                 return fout(409, "goedkeuring_al_gebruikt", "Deze goedkeuring is al eens gebruikt; keur opnieuw goed.")
+            gevuld: dict[str, Any] | None = None
+            regel = kluismod.regel_van(policy, prop["parameters"]) if actie.action_id == "app.install" else None
+            if regel is not None:
+                try:
+                    if self.kluis is None:
+                        melding = "Deze executor kan geen geheimen ophalen; er is niets geïnstalleerd."
+                        raise kluismod.KluisFout(503, "kluis_afgifte_mislukt", melding)
+                    gevuld = self.kluis.vul(regel, request)
+                except kluismod.KluisFout as exc:
+                    return fout(exc.status, exc.code, exc.melding)
+                # Vóór de schrijfaanroep: ook een onderbroken installatie blijft gemarkeerd (fail-closed).
+                self.journal.markeer_kluis(
+                    request_id,
+                    doel.naam,
+                    str(link["fingerprint"]),
+                    kluismod.markering(regel, prop["parameters"]["catalog_binding"]),
+                )
             # Lopend vanaf vóór de rij "gestart" tot na het einde ervan: zolang telt de rij niet als onafgemaakt.
             with self.journal.lopend(nonce):
                 self.journal.begin(
@@ -653,7 +696,7 @@ class Uitvoerder:
                         ",".join(hercontrole["codes"]),
                     )
                 return self._uitvoeren_en_teruglezen(
-                    nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, hercontrole
+                    nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, hercontrole, gevuld
                 )
         finally:
             nas.close()
@@ -717,10 +760,11 @@ class Uitvoerder:
         nonce: str,
         verwachte_image: Mapping[str, Any] | None,
         hercontrole: Mapping[str, Any] | None = None,
+        gevuld: Mapping[str, Any] | None = None,
     ) -> Uitkomst:
         mislukt: NasFout | None = None
         try:
-            self._voer_uit(nas, methode, actie, prop, doel, request_id)
+            self._voer_uit(nas, methode, actie, prop, doel, request_id, gevuld)
         except NasFout as exc:
             mislukt = exc
         except Exception as exc:

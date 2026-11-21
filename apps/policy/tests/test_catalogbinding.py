@@ -114,7 +114,10 @@ BINDING_RIJEN: list[tuple[str, dict[str, Any], str]] = [
      {"release": {"catalog": {"train": "stable", "app": "ix-app", "version": "1.4.9"}, "image_digests": [DIGEST]}},
      "release_verschilt"),
     ("kluisplekken", {"vault_refs": [{"path": "x", "parameter": "y", "ref": "vault://app/demo-app/y"}]},
-     "kluis_nog_niet_beschikbaar"),
+     "kluisplek_past_niet"),
+    ("koppeling zonder tokenplek", {"koppeling": {"soort": "volledig", "hub_url": "https://hub.test",
+                                                  "hub_key_fingerprint": "ABCD-EFGH-JKMN-PQRS"}},
+     "koppeling_past_niet"),
     ("plan-ID geen UUID", {"plan_id": "mijn-plan"}, "patroon"),
     ("onbekend veld", {"trusted_app_id": True}, "onbekend_veld"),
 ]  # fmt: skip
@@ -125,7 +128,7 @@ def test_afwijkende_binding_wordt_geweigerd(beleid: Any, naam: str, wijzig: dict
     assert code in _codes(beleid, _params(**wijzig)), naam
 
 
-@pytest.mark.parametrize("weg", ["provenance", "release", "instance", "vault_refs", "plan_etag"])
+@pytest.mark.parametrize("weg", ["provenance", "release", "instance", "vault_refs", "koppeling", "plan_etag"])
 def test_ontbrekend_bindingsveld_wordt_geweigerd(beleid: Any, weg: str) -> None:
     p = _params()
     del p["catalog_binding"][weg]
@@ -194,7 +197,16 @@ def test_ex47_blijft_gelden_met_een_geldige_binding(beleid: Any) -> None:
 
 
 REGEL_FOUTEN: list[tuple[str, dict[str, Any], str]] = [
-    ("kluisplekken", {"kluisplekken": ["x"]}, "kluisplekken zijn in deze versie niet toegestaan"),
+    ("kluisplek geen object", {"kluisplekken": ["x"]}, "verwacht precies env en type"),
+    ("token op een andere plek", {"kluisplekken": [{"env": "APP_TOKEN", "type": "enrollment-token"}]},
+     "alleen op HUB_ENROLLMENT_TOKEN"),
+    ("appgeheim op HUB_*", {"kluisplekken": [{"env": "HUB_SECRET", "type": "appgeheim"}]}, "geheimnaam buiten HUB_*"),
+    ("appgeheim zonder geheimnaam", {"kluisplekken": [{"env": "APP_MODE", "type": "appgeheim"}]},
+     "geheimnaam buiten HUB_*"),
+    ("appgeheim op een accountnaam", {"kluisplekken": [{"env": "ADMIN_PASSWORD", "type": "appgeheim"}]},
+     "nooit op een account"),
+    ("onbekend type", {"kluisplekken": [{"env": "APP_SECRET", "type": "wachtwoord"}]}, "alleen appgeheim"),
+    ("dubbele plek", {"kluisplekken": [{"env": "APP_SECRET", "type": "appgeheim"}] * 2}, "dubbel"),
     ("http-url", {"source": {"source_id": BRON_ID, "url": "http://forge.test/a/b", "subpath": None, "path": "m.yaml",
                              "commit": "c" * 40}},
      "source.url"),
@@ -290,3 +302,73 @@ def test_readback_alleen_eenduidig_bewijs(
 def test_readback_zonder_binding_verandert_niets() -> None:
     assert readback_digest_afwijking(install_params("demo-app"), [], []) is None
     assert copy.deepcopy(install_params("demo-app")) == install_params("demo-app")
+
+
+# ------------------------------------------------------------------ kluisplekken en koppeling (§8.3, M2)
+KLUISPLEKKEN = [
+    {"env": "APP_SECRET_KEY", "type": "appgeheim"},
+    {"env": "HUB_ENROLLMENT_TOKEN", "type": "enrollment-token"},
+]
+KOPPELING = {"soort": "volledig", "hub_url": "https://hub.test", "hub_key_fingerprint": "ABCD-EFGH-JKMN-PQRS"}
+KLUISREF = "vault://app/demo-app/app_secret_key"
+REVISIE = "44444444-4444-4444-8444-444444444444"
+
+
+@pytest.fixture(scope="module")
+def kluisbeleid(tmp_path_factory: pytest.TempPathFactory) -> Any:
+    regel = catalogus_regel(kluisplekken=KLUISPLEKKEN)
+    return load_policy(policy_met_regels(tmp_path_factory.mktemp("k") / "policy", [regel]))
+
+
+def _kluisparams(envs: Any = None, **binding_change: Any) -> dict[str, Any]:
+    regel = catalogus_regel(kluisplekken=KLUISPLEKKEN)
+    ref = {"path": "values.envs[1].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": REVISIE}
+    wijzig = {"vault_refs": [ref], "koppeling": KOPPELING, **binding_change}
+    p = install_params(
+        "demo-app", envs=envs or [{"name": "APP_MODE", "value": "a"}, {"name": "APP_SECRET_KEY", "value": KLUISREF}]
+    )
+    p["catalog_binding"] = catalog_binding(regel, **wijzig)
+    p["manifest"]["manifest_sha256"] = regel["manifest_sha256"]
+    return p
+
+
+def test_kluisplek_en_koppeling_zoals_de_regel_vraagt(kluisbeleid: Any) -> None:
+    assert _codes(kluisbeleid, _kluisparams()) == []
+
+
+KLUIS_RIJEN: list[tuple[str, Any, dict[str, Any], str]] = [
+    ("ontbrekende ref", None, {"vault_refs": []}, "kluisplek_past_niet"),
+    ("extra ref", None, {"vault_refs": [
+        {"path": "values.envs[1].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": REVISIE},
+        {"path": "values.envs[0].value", "parameter": "app_mode", "ref": KLUISREF, "revision": REVISIE}]},
+     "kluisplek_past_niet"),
+    ("ander pad", None, {"vault_refs": [
+        {"path": "values.envs[0].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": REVISIE}]},
+     "kluisplek_past_niet"),
+    ("revisie geen UUID", None, {"vault_refs": [
+        {"path": "values.envs[1].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": "r1"}]},
+     "kluisplek_past_niet"),
+    ("plek zonder verwijzing", [{"name": "APP_SECRET_KEY", "value": "klaar"}], {}, "kluisplek_past_niet"),
+    ("andere kluisverwijzing in de payload",
+     [{"name": "APP_SECRET_KEY", "value": KLUISREF}, {"name": "API_TOKEN", "value": "vault://app/demo-app/api_token"}],
+     {"vault_refs": [
+         {"path": "values.envs[0].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": REVISIE}]},
+     "kluisplek_past_niet"),
+    ("koppeling ontbreekt bij een tokenplek", None, {"koppeling": None}, "koppeling_past_niet"),
+    ("koppeling met andere soort", None, {"koppeling": {**KOPPELING, "soort": "half"}}, "koppeling_past_niet"),
+    ("koppeling met ongeldige vingerafdruk", None, {"koppeling": {**KOPPELING, "hub_key_fingerprint": "x"}},
+     "koppeling_past_niet"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("naam", "envs", "wijzig", "code"), KLUIS_RIJEN, ids=[r[0] for r in KLUIS_RIJEN])
+def test_afwijkende_kluisbinding_wordt_geweigerd(
+    kluisbeleid: Any, naam: str, envs: Any, wijzig: Any, code: str
+) -> None:
+    assert code in _codes(kluisbeleid, _kluisparams(envs, **wijzig)), naam
+
+
+def test_hub_variabele_in_de_payload_blijft_gereserveerd(kluisbeleid: Any) -> None:
+    envs = [{"name": "APP_SECRET_KEY", "value": KLUISREF}, {"name": "HUB_URL", "value": "https://x.test"}]
+    ref = {"path": "values.envs[0].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": REVISIE}
+    assert "reserved_env" in _codes(kluisbeleid, _kluisparams(envs, vault_refs=[ref]))

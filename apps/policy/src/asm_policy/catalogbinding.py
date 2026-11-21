@@ -6,8 +6,9 @@ bij die regel passen. De executor kent geen appstore of planner; deze regel is z
 daarnaast zelf de handtekening van de appstore (``hub.catalog.plannen``); dat kan de executor niet.
 
 Fail-closed: een onbekend, ontbrekend of afwijkend veld, een lege witte lijst of meer dan één passende regel geeft een
-:class:`~asm_policy.params.Fout`, nooit een stilzwijgende vrijgave. Kluisplekken blijven dicht tot deel E: de lijst
-``vault_refs`` moet leeg zijn.
+:class:`~asm_policy.params.Fout`, nooit een stilzwijgende vrijgave. Kluisplekken (§8.3, M2): alleen wat de eigen regel
+als ``kluisplekken`` noemt, met precies de verwijzingen en revisies uit ``vault_refs`` en de ``koppeling`` die bij een
+koppelbare eigen dienst hoort. Het type van een plek volgt alleen uit de regel.
 """
 
 from __future__ import annotations
@@ -16,9 +17,11 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from asm_policy._asf_c12 import has_account_word, is_login_name, is_secret_name
 from asm_policy.params import (
     APP_NAME_RE,
     CATALOG_APP_RE,
+    ENV_NAME_RE,
     IX_APP,
     SHA_RE,
     TRAIN_RE,
@@ -52,6 +55,7 @@ BINDING_KEYS = {
     "plan_etag",
     "instance",
     "vault_refs",
+    "koppeling",
 }
 # Het getekende record: de bestaande velden van ``SignedProvenance.record`` plus de aanvullingen van §8.1.
 RECORD_KEYS = {
@@ -90,6 +94,14 @@ REGEL_KEYS = {
 REGEL_SOURCE_KEYS = {"source_id", "url", "subpath", "path", "commit"}
 VELD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 CATALOG_KEYS = {"train", "app", "version"}
+# §8.3: precies twee gebonden typen; het enrollment-token heeft één vaste plek.
+APPGEHEIM, TOKEN = "appgeheim", "enrollment-token"
+TOKEN_ENV = "HUB_ENROLLMENT_TOKEN"  # noqa: S105 - de naam van de plek, geen waarde
+VORM = {APPGEHEIM: re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{42}$"), TOKEN: re.compile(r"^enr_[A-Za-z0-9_-]{43}$")}
+VAULT_REF_KEYS = {"path", "parameter", "ref", "revision"}
+KOPPELING_KEYS = {"soort", "hub_url", "hub_key_fingerprint"}
+HUB_URL_RE = re.compile(r"^https?://[A-Za-z0-9.:\[\]-]{1,253}$")
+FINGERPRINT_RE = re.compile(r"^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$")
 
 
 class RegelFout(ValueError):
@@ -131,9 +143,6 @@ def laad_regels(raw: Any) -> tuple[dict[str, Any], ...]:
         digests = r["image_digests"]
         if not isinstance(digests, list) or not digests or len(set(digests)) != len(digests):
             raise RegelFout(f"{w}.image_digests: verwacht een niet-lege lijst zonder dubbelen")
-        if r["kluisplekken"] != []:
-            # Kluisplekken openen pas in deel E (ADR-0032 besluit 4); tot dan is elke regel zonder geheimen.
-            raise RegelFout(f"{w}.kluisplekken: kluisplekken zijn in deze versie niet toegestaan")
         regel: dict[str, Any] = {
             "app_id": _regel_tekst(r["app_id"], f"{w}.app_id", APP_NAME_RE, 64),
             "version": _regel_tekst(r["version"], f"{w}.version", VERSION_RE, 32),
@@ -154,12 +163,94 @@ def laad_regels(raw: Any) -> tuple[dict[str, Any], ...]:
             "publisher_key_sha256": _regel_tekst(r["publisher_key_sha256"], f"{w}.publisher_key_sha256", SHA_RE),
             # Het veldschema van deze versie: de toegestane velden onder ``app_create.values`` (R-VEILIG-4).
             "formuliervelden": sorted(_regel_tekst(v, f"{w}.formuliervelden", VELD_RE, 64) for v in velden),
-            "kluisplekken": [],
+            "kluisplekken": _kluisplekken(r["kluisplekken"], f"{w}.kluisplekken"),
         }
         if any(".." in (p or "").split("/") for p in (regel["source"]["subpath"], regel["source"]["path"])):
             raise RegelFout(f"{w}.source: '..' is geen geldig paddeel")
         out.append(regel)
     return tuple(out)
+
+
+def _kluisplekken(raw: Any, w: str) -> list[dict[str, str]]:
+    """``[{env, type}]`` (§8.3): een appgeheim op een geheimnaam buiten ``HUB_*``; het token op zijn vaste plek."""
+    if not isinstance(raw, list):
+        raise RegelFout(f"{w}: verwacht een lijst")
+    out: dict[str, dict[str, str]] = {}
+    for j, p in enumerate(raw):
+        if not isinstance(p, Mapping) or set(p) != {"env", "type"}:
+            raise RegelFout(f"{w}[{j}]: verwacht precies env en type")
+        env = _regel_tekst(p["env"], f"{w}[{j}].env", ENV_NAME_RE, 128)
+        if p["type"] == TOKEN:
+            if env != TOKEN_ENV:
+                raise RegelFout(f"{w}[{j}]: het enrollment-token staat alleen op {TOKEN_ENV}")
+        elif p["type"] == APPGEHEIM:
+            if env.upper().startswith("HUB_") or not is_secret_name(env) or has_account_word(env) or is_login_name(env):
+                raise RegelFout(f"{w}[{j}]: een appgeheim staat op een geheimnaam buiten HUB_* en nooit op een account")
+        else:
+            raise RegelFout(f"{w}[{j}].type: alleen {APPGEHEIM} of {TOKEN}")
+        if env in out:
+            raise RegelFout(f"{w}[{j}]: plek {env} staat er dubbel in")
+        out[env] = {"env": env, "type": p["type"]}
+    return [out[k] for k in sorted(out)]
+
+
+def koppelbaar(regel: Mapping[str, Any]) -> bool:
+    """Een regel met een tokenplek is een koppelbare eigen dienst (§8.3)."""
+    return any(p["type"] == TOKEN for p in regel["kluisplekken"])
+
+
+def kluisrefs(regel: Mapping[str, Any], values: Any, app_id: str) -> list[dict[str, str]] | None:
+    """Per appgeheim-plek ``{path, parameter, ref}`` uit de payload, in de volgorde van de regel. ``None`` als een
+    plek ontbreekt, dubbel staat of niet precies de verwijzing ``vault://app/<app_id>/<parameter>`` draagt."""
+    envs = values.get("envs") if isinstance(values, Mapping) else None
+    envs = envs if isinstance(envs, list) else []
+    out: list[dict[str, str]] = []
+    for plek in regel["kluisplekken"]:
+        if plek["type"] != APPGEHEIM:
+            continue
+        parameter = plek["env"].lower()
+        ref = f"vault://app/{app_id}/{parameter}"
+        idx = [i for i, e in enumerate(envs) if isinstance(e, Mapping) and e.get("name") == plek["env"]]
+        if len(idx) != 1 or envs[idx[0]].get("value") != ref:
+            return None
+        out.append({"path": f"values.envs[{idx[0]}].value", "parameter": parameter, "ref": ref})
+    return out
+
+
+def _kluis(regel: Mapping[str, Any], b: Mapping[str, Any], params: Mapping[str, Any], app_id: str) -> list[Fout]:
+    """``vault_refs`` en ``koppeling`` precies zoals de eigen regel en de payload ze vragen (§8.3)."""
+    w = "parameters.catalog_binding"
+    ac = params.get("app_create") if isinstance(params.get("app_create"), Mapping) else {}
+    assert isinstance(ac, Mapping)
+    out: list[Fout] = []
+    verwacht = kluisrefs(regel, ac.get("values"), app_id)
+    refs = b["vault_refs"]
+    goed = isinstance(refs, list) and all(
+        isinstance(r, Mapping)
+        and set(r) == VAULT_REF_KEYS
+        and isinstance(r["revision"], str)
+        and UUID_RE.fullmatch(r["revision"]) is not None
+        for r in refs
+    )
+    if verwacht is None or not goed or [{k: r[k] for k in ("path", "parameter", "ref")} for r in refs] != verwacht:
+        out.append(_f(f"{w}.vault_refs", "kluisplek_past_niet", "de kluisplekken passen niet bij de toegelaten regel"))
+    elif vault_refs(params) != sorted(r["ref"] for r in verwacht):
+        out.append(_f(f"{w}.vault_refs", "kluisplek_past_niet", "een andere kluisverwijzing in de payload"))
+    k = b["koppeling"]
+    if koppelbaar(regel):
+        if not (
+            isinstance(k, Mapping)
+            and set(k) == KOPPELING_KEYS
+            and k["soort"] == "volledig"
+            and isinstance(k["hub_url"], str)
+            and HUB_URL_RE.fullmatch(k["hub_url"]) is not None
+            and isinstance(k["hub_key_fingerprint"], str)
+            and FINGERPRINT_RE.fullmatch(k["hub_key_fingerprint"]) is not None
+        ):
+            out.append(_f(f"{w}.koppeling", "koppeling_past_niet", "een koppelbare eigen dienst vraagt de koppeling"))
+    elif k is not None:
+        out.append(_f(f"{w}.koppeling", "koppeling_past_niet", "deze regel koppelt niet met de Hub"))
+    return out
 
 
 # ------------------------------------------------------------------ zoeken
@@ -239,8 +330,6 @@ def controleer(regels: tuple[dict[str, Any], ...], params: Mapping[str, Any], ta
     out += _text(b["step_id"], f"{w}.step_id", max_len=64, pattern=STEP_RE)
     out += _text(b["plan_etag"], f"{w}.plan_etag", max_len=122, pattern=ETAG_RE)
     out += _instance(b["instance"], f"{w}.instance", target, ac.get("app_name"))
-    if b["vault_refs"] != [] or vault_refs(params):
-        out.append(_f(f"{w}.vault_refs", "kluis_nog_niet_beschikbaar", "kluisplekken openen pas in deel E"))
     prov = b["provenance"]
     out += _only(prov, f"{w}.provenance", {"record", "signature", "key_id", "alg"}, {"record", "signature", "key_id"})
     if not isinstance(prov, Mapping) or out:
@@ -261,6 +350,7 @@ def controleer(regels: tuple[dict[str, Any], ...], params: Mapping[str, Any], ta
         code = "catalogusversie_niet_toegelaten" if not passend else "catalogusregel_dubbelzinnig"
         return [_f(f"{w}.provenance.record", code, "Geen eenduidige geverifieerde catalogusregel.")]
     regel = passend[0]
+    out += _kluis(regel, b, params, str(record.get("app_id")))
     if rel.get("catalog") != regel["catalog"] or rel.get("image_digests") != regel["image_digests"]:
         out.append(_f(f"{w}.release", "release_verschilt", "de release past niet bij de toegelaten regel"))
     # De payload moet precies de toegelaten catalogusversie installeren.

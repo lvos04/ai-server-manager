@@ -27,7 +27,7 @@ from sqlalchemy import select
 from hub import audit
 from hub.actions import beleid, service
 from hub.actions import blokkades as blok_mod
-from hub.catalog import plannen
+from hub.catalog import kluis, plannen
 from hub.deps import (
     DB,
     Admin,
@@ -199,6 +199,18 @@ def propose(
             422,
             "catalog_binding_alleen_via_plan",
             "Een catalogusinstallatie loopt via /api/v1/catalog/plans; een eigen catalog_binding wordt geweigerd.",
+        )
+    doelnaam = body.target.get("app_id") if isinstance(body.target, dict) else None
+    if (
+        (body.action_id == "app.update" and "image" in body.parameters)
+        or (body.action_id == "app.rollback" and "herstel_van" in body.parameters)
+    ) and kluis.gemarkeerd(db, str(doelnaam)):
+        # §8.3: zonder recept met alleen verwijzingen zou app.config de ingevulde geheimen in het journaal brengen.
+        raise HubError(
+            409,
+            "kluisplekken_recept_ontbreekt",
+            "Deze app kreeg bij de installatie geheimen uit de kluis. Bijwerken of terugzetten via de waarden kan pas "
+            "met het recept met alleen verwijzingen; er is niets voorgesteld.",
         )
 
     def werk() -> tuple[int, dict[str, Any]]:

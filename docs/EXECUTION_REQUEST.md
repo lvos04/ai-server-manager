@@ -112,8 +112,10 @@ uitgevoerd:
 | er loopt al een uitvoering (de nonce is dan nog niet verbruikt) | `executor_bezet` (409) |
 | gestopt na een eerdere afwijking | `executor_gestopt` (409) |
 | journaal (eigen SQLite) niet beschikbaar | `journaal_niet_beschikbaar` (503) |
-| schrijfsleutel niet ingesteld, vault-verwijzing in de waarden, of TrueNAS kent geen van de methoden | `capability_unavailable` (501; `details.reden` = `schrijfsleutel_ontbreekt` of `vault_verwijzingen`, of `details.methoden` met de gezochte methoden) |
+| schrijfsleutel niet ingesteld, vault-verwijzing in de waarden zonder `catalog_binding`, of TrueNAS kent geen van de methoden | `capability_unavailable` (501; `details.reden` = `schrijfsleutel_ontbreekt` of `vault_verwijzingen`, of `details.methoden` met de gezochte methoden) |
 | schrijfsleutel of sleutelopslag onleesbaar | `schrijfsleutel_onleesbaar` (503) |
+| kluisplekken (contract 1.3 §8.3): de afgifte bij de Hub mislukt, een waarde past niet bij het type van haar plek, of de Hub-koppeling in het plan is niet die van deze executor | `kluis_afgifte_mislukt` (503), `kluis_vorm_ongeldig` (422), `koppeling_past_niet` (409) |
+| `app.update` met `image` of `app.rollback` met `herstel_van` op een instantie met ingevulde kluisplekken, of de lijst daarvan is onleesbaar | `kluisplekken_recept_ontbreekt` (409) |
 | TrueNAS onbereikbaar, te traag, ander certificaat, sleutel geweigerd of zonder rechten | `truenas_onbereikbaar`, `truenas_timeout`, `certificaat_gewijzigd`, `sleutel_geweigerd`, `truenas_geen_toegang` (503) |
 | TrueNAS geeft een fout bij het lezen | `truenas_fout` (502) |
 

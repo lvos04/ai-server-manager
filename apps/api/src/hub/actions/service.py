@@ -44,6 +44,7 @@ from hub.actions import blokkades as blok_mod
 from hub.actions.beleid import get_policy
 from hub.actions.doel import Doel, DoelOnbekend, lees_doel
 from hub.actions.preview import SCHEMA, bouw, eigen_opdracht, toon_bewaarde_preview
+from hub.catalog import kluis
 from hub.config import Settings
 from hub.deps import Principal
 from hub.errors import HubError
@@ -488,7 +489,8 @@ def stel_voor(
         raise HubError(
             422, "parameters_ongeldig", "Doel of parameters voldoen niet aan het schema.", _fouten_dict(fouten)
         )
-    if aid == "app.install" and vault_refs(parameters):
+    if aid == "app.install" and vault_refs(parameters) and "catalog_binding" not in parameters:
+        # Met een catalogusbinding heeft validate_parameters de plekken al tegen de eigen regel getoetst (§8.3).
         raise HubError(
             501,
             "capability_unavailable",
@@ -1425,6 +1427,7 @@ def voer_uit(
             "De eigen controle van de Hub wees het uitvoeringsverzoek af; er is niets naar de executor gestuurd.",
             {"request_id": str(req.id), "code": eigen.code, "details": eigen.details},
         )
+    kluis.leg_afgifte_vast(db, req, ap, verzoek)  # §8.3: de hash van precies dit verzoek, vóór verzending
     bearer, _ = keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))
     try:
         res = servicecalls.call(

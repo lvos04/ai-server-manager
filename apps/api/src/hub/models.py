@@ -963,3 +963,29 @@ class CatalogPlan(Base):
     created_by: Mapped[str] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class AppGeheim(Base):
+    """Een appgeheim (contract 1.3 §8.3, M2): per instantie, ref en revisie versleuteld met de eigen ``vault.key``.
+    Gescheiden van de kluisruimtes van §3.10; geen ``last4``, hash of deel, alleen "gegenereerd" met datum."""
+
+    __tablename__ = "app_geheim"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    instance_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    ref: Mapped[str] = mapped_column(String(200))
+    revision: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
+class KluisAfgifte(Base):
+    """De afgifte bij één uitvoering (§8.3): vlak vóór verzending vastgelegd, één atomaire claim. Nooit een waarde of
+    een ophaalbaar antwoord."""
+
+    __tablename__ = "kluis_afgifte"
+    request_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    request_sha256: Mapped[str] = mapped_column(String(71))
+    expires_at: Mapped[datetime] = mapped_column(TS)
+    claimed_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TS, default=utcnow)

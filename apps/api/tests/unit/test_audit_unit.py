@@ -53,6 +53,7 @@ EXEMPT = {
     "events.py:apply": "501 capability_unavailable",
     "events.py:rollback": "501 capability_unavailable",
     "monitoring.py:heartbeat": "hartslag van een dienst (service-token), geen beheerhandeling",
+    "kluis.py:secret_claim": "auditrecord kluis.afgifte in hub.catalog.kluis.claim, alleen bij een afgifte (§8.3)",
     "logs.py:logs_ingest": "logregels van een dienst (service-token), geen beheerhandeling",
     "oidc.py:oidc_test_start": "start alleen een testlogin; het resultaat wordt in de callback geaudit",
 }
