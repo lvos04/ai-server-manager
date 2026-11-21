@@ -924,9 +924,20 @@ dicht zolang appstore en planner de §8.1/§8.2-aanvullingen niet leveren (zie m
   goedkeuring en uitvoering controleert de Hub plan en bewijs opnieuw. `POST /api/v1/actions` weigert een eigen
   `catalog_binding`. Na uitvoering meldt de Hub het stapresultaat met de eigen readback en registreert naam en
   digest; de status is `geinstalleerd_controles_open`, nooit gezond.
+- **Herstel na R-VEILIG (S-P2-050d).** De Hub valideert het oorspronkelijke manifest zelf met een kopie van het
+  gepinde schema (`hub/catalog/manifest-v1.schema.json`, `schema_sha256` van ASF_COMMIT; een regel met een ander
+  schema geeft geen plan) en toetst de ingevulde parameters vóór de planneraanroep: alleen gedeclareerde
+  `wizard`-/`dataset_picker`-parameters met het juiste type en zonder geheim (C-12). De regel noemt ook de bron-ID
+  en het veldschema (`formuliervelden`); item, versie, record en actieve bron (`trusted_key_id`) moeten dezelfde
+  bron en uitgeverssleutel noemen. De controles na installatie moeten gelijk zijn aan die uit het geverifieerde
+  manifest. Bij aanmaak bewaart de Hub de canonieke stapinhoud; vóór voorstel, goedkeuring en uitvoering vergelijkt
+  hij die, de vervaltijd, de planstatus en de voorgangers (een stap met voorganger blijft dicht tot er een eigen
+  bevestiging is). Een tegenstrijdige image-readback is een afwijking. Terug naar 0021 bewaart een gevulde
+  `catalog_plan` als `catalog_plan_bewaard`; opnieuw 0022 zet haar ongewijzigd terug.
 - **VERSIE 2.** Een aparte beheerdersselectie van bron en uitgever met eigen revisie (nu: de witte lijst onder de
-  `policy_hash`). Volledige hervalidatie van het manifest met de gepinde validator in de Hub (nu: de regel pint de
-  manifesthash). Een appstore-previewaanroep naast de planner. Kommagetallen in manifest of parameters (nu
+  `policy_hash`). De overige regels van de gepinde validator naast het schema (nu: het getekende record verklaart
+  `valid: true` en de regel pint de manifesthash). Een veldschema dieper dan het eerste niveau. Een eigen
+  bevestigingsroute voor handmatige voorgangers. Een appstore-previewaanroep naast de planner. Kommagetallen in manifest of parameters (nu
   geweigerd door de canonieke JSON). Hostpoort in de registratie uit de volgende inventaris (nu `null` met reden).
   Bevestigingsroute voor de controles na installatie. Koppeling van latere acties aan de registratie (F/G).
 

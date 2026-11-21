@@ -20,16 +20,30 @@ HOST = "nas-primary"
 
 def install_params(app: str = "demo-app", **values: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
-        "image": {"repository": "ghcr.io/voorbeeld/demo-app", "tag": f"1.2.3@{DIGEST}", "pull_policy": "missing"},
+        "image": {
+            "repository": "ghcr.io/voorbeeld/demo-app",
+            "tag": f"1.2.3@{DIGEST}",
+            "pull_policy": "missing",
+        },
         "restart_policy": "unless-stopped",
         "TZ": "Etc/UTC",
         "envs": [{"name": "APP_MODE", "value": "prod"}],
-        "ports": [{"bind_mode": "published", "port_number": 30555, "container_port": 8080, "protocol": "tcp"}],
+        "ports": [
+            {
+                "bind_mode": "published",
+                "port_number": 30555,
+                "container_port": 8080,
+                "protocol": "tcp",
+            }
+        ],
         "storage": [
             {
                 "type": "host_path",
                 "mount_path": "/data",
-                "host_path_config": {"path": "/mnt/testpool/apps/demo-app", "acl_enable": False},
+                "host_path_config": {
+                    "path": "/mnt/testpool/apps/demo-app",
+                    "acl_enable": False,
+                },
             }
         ],
         "resources": {"limits": {"cpus": 2, "memory": 1024}},
@@ -49,7 +63,10 @@ def install_params(app: str = "demo-app", **values: Any) -> dict[str, Any]:
 
 
 def proposal(
-    action_id: str, target: dict[str, Any], parameters: dict[str, Any] | None = None, **change: Any
+    action_id: str,
+    target: dict[str, Any],
+    parameters: dict[str, Any] | None = None,
+    **change: Any,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {
         "idempotency_key": str(uuid.uuid4()),
@@ -83,7 +100,11 @@ def execution_request(
     req: dict[str, Any] = {
         "proposal": copy.deepcopy(prop),
         "approval": approval,
-        "policy_decision": {"risk_class": risk_class, "rule_ids": rule_ids or [], "policy_hash": policy_hash},
+        "policy_decision": {
+            "risk_class": risk_class,
+            "rule_ids": rule_ids or [],
+            "policy_hash": policy_hash,
+        },
         "issued_at": execreq.iso(now),
         "expires_at": execreq.iso(now + timedelta(seconds=ttl)),
         "nonce": str(uuid.uuid4()),
@@ -128,6 +149,7 @@ CAT_SCHEMA = "sha256:" + "5" * 64
 CAT_VALIDATOR = "0.9.0"
 CAT_URL = "https://forge.test/leon/demo-catalogus"
 CAT_PUBLISHER = "sha256:" + "7" * 64
+CAT_SOURCE_ID = "33333333-3333-4333-8333-333333333333"
 
 
 def catalogus_regel(manifest_sha256: str = "sha256:" + "6" * 64, **change: Any) -> dict[str, Any]:
@@ -139,8 +161,15 @@ def catalogus_regel(manifest_sha256: str = "sha256:" + "6" * 64, **change: Any) 
         "image_digests": [DIGEST],
         "schema_sha256": CAT_SCHEMA,
         "validator_version": CAT_VALIDATOR,
-        "source": {"url": CAT_URL, "subpath": "apps", "path": "demo-app/manifest.yaml", "commit": CAT_COMMIT},
+        "source": {
+            "source_id": CAT_SOURCE_ID,
+            "url": CAT_URL,
+            "subpath": "apps",
+            "path": "demo-app/manifest.yaml",
+            "commit": CAT_COMMIT,
+        },
         "publisher_key_sha256": CAT_PUBLISHER,
+        "formuliervelden": sorted(install_params()["app_create"]["values"]),
         "kluisplekken": [],
     }
     regel.update(change)
@@ -157,7 +186,7 @@ def provenance_record(regel: dict[str, Any], **change: Any) -> dict[str, Any]:
         "schema_sha256": regel["schema_sha256"],
         "validator_version": regel["validator_version"],
         "source": {
-            "source_id": "33333333-3333-4333-8333-333333333333",
+            "source_id": regel["source"]["source_id"],
             "kind": "git",
             "url": regel["source"]["url"],
             "ref": "main",
@@ -187,7 +216,10 @@ def catalog_binding(regel: dict[str, Any], app: str = CAT_APP, **change: Any) ->
             "key_id": "0123456789abcdef",
             "alg": "EdDSA",
         },
-        "release": {"catalog": dict(regel["catalog"]), "image_digests": list(regel["image_digests"])},
+        "release": {
+            "catalog": dict(regel["catalog"]),
+            "image_digests": list(regel["image_digests"]),
+        },
         "plan_id": "55555555-5555-4555-8555-555555555555",
         "step_id": "installeren",
         "plan_etag": '"plan-55555555-5555-4555-8555-555555555555-v1"',

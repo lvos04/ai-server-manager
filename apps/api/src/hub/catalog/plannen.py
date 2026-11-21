@@ -19,17 +19,22 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
+from functools import lru_cache
+from importlib import resources
 from typing import Any
 
 import yaml
+from asm_policy._asf_c12 import is_secret_name, secret_text_reasons
 from asm_policy.canonical import CanonicalError, canonical_json, canonical_sha256
 from asm_policy.catalogbinding import regels_voor_record
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,6 +58,11 @@ HOST_ID = "nas-primary"
 STAP_ACTIE = "app.install"
 OPEN = ("klaar_voor_voorstel", "voorgesteld")
 NS = uuid.UUID("8f1d3c52-5b0e-4f7a-9d61-2c4b7e0a9f13")  # vaste naamruimte voor de idempotente stapmelding
+# Kopie van ``manifest-v1.schema.json`` uit appstore-en-fork op ASF_COMMIT (``schema_sha256`` van die validator).
+SCHEMA_SHA256 = "sha256:f2f1201a12e28ec88db1ea7e49af2bb7f10b8970dc8b68fae30ec7b33b243ce1"
+INVULBAAR = ("wizard", "dataset_picker")  # bronnen die de aanvrager mag invullen; geheimen openen pas in deel E
+TEKSTTYPES = ("string", "path", "dataset", "url", "timezone", "duration")
+CONTROLE_KEYS = ("id", "soort", "beschrijving_nl")
 
 
 def _fout(status: int, code: str, message: str, details: dict[str, Any] | None = None) -> HubError:
@@ -131,6 +141,53 @@ def _weiger(reden: str) -> HubError:
     return _fout(409, "bewijs_ongeldig", "Het catalogusbewijs klopt niet; er wordt niets gepland.", {"reden": reden})
 
 
+@lru_cache(maxsize=1)
+def _schema() -> Draft202012Validator:
+    tekst = resources.files("hub.catalog").joinpath("manifest-v1.schema.json").read_text(encoding="utf-8")
+    data = json.loads(tekst)
+    if canonical_sha256(data) != SCHEMA_SHA256:
+        raise RuntimeError("manifest-v1.schema.json wijkt af van de gepinde schema_sha256")
+    return Draft202012Validator(data)
+
+
+def manifest_fouten(regel: Mapping[str, Any], manifest: Any) -> int:
+    """Aantal schemafouten van het oorspronkelijke manifest; een onbekend schema telt als fout (fail-closed)."""
+    if regel.get("schema_sha256") != SCHEMA_SHA256 or not isinstance(manifest, Mapping):
+        return 1
+    return sum(1 for _ in _schema().iter_errors(dict(manifest)))
+
+
+def _type_past(soort: Any, waarde: Any) -> bool:
+    if soort in TEKSTTYPES:
+        return isinstance(waarde, str) and 0 < len(waarde) <= 500
+    if soort == "integer":
+        return isinstance(waarde, int) and not isinstance(waarde, bool)
+    if soort == "port":
+        return isinstance(waarde, int) and not isinstance(waarde, bool) and 1 <= waarde <= 65535
+    if soort == "boolean":
+        return isinstance(waarde, bool)
+    return soort == "gpu" and waarde in ("none", "intel_render")
+
+
+def parameters_fouten(manifest: Mapping[str, Any], parameters: Mapping[str, Any]) -> list[str]:
+    """Codes voor ingevulde parameters die niet gedeclareerd, niet invulbaar, verkeerd getypt of geheim zijn (§8.1)."""
+    decl = {p.get("name"): p for p in manifest.get("parameters") or [] if isinstance(p, Mapping)}
+    codes: set[str] = set()
+    for naam, waarde in parameters.items():
+        p = decl.get(naam)
+        if p is None:
+            codes.add("niet_gedeclareerd")
+        elif (
+            p.get("source") not in INVULBAAR or p.get("secret") or p.get("type") == "secret_ref" or is_secret_name(naam)
+        ):
+            codes.add("niet_invulbaar")
+        elif not _type_past(p.get("type"), waarde):
+            codes.add("type")
+        elif isinstance(waarde, str) and secret_text_reasons(waarde, settings=True):
+            codes.add("geheim_in_waarde")
+    return sorted(codes)
+
+
 def bewijs(db: Session, settings: Settings, keyring: KeyRing, *, app_id: str, version_id: str) -> dict[str, Any]:
     """Verifieer de gekozen versie bij de appstore zelf (§8.1). Geeft ``{service, provenance, manifest, regel}``."""
     svc, base = _dienst(db, settings, APPSTORE_APP_ID)
@@ -172,7 +229,11 @@ def bewijs(db: Session, settings: Settings, keyring: KeyRing, *, app_id: str, ve
         "version_id": record.get("version_id") == versie.get("id") == vid,
         "app_id": record.get("app_id") == entry.get("app_id") == versie.get("app_id") == app_id,
         "version": record.get("version") == versie.get("version"),
-        "source_id": bron_id == str(versie.get("source_id")) == str(bron.get("id")),
+        "source_id": bron_id == str(versie.get("source_id")) == str(bron.get("id")) == str(_bron_van(entry)),
+        # De actieve bron noemt dezelfde uitgeverssleutel als het record (R-VEILIG-3); de volledige vingerafdruk
+        # vergelijkt de witte lijst.
+        "uitgeverssleutel": isinstance(record.get("publisher_key_sha256"), str)
+        and record.get("publisher_key_id") == record["publisher_key_sha256"][7:23] == bron.get("trusted_key_id"),
         "bron": bron.get("kind") == "git"
         and bron.get("enabled") is True
         and bron.get("require_signature") is True
@@ -191,7 +252,14 @@ def bewijs(db: Session, settings: Settings, keyring: KeyRing, *, app_id: str, ve
     if len(regels) != 1:
         code = "catalogusversie_niet_toegelaten" if not regels else "catalogusregel_dubbelzinnig"
         raise _fout(409, code, "Deze versie staat niet (eenduidig) in de witte lijst van de beheerder.")
+    if manifest_fouten(regels[0], manifest):
+        raise _weiger("manifest_schema")
     return {"service": svc, "provenance": dict(prov), "manifest": dict(manifest), "regel": regels[0]}  # type: ignore[arg-type]
+
+
+def _bron_van(entry: Mapping[str, Any]) -> Any:
+    src = entry.get("source")
+    return src.get("id") if isinstance(src, Mapping) else None
 
 
 # ------------------------------------------------------------------ M3: eigen plan bij de planner
@@ -227,6 +295,12 @@ def maak_plan(
     doel: dict[str, Any],
 ) -> dict[str, Any]:
     m1 = bewijs(db, settings, keyring, app_id=app_id, version_id=version_id)
+    codes = parameters_fouten(m1["manifest"], parameters)
+    if codes:
+        # Geen namen of waarden terug: die kunnen van de aanvrager komen.
+        raise _fout(
+            422, "parameters_ongeldig", "De ingevulde parameters passen niet bij het manifest.", {"codes": codes}
+        )
     revisie = _naam_vrij(db, settings, app_name)
     regel = m1["regel"]
     vijf = {
@@ -268,6 +342,16 @@ def maak_plan(
         raise _fout(409, "plan_binding_verschilt", "De planner gaf een andere of geen catalogusbinding terug.")
     if stap is None or not _stap_past(stap["voorstel"], app_name):
         raise _fout(409, "plan_stap_onverwacht", "Het plan bevat niet precies één passende installatiestap.")
+    controles = (view.get("plan") or {}).get("controles_na_installatie") or []
+    if controles != (m1["manifest"].get("post_install_checks") or []):
+        # Alleen de openbare controles uit het geverifieerde manifest komen in opslag en antwoord (R-VEILIG-1).
+        raise _fout(409, "plan_controles_verschillen", "De controles na installatie wijken af van het manifest.")
+    if stap.get("hangt_af_van"):
+        status, reden = "geblokkeerd", "voorganger_onbevestigd"  # geen eigen bevestiging in deze versie
+    elif view.get("status") == "klaar_voor_voorstel":
+        status, reden = "klaar_voor_voorstel", None
+    else:
+        status, reden = "geblokkeerd", "planner_niet_klaar"
     now = utcnow()
     plan = CatalogPlan(
         id=plan_id,
@@ -279,10 +363,11 @@ def maak_plan(
         binding={**vijf, "plan_id": str(plan_id), "step_id": stap["id"], "plan_etag": view["etag"], "vault_refs": []},
         plan_etag=view["etag"],
         step_id=stap["id"],
-        controles_na_installatie=list((view.get("plan") or {}).get("controles_na_installatie") or []),
+        stap_sha256=_stap_sha(stap),
+        controles_na_installatie=[{k: c[k] for k in CONTROLE_KEYS} for c in controles],
         expires_at=verloopt,
-        status="klaar_voor_voorstel" if view.get("status") == "klaar_voor_voorstel" else "geblokkeerd",
-        reden=None if view.get("status") == "klaar_voor_voorstel" else str(view.get("status"))[:64],
+        status=status,
+        reden=reden,
         created_by=principal.name,
         created_at=now,
         updated_at=now,
@@ -290,6 +375,20 @@ def maak_plan(
     db.add(plan)
     db.flush()
     return plan_dict(plan)
+
+
+def _stap_sha(stap: Mapping[str, Any]) -> str:
+    try:
+        return canonical_sha256(stap.get("voorstel"))
+    except CanonicalError:
+        raise _fout(503, "dienst_antwoord_ongeldig", "De planner gaf een niet-canonieke stap terug.") from None
+
+
+def _tijd(waarde: Any) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(waarde).replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _stap_past(voorstel: Any, app_name: str) -> bool:
@@ -341,6 +440,11 @@ def _plan_nu(db: Session, settings: Settings, keyring: KeyRing, plan: CatalogPla
         "vervallen": view.get("vervallen") is False,
         "stap": stap is not None and stap.get("id") == plan.step_id and _stap_past(stap.get("voorstel"), plan.app_name),
         "vrijgegeven": plan.step_id in (view.get("vrijgegeven_stappen") or []),
+        # Bij gelijke ETag toch zelf vergelijken: stapinhoud, vervaltijd, planstatus en voorgangers (R-VEILIG-5/-6).
+        "stapinhoud": stap is not None and _stap_sha(stap) == plan.stap_sha256,
+        "vervaltijd": _tijd(view.get("expires_at")) == plan.expires_at,
+        "planstatus": view.get("status") == "klaar_voor_voorstel",
+        "voorganger": stap is not None and not stap.get("hangt_af_van"),
     }
     anders = sorted(k for k, ok in checks.items() if not ok)
     if anders:

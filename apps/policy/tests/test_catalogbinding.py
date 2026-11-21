@@ -26,6 +26,7 @@ from asm_policy.catalogbinding import readback_digest_afwijking
 from asm_policy.params import validate_parameters
 
 APP = {"host_id": HOST, "app_id": "demo-app"}
+BRON_ID = "33333333-3333-4333-8333-333333333333"
 
 
 @pytest.fixture(scope="module")
@@ -76,6 +77,11 @@ AFWIJKINGEN: list[tuple[str, Any, str]] = [
     ("ander subpad", lambda: _src(subpath=None), "catalogusversie_niet_toegelaten"),
     ("ander bestand", lambda: _src(path="demo-app/ander.yaml"), "catalogusversie_niet_toegelaten"),
     ("andere bronlocatie", lambda: _src(url="https://forge.test/x/y"), "catalogusversie_niet_toegelaten"),
+    (
+        "andere bron-ID",
+        lambda: _src(source_id="99999999-9999-4999-8999-999999999999"),
+        "catalogusversie_niet_toegelaten",
+    ),
     ("http-bron", lambda: _src(kind="http"), "bron_niet_toegelaten"),
     ("ingebouwde bron", lambda: _src(kind="bundled"), "bron_niet_toegelaten"),
     ("bewegende ref zonder commit", lambda: _src(commit=None), "bron_niet_gepind"),
@@ -150,6 +156,28 @@ def test_payload_moet_de_toegelaten_release_installeren(beleid: Any) -> None:
     assert "release_verschilt" in _codes(beleid, p)
 
 
+def test_onbekend_formulierveld_van_de_catalogusversie_wordt_geweigerd(tmp_path: Path) -> None:
+    # R-VEILIG-4: het veldschema van de toegelaten versie staat in de regel; een extra veld valt erbuiten.
+    regel = catalogus_regel(catalog={"train": "stable", "app": "voorbeeldapp", "version": "1.4.8"})
+    beleid = load_policy(policy_met_regels(tmp_path / "p", [regel]))
+    p = install_params("demo-app")
+    p["app_create"].update(catalog_app="voorbeeldapp", values={})
+    p["manifest"]["install_reason"] = "Controle met een openbaar tekstveld"
+    p["catalog_binding"] = catalog_binding(regel)
+    assert _codes(beleid, p) == []
+    p["app_create"]["values"]["review_weergavetekst"] = "voorbeeld"
+    assert "veld_niet_in_schema" in _codes(beleid, p)
+
+
+def test_manifesthash_van_de_vertaalde_stap_moet_bij_het_record_passen(beleid: Any) -> None:
+    # R-VEILIG-4: een expliciete manifesthash in de payload die afwijkt van het getekende record.
+    p = _params()
+    p["manifest"]["manifest_sha256"] = catalogus_regel()["manifest_sha256"]
+    assert _codes(beleid, p) == []
+    p["manifest"]["manifest_sha256"] = DIGEST_B
+    assert "manifest_verschilt" in _codes(beleid, p)
+
+
 def test_dubbele_regel_is_dubbelzinnig(tmp_path: Path) -> None:
     beleid = load_policy(policy_met_regels(tmp_path / "p", [catalogus_regel(), catalogus_regel()]))
     assert _codes(beleid, _params()) == ["catalogusregel_dubbelzinnig"]
@@ -163,14 +191,19 @@ def test_ex47_blijft_gelden_met_een_geldige_binding(beleid: Any) -> None:
 
 REGEL_FOUTEN: list[tuple[str, dict[str, Any], str]] = [
     ("kluisplekken", {"kluisplekken": ["x"]}, "kluisplekken zijn in deze versie niet toegestaan"),
-    ("http-url", {"source": {"url": "http://forge.test/a/b", "subpath": None, "path": "m.yaml", "commit": "c" * 40}},
+    ("http-url", {"source": {"source_id": BRON_ID, "url": "http://forge.test/a/b", "subpath": None, "path": "m.yaml",
+                             "commit": "c" * 40}},
      "source.url"),
-    ("subpad met ..", {"source": {"url": "https://forge.test/a/b", "subpath": "../x", "path": "m.yaml",
+    ("subpad met ..", {"source": {"source_id": BRON_ID, "url": "https://forge.test/a/b", "subpath": "../x",
+                                  "path": "m.yaml",
                                   "commit": "c" * 40}}, "geen geldig paddeel"),
-    ("korte commit", {"source": {"url": "https://forge.test/a/b", "subpath": None, "path": "m.yaml",
-                                 "commit": "c" * 7}}, "commit"),
+    ("korte commit", {"source": {"source_id": BRON_ID, "url": "https://forge.test/a/b", "subpath": None,
+                                 "path": "m.yaml", "commit": "c" * 7}}, "commit"),
     ("lege digests", {"image_digests": []}, "image_digests"),
     ("tag als digest", {"image_digests": ["latest"]}, "image_digests"),
+    ("bron zonder bron-ID", {"source": {"url": "https://forge.test/a/b", "subpath": None, "path": "m.yaml",
+                                        "commit": "c" * 40}}, "source: verwacht precies"),
+    ("veldschema geen lijst", {"formuliervelden": "image"}, "formuliervelden"),
 ]  # fmt: skip
 
 
@@ -197,6 +230,10 @@ READBACK: list[tuple[str, list[str], list[dict[str, Any]], str | None]] = [
     ("geen imagerij", [REF], [], "digest_niet_bevestigd"),
     ("imagerij zonder digests", [REF], [{"repo_tags": [REF], "repo_digests": []}], "digest_niet_bevestigd"),
     ("geen images bij de app", [], [], "digest_niet_bevestigd"),
+    # R-VEILIG-7: twee imagerijen voor dezelfde tag, waarvan één met een niet-toegelaten digest.
+    ("tegenstrijdige imagerijen", [REF],
+     [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]},
+      {"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST_B}"]}], "digest_verschilt"),
 ]  # fmt: skip
 
 

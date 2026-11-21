@@ -170,6 +170,40 @@ def test_migratie_naar_head_op_een_gevulde_database_verliest_niets(lege_db: str)
         engine.dispose()
 
 
+def test_planregistratie_overleeft_terugmigratie_onder_0022(lege_db: str) -> None:
+    """R-HARDE-EIS-1: een bevestigde installatie onder 0022 behoudt bij 0022 -> 0021 -> 0022 haar registratie."""
+    from hub.models import CatalogPlan
+    from hub.timeutil import utcnow
+
+    migrations.upgrade(lege_db, "0022")
+    pid = uuid.uuid4()
+    registratie = {"app_name": "demo-app", "digests": ["sha256:" + "a" * 64]}
+    engine = sa.create_engine(lege_db)
+    try:
+        with Session(engine) as db:
+            db.add(CatalogPlan(id=pid, soort="install", app_id="demo-app", app_name="demo-app",
+                               instance_id=uuid.uuid4(), planner_service_id=uuid.uuid4(), binding={"plan_id": str(pid)},
+                               step_id="installeren", stap_sha256="sha256:" + "b" * 64, plan_etag='"plan-v1"',
+                               controles_na_installatie=[], expires_at=utcnow(), status="geinstalleerd_controles_open",
+                               request_id=uuid.uuid4(), created_by="test", created_at=utcnow(), updated_at=utcnow(),
+                               melding={"status": "gemeld"}, registratie=registratie))  # fmt: skip
+            db.commit()
+        migrations.downgrade(lege_db, "0021")
+        migrations.upgrade(lege_db, "0022")
+        with Session(engine) as db:
+            na = db.get(CatalogPlan, pid)
+            assert na is not None and na.registratie == registratie and na.status == "geinstalleerd_controles_open"
+        # Een lege tabel mag gewoon weg: terug en heen blijft dan schoon.
+        with Session(engine) as db:
+            db.execute(sa.delete(CatalogPlan))
+            db.commit()
+        migrations.downgrade(lege_db, "0021")
+        assert "catalog_plan_bewaard" not in sa.inspect(engine).get_table_names()
+        migrations.upgrade(lege_db, "0022")
+    finally:
+        engine.dispose()
+
+
 def test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring(lege_db: str, tmp_path: Path) -> None:
     migrations.upgrade(lege_db, "0017")
     settings = Settings(database_url=lege_db, data_dir=tmp_path)

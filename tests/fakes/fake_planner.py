@@ -34,7 +34,13 @@ class FakePlanner(FakeHTTP):
     def _claims(self, seen: Seen) -> dict[str, Any] | None:
         auth = seen.headers.get("authorization", "")
         try:
-            claims = jwt.decode(auth[7:], self.public_key, algorithms=["EdDSA"], audience=APP_ID, issuer="hub")
+            claims = jwt.decode(
+                auth[7:],
+                self.public_key,
+                algorithms=["EdDSA"],
+                audience=APP_ID,
+                issuer="hub",
+            )
         except jwt.PyJWTError as exc:
             self.rejected.append(type(exc).__name__)
             return None
@@ -52,7 +58,14 @@ class FakePlanner(FakeHTTP):
             key = seen.headers.get("idempotency-key", "")
             if claims.get("catalog_request_sha256") != canonical_sha256(["POST", PREVIEW, key, body]):
                 self.rejected.append("catalog_request_sha256")
-                return Reply(401, {"code": "unauthorized", "message": "Claim past niet.", "details": {}})
+                return Reply(
+                    401,
+                    {
+                        "code": "unauthorized",
+                        "message": "Claim past niet.",
+                        "details": {},
+                    },
+                )
             pid = str(uuid.uuid4())
             stap = {
                 "id": "installeren",
@@ -70,7 +83,16 @@ class FakePlanner(FakeHTTP):
                 "soort": "install",
                 "status": "klaar_voor_voorstel",
                 "vervallen": False,
-                "plan": {"stappen": [stap], "controles_na_installatie": [{"id": "http_bereikbaar"}]},
+                "plan": {
+                    "stappen": [stap],
+                    "controles_na_installatie": [
+                        {
+                            "id": "http_bereikbaar",
+                            "soort": "http",
+                            "beschrijving_nl": "De webinterface antwoordt.",
+                        }
+                    ],
+                },
                 "vrijgegeven_stappen": ["installeren"],
                 "catalog_binding": body["catalog_binding"],
                 "etag": f'"plan-{pid}-v1"',

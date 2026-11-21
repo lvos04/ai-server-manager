@@ -83,9 +83,12 @@ REGEL_KEYS = {
     "validator_version",
     "source",
     "publisher_key_sha256",
+    "formuliervelden",
     "kluisplekken",
 }
-REGEL_SOURCE_KEYS = {"url", "subpath", "path", "commit"}
+# De vooraf toegelaten bron-ID hoort bij de bron: item, versie en record moeten dezelfde noemen (R-VEILIG-3).
+REGEL_SOURCE_KEYS = {"source_id", "url", "subpath", "path", "commit"}
+VELD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 CATALOG_KEYS = {"train", "app", "version"}
 
 
@@ -121,7 +124,10 @@ def laad_regels(raw: Any) -> tuple[dict[str, Any], ...]:
             raise RegelFout(f"{w}: verwacht precies de velden {sorted(REGEL_KEYS)}")
         src = r["source"]
         if not isinstance(src, Mapping) or set(src) != REGEL_SOURCE_KEYS:
-            raise RegelFout(f"{w}.source: verwacht precies url, subpath, path en commit")
+            raise RegelFout(f"{w}.source: verwacht precies source_id, url, subpath, path en commit")
+        velden = r["formuliervelden"]
+        if not isinstance(velden, list) or len(set(map(str, velden))) != len(velden):
+            raise RegelFout(f"{w}.formuliervelden: verwacht een lijst zonder dubbelen")
         digests = r["image_digests"]
         if not isinstance(digests, list) or not digests or len(set(digests)) != len(digests):
             raise RegelFout(f"{w}.image_digests: verwacht een niet-lege lijst zonder dubbelen")
@@ -137,6 +143,7 @@ def laad_regels(raw: Any) -> tuple[dict[str, Any], ...]:
             "schema_sha256": _regel_tekst(r["schema_sha256"], f"{w}.schema_sha256", SHA_RE),
             "validator_version": _regel_tekst(r["validator_version"], f"{w}.validator_version", VALIDATOR_RE, 64),
             "source": {
+                "source_id": _regel_tekst(src["source_id"], f"{w}.source.source_id", UUID_RE, 36),
                 "url": _regel_tekst(src["url"], f"{w}.source.url", URL_RE),
                 "subpath": None
                 if src["subpath"] is None
@@ -145,6 +152,8 @@ def laad_regels(raw: Any) -> tuple[dict[str, Any], ...]:
                 "commit": _regel_tekst(src["commit"], f"{w}.source.commit", COMMIT_RE, 40),
             },
             "publisher_key_sha256": _regel_tekst(r["publisher_key_sha256"], f"{w}.publisher_key_sha256", SHA_RE),
+            # Het veldschema van deze versie: de toegestane velden onder ``app_create.values`` (R-VEILIG-4).
+            "formuliervelden": sorted(_regel_tekst(v, f"{w}.formuliervelden", VELD_RE, 64) for v in velden),
             "kluisplekken": [],
         }
         if any(".." in (p or "").split("/") for p in (regel["source"]["subpath"], regel["source"]["path"])):
@@ -257,10 +266,19 @@ def controleer(regels: tuple[dict[str, Any], ...], params: Mapping[str, Any], ta
     # De payload moet precies de toegelaten catalogusversie installeren.
     if {"train": ac.get("train"), "app": ac.get("catalog_app"), "version": ac.get("version")} != regel["catalog"]:
         out.append(_f("parameters.app_create", "release_verschilt", "de installatie past niet bij de release"))
+    values = ac.get("values") if isinstance(ac.get("values"), Mapping) else {}
+    assert isinstance(values, Mapping)
+    # shortcut: alleen velden op het eerste niveau; diepere toetsen EX47/C-12. Verfijnen als een regel dat vraagt.
+    for naam in sorted(set(map(str, values)) - set(regel["formuliervelden"])):
+        out.append(_f(f"parameters.app_create.values.{naam}", "veld_niet_in_schema", "veld buiten het veldschema"))
+    manifest = params.get("manifest") if isinstance(params.get("manifest"), Mapping) else {}
+    assert isinstance(manifest, Mapping)
+    if "manifest_sha256" in manifest and manifest["manifest_sha256"] != record.get("manifest_sha256"):
+        out.append(
+            _f("parameters.manifest.manifest_sha256", "manifest_verschilt", "manifesthash wijkt af van het record")
+        )
     if ac.get("catalog_app") == IX_APP:
         img = expected_image(params) or {}
-        manifest = params.get("manifest") if isinstance(params.get("manifest"), Mapping) else {}
-        assert isinstance(manifest, Mapping)
         if img.get("digest") not in regel["image_digests"] or manifest.get("image_digest") != img.get("digest"):
             out.append(_f("parameters.app_create.values.image", "digest_verschilt", "image niet in de release"))
         if manifest.get("app_id") != record.get("app_id") or manifest.get("version") != record.get("version"):
@@ -288,6 +306,7 @@ def readback_digest_afwijking(
         gevonden += sorted(digests)
         if not digests:
             return {"code": "digest_niet_bevestigd", "verwacht": sorted(toegelaten), "gevonden": []}
-        if not digests & toegelaten:
+        # Elke rij voor deze tag telt: één niet-toegelaten digest is een afwijking, ook naast een goede (R-VEILIG-7).
+        if digests - toegelaten:
             return {"code": "digest_verschilt", "verwacht": sorted(toegelaten), "gevonden": sorted(digests)}
     return None
