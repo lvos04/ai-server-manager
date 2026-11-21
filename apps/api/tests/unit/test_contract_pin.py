@@ -14,10 +14,10 @@ from pathlib import Path
 import pytest
 
 PV2 = Path(__file__).resolve().parents[4] / "docs" / "platform-v2"
-# Contract 1.3 bevat de aanvulling C-12 (ADR-0031) en het M3-besluit over catalogusbeschikbaarheid (KLEIN-111).
-BRON_COMMIT = "7ebed6523dcb643b4f3c8510bda46c918a49ea14 (M3, KLEIN-111)"
+# Contract 1.3 bevat de aanvulling C-12 (ADR-0031) en de besluiten over catalogusbeschikbaarheid, bron- en doelbinding.
+BRON_COMMIT = "contracttekst S-P2-050d (M1 en M3)"
 PINS = {
-    "PLATFORM_CONTRACTEN.md": "c06eebdc23b52fd4e3ffa5be18abc481c2fbbf0938d86c58bebb78a870fd8159",
+    "PLATFORM_CONTRACTEN.md": "e3a8f6cdd11e6460708fdfae5fd6c44da05f62a8670bfebce951824d6aa46c0a",
     "CONTRACT_1.3_CONFORMITEIT.md": "b5ebba073a8fe8beb715d58e6760feae38e33ad445956d107e64840133dd7924",
 }
 

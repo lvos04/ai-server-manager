@@ -237,6 +237,30 @@ def test_versieregel_blijft_letterlijk_staan() -> None:
     )
 
 
+KOP_M1 = "### 8.1 Bron- en doelbinding van appplannen (M1)"
+KOP_M3 = "### 8.2 Vertrouwde plannerinvoer (M3)"
+
+
+@pytest.mark.parametrize(
+    ("kop", "verplicht"),
+    [
+        (KOP_M1, ("entry_id", "version_id", "manifest_sha256", "app_id")),
+        (KOP_M1, ("source.subpath", "source.commit", "publisher_key_sha256")),
+        (KOP_M1, ("target.app_id", "instance_id", "expected_version")),
+        (KOP_M1, ("action_scope.parameters_sha256", "vault_refs", "readback")),
+        (KOP_M1, ("onvolledig", "nieuwe preview en goedkeuring", "nul kluisopvragen en nul schrijfaanroepen")),
+        (KOP_M3, ("service:hub", "catalog_request_sha256", "manifest_sha256")),
+        (KOP_M3, ("plan_id", "step_id", "ETag", "instance_id")),
+        (KOP_M3, ("manifest_yaml", "geen uitvoerbare stap", "geen kluisvertaling")),
+        (KOP_M3, ("report_step", "eigen readback", "levende bevoegde gebruikerssessie")),
+    ],
+)
+def test_appplan_contract(kop: str, verplicht: tuple[str, ...]) -> None:
+    tekst = _paragraaf(kop)
+    for onderdeel in verplicht:
+        assert onderdeel in tekst
+
+
 def test_aanvulling_c12_staat_in_het_wijzigingslog_en_in_de_kop() -> None:
     log = _wijzigingslog()
     assert KOP_C12 in log

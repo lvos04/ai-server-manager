@@ -4,6 +4,13 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Vastgelegd — Bron en doel van uitvoerbare appplannen (S-P2-050d)
+
+- Platformcontract 1.3 §8.1 bindt catalogusitem, versie, manifesthash, Git-pin en uitgeversbewijs aan één
+  doelinstantie. §8.2 bindt de geverifieerde plannerinvoer aan de bestaande Hub-dienst-JWT en het eigen plan.
+  ADR-0032 wijst de aanvullingen toe aan appstore, planner, Hub en executor. Uitvoering blijft gesloten tot de
+  vereiste controles zijn gebouwd en beproefd.
+
 ### Aangescherpt — Installatiebeleid en preview (S-P2-050c)
 - De Hub en executor toetsen installatiewaarden met de gepinde C-12-eigenaarsregels. Aanmeldgegevens worden
   geweigerd, ook als kluisverwijzing. Variant B vereist voor een kluisverwijzing in een omgevingsvariabele van
