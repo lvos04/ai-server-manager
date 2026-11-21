@@ -103,12 +103,6 @@ export const PLANNED: Record<string, PlannedScreen> = {
     wat: "AI-chat die logs uitlegt en plannen maakt; ‘repareer’ leidt altijd naar een actievoorstel met preview, nooit naar een terminal. AI staat standaard uit.",
     bron: "Risicobeleid R0–R3, policy-engine en de gekoppelde executor (B02).",
   },
-  media: {
-    titel: "Media",
-    fase: "P3 en P4",
-    wat: "Film, serie, anime, muziek en Live TV met verder kijken, kwaliteit, downloads en verzoekstatus.",
-    bron: "MediaGuard en Media Source Optimizer (P3), Jelly Leon / Jellyfin (P4).",
-  },
   netwerk: {
     titel: "Netwerk",
     fase: "P5",

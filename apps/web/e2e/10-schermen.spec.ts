@@ -173,7 +173,6 @@ test("Backups: dekking per app, sync ≠ herstelgarantie, back-upgate dicht (gee
 test("nog niet beschikbare schermen tonen eerlijk de fase en geen gegevens", async ({ page }) => {
   const expected: Record<string, string> = {
     "/ai": "P2",
-    "/media": "P3 en P4",
     "/netwerk": "P5",
     "/automatisering": "P2",
     "/kosten": "P5",

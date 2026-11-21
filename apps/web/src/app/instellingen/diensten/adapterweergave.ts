@@ -29,6 +29,15 @@ export interface Koppeling {
   version: number;
   verbinding: { status: string; observed_at: string | null; reason_code: string | null; laatste_status?: string | null };
 }
+export function veiligAdres(waarde: string) {
+  try {
+    const url = new URL(waarde);
+    return url.protocol === "https:" && !url.username && !url.password && !/[?#\s]/.test(waarde);
+  } catch {
+    return false;
+  }
+}
+
 export interface Pagina<T> { items: T[]; next_cursor: string | null }
 export interface Installaties extends Pagina<Installatie> { inventaris: { status: string } }
 

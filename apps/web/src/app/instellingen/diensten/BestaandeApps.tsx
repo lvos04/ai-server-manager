@@ -15,7 +15,7 @@ import { useApi } from "@/lib/use-api";
 import { uuidv4 } from "@/lib/uuid";
 import {
   ADAPTERS, APPS, allePaginas, koppelstatus, oorzaak, type AppId, type Installatie, type Installaties,
-  type Koppeling, type Pagina, type Probleem, type Veld,
+  type Koppeling, type Pagina, type Probleem, type Veld, veiligAdres,
 } from "./adapterweergave";
 
 type Actie = "Opslaan" | "Testen" | "Ontkoppelen";
@@ -23,15 +23,6 @@ const CONTACTWOORDEN: Record<string, string> = { healthy: "Bereikbaar", degraded
 
 function verbindingsuitval(error: HubApiError) {
   return error.status === 0 || [502, 503, 504].includes(error.status);
-}
-
-function veiligAdres(waarde: string) {
-  try {
-    const url = new URL(waarde);
-    return url.protocol === "https:" && !url.username && !url.password && !/[?#\s]/.test(waarde);
-  } catch {
-    return false;
-  }
 }
 
 function AppKaart({ app, doel, koppeling, beheer, inventarisActueel, laatstBekend, nu, vernieuw }: {

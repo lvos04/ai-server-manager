@@ -784,3 +784,40 @@ volgt de kaart en foutmeldingen zijn via het invoerveld voorleesbaar.
 De browserproef legt de vijf toestanden van dezelfde my_house-kaart vast met een gesimuleerde
 installatie. [Leeg](review/diensten-leeg.png) · [Bezig](review/diensten-bezig.png) ·
 [Fout](review/diensten-fout.png) · [Verouderd](review/diensten-verouderd.png) · [Gekoppeld](review/diensten-gekoppeld.png)
+
+## Media (S-P3-080)
+
+Het scherm **Media** leest de adapterkoppelingen van MediaGuard en Media Source Optimizer (MSO).
+Het toont alleen gegevens en heeft geen actieknoppen voor MediaGuard of MSO. Acties blijven in de app zelf.
+De leesvolgorde is MediaGuard, MSO, **Waarom ontbreekt dit?** en Jelly Leon. Op een smal scherm staan
+de cijfertegels onder elkaar. Vanaf `sm` staan er twee naast elkaar en vanaf `xl` drie.
+
+| Toestand | Wat de gebruiker ziet en kan doen |
+| --- | --- |
+| Leeg | **MediaGuard en MSO zijn nog niet gekoppeld** met de link naar Instellingen → Diensten. Ontbreekt één van beide apps, dan krijgt alleen die app zo'n kaart. |
+| Bezig | **Koppelingen ophalen…** zonder lege of gevulde toestand. |
+| Fout | Het foutpaneel noemt de oorzaak en biedt **Opnieuw proberen**. Bij een weigering verdwijnen eerdere gegevens. |
+| Verouderd | Bij verbindingsuitval blijft de laatst bekende lijst staan met **Verouderde mediagegevens**. Een verlopen of onbereikbare meting staat grijs als **Laatst gemeten · tijd** met de status Verouderd, nooit als actueel. |
+| Gevuld | Per MediaGuard-installatie: mediaservers (label, verbonden, kijkpauze ja/nee), de noodstop en vijf cijfers (Wanted, Status, Downloads, AV1, Incidenten) met meettijd. Per MSO-installatie: gezondheid uit de openbare verbindingstest, open wijzigingen met een link naar MSO en de kostenregel met herkomst. |
+
+Elk cijfer draagt zijn meetkwaliteit inline (Peil C-07): `· gemeten`, `≈ … · geschat` of **Onbekend** met reden.
+Het Peil-onderdeel ZekerheidLabel (T-24) is voor AI-zekerheid bedoeld. Daarom gebruikt dit scherm voor meetwaarden
+het kwaliteitswoord van de StatKaart. Zolang MediaGuard geen alleen-lezen bron heeft (S-P3-030), is elk
+MediaGuard-cijfer **Onbekend: geen alleen-lezen bron** en nooit 0. Open wijzigingen en kosten van MSO zijn
+**onbekend: leesrecht niet bevestigd** totdat het MSO-leesbewijs er is (versie 2).
+
+Staat de noodstop aan, dan verschijnt in de MediaGuard-kaart de balk **MediaGuard is gepauzeerd (noodstop)**
+met sinds wanneer. Het is een statusbalk in de kleur `paused` met het icoon `circle-pause`. Een knop om de noodstop
+uit te zetten ontbreekt bewust.
+
+**Waarom ontbreekt dit?** toont de vijf schakels van de downloadketen uit S-P3-075, met per schakel de eigenaar.
+Bij precies één koppeling met een geldig HTTPS-adres verwijst de link naar het scherm van die eigenaar.
+Anders gaat de link naar het koppelscherm. Het deel voor Jelly Leon blijft gepland (fase P4). Emby blijft de
+mediaserver en het scherm toont niets dat Jelly Leon veronderstelt.
+
+De browserproef legt de toestanden vast op smal (360) en breed (1440) scherm:
+[Leeg smal](review/media-leeg-smal.png) · [Leeg breed](review/media-leeg-breed.png) ·
+[Bezig smal](review/media-bezig-smal.png) · [Bezig breed](review/media-bezig-breed.png) ·
+[Fout smal](review/media-fout-smal.png) · [Fout breed](review/media-fout-breed.png) ·
+[Verouderd smal](review/media-verouderd-smal.png) · [Verouderd breed](review/media-verouderd-breed.png) ·
+[Gevuld smal](review/media-gevuld-smal.png) · [Gevuld breed](review/media-gevuld-breed.png)
