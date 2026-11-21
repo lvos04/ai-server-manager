@@ -134,7 +134,9 @@ test("verouderd: metingen ouder dan vijftien minuten staan grijs als laatst geme
   const wanted = page.getByTestId("cijfer-wanted");
   await expect(wanted).toContainText("Laatst gemeten");
   await expect(wanted).toContainText("meting verouderd");
-  await expect(wanted).not.toContainText("17 · gemeten");
+  // Titel direct gevolgd door het actuele getal; de meettijd zelf kan ook op ":17" eindigen.
+  await expect(wanted).not.toContainText("open17 · gemeten");
+  await expect(wanted.locator(".text-stale-ink")).toContainText("17");
   await expect(page.getByTestId("pauzebalk")).toHaveCount(0);
   await expect(page.locator("main")).toContainText("Noodstop · onbekend: meting verouderd");
   await controleer(page, "media verouderd");
