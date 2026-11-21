@@ -189,7 +189,10 @@ jobs:
           python -m pip check
       - *testdatabase
       - name: npm ci
-        run: npm ci --no-audit --no-fund
+        run: |
+          npm ci --no-audit --no-fund
+          # npm slaat een mislukte optionele download stil over (npm/cli#4828); dan één schone herpoging.
+          node -e "require('@rolldown/binding-linux-x64-gnu')" || { rm -rf node_modules; npm ci --no-audit --no-fund; node -e "require('@rolldown/binding-linux-x64-gnu')"; }
       - name: eslint (incl. jsx-a11y strict) en TypeScript
         run: |
           node node_modules/eslint/bin/eslint.js --max-warnings=0 .
