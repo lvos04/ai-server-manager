@@ -204,6 +204,51 @@ def test_planregistratie_overleeft_terugmigratie_onder_0022(lege_db: str) -> Non
         engine.dispose()
 
 
+def test_plannen_uit_de_oorspronkelijke_0022_blijven_leesbaar(lege_db: str) -> None:
+    """R-HARDE-EIS-1: de oorspronkelijke 0022 had geen ``stap_sha256``. 0023 maakt zo'n database weer leesbaar, laat de
+    registratie staan en zet een open plan zonder stapbewijs op opnieuw voorvertonen; ook na terug en weer heen."""
+    from hub.catalog import plannen
+    from hub.timeutil import utcnow
+
+    migrations.upgrade(lege_db, "0022")
+    engine = sa.create_engine(lege_db)
+    try:
+        with engine.begin() as c:
+            c.execute(
+                sa.text("ALTER TABLE catalog_plan DROP COLUMN stap_sha256")
+            )  # de vorm van de oorspronkelijke 0022
+        tabel = sa.Table("catalog_plan", sa.MetaData(), autoload_with=engine)
+        registratie = {"app_name": "demo-app", "digests": ["sha256:" + "a" * 64]}
+        controle = {"id": "http_bereikbaar", "soort": "http", "beschrijving_nl": "Antwoordt.", "oude_notitie": "x"}
+        ids = {"bevestigd": uuid.uuid4(), "open": uuid.uuid4()}
+        with engine.begin() as c:
+            for soort, pid in ids.items():
+                c.execute(tabel.insert().values(
+                    id=pid, soort="install", app_id="demo-app", app_name=f"demo-{soort}", instance_id=uuid.uuid4(),
+                    planner_service_id=uuid.uuid4(), binding={"plan_id": str(pid)}, plan_etag='"plan-v1"',
+                    step_id="installeren", controles_na_installatie=[controle], expires_at=utcnow(),
+                    status="geinstalleerd_controles_open" if soort == "bevestigd" else "klaar_voor_voorstel",
+                    request_id=uuid.uuid4() if soort == "bevestigd" else None,
+                    registratie=registratie if soort == "bevestigd" else None,
+                    created_by="test", created_at=utcnow(), updated_at=utcnow(),
+                ))  # fmt: skip
+        assert migrations.pending_migrations(lege_db)
+        for ronde in ("update", "terug_en_heen"):
+            if ronde == "terug_en_heen":
+                migrations.downgrade(lege_db, "0021")
+            migrations.upgrade(lege_db)
+            assert not migrations.pending_migrations(lege_db)
+            with Session(engine) as db:
+                bevestigd = plannen.haal_plan(db, ids["bevestigd"])
+                assert bevestigd.registratie == registratie and bevestigd.status == "geinstalleerd_controles_open"
+                assert bevestigd.stap_sha256 is None
+                assert bevestigd.controles_na_installatie == [{k: controle[k] for k in plannen.CONTROLE_KEYS}]
+                open_plan = plannen.haal_plan(db, ids["open"])
+                assert (open_plan.status, open_plan.reden) == ("geblokkeerd", "opnieuw_voorvertonen")
+    finally:
+        engine.dispose()
+
+
 def test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring(lege_db: str, tmp_path: Path) -> None:
     migrations.upgrade(lege_db, "0017")
     settings = Settings(database_url=lege_db, data_dir=tmp_path)
@@ -274,6 +319,9 @@ def test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring(lege_db: 
         assert meet_maskering() == na
 
         migrations.downgrade(lege_db, "base")
+        with engine.begin() as conn:
+            # De bewarende terugweg van 0022 laat een gevulde plantabel staan; voor een leeg schema hier bewust weg.
+            conn.exec_driver_sql("DROP TABLE IF EXISTS catalog_plan_bewaard")
         subprocess.run(
             [
                 settings.pg_restore_bin,
@@ -362,6 +410,9 @@ def test_terugval_na_klokcorrectie(lege_db: str, tmp_path: Path, monkeypatch: py
         assert Path(str(dump) + ".sha256").read_text().split() == [backup.sha256, dump.name]
         # Herstel op een leeg schema zodat de gebruikerswijziging alleen uit deze export kan komen.
         migrations.downgrade(lege_db, "base")
+        with engine.begin() as conn:
+            # De bewarende terugweg van 0022 laat een gevulde plantabel staan; voor een leeg schema hier bewust weg.
+            conn.exec_driver_sql("DROP TABLE IF EXISTS catalog_plan_bewaard")
         subprocess.run(
             [
                 settings.pg_restore_bin,

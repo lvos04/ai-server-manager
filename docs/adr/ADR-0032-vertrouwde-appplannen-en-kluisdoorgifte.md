@@ -934,9 +934,17 @@ dicht zolang appstore en planner de §8.1/§8.2-aanvullingen niet leveren (zie m
   hij die, de vervaltijd, de planstatus en de voorgangers (een stap met voorganger blijft dicht tot er een eigen
   bevestiging is). Een tegenstrijdige image-readback is een afwijking. Terug naar 0021 bewaart een gevulde
   `catalog_plan` als `catalog_plan_bewaard`; opnieuw 0022 zet haar ongewijzigd terug.
+- **Herstel na de tweede R-VEILIG-ronde (S-P2-050d).** De Hub draait nu de gepinde validator zelf: een letterlijke
+  kopie van `appstore/manifest` op ASF_COMMIT in `hub/catalog/asf` (bytegelijkheid bewaakt via `BRON.json`). Het
+  oorspronkelijke manifest moet nul fouten geven (schema én regels, zoals hostnetwerk zonder reden); elke ingevulde
+  parameterwaarde gaat vóór de planneraanroep door de parametercontrole van die validator (bijvoorbeeld geen relatief
+  pad). De vertaalde stap moet zelf de manifesthash van het record noemen; ontbreken is een weigering. Bij de
+  readback is elke imagerij zonder digest en een actieve imagereferentie met een andere digest een afwijking.
+  Antwoorden (lezen en idempotente herhaling) tonen van de controles alleen `id`, `soort` en `beschrijving_nl`.
+  Migratie 0023 maakt databases uit de oorspronkelijke 0022 (zonder `stap_sha256`) weer leesbaar, laat registraties
+  staan en zet oude open plannen op `opnieuw_voorvertonen`.
 - **VERSIE 2.** Een aparte beheerdersselectie van bron en uitgever met eigen revisie (nu: de witte lijst onder de
-  `policy_hash`). De overige regels van de gepinde validator naast het schema (nu: het getekende record verklaart
-  `valid: true` en de regel pint de manifesthash). Een veldschema dieper dan het eerste niveau. Een eigen
+  `policy_hash`). Een veldschema dieper dan het eerste niveau. Een eigen
   bevestigingsroute voor handmatige voorgangers. Een appstore-previewaanroep naast de planner. Kommagetallen in manifest of parameters (nu
   geweigerd door de canonieke JSON). Hostpoort in de registratie uit de volgende inventaris (nu `null` met reden).
   Bevestigingsroute voor de controles na installatie. Koppeling van latere acties aan de registratie (F/G).

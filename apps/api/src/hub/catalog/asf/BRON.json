@@ -1,0 +1,19 @@
+{
+  "bron": "appstore-en-fork",
+  "asf_commit": "a994c2a51f45b81b2c48c6533b0ccf51ba857f5a",
+  "pad": "apps/api/src/appstore",
+  "aanpassing": "manifest/validator.py: resources.files(\"appstore.manifest\") -> resources.files(__package__)",
+  "bestanden": {
+    "__init__.py": "sha256:f2274324059ecd22d08efe274c0b825658079643e594a0b05b6242a7631b4292",
+    "manifest/__init__.py": "sha256:ac9426c2f3620e224f7787799e47e2b10b08bb8e9c6e19139e38c31fe6d971ff",
+    "manifest/validator.py": "sha256:df66add14ebe15645c227682d380a592bc6da7a6b48e7131eb39beb7f967e1cb",
+    "manifest/rules.py": "sha256:8fe1900d60af5d5c21de237fb0095ff2055ae9cc00dbabf7b62c78641438e473",
+    "manifest/model.py": "sha256:934826f0385d27661ee80026cd34fa89d7f179db9b932848f5021d73eaa5b580",
+    "manifest/findings.py": "sha256:7fab5e4f23911441f7d7632030d8ceaa62331a25e4c7a50d812dcbaf16f443d5",
+    "manifest/canonical.py": "sha256:11bba5893191897a94fc60e80fe5b23269dca8746b64353bb943b4513030cfa2",
+    "manifest/loader.py": "sha256:c84ef3211a730ce88211fbc954543e3d205c9def66dbb0bff8b3a928c900fe5c",
+    "manifest/truenas.py": "sha256:c402c0dd8cf998dc2fc11eb66df39ec95e27cef8b7307805f221d7176237298e",
+    "manifest/translate.py": "sha256:64a7b56433d70f93bffbe67cfaf9348270f7410c443b9990bab261403fd79479",
+    "manifest/manifest-v1.schema.json": "sha256:85c9b90894b3a2b4c23a6c5360da11cd2c1c6934e83111afd27deb445959f5de"
+  }
+}

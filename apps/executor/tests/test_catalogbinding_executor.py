@@ -56,6 +56,7 @@ def _verzoek(hub: Hub, policy: Any, params: dict[str, Any]) -> dict[str, Any]:
 def _params(**binding_change: Any) -> dict[str, Any]:
     p = install_params("demo-app")
     p["catalog_binding"] = catalog_binding(catalogus_regel(), **binding_change)
+    p["manifest"]["manifest_sha256"] = catalogus_regel()["manifest_sha256"]
     return p
 
 

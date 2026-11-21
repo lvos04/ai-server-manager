@@ -270,6 +270,8 @@ jobs:
         run: |
           test "$(git -C .asf rev-parse HEAD)" = "$ASF_COMMIT"
           python tools/sync_asf_c12.py .asf --check
+          # De validatorkopie van de Hub (hub/catalog/asf/BRON.json) moet bytegelijk zijn aan deze pin.
+          python -I -c 'import hashlib, json, pathlib, sys; b = json.load(open("apps/api/src/hub/catalog/asf/BRON.json")); r = pathlib.Path(".asf", b["pad"]); fout = [f for f, d in b["bestanden"].items() if "sha256:" + hashlib.sha256((r / f).read_bytes()).hexdigest() != d]; sys.exit(f"validatorkopie wijkt af: {fout}" if fout or b["asf_commit"] != sys.argv[1] else 0)' "$ASF_COMMIT"
           python -m pip install -r .asf/apps/api/requirements.lock
           python -m pip install --no-deps ./.asf/apps/api
       - name: Eigen manifesten valideren (--strict)

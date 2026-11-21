@@ -951,7 +951,8 @@ class CatalogPlan(Base):
     binding: Mapped[dict[str, Any]] = mapped_column(JSONB)
     plan_etag: Mapped[str] = mapped_column(String(122))
     step_id: Mapped[str | None] = mapped_column(String(64))
-    stap_sha256: Mapped[str] = mapped_column(String(71))  # canonieke stapinhoud uit het eigen aanmaakantwoord
+    # canonieke stapinhoud uit het eigen aanmaakantwoord; leeg bij een plan uit de oorspronkelijke 0022 (migratie 0023)
+    stap_sha256: Mapped[str | None] = mapped_column(String(71))
     controles_na_installatie: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     expires_at: Mapped[datetime] = mapped_column(TS)
     status: Mapped[str] = mapped_column(String(32))

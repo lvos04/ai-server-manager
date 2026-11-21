@@ -370,6 +370,10 @@ async def _idempotency(
         from hub.actions.preview import idempotency_response as actieantwoord
 
         response_filter = actieantwoord
+    elif path.startswith("/api/v1/catalog/plans/"):
+        from hub.catalog.plannen import idempotency_response as planantwoord
+
+        response_filter = planantwoord
     return Idempotency(db, scope, key, rhash, response_filter=response_filter)
 
 

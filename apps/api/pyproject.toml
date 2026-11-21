@@ -51,6 +51,8 @@ packages = ["src/hub"]
 line-length = 120
 target-version = "py312"
 src = ["src", "tests"]
+# Letterlijke kopie van de gepinde manifestvalidator (BRON.json); niet herschrijven.
+extend-exclude = ["src/hub/catalog/asf"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF"]
@@ -76,5 +78,5 @@ mypy_path = "src"
 packages = ["hub"]
 
 [[tool.mypy.overrides]]
-module = ["argon2.*", "alembic.*"]
+module = ["argon2.*", "alembic.*", "jsonschema.*"]
 ignore_missing_imports = true

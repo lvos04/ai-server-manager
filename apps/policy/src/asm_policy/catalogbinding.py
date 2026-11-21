@@ -273,9 +273,10 @@ def controleer(regels: tuple[dict[str, Any], ...], params: Mapping[str, Any], ta
         out.append(_f(f"parameters.app_create.values.{naam}", "veld_niet_in_schema", "veld buiten het veldschema"))
     manifest = params.get("manifest") if isinstance(params.get("manifest"), Mapping) else {}
     assert isinstance(manifest, Mapping)
-    if "manifest_sha256" in manifest and manifest["manifest_sha256"] != record.get("manifest_sha256"):
+    # De vertaalde stap moet zelf de hash van het gevalideerde manifest noemen; ontbreken is geen vrijgave (R-VEILIG-4).
+    if manifest.get("manifest_sha256") != record.get("manifest_sha256"):
         out.append(
-            _f("parameters.manifest.manifest_sha256", "manifest_verschilt", "manifesthash wijkt af van het record")
+            _f("parameters.manifest.manifest_sha256", "manifest_verschilt", "manifesthash ontbreekt of wijkt af")
         )
     if ac.get("catalog_app") == IX_APP:
         img = expected_image(params) or {}
@@ -300,13 +301,19 @@ def readback_digest_afwijking(
         return {"code": "digest_niet_bevestigd", "verwacht": sorted(toegelaten), "gevonden": []}
     gevonden: list[str] = []
     for ref in refs:
-        namen = {ref, ref.split("@", 1)[0]}  # ``repo:tag@digest`` staat in app.image.query als ``repo:tag``
-        rijen = [i for i in images if namen & {str(t) for t in i.get("repo_tags") or []}]
-        digests = {str(d).split("@", 1)[-1] for i in rijen for d in i.get("repo_digests") or [] if d}
+        naam, _, eigen = ref.partition("@")  # ``repo:tag@digest`` staat in app.image.query als ``repo:tag``
+        rijen = [i for i in images if {ref, naam} & {str(t) for t in i.get("repo_tags") or []}]
+        per_rij = [{str(d).split("@", 1)[-1] for d in i.get("repo_digests") or [] if d} for i in rijen]
+        digests = set().union(*per_rij)
         gevonden += sorted(digests)
-        if not digests:
-            return {"code": "digest_niet_bevestigd", "verwacht": sorted(toegelaten), "gevonden": []}
-        # Elke rij voor deze tag telt: één niet-toegelaten digest is een afwijking, ook naast een goede (R-VEILIG-7).
-        if digests - toegelaten:
-            return {"code": "digest_verschilt", "verwacht": sorted(toegelaten), "gevonden": sorted(digests)}
+        # Elke rij voor deze tag moet een digest hebben; een rij zonder is geen eenduidig bewijs (R-VEILIG-7).
+        if not per_rij or not all(per_rij):
+            return {"code": "digest_niet_bevestigd", "verwacht": sorted(toegelaten), "gevonden": sorted(digests)}
+        # Elke rij telt, en ook de digest in de actieve imagereferentie zelf: die moet in de release en in de meting.
+        if digests - toegelaten or (eigen and (eigen not in toegelaten or eigen not in digests)):
+            return {
+                "code": "digest_verschilt",
+                "verwacht": sorted(toegelaten),
+                "gevonden": sorted(digests | {eigen} - {""}),
+            }
     return None

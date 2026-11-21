@@ -18,13 +18,11 @@ Onbekend is niet goed: elke ontbrekende, onbereikbare of afwijkende bron geeft e
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
-import json
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
-from functools import lru_cache
-from importlib import resources
 from typing import Any
 
 import yaml
@@ -34,13 +32,15 @@ from asm_policy.catalogbinding import regels_voor_record
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub.actions import service
 from hub.actions.beleid import get_policy
 from hub.catalog.appstore import APPSTORE_APP_ID
+from hub.catalog.asf.manifest.model import Parameter
+from hub.catalog.asf.manifest.translate import _check_value, is_secret
+from hub.catalog.asf.manifest.validator import schema_sha256, validate_data
 from hub.config import Settings
 from hub.deps import Principal
 from hub.errors import HubError
@@ -58,10 +58,9 @@ HOST_ID = "nas-primary"
 STAP_ACTIE = "app.install"
 OPEN = ("klaar_voor_voorstel", "voorgesteld")
 NS = uuid.UUID("8f1d3c52-5b0e-4f7a-9d61-2c4b7e0a9f13")  # vaste naamruimte voor de idempotente stapmelding
-# Kopie van ``manifest-v1.schema.json`` uit appstore-en-fork op ASF_COMMIT (``schema_sha256`` van die validator).
+# ``schema_sha256`` van de gepinde validator (kopie in ``hub.catalog.asf`` van appstore-en-fork op ASF_COMMIT).
 SCHEMA_SHA256 = "sha256:f2f1201a12e28ec88db1ea7e49af2bb7f10b8970dc8b68fae30ec7b33b243ce1"
 INVULBAAR = ("wizard", "dataset_picker")  # bronnen die de aanvrager mag invullen; geheimen openen pas in deel E
-TEKSTTYPES = ("string", "path", "dataset", "url", "timezone", "duration")
 CONTROLE_KEYS = ("id", "soort", "beschrijving_nl")
 
 
@@ -141,47 +140,34 @@ def _weiger(reden: str) -> HubError:
     return _fout(409, "bewijs_ongeldig", "Het catalogusbewijs klopt niet; er wordt niets gepland.", {"reden": reden})
 
 
-@lru_cache(maxsize=1)
-def _schema() -> Draft202012Validator:
-    tekst = resources.files("hub.catalog").joinpath("manifest-v1.schema.json").read_text(encoding="utf-8")
-    data = json.loads(tekst)
-    if canonical_sha256(data) != SCHEMA_SHA256:
-        raise RuntimeError("manifest-v1.schema.json wijkt af van de gepinde schema_sha256")
-    return Draft202012Validator(data)
-
-
 def manifest_fouten(regel: Mapping[str, Any], manifest: Any) -> int:
-    """Aantal schemafouten van het oorspronkelijke manifest; een onbekend schema telt als fout (fail-closed)."""
-    if regel.get("schema_sha256") != SCHEMA_SHA256 or not isinstance(manifest, Mapping):
+    """Aantal fouten van de gepinde validator (schema én regels) voor het oorspronkelijke manifest (§8.1, R-VEILIG-2).
+
+    Een ander schema dan de pin telt als fout (fail-closed)."""
+    if regel.get("schema_sha256") != SCHEMA_SHA256 or schema_sha256() != SCHEMA_SHA256:
         return 1
-    return sum(1 for _ in _schema().iter_errors(dict(manifest)))
-
-
-def _type_past(soort: Any, waarde: Any) -> bool:
-    if soort in TEKSTTYPES:
-        return isinstance(waarde, str) and 0 < len(waarde) <= 500
-    if soort == "integer":
-        return isinstance(waarde, int) and not isinstance(waarde, bool)
-    if soort == "port":
-        return isinstance(waarde, int) and not isinstance(waarde, bool) and 1 <= waarde <= 65535
-    if soort == "boolean":
-        return isinstance(waarde, bool)
-    return soort == "gpu" and waarde in ("none", "intel_render")
+    if not isinstance(manifest, Mapping):
+        return 1
+    rapport, model = validate_data(copy.deepcopy(dict(manifest)))
+    return rapport.errors if model is not None else max(rapport.errors, 1)
 
 
 def parameters_fouten(manifest: Mapping[str, Any], parameters: Mapping[str, Any]) -> list[str]:
-    """Codes voor ingevulde parameters die niet gedeclareerd, niet invulbaar, verkeerd getypt of geheim zijn (§8.1)."""
+    """Codes voor ingevulde parameters die niet gedeclareerd, niet invulbaar, ongeldig of geheim zijn (§8.1).
+
+    De waarde zelf toetst de parametercontrole van de gepinde validator (type, pad, dataset, adres, ...)."""
     decl = {p.get("name"): p for p in manifest.get("parameters") or [] if isinstance(p, Mapping)}
     codes: set[str] = set()
     for naam, waarde in parameters.items():
-        p = decl.get(naam)
+        try:
+            p = Parameter.model_validate(decl[naam]) if naam in decl else None
+        except ValueError:
+            p = None
         if p is None:
             codes.add("niet_gedeclareerd")
-        elif (
-            p.get("source") not in INVULBAAR or p.get("secret") or p.get("type") == "secret_ref" or is_secret_name(naam)
-        ):
+        elif p.source not in INVULBAAR or is_secret(p) or p.type == "secret_ref" or is_secret_name(naam):
             codes.add("niet_invulbaar")
-        elif not _type_past(p.get("type"), waarde):
+        elif _check_value(p, waarde) is not None:
             codes.add("type")
         elif isinstance(waarde, str) and secret_text_reasons(waarde, settings=True):
             codes.add("geheim_in_waarde")
@@ -364,7 +350,7 @@ def maak_plan(
         plan_etag=view["etag"],
         step_id=stap["id"],
         stap_sha256=_stap_sha(stap),
-        controles_na_installatie=[{k: c[k] for k in CONTROLE_KEYS} for c in controles],
+        controles_na_installatie=openbare_controles(controles),
         expires_at=verloopt,
         status=status,
         reden=reden,
@@ -415,8 +401,20 @@ def plan_dict(plan: CatalogPlan) -> dict[str, Any]:
         "release": plan.binding.get("release"),
         "registratie": plan.registratie,
         "melding": plan.melding,
-        "controles_na_installatie": plan.controles_na_installatie,
+        "controles_na_installatie": openbare_controles(plan.controles_na_installatie),
     }
+
+
+def openbare_controles(controles: Any) -> list[dict[str, Any]]:
+    """Alleen de openbare velden, ook uit rijen en antwoorden van vóór het herstel (R-VEILIG-1)."""
+    return [{k: c.get(k) for k in CONTROLE_KEYS} for c in controles or [] if isinstance(c, Mapping)]
+
+
+def idempotency_response(body: Any) -> Any:
+    """Filter voor herhaalde antwoorden van de planroutes: een bewaard oud antwoord lekt geen extra controleveld."""
+    if isinstance(body, dict) and "controles_na_installatie" in body:
+        return {**body, "controles_na_installatie": openbare_controles(body["controles_na_installatie"])}
+    return body
 
 
 def _plan_nu(db: Session, settings: Settings, keyring: KeyRing, plan: CatalogPlan) -> dict[str, Any]:

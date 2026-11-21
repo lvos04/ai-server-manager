@@ -246,7 +246,9 @@ def keten(
             "trusted_key_id": REGEL["publisher_key_sha256"][7:23],
         },
     }
-    planner = FakePlanner(hub_key, install_params("demo-app")).start()
+    stap = install_params("demo-app")
+    stap["manifest"]["manifest_sha256"] = REGEL["manifest_sha256"]  # zoals de planner uit zijn validatierapport
+    planner = FakePlanner(hub_key, stap).start()
     urls = {"appstore-en-fork": store.url, "jelly-leon-platform": planner.url}
     # In productie komen de adressen uit de inventaris (app.query + D03); hier zijn het de testservers.
     monkeypatch.setattr(
@@ -454,6 +456,47 @@ def test_niet_gedeclareerde_of_geheime_parameter_bereikt_de_planner_niet(
         assert marker not in r.text
     assert keten.planner.requests == [] and keten.planner.plans == {}
     assert _plan(keten.stack.admin, parameters={"public_url": "https://demo.test/"}).status_code == 201
+
+
+@pytest.mark.parametrize("waarde", ["voorbeeldmap", "/mnt/testpool/../etc", "/etc/demo"])
+def test_ongeldige_padwaarde_bereikt_de_planner_niet(keten: Keten, waarde: str) -> None:
+    """R-VEILIG-2: de parametercontrole van de gepinde validator weigert een ongeldig pad vóór de planner."""
+    r = _plan(keten.stack.admin, parameters={"data_path": waarde})
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    assert keten.planner.requests == [] and not schrijfaanroepen(keten.stack.nas)
+
+
+def test_bewaarde_oude_antwoordvorm_lekt_niet_bij_lezen_of_herhalen(keten: Keten, app: Any) -> None:
+    """R-VEILIG-1: een plan of cacheantwoord van vóór het herstel met een extra controleveld toont dat veld niet."""
+    import json
+
+    import sqlalchemy as sa
+
+    from hub.models import CatalogPlan, IdempotencyRecord
+
+    admin = keten.stack.admin
+    gemaakt = _plan(admin)
+    assert gemaakt.status_code == 201
+    plan_id = uuid.UUID(gemaakt.json()["plan_id"])
+    sleutel = gemaakt.request.headers["Idempotency-Key"]
+    with app.state.sessionmaker.begin() as db:
+        rij = db.get(CatalogPlan, plan_id)
+        oud = [dict(rij.controles_na_installatie[0], oude_notitie="voorbeeldnotitie")]
+        rij.controles_na_installatie = oud
+        cache = db.scalars(sa.select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(sleutel))).one()
+        cache.response_body = dict(cache.response_body, controles_na_installatie=oud)
+    make_user(admin, "lezer-oud", "viewer")
+    with login_as(app, "lezer-oud") as lezer:
+        gelezen = lezer.get(f"/api/v1/catalog/plans/{plan_id}")
+    herhaald = admin.post(
+        gemaakt.request.url.path, json=json.loads(gemaakt.request.content), headers={"Idempotency-Key": sleutel}
+    )
+    assert gelezen.status_code == 200 and herhaald.headers.get("Idempotent-Replay") == "true"
+    for antwoord in (gelezen.json(), herhaald.json()):
+        assert [set(c) for c in antwoord["controles_na_installatie"]] == [{"id", "soort", "beschrijving_nl"}]
+    with app.state.sessionmaker() as db:
+        cache = db.scalars(sa.select(IdempotencyRecord).where(IdempotencyRecord.key == uuid.UUID(sleutel))).one()
+        assert "oude_notitie" not in json.dumps(cache.response_body)  # de herhaling schoont het cacheantwoord op
 
 
 def test_plannercontroles_alleen_openbare_velden(keten: Keten, app: Any, monkeypatch: pytest.MonkeyPatch) -> None:

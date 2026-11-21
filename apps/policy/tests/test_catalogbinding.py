@@ -37,6 +37,7 @@ def beleid(tmp_path_factory: pytest.TempPathFactory) -> Any:
 def _params(**binding_change: Any) -> dict[str, Any]:
     p = install_params("demo-app")
     p["catalog_binding"] = catalog_binding(catalogus_regel(), **binding_change)
+    p["manifest"]["manifest_sha256"] = catalogus_regel()["manifest_sha256"]
     return p
 
 
@@ -164,6 +165,7 @@ def test_onbekend_formulierveld_van_de_catalogusversie_wordt_geweigerd(tmp_path:
     p["app_create"].update(catalog_app="voorbeeldapp", values={})
     p["manifest"]["install_reason"] = "Controle met een openbaar tekstveld"
     p["catalog_binding"] = catalog_binding(regel)
+    p["manifest"]["manifest_sha256"] = regel["manifest_sha256"]
     assert _codes(beleid, p) == []
     p["app_create"]["values"]["review_weergavetekst"] = "voorbeeld"
     assert "veld_niet_in_schema" in _codes(beleid, p)
@@ -175,6 +177,8 @@ def test_manifesthash_van_de_vertaalde_stap_moet_bij_het_record_passen(beleid: A
     p["manifest"]["manifest_sha256"] = catalogus_regel()["manifest_sha256"]
     assert _codes(beleid, p) == []
     p["manifest"]["manifest_sha256"] = DIGEST_B
+    assert "manifest_verschilt" in _codes(beleid, p)
+    del p["manifest"]["manifest_sha256"]  # ontbreken is geen vrijgave, ook als het record een hash heeft
     assert "manifest_verschilt" in _codes(beleid, p)
 
 
@@ -234,6 +238,15 @@ READBACK: list[tuple[str, list[str], list[dict[str, Any]], str | None]] = [
     ("tegenstrijdige imagerijen", [REF],
      [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]},
       {"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST_B}"]}], "digest_verschilt"),
+    # Een goede rij naast een rij zonder digest voor dezelfde tag: niet eenduidig.
+    ("goede rij en rij zonder digest", [REF],
+     [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]},
+      {"repo_tags": [REF], "repo_digests": []}], "digest_niet_bevestigd"),
+    # De actieve imagereferentie noemt zelf een andere digest dan release en meting.
+    ("actieve referentie met andere digest", [f"{REF}@{DIGEST_B}"],
+     [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]}], "digest_verschilt"),
+    ("actieve referentie met de goede digest", [f"{REF}@{DIGEST}"],
+     [{"repo_tags": [REF], "repo_digests": [f"ghcr.io/voorbeeld/demo-app@{DIGEST}"]}], None),
 ]  # fmt: skip
 
 
