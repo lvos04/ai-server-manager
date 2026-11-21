@@ -26,7 +26,7 @@ const gemeten = (waarde: number, observed_at = VERS): BronCijfer => ({ status: "
 const weg = (reden: string): BronCijfer => ({ status: "onbekend", waarde: null, observed_at: null, reden });
 function overzicht(extra: Partial<MediaGuardOverzicht> = {}): MediaGuardOverzicht {
   return {
-    wanted: gemeten(17), status: gemeten(0), downloads: gemeten(4), av1: gemeten(3), incidenten: gemeten(6),
+    wanted: gemeten(17), status: gemeten(0), downloads: weg("MediaGuard heeft nog geen bijwerkingsvrije downloadbron"), av1: gemeten(3), incidenten: gemeten(6),
     noodstop: { status: "gemeten", actief: false, sinds: null, observed_at: VERS, reden: null }, mediaservers: SERVERS, ...extra,
   };
 }
@@ -113,11 +113,35 @@ describe("Media: toestanden van het scherm", () => {
     expect(tekst(html)).toContain("Noodstop · onbekend: meting verouderd");
   });
 
+  it("verouderd volgens de Hub: onbekend zonder getal, met 'Laatst gemeten' en de bronmeettijd, nooit 'Nog nooit gemeten'", () => {
+    // Vorm van het echte Hub-antwoord bij een verouderde bron (R-VEILIG-5): onbekend, waarde null, oorspronkelijke meettijd.
+    const verouderd: BronCijfer = { status: "onbekend", waarde: null, observed_at: OUD, reden: "meting verouderd" };
+    proef.mg = { data: overzicht({ wanted: verouderd, noodstop: { status: "onbekend", actief: null, sinds: null, observed_at: OUD, reden: "meting verouderd" } }) };
+    const html = inhoud([MG]);
+    const wanted = html.split('data-testid="cijfer-wanted"')[1]!.split("</dl>")[0]!;
+    expect(tekst(wanted)).toContain("Onbekend Laatst gemeten");
+    expect(wanted).toContain("text-stale-ink");
+    expect(wanted).toContain(`dateTime="${OUD}"`);
+    expect(tekst(wanted)).toContain("meting verouderd");
+    expect(wanted).not.toContain("Nog nooit gemeten");
+    expect(tekst(wanted)).not.toMatch(/\b17\b/);
+    expect(html).not.toContain("pauzebalk");
+    expect(html).not.toContain("noodstop-uit");
+    expect(tekst(html)).toContain("Noodstop · onbekend: meting verouderd · laatst gemeten");
+    expect(html).toContain(`<time dateTime="${OUD}">`);
+  });
+
+  it("nooit gemeten: zonder bronmeettijd blijft 'Nog nooit gemeten' staan", () => {
+    const html = inhoud([MG]);
+    expect(html.split('data-testid="cijfer-wanted"')[1]!.split("</dl>")[0]).toContain("Nog nooit gemeten");
+    expect(tegel(html, "wanted")).not.toContain("Laatst gemeten");
+  });
+
   it("verbindingsuitval: het laatste overzicht blijft grijs staan, nooit als actueel", () => {
     proef.mg = { data: overzicht(), error: new HubApiError(503, "api_unavailable", "Niet bereikbaar."), stale: true };
     const html = inhoud([MG]);
-    expect(tegel(html, "downloads")).toContain("Laatst gemeten");
-    expect(tegel(html, "downloads")).toContain("De Hub kon MediaGuard niet opnieuw lezen.");
+    expect(tegel(html, "wanted")).toContain("Laatst gemeten");
+    expect(tegel(html, "wanted")).toContain("De Hub kon MediaGuard niet opnieuw lezen.");
     expect(tekst(html)).toContain("Noodstop · onbekend: De Hub kon MediaGuard niet opnieuw lezen.");
   });
 
@@ -141,7 +165,7 @@ describe("Media: toestanden van het scherm", () => {
   });
 
   it("noodstop aan: de kaart zelf heeft geen knop", () => {
-    const mg: MediaGuardWeergave = { ...mediaguardWeergave(MG, ONBEKEND, NU, false, "x"), noodstop: { actief: true, sinds: "2026-11-21T09:30:00Z", reden: null } };
+    const mg: MediaGuardWeergave = { ...mediaguardWeergave(MG, ONBEKEND, NU, false, "x"), noodstop: { actief: true, sinds: "2026-11-21T09:30:00Z", reden: null, observedAt: VERS } };
     const html = renderToStaticMarkup(<MediaGuardKaart mg={mg} />);
     expect(tekst(html)).toContain("gepauzeerd (noodstop)");
     expect(html).not.toContain("<button");

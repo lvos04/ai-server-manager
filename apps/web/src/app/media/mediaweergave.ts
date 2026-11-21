@@ -46,7 +46,7 @@ export interface MediaGuardWeergave {
   installatie: string;
   servers: Mediaserver[] | null;
   serversReden: string | null;
-  noodstop: { actief: boolean | null; sinds: string | null; reden: string | null };
+  noodstop: { actief: boolean | null; sinds: string | null; reden: string | null; observedAt: string | null };
   cijfers: Cijfer[];
 }
 
@@ -88,7 +88,8 @@ export function mediaguardWeergave(k: Koppeling, o: MediaGuardOverzicht | null, 
     const c = o?.[id];
     const t = c ? meettijd(c.observed_at, nu) : null;
     if (!c || c.status !== "gemeten" || typeof c.waarde !== "number" || t === null) {
-      return { id, titel, waarde: null, zekerheid: "onbekend", observedAt: null, verouderd: false, reden: c?.reden ?? fout };
+      // Een bekende bronmeettijd blijft zichtbaar als "laatst gemeten" (grijs), zonder getal.
+      return { id, titel, waarde: null, zekerheid: "onbekend", observedAt: t === null ? null : c!.observed_at, verouderd: t !== null, reden: c?.reden ?? fout };
     }
     const verouderd = oud || nu - t > MAX_AGE_MS;
     return { id, titel, waarde: c.waarde, zekerheid: "gemeten", observedAt: c.observed_at, verouderd, reden: verouderd ? (oud ? nietActueel : "meting verouderd") : null };
@@ -102,8 +103,8 @@ export function mediaguardWeergave(k: Koppeling, o: MediaGuardOverzicht | null, 
     servers: null,
     serversReden: o?.mediaservers.reden ?? fout,
     noodstop: noodstopVers
-      ? { actief: n.actief, sinds: n.sinds, reden: null }
-      : { actief: null, sinds: null, reden: n?.status === "gemeten" ? (oud ? nietActueel : "meting verouderd") : n?.reden ?? fout },
+      ? { actief: n.actief, sinds: n.sinds, reden: null, observedAt: n.observed_at }
+      : { actief: null, sinds: null, reden: n?.status === "gemeten" ? (oud ? nietActueel : "meting verouderd") : n?.reden ?? fout, observedAt: nt === null ? null : n!.observed_at },
     cijfers,
   };
 }

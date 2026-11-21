@@ -35,7 +35,10 @@ export function CijferTegel({ cijfer, bron }: { cijfer: Cijfer; bron: string }) 
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-border p-3" data-testid={"cijfer-" + cijfer.id}>
       <h4 className="font-semibold">{cijfer.titel}</h4>
       {getal === null ? (
-        <p className="text-2xl font-semibold">Onbekend</p>
+        <p className="text-2xl font-semibold">
+          Onbekend
+          {cijfer.observedAt ? <span className="block text-sm font-semibold text-stale-ink">Laatst gemeten · {formatTime(cijfer.observedAt)}</span> : null}
+        </p>
       ) : verouderd ? (
         <p className="text-2xl text-stale-ink">
           {getal}
@@ -46,7 +49,7 @@ export function CijferTegel({ cijfer, bron }: { cijfer: Cijfer; bron: string }) 
       )}
       {getal !== null && verouderd ? <StatusBadge view={{ tone: "stale", label: "Verouderd" }} /> : null}
       {cijfer.reden ? <p className="text-sm">{getal === null ? "Onbekend: " : ""}{cijfer.reden}</p> : null}
-      <Freshness bron={bron} label="Gemeten" observedAt={getal === null ? null : cijfer.observedAt} verouderd={getal !== null && verouderd} />
+      <Freshness bron={bron} label="Gemeten" observedAt={cijfer.observedAt} verouderd={cijfer.observedAt !== null && verouderd} />
     </div>
   );
 }
@@ -92,7 +95,12 @@ export function MediaGuardKaart({ mg }: { mg: MediaGuardWeergave }) {
           </ul>
         )}
       </section>
-      {mg.noodstop.actief === null ? <p>Noodstop · onbekend: {mg.noodstop.reden}</p> : null}
+      {mg.noodstop.actief === null ? (
+        <p>
+          Noodstop · onbekend: {mg.noodstop.reden}
+          {mg.noodstop.observedAt ? <span className="text-stale-ink"> · laatst gemeten <time dateTime={mg.noodstop.observedAt}>{formatTime(mg.noodstop.observedAt)}</time></span> : null}
+        </p>
+      ) : null}
       {mg.noodstop.actief === false ? <p data-testid="noodstop-uit">Noodstop · uit · gemeten</p> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {mg.cijfers.map((c) => <CijferTegel key={c.id} cijfer={c} bron="MediaGuard" />)}

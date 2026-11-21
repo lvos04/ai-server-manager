@@ -9,20 +9,27 @@ const route = "**/api/v1/adapterkoppelingen?*";
 const overzichtRoute = "**/api/v1/adapterkoppelingen/*/mediaguard";
 const onbekend = { status: "unknown", observed_at: null, reason_code: "geen_alleen_lezen_bron" };
 const CIJFERS = ["wanted", "status", "downloads", "av1", "incidenten"];
+const DOWNLOADS = "MediaGuard heeft nog geen bijwerkingsvrije downloadbron";
 const SERVERS = { status: "onbekend", servers: null, reden: "MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron" };
 
 function mediaguard() {
   return { id: randomUUID(), app_id: "mediaguard", catalog_app_id: randomUUID(), basis_url: "https://media.example", laatste4: "TST4",
     ingevoerd_op: null, version: 1, verbinding: onbekend, gezondheid: onbekend };
 }
-/** Vorm van hub/adapters/mediaguard_lezen.py::Overzicht. */
-function overzicht(tijd: string | null, noodstopAan = false) {
-  const waarden = [17, 0, 4, 3, 6];
-  const cijfers = Object.fromEntries(CIJFERS.map((k, i) => [k, tijd
-    ? { status: "gemeten", waarde: waarden[i], observed_at: tijd, reden: null }
+/**
+ * Vorm van hub/adapters/mediaguard_lezen.py::Overzicht. `verouderd`: zoals de Hub een te oude bronmeting teruggeeft,
+ * onbekend zonder waarde maar met de oorspronkelijke meettijd. Downloads vraagt de Hub nooit op (bijwerkingen in MediaGuard).
+ */
+function overzicht(tijd: string | null, noodstopAan = false, verouderd = false) {
+  const waarden = [17, 0, null, 3, 6];
+  const cijfers = Object.fromEntries(CIJFERS.map((k, i) => [k, k === "downloads"
+    ? { status: "onbekend", waarde: null, observed_at: null, reden: DOWNLOADS }
+    : tijd && verouderd ? { status: "onbekend", waarde: null, observed_at: tijd, reden: "meting verouderd" }
+    : tijd ? { status: "gemeten", waarde: waarden[i], observed_at: tijd, reden: null }
     : { status: "onbekend", waarde: null, observed_at: null, reden: "geen leesrecht" }]));
-  const noodstop = tijd
-    ? { status: "gemeten", actief: noodstopAan, sinds: noodstopAan ? tijd : null, observed_at: tijd, reden: null }
+  const noodstop = tijd && verouderd
+    ? { status: "onbekend", actief: null, sinds: null, observed_at: tijd, reden: "meting verouderd" }
+    : tijd ? { status: "gemeten", actief: noodstopAan, sinds: noodstopAan ? tijd : null, observed_at: tijd, reden: null }
     : { status: "onbekend", actief: null, sinds: null, observed_at: null, reden: "geen leesrecht" };
   return { correlation_id: randomUUID(), ...cijfers, noodstop, mediaservers: SERVERS };
 }
@@ -88,7 +95,7 @@ test("(a) gekoppeld met onbekende MediaGuard-bron: onbekend in plaats van nul, e
   await ready(page);
   for (const id of CIJFERS) {
     const tegel = page.getByTestId("cijfer-" + id);
-    await expect(tegel).toContainText("Onbekend: geen leesrecht");
+    await expect(tegel).toContainText(id === "downloads" ? "Onbekend: " + DOWNLOADS : "Onbekend: geen leesrecht");
     await expect(tegel).not.toContainText(/\b0\b/);
   }
   await expect(page.getByTestId("pauzebalk")).toHaveCount(0);
@@ -108,6 +115,7 @@ test("(b) gevuld: vijf gemeten cijfers, noodstop aan met sinds, mediaservers onb
   await expect(page.getByTestId("cijfer-wanted")).toContainText("17 · gemeten");
   await expect(page.getByTestId("cijfer-status")).toContainText("0 · gemeten");
   await expect(page.getByTestId("cijfer-av1")).toContainText("3 · gemeten");
+  await expect(page.getByTestId("cijfer-downloads")).toContainText("Onbekend: " + DOWNLOADS);
   await expect(page.getByTestId("pauzebalk")).toContainText("MediaGuard is gepauzeerd (noodstop)");
   await expect(page.locator("main")).toContainText("Onbekend: MediaGuard heeft nog geen bijwerkingsvrije mediaserverbron");
   await expect(page.getByTestId("mso-gezondheid")).toContainText("Bereikbaar · gemeten");
@@ -119,12 +127,12 @@ test("(b) gevuld: vijf gemeten cijfers, noodstop aan met sinds, mediaservers onb
   await afdruk(page, info, "gevuld");
 });
 
-test("verouderd: metingen ouder dan vijftien minuten staan grijs als laatst gemeten", async ({ page }, info) => {
+test("verouderd: metingen ouder dan vijftien minuten staan grijs als laatst gemeten, zonder getal", async ({ page }, info) => {
   const nu = new Date();
   const oud = new Date(nu.getTime() - 20 * 60_000).toISOString();
   await page.clock.install({ time: nu });
   await page.route(route, (r) => r.fulfill({ json: { items: [mediaguard(), mso(oud)], next_cursor: null } }));
-  await page.route(overzichtRoute, (r) => r.fulfill({ json: overzicht(oud, true) }));
+  await page.route(overzichtRoute, (r) => r.fulfill({ json: overzicht(oud, true, true) }));
   await page.goto("/media");
   await ready(page);
   const gezondheid = page.getByTestId("mso-gezondheid");
@@ -134,11 +142,12 @@ test("verouderd: metingen ouder dan vijftien minuten staan grijs als laatst geme
   const wanted = page.getByTestId("cijfer-wanted");
   await expect(wanted).toContainText("Laatst gemeten");
   await expect(wanted).toContainText("meting verouderd");
-  // Titel direct gevolgd door het actuele getal; de meettijd zelf kan ook op ":17" eindigen.
-  await expect(wanted).not.toContainText("open17 · gemeten");
-  await expect(wanted.locator(".text-stale-ink")).toContainText("17");
+  await expect(wanted).not.toContainText("Nog nooit gemeten");
+  await expect(wanted.locator(`time[datetime="${oud}"]`)).toBeVisible();
+  await expect(wanted.locator(".text-2xl")).toHaveText(/^Onbekend/);
   await expect(page.getByTestId("pauzebalk")).toHaveCount(0);
-  await expect(page.locator("main")).toContainText("Noodstop · onbekend: meting verouderd");
+  await expect(page.getByTestId("noodstop-uit")).toHaveCount(0);
+  await expect(page.locator("main")).toContainText("Noodstop · onbekend: meting verouderd · laatst gemeten");
   await controleer(page, "media verouderd");
   await afdruk(page, info, "verouderd");
 });
