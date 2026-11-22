@@ -63,8 +63,11 @@ SCHEMA = (
 )
 
 
-# In de geheimenmap (het deel dat bij herstel terugkomt): deze installatie heeft ooit kluisplekken vastgelegd. Zonder
-# het bijbehorende journaal is de kluismarkering dan onbekend, niet leeg (onvolledig herstel; R-VEILIG-2).
+# In de geheimenmap (het deel dat bij herstel terugkomt) staat per gemarkeerde instantie een leeg ankerbestand (naam:
+# de instantie-ID in hex, nooit een waarde). Journaal en ankers moeten dezelfde instanties noemen; een anker zonder rij
+# betekent een onvolledig of ouder hersteld journaal: de markering is dan onbekend, niet leeg (R-VEILIG-2).
+KLUIS_ANKERS = "kluismarkering"
+# Eén anker voor de hele installatie uit de vorige versie (45b75b0); alleen nog gelezen.
 KLUIS_ANKER = "kluis-in-gebruik"
 
 
@@ -88,6 +91,7 @@ class Journal:
         self.path = path
         self.vault = Vault(secrets_dir)
         self.anker = secrets_dir / KLUIS_ANKER
+        self.ankers = secrets_dir / KLUIS_ANKERS
         self._sleutel = os.path.abspath(path)
         # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
         self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
@@ -248,25 +252,48 @@ class Journal:
                 " VALUES (?, ?, ?, ?, ?)",
                 (request_id, app, nas_fingerprint, json.dumps(plekken, sort_keys=True), int(time.time())),
             )
-        # Na de rij: een anker zonder rij kan niet ontstaan, een rij zonder anker laat het journaal zelf gelden.
+        # Na de rij: een anker zonder rij kan niet ontstaan, een rij zonder anker vult het lezen of starten aan.
+        self._zet_anker(app)
+
+    def _zet_anker(self, app: str) -> None:
         try:
-            os.close(os.open(self.anker, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600))
+            self.ankers.mkdir(mode=0o700, exist_ok=True)
+            os.close(os.open(self.ankers / app.encode().hex(), os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600))
         except OSError as exc:
             raise JournalUnavailable(type(exc).__name__) from None
 
+    def _verankerd(self) -> set[str]:
+        """De instanties met een anker; een onleesbare ankermap of een vreemde naam: :class:`JournalUnavailable`."""
+        try:
+            namen = [p.name for p in self.ankers.iterdir()] if self.ankers.exists() else []
+            return {bytes.fromhex(n).decode() for n in namen}
+        except (OSError, ValueError):
+            raise JournalUnavailable("kluisanker_onleesbaar") from None
+
+    def _kluisrijen(self) -> set[str]:
+        with self._connect(aanmaken=False) as conn:
+            return {str(r[0]) for r in conn.execute("SELECT app FROM kluismarkering").fetchall()}
+
+    def vul_kluisankers_aan(self) -> None:
+        """Bij het starten (ook na een upgrade): elke markering in het journaal krijgt haar anker."""
+        for app in self._kluisrijen() - self._verankerd():
+            self._zet_anker(app)
+
     def kluis_gemarkeerd(self, app: str) -> bool:
         """Onleesbaar of ontbrekend journaal: :class:`JournalUnavailable` (de aanroeper weigert dan, §8.3). Lezen maakt
-        nooit een journaal aan. Staat het anker er maar heeft het journaal geen enkele markering, dan is het journaal
-        niet mee hersteld: ook onbekend (R-VEILIG-2)."""
-        with self._connect(aanmaken=False) as conn:
-            rijen = conn.execute("SELECT app FROM kluismarkering").fetchall()
+        nooit een journaal aan. Een anker zonder markering in het journaal (ouder of leeg hersteld journaal), of het
+        anker van de vorige versie bij een journaal zonder markeringen: ook onbekend (R-VEILIG-2)."""
+        rijen = self._kluisrijen()
+        verankerd = self._verankerd()
+        for ontbreekt in rijen - verankerd:
+            self._zet_anker(ontbreekt)
         try:
-            anker = self.anker.exists()
+            oud_anker = self.anker.exists()
         except OSError:
-            anker = True
-        if anker and not rijen:
+            oud_anker = True
+        if verankerd - rijen or (oud_anker and not rijen):
             raise JournalUnavailable("kluismarkering_onvolledig")
-        return any(r[0] == app for r in rijen)
+        return app in rijen
 
     # ------------------------------------------------------------------ gestopt na een afwijking
     @staticmethod

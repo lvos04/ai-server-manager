@@ -348,7 +348,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.secrets_dir.exists():
             # Bij het starten: een onafgemaakte uitvoering (rij "gestart" zonder einde, het proces viel weg na de
             # schrijfaanroep) of een afwijking zonder vrijgave zet de executor op gestopt (R-VEILIG-1/-2, S-P2-030).
-            # Een onleesbaar journaal telt elders al als gestopt.
+            # Een onleesbaar journaal telt elders al als gestopt. Eerst krijgt elke kluismarkering haar anker in de
+            # geheimenmap (ook na een upgrade); vóór stopped(), dat een ontbrekend journaal leeg aanmaakt (R-VEILIG-2).
+            with contextlib.suppress(JournalUnavailable):
+                journal.vul_kluisankers_aan()
             with contextlib.suppress(JournalUnavailable):
                 if (bij_start := journal.stopped()) is not None:
                     log.warning("executor gestopt bij het starten: code=%s", bij_start.get("code"))

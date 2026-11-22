@@ -259,3 +259,94 @@ def test_onvolledig_hersteld_journaal_weigert_bijwerken_zonder_nas(stack: tuple[
     r = execute(c, hub, approved(hub, prop))
     assert r.status_code == 409 and r.json()["code"] == "kluisplekken_recept_ontbreekt", r.text
     assert nas.mutations == []
+
+
+def _momentopname(bron: Path, doel: Path) -> None:
+    import sqlite3
+    from contextlib import closing
+
+    with closing(sqlite3.connect(bron)) as origineel, closing(sqlite3.connect(doel)) as kopie:
+        origineel.backup(kopie)
+
+
+def _markeer(journal: Journal, app: str) -> None:
+    journal.markeer_kluis(str(uuid.uuid4()), app, "sha256:" + "1" * 64, [{"env": "X", "type": "appgeheim"}])
+
+
+@pytest.mark.parametrize("volledig", [True, False], ids=["volledige herstelset", "oudere journaalkopie"])
+def test_herstel_met_een_oudere_journaalkopie_houdt_elke_markering_onbekend(tmp_path: Path, volledig: bool) -> None:
+    import shutil
+
+    from executor.config import Settings
+    from executor.journal import JournalUnavailable
+
+    bron = Hub(tmp_path / "origineel").settings
+    journal = Journal(bron.replay_db, bron.secrets_dir)
+    _markeer(journal, "my-house")
+    eerder = tmp_path / "eerder.sqlite3"
+    _momentopname(bron.replay_db, eerder)
+    _markeer(journal, "demo-app")
+    doel = Settings(data_dir=tmp_path / "hersteld")
+    shutil.copytree(bron.secrets_dir, doel.secrets_dir)
+    _momentopname(bron.replay_db if volledig else eerder, doel.replay_db)
+    hersteld = Journal(doel.replay_db, doel.secrets_dir)
+    if volledig:
+        assert hersteld.kluis_gemarkeerd("demo-app") is True
+        assert hersteld.kluis_gemarkeerd("ongebruikt") is False
+    else:
+        for app in ("my-house", "demo-app", "ongebruikt"):
+            with pytest.raises(JournalUnavailable):
+                hersteld.kluis_gemarkeerd(app)
+
+
+@pytest.mark.parametrize("bij", ["starten", "lezen"])
+def test_markering_zonder_anker_uit_de_vorige_versie_krijgt_haar_anker(tmp_path: Path, bij: str) -> None:
+    """Een rij zonder anker (vorige versie, of onderbroken tussen rij en anker) krijgt het anker alsnog; daarna houdt
+    een herstel van alleen de geheimenmap de markering onbekend."""
+    import shutil
+
+    from executor.config import Settings
+    from executor.journal import JournalUnavailable
+
+    bron = Hub(tmp_path / "origineel").settings
+    journal = Journal(bron.replay_db, bron.secrets_dir)
+    _markeer(journal, "my-house")
+    shutil.rmtree(journal.ankers)
+    if bij == "starten":
+        from executorhelpers import BASE
+
+        from executor.app import create_app
+
+        with TestClient(create_app(bron), base_url=BASE):
+            pass
+    else:
+        assert journal.kluis_gemarkeerd("my-house") is True
+    assert (journal.ankers / b"my-house".hex()).is_file()
+    doel = Settings(data_dir=tmp_path / "hersteld")
+    shutil.copytree(bron.secrets_dir, doel.secrets_dir)
+    hersteld = Journal(doel.replay_db, doel.secrets_dir)
+    assert hersteld.stopped() is None
+    with pytest.raises(JournalUnavailable):
+        hersteld.kluis_gemarkeerd("my-house")
+
+
+def test_anker_van_de_vorige_versie_zonder_markeringen_is_onbekend(tmp_path: Path) -> None:
+    from executor.journal import KLUIS_ANKER, JournalUnavailable
+
+    s = Hub(tmp_path / "nieuw").settings
+    journal = Journal(s.replay_db, s.secrets_dir)
+    assert journal.stopped() is None
+    (s.secrets_dir / KLUIS_ANKER).touch()
+    with pytest.raises(JournalUnavailable):
+        journal.kluis_gemarkeerd("my-house")
+
+
+def test_vreemd_bestand_in_de_ankermap_is_onbekend(tmp_path: Path) -> None:
+    from executor.journal import JournalUnavailable
+
+    s = Hub(tmp_path / "nieuw").settings
+    journal = Journal(s.replay_db, s.secrets_dir)
+    _markeer(journal, "my-house")
+    (journal.ankers / "geen-hex").touch()
+    with pytest.raises(JournalUnavailable):
+        journal.kluis_gemarkeerd("my-house")
