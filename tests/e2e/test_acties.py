@@ -1047,50 +1047,127 @@ def test_zonder_geteste_besluiten_geen_r2_en_geen_opslagmutatie(stack: Stack) ->
     assert schrijfaanroepen(nas) == []
 
 
-def test_bijwerken_vraagt_een_geverifieerd_herstelpunt(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
-    """``requires_backup``: zonder geverifieerd herstelpunt (B12) geen update. App-herstelpunten bestaan in deze
-    versie nog niet; het tweede deel gebruikt een **gesimuleerd** herstelpunt om de binding te tonen."""
-    from hub.actions import blokkades
+def _snapshot(stack: Stack, dataset: str, naam: str) -> dict[str, Any]:
+    """Een checkpoint via de echte route: ``zfs.snapshot.create`` (R1) door de Hub en de executor."""
+    v = stel_voor(
+        stack.admin,
+        "zfs.snapshot.create",
+        {"host_id": "nas-primary", "dataset": dataset},
+        {"naam": naam, "recursief": True},
+    )
+    assert v.status_code == 201 and v.json()["blokkades"] == [], v.text
+    r = voer_uit(stack.admin, v.json())
+    assert r.status_code == 200 and r.json()["resultaat"]["waarschuwingen"] == [], r.text
+    return dict(v.json())
 
+
+def _demo_dataset(stack: Stack) -> None:
+    """Een eigen dataset voor demo-app (zoals een beheerder hem aanmaakt): drie datasets dekken dan de app."""
+    apps = stack.nas.datasets()["testpool/apps"]
+    apps["children"].append({**apps["children"][0], "id": "testpool/apps/demo-app", "name": "testpool/apps/demo-app",
+                             "mountpoint": "/mnt/testpool/apps/demo-app", "children": []})  # fmt: skip
+
+
+def test_bijwerken_vraagt_een_geverifieerd_herstelpunt(stack: Stack) -> None:
+    """``requires_backup`` en de pre-update-gate (S-P2-050f): zonder eigen, geverifieerd checkpoint geen update. Het
+    checkpoint is een snapshot die Hub en executor zelf maakten via de echte route, vers, na de laatste wijziging van
+    de app en op een dataset die de opslag van de app dekt. Geen teststub van ``verified_checkpoint``."""
     admin, nas = stack.admin, stack.nas
+    _demo_dataset(stack)
     assert voer_uit(admin, _installeer(stack)).status_code == 200
+    stack.vernieuw()
     nieuw = {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}}
     v = stel_voor(admin, "app.update", app_target("demo-app"), nieuw).json()
     assert v["risk_class"] == "R2" and _codes(v) == ["backup_checkpoint_ontbreekt"]
+    assert v["blokkades"][0]["details"] == ["geen_passend_checkpoint"]
     _geblokkeerd(keur_goed(admin, v), "backup_checkpoint_ontbreekt")
     # Een herstelpunt dat de aanvrager zelf noemt, is geen bewijs: het veld bestaat niet eens in het voorstel.
     r = stel_voor(admin, "app.update", app_target("demo-app"), {**nieuw, "backup_checkpoint_id": str(uuid.uuid4())})
     assert r.status_code == 422, r.text
+    # Een snapshot van een dataset die de app niet dekt, telt niet.
+    _snapshot(stack, "testpool/photos", "foto")
+    _geblokkeerd(keur_goed(admin, haal(admin, v)), "backup_checkpoint_ontbreekt")
 
-    punt = {"id": str(uuid.uuid4())}
-    monkeypatch.setattr(blokkades, "verified_checkpoint", lambda db, req: punt["id"])
+    eerste = _snapshot(stack, "testpool/apps/demo-app", "voor-update")
     v = haal(admin, v)
     r = keur_goed(admin, v)
-    assert r.status_code == 200 and r.json()["goedkeuring"]["backup_checkpoint_id"] == punt["id"], r.text
-    # Een ander herstelpunt dan bij de goedkeuring: de goedkeuring vervalt.
-    eerste, punt["id"] = punt["id"], str(uuid.uuid4())
+    assert r.status_code == 200 and r.json()["goedkeuring"]["backup_checkpoint_id"] == eerste["request_id"], r.text
+    # Een nieuwer checkpoint dan bij de goedkeuring: de goedkeuring vervalt.
+    tweede = _snapshot(stack, "testpool/apps", "nieuwer")
     r = voer_uit(admin, v)
     assert r.status_code == 409 and r.json()["code"] == "goedkeuring_vervallen", r.text
     assert r.json()["details"]["gewijzigd"] == ["backup_checkpoint_id"]
-    assert schrijfaanroepen(nas) == ["app.create"]
-    punt["id"] = eerste
+    assert schrijfaanroepen(nas) == [
+        "app.create",
+        "pool.snapshot.create",
+        "pool.snapshot.create",
+        "pool.snapshot.create",
+    ]
     v = haal(admin, v)
-    assert keur_goed(admin, v).status_code == 200
+    r = keur_goed(admin, v)
+    assert r.status_code == 200 and r.json()["goedkeuring"]["backup_checkpoint_id"] == tweede["request_id"], r.text
     r = voer_uit(admin, v)
     assert r.status_code == 200 and r.json()["resultaat"]["methode"] == "app.update", r.text
     naam, opties = nas.updated[-1]
     assert naam == "demo-app" and set(opties) == {"values"} and set(opties["values"]) == {"image"}
 
-    # Terugzetten = app.update met de vorige waarden die de executor bij die wijziging bewaarde.
+    # Terugzetten: het checkpoint van vóór de update is nu verouderd; een nieuw checkpoint is nodig.
     vorige = copy.deepcopy(nas.created[0]["values"])
     t = stel_voor(admin, "app.rollback", app_target("demo-app"), {"herstel_van": v["request_id"]}).json()
-    assert t["preview"]["wijziging"]["soort"] == "terugzetten" and t["blokkades"] == []
+    assert t["preview"]["wijziging"]["soort"] == "terugzetten" and _codes(t) == ["backup_checkpoint_ontbreekt"]
+    _snapshot(stack, "testpool", "voor-terugzetten")
+    t = haal(admin, t)
     assert keur_goed(admin, t).status_code == 200
     r = voer_uit(admin, t)
     assert r.status_code == 200 and r.json()["resultaat"]["methode"] == "app.update", r.text
     assert nas.updated[-1] == ("demo-app", {"values": vorige})
-    assert schrijfaanroepen(nas) == ["app.create", "app.update", "app.update"]
+    assert schrijfaanroepen(nas)[-2:] == ["pool.snapshot.create", "app.update"]
     assert "app.update(custom_compose)" not in nas.mutations
+
+
+def test_na_een_migratie_alleen_terug_via_database_herstel(stack: Stack) -> None:
+    """EX15 (ADR-0032 besluit 8): een update die een migratie meldt, is niet op alleen de image terug te zetten. De
+    Hub weigert uit zijn eigen administratie (ook met een vers checkpoint); TrueNAS krijgt geen terugzetaanroep."""
+    admin, nas = stack.admin, stack.nas
+    _demo_dataset(stack)
+    assert voer_uit(admin, _installeer(stack)).status_code == 200
+    stack.vernieuw()
+    _snapshot(stack, "testpool/apps/demo-app", "voor-update")
+    nieuw = {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}, "upgrade": {"migrations": True}}
+    v = stel_voor(admin, "app.update", app_target("demo-app"), nieuw).json()
+    assert v["blokkades"] == [] and keur_goed(admin, v).status_code == 200
+    assert voer_uit(admin, v).status_code == 200
+    _snapshot(stack, "testpool/apps", "voor-terugzetten")
+    t = stel_voor(admin, "app.rollback", app_target("demo-app"), {"herstel_van": v["request_id"]}).json()
+    assert _codes(t) == ["database_herstel_vereist"]
+    _geblokkeerd(keur_goed(admin, t), "database_herstel_vereist")
+    # Een herstelpunt dat geen eigen uitgevoerde wijziging van deze app is: herkomst onbekend.
+    t = stel_voor(admin, "app.rollback", app_target("demo-app"), {"herstel_van": str(uuid.uuid4())}).json()
+    assert _codes(t) == ["herkomst_onbekend"]
+    assert len(nas.updated) == 1
+
+
+def test_kijker_kan_geen_update_voorstellen_of_goedkeuren(stack: Stack) -> None:
+    """Toestandstabel S-P2-050f, rij kijkersrol: alleen lezen; geen voorstel, goedkeuring of uitvoering."""
+    admin, nas = stack.admin, stack.nas
+    _demo_dataset(stack)
+    assert voer_uit(admin, _installeer(stack)).status_code == 200
+    stack.vernieuw()
+    _snapshot(stack, "testpool/apps/demo-app", "voor-update")
+    v = stel_voor(
+        admin, "app.update", app_target("demo-app"), {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}}
+    ).json()
+    make_user(admin, "vera", "viewer")
+    vera = login_as(stack.app, "vera")
+    assert (
+        stel_voor(
+            vera, "app.update", app_target("demo-app"), {"image": {"repository": REPO, "tag": "1.2.5"}}
+        ).status_code
+        == 403
+    )
+    assert keur_goed(vera, v).status_code == 403
+    assert voer_uit(vera, v).status_code == 403
+    assert nas.updated == []
 
 
 def _installeer(stack: Stack) -> dict[str, Any]:

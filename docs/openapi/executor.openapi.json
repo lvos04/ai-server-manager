@@ -105,7 +105,7 @@
             "description": "Geen dienst-JWT van de Hub, of het verzoek is geweigerd: handtekening_ongeldig, verzoek_verlopen, actie_geweigerd, actie_niet_toegestaan, risicoklasse_te_laag, goedkeuring_ontbreekt, goedkeuring_verlopen, goedkeuring_ongeldig"
           },
           "409": {
-            "description": "Niets uitgevoerd: policy_hash_verschilt, nonce_al_gebruikt, goedkeuring_al_gebruikt, goedkeuring_past_niet, doel_gewijzigd, doel_bestaat_niet, doel_bestaat_al, doel_past_niet, pool_niet_gezond, backup_checkpoint_ontbreekt, herstelpunt_onbekend, executor_bezet, executor_gestopt. Of ná de aanroep: afwijking (readback wijkt af; de executor is gestopt)"
+            "description": "Niets uitgevoerd: policy_hash_verschilt, nonce_al_gebruikt, goedkeuring_al_gebruikt, goedkeuring_past_niet, doel_gewijzigd, doel_bestaat_niet, doel_bestaat_al, doel_past_niet, pool_niet_gezond, backup_checkpoint_ontbreekt, herstelpunt_onbekend, checkpoint_ontbreekt, checkpoint_verlopen, checkpoint_afwijkend, checkpoint_dekt_niet, database_herstel_vereist, herkomst_onbekend, executor_bezet, executor_gestopt. Of ná de aanroep: afwijking (readback wijkt af; de executor is gestopt)"
           },
           "422": {
             "description": "validation_error, execution_request_ongeldig of parameters_ongeldig"

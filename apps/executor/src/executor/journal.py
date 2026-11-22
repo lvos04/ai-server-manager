@@ -60,7 +60,19 @@ SCHEMA = (
     "CREATE TABLE IF NOT EXISTS kluismarkering ("
     " request_id TEXT PRIMARY KEY, app TEXT NOT NULL, nas_fingerprint TEXT NOT NULL, plekken TEXT NOT NULL,"
     " created_at INTEGER NOT NULL)",
+    # S-P2-050f: per bijwerken of terugzetten de eigen herkomst (verzegeld) en per snapshotactie het checkpoint.
+    "CREATE TABLE IF NOT EXISTS recept_herkomst ("
+    " id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, app TEXT NOT NULL, box TEXT NOT NULL,"
+    " created_at INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS checkpoint ("
+    " request_id TEXT PRIMARY KEY, dataset TEXT NOT NULL, snapshot TEXT NOT NULL, createtxg TEXT NOT NULL,"
+    " recursief INTEGER NOT NULL, grens INTEGER NOT NULL, created_at INTEGER NOT NULL)",
 )
+AAD_HERKOMST = b"executor-recept-herkomst-v1"
+AAD_OUD = b"executor-oud-vastlegging-v1"
+# In de geheimenmap: de eenmalige vastlegging van de recepten van vóór S-P2-050f is gedaan. Ontbreekt daarna de
+# vastlegging zelf (verlies), dan wordt nooit opnieuw geïnventariseerd (ADR-0032 besluit 8).
+OUD_ANKER = "f-ingebruikname"
 
 
 # In de geheimenmap (het deel dat bij herstel terugkomt) staat per gemarkeerde instantie een leeg ankerbestand (naam:
@@ -92,6 +104,7 @@ class Journal:
         self.vault = Vault(secrets_dir)
         self.anker = secrets_dir / KLUIS_ANKER
         self.ankers = secrets_dir / KLUIS_ANKERS
+        self.oud_anker = secrets_dir / OUD_ANKER
         self._sleutel = os.path.abspath(path)
         # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
         self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
@@ -221,16 +234,158 @@ class Journal:
         return [dict(zip(keys, r, strict=True)) for r in rows]
 
     # ------------------------------------------------------------------ vorige app-waarden (terugzetten)
-    def save_values(self, request_id: str, app: str, values: dict[str, Any]) -> None:
+    def _zegel(self, data: Any, aad: bytes) -> str:
         try:
-            box = self.vault.seal(json.dumps(values, sort_keys=True).encode(), AAD + request_id.encode())
+            return json.dumps(self.vault.seal(json.dumps(data, sort_keys=True).encode(), aad))
         except NasLinkOnleesbaar:
             raise JournalUnavailable("vault.key") from None
+
+    def _open(self, box: str, aad: bytes) -> Any:
+        try:
+            return json.loads(self.vault.open(json.loads(box), aad))
+        except (NasLinkOnleesbaar, ValueError, TypeError):
+            raise JournalUnavailable("zegel_ongeldig") from None
+
+    def save_values(
+        self, request_id: str, app: str, values: dict[str, Any], herkomst: dict[str, Any] | None = None
+    ) -> None:
+        """Het recept (vorige waarden) en, sinds S-P2-050f, in dezelfde transactie de eigen herkomst."""
+        box = self._zegel(values, AAD + request_id.encode())
+        hbox = (
+            self._zegel({**herkomst, "app": app}, AAD_HERKOMST + f"{request_id}:{app}".encode()) if herkomst else None
+        )
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute(
+                    "INSERT OR REPLACE INTO app_values (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
+                    (request_id, app, box, int(time.time())),
+                )
+                if hbox is not None:
+                    conn.execute(
+                        "INSERT INTO recept_herkomst (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
+                        (request_id, app, hbox, int(time.time())),
+                    )
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+
+    # ------------------------------------------------------------------ herkomst en checkpoints (S-P2-050f)
+    def leg_herkomst_vast(self, request_id: str, app: str, herkomst: dict[str, Any]) -> None:
+        """Herkomst van een bijwerking zonder recept (catalogusversie), vóór de schrijfaanroep."""
+        hbox = self._zegel({**herkomst, "app": app}, AAD_HERKOMST + f"{request_id}:{app}".encode())
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO app_values (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
-                (request_id, app, json.dumps(box), int(time.time())),
+                "INSERT INTO recept_herkomst (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
+                (request_id, app, hbox, int(time.time())),
             )
+
+    def herkomsten(self, app: str) -> list[tuple[int, str, dict[str, Any]]]:
+        """``(volgnummer, request_id, herkomst)`` van deze app op volgorde. Een ongeldig zegel of een herkomst van een
+        andere app: :class:`JournalUnavailable` (onbekend, nooit alsnog ``oud``)."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, request_id, box FROM recept_herkomst WHERE app = ? ORDER BY id", (app,)
+            ).fetchall()
+        uit = []
+        for rid, request_id, box in rows:
+            h = self._open(box, AAD_HERKOMST + f"{request_id}:{app}".encode())
+            if not isinstance(h, dict) or h.get("app") != app:
+                raise JournalUnavailable("herkomst_ongeldig")
+            uit.append((int(rid), str(request_id), h))
+        return uit
+
+    def heeft_herkomst(self, request_id: str) -> bool:
+        with self._connect() as conn:
+            return (
+                conn.execute("SELECT 1 FROM recept_herkomst WHERE request_id = ?", (request_id,)).fetchone() is not None
+            )
+
+    def leg_checkpoint_vast(
+        self, request_id: str, dataset: str, snapshot: str, createtxg: str, recursief: bool
+    ) -> None:
+        """Na een geslaagde en teruggelezen snapshot: dit is een checkpoint. ``grens`` is de laatste bijwerking die er
+        toen al was; een latere bijwerking van een app maakt het checkpoint voor die app verouderd."""
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                grens = int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM recept_herkomst").fetchone()[0])
+                conn.execute(
+                    "INSERT INTO checkpoint (request_id, dataset, snapshot, createtxg, recursief, grens, created_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (request_id, dataset, snapshot, createtxg, int(recursief), grens, int(time.time())),
+                )
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+
+    def checkpoint(self, request_id: str) -> dict[str, Any] | None:
+        keys = ("request_id", "dataset", "snapshot", "createtxg", "recursief", "grens", "created_at")
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT request_id, dataset, snapshot, createtxg, recursief, grens, created_at FROM checkpoint"
+                " WHERE request_id = ?",
+                (request_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        uit = dict(zip(keys, row, strict=True))
+        uit["recursief"] = bool(uit["recursief"])
+        return uit
+
+    def gewijzigd_na(self, app: str, grens: int) -> bool:
+        """Of deze app na volgnummer ``grens`` is bijgewerkt of teruggezet (ook een mislukte poging telt)."""
+        with self._connect() as conn:
+            return (
+                conn.execute("SELECT 1 FROM recept_herkomst WHERE app = ? AND id > ?", (app, grens)).fetchone()
+                is not None
+            )
+
+    def oud_vastlegging(self) -> set[tuple[str, str, int]]:
+        """De recepten van vóór S-P2-050f: ``(request_id, app, created_at)``. De eerste keer eenmalig vastgelegd
+        (verzegeld, in één transactie met het tijdanker), daarna alleen gelezen; nooit opnieuw geïnventariseerd.
+        Ontbreekt de vastlegging na de eerste keer, of is het zegel ongeldig: :class:`JournalUnavailable`."""
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                waarde: Any
+                row = conn.execute("SELECT value FROM state WHERE key = 'oud_vastlegging'").fetchone()
+                if row is None:
+                    if self.oud_anker.exists():
+                        raise JournalUnavailable("oud_vastlegging_ontbreekt")
+                    leden = conn.execute(
+                        "SELECT request_id, app, created_at FROM app_values"
+                        " WHERE request_id NOT IN (SELECT request_id FROM recept_herkomst) ORDER BY request_id"
+                    ).fetchall()
+                    data: Any = {"tijdanker": int(time.time()), "leden": [list(r) for r in leden], "aantal": len(leden)}
+                    conn.execute(
+                        "INSERT INTO state (key, value) VALUES ('oud_vastlegging', ?)", (self._zegel(data, AAD_OUD),)
+                    )
+                    waarde = data
+                else:
+                    waarde = self._open(row[0], AAD_OUD)
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        try:
+            os.close(os.open(self.oud_anker, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600))
+        except OSError as exc:
+            raise JournalUnavailable(type(exc).__name__) from None
+        try:
+            lijst = waarde["leden"]
+            if len(lijst) != waarde["aantal"]:
+                raise ValueError
+            return {(str(r[0]), str(r[1]), int(r[2])) for r in lijst}
+        except (KeyError, TypeError, ValueError, IndexError):
+            raise JournalUnavailable("oud_vastlegging_ongeldig") from None
+
+    def recept_tijd(self, request_id: str) -> tuple[str, int] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT app, created_at FROM app_values WHERE request_id = ?", (request_id,)).fetchone()
+        return (str(row[0]), int(row[1])) if row else None
 
     def load_values(self, request_id: str) -> tuple[str, dict[str, Any]] | None:
         with self._connect() as conn:

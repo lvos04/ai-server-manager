@@ -1309,7 +1309,8 @@ def test_snapshot_maken_en_klonen_naar_de_sandbox(tmp_path: Path, versie: str, p
         r = execute(c, hub, signed(hub, prop, risk_class="R1"))
         assert r.status_code == 200, r.text
         assert r.json()["methode"] == f"{prefix}.snapshot.create"
-        assert r.json()["readback"] == {"snapshot": f"{ds}@asm-proef", "aanwezig": True}
+        assert r.json()["readback"] == {"snapshot": f"{ds}@asm-proef", "aanwezig": True, "createtxg": "1001"}
+        assert r.json()["waarschuwingen"] == []  # vastgelegd als checkpoint (S-P2-050f)
         assert r.json()["before_hash"] != r.json()["after_hash"]
         # Dezelfde naam nogmaals: geweigerd vóór de aanroep.
         prop2 = proposal(prop["action_id"], prop["target"], prop["parameters"], expected_version=dataset_etag(ds))

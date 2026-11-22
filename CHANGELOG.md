@@ -4,6 +4,20 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Geverifieerde app-checkpoints en pre-update-gate (S-P2-050f, deel F)
+
+- Een geslaagde, teruggelezen `zfs.snapshot.create` is een checkpoint: de executor legt dataset, snapshot,
+  `createtxg` en recursief vast in zijn journaal. De Hub kiest bij `app.update`/`app.rollback` zelf zijn eigen
+  snapshotverzoek van het laatste uur, van na de laatste wijziging van de app, dat de opslag uit de inventaris
+  dekt; anders `backup_checkpoint_ontbreekt` met de reden. De executor controleert vóór de schrijfaanroep opnieuw:
+  `checkpoint_ontbreekt`, `checkpoint_verlopen`, `checkpoint_afwijkend` (snapshot weg of andere `createtxg`) of
+  `checkpoint_dekt_niet` (dekking uit `app.config`). Fail-closed; geen nieuwe externe dienst.
+- EX15 met optie 3 (ADR-0032 besluit 8): `app.update` kent het optionele veld `upgrade` (`migrations`,
+  `tag_only_rollback_safe`). De executor legt bij elke bijwerking en terugzetting de herkomst verzegeld vast
+  (`buiten_keten`) en bij de eerste start eenmalig de bestaande recepten als `oud`. Na een gemelde migratie weigeren
+  Hub en executor terugzetten op alleen de image (`database_herstel_vereist`); een herstelpunt zonder eigen herkomst
+  geeft `herkomst_onbekend`. Sim-getest tegen contractconforme fakes; NIET GEVALIDEERD (echte NAS).
+
 ### Vastgelegd — Afzonderlijke geheime overdracht (S-P2-050e, M2)
 
 - Platformcontract 1.3 §8.3 legt de overdracht van appgeheimen en het enrollment-token vast. Het ondertekende

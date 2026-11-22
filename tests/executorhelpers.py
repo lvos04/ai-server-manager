@@ -18,6 +18,7 @@ from executor.app import create_app
 from executor.config import Settings
 from executor.firststart import ensure_secrets
 from executor.hublink import HubLinkStore
+from executor.journal import Journal
 from executor.naslink import NasLinkStore
 from executor.truenas import fetch_fingerprint
 from fakes.fake_truenas import FakeTrueNAS, KeyProfile
@@ -166,9 +167,23 @@ def signed(
     )
 
 
+def checkpoint(
+    hub: Hub, dataset: str = "testpool/apps", snapshot: str = "testpool/apps@auto-latest", createtxg: str = "1000"
+) -> str:
+    """Een checkpoint in het eigen journaal van de executor, alsof hij die snapshot zelf maakte (de verificatie zelf
+    blijft echt: bestaan, createtxg, leeftijd en dekking worden bij de uitvoering gecontroleerd)."""
+    request_id = str(uuid.uuid4())
+    Journal(hub.settings.replay_db, hub.settings.secrets_dir).leg_checkpoint_vast(
+        request_id, dataset, snapshot, createtxg, True
+    )
+    return request_id
+
+
 def approved(hub: Hub, prop: dict[str, Any], *, risk_class: str = "R2", **change: Any) -> dict[str, Any]:
     """Ondertekend verzoek met een passende goedkeuring; ``change`` wijzigt velden van de goedkeuring."""
     basis: dict[str, Any] = {"backup_checkpoint_id": str(uuid.uuid4())}
+    if prop.get("action_id") in ("app.update", "app.rollback") and "backup_checkpoint_id" not in change:
+        basis["backup_checkpoint_id"] = checkpoint(hub)
     basis.update(change)
     approval = approval_for(prop, policy_hash=POLICY.hash, risk_class=risk_class, **basis)
     return signed(hub, prop, risk_class=risk_class, approval=approval)

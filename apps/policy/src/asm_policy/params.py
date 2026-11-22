@@ -394,7 +394,16 @@ def _image_ref(img: Any, where: str, digest: Any = None) -> list[Fout]:
 
 
 def _app_update(params: Mapping[str, Any]) -> list[Fout]:
-    out = _only(params, "parameters", {"image", "catalog_version", "image_digest", "manifest_sha256"})
+    out = _only(params, "parameters", {"image", "catalog_version", "image_digest", "manifest_sha256", "upgrade"})
+    if "upgrade" in params:
+        # Upgradecontext (§9 upgrade: migrations, tag_only_rollback_safe; EX15). Hij maakt het terugzetten alleen
+        # strenger: een migratie of een onveilige tag-terugval blokkeert later terugzetten op alleen de tag.
+        up = params["upgrade"]
+        keys = {"migrations", "tag_only_rollback_safe"}
+        out += _only(up, "parameters.upgrade", keys)
+        if isinstance(up, Mapping):
+            for k in sorted(keys & set(up)):
+                out += _bool(up[k], f"parameters.upgrade.{k}")
     has_img, has_cat = "image" in params, "catalog_version" in params
     if has_img == has_cat:
         out.append(_f("parameters", "precies_een", "precies één van image (Custom App) of catalog_version"))

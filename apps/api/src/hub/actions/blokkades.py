@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from asm_policy import Policy
+from asm_policy import checkpoint as cpmod
 from asm_policy.engine import Classification, class_at_least
 from asm_policy.loader import ActieDef
 from sqlalchemy import func, select
@@ -30,6 +31,18 @@ from hub.timeutil import iso, utcnow
 
 NOODSTOP_KEY = "acties.noodstop"
 GATE_DICHT = ("BLK-GATE", "gate_dicht", "Een gate die deze actie nodig heeft, is niet open.")
+DATABASE_HERSTEL = (
+    "BLK-EX15",
+    "database_herstel_vereist",
+    "Na deze versie liep een databasemigratie (of de tag-terugval is onveilig): alleen de image terugzetten kan de "
+    "data beschadigen. Terugzetten kan alleen samen met de database uit het checkpoint, via de eigenaar.",
+)
+HERKOMST_ONBEKEND = (
+    "BLK-HERKOMST",
+    "herkomst_onbekend",
+    "Dit herstelpunt is geen eigen, uitgevoerde bijwerking van deze app; de herkomst is onbekend.",
+)
+APP_WIJZIGINGEN = ("app.update", "app.rollback")
 EXECUTOR_LOS = (
     "BLK-EXECUTOR",
     "executor_niet_gekoppeld",
@@ -45,14 +58,117 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
     return _gate_inputs(db, settings)
 
 
-def verified_checkpoint(db: Session, req: ActionRequest) -> str | None:
-    """Het id van een geverifieerd herstelpunt (B12) van de app binnen het RPO, of ``None``.
+def _app_datasets(db: Session, settings: Settings, app: str) -> list[str] | None:
+    """De datasets van deze app volgens de verse inventaris (opslag → koppelpunt), of ``None`` als dat onbekend is."""
+    from hub.routers.backups import coverage_inputs
 
-    App-herstelpunten (B12) bestaan in deze versie nog niet; daarom altijd ``None`` en dus de blokkade
-    ``backup_checkpoint_ontbreekt`` voor acties met ``requires_backup``. Een id dat een gebruiker of de AI opgeeft,
-    is nooit bewijs: alleen een eigen, geverifieerd record telt.
-    """
-    return None
+    inp = coverage_inputs(db, settings)
+    if inp.apps.get("status") != "ok" or inp.datasets.get("status") != "ok":
+        return None
+    mounts = [(str(d["mountpoint"]), str(d["naam"])) for d in inp.datasets.get("data") or [] if d.get("mountpoint")]
+    rij = next((a for a in inp.apps.get("data") or [] if a.get("naam") == app), None)
+    if rij is None:
+        return None
+    uit: list[str] = []
+    for m in rij.get("opslag") or []:
+        ds = cpmod.dataset_voor_pad(str(m.get("bron") or ""), mounts)
+        if ds is None:
+            return None
+        if ds not in uit:
+            uit.append(ds)
+    return uit
+
+
+def _eigen_wijzigingen(db: Session, req: ActionRequest) -> list[ActionRequest]:
+    """Eigen bijwerkingen en terugzettingen van dit doel die naar de executor gingen, op volgorde."""
+    return list(
+        db.scalars(
+            select(ActionRequest)
+            .where(
+                ActionRequest.doel_sleutel == req.doel_sleutel,
+                ActionRequest.action_id.in_(APP_WIJZIGINGEN),
+                ActionRequest.gestart_op.is_not(None),
+                ActionRequest.id != req.id,
+            )
+            .order_by(ActionRequest.gestart_op)
+        )
+    )
+
+
+def verified_checkpoint(
+    db: Session, settings: Settings, req: ActionRequest, *, now: datetime | None = None
+) -> tuple[str | None, str]:
+    """``(id, reden)``: het id van een eigen, geverifieerd app-checkpoint, of ``None`` met de reden (S-P2-050f).
+
+    Een checkpoint is een eigen ``zfs.snapshot.create`` die de executor uitvoerde en teruglas (aanwezig, met
+    ``createtxg``, zonder ``checkpoint_niet_vastgelegd``), hooguit een uur oud, gemaakt na de laatste eigen bijwerking
+    van deze app, op een dataset die alle opslag van de app dekt. Een id dat een gebruiker of de AI opgeeft, is nooit
+    bewijs. De executor controleert bij de uitvoering zelf opnieuw (bestaan, ``createtxg``, dekking uit
+    ``app.config``)."""
+    if req.action_id not in APP_WIJZIGINGEN:
+        return None, "geen_app_wijziging"
+    now = now or utcnow()
+    app = req.doel_sleutel.removeprefix("app:")
+    nodig = _app_datasets(db, settings, app)
+    if nodig is None:
+        return None, "dekking_onbekend"
+    vanaf = now - timedelta(seconds=cpmod.CHECKPOINT_MAX_SECONDEN)
+    vorige = _eigen_wijzigingen(db, req)
+    if vorige:
+        # Na het einde van de laatste eigen wijziging (``gestart_op`` is op hele seconden afgerond; de laatste
+        # bijwerking van het verzoek ligt altijd ná de werkelijke start).
+        vanaf = max(vanaf, *(t for t in (vorige[-1].gestart_op, vorige[-1].bijgewerkt_op) if t is not None))
+    kandidaten = db.scalars(
+        select(ActionRequest)
+        .where(
+            ActionRequest.action_id == "zfs.snapshot.create",
+            ActionRequest.status == "uitgevoerd",
+            ActionRequest.uitgevoerd_op.is_not(None),
+            ActionRequest.uitgevoerd_op > vanaf,
+        )
+        .order_by(ActionRequest.uitgevoerd_op.desc())
+    )
+    for k in kandidaten:
+        res = k.resultaat if isinstance(k.resultaat, dict) else {}
+        rb_ruw = res.get("readback")
+        rb: dict[str, Any] = rb_ruw if isinstance(rb_ruw, dict) else {}
+        if not (rb.get("aanwezig") is True and rb.get("createtxg")) or "checkpoint_niet_vastgelegd" in (
+            res.get("waarschuwingen") or []
+        ):
+            continue
+        ds = str((k.target or {}).get("dataset") or "")
+        recursief = bool((k.parameters or {}).get("recursief"))
+        if all(cpmod.dekt(ds, recursief, d) for d in nodig):
+            return str(k.id), "geverifieerd"
+    return None, "geen_passend_checkpoint"
+
+
+def ex15(db: Session, req: ActionRequest) -> list[dict[str, Any]]:
+    """EX15 bij de Hub, uit de eigen administratie (ADR-0032 besluit 8): geen terugzetten op alleen de image na een
+    gemelde migratie, en geen herstelpunt dat geen eigen uitgevoerde wijziging van dit doel is."""
+    if req.action_id != "app.rollback":
+        return []
+    eigen = [r for r in _eigen_wijzigingen(db, req) if r.status == "uitgevoerd"]
+    params = req.parameters if isinstance(req.parameters, dict) else {}
+    if "herstel_van" in params:
+        idx = next((i for i, r in enumerate(eigen) if str(r.id) == str(params["herstel_van"])), None)
+        if idx is None:
+            return [_blok(HERKOMST_ONBEKEND)]
+        eigen = eigen[idx:]
+    # shortcut: bij een catalogusrollback telt elke gemelde migratie van dit doel (de Hub kent de vertrekversie niet
+    # per verzoek); de executor kijkt preciezer vanaf de laatste update die van de doelversie vertrok. Versie 2.
+    if any(_migratie(r.parameters) for r in eigen):
+        return [_blok(DATABASE_HERSTEL)]
+    return []
+
+
+def _migratie(params: Any) -> bool:
+    up = params.get("upgrade") if isinstance(params, dict) else None
+    return isinstance(up, dict) and (up.get("migrations") is True or up.get("tag_only_rollback_safe") is False)
+
+
+def _blok(t: tuple[str, str, str]) -> dict[str, Any]:
+    return {"id": t[0], "code": t[1], "reden": t[2], "details": []}
 
 
 def nodige_gates(actie: ActieDef, cls: Classification) -> list[str]:
@@ -201,8 +317,9 @@ def dynamisch(
     out += _tempo(db, policy, actie, req.doel_sleutel, now)
     checkpoint: str | None = None
     if cls.requires_backup:
-        checkpoint = verified_checkpoint(db, req)
+        checkpoint, reden = verified_checkpoint(db, settings, req, now=now)
         if not checkpoint:
             r = policy.dynamisch["checkpoint"]
-            out.append({"id": r.id, "code": r.code, "reden": r.reden_nl, "details": []})
+            out.append({"id": r.id, "code": r.code, "reden": r.reden_nl, "details": [reden]})
+    out += ex15(db, req)
     return out, checkpoint

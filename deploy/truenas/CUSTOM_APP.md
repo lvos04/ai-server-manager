@@ -205,8 +205,12 @@ uitvoeren, dan vervalt de goedkeuring en volgt een nieuwe preview.
 - **Geblokkeerd tot het is opgelost:** pool niet gezond of onbekend, back-up niet groen, executor niet gekoppeld,
   noodstop aan. Zo'n blokkade is niet weg te klikken, ook niet door een beheerder.
 - **Verwijderen van een app** haalt alleen de containers weg; datasets en data blijven staan.
-- **Bijwerken en terugzetten** vragen een geverifieerd herstelpunt van de app. Die herstelpunten bestaan in deze
-  versie nog niet; tot dan weigert de Hub die twee acties eerlijk (`backup_checkpoint_ontbreekt`).
+- **Bijwerken en terugzetten** vragen een geverifieerd herstelpunt van de app: maak eerst via het platform een
+  snapshot (`zfs.snapshot.create`, recursief) van de dataset met de appdata. Hub en executor gebruiken alleen hun
+  eigen snapshot van het laatste uur, van na de vorige wijziging van de app, die alle opslag van de app dekt;
+  anders weigeren ze (`backup_checkpoint_ontbreekt`, bij de executor `checkpoint_*`). Meldt een update een
+  databasemigratie (`upgrade.migrations`), dan kan alleen de image terugzetten niet meer
+  (`database_herstel_vereist`): image en database horen samen terug, via de eigenaar.
 - **Noodstop:** een beheerder legt alle uitvoering in één keer stil.
 
 De schermen hiervoor in de Hub-UI zijn nog niet gebouwd. Tot die er zijn, is dit voor een gebruiker nog niet te

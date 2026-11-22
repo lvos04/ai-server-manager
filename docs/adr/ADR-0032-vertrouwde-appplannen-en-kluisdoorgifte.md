@@ -950,6 +950,45 @@ dicht zolang appstore en planner de §8.1/§8.2-aanvullingen niet leveren (zie m
   geweigerd door de canonieke JSON). Hostpoort in de registratie uit de volgende inventaris (nu `null` met reden).
   Bevestigingsroute voor de controles na installatie. Koppeling van latere acties aan de registratie (F/G).
 
+## Uitvoering deel F (S-P2-050f, 2026-11-22, niveau N5)
+
+Status: gebouwd en Sim-getest tegen contractconforme fakes. NIET GEVALIDEERD (echte NAS). Versie 1: de kern
+(geverifieerd checkpoint, fail-closed pre-update-gate, EX15 met optie 3); de rest staat onder VERSIE 2.
+
+- **Checkpoint.** Alleen een snapshot die het platform zelf maakte via de bestaande actie `zfs.snapshot.create`
+  (adapters en gesimuleerde TrueNAS; geen OneDrive of andere externe dienst, die horen bij 090/100). Na een
+  geslaagde readback legt de executor `request_id`, dataset, snapshot, `createtxg`, recursief en de journaalgrens
+  vast (tabel `checkpoint`); zonder `createtxg` of bij een journaalfout blijft de snapshot staan, met waarschuwing
+  `checkpoint_niet_vastgelegd`, en telt hij niet. De gedeelde regels staan in `asm_policy/checkpoint.py`
+  (`CHECKPOINT_MAX_SECONDEN` = 3600, dekking per dataset, opslag uit `app.config`).
+- **Hub.** `blokkades.verified_checkpoint` kiest het nieuwste eigen uitgevoerde snapshotverzoek met readback
+  `aanwezig` en `createtxg`, hooguit een uur oud, ná het einde van de laatste eigen bijwerking/terugzetting van de
+  app, waarvan de dataset (met recursief) alle datasets van de app uit de verse inventaris dekt. Anders
+  `backup_checkpoint_ontbreekt` met reden (`dekking_onbekend`, `geen_passend_checkpoint`). `Approval.backup_checkpoint_id`
+  bindt het id; een nieuwer checkpoint bij de uitvoering laat de goedkeuring vervallen (bestaand).
+- **Executor (pre-update-gate).** Vóór de eenmalige goedkeuringsnonce en vóór elke schrijfaanroep, voor alle
+  varianten van `app.update` en `app.rollback`: `checkpoint_ontbreekt` (niet in het eigen journaal),
+  `checkpoint_verlopen` (ouder dan een uur of de app is daarna bijgewerkt), `checkpoint_afwijkend` (snapshot weg of
+  andere `createtxg`) en `checkpoint_dekt_niet` (hostpad, ix-volume of `ix-apps/app_mounts/<app>` buiten de
+  snapshot; andere opslagsoorten zoals NFS/SMB of een onbekend pad geven nooit dekking).
+- **EX15, optie 3.** `parameters.upgrade` (`migrations`, `tag_only_rollback_safe`) volgt het manifest (§9) en maakt
+  alleen strenger. De executor bewaart bij elke bijwerking en terugzetting in dezelfde transactie als het recept een
+  verzegelde herkomst (`buiten_keten`, migratievlag, vertrekversie, checkpoint; tabel `recept_herkomst`). Bij de
+  eerste start legt hij eenmalig de bestaande recepten als `oud` vast (verzegeld, met tijdanker en een anker in de
+  geheimenmap; verlies leidt nooit tot opnieuw inventariseren). Terugzetten: een gemelde migratie vanaf het
+  herstelpunt geeft `database_herstel_vereist` (geen rollback-RPC, geen snapshot-rollback); geen eigen herkomst en
+  niet `oud`, of allebei, geeft `herkomst_onbekend`; `oud` en `buiten_keten` gaan door met `herkomst` in het
+  antwoord en één logregel. De Hub weigert uit zijn eigen administratie hetzelfde (`database_herstel_vereist`,
+  `herkomst_onbekend` als het herstelpunt geen eigen uitgevoerde wijziging van dit doel is).
+- **Kluismarkering (050e)** blijft: een gemarkeerde instantie vraagt een recept met alleen verwijzingen.
+- **VERSIE 2.** Herkomst `keten` met ondertekende migratiecontext uit de vertrouwde keten (050g); tot dan is elke
+  update `buiten_keten` en wordt een migratie alleen geweigerd als de update haar zelf meldt (restrisico van optie
+  3). Hub-kopie van de oud-vastlegging met vergelijking, herstelbediening en de R3-beheerdersbevestiging. Een RPO
+  korter dan een uur uit het manifest; dekking van een database-export (alleen ZFS-snapshot nu); een checkpoint
+  over meer datasets; symlinks in hostpaden (M5). Vertrekversie per verzoek bij de Hub voor een preciezere
+  catalogusrollback (nu weigert de Hub na elke gemelde migratie van dit doel). De schaduwinstallatie van besluit 2
+  en de updatevariant met handmatige export (besluit 3) blijven dicht.
+
 ## Open contractmeldingen en tekstvoorstellen
 
 De regisseur laat de eigenaar de open meldingen in eigen opdrachten vaststellen en waar nodig de contractkopieën

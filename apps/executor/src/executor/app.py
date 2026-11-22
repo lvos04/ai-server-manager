@@ -353,6 +353,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             with contextlib.suppress(JournalUnavailable):
                 journal.vul_kluisankers_aan()
             with contextlib.suppress(JournalUnavailable):
+                # Eenmalig: de recepten van vóór S-P2-050f als "oud" vastleggen (ADR-0032 besluit 8, optie 3).
+                journal.oud_vastlegging()
+            with contextlib.suppress(JournalUnavailable):
                 if (bij_start := journal.stopped()) is not None:
                     log.warning("executor gestopt bij het starten: code=%s", bij_start.get("code"))
             resume_after_restart(store)
@@ -703,8 +706,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             409: {
                 "description": "Niets uitgevoerd: policy_hash_verschilt, nonce_al_gebruikt, goedkeuring_al_gebruikt, "
                 "goedkeuring_past_niet, doel_gewijzigd, doel_bestaat_niet, doel_bestaat_al, doel_past_niet, "
-                "pool_niet_gezond, backup_checkpoint_ontbreekt, herstelpunt_onbekend, executor_bezet, "
-                "executor_gestopt. Of ná de aanroep: afwijking (readback wijkt af; de executor is gestopt)"
+                "pool_niet_gezond, backup_checkpoint_ontbreekt, herstelpunt_onbekend, checkpoint_ontbreekt, "
+                "checkpoint_verlopen, checkpoint_afwijkend, checkpoint_dekt_niet, database_herstel_vereist, "
+                "herkomst_onbekend, executor_bezet, executor_gestopt. Of ná de aanroep: afwijking (readback wijkt "
+                "af; de executor is gestopt)"
             },
             422: {"description": "validation_error, execution_request_ongeldig of parameters_ongeldig"},
             501: {"description": "capability_unavailable (geen schrijfsleutel, of TrueNAS kent de methode niet)"},
