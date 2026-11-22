@@ -1368,6 +1368,7 @@ def voer_uit(
     if not actie.via_executor:
         raise HubError(501, "capability_unavailable", "Voor deze actie bestaat in deze versie nog geen uitvoerder.")
     svc, base = _executor(db, settings)
+    kluis.controleer_revisies(db, req)  # een niet-bestaand kluispad: weigering vóór ondertekening (S-P2-070)
 
     # Atomair: eerst de eenmalige nonce van de goedkeuring verbruiken (EX20), dan het voorstel op 'bezig'. Wie tweede
     # komt, wijzigt nul rijen en krijgt 409; er gaat dan niets naar de executor.

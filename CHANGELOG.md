@@ -4,6 +4,17 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Geheimen van catalogusapps via de vault (S-P2-070)
+
+- De preview van een installatie toont per kluisverwijzing `{"verwijzing": "vault://app/<app_id>/<parameter>",
+  "waarde": "geheim, niet getoond"}`; de waarde vult pas de executor in (contract 1.3 §8.3).
+- Een niet-bestaand kluispad weigert vóór ondertekening: een verwijzing buiten de regel geeft geen voorstel, en een
+  gebonden revisie die bij het uitvoeren niet (meer) als die verwijzing van die instantie bestaat geeft
+  `409 kluiswaarde_ontbreekt` zonder ondertekend verzoek, afgifte of schrijfaanroep.
+- De lekzoektocht na een volledige installatie-run loopt nu ook over de preview, het antwoord van elke route van Hub
+  en executor en de hexvorm in binaire kolommen. De tegenproef zet de versleuteling van de app-opslag uit en maakt de
+  zoektocht rood (V-003); zonder de hexvorm bleef die zoektocht groen. Sim-getest; NIET GEVALIDEERD (echte NAS).
+
 ### Toegevoegd — Dynamische blokkades en gates: pool, back-up, boiler (S-P2-060)
 
 - Een eigen back-up die te oud wordt voor de back-upgate geeft nu een kritiek incident `backup.verouderd` (event

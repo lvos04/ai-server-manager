@@ -53,6 +53,12 @@ def test_vult_een_kopie_met_geheim_en_koppeling_in() -> None:
     assert VALUES["envs"][1]["value"] == REF  # het origineel blijft een verwijzing
 
 
+def test_zonder_koppeling_gaat_er_geen_hub_veld_mee() -> None:
+    """S-P2-070 bouwpunt 5: ``HUB_*`` alleen als de eigen regel de app koppelt (tokenplek); anders alleen het geheim."""
+    uit = _vul(token=None, regel={"kluisplekken": REGEL["kluisplekken"][:1]})
+    assert uit["envs"] == [{"name": "APP_MODE", "value": "prod"}, {"name": "APP_SECRET_KEY", "value": GEHEIM}]
+
+
 @pytest.mark.parametrize(
     "geheim",
     [

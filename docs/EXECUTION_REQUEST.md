@@ -82,6 +82,10 @@ Hooguit 15 minuten geldig. Vervalt bij elke wijziging van een gebonden veld (`pr
   `signature`; base64url zonder opvulling. Canonieke JSON = gesorteerde sleutels, scheidingstekens `,` en `:`, UTF-8
   zonder escapes, alleen tekst/gehele getallen/booleans/`null`/lijsten/objecten (geen kommagetallen).
 - De ontvanger probeert elke bij het koppelen gepinde policy-sleutel (`pins.policy`).
+- **Kluisverwijzingen (contract 1.3 §8.3, S-P2-070):** het verzoek draagt alleen `vault://app/<app_id>/<parameter>`
+  met revisie, nooit een waarde. Vlak vóór ondertekening controleert de Hub dat elke gebonden revisie nog als die
+  verwijzing van die instantie in zijn app-opslag staat; anders `kluiswaarde_ontbreekt` (409): niets ondertekend,
+  geen afgifte, de goedkeuring blijft ongebruikt. De preview toont per verwijzing `"geheim, niet getoond"`.
 
 ## Wat de uitvoerder zelf opnieuw controleert
 

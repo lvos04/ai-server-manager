@@ -6,7 +6,7 @@ er iets aan (andere image of digest op de NAS, ander beleid, andere risicoklasse
 goedkeuring (EX19).
 
 Geheimen: waarden van omgevingsvariabelen staan nooit in de preview (alleen de namen); verwijzingen naar de kluis
-(``vault://…``) worden als verwijzing getoond, nooit ingevuld.
+(``vault://…``) worden als verwijzing getoond met :data:`GEHEIM_NIET_GETOOND`, nooit ingevuld (S-P2-070).
 
 Installeren (S-P2-040, R-VEILIG-1; ADR-0030 besluit 32): ``wijziging.waarden`` toont elk gezet veld van
 ``app_create.values`` mét zijn waarde, zodat een beheerder niets ongezien goedkeurt; alleen een geheim niet.
@@ -51,6 +51,7 @@ from hub.actions.doel import Doel
 from hub.redact import LOG_SECRET_KEY_RE, REDACTED, _entropy, redact_text
 
 SCHEMA = "asm-preview/1"
+GEHEIM_NIET_GETOOND = "geheim, niet getoond"  # S-P2-070 bouwpunt 3: de waarde vult pas de executor in
 DATA_BLIJFT = "Datasets en data blijven staan; de Hub en de executor verwijderen nooit data."
 
 
@@ -430,7 +431,7 @@ def _install(target: Mapping[str, Any], parameters: Mapping[str, Any]) -> dict[s
         "omgevingsvariabelen": sorted(
             str(e.get("name")) for e in _lijst(values.get("envs")) if isinstance(e, Mapping) and e.get("name")
         ),
-        "kluisverwijzingen": vault_refs(parameters),
+        "kluisverwijzingen": [{"verwijzing": ref, "waarde": GEHEIM_NIET_GETOOND} for ref in vault_refs(parameters)],
         "resources": resources,
         "gpu": bool((resources or {}).get("gpus")) or bool(manifest.get("gpu")),
         "restart_policy": values.get("restart_policy"),

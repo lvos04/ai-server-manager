@@ -126,6 +126,25 @@ def heeft_kluis(binding: Any) -> bool:
     return isinstance(binding, Mapping) and bool(binding.get("vault_refs") or binding.get("koppeling"))
 
 
+def controleer_revisies(db: Session, req: ActionRequest) -> None:
+    """Vóór ondertekening (S-P2-070): elke gebonden verwijzing bestaat als revisie van deze instantie in de app-opslag.
+    Een niet-bestaand kluispad weigert hier, zonder ondertekend verzoek, afgifte of schrijfaanroep."""
+    binding = (req.parameters or {}).get("catalog_binding")
+    if not heeft_kluis(binding):
+        return
+    assert isinstance(binding, Mapping)  # heeft_kluis
+    instance = str(binding["instance"]["instance_id"])
+    for r in binding.get("vault_refs") or []:
+        row = db.scalars(select(AppGeheim).where(AppGeheim.revision == uuid.UUID(r["revision"]))).first()
+        if row is None or row.ref != r["ref"] or str(row.instance_id) != instance:
+            raise HubError(
+                409,
+                "kluiswaarde_ontbreekt",
+                "Een kluisverwijzing in dit voorstel bestaat niet in de kluis van de Hub; er is niets ondertekend of "
+                "verstuurd.",
+            )
+
+
 def leg_afgifte_vast(db: Session, req: ActionRequest, ap: Approval | None, verzoek: Mapping[str, Any]) -> None:
     """Vlak vóór verzending: de hash van precies dit ondertekende verzoek en de eerst aflopende tijd (hooguit 60 s)."""
     if not heeft_kluis((req.parameters or {}).get("catalog_binding")):

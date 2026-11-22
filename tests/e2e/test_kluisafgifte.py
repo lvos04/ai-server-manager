@@ -6,6 +6,11 @@ met een appgeheim en een tokenplek maakt de app een koppelbare eigen dienst. All
 Toestandstabel (één test per rij): positief (koppelketen), verkeerd type, verkeerd doel, tokenhergebruik, tweede
 claim, ontbrekende ref, extra ref, ander token-veld, andere verzoekhash, verlopen afgifte, kijker- en beheerdersrol,
 andere dienst, vreemde handtekening, onbekend veld, ontbrekende plek in de stap, markering bij bijwerken.
+
+S-P2-070: de zoektocht na een volledige installatie-run loopt over de Hub-tabellen (ook audit en logs), de
+executor-datamap, de preview (de diff), de opgevangen logregels en het antwoord van elke route van Hub en executor; de
+tegenproef zet de afscherming uit en moet de zoektocht rood maken (V-003). Een niet-bestaand kluispad weigert vóór
+ondertekening.
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 from actiehelpers import app_target, keur_goed, schrijfaanroepen, stel_voor, voer_uit
-from conftest import enroll_body, login_as, make_user, service_jwk
+from conftest import enroll_body, idem, login_as, make_user, service_jwk
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from e2e.test_catalogus_installeren import (
     REGEL,
@@ -109,6 +114,7 @@ def _scan(keten: Keten, app: Any, geheimen: list[str], hashes: list[str], tekste
     zoek = [
         *geheimen,
         *(base64.b64encode(g.encode()).decode() for g in geheimen),
+        *(g.encode().hex() for g in geheimen),  # bytea staat in to_jsonb als hex (S-P2-070, tegenproef V-003)
         *hashes,
     ]
     with app.state.sessionmaker() as db:
@@ -123,6 +129,39 @@ def _scan(keten: Keten, app: Any, geheimen: list[str], hashes: list[str], tekste
         assert m.encode() not in ruw
         for tekst in teksten:
             assert m not in tekst
+
+
+def _elke_route(keten: Keten, app: Any, ids: dict[str, str]) -> list[str]:
+    """Het antwoord van elke route uit het schema van de Hub (als beheerder, met de echte id's) en van de executor
+    (S-P2-070). Eerst alle leesroutes, daarna de rest met een lege body; elk antwoord telt mee in de zoektocht."""
+    import httpx
+
+    def pad(p: str) -> str:
+        for naam, waarde in {**ids, "app_uuid": str(uuid.uuid4())}.items():
+            p = p.replace("{" + naam + "}", waarde)
+        return re.sub(r"\{[a-z_]+\}", lambda _m: str(uuid.uuid4()), p)
+
+    admin = keten.stack.admin
+    routes = sorted(
+        ((m.upper(), p) for p, ops in app.openapi()["paths"].items() for m in ops),
+        key=lambda r: (r[0] != "GET", r),
+    )
+    assert len(routes) > 100  # ondergrens: een lege routelijst kan de zoektocht niet groen maken (V-003)
+    afmelden = ("POST", "/api/v1/auth/logout")
+    uit, gelezen = [], 0
+    for methode, p in [*(r for r in routes if r != afmelden), afmelden]:
+        if (methode, p) == afmelden:  # als laatste: tot hier was elke aanroep aangemeld
+            assert admin.get("/api/v1/auth/me").status_code == 200
+        extra: dict[str, Any] = {} if methode == "GET" else {"json": {}}
+        antwoord = admin.request(methode, pad(p), headers=idem(), **extra)
+        gelezen += methode == "GET" and antwoord.status_code == 200
+        uit.append(antwoord.text)
+    assert gelezen >= 40  # ondergrens: de leesroutes gaven echt inhoud terug, geen reeks 401/404 (V-003)
+    ex = json.loads((Path(__file__).parents[2] / "docs/openapi/executor.openapi.json").read_text())
+    for p, ops in ex["paths"].items():
+        for m in ops:
+            uit.append(httpx.request(m.upper(), keten.stack.ex_url + pad(p), json={} if m != "get" else None).text)
+    return uit
 
 
 def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
@@ -167,6 +206,9 @@ def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
         assert grant.secret_hash == hashlib.sha256(token.encode()).hexdigest() and grant.used_at is not None
         assert db.execute(sa.text("SELECT claimed_at FROM kluis_afgifte")).scalar_one() is not None
 
+    # De preview (de diff die de beheerder goedkeurt) noemt alleen de verwijzing, met "geheim, niet getoond".
+    preview = admin.get(f"/api/v1/actions/{v['request_id']}").json()["preview"]
+    assert preview["wijziging"]["kluisverwijzingen"] == [{"verwijzing": REF, "waarde": "geheim, niet getoond"}]
     teksten = [
         r.text,
         json.dumps(admin.get(f"/api/v1/actions/{v['request_id']}").json()),
@@ -207,6 +249,10 @@ def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
     )
     assert r.status_code == 409 and r.json()["code"] == "kluisplekken_recept_ontbreekt", r.text
     assert "app.config" not in keten.stack.nas.mutations
+
+    # Als laatste het antwoord van elke route (de rondgang raakt ook schrijfroutes en het afmelden).
+    routes = _elke_route(keten, app, {"request_id": v["request_id"], "plan_id": plan["plan_id"]})
+    _scan(keten, app, [geheim, token], [hashlib.sha256(geheim.encode()).hexdigest()], [*routes, caplog.text])
 
 
 def test_verwisseld_type_weigert_de_executor_zonder_schrijfaanroep(
@@ -490,3 +536,90 @@ def test_verstreken_venster_bij_ondertekening_geeft_geen_afgiftebewijs(
     r = voer_uit(kluisketen.stack.admin, v)
     assert r.status_code == 409 and r.json()["details"]["executor"]["code"] == "kluis_afgifte_mislukt", r.text
     assert gezien == [(410, "afgifte_verlopen")] and kluisketen.stack.nas.created == []
+
+
+def test_zoektocht_wordt_rood_als_de_afscherming_uit_staat(
+    kluisketen: Keten, app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tegenproef (V-003, S-P2-070): zonder versleuteling in de app-opslag staat het appgeheim leesbaar in de Hub; de
+    zoektocht van de positieve rij moet dat vinden."""
+    from hub.vault import Vault
+
+    encrypt, decrypt = Vault.encrypt, Vault.decrypt
+
+    def onversleuteld(self: Vault, aad: str, tekst: str) -> tuple[bytes, bytes]:
+        return (b"\0" * 12, tekst.encode()) if aad.startswith("vault://app/") else encrypt(self, aad, tekst)
+
+    def leesbaar(self: Vault, aad: str, nonce: bytes, ct: bytes) -> str:
+        return ct.decode() if aad.startswith("vault://app/") else decrypt(self, aad, nonce, ct)
+
+    monkeypatch.setattr(Vault, "encrypt", onversleuteld)
+    monkeypatch.setattr(Vault, "decrypt", leesbaar)
+    _, v = _voorstel(kluisketen)
+    r = voer_uit(kluisketen.stack.admin, v)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    geheim = _envs(kluisketen)["APP_SECRET_KEY"]
+    with pytest.raises(AssertionError, match="app_geheim"):
+        _scan(kluisketen, app, [geheim], [], [])
+
+
+def test_kluisverwijzing_buiten_de_regel_weigert_vóór_ondertekening(
+    admin: Any,
+    app: Any,
+    nas: Any,  # noqa: F811
+    worker_once: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Een verwijzing naar een kluispad dat de regel niet kent: geen revisie, geen voorstel, niets ondertekend."""
+    stap = copy.deepcopy(KLUISSTAP)
+    stap["app_create"]["values"]["envs"][1]["value"] = "vault://app/demo-app/bestaat_niet"
+    getekend = _tel_ondertekeningen(monkeypatch)
+    with maak_keten(admin, app, nas, worker_once, tmp_path, monkeypatch, KLUISREGEL, stap) as k:
+        r = _plan(k.stack.admin)
+        if r.status_code == 201:
+            r = _stel_voor(k.stack.admin, r.json())
+        assert r.status_code in (409, 422), r.text
+        assert not schrijfaanroepen(k.stack.nas) and getekend == []
+        with app.state.sessionmaker() as db:
+            assert db.execute(sa.text("SELECT count(*) FROM app_geheim")).scalar_one() == 0
+            assert db.execute(sa.text("SELECT count(*) FROM kluis_afgifte")).scalar_one() == 0
+
+
+def _tel_ondertekeningen(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Elke ondertekening van een ExecutionRequest door de Hub (de request_id), om "vóór ondertekening" te bewijzen."""
+    from hub.actions import service
+
+    getekend: list[str] = []
+    origineel = service.execreq.sign
+
+    def sign(envelope: Any, key: Any) -> Any:
+        getekend.append(str(envelope.get("request_id")))
+        return origineel(envelope, key)
+
+    monkeypatch.setattr(service.execreq, "sign", sign)
+    return getekend
+
+
+@pytest.mark.parametrize("afwijking", ["revisie weg", "andere verwijzing", "andere instantie"])
+def test_niet_bestaand_kluispad_bij_uitvoeren_weigert_vóór_ondertekening(
+    kluisketen: Keten, app: Any, monkeypatch: pytest.MonkeyPatch, afwijking: str
+) -> None:
+    """Na het akkoord bestaat de gebonden revisie niet (meer) als deze verwijzing van deze instantie: de Hub weigert
+    met ``kluiswaarde_ontbreekt`` vóór ondertekening; geen afgifte of schrijfaanroep, het akkoord blijft ongebruikt."""
+    _, v = _voorstel(kluisketen)
+    with app.state.sessionmaker() as db:
+        sql = {
+            "revisie weg": "DELETE FROM app_geheim",
+            "andere verwijzing": "UPDATE app_geheim SET ref = 'vault://app/demo-app/iets_anders'",
+            "andere instantie": "UPDATE app_geheim SET instance_id = gen_random_uuid()",
+        }[afwijking]
+        db.execute(sa.text(sql))
+        db.commit()
+    getekend = _tel_ondertekeningen(monkeypatch)
+    r = voer_uit(kluisketen.stack.admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "kluiswaarde_ontbreekt", r.text
+    assert getekend == [] and not schrijfaanroepen(kluisketen.stack.nas)
+    with app.state.sessionmaker() as db:
+        assert db.execute(sa.text("SELECT count(*) FROM kluis_afgifte")).scalar_one() == 0
+        assert db.execute(sa.text("SELECT count(*) FROM approval WHERE used_at IS NOT NULL")).scalar_one() == 0
