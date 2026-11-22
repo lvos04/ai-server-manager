@@ -1047,6 +1047,110 @@ def test_zonder_geteste_besluiten_geen_r2_en_geen_opslagmutatie(stack: Stack) ->
     assert schrijfaanroepen(nas) == []
 
 
+def _teken_spion(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Telt elke handtekening die de Hub onder een ``ExecutionRequest`` zet (de echte functie blijft werken)."""
+    from hub.actions import service
+
+    getekend: list[str] = []
+    echt = service.execreq.sign
+
+    def spion(envelope: Any, key: Any) -> Any:
+        getekend.append("ExecutionRequest")
+        return echt(envelope, key)
+
+    monkeypatch.setattr(service.execreq, "sign", spion)
+    return getekend
+
+
+def _voor_gate(stack: Stack, gate: str) -> dict[str, Any]:
+    """Een uitvoerbaar voorstel dat precies deze gate nodig heeft, goedgekeurd terwijl alles nog open is."""
+    admin = stack.admin
+    if gate == "r2_r3_acties":
+        v = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
+    elif gate == "data_mutatie":
+        v = stel_voor(
+            admin, "zfs.snapshot.create", {"host_id": "nas-primary", "dataset": "testpool/apps"}, {"naam": "gate"}
+        ).json()
+    elif gate == "deployment":
+        v = stel_voor(admin, "app.install", app_target("demo-app"), install_params("demo-app")).json()
+    else:  # bestaande_app_updates: met een eigen, geverifieerd checkpoint, zodat alleen de gate in de weg kan staan
+        _demo_dataset(stack)
+        assert voer_uit(admin, _installeer(stack)).status_code == 200
+        stack.vernieuw()
+        _snapshot(stack, "testpool/apps/demo-app", "voor-update")
+        nieuw = {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}}
+        v = stel_voor(admin, "app.update", app_target("demo-app"), nieuw).json()
+    assert v["blokkades"] == [], v
+    if v["risk_class"] in ("R2", "R3"):
+        assert keur_goed(admin, v).status_code == 200
+    return dict(v)
+
+
+@pytest.mark.parametrize(
+    ("gate", "sluit", "code"),
+    [
+        ("r2_r3_acties", {"backup": "oud"}, "backup_gate_rood"),
+        ("data_mutatie", {"D06": "Ingevuld"}, "gate_dicht"),
+        ("deployment", {"D03": "Ingevuld"}, "gate_dicht"),
+        ("bestaande_app_updates", {"D07": "Ingevuld"}, "gate_dicht"),
+    ],
+)
+def test_dichte_gate_ondertekent_niets(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, gate: str, sluit: dict[str, str], code: str
+) -> None:
+    """S-P2-060 bouwpunt 1 (ADR-0030 besluit 11): per gate een actie die al is goedgekeurd. Gaat de gate dicht, dan
+    zet de Hub geen handtekening, verbruikt hij de goedkeuring niet en gaat er niets naar de executor of de NAS. Gaat
+    de gate weer open, dan ondertekent dezelfde route wel (de spion telt echt)."""
+    admin, nas = stack.admin, stack.nas
+    v = _voor_gate(stack, gate)
+    schrijf_voor = list(schrijfaanroepen(nas))
+    getekend = _teken_spion(monkeypatch)
+    besluiten = dict(stack.toestand.besluiten or {})
+    for did, status in sluit.items():
+        if did == "backup":
+            stack.toestand.backup = status
+        else:
+            stack.toestand.besluiten = {**besluiten, did: (status, None)}
+    r = voer_uit(admin, v)
+    _geblokkeerd(r, code)
+    blok = next(b for b in r.json()["details"]["blokkades"] if b["code"] == code)
+    assert blok["reden"] and blok["details"], blok  # vaste code met een Nederlandse uitleg
+    assert getekend == [] and schrijfaanroepen(nas) == schrijf_voor
+    rij = _rij(stack.app, v["request_id"])
+    assert rij.gestart_op is None and rij.execution_nonce is None
+    assert haal(admin, v)["status"] in ("klaar", "goedgekeurd")
+    # Weer open: dezelfde goedkeuring is nog bruikbaar en nu wordt er wel ondertekend en uitgevoerd.
+    stack.toestand.besluiten, stack.toestand.backup = besluiten, "vers"
+    r = voer_uit(admin, v)
+    assert r.status_code == 200, r.text
+    assert len(getekend) == 1 and len(schrijfaanroepen(nas)) > len(schrijf_voor)
+
+
+def test_beheerder_kan_een_gate_niet_wegklikken(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
+    """S-P2-060 (B12-006, ADR-0030 besluit 11): er is geen schrijfroute voor gates, een goedkeuring met extra velden
+    bestaat niet en een beheerder kan een ongezonde pool niet overrulen. Er wordt niets ondertekend."""
+    admin, nas = stack.admin, stack.nas
+    gates = {p: set(m) for p, m in stack.app.openapi()["paths"].items() if p.startswith("/api/v1/gates")}
+    assert gates and all(m == {"get"} for m in gates.values()), gates
+    for methode in ("post", "put", "patch", "delete"):
+        for pad in ("/api/v1/gates", "/api/v1/gates/data_mutatie", "/api/v1/gates/data_mutatie/override"):
+            r = getattr(admin, methode)(
+                pad, headers=idem(), **({} if methode == "delete" else {"json": {"open": True}})
+            )
+            assert r.status_code in (404, 405), (methode, pad, r.status_code)
+    v = stel_voor(admin, "app.install", app_target("demo-app"), install_params("demo-app")).json()
+    assert keur_goed(admin, v).status_code == 200
+    nas.data["pool.query"][0]["healthy"] = False
+    stack.vernieuw()
+    getekend = _teken_spion(monkeypatch)
+    for extra in ({"blokkades_negeren": True}, {"gate": "open"}, {"override": True}):
+        r = keur_goed(admin, haal(admin, v), **extra)  # type: ignore[arg-type]
+        assert r.status_code in (409, 422) and r.status_code != 200, r.text
+    _geblokkeerd(voer_uit(admin, v), "pool_niet_gezond")
+    assert admin.get("/api/v1/gates/data_mutatie").json()["status"] == "geblokkeerd"
+    assert getekend == [] and schrijfaanroepen(nas) == []
+
+
 def _snapshot(stack: Stack, dataset: str, naam: str, recursief: bool = True) -> dict[str, Any]:
     """Een checkpoint via de echte route: ``zfs.snapshot.create`` (R1) door de Hub en de executor."""
     v = stel_voor(

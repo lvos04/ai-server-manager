@@ -228,7 +228,12 @@ def test_onbekend_id_met_een_verboden_woord_verderop_wordt_als_onbekend_geweiger
     ],
 )
 def test_ex27_boiler_wordt_altijd_geweigerd(action_id: str, target: dict[str, Any], parameters: dict[str, Any]) -> None:
-    for actor in ("user", "ai", "flow"):
+    """Elke route (S-P2-060 bouwpunt 4): mens via de Hub-API, automatisering (flow), AI-voorstel, spraak, dienst en
+    systeem. De executor gebruikt dezelfde classificatie bij zijn eigen controle (``check_decision``)."""
+    from asm_policy.engine import ACTOR_TYPES
+
+    assert {"user", "ai", "flow"} <= set(ACTOR_TYPES)
+    for actor in ACTOR_TYPES:
         c = classify(POLICY, action_id=action_id, target=target, parameters=parameters, actor_type=actor)
         assert c.geweigerd and c.risk_class == "R3"
         assert "boiler_verboden" in [b.code for b in c.blokkades]

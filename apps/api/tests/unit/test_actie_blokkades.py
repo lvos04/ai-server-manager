@@ -118,3 +118,19 @@ def test_meerdere_oorzaken_komen_allemaal_boven() -> None:
     uit = _uitkomst(pools={"status": "unknown"}, backup_uur=None, executor=False, besluiten={"D04": "Open"})
     codes = _codes(uit, ["r2_r3_acties", "data_mutatie", "deployment"])
     assert {"pool_niet_gezond", "backup_gate_rood", "executor_niet_gekoppeld"} <= codes
+
+
+def test_elke_opslagmutatie_vraagt_de_poolgate_en_riskante_media_acties_bestaan_niet() -> None:
+    """EX11 (S-P2-060 bouwpunt 2): elke toegestane actie met ``opslagmutatie`` loopt via ``data_mutatie`` (en dus via
+    de poolmeting); een riskante media-actie (wissen, opschonen) staat niet op de allowlist en wordt altijd
+    geweigerd, ook als de pool gezond is."""
+    opslag = [a for a in POLICY.acties.values() if a.opslagmutatie]
+    assert opslag, "geen opslagmutaties in het beleid"
+    for a in opslag:
+        cls = classify(POLICY, action_id=a.action_id, target={"host_id": HOST}, parameters={}, actor_type="user")
+        assert "data_mutatie" in nodige_gates(a, cls), a.action_id
+    uit = _uitkomst(pools={"status": "ok", "data": [{"naam": "p", "gezond": False, "status": "DEGRADED"}]})
+    assert _codes(uit, ["data_mutatie"]) == {"pool_niet_gezond"}
+    for aid in ("media.purge", "mediaguard.purge.start", "jellyfin.media.delete", "downloads.wipe"):
+        c = classify(POLICY, action_id=aid, target={"host_id": HOST}, parameters={}, actor_type="user")
+        assert c.geweigerd and POLICY.actie(aid) is None, aid
