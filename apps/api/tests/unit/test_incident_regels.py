@@ -191,6 +191,20 @@ def test_verouderde_eigen_backup_is_een_kritiek_incident() -> None:
     assert classify(ev("zoeken-en-persoonlijke-ai", "backup.freshness.recovered", {}, ent)) is None
 
 
+@pytest.mark.parametrize("status", ["verouderd", "aanmelding_verlopen"])
+def test_verouderde_of_afgemelde_externe_backup_is_een_kritiek_incident(status: str) -> None:
+    """B12-004 (S-P2-090): verouderde upload of verlopen OneDrive-aanmelding → probleem met hoge prioriteit; weer
+    actueel → herstel op dezelfde vingerafdruk. Een andere dienst kan dit incident niet maken of sluiten."""
+    ent = ("offsite_backup", "hub")
+    p = classify(ev(APP_ID, "backup.offsite.stale", {"status": status, "reden": status}, ent, "outbox"))
+    h = classify(ev(APP_ID, "backup.offsite.recovered", {"status": "ok"}, ent, "outbox"))
+    assert p is not None and (p.rol, p.soort, p.ernst) == ("probleem", "backup.extern", "kritiek")
+    assert "backup_gate_rood" in p.samenvatting and p.details["status"] == status
+    assert ("aanmelding verlopen" in p.titel) is (status == "aanmelding_verlopen")
+    assert h is not None and h.rol == "herstel" and h.vingerafdruk == p.vingerafdruk
+    assert classify(ev("zoeken-en-persoonlijke-ai", "backup.offsite.stale", {"status": status}, ent)) is None
+
+
 def test_vaste_service_events_en_oude_namen() -> None:
     rej = classify(ev("home-control-hub", "service.key_rotation.rejected", entity=("service", "home-control-hub")))
     assert rej and rej.rol == "probleem"

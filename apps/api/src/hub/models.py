@@ -341,6 +341,25 @@ class SelfBackup(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
 
 
+class Herstelpunt(Base):
+    """Herstelpunt per app (B12-006): een eigen, teruggelezen snapshot (``checkpoint_id`` = de uitgevoerde
+    ``zfs.snapshot.create``-actie, wat de executor zelf controleert) plus de database-export die erbij hoort. Alleen
+    ``status = geverifieerd`` en jonger dan de RPO uit D16 telt voor de pre-update-gate. HARDE EIS: voor Emby, de
+    mediaserver en MediaGuard is het zonder geverifieerde database-export nooit ``geverifieerd``."""
+
+    __tablename__ = "herstelpunt"
+    __table_args__ = (UniqueConstraint("checkpoint_id", "app", name="uq_herstelpunt_checkpoint_app"),)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    app: Mapped[str] = mapped_column(String(128), index=True)
+    checkpoint_id: Mapped[str] = mapped_column(String(80))
+    gemaakt_op: Mapped[datetime] = mapped_column(TS)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # {actie_id, datasets}
+    db_export: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    status: Mapped[str] = mapped_column(String(24))  # geverifieerd | niet_geverifieerd
+    reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    vastgelegd_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
+
+
 class RestoreTest(Base):
     """Expliciet bewijsrecord van een echte hersteltest (handmatig; de Hub voert in P0 zelf geen restore uit)."""
 

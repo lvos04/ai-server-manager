@@ -138,6 +138,8 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/backups/restore-tests"): "viewer",
     ("POST", "/api/v1/backups/restore-tests"): "admin",
     ("GET", "/api/v1/backups/self"): "viewer",
+    ("GET", "/api/v1/backups/extern"): "viewer",
+    ("GET", "/api/v1/backups/herstelpunten"): "viewer",
     ("POST", "/api/v1/backups/self"): "admin",
     ("POST", "/api/v1/backups/self/{backup_id}/verify"): "operator",
     ("GET", "/api/v1/backups/snapshot-policy/proposal"): "viewer",

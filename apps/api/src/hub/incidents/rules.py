@@ -175,6 +175,13 @@ def _safe_details(ev: EventIn, keys: tuple[str, ...] | None = None) -> dict[str,
 
 ADAPTER_HEALTH_FAILED = "monitoring.adapter_health.failed"
 BACKUP_VEROUDERD_FP = f"{APP_ID}:eigen_backup_verouderd"
+OFFSITE_FP = f"{APP_ID}:extern_backup"
+OFFSITE_TITEL = {
+    "aanmelding_verlopen": "OneDrive-aanmelding verlopen: externe back-up loopt niet",
+    "mislukt": "Externe back-up (OneDrive) mislukt",
+    "ontbreekt": "Externe back-uptaak uit D04 ontbreekt of staat uit",
+    "verouderd": "Externe back-up (OneDrive) verouderd",
+}
 ADAPTER_HEALTH_RECOVERED = "monitoring.adapter_health.recovered"
 
 
@@ -512,6 +519,36 @@ def _hub(ev: EventIn) -> Signaal | None:
             "Auditspoor",
             samenvatting="De controle van het auditspoor vond een wijziging, gat of afgeknipte staart.",
             details=_safe_details(ev, ("fouten", "anker")),
+        )
+    if et in ("backup.offsite.stale", "backup.offsite.recovered"):
+        # B12-004/EX12: verouderde upload of verlopen aanmelding → hoge prioriteit; de back-upgate blijft dicht.
+        if et.endswith("recovered"):
+            return Signaal(
+                "herstel",
+                "backup.extern",
+                OFFSITE_FP,
+                "Externe back-up weer actueel",
+                "info",
+                "hub:backup",
+                "offsite_backup",
+                "hub",
+                "Externe back-up (OneDrive)",
+                samenvatting="Elke taak uit D04 heeft weer een verse, geslaagde upload.",
+            )
+        status = _s(p.get("status"), 32)
+        return Signaal(
+            "probleem",
+            "backup.extern",
+            OFFSITE_FP,
+            OFFSITE_TITEL.get(status, "Externe back-up niet in orde") + ": R2/R3-acties en opslagmutaties dicht",
+            "kritiek",
+            "hub:backup",
+            "offsite_backup",
+            "hub",
+            "Externe back-up (OneDrive)",
+            samenvatting=f"Externe back-up: {status} ({_s(p.get('reden'), 64)}); de back-upgate blijft dicht "
+            "(backup_gate_rood) tot elke taak uit D04 weer een verse, geslaagde upload heeft.",
+            details=_safe_details(ev, ("status", "reden", "taken", "max_leeftijd_s")),
         )
     if et in ("backup.freshness.stale", "backup.freshness.recovered"):
         # EX12: de laatste geverifieerde eigen back-up is te oud; de back-upgate (en daarmee R2/R3) is dicht.

@@ -225,11 +225,36 @@ def _backup_versheid(db: Session, ctx: Context) -> bool:
     return verouderd
 
 
+def _extern_backup(db: Session, ctx: Context) -> str:
+    """B12-004: verouderde upload of verlopen aanmelding van de externe back-up → event ``backup.offsite.stale`` (→
+    incident met hoge prioriteit); alleen een positief ``ok`` geeft ``.recovered``. ``unknown`` laat het incident
+    staan zoals het is (de gate is dan wel dicht). Zelfde beoordeling als de back-upgate (één waarheid)."""
+    from hub.events.envelope import emit
+    from hub.incidents import engine, rules
+    from hub.routers.onboarding import gate_inputs
+
+    e = gate_inputs(db, ctx.settings).extern_backup or {"status": "unknown", "reden": "niet_gemeten"}
+    open_ = engine.active_for(db, rules.OFFSITE_FP) is not None
+    probleem = e["status"] not in ("ok", "unknown")
+    if probleem != open_ and e["status"] != "unknown":
+        taken = [{"id": t.get("id"), "status": t.get("status"), "reden": t.get("reden")} for t in e.get("taken") or []]
+        emit(
+            db,
+            "backup.offsite.stale" if probleem else "backup.offsite.recovered",
+            "offsite_backup",
+            "hub",
+            {"status": e["status"], "reden": e.get("reden"), "taken": taken, "max_leeftijd_s": e.get("max_leeftijd_s")},
+        )
+        db.flush()
+    return str(e["status"])
+
+
 def _task_incidents(db: Session, ctx: Context) -> dict[str, Any]:
     from hub.incidents import engine
 
     verouderd = _backup_versheid(db, ctx)
-    return {**engine.run(db, ctx.settings, ctx.now), "backup_verouderd": verouderd}
+    extern = _extern_backup(db, ctx)
+    return {**engine.run(db, ctx.settings, ctx.now), "backup_verouderd": verouderd, "extern_backup": extern}
 
 
 def _task_logs(db: Session, ctx: Context) -> dict[str, Any]:

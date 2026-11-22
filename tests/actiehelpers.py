@@ -27,7 +27,11 @@ from nashelpers import connect, refresh
 
 HOST = "nas-primary"
 EX_BASE = "http://executor.local"
-ALLE_BESLUITEN = {f"D{n:02d}": ("Getest", None) for n in range(1, 19)}
+# D16 met een RPO van een dag voor de testapps: zonder RPO telt geen enkel herstelpunt (S-P2-090, fail-closed).
+TEST_APPS = ("demo-app", "demo", "huis", "my-house", "andere-app", "fotos", "mediabak", "mediaspeler", "jellyfin")
+D16_TEST = {"per_app": [{"app_id": a, "rpo_uren": 24, "rto_uren": 4} for a in TEST_APPS]}
+ALLE_BESLUITEN: dict[str, tuple[str, Any]] = {f"D{n:02d}": ("Getest", None) for n in range(1, 19)}
+ALLE_BESLUITEN["D16"] = ("Getest", D16_TEST)
 
 
 class Served:
@@ -56,6 +60,7 @@ class Toestand:
 
     besluiten: dict[str, tuple[str, Any]] | None = field(default_factory=lambda: dict(ALLE_BESLUITEN))
     backup: str = "vers"  # vers | geen | oud | echt
+    extern: str = "vers"  # vers | echt (de echte beoordeling van de OneDrive-taken uit D04, B12-004)
 
 
 @dataclass
@@ -80,7 +85,7 @@ class Stack:
 
 
 def zet_gate_invoer(monkeypatch: Any, toestand: Toestand) -> None:
-    """Besluiten en eigen back-up als *gemeten invoer* zetten; pool en executor blijven echt gemeten."""
+    """Besluiten, eigen en externe back-up als *gemeten invoer* zetten; pool en executor blijven echt gemeten."""
     from hub.actions import blokkades
     from hub.routers.onboarding import gate_inputs as echte
     from hub.timeutil import utcnow
@@ -96,6 +101,8 @@ def zet_gate_invoer(monkeypatch: Any, toestand: Toestand) -> None:
             inp.eigen_backup = {"finished_at": oud, "sha256": "sha256:" + "c" * 64, "id": str(uuid.uuid4())}
         elif toestand.backup == "geen":
             inp.eigen_backup = None
+        if toestand.extern == "vers":
+            inp.extern_backup = {"status": "ok", "reden": None, "taken": []}
         return inp
 
     monkeypatch.setattr(blokkades, "gate_inputs", invoer)

@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
+
 from hub.backup.coverage import CoverageInputs, compute, snapshot_policy_proposal
 from hub.timeutil import iso
 
@@ -171,3 +173,93 @@ def test_snapshotvoorstel_met_ruimtewaarschuwing() -> None:
     assert set(by_ds) == {"p/apps/hub", "p/photos"}
     assert by_ds["p/apps/hub"]["voorstel"]["frequentie"] == "dagelijks"
     assert any("85.0% vol" in w for w in prop["waarschuwingen"])
+
+
+# ---------------------------------------------------------------- OneDrive-verificatie (B12-004, S-P2-090)
+D04 = ("Ingevuld", {"methode": "truenas_cloud_sync", "taken": ["Foto's naar OneDrive"]})
+MAX = 26 * 3600
+
+
+def _taak(staat: str | None, uur_geleden: float = 4, fout: str | None = None, **over: Any) -> dict[str, Any]:
+    job = (
+        None if staat is None else {"staat": staat, "beeindigd": iso(NOW - timedelta(hours=uur_geleden)), "fout": fout}
+    )
+    t = {
+        "id": 1,
+        "omschrijving": "Foto's naar OneDrive",
+        "richting": "PUSH",
+        "is_onedrive": True,
+        "ingeschakeld": True,
+        "laatste_job": job,
+    }
+    return {**t, **over}
+
+
+def _extern(*taken: dict[str, Any], d04: Any = D04, cloudsync: Any = None) -> dict[str, Any]:
+    from hub.backup.offsite import beoordeel
+
+    return beoordeel(d04, cloudsync or ok(list(taken)), NOW, MAX)
+
+
+def test_extern_vers_en_geslaagd_is_ok() -> None:
+    uit = _extern(_taak("SUCCESS"))
+    assert uit["status"] == "ok" and uit["taken"][0]["status"] == "ok"
+
+
+@pytest.mark.parametrize(
+    ("taak", "status", "reden"),
+    [
+        (_taak("SUCCESS", uur_geleden=27), "verouderd", "laatste_upload_te_oud"),
+        (_taak("SUCCESS", uur_geleden=-1), "verouderd", "laatste_upload_te_oud"),  # in de toekomst
+        (_taak(None), "verouderd", "nooit_geupload"),
+        (_taak("FAILED", fout="invalid_grant: AADSTS70008 refresh token expired"), "aanmelding_verlopen", None),
+        (_taak("FAILED", fout="Failed to copy: quota"), "mislukt", "laatste_upload_mislukt"),
+        (_taak("SUCCESS", ingeschakeld=False), "ontbreekt", "taak_uit_of_geen_onedrive_push"),
+        (_taak("SUCCESS", is_onedrive=False), "ontbreekt", "taak_uit_of_geen_onedrive_push"),
+        (_taak("SUCCESS", omschrijving="iets anders", id=9), "ontbreekt", "taak_niet_gevonden"),
+        (_taak("RUNNING"), "unknown", "job_running"),
+    ],
+)
+def test_extern_negatief_nooit_ok(taak: dict[str, Any], status: str, reden: str | None) -> None:
+    uit = _extern(taak)
+    assert uit["status"] == status and uit["reden"] == (reden or status)
+
+
+def test_extern_onbekend_zonder_bruikbare_invoer() -> None:
+    assert _extern(_taak("SUCCESS"), d04=None)["reden"] == "d04_niet_ingevuld"
+    assert _extern(_taak("SUCCESS"), d04=("Ingevuld", {"methode": "rclone", "taken": ["x"]}))["reden"] == (
+        "capability_unavailable"
+    )
+    assert _extern(cloudsync=UNKNOWN)["status"] == "unknown"
+    # Eén goede en één verouderde taak: het slechtste telt.
+    d04 = ("Getest", {"methode": "truenas_cloud_sync", "taken": ["Foto's naar OneDrive", "2"]})
+    uit = _extern(_taak("SUCCESS"), _taak("SUCCESS", uur_geleden=30, id=2, omschrijving="b"), d04=d04)
+    assert uit["status"] == "verouderd" and [t["status"] for t in uit["taken"]] == ["ok", "verouderd"]
+
+
+# ---------------------------------------------------------------- herstelpunt per app (B12-006, S-P2-090)
+DB = {"bron": "connector", "id": "x", "sha256": "a" * 64}
+
+
+@pytest.mark.parametrize(
+    ("namen", "db_export", "uur_oud", "rpo_uur", "verwacht"),
+    [
+        ({"demo-app"}, None, 0.5, 24, ("geverifieerd", None, True)),
+        ({"demo-app"}, None, 0.5, None, ("geverifieerd", "rpo_onbekend", False)),
+        ({"demo-app"}, None, 2, 1, ("geverifieerd", "herstelpunt_ouder_dan_rpo", False)),
+        ({"demo-app"}, None, -0.1, 24, ("geverifieerd", "herstelpunt_ouder_dan_rpo", False)),  # toekomst
+        # HARDE EIS: MediaGuard, Emby en de mediaserver alleen mét database (kijkgeschiedenis, voortgang).
+        ({"media-guard", "mediaguard"}, None, 0.5, 24, ("niet_geverifieerd", "database_export_ontbreekt", False)),
+        ({"emby"}, {"sha256": None}, 0.5, 24, ("niet_geverifieerd", "database_export_ontbreekt", False)),
+        ({"jellyfin"}, None, 0.5, 24, ("niet_geverifieerd", "database_export_ontbreekt", False)),
+        ({"mediaguard"}, DB, 0.5, 24, ("geverifieerd", None, True)),
+    ],
+)
+def test_herstelpunt_telt_alleen_geverifieerd_en_binnen_rpo(
+    namen: set[str], db_export: Any, uur_oud: float, rpo_uur: float | None, verwacht: tuple[str, Any, bool]
+) -> None:
+    from hub.actions.blokkades import beoordeel_herstelpunt
+
+    rpo_s = None if rpo_uur is None else rpo_uur * 3600
+    gemaakt = NOW - timedelta(hours=uur_oud)
+    assert beoordeel_herstelpunt(namen=namen, db_export=db_export, gemaakt_op=gemaakt, rpo_s=rpo_s, now=NOW) == verwacht

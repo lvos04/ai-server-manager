@@ -7,28 +7,33 @@ voegt toe wat alleen de Hub kan weten:
   executor niet gekoppeld → ``executor_niet_gekoppeld``; een ander besluit nog niet getest → ``gate_dicht``;
 - **noodstop**: een beheerder kan alle uitvoering stilleggen (Hub-instelling ``acties.noodstop``);
 - **anti-flap**: afkoeltijd en maximum per uur per (actie, doel) — voor iedereen, niet alleen voor de AI;
-- **herstelpunt**: een actie met ``requires_backup`` heeft een geverifieerd herstelpunt (B12) nodig.
+- **herstelpunt**: een actie met ``requires_backup`` heeft een geverifieerd herstelpunt (B12-006) nodig, jonger dan de
+  RPO van die app uit D16; voor Emby, de mediaserver en MediaGuard alleen met de database erin (HARDE EIS).
 
 Een blokkade geldt óók met goedkeuring; er is geen route om er een weg te klikken. Onbekend telt als geblokkeerd.
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
 from asm_policy import Policy
 from asm_policy import checkpoint as cpmod
-from asm_policy.engine import Classification, class_at_least
+from asm_policy.engine import Classification, class_at_least, recognize_all
 from asm_policy.loader import ActieDef
 from asm_policy.params import expected_image
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from hub import APP_ID
 from hub.config import Settings
-from hub.models import ActionRequest, HubSetting
+from hub.models import ActionRequest, Herstelpunt, HubSetting
 from hub.onboarding import gates as gates_mod
-from hub.timeutil import iso, utcnow
+from hub.onboarding.catalog import D16Waarde
+from hub.timeutil import binnen_venster, iso, utcnow
 
 NOODSTOP_KEY = "acties.noodstop"
 GATE_DICHT = ("BLK-GATE", "gate_dicht", "Een gate die deze actie nodig heeft, is niet open.")
@@ -44,6 +49,9 @@ HERKOMST_ONBEKEND = (
     "Dit herstelpunt is geen eigen, uitgevoerde bijwerking van deze app; de herkomst is onbekend.",
 )
 APP_WIJZIGINGEN = ("app.update", "app.rollback")
+# HARDE EIS: bij deze apps hoort de database (kijkgeschiedenis, hervatpunten, MediaGuard-voortgang) bij elk herstelpunt.
+# Herkend op appnaam, catalogusapp en image (asm_policy-herkenning); een herkenning maakt alleen strenger.
+DATABASE_VERPLICHT = frozenset({"emby", "jellyfin", "jelly-leon", "mediaguard"})
 EXECUTOR_LOS = (
     "BLK-EXECUTOR",
     "executor_niet_gekoppeld",
@@ -85,6 +93,78 @@ def _app_datasets(db: Session, settings: Settings, app: str) -> list[str] | None
     return uit
 
 
+def _inventarisrij(db: Session, settings: Settings, app: str) -> dict[str, Any]:
+    from hub.routers.backups import coverage_inputs
+
+    apps = coverage_inputs(db, settings).apps
+    rijen = apps.get("data") if apps.get("status") == "ok" else None
+    return next((a for a in rijen or [] if isinstance(a, dict) and a.get("naam") == app), {})
+
+
+def herkenningen(db: Session, settings: Settings, policy: Policy, app: str, cls: Classification) -> set[str]:
+    """Alle namen waaronder deze app bekend is: appnaam, catalogusapp, herkenning uit de inventaris en het beleid."""
+    rij = _inventarisrij(db, settings, app)
+    cat = str(rij.get("catalogus_app") or "") or None
+    uit = {app.lower(), *recognize_all(policy, app, catalogus=cat)}
+    uit |= {str(x).lower() for x in (rij.get("herkend_als"), cls.herkend_als) if x}
+    return uit
+
+
+def rpo_seconden(db: Session, settings: Settings, namen: set[str]) -> float | None:
+    """De strengste RPO uit D16 (Ingevuld of Getest) voor een van deze namen, of ``None`` (dan telt niets)."""
+    status, waarde = gate_inputs(db, settings).decisions.get("D16", ("Open", None))
+    if status not in ("Ingevuld", "Getest") or not isinstance(waarde, dict):
+        return None
+    try:
+        per_app = D16Waarde.model_validate(waarde).per_app
+    except ValueError:
+        return None
+    uren = [a.rpo_uren for a in per_app if a.app_id.lower() in namen]
+    return min(uren) * 3600 if uren else None
+
+
+def _db_export(db: Session, app: str, max_age_seconds: float, now: datetime) -> dict[str, Any] | None:
+    """Geverifieerde database-export bij dit herstelpunt, of ``None``. Alleen de eigen Hub-export is nu te meten; van
+    andere apps komt die via hun connector-capability (nog niet beschikbaar: ``None``, nooit gesimuleerd succes)."""
+    if app != APP_ID:
+        return None
+    from hub.backup.selfbackup import latest_verified
+
+    b = latest_verified(db)
+    if b is None or b.finished_at is None or not binnen_venster(b.finished_at, now, max_age_seconds):
+        return None
+    return {"bron": "pg_dump", "id": str(b.id), "sha256": b.sha256, "gemaakt_op": iso(b.finished_at)}
+
+
+def beoordeel_herstelpunt(
+    *, namen: set[str], db_export: dict[str, Any] | None, gemaakt_op: datetime, rpo_s: float | None, now: datetime
+) -> tuple[str, str | None, bool]:
+    """``(status, reden, telt)``: ``status`` gaat over de inhoud, ``telt`` ook over de leeftijd (RPO). Positieve witte
+    lijst: zonder RPO, met een herstelpunt uit de toekomst of ouder dan de RPO telt het niet."""
+    if namen & DATABASE_VERPLICHT and not (isinstance(db_export, dict) and db_export.get("sha256")):
+        return "niet_geverifieerd", "database_export_ontbreekt", False
+    if rpo_s is None:
+        return "geverifieerd", "rpo_onbekend", False
+    if not binnen_venster(gemaakt_op, now, rpo_s):
+        return "geverifieerd", "herstelpunt_ouder_dan_rpo", False
+    return "geverifieerd", None, True
+
+
+def _leg_vast(db: Session, app: str, k: ActionRequest, datasets: list[str], dbx: Any, status: str, reden: Any) -> None:
+    """Upsert op (checkpoint, app): gelijktijdige voorstellen schrijven hetzelfde record, nooit een dubbel."""
+    waarden = {
+        "snapshot": {"actie_id": str(k.id), "datasets": sorted(datasets)},
+        "db_export": dbx,
+        "status": status,
+        "reden": reden,
+        "vastgelegd_op": utcnow(),
+    }
+    stmt = pg_insert(Herstelpunt).values(
+        id=uuid.uuid4(), app=app, checkpoint_id=str(k.id), gemaakt_op=k.uitgevoerd_op, **waarden
+    )
+    db.execute(stmt.on_conflict_do_update(constraint="uq_herstelpunt_checkpoint_app", set_=waarden))
+
+
 def _eigen_wijzigingen(db: Session, req: ActionRequest) -> list[ActionRequest]:
     """Eigen bijwerkingen en terugzettingen van dit doel die naar de executor gingen, op volgorde."""
     return list(
@@ -102,7 +182,12 @@ def _eigen_wijzigingen(db: Session, req: ActionRequest) -> list[ActionRequest]:
 
 
 def verified_checkpoint(
-    db: Session, settings: Settings, req: ActionRequest, *, now: datetime | None = None
+    db: Session,
+    settings: Settings,
+    req: ActionRequest,
+    *,
+    now: datetime | None = None,
+    namen: set[str] | None = None,
 ) -> tuple[str | None, str]:
     """``(id, reden)``: het id van een eigen, geverifieerd app-checkpoint, of ``None`` met de reden (S-P2-050f).
 
@@ -160,7 +245,17 @@ def verified_checkpoint(
         # Per dataset een eigen, teruggelezen snapshot van die actie (R-HARDE-EIS-2); het verzoek zelf telt niet.
         leden = rb.get("leden")
         if isinstance(leden, dict) and all(d in leden for d in nodig):
-            return str(k.id), "geverifieerd"
+            # Herstelpunt per app (S-P2-090): het nieuwste passende checkpoint plus de database-export, binnen de RPO.
+            alle = (namen or set()) | {app.lower()}
+            rpo_s = rpo_seconden(db, settings, alle)
+            dbx = _db_export(db, app, rpo_s or 0, now)
+            if k.uitgevoerd_op is None:
+                continue
+            status, reden, telt = beoordeel_herstelpunt(
+                namen=alle, db_export=dbx, gemaakt_op=k.uitgevoerd_op, rpo_s=rpo_s, now=now
+            )
+            _leg_vast(db, app, k, list(leden), dbx, status, reden)
+            return (str(k.id), "geverifieerd") if telt else (None, str(reden))
     return None, "geen_passend_checkpoint"
 
 
@@ -357,7 +452,8 @@ def dynamisch(
     out += _tempo(db, policy, actie, req.doel_sleutel, now)
     checkpoint: str | None = None
     if cls.requires_backup:
-        checkpoint, reden = verified_checkpoint(db, settings, req, now=now)
+        namen = herkenningen(db, settings, policy, req.doel_sleutel.removeprefix("app:"), cls)
+        checkpoint, reden = verified_checkpoint(db, settings, req, now=now, namen=namen)
         if not checkpoint:
             r = policy.dynamisch["checkpoint"]
             out.append({"id": r.id, "code": r.code, "reden": r.reden_nl, "details": [reden]})

@@ -20,7 +20,7 @@ from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer
 from hub.errors import HubError
 from hub.inventory.store import kind_state
 from hub.jobs import job_dict
-from hub.models import Decision, Job, RestoreTest, SelfBackup, Service
+from hub.models import Decision, Herstelpunt, Job, RestoreTest, SelfBackup, Service
 from hub.timeutil import iso, utcnow
 from hub.truenas.connection import current_target
 
@@ -110,6 +110,40 @@ def get_coverage(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
 def get_policy_proposal(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
     inp = coverage_inputs(db, settings)
     return cov.snapshot_policy_proposal(inp, cov.compute(inp))
+
+
+@router.get("/extern", summary="Verificatie van de externe back-up (OneDrive-uploadtaken uit D04, B12-004)")
+def get_extern(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
+    from hub.routers.onboarding import gate_inputs
+
+    uit = gate_inputs(db, settings).extern_backup
+    db.commit()
+    return {**(uit or {}), "opmerking": cov.SYNC_IS_GEEN_GARANTIE}
+
+
+@router.get("/herstelpunten", summary="Herstelpunten per app (B12-006): snapshot, database-export en status")
+def list_herstelpunten(db: DB, _: Viewer, app: str | None = None) -> dict[str, Any]:
+    q = select(Herstelpunt).order_by(Herstelpunt.gemaakt_op.desc()).limit(100)
+    if app:
+        q = q.where(Herstelpunt.app == app)
+    return {
+        "items": [
+            {
+                "id": str(h.id),
+                "app": h.app,
+                "checkpoint_id": h.checkpoint_id,
+                "gemaakt_op": iso(h.gemaakt_op),
+                "snapshot": h.snapshot,
+                "db_export": h.db_export,
+                "status": h.status,
+                "reden": h.reden,
+                "vastgelegd_op": iso(h.vastgelegd_op),
+            }
+            for h in db.scalars(q)
+        ],
+        "regel": "Alleen een geverifieerd herstelpunt jonger dan de RPO uit D16 telt; voor Emby, de mediaserver en "
+        "MediaGuard alleen met de database erin.",
+    }
 
 
 @router.get("/self", summary="Eigen database-exports (pg_dump) met verificatie")

@@ -1284,6 +1284,72 @@ def test_bijwerken_vraagt_een_geverifieerd_herstelpunt(stack: Stack) -> None:
     assert "app.update(custom_compose)" not in nas.mutations
 
 
+def _herstelpunten(admin: Any) -> list[dict[str, Any]]:
+    r = admin.get("/api/v1/backups/herstelpunten", params={"app": "demo-app"})
+    assert r.status_code == 200, r.text
+    return list(r.json()["items"])
+
+
+def _weigering(admin: Any, voorstel: dict[str, Any]) -> list[str]:
+    """Goedkeuren wordt geweigerd met ``backup_checkpoint_ontbreekt``; geeft de reden(en) van het herstelpunt."""
+    r = keur_goed(admin, haal(admin, voorstel))
+    _geblokkeerd(r, "backup_checkpoint_ontbreekt")
+    return next(b["details"] for b in r.json()["details"]["blokkades"] if b["code"] == "backup_checkpoint_ontbreekt")
+
+
+def test_herstelpunt_telt_alleen_binnen_de_rpo_en_met_database_waar_dat_moet(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B12-006 (S-P2-090): het herstelpunt per app (snapshot + database-export + status) telt alleen als het
+    ``geverifieerd`` is en jonger dan de RPO uit D16. Ouder dan de RPO of zonder RPO → update geweigerd
+    (``backup_checkpoint_ontbreekt``), ook als het checkpoint nog binnen het uur van de executor valt. HARDE EIS: een
+    herstelpunt van MediaGuard (of Emby, de mediaserver) zonder database telt niet."""
+    from hub.actions import blokkades
+    from hub.models import ActionRequest
+
+    admin = stack.admin
+    _demo_dataset(stack)
+    assert voer_uit(admin, _installeer(stack)).status_code == 200
+    stack.vernieuw()
+    assert stack.toestand.besluiten is not None
+    stack.toestand.besluiten["D16"] = ("Getest", {"per_app": [{"app_id": "demo-app", "rpo_uren": 0.5, "rto_uren": 1}]})
+    cp = _snapshot(stack, "testpool/apps/demo-app", "voor-update")
+    nieuw = {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}}
+    v = stel_voor(admin, "app.update", app_target("demo-app"), nieuw).json()
+    assert v["blokkades"] == [], v
+    [hp] = _herstelpunten(admin)
+    assert (hp["checkpoint_id"], hp["status"], hp["reden"], hp["db_export"]) == (
+        cp["request_id"],
+        "geverifieerd",
+        None,
+        None,
+    )
+    assert hp["snapshot"]["datasets"] and hp["snapshot"]["actie_id"] == cp["request_id"]
+
+    # 40 minuten oud: binnen het uur van de executor, maar ouder dan de RPO van 30 minuten → geweigerd.
+    with stack.app.state.sessionmaker() as db:
+        rij = db.get(ActionRequest, uuid.UUID(cp["request_id"]))
+        assert rij is not None and rij.uitgevoerd_op is not None
+        rij.uitgevoerd_op -= timedelta(minutes=40)
+        db.commit()
+    assert _weigering(admin, v) == ["herstelpunt_ouder_dan_rpo"]
+
+    # Geen RPO voor deze app in D16: niets telt (fail-closed).
+    stack.toestand.besluiten["D16"] = ("Getest", {"per_app": [{"app_id": "andere-app", "rpo_uren": 24, "rto_uren": 1}]})
+    cp = _snapshot(stack, "testpool/apps", "zonder-rpo")  # ander doel: geen afkoeltijd
+    assert _weigering(admin, v) == ["rpo_onbekend"]
+
+    # HARDE EIS: dezelfde app herkend als MediaGuard (de herkenning zelf komt uit asm_policy en is daar getest).
+    # Zonder database-export is het herstelpunt niet geverifieerd en telt het niet, ook vers en binnen de RPO.
+    stack.toestand.besluiten["D16"] = ("Getest", {"per_app": [{"app_id": "demo-app", "rpo_uren": 24, "rto_uren": 1}]})
+    echt = blokkades.herkenningen
+    monkeypatch.setattr(blokkades, "herkenningen", lambda *a: echt(*a) | {"mediaguard"})
+    assert _weigering(admin, v) == ["database_export_ontbreekt"]
+    nieuwste = next(h for h in _herstelpunten(admin) if h["checkpoint_id"] == cp["request_id"])
+    assert (nieuwste["status"], nieuwste["reden"]) == ("niet_geverifieerd", "database_export_ontbreekt")
+    assert schrijfaanroepen(stack.nas)[-1] == "pool.snapshot.create"  # nooit een app.update
+
+
 def test_na_een_migratie_alleen_terug_via_database_herstel(stack: Stack) -> None:
     """EX15 (ADR-0032 besluit 8): een update die een migratie meldt, is niet op alleen de image terug te zetten. De
     Hub weigert uit zijn eigen administratie (ook met een vers checkpoint); TrueNAS krijgt geen terugzetaanroep."""

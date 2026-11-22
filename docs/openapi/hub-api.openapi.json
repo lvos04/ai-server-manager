@@ -7144,6 +7144,80 @@
         ]
       }
     },
+    "/api/v1/backups/extern": {
+      "get": {
+        "operationId": "get_extern_api_v1_backups_extern_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Extern Api V1 Backups Extern Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Verificatie van de externe back-up (OneDrive-uploadtaken uit D04, B12-004)",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/herstelpunten": {
+      "get": {
+        "operationId": "list_herstelpunten_api_v1_backups_herstelpunten_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "app",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "App"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Herstelpunten Api V1 Backups Herstelpunten Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Herstelpunten per app (B12-006): snapshot, database-export en status",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
     "/api/v1/backups/restore-tests": {
       "get": {
         "operationId": "list_restore_tests_api_v1_backups_restore_tests_get",

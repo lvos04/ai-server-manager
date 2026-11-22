@@ -36,6 +36,7 @@ def _uitkomst(
             eigen_backup=None if backup_uur is None else {"finished_at": now - timedelta(hours=backup_uur)},
             eigen_backup_max_age_seconds=26 * 3600,
             executor_gekoppeld=executor,
+            extern_backup={"status": "ok", "reden": None, "taken": []},
             now=now,
         )
     )

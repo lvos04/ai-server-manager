@@ -50,6 +50,21 @@ en de meetdekking in `GET /api/v1/monitoring/coverage` (welke bron wat levert en
   Ook de instelbare inventaris-TTL geldt hooguit 900 s.
 - De Hub zelf meldt `database`, `worker`, `jobs` (wachtrij, bezig, laatste klaar) en `eigen_backup`.
 
+## Externe back-up (OneDrive, B12-004)
+
+- De Hub leest de uploadtaken uit besluit D04 (methode `truenas_cloud_sync`) via `cloudsync.query` van TrueNAS,
+  alleen-lezen en zonder credential-attributen. Hij maakt of wijzigt geen opslagdienst. Uitkomst:
+  `GET /api/v1/backups/extern`.
+- Alleen een ingeschakelde PUSH-taak naar OneDrive met een laatste job `SUCCESS` van hooguit
+  `HUB_OFFSITE_MAX_AGE_SECONDS` (standaard 26 uur) geleden is `ok`. Een verouderde of nooit gelopen upload
+  (`verouderd`), een verlopen aanmelding (`aanmelding_verlopen`), een mislukte job (`mislukt`) of een ontbrekende of
+  uitgeschakelde taak (`ontbreekt`) geeft het incident `backup.extern` met ernst kritiek. De back-upgate is dan dicht
+  (`backup_gate_rood`, dus ook R2/R3 en opslagmutaties).
+- `unknown` geeft geen incident maar houdt de gate wel dicht. Dat geldt bij een andere methode in D04
+  (`capability_unavailable`), een niet-leesbare TrueNAS of een job die nog loopt. Een open incident sluit alleen bij
+  positief bewijs: een verse, geslaagde upload van elke taak.
+- Een geslaagde upload is geen herstelgarantie; alleen een vastgelegde hersteltest is dat.
+
 ## Gotify (meldingen op je telefoon)
 
 1. In Gotify: **Apps → Applicatie maken** (bv. "Hub") en kopieer het **applicatietoken**. Gebruik nooit een

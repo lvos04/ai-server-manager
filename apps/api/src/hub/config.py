@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     # Eigen back-up (pg_dump) van de ingebouwde database
     self_backup_interval_seconds: int = Field(default=24 * 3600, ge=300, le=7 * 24 * 3600)
     self_backup_keep: int = Field(default=7, ge=1, le=365)
+    # Externe back-up (B12-004): de laatste geslaagde upload van elke D04-taak mag hooguit zo oud zijn.
+    offsite_max_age_seconds: int = Field(default=26 * 3600, ge=3600, le=31 * 24 * 3600)
     pg_dump_bin: str = "pg_dump"
     pg_restore_bin: str = "pg_restore"
 

@@ -109,6 +109,18 @@ In deze volgorde; elke weigering heeft een stabiele code en er wordt niets uitge
 | pre-update-gate bij `app.update`/`app.rollback` (S-P2-050f): het gebonden checkpoint is een eigen, vastgelegde snapshot, hooguit een uur oud, van na de laatste wijziging van de app, nog met dezelfde `createtxg` per teruggelezen lid, en dekt alle opslag uit `app.config`, de schrijfbare koppelingen van de draaiende werklast, aangekoppelde kinddatasets en bij terugzetten de bestemmingen van het recept; vlak vóór de schrijfaanroep opnieuw gecontroleerd | `checkpoint_ontbreekt`, `checkpoint_verlopen`, `checkpoint_afwijkend`, `checkpoint_dekt_niet`, `doel_gewijzigd` (409) |
 | EX15 bij `app.rollback` en `app.update` (ADR-0032 besluit 8, optie 3): herkomst uit het eigen journaal als hash-keten per app (elke regel bevat de hash van de vorige) met anker (hash en aantal) in de geheimenmap; een ontbrekende regel of een niet te herleiden vertrekversie geeft `herkomst_onbekend`; image-identiteit is repository plus digest, in de tag of apart; na een gemelde migratie (`parameters.upgrade`) geen terugkeer naar een image of catalogusversie van ervóór op alleen de image | `database_herstel_vereist`, `herkomst_onbekend` (409); bij `oud`/`buiten_keten` gaat het door met `herkomst` in het antwoord |
 
+**Herstelpunt per app bij de Hub (B12-006, S-P2-090).** Vóór de Hub een `app.update`, `app.rollback` of andere
+actie met `requires_backup` ondertekent, legt hij bij het nieuwste passende checkpoint een herstelpunt vast
+(`GET /api/v1/backups/herstelpunten`): app, tijdstip, snapshot (de uitgevoerde `zfs.snapshot.create` en de
+teruggelezen datasets), database-export en status. Het telt alleen als het `geverifieerd` is én jonger dan de RPO van
+die app uit D16 (de strengste RPO over appnaam, catalogusapp en herkenning). Anders blijft de blokkade
+`backup_checkpoint_ontbreekt` staan, met als reden `herstelpunt_ouder_dan_rpo`, `rpo_onbekend` of
+`database_export_ontbreekt`. HARDE EIS: voor Emby, de mediaserver (Jellyfin, Jelly Leon) en MediaGuard is een
+herstelpunt zonder geverifieerde database-export (kijkgeschiedenis, hervatpunten, voortgang) nooit `geverifieerd`.
+Zo'n export van een andere app levert pas haar connector; tot dan blijft het herstelpunt daar
+`niet_geverifieerd`. De beheerder kan dit niet wegklikken. In `Approval.backup_checkpoint_id` staat het checkpoint dat
+de executor zelf opnieuw controleert (tabel hierboven).
+
 Tussen deze stappen kan de executor ook weigeren om een reden die niet in het verzoek zit. Ook dan is er niets
 uitgevoerd:
 

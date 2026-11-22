@@ -62,11 +62,15 @@ def test_d08_render_node_formaat_en_uniek() -> None:
         validate_value("D08", {"gpus": [{**g[0], "render_node": "/dev/sda"}]})
 
 
+EXTERN_OK: dict[str, Any] = {"status": "ok", "reden": None, "taken": []}
+
+
 def _inputs(
     statuses: dict[str, str],
     pools: dict[str, Any] | None = None,
     backup_age_h: float | None = None,
     executor: bool = False,
+    extern: dict[str, Any] | None = EXTERN_OK,
 ) -> GateInputs:
     now = datetime.now(UTC)
     dec = {d.id: ("Open", None) for d in DECISIONS}
@@ -77,6 +81,7 @@ def _inputs(
         eigen_backup=None if backup_age_h is None else {"finished_at": now - timedelta(hours=backup_age_h)},
         eigen_backup_max_age_seconds=26 * 3600,
         executor_gekoppeld=executor,
+        extern_backup=extern,
         now=now,
     )
 
@@ -123,6 +128,26 @@ def test_executor_niet_gekoppeld_blokkeert_deploy_en_r2r3() -> None:
     assert g["deployment"]["status"] == "geblokkeerd" and g["r2_r3_acties"]["status"] == "geblokkeerd"
     g = _gates(_inputs(all_ok, healthy, backup_age_h=1, executor=True))
     assert all(x["toegestaan"] for x in g.values()), [x for x in g.values() if not x["toegestaan"]]
+
+
+@pytest.mark.parametrize(
+    ("extern", "status"),
+    [
+        (None, "unknown"),
+        ({"status": "unknown", "reden": "cloudsync_unreachable"}, "unknown"),
+        ({"status": "verouderd", "reden": "laatste_upload_te_oud"}, "geblokkeerd"),
+        ({"status": "aanmelding_verlopen", "reden": "aanmelding_verlopen"}, "geblokkeerd"),
+    ],
+)
+def test_backupgate_vraagt_een_actuele_externe_backup(extern: dict[str, Any] | None, status: str) -> None:
+    """B12-004/EX12: alleen een positief ``ok`` van de OneDrive-verificatie houdt de back-upgate open; niet gemeten
+    of onbekend is nooit groen, een verouderde upload of verlopen aanmelding is dicht (en daarmee R2/R3)."""
+    base = {d.id: "Getest" for d in DECISIONS}
+    healthy = {"status": "ok", "data": [{"naam": "p", "status": "ONLINE", "gezond": True}]}
+    g = _gates(_inputs(base, healthy, backup_age_h=1, executor=True, extern=extern))
+    assert g["backup_gate"]["status"] == status and g["r2_r3_acties"]["toegestaan"] is False
+    assert any(r["id"] == "extern_backup" for r in g["backup_gate"]["redenen"])
+    assert _gates(_inputs(base, healthy, backup_age_h=1, executor=True))["backup_gate"]["status"] == "toegestaan"
 
 
 def test_schema_beschikbaar_voor_ui() -> None:

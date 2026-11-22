@@ -63,6 +63,9 @@ def lege_db() -> Iterator[str]:
             conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
+BEWAARD = ("catalog_plan_bewaard", "app_geheim_bewaard", "kluis_afgifte_bewaard", "herstelpunt_bewaard")
+
+
 def _vorige_en_head() -> tuple[str, str]:
     script = ScriptDirectory.from_config(migrations.alembic_config())
     head = script.get_current_head()
@@ -331,8 +334,9 @@ def test_historische_actiepreviews_migreren_met_behoud_van_goedkeuring(lege_db: 
 
         migrations.downgrade(lege_db, "base")
         with engine.begin() as conn:
-            # De bewarende terugweg van 0022 laat een gevulde plantabel staan; voor een leeg schema hier bewust weg.
-            conn.exec_driver_sql("DROP TABLE IF EXISTS catalog_plan_bewaard")
+            # De bewarende terugweg van 0022, 0024 en 0025 laat gevulde tabellen staan; voor een leeg schema hier weg.
+            for tabel in BEWAARD:
+                conn.exec_driver_sql(f"DROP TABLE IF EXISTS {tabel}")
         subprocess.run(
             [
                 settings.pg_restore_bin,
@@ -422,8 +426,9 @@ def test_terugval_na_klokcorrectie(lege_db: str, tmp_path: Path, monkeypatch: py
         # Herstel op een leeg schema zodat de gebruikerswijziging alleen uit deze export kan komen.
         migrations.downgrade(lege_db, "base")
         with engine.begin() as conn:
-            # De bewarende terugweg van 0022 laat een gevulde plantabel staan; voor een leeg schema hier bewust weg.
-            conn.exec_driver_sql("DROP TABLE IF EXISTS catalog_plan_bewaard")
+            # De bewarende terugweg van 0022, 0024 en 0025 laat gevulde tabellen staan; voor een leeg schema hier weg.
+            for tabel in BEWAARD:
+                conn.exec_driver_sql(f"DROP TABLE IF EXISTS {tabel}")
         subprocess.run(
             [
                 settings.pg_restore_bin,
@@ -610,5 +615,34 @@ def test_appgeheimen_en_afgiften_overleven_terugmigratie_onder_0024(lege_db: str
         migrations.downgrade(lege_db, "0023")
         assert not {"app_geheim", "app_geheim_bewaard"} & set(sa.inspect(engine).get_table_names())
         migrations.upgrade(lege_db, "0024")
+    finally:
+        engine.dispose()
+
+
+def test_herstelpunten_overleven_terugmigratie_onder_0025(lege_db: str) -> None:
+    """HARDE EIS (S-P2-090): een vastgelegd herstelpunt blijft bij 0025 -> 0024 -> 0025 bewaard; een lege tabel gaat
+    gewoon weg."""
+    from hub.models import Herstelpunt
+    from hub.timeutil import utcnow
+
+    migrations.upgrade(lege_db, "0025")
+    hid = uuid.uuid4()
+    engine = sa.create_engine(lege_db)
+    try:
+        with Session(engine) as db:
+            db.add(Herstelpunt(id=hid, app="demo-app", checkpoint_id=str(uuid.uuid4()), gemaakt_op=utcnow(),
+                               snapshot={"datasets": ["p/apps"]}, status="geverifieerd"))  # fmt: skip
+            db.commit()
+        migrations.downgrade(lege_db, "0024")
+        assert "herstelpunt_bewaard" in set(sa.inspect(engine).get_table_names())
+        migrations.upgrade(lege_db, "0025")
+        with Session(engine) as db:
+            hp = db.get(Herstelpunt, hid)
+            assert hp is not None and hp.snapshot == {"datasets": ["p/apps"]}
+            db.execute(sa.delete(Herstelpunt))
+            db.commit()
+        migrations.downgrade(lege_db, "0024")
+        assert not {"herstelpunt", "herstelpunt_bewaard"} & set(sa.inspect(engine).get_table_names())
+        migrations.upgrade(lege_db, "0025")
     finally:
         engine.dispose()

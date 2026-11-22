@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub import audit
+from hub.backup import offsite
 from hub.backup.selfbackup import latest_verified
 from hub.config import Settings
 from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer, get_vault
@@ -218,11 +219,12 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
     decisions = {r.id: (r.status, r.waarde) for r in db.scalars(select(Decision))}
     target = current_target(db)
     b = latest_verified(db)
+    url = target.url if target else None
+    cloudsync = kind_state(db, "cloudsync", target=url, ttl_seconds=settings.inventory_max_age_seconds)
     return gates_mod.GateInputs(
         decisions=decisions,
-        pools_state=kind_state(
-            db, "pools", target=target.url if target else None, ttl_seconds=settings.inventory_max_age_seconds
-        ),
+        pools_state=kind_state(db, "pools", target=url, ttl_seconds=settings.inventory_max_age_seconds),
+        extern_backup=offsite.beoordeel(decisions.get("D04"), cloudsync, utcnow(), settings.offsite_max_age_seconds),
         eigen_backup={"finished_at": b.finished_at, "sha256": b.sha256, "id": str(b.id)}
         if b and b.finished_at
         else None,

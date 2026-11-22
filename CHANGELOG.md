@@ -4,6 +4,19 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Back-up: OneDrive-verificatie, herstelpunten per app en pre-update-gate (S-P2-090)
+
+- B12-004: de Hub toetst de OneDrive-uploadtaken uit D04 via de alleen-lezen inventaris (`cloudsync.query`). Een
+  verouderde upload of verlopen aanmelding geeft het kritieke incident `backup.extern` en houdt de back-upgate dicht
+  (`backup_gate_rood`). Onbekend telt nooit als groen. Nieuw: `GET /api/v1/backups/extern` en instelling
+  `HUB_OFFSITE_MAX_AGE_SECONDS`.
+- B12-006: herstelpunt per app (tabel `herstelpunt`, migratie 0025; `GET /api/v1/backups/herstelpunten`) met
+  snapshot, database-export en status. `app.update`, `app.rollback` en elke actie met `requires_backup` worden alleen
+  ondertekend met een geverifieerd herstelpunt jonger dan de RPO uit D16. Zonder RPO, of met een ouder herstelpunt,
+  blijft het `backup_checkpoint_ontbreekt`. HARDE EIS: voor Emby, de mediaserver en MediaGuard telt een herstelpunt
+  zonder database niet.
+- Sim-getest met de nagebootste TrueNAS. NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS).
+
 ### Toegevoegd — Acties via de eigenaar-connector (S-P2-080)
 
 - `sso.sessions.revoke` en `sso.oidc.hub.register` lopen nu als ondertekend `ExecutionRequest` naar

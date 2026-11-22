@@ -21,7 +21,7 @@ class GateDef:
     id: str
     naam: str
     besluiten: tuple[tuple[str, str], ...] = ()  # (besluit, minimale status)
-    checks: tuple[str, ...] = ()  # executor | pools_gezond | eigen_backup
+    checks: tuple[str, ...] = ()  # executor | pools_gezond | eigen_backup | extern_backup
     gates: tuple[str, ...] = ()  # afhankelijke gates
 
 
@@ -35,7 +35,10 @@ GATES: tuple[GateDef, ...] = (
         ("executor",),
     ),
     GateDef(
-        "backup_gate", "Back-upgate", (("D04", "Ingevuld"), ("D05", "Getest"), ("D16", "Ingevuld")), ("eigen_backup",)
+        "backup_gate",
+        "Back-upgate",
+        (("D04", "Ingevuld"), ("D05", "Getest"), ("D16", "Ingevuld")),
+        ("eigen_backup", "extern_backup"),
     ),
     GateDef(
         "data_mutatie",
@@ -79,6 +82,8 @@ class GateInputs:
     eigen_backup: dict[str, Any] | None  # laatste geverifieerde eigen back-up {finished_at, sha256} of None
     eigen_backup_max_age_seconds: int
     executor_gekoppeld: bool = False
+    # Uitkomst van :func:`hub.backup.offsite.beoordeel` (B12-004); ``None`` = niet gemeten (telt nooit als groen).
+    extern_backup: dict[str, Any] | None = None
     now: datetime = field(default_factory=utcnow)
 
 
@@ -149,6 +154,17 @@ def _check(name: str, inp: GateInputs) -> dict[str, Any] | None:
                 "tekst": f"Laatste geverifieerde Hub-back-up is te oud of ligt in de toekomst ({iso(finished)}).",
             }
         return None
+    if name == "extern_backup":
+        e = inp.extern_backup or {"status": "unknown", "reden": "niet_gemeten"}
+        if e.get("status") == "ok":
+            return None
+        probleem = e.get("status") != "unknown"
+        return {
+            "soort": "meting",
+            "id": "extern_backup",
+            "status": "geblokkeerd" if probleem else "unknown",
+            "tekst": f"Externe back-up (OneDrive) niet aantoonbaar actueel: {e.get('status')} ({e.get('reden')}).",
+        }
     raise ValueError(name)
 
 
