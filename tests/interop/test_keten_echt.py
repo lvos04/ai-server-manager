@@ -632,31 +632,31 @@ def test_t1_vervalst_manifest_bereikt_planner_en_nas_niet(keten: Keten, sql: str
     assert keten.plannen_bij_planner() == [] and schrijfaanroepen(keten.nas) == []
 
 
-def _witte_lijst(monkeypatch: pytest.MonkeyPatch, regel: dict[str, Any]) -> None:
+def _witte_lijst(monkeypatch: pytest.MonkeyPatch, regel: dict[str, Any], doel: Path) -> None:
     from hub.actions import beleid
 
     monkeypatch.setenv(
         "ASM_POLICY_DIR",
-        str(policy_met_regels(Path(os.environ["TMPDIR"]) / uuid.uuid4().hex, [regel])),
+        str(policy_met_regels(doel / "policy-regel", [regel])),
     )
     beleid._geladen.cache_clear()
 
 
 def test_t1_andere_manifesthash_dan_de_witte_lijst_geeft_geen_plan(
-    keten: Keten, monkeypatch: pytest.MonkeyPatch
+    keten: Keten, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    _witte_lijst(monkeypatch, {**keten.regel, "manifest_sha256": "sha256:" + "6" * 64})
+    _witte_lijst(monkeypatch, {**keten.regel, "manifest_sha256": "sha256:" + "6" * 64}, tmp_path)
     r = _plan(keten)
     assert r.status_code == 409 and r.json()["code"] == "catalogusversie_niet_toegelaten", r.text
     assert keten.plannen_bij_planner() == []
 
 
 def test_t1_image_buiten_de_release_van_de_witte_lijst_wordt_niet_voorgesteld(
-    keten: Keten, monkeypatch: pytest.MonkeyPatch
+    keten: Keten, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """De regel laat een andere digest toe dan het (verder gelijke) manifest noemt: de stap van de echte planner past
     niet bij de release; de Hub stelt niets voor en TrueNAS krijgt niets."""
-    _witte_lijst(monkeypatch, {**keten.regel, "image_digests": [DIGEST_B]})
+    _witte_lijst(monkeypatch, {**keten.regel, "image_digests": [DIGEST_B]}, tmp_path)
     r = _plan(keten)
     assert r.status_code == 201, r.text
     v = _stel_voor(keten, r.json())
