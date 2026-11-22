@@ -19,7 +19,7 @@ from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer, get_vault
 from hub.errors import HubError
 from hub.events.envelope import emit
 from hub.inventory.store import kind_state
-from hub.models import Decision, Service
+from hub.models import Decision, HubSetting, Service
 from hub.onboarding import gates as gates_mod
 from hub.onboarding import service
 from hub.onboarding.catalog import BY_ID, DECISIONS
@@ -221,10 +221,17 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
     b = latest_verified(db)
     url = target.url if target else None
     cloudsync = kind_state(db, "cloudsync", target=url, ttl_seconds=settings.inventory_max_age_seconds)
+    storingen = db.get(HubSetting, offsite.STORINGEN_KEY)
     return gates_mod.GateInputs(
         decisions=decisions,
         pools_state=kind_state(db, "pools", target=url, ttl_seconds=settings.inventory_max_age_seconds),
-        extern_backup=offsite.beoordeel(decisions.get("D04"), cloudsync, utcnow(), settings.offsite_max_age_seconds),
+        extern_backup=offsite.beoordeel(
+            decisions.get("D04"),
+            cloudsync,
+            utcnow(),
+            settings.offsite_max_age_seconds,
+            dict(storingen.waarde or {}) if storingen is not None else None,
+        ),
         eigen_backup={"finished_at": b.finished_at, "sha256": b.sha256, "id": str(b.id)}
         if b and b.finished_at
         else None,

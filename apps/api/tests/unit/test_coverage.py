@@ -237,6 +237,48 @@ def test_extern_onbekend_zonder_bruikbare_invoer() -> None:
     assert uit["status"] == "verouderd" and [t["status"] for t in uit["taken"]] == ["ok", "verouderd"]
 
 
+def test_extern_onzekere_bron_is_nooit_ok() -> None:
+    """R-HARDE-EIS-4: alleen boolean true en een SUCCESS zonder foutinformatie tellen."""
+    from hub.truenas.normalize import cloudsync
+
+    ruw = {"id": 1, "description": "x", "direction": "PUSH", "credentials": {"provider": {"type": "ONEDRIVE"}}}
+    for enabled in ("false", "true", 1, None):
+        assert cloudsync([{**ruw, "enabled": enabled}])[0]["ingeschakeld"] is False
+    assert cloudsync([{**ruw, "enabled": True}])[0]["ingeschakeld"] is True
+    uit = _extern(_taak("SUCCESS", fout="upload mislukt"))
+    assert (uit["status"], uit["reden"]) == ("mislukt", "tegenstrijdige_jobstatus")
+
+
+def test_extern_dubbele_omschrijving_is_in_elke_volgorde_dicht() -> None:
+    """R-HARDE-EIS-3: een omschrijving of ID die op twee taken past, koppelt niet."""
+    gezond, kapot = _taak("SUCCESS"), _taak("FAILED", fout="quota", id=2)
+    for volgorde in ([gezond, kapot], [kapot, gezond]):
+        uit = _extern(*volgorde)
+        assert (uit["status"], uit["reden"]) == ("ontbreekt", "taak_niet_eenduidig")
+    # Op een eenduidige taak-ID koppelt het wel.
+    d04 = ("Ingevuld", {"methode": "truenas_cloud_sync", "taken": ["1"]})
+    assert _extern(gezond, kapot, d04=d04)["status"] == "ok"
+
+
+def test_extern_storing_vraagt_een_latere_upload() -> None:
+    """R-HARDE-EIS-5: een upload van vóór (of gelijk aan) de laatste bevestigde storing heft die niet op."""
+    from hub.backup.offsite import beoordeel
+
+    storing = {"1": iso(NOW - timedelta(hours=1))}
+    oud = beoordeel(D04, ok([_taak("SUCCESS", uur_geleden=4)]), NOW, MAX, storing)
+    assert (oud["status"], oud["reden"]) == ("mislukt", "geen_upload_na_storing")
+    gelijk = beoordeel(D04, ok([_taak("SUCCESS", uur_geleden=1)]), NOW, MAX, storing)
+    assert gelijk["status"] == "mislukt"
+    assert beoordeel(D04, ok([_taak("SUCCESS", uur_geleden=0.5)]), NOW, MAX, storing)["status"] == "ok"
+    assert beoordeel(D04, ok([_taak("SUCCESS")]), NOW, MAX, {"1": "geen tijd"})["status"] == "mislukt"
+
+
+def test_extern_geeft_geen_vrije_taaktekst_uit() -> None:
+    """R-HARDE-EIS-7: de omschrijving (vrije tekst) staat nooit in de uitkomst."""
+    uit = _extern(_taak("SUCCESS"))
+    assert "Foto's naar OneDrive" not in str(uit) and "omschrijving" not in str(uit)
+
+
 # ---------------------------------------------------------------- herstelpunt per app (B12-006, S-P2-090)
 DB = {"bron": "connector", "id": "x", "sha256": "a" * 64}
 

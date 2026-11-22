@@ -16,6 +16,10 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   blijft het `backup_checkpoint_ontbreekt`. HARDE EIS: voor Emby, de mediaserver en MediaGuard telt een herstelpunt
   zonder database niet.
 - Sim-getest met de nagebootste TrueNAS. NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS).
+- Herstel (R-HARDE-EIS-1 t/m -7): de terugweg van 0025 neemt eerst het tabelslot (geen verlies bij een gelijktijdige
+  schrijver); de strengste RPO telt ook de catalogusnaam; OneDrive-taken koppelen alleen eenduidig; `enabled` alleen
+  als boolean `true` en `SUCCESS` zonder foutmelding; per taak de laatste storing, alleen een latere upload herstelt;
+  een vertraagd herstelbericht sluit geen nieuwe storing; geen taakomschrijving in `GET /api/v1/backups/extern`.
 
 ### Toegevoegd — Acties via de eigenaar-connector (S-P2-080)
 

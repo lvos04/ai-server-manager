@@ -105,7 +105,8 @@ def herkenningen(db: Session, settings: Settings, policy: Policy, app: str, cls:
     """Alle namen waaronder deze app bekend is: appnaam, catalogusapp, herkenning uit de inventaris en het beleid."""
     rij = _inventarisrij(db, settings, app)
     cat = str(rij.get("catalogus_app") or "") or None
-    uit = {app.lower(), *recognize_all(policy, app, catalogus=cat)}
+    # De gemeten catalogusnaam telt zelf mee, zodat de strengste RPO over alle namen geldt (R-HARDE-EIS-2).
+    uit = {app.lower(), *([cat.lower()] if cat else []), *recognize_all(policy, app, catalogus=cat)}
     uit |= {str(x).lower() for x in (rij.get("herkend_als"), cls.herkend_als) if x}
     return uit
 

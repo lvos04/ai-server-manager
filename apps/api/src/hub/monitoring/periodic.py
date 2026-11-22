@@ -234,6 +234,7 @@ def _extern_backup(db: Session, ctx: Context) -> str:
     from hub.routers.onboarding import gate_inputs
 
     e = gate_inputs(db, ctx.settings).extern_backup or {"status": "unknown", "reden": "niet_gemeten"}
+    _bewaar_storingen(db, e, ctx.now)
     open_ = engine.active_for(db, rules.OFFSITE_FP) is not None
     probleem = e["status"] not in ("ok", "unknown")
     if probleem != open_ and e["status"] != "unknown":
@@ -243,10 +244,44 @@ def _extern_backup(db: Session, ctx: Context) -> str:
             "backup.offsite.stale" if probleem else "backup.offsite.recovered",
             "offsite_backup",
             "hub",
-            {"status": e["status"], "reden": e.get("reden"), "taken": taken, "max_leeftijd_s": e.get("max_leeftijd_s")},
+            {
+                "status": e["status"],
+                "reden": e.get("reden"),
+                "taken": taken,
+                "max_leeftijd_s": e.get("max_leeftijd_s"),
+                "meting_op": e.get("afgeleid_op"),  # het herstel hoort bij deze meting (R-HARDE-EIS-6)
+            },
         )
         db.flush()
     return str(e["status"])
+
+
+def _bewaar_storingen(db: Session, e: dict[str, Any], now: datetime) -> None:
+    """R-HARDE-EIS-5: per taak de laatste bevestigde storing; alleen een latere geslaagde upload heft die op."""
+    from hub.backup import offsite
+    from hub.models import HubSetting
+
+    nieuw = {
+        str(t["id"]): t.get("beeindigd") or iso(now)
+        for t in e.get("taken") or []
+        if t.get("id") is not None and t.get("status") in offsite.STORINGEN
+    }
+    if not nieuw:
+        return
+    row = db.get(HubSetting, offsite.STORINGEN_KEY, with_for_update=True)
+    oud = dict(row.waarde or {}) if row is not None else {}
+    samen = {**oud}
+    for taak, tijd in nieuw.items():
+        vorige = offsite.lees_tijd(oud.get(taak))
+        if vorige is None or (offsite.lees_tijd(tijd) or now) > vorige:
+            samen[taak] = tijd
+    if samen == oud:
+        return
+    if row is None:
+        db.add(HubSetting(sleutel=offsite.STORINGEN_KEY, waarde=samen, gewijzigd_op=now, gewijzigd_door="system:hub"))
+    else:
+        row.waarde, row.gewijzigd_op, row.gewijzigd_door = samen, now, "system:hub"
+    db.flush()
 
 
 def _task_incidents(db: Session, ctx: Context) -> dict[str, Any]:

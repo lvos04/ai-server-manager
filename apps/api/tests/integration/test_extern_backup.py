@@ -4,11 +4,17 @@ prioriteit en houdt de back-upgate (en daarmee R2/R3) dicht. Nooit een echt OneD
 
 from __future__ import annotations
 
+import json
+import logging
+import uuid
+from copy import deepcopy
+from datetime import timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from conftest import idem
-from fakes.fake_truenas import _ms
+from fakes.fake_truenas import _app, _ms
 from nashelpers import READONLY_KEY, connect, refresh
 from sqlalchemy import func, select
 
@@ -101,3 +107,132 @@ def test_verouderde_upload_en_verlopen_aanmelding_geven_incident_en_gate_dicht(
     [inc] = _incidenten(admin)
     assert inc["status"] == "opgelost", inc
     assert _extern_reden(admin) is None
+
+
+def _taakbesluit(admin: Any, taken: list[str]) -> None:
+    r = admin.put("/api/v1/decisions/D04/waarde", json={"waarde": {**D04, "taken": taken}}, headers=idem())
+    assert r.status_code == 200, r.text
+
+
+def test_dubbele_omschrijving_houdt_gate_dicht_en_incident_open(
+    admin: Any, fake_nas: Any, worker_once: Any, periodic_run: Any
+) -> None:
+    """R-HARDE-EIS-3: een gezonde taak met dezelfde omschrijving verbergt de mislukte niet (elke volgorde)."""
+    connect(admin, fake_nas)
+    taken = fake_nas.data["cloudsync.query"]
+    gezond = deepcopy(taken[0])
+    gezond["id"] += 100
+    taken[0]["job"].update(state="FAILED", error="teststoring")
+    _taakbesluit(admin, [gezond["description"]])
+    assert _ronde(admin, worker_once, periodic_run) == "mislukt"
+    for plek in (0, len(taken)):
+        taken.insert(plek, gezond)
+        assert _ronde(admin, worker_once, periodic_run) == "ontbreekt"
+        assert _extern_reden(admin) is not None and _incidenten(admin)[0]["status"] == "open"
+        taken.remove(gezond)
+
+
+def test_oudere_upload_heft_latere_storing_niet_op(
+    admin: Any, fake_nas: Any, worker_once: Any, periodic_run: Any
+) -> None:
+    """R-HARDE-EIS-5: na een storing telt alleen een LATERE geslaagde upload als herstel."""
+    connect(admin, fake_nas)
+    taak = fake_nas.data["cloudsync.query"][0]
+    _taakbesluit(admin, [str(taak["id"])])
+    eerdere_upload = deepcopy(taak["job"])  # geslaagd, vier uur geleden
+    taak["job"].update(state="FAILED", time_started=_ms(hours_ago=2), time_finished=_ms(hours_ago=1), error="x")
+    assert _ronde(admin, worker_once, periodic_run) == "mislukt"
+    taak["job"] = eerdere_upload
+    assert _ronde(admin, worker_once, periodic_run) == "mislukt"
+    assert _extern_reden(admin) is not None and _incidenten(admin)[0]["status"] == "open"
+    taak["job"] = {**eerdere_upload, "time_started": _ms(hours_ago=0.5), "time_finished": _ms(hours_ago=0.25)}
+    assert _ronde(admin, worker_once, periodic_run) == "ok"
+    assert _incidenten(admin)[0]["status"] == "opgelost"
+
+
+def test_vrije_taaktekst_blijft_uit_antwoord_events_en_log(
+    admin: Any, app: Any, fake_nas: Any, worker_once: Any, periodic_run: Any, caplog: Any
+) -> None:
+    """R-HARDE-EIS-7: een kijker ziet de taakomschrijving niet; ook niet in gate, incident, events of log."""
+    from conftest import login_as, make_user
+
+    from hub.models import OutboxEvent
+
+    connect(admin, fake_nas)
+    taak = fake_nas.data["cloudsync.query"][0]
+    _taakbesluit(admin, [str(taak["id"])])
+    make_user(admin, "lezer", "viewer")
+    markering = uuid.uuid4().hex
+    taak["description"] = "proef?access_token=" + markering
+    caplog.clear()
+    with caplog.at_level(logging.INFO), login_as(app, "lezer") as lezer:
+        _ronde(admin, worker_once, periodic_run)
+        antwoord = lezer.get("/api/v1/backups/extern")
+        assert antwoord.status_code == 200, antwoord.text
+        sporen = [antwoord.text, admin.get("/api/v1/gates/backup_gate").text, json.dumps(_incidenten(admin))]
+        with app.state.sessionmaker() as db:
+            sporen.extend(json.dumps(x) for x in db.scalars(select(OutboxEvent.payload)))
+        sporen.append(caplog.text)
+    assert not any(markering in x for x in sporen)
+
+
+def test_vertraagd_herstelbericht_sluit_nieuwe_storing_niet(app: Any, settings: Any, monkeypatch: Any) -> None:
+    """R-HARDE-EIS-6: een herstelbericht dat pas na een nieuwe storing wordt verwerkt, sluit het incident niet."""
+    from hub.events.envelope import emit
+    from hub.incidents import engine, rules
+    from hub.monitoring import periodic
+    from hub.routers import onboarding
+    from hub.timeutil import utcnow
+
+    meting = {"status": "mislukt"}
+    monkeypatch.setattr(onboarding, "gate_inputs", lambda *a: SimpleNamespace(eigen_backup=None, extern_backup=meting))
+    settings.incident_batch = 10
+    with app.state.sessionmaker.begin() as db:
+
+        def ronde(status: str) -> None:
+            meting["status"] = status
+            periodic._task_incidents(db, SimpleNamespace(settings=settings, now=utcnow()))
+            db.flush()
+
+        ronde("mislukt")
+        for _ in range(settings.incident_batch):  # achterstand: het herstelbericht blijft een ronde liggen
+            emit(db, "proef.achterstand.meting", "proef", "proef", {})
+        ronde("ok")
+        assert engine.active_for(db, rules.OFFSITE_FP) is not None
+        ronde("mislukt")
+        assert engine.active_for(db, rules.OFFSITE_FP) is not None
+        ronde("ok")  # een actuele, goede meting sluit wel
+        ronde("ok")
+        assert engine.active_for(db, rules.OFFSITE_FP) is None
+
+
+def test_strengste_rpo_telt_ook_de_catalogusnaam(
+    admin: Any, app: Any, fake_nas: Any, worker_once: Any, settings: Any
+) -> None:
+    """R-HARDE-EIS-2: de strengste RPO over runtime- én catalogusnaam; 30 minuten oud telt dan niet bij 15 min."""
+    from asm_policy import load_policy
+
+    from hub.actions import blokkades
+    from hub.timeutil import utcnow
+
+    fake_nas.data["app.query"].append(
+        _app("proef", "RUNNING", "proef:1", 8044, 8044, "/proef/app", "/config", catalog_app="proefcatalogus")
+    )
+    connect(admin, fake_nas)
+    refresh(admin, worker_once)
+    d16 = {
+        "per_app": [
+            {"app_id": "proef", "rpo_uren": 1, "rto_uren": 1},
+            {"app_id": "proefcatalogus", "rpo_uren": 0.25, "rto_uren": 1},
+        ]
+    }
+    r = admin.put("/api/v1/decisions/D16/waarde", json={"waarde": d16}, headers=idem())
+    assert r.status_code == 200, r.text
+    with app.state.sessionmaker() as db:
+        namen = blokkades.herkenningen(db, settings, load_policy(), "proef", SimpleNamespace(herkend_als=None))
+        rpo = blokkades.rpo_seconden(db, settings, namen)
+    nu = utcnow()
+    assert "proefcatalogus" in namen and rpo == 900
+    assert not blokkades.beoordeel_herstelpunt(
+        namen=namen, db_export=None, gemaakt_op=nu - timedelta(minutes=30), rpo_s=rpo, now=nu
+    )[2]

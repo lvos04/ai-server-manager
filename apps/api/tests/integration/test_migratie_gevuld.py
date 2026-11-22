@@ -646,3 +646,44 @@ def test_herstelpunten_overleven_terugmigratie_onder_0025(lege_db: str) -> None:
         migrations.upgrade(lege_db, "0025")
     finally:
         engine.dispose()
+
+
+def test_terugweg_0025_bewaart_een_tijdens_het_wachten_bevestigd_herstelpunt(lege_db: str) -> None:
+    """R-HARDE-EIS-1: een schrijver die commit terwijl de terugweg op het tabelslot wacht, verliest niets; de rij komt
+    na 0024 -> 0025 met alle velden terug."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from hub.models import Herstelpunt
+    from hub.timeutil import utcnow
+
+    migrations.upgrade(lege_db, "0025")
+    engine = sa.create_engine(lege_db)
+    hid = uuid.uuid4()
+    wacht = sa.text(
+        "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='relation' AND relation='herstelpunt'::regclass "
+        "AND mode='AccessExclusiveLock' AND NOT granted)"
+    )
+    alles = sa.select(*Herstelpunt.__table__.columns)
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool, Session(engine) as schrijver:
+            schrijver.add(Herstelpunt(id=hid, app="mediaguard", checkpoint_id=str(uuid.uuid4()), gemaakt_op=utcnow(),
+                                      snapshot={"datasets": ["p/mg"]}, db_export={"sha256": "ab" * 32},
+                                      status="niet_geverifieerd", reden="database_export_ontbreekt"))  # fmt: skip
+            schrijver.flush()
+            voor = schrijver.execute(alles).all()
+            terug = pool.submit(migrations.downgrade, lege_db, "0024")
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as kijker:
+                eind = time.monotonic() + 10
+                while not kijker.scalar(wacht):
+                    assert not terug.done() and time.monotonic() < eind, "terugweg bereikte het tabelslot niet"
+                    time.sleep(0.02)
+            schrijver.commit()
+            terug.result(timeout=10)
+        assert "herstelpunt_bewaard" in set(sa.inspect(engine).get_table_names())
+        migrations.upgrade(lege_db, "0025")
+        with engine.connect() as c:
+            na = c.execute(alles).all()
+        assert len(voor) == 1 and na == voor
+    finally:
+        engine.dispose()

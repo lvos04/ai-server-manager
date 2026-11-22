@@ -36,6 +36,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Eerst het exclusieve slot in deze transactie: een gelijktijdige schrijver commit vóór de leegtecontrole of wacht
+    # tot na de terugweg (R-HARDE-EIS-1); zonder slot kon een net bevestigde rij met de tabel verdwijnen.
+    op.execute("LOCK TABLE herstelpunt IN ACCESS EXCLUSIVE MODE")
     if op.get_bind().execute(sa.text("SELECT EXISTS (SELECT 1 FROM herstelpunt)")).scalar():
         op.rename_table("herstelpunt", "herstelpunt_bewaard")
     else:

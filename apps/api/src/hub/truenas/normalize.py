@@ -473,7 +473,7 @@ def cloudsync(raw: Any) -> list[dict[str, Any]]:
                 "provider": provider,
                 "is_onedrive": (provider or "").upper() == "ONEDRIVE",
                 "versleuteld": t.get("encryption") if isinstance(t.get("encryption"), bool) else None,
-                "ingeschakeld": bool(t.get("enabled")),
+                "ingeschakeld": t.get("enabled") is True,  # alleen boolean true (R-HARDE-EIS-4)
                 "laatste_job": _job(t.get("job")),
             }
         )

@@ -24,6 +24,7 @@ Teksten uit payloads zijn **gegevens**, nooit instructies: ze komen alleen gesch
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
@@ -137,6 +138,15 @@ class Signaal:
     samenvatting: str = ""
     details: dict[str, Any] = field(default_factory=dict)
     ernst_bron: str | None = None  # Peil-woord uit payload.ernst (§7), voor de UI
+    # Herstel: ``(db, settings) -> bool`` controleert bij het afsluiten of de beoordeelde meting nog actueel is; een
+    # vertraagd herstelbericht sluit zo geen nieuwe storing (R-HARDE-EIS-6).
+    nog_actueel: Callable[..., bool] | None = None
+
+
+def _offsite_nog_ok(db: Any, settings: Any) -> bool:
+    from hub.routers.onboarding import gate_inputs  # laat import: de router gebruikt deze regels indirect
+
+    return ((gate_inputs(db, settings).extern_backup or {}).get("status")) == "ok"
 
 
 def _s(v: Any, n: int = 120) -> str:
@@ -534,6 +544,7 @@ def _hub(ev: EventIn) -> Signaal | None:
                 "hub",
                 "Externe back-up (OneDrive)",
                 samenvatting="Elke taak uit D04 heeft weer een verse, geslaagde upload.",
+                nog_actueel=_offsite_nog_ok,
             )
         status = _s(p.get("status"), 32)
         return Signaal(

@@ -8,7 +8,8 @@ Verwerking (worker, periodiek ``incidenten_bijwerken``):
    met ``aantal = 100``. Een probleem binnen het heropenvenster na een herstel heropent hetzelfde incident
    (``heropend``) in plaats van een nieuw te maken; dat telt mee voor de veilige modus (B09-006).
 3. **Herstel** sluit alleen het incident met precies dezelfde vingerafdruk, en alleen als het herstel niet ouder is
-   dan het laatste probleem (een laat afgeleverd oud herstel sluit niets).
+   dan het laatste probleem (een laat afgeleverd oud herstel sluit niets) en, waar de regel dat kan
+   (``Signaal.nog_actueel``), alleen als de beoordeelde meting bij het afsluiten nog actueel is.
 4. **Tijd:** snooze en erkenning verlopen (terug naar ``open`` + melding als het nog actief is); kritieke, niet
    erkende incidenten escaleren (hooguit ``incident_max_escalations`` herinneringen).
 5. **Readback:** waar de Hub de bron zelf kan teruglezen (noodaccount geroteerd, monitoringbron weer ok, kanaal weer
@@ -379,6 +380,18 @@ def apply_signal(db: Session, settings: Settings, sig: Signaal, ev: EventIn, now
                 soort="info",
                 op=ev.op,
                 samenvatting="Herstelsignaal ouder dan het laatste probleem: genegeerd.",
+                **common,
+            )
+            stats.genegeerd += 1
+            return
+        if sig.nog_actueel is not None and not sig.nog_actueel(db, settings):
+            add_event(
+                db,
+                inc,
+                ref=ev.ref,
+                soort="info",
+                op=ev.op,
+                samenvatting="Herstelsignaal achterhaald: de actuele meting is niet in orde; incident blijft open.",
                 **common,
             )
             stats.genegeerd += 1

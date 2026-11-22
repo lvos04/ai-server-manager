@@ -63,6 +63,13 @@ en de meetdekking in `GET /api/v1/monitoring/coverage` (welke bron wat levert en
 - `unknown` geeft geen incident maar houdt de gate wel dicht. Dat geldt bij een andere methode in D04
   (`capability_unavailable`), een niet-leesbare TrueNAS of een job die nog loopt. Een open incident sluit alleen bij
   positief bewijs: een verse, geslaagde upload van elke taak.
+- Fail-closed bij twijfel: alleen `enabled` als boolean `true` telt als ingeschakeld; een job `SUCCESS` mét foutmelding
+  is `mislukt` (`tegenstrijdige_jobstatus`). Een D04-naam moet op precies één taak passen (taak-ID of omschrijving);
+  past hij op meer taken, dan is de taak `ontbreekt` (`taak_niet_eenduidig`).
+- Per taak bewaart de Hub de laatste bevestigde storing (instelling `backup.extern.storingen`). Alleen een upload die
+  ná die storing klaar is, heft haar op; een oudere upload blijft `mislukt` (`geen_upload_na_storing`). Een
+  herstelbericht sluit het incident alleen als de actuele meting bij het afsluiten nog `ok` is.
+- De uitkomst bevat geen vrije taaktekst (omschrijving), alleen taak-ID, staat, tijd en reden.
 - Een geslaagde upload is geen herstelgarantie; alleen een vastgelegde hersteltest is dat.
 
 ## Gotify (meldingen op je telefoon)
