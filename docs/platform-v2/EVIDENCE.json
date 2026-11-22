@@ -768,5 +768,35 @@
     "opmerking": "Hub-deel en executor-deel (S-P2-030). De nonce wordt in de database van de Hub atomair verbruikt vóór er iets naar de executor gaat, en de executor houdt zijn eigen nonces bij. Er rest bouwwerk naast de NAS-test: de herbeoordeling (S-P2-210) en de Hub-delen voor de connectoren van P3.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-15"
+  },
+  {
+    "id": "EX11",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware)",
+    "bewijs": "S-P2-060. Gate-beoordeling: apps/api/tests/unit/test_actie_blokkades.py::test_pool_degraded_of_onbekend_blokkeert_opslagmutaties (DEGRADED, gezondheid onbekend, geen pools, meting verouderd, niet ingesteld, auth_failed: allemaal pool_niet_gezond, ook via r2_r3_acties), ::test_elke_opslagmutatie_vraagt_de_poolgate_en_riskante_media_acties_bestaan_niet (elke opslagmutatie loopt via data_mutatie; media.purge, mediaguard.purge.start, jellyfin.media.delete en downloads.wipe staan niet op de allowlist en worden geweigerd), apps/api/tests/unit/test_catalog_gates.py::test_data_mutatie_pool_onbekend_of_degraded; Hub en executor tegen de nagebootste TrueNAS: tests/e2e/test_acties.py::test_pool_niet_gezond_blokkeert_opslagmutaties_ook_met_goedkeuring (DEGRADED, FAULTED, niet healthy; ook met goedkeuring, geen schrijfaanroep), ::test_dichte_gate_ondertekent_niets[data_mutatie-…] (geen handtekening, geen nonce, goedkeuring niet verbruikt; na heropenen wel), ::test_beheerder_kan_een_gate_niet_wegklikken (geen schrijfroute voor gates, extra goedkeuringsvelden geweigerd, ongezonde pool blijft pool_niet_gezond); executor zelf: apps/executor/tests/test_uitvoeren.py::test_pool_niet_gezond_of_onbekend_blokkeert_opslagmutaties.",
+    "blokkade": "NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware): poolstatus komt uit een testfixture; de boiler is niet aangesloten.",
+    "opmerking": "Hub-deel en executor-deel. Een meting die niet vers is (ouder dan de TTL van de inventaris) is unknown en houdt de gate dicht (V-051). 'Riskante media-acties' bestaan in deze versie niet als actie: wissen en opschonen vallen onder BLK-DESTRUCTIEF en MediaGuard-acties onder RES-MEDIAGUARD.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-22"
+  },
+  {
+    "id": "EX12",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware)",
+    "bewijs": "S-P2-060 (gate-deel). Verouderde eigen back-up: apps/api/tests/integration/test_backup_verouderd.py::test_verouderde_backup_geeft_kritiek_incident_en_houdt_r2_r3_dicht (echte pg_dump-export en worker-taak incidenten_bijwerken: vers geen incident; te oud een kritiek incident backup.verouderd, de back-upgate noemt de eigen export en r2_r3_acties geeft backup_gate_rood; geen tweede event per ronde; na een nieuwe geverifieerde export sluit het incident), apps/api/tests/unit/test_incident_regels.py::test_verouderde_eigen_backup_is_een_kritiek_incident; gate: apps/api/tests/unit/test_actie_blokkades.py::test_backupgate_rood_blokkeert_opslagmutaties, tests/e2e/test_acties.py::test_backup_gate_rood_blokkeert_opslagmutaties, ::test_zonder_geteste_besluiten_geen_r2_en_geen_opslagmutatie, ::test_dichte_gate_ondertekent_niets[r2_r3_acties-…]; herstelpunt (S-P2-050f): tests/e2e/test_acties.py::test_bijwerken_vraagt_een_geverifieerd_herstelpunt (backup_checkpoint_ontbreekt), apps/executor/tests/test_uitvoeren.py::test_herstelpunt_verplicht_bij_update_en_terugzetten (backup_checkpoint_ontbreekt bij de executor).",
+    "blokkade": "NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware): poolstatus komt uit een testfixture; de boiler is niet aangesloten.",
+    "opmerking": "Gate-deel; het back-upbeleid zelf (B12-004/B12-006) is S-P2-080. Een mislukte export gaf al een kritiek incident (backup.eigen_mislukt); nu ook een export die te oud wordt (backup.verouderd, ernst kritiek). Nog nooit een geverifieerde export is 'ontbreekt': de gate is dan dicht, maar er komt geen apart incident (VERSIE 2).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-22"
+  },
+  {
+    "id": "EX27",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware)",
+    "bewijs": "S-P2-060. Per route: Hub-API (mens) apps/api/tests/integration/test_acties.py::test_boiler_wordt_altijd_geweigerd (actie, doel en parameters; 403 boiler_verboden, ook voor een beheerder, niet goed te keuren of uit te voeren); voorstel met de boiler diep in de parameters apps/api/tests/integration/test_acties.py::test_diep_geneste_waarden_worden_geweigerd_en_niet_bewaard (app.install met 'boiler aan' genest: 403 boiler_verboden, geen bewaarde waarden) en ::test_losse_teksten_in_lijsten_worden_geweigerd_en_niet_bewaard (boiler als losse tekst in een lijst); automatisering, AI-voorstel, spraak, dienst en systeem apps/policy/tests/test_policy.py::test_ex27_boiler_wordt_altijd_geweigerd (elke actor uit ACTOR_TYPES) en ::test_boiler_tot_de_scangrens_gezien_en_dieper_dicht; executor apps/executor/tests/test_executor.py::test_buiten_de_allowlist_altijd_geweigerd[boiler.aan-…] (ook met een geldige handtekening van de Hub) en apps/executor/tests/test_uitvoeren.py::test_te_diep_geneste_waarden_weigert_de_executor_zelf (boiler diep genest: boiler_verboden). Bewaking blijft: apps/api/tests/integration/test_acties.py::test_een_melding_over_de_boiler_mag_maar_schakelt_niets, apps/policy/tests/test_policy.py::test_melding_over_de_boiler_schakelt_niets_en_mag; D14 kan alleen 'boiler alleen meten' zijn (apps/api/tests/unit/test_catalog_gates.py::test_veiligheidsbesluiten_kunnen_niet_onveilig).",
+    "blokkade": "NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware): poolstatus komt uit een testfixture; de boiler is niet aangesloten.",
+    "opmerking": "Hub-, beleid- en executordeel. Voorstellen door flows, AI of diensten hebben in de Hub nog geen eigen ingang (alleen gebruikerssessies); de gedeelde classificatie weigert de boiler voor elke actor. Energie lezen gebeurt niet in de Hub maar bij my_house en home-control-hub; dat deel is daar te bewijzen.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-22"
   }
 ]

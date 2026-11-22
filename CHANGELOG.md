@@ -4,6 +4,17 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Dynamische blokkades en gates: pool, back-up, boiler (S-P2-060)
+
+- Een eigen back-up die te oud wordt voor de back-upgate geeft nu een kritiek incident `backup.verouderd` (event
+  `backup.freshness.stale`, de worker-taak `incidenten_bijwerken`). Het incident sluit zodra er weer een verse,
+  geverifieerde export is (`backup.freshness.recovered`). De grens is dezelfde als die van de gate, dus R2/R3 blijft
+  dicht met `backup_gate_rood` (EX12).
+- Nieuwe negatieve tests: per gate (`r2_r3_acties`, `data_mutatie`, `deployment`, `bestaande_app_updates`) een
+  goedgekeurde actie die bij een dichte gate niet wordt ondertekend. Een beheerder kan een gate niet wegklikken.
+  Elke opslagmutatie loopt via de poolgate (EX11). De boiler wordt geweigerd voor elke soort actor (EX27).
+  Sim-geslaagd; NIET GEVALIDEERD (echte NAS, hardware).
+
 ### Toegevoegd — Volledige keten appstore → planner → Hub → executor (S-P2-050g, deel G)
 
 - `tests/interop/test_keten_echt.py` en de CI-job `keten` draaien de gepinde appstore-en-fork en jelly-leon-platform,
