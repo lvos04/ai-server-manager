@@ -2,7 +2,9 @@
 
 Stroom: voorstel → deterministische classificatie (``risk_claim`` wordt genegeerd) → eigen readback van het doel →
 preview met ``preview_hash`` → bij R2/R3 een goedkeuring die vastzit aan preview, ETag en beleid → vlak vóór verzending
-alles opnieuw → ondertekend ``ExecutionRequest`` naar de executor → uitkomst eerlijk vastleggen.
+alles opnieuw → ondertekend ``ExecutionRequest`` naar de executor → uitkomst eerlijk vastleggen. Een actie van een
+eigenaar-connector (§8, tweede tabel) loopt net zo, met het voorstel van de eigenaar (``/connector/v1/propose``) als
+doel en ``/connector/v1/apply`` van de eigenaar als uitvoerder.
 
 Vaste regels in dit bestand:
 
@@ -22,6 +24,7 @@ Vaste regels in dit bestand:
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import json
 import math
@@ -392,7 +395,12 @@ def _lees(
     actie: ActieDef,
     target: Mapping[str, Any],
     parameters: Mapping[str, Any],
+    *,
+    keyring: KeyRing | None = None,
+    reden: str = "",
 ) -> Doel:
+    if actie.eigenaar is not None:
+        return _eigenaar_voorstel(db, settings, keyring, actie, target, parameters, reden)
     try:
         return lees_doel(db, vault, settings, policy, actie, target, parameters)
     except DoelOnbekend as exc:
@@ -421,6 +429,7 @@ def stel_voor(
     expected_version: str | None,
     expires_in_seconds: int,
     trace_id: str,
+    keyring: KeyRing | None = None,
 ) -> dict[str, Any]:
     policy = get_policy()
     if db.get(ActionRequest, request_id) is not None:
@@ -472,17 +481,6 @@ def stel_voor(
             message="Deze actie staat niet op de allowlist; er is niets voorgesteld.",
             **gemeen,
         )
-    if actie.eigenaar is not None:
-        _weiger(
-            db,
-            policy,
-            principal,
-            cls=cls,
-            status=501,
-            code="capability_unavailable",
-            message=f"Deze actie voert {actie.eigenaar} zelf uit; die koppeling bestaat in deze versie nog niet.",
-            **gemeen,
-        )
     fouten = validate_target(actie, target)
     fouten += [] if fouten else validate_parameters(policy, actie, target, parameters)
     if fouten:
@@ -504,9 +502,12 @@ def stel_voor(
             501, "capability_unavailable", EIGEN_OPDRACHT_NL, {"reden": "eigen_opdracht", "velden": opdracht}
         )
     # Stap 2: het doel zelf uitlezen en opnieuw classificeren met wat er werkelijk staat (kritiek, beschermd).
-    doel = _lees(db, vault, settings, policy, actie, target, parameters)
-    cls = classify(
-        policy, action_id=aid, target=target, parameters=parameters, actor_type="user", herkend_als=doel.herkend_als
+    doel = _lees(db, vault, settings, policy, actie, target, parameters, keyring=keyring, reden=reason)
+    cls = _met_eigenaar(
+        classify(
+            policy, action_id=aid, target=target, parameters=parameters, actor_type="user", herkend_als=doel.herkend_als
+        ),
+        doel,
     )
     if cls.geweigerd:
         _weiger(
@@ -583,7 +584,13 @@ def stel_voor(
 
 # ------------------------------------------------------------------ herberekenen
 def _herbereken(
-    db: Session, settings: Settings, vault: Vault, policy: Policy, req: ActionRequest, now: datetime
+    db: Session,
+    settings: Settings,
+    vault: Vault,
+    policy: Policy,
+    req: ActionRequest,
+    now: datetime,
+    keyring: KeyRing | None = None,
 ) -> tuple[ActieDef, Classification, Doel, dict[str, Any], str]:
     """Alles opnieuw, met het beleid en de NAS van nu. Past het voorstel niet meer, dan is het geweigerd."""
 
@@ -621,7 +628,7 @@ def _herbereken(
     kaal = classify(
         policy, action_id=req.action_id, target=req.target, parameters=req.parameters, actor_type=req.actor_type
     )
-    if actie is None or not kaal.known or kaal.geweigerd or kaal.gereserveerd is not None or actie.eigenaar is not None:
+    if actie is None or not kaal.known or kaal.geweigerd or kaal.gereserveerd is not None:
         stop("Het beleid staat deze actie niet (meer) toe.", kaal, {"rule_ids": list(kaal.rule_ids)})
     fouten = validate_target(actie, req.target)
     fouten += [] if fouten else validate_parameters(policy, actie, req.target, req.parameters)
@@ -632,14 +639,17 @@ def _herbereken(
         # Een open voorstel van vóór S-P2-040: de preview toonde die opdracht niet (R-VEILIG-1, optie C).
         details = {"reden": "eigen_opdracht", "velden": opdracht}
         stop(EIGEN_OPDRACHT_NL, None, details, status=501, code="capability_unavailable")
-    doel = _lees(db, vault, settings, policy, actie, req.target, req.parameters)
-    cls = classify(
-        policy,
-        action_id=req.action_id,
-        target=req.target,
-        parameters=req.parameters,
-        actor_type=req.actor_type,
-        herkend_als=doel.herkend_als,
+    doel = _lees(db, vault, settings, policy, actie, req.target, req.parameters, keyring=keyring, reden=req.reden)
+    cls = _met_eigenaar(
+        classify(
+            policy,
+            action_id=req.action_id,
+            target=req.target,
+            parameters=req.parameters,
+            actor_type=req.actor_type,
+            herkend_als=doel.herkend_als,
+        ),
+        doel,
     )
     if cls.geweigerd:
         stop("Het beleid weigert deze actie voor dit doel.", cls, {"blokkades": [b.as_dict() for b in cls.blokkades]})
@@ -697,6 +707,7 @@ def keur_goed(
     resource_etag: str,
     policy_hash: str,
     trace_id: str,
+    keyring: KeyRing | None = None,
 ) -> dict[str, Any]:
     policy = get_policy()
     now = _nu()
@@ -710,7 +721,7 @@ def keur_goed(
             "Dit voorstel wacht niet op goedkeuring.",
             {"status": req.status, "goedkeuring_nodig": class_at_least(req.risk_class, "R2")},
         )
-    actie, cls, _doel, preview, phash = _herbereken(db, settings, vault, policy, req, now)
+    actie, cls, _doel, preview, phash = _herbereken(db, settings, vault, policy, req, now, keyring)
     anders = _neem_over(req, policy, cls, _doel, preview, phash, now)
     if not cls.requires_approval:
         # Het doel is niet meer kritiek of het beleid is gewijzigd: er valt niets meer goed te keuren.
@@ -1040,6 +1051,133 @@ def _executor(db: Session, settings: Settings) -> tuple[Service, str]:
     return svc, base
 
 
+# ------------------------------------------------------------------ eigenaar-connector (§6, §8 tweede tabel)
+EIGENAAR_PROPOSE = "/connector/v1/propose"
+EIGENAAR_APPLY = "/connector/v1/apply"
+EIGENAAR_HASH_RE = re.compile(r"(?:sha256:)?([0-9a-f]{64})")
+# Een ontbrekende route of functie bij de eigenaar is eerlijk capability_unavailable (§4.4, §6).
+ONTBREEKT = (404, 405, 501)
+
+
+def _met_eigenaar(cls: Classification, doel: Doel) -> Classification:
+    """``requires_backup`` uit het voorstel van de eigenaar of uit het beleid (§8): alleen strenger, nooit losser."""
+    if doel.eigenaar is not None and doel.eigenaar["requires_backup"] and not cls.requires_backup:
+        return dataclasses.replace(cls, requires_backup=True)
+    return cls
+
+
+def _eigenaar(db: Session, settings: Settings, app_id: str) -> tuple[Service, str]:
+    svc = db.scalars(select(Service).where(Service.app_id == app_id, Service.status == "active")).first()
+    if svc is None:
+        raise HubError(
+            409,
+            "eigenaar_niet_gekoppeld",
+            f"De eigenaar van deze actie ({app_id}) is niet gekoppeld; er is niets voorgesteld of uitgevoerd.",
+            {"eigenaar": app_id},
+        )
+    base, why = service_base_url(db, settings, svc)
+    if base is None:
+        raise HubError(
+            409,
+            "eigenaar_adres_onbekend",
+            "Het adres van de eigenaar is niet gemeten (NAS-adres D03 + hostpoort uit de inventaris); er is niets "
+            "voorgesteld of uitgevoerd.",
+            {"eigenaar": app_id, "reason": why},
+        )
+    return svc, base
+
+
+def _eigenaar_onbekend(reden: str) -> HubError:
+    return HubError(
+        409,
+        "doel_onbekend",
+        "De eigenaar gaf geen bruikbaar voorstel; onbekend telt nooit als ongewijzigd. Er is niets voorgesteld, "
+        "goedgekeurd of uitgevoerd.",
+        {"reason_code": reden},
+    )
+
+
+def _eigenaar_voorstel(
+    db: Session,
+    settings: Settings,
+    keyring: KeyRing | None,
+    actie: ActieDef,
+    target: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    reden: str,
+) -> Doel:
+    """Het voorstel van de eigenaar (``POST /connector/v1/propose``, §6) als doel: zijn ``resource_etag`` en
+    ``preview_hash`` binden de goedkeuring, want de eigenaar controleert bij ``apply`` dat die bij zijn eigen voorstel
+    horen. Van het antwoord neemt de Hub alleen vaste velden in vaste vorm over (zoals bij de executor)."""
+    eigenaar = str(actie.eigenaar)
+    if keyring is None:  # pragma: no cover - elke route geeft de sleutels mee
+        raise _eigenaar_onbekend("geen_sleutels")
+    svc, base = _eigenaar(db, settings, eigenaar)
+    bearer, _ = keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))
+    try:
+        res = servicecalls.call(
+            base,
+            "POST",
+            EIGENAAR_PROPOSE,
+            bearer=bearer,
+            idempotency_key=str(uuid.uuid4()),  # elke herberekening is een nieuw voorstel bij de eigenaar
+            body={
+                "action_id": actie.action_id,
+                "target": dict(target),
+                "parameters": dict(parameters),
+                "reason": reden[:300],
+            },
+            connect_timeout=settings.service_call_connect_timeout,
+            read_timeout=settings.service_call_read_timeout,
+        )
+    except servicecalls.ServiceCallError as exc:
+        raise _eigenaar_onbekend(f"eigenaar_{_reden(exc.reason) or ONBEKENDE_REDEN}") from None
+    body = res.body if isinstance(res.body, dict) else {}
+    if res.status in ONTBREEKT:
+        raise HubError(
+            501,
+            "capability_unavailable",
+            f"{eigenaar} biedt voor deze actie (nog) geen voorstel aan; er is niets voorgesteld.",
+            {"eigenaar": eigenaar, "http_status": res.status},
+        )
+    code = _vorm(body.get("code"), CODE_RE)
+    if 400 <= res.status < 500 and code is not None:
+        raise HubError(
+            409,
+            "eigenaar_weigerde_voorstel",
+            f"{eigenaar} weigerde het voorstel; er is niets voorgesteld.",
+            {"eigenaar": eigenaar, "http_status": res.status, "code": code},
+        )
+    if res.status not in (200, 201):
+        raise _eigenaar_onbekend(f"eigenaar_http_{res.status}")
+    ph = EIGENAAR_HASH_RE.fullmatch(body["preview_hash"]) if isinstance(body.get("preview_hash"), str) else None
+    et = EIGENAAR_HASH_RE.fullmatch(body["resource_etag"]) if isinstance(body.get("resource_etag"), str) else None
+    voorstel_id = _vorm(body.get("proposal_id"), UUID_RE)
+    diff = _structuur(body.get("diff"), list)
+    backup = body.get("requires_backup")
+    if (
+        ph is None
+        or et is None
+        or voorstel_id is None
+        or diff is None
+        or not isinstance(backup, bool)
+        or body.get("action_id") != actie.action_id
+    ):
+        raise _eigenaar_onbekend("eigenaar_antwoord_ongeldig")
+    return Doel(
+        "eigenaar",
+        eigenaar,
+        f"sha256:{et.group(1)}",
+        True,
+        eigenaar={
+            "voorstel_id": voorstel_id,
+            "preview_hash": f"sha256:{ph.group(1)}",
+            "requires_backup": backup,
+            "diff": diff,
+        },
+    )
+
+
 def _envelope(
     req: ActionRequest,
     ap: Approval | None,
@@ -1169,13 +1307,16 @@ def _antwoord(
     )
 
 
-def _onbekend(db: Session, req: ActionRequest, reden: str, actor: str) -> NoReturn:
+def _onbekend(db: Session, req: ActionRequest, reden: str, actor: str, *, eigenaar: bool = False) -> NoReturn:
     reden = _reden(reden) or ONBEKENDE_REDEN
     _sluit(db, req, "onbekend", {"code": "uitkomst_onbekend", "reden": reden}, actor=actor, extra={"reden": reden})
     raise Bewaard(
         502,
         "uitkomst_onbekend",
-        "De executor gaf geen bruikbaar antwoord; of de actie is uitgevoerd, is onbekend. De Hub herhaalt niets. "
+        "De eigenaar gaf geen bruikbaar antwoord; of de actie is uitgevoerd, is onbekend. De Hub herhaalt niets. "
+        "Controleer de toestand bij de eigenaar zelf."
+        if eigenaar
+        else "De executor gaf geen bruikbaar antwoord; of de actie is uitgevoerd, is onbekend. De Hub herhaalt niets. "
         "Vraag de uitkomst later op via het journaal van de executor.",
         {"request_id": str(req.id), "reden": reden},
     )
@@ -1285,7 +1426,7 @@ def voer_uit(
     if class_at_least(req.risk_class, "R2") and principal.role != Role.admin:
         raise HubError(403, "forbidden", "Alleen een beheerder voert een R2- of R3-actie uit.")
     ap = huidige_goedkeuring(db, req) if req.status == "goedgekeurd" else None
-    actie, cls, doel, preview, phash = _herbereken(db, settings, vault, policy, req, now)
+    actie, cls, doel, preview, phash = _herbereken(db, settings, vault, policy, req, now, keyring)
     if cls.requires_approval and principal.role != Role.admin:
         raise HubError(403, "forbidden", "Alleen een beheerder voert een R2- of R3-actie uit.")
     if ap is not None:
@@ -1365,9 +1506,12 @@ def voer_uit(
         )
     if actie.uitvoerder == "hub:gotify":
         return _meld(db, req, principal, now)
-    if not actie.via_executor:
+    if actie.eigenaar is not None:
+        svc, base = _eigenaar(db, settings, actie.eigenaar)
+    elif actie.via_executor:
+        svc, base = _executor(db, settings)
+    else:
         raise HubError(501, "capability_unavailable", "Voor deze actie bestaat in deze versie nog geen uitvoerder.")
-    svc, base = _executor(db, settings)
     kluis.controleer_revisies(db, req)  # een niet-bestaand kluispad: weigering vóór ondertekening (S-P2-070)
 
     # Atomair: eerst de eenmalige nonce van de goedkeuring verbruiken (EX20), dan het voorstel op 'bezig'. Wie tweede
@@ -1419,7 +1563,9 @@ def voer_uit(
     nu = utcnow()
     eigen = check_envelope(policy, verzoek, [keyring.policy_signing.public_key()], now=nu)
     if eigen is None:
-        _a, _c, eigen = check_decision(policy, verzoek, now=nu, herkend_als=doel.herkend_als, uitvoerder="executor")
+        _a, _c, eigen = check_decision(
+            policy, verzoek, now=nu, herkend_als=doel.herkend_als, uitvoerder=actie.uitvoerder
+        )
     if eigen is not None:
         _sluit(db, req, "mislukt", {"code": eigen.code, "message": eigen.melding, "bij": "hub"}, actor=principal.name)
         raise Bewaard(
@@ -1434,7 +1580,7 @@ def voer_uit(
         res = servicecalls.call(
             base,
             "POST",
-            "/api/v1/execute",
+            EIGENAAR_APPLY if actie.eigenaar is not None else "/api/v1/execute",
             bearer=bearer,
             idempotency_key=str(nonce),
             body=verzoek,
@@ -1442,15 +1588,39 @@ def voer_uit(
             read_timeout=float(actie.timeout_seconden + ANTWOORD_MARGE),
         )
     except servicecalls.ServiceCallError as exc:
+        if actie.eigenaar is not None:
+            # Een eigenaar heeft (nog) geen journaal voor de Hub: de uitkomst blijft onbekend, de Hub herhaalt niets.
+            _onbekend(db, req, f"eigenaar_{exc.reason}", principal.name, eigenaar=True)
         uitkomst, gegevens = _journaal(db, settings, keyring, req)
         if uitkomst in ("uitgevoerd", "mislukt", "afwijking"):
             return _antwoord(db, req, uitkomst, gegevens, principal.name)
         _onbekend(db, req, f"executor_{exc.reason}", principal.name)
-    return _verwerk(db, req, res, principal.name, policy.hash)
+    if actie.eigenaar is not None and res.status in (404, 405):
+        # De eigenaar kent de route apply (nog) niet: niets uitgevoerd, eerlijk capability_unavailable (§6).
+        _sluit(
+            db,
+            req,
+            "mislukt",
+            {"code": "capability_unavailable", "http_status": res.status, "bij": "eigenaar"},
+            actor=principal.name,
+        )
+        raise Bewaard(
+            501,
+            "capability_unavailable",
+            f"{actie.eigenaar} kan deze actie (nog) niet uitvoeren; er is niets uitgevoerd.",
+            {"request_id": str(req.id), "eigenaar": actie.eigenaar, "http_status": res.status},
+        )
+    return _verwerk(db, req, res, principal.name, policy.hash, eigenaar=actie.eigenaar is not None)
 
 
 def _verwerk(
-    db: Session, req: ActionRequest, res: servicecalls.CallResult, actor: str, policy_hash: str
+    db: Session,
+    req: ActionRequest,
+    res: servicecalls.CallResult,
+    actor: str,
+    policy_hash: str,
+    *,
+    eigenaar: bool = False,
 ) -> tuple[int, dict[str, Any]]:
     """Het antwoord van de executor vastleggen. Alleen velden uit de vaste lijst (:func:`_van_executor`); de eigen
     velden van de Hub (``code``, ``request_id``, …) komen altijd ná die velden en zijn dus niet te overschrijven."""
@@ -1463,7 +1633,7 @@ def _verwerk(
         resultaat = _bewijs_uitgevoerd(body, policy_hash)
         if resultaat is None:
             # R-VEILIG-2: "uitgevoerd" zonder volledig bewijs is een onduidelijk antwoord, nooit een succes.
-            _onbekend(db, req, BEWIJS_ONVOLLEDIG, actor)
+            _onbekend(db, req, BEWIJS_ONVOLLEDIG, actor, eigenaar=eigenaar)
         _sluit(db, req, "uitgevoerd", resultaat, actor=actor)
         return 200, weergave(db, req)
     if res.status == 409 and code == "afwijking":
@@ -1499,16 +1669,17 @@ def _verwerk(
             {"code": code, "message": melding, "details": schoon, "http_status": res.status},
             actor=actor,
         )
+        wie = "eigenaar" if eigenaar else "executor"
         raise Bewaard(
             501 if res.status == 501 else 409,
             "capability_unavailable" if res.status == 501 else "uitvoering_geweigerd",
-            (melding or "Deze functie bestaat in de executor nog niet; er is niets uitgevoerd.")
+            (melding or f"Deze functie bestaat bij de {wie} nog niet; er is niets uitgevoerd.")
             if res.status == 501
-            else "De executor heeft de actie geweigerd; er is niets uitgevoerd.",
-            {"request_id": str(req.id), "executor": {"code": code, "message": melding, "details": schoon}},
+            else f"De {wie} heeft de actie geweigerd; er is niets uitgevoerd.",
+            {"request_id": str(req.id), wie: {"code": code, "message": melding, "details": schoon}},
         )
     # Ook een code buiten het vaste patroon (vrije tekst, stuurtekens): geen bruikbaar antwoord.
-    _onbekend(db, req, f"executor_http_{res.status}", actor)
+    _onbekend(db, req, f"{'eigenaar' if eigenaar else 'executor'}_http_{res.status}", actor, eigenaar=eigenaar)
 
 
 def haal_uitkomst_op(
@@ -1524,6 +1695,14 @@ def haal_uitkomst_op(
         raise HubError(409, "nog_bezig", "Deze actie loopt nog; wacht op het antwoord van de executor.")
     if req.status not in ("onbekend", "bezig"):
         raise HubError(409, "status_past_niet", "De uitkomst van dit verzoek is al bekend.", {"status": req.status})
+    if actie is not None and actie.eigenaar is not None:
+        # shortcut: de eigenaar biedt de Hub (nog) geen journaal; de uitkomst blijft onbekend tot er een is (VERSIE 2).
+        raise HubError(
+            409,
+            "uitkomst_onbekend",
+            "De eigenaar heeft geen journaal voor de Hub; de uitkomst is niet vast te stellen. De Hub herhaalt niets.",
+            {"request_id": str(req.id), "journaal": "geen_journaal_eigenaar"},
+        )
     uitkomst, gegevens = _journaal(db, settings, keyring, req)
     if uitkomst in ("uitgevoerd", "mislukt", "afwijking"):
         return _antwoord(db, req, uitkomst, gegevens, principal.name)

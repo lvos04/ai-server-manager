@@ -111,6 +111,10 @@ def verified_checkpoint(
     van deze app, op een dataset die alle opslag van de app dekt. Een id dat een gebruiker of de AI opgeeft, is nooit
     bewijs. De executor controleert bij de uitvoering zelf opnieuw (bestaan, ``createtxg``, dekking uit
     ``app.config``)."""
+    if req.doel_sleutel.startswith("eigenaar:"):
+        # shortcut: de Hub meet nog geen B12-back-up van de data van een eigenaar (bv. de Authentik-database); zonder
+        # dat bewijs blijft een actie met requires_backup geblokkeerd. Vervalt zodra die meting er is (VERSIE 2).
+        return None, "backupbewijs_eigenaar_ontbreekt"
     if req.action_id not in APP_WIJZIGINGEN:
         return None, "geen_app_wijziging"
     now = now or utcnow()

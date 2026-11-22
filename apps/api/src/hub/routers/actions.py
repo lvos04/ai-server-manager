@@ -181,6 +181,7 @@ def propose(
     db: DB,
     settings: SettingsDep,
     vault: VaultDep,
+    keyring: KeyRingDep,
     principal: Operator,
     idem: Idem,
 ) -> JSONResponse:
@@ -228,6 +229,7 @@ def propose(
             evidence_ids=body.evidence_ids,
             expected_version=body.expected_version,
             expires_in_seconds=body.expires_in_seconds,
+            keyring=keyring,
             trace_id=trace_id_of(request),
         )
 
@@ -301,6 +303,7 @@ def approve(
             resource_etag=body.resource_etag,
             policy_hash=body.policy_hash,
             trace_id=trace_id_of(request),
+            keyring=keyring,
         )
 
     return _afhandelen(request, idem, werk)

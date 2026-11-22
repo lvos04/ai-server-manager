@@ -51,6 +51,8 @@ class Doel:
     # (doelen zonder app) zegt "na een stop niet herkenbaar": dicht bij twijfel (S-P2-010).
     herkend_als: Herkenning = field(default_factory=lambda: Herkenning((), True, False))
     extra_bestaat: bool = False  # snapshot of sandbox-dataset bestaat al
+    # Het voorstel van de eigenaar-connector (§6 ``propose``): voorstel_id, preview_hash, requires_backup en diff.
+    eigenaar: dict[str, Any] | None = None
 
     @property
     def sleutel(self) -> str:
@@ -165,7 +167,8 @@ def lees_doel(
     if actie.doel == "geen":
         return Doel("geen", "", "geen", True)
     if actie.doel == "eigenaar":
-        return Doel("eigenaar", str(target.get("app_id") or ""), "eigenaar", True)
+        # Een eigenaaractie leest de Hub alleen via het voorstel van de eigenaar (service._eigenaar_voorstel).
+        raise DoelOnbekend("eigenaar_via_connector", "Dit doel leest alleen de eigenaar-connector.")
     nas = current_target(db)
     if nas is None:
         raise DoelOnbekend("not_configured", "Besluit D03 (NAS-adres) is nog niet ingevuld.")

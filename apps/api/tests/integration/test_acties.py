@@ -198,8 +198,9 @@ def test_een_melding_over_de_boiler_mag_maar_schakelt_niets(stack: Stack) -> Non
         ("app.onbekend", 403, "actie_niet_toegestaan", "R3"),
         ("mediaguard.repair.start", 501, "capability_unavailable", "R3"),
         ("my_house.device.set", 501, "capability_unavailable", "R3"),
-        # Bekende actie van een andere eigenaar: de klasse uit het beleid blijft staan, uitvoeren kan hier niet.
-        ("sso.oidc.hub.register", 501, "capability_unavailable", "R2"),
+        # MediaGuard-acties blijven gereserveerd tot BG-05 en P3-02 (§8, tweede tabel; S-P2-080).
+        ("mediaguard.wanted.search", 501, "capability_unavailable", "R3"),
+        ("mediaguard.quarantine.restore", 501, "capability_unavailable", "R3"),
     ],
 )
 def test_verboden_onbekende_en_gereserveerde_acties(

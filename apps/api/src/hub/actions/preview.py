@@ -495,6 +495,15 @@ def _wijziging(actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[s
         return {"soort": "snapshot_klonen", "snapshot": doel.naam, "naar": parameters.get("doel_dataset")}
     if aid == "notification.send":
         return {"soort": "melding", "titel": parameters.get("titel"), "prioriteit": parameters.get("prioriteit", 2)}
+    if doel.eigenaar is not None:
+        # De wijziging zoals de eigenaar haar in zijn voorstel (§6 propose) beschrijft; ook die gaat door _toon.
+        return {
+            "soort": aid,
+            "eigenaar": doel.naam,
+            "voorstel_id": doel.eigenaar["voorstel_id"],
+            "requires_backup": doel.eigenaar["requires_backup"],
+            "diff": doel.eigenaar["diff"],
+        }
     return {"soort": aid}
 
 
@@ -552,4 +561,8 @@ def bouw(
         "dataretentie": DATA_BLIJFT,
         "terugdraaien": _terugdraaien(actie.action_id, doel),
     }
+    if doel.eigenaar is not None:
+        # De eigenaar controleert bij apply dat de goedkeuring bij zijn eigen voorstel hoort (§8, tweede tabel): de
+        # goedkeuring bindt daarom zijn preview_hash. Beleid, klasse en ETag bindt de goedkeuring apart.
+        return preview, str(doel.eigenaar["preview_hash"])
     return preview, canonical_sha256(preview)
