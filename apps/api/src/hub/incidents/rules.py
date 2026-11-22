@@ -174,6 +174,7 @@ def _safe_details(ev: EventIn, keys: tuple[str, ...] | None = None) -> dict[str,
 
 
 ADAPTER_HEALTH_FAILED = "monitoring.adapter_health.failed"
+BACKUP_VEROUDERD_FP = f"{APP_ID}:eigen_backup_verouderd"
 ADAPTER_HEALTH_RECOVERED = "monitoring.adapter_health.recovered"
 
 
@@ -511,6 +512,36 @@ def _hub(ev: EventIn) -> Signaal | None:
             "Auditspoor",
             samenvatting="De controle van het auditspoor vond een wijziging, gat of afgeknipte staart.",
             details=_safe_details(ev, ("fouten", "anker")),
+        )
+    if et in ("backup.freshness.stale", "backup.freshness.recovered"):
+        # EX12: de laatste geverifieerde eigen back-up is te oud; de back-upgate (en daarmee R2/R3) is dicht.
+        fp = BACKUP_VEROUDERD_FP
+        if et.endswith("recovered"):
+            return Signaal(
+                "herstel",
+                "backup.verouderd",
+                fp,
+                "Eigen back-up weer actueel",
+                "info",
+                "hub:backup",
+                "self_backup",
+                "hub",
+                "Eigen database-export",
+                samenvatting="Er is weer een verse, geverifieerde back-up.",
+            )
+        return Signaal(
+            "probleem",
+            "backup.verouderd",
+            fp,
+            "Eigen back-up verouderd: R2/R3-acties en opslagmutaties dicht",
+            "kritiek",
+            "hub:backup",
+            "self_backup",
+            "hub",
+            "Eigen database-export",
+            samenvatting="De laatste geverifieerde back-up is ouder dan toegestaan; de back-upgate blijft dicht "
+            "(backup_gate_rood) tot er een verse, geverifieerde back-up is.",
+            details=_safe_details(ev, ("laatste_geverifieerd", "max_leeftijd_s")),
         )
     return None
 

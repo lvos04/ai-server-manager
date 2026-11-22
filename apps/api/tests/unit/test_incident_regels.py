@@ -179,6 +179,18 @@ def test_buiten_het_eigen_domein_alleen_informatie(source: str, event_type: str,
     assert classify(ev(source, event_type, entity=entity)) is None
 
 
+def test_verouderde_eigen_backup_is_een_kritiek_incident() -> None:
+    """EX12 (S-P2-060): verouderd → probleem met de hoogste ernst; weer vers → herstel op dezelfde vingerafdruk. Een
+    andere dienst kan dit incident niet maken of sluiten (domein van de Hub)."""
+    ent = ("self_backup", "hub")
+    p = classify(ev(APP_ID, "backup.freshness.stale", {"max_leeftijd_s": 93600}, ent, "outbox"))
+    h = classify(ev(APP_ID, "backup.freshness.recovered", {}, ent, "outbox"))
+    assert p is not None and (p.rol, p.soort, p.ernst) == ("probleem", "backup.verouderd", "kritiek")
+    assert "backup_gate_rood" in p.samenvatting and p.details == {"max_leeftijd_s": 93600}
+    assert h is not None and h.rol == "herstel" and h.vingerafdruk == p.vingerafdruk
+    assert classify(ev("zoeken-en-persoonlijke-ai", "backup.freshness.recovered", {}, ent)) is None
+
+
 def test_vaste_service_events_en_oude_namen() -> None:
     rej = classify(ev("home-control-hub", "service.key_rotation.rejected", entity=("service", "home-control-hub")))
     assert rej and rej.rol == "probleem"

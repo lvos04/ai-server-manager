@@ -195,10 +195,41 @@ def _task_audit_verify(db: Session, ctx: Context) -> dict[str, Any]:
     return {"ketting": res["status"], "gecontroleerd": res["gecontroleerd"], "fouten": res["fouten"][:3]}
 
 
+def _backup_versheid(db: Session, ctx: Context) -> bool:
+    """EX12: is de laatste geverifieerde eigen back-up te oud voor de back-upgate? Bij een overgang een event
+    (``backup.freshness.stale`` / ``.recovered`` → incident). Zelfde invoer en grens als de gate (één waarheid)."""
+    from hub.events.envelope import emit
+    from hub.incidents import engine, rules
+    from hub.routers.onboarding import gate_inputs
+
+    inp = gate_inputs(db, ctx.settings)
+    b = inp.eigen_backup
+    # shortcut: nog nooit een geverifieerde back-up is "ontbreekt", geen "verouderd"; de gate is dan wel dicht en een
+    # mislukte export geeft al een incident (backup.eigen_mislukt). Versie 2: ook een incident als er na de eerste
+    # start te lang geen enkele back-up is.
+    verouderd = b is not None and (ctx.now - b["finished_at"]).total_seconds() > inp.eigen_backup_max_age_seconds
+    # De stand van vorige keer is het open incident zelf (ook na een mislukte ronde of een handmatige afsluiting).
+    voor = engine.active_for(db, rules.BACKUP_VEROUDERD_FP) is not None
+    if verouderd != voor:
+        emit(
+            db,
+            "backup.freshness.stale" if verouderd else "backup.freshness.recovered",
+            "self_backup",
+            "hub",
+            {
+                "laatste_geverifieerd": iso(b["finished_at"]) if b else None,
+                "max_leeftijd_s": inp.eigen_backup_max_age_seconds,
+            },
+        )
+        db.flush()
+    return verouderd
+
+
 def _task_incidents(db: Session, ctx: Context) -> dict[str, Any]:
     from hub.incidents import engine
 
-    return engine.run(db, ctx.settings, ctx.now)
+    verouderd = _backup_versheid(db, ctx)
+    return {**engine.run(db, ctx.settings, ctx.now), "backup_verouderd": verouderd}
 
 
 def _task_logs(db: Session, ctx: Context) -> dict[str, Any]:
