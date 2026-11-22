@@ -70,11 +70,11 @@ def _app_datasets(db: Session, settings: Settings, app: str) -> list[str] | None
         return None
     mounts = [(str(d["mountpoint"]), str(d["naam"])) for d in inp.datasets.get("data") or [] if d.get("mountpoint")]
     rij = next((a for a in inp.apps.get("data") or [] if a.get("naam") == app), None)
-    if rij is None:
-        return None
+    if rij is None or rij.get("opslag_gelezen") is not True:
+        return None  # de volumelijst van de werklast is niet (volledig) gelezen: onbekend (R-HARDE-EIS-1)
     uit: list[str] = []
     for m in rij.get("opslag") or []:
-        if m.get("type") == "tmpfs":
+        if m.get("type") == "tmpfs" or m.get("alleen_lezen") is True:
             continue
         lijst = cpmod.onder_pad(str(m.get("bron") or ""), mounts)
         if lijst is None:
@@ -167,11 +167,16 @@ def ex15(db: Session, req: ActionRequest) -> list[dict[str, Any]]:
     databaseherstel, ongeacht de actienaam (R-HARDE-EIS-5)."""
     if req.action_id not in APP_WIJZIGINGEN:
         return []
-    eigen = [r for r in _eigen_wijzigingen(db, req) if r.status == "uitgevoerd"]
+    gestart = _eigen_wijzigingen(db, req)
+    eigen = [r for r in gestart if r.status == "uitgevoerd"]
     params = req.parameters if isinstance(req.parameters, dict) else {}
-    historie = [(_migratie(r.parameters), cpmod.identiteiten(_huidig(r))) for r in eigen]
+    # Elke gestarte wijziging telt: ook een mislukte of onbekende uitkomst kan de migratie al hebben gedraaid.
+    historie = [(_migratie(r.parameters), cpmod.identiteiten(_huidig(r))) for r in gestart]
     doel = cpmod.doel_identiteiten(expected_image(params), params.get("catalog_version"))
-    if cpmod.terug_voor_migratie(historie, doel):
+    terug = cpmod.terug_voor_migratie(historie, doel)
+    if terug is None:
+        return [_blok(HERKOMST_ONBEKEND)]  # wat er vóór een wijziging tot en met de migratie draaide, is onbekend
+    if terug:
         return [_blok(DATABASE_HERSTEL)]
     if req.action_id != "app.rollback":
         return []

@@ -33,6 +33,7 @@ Een stop raakt nooit een app: alleen de executor weigert verdere acties tot de v
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import sqlite3
@@ -76,9 +77,18 @@ AAD_OUD = b"executor-oud-vastlegging-v1"
 # In de geheimenmap: de eenmalige vastlegging van de recepten van vóór S-P2-050f is gedaan. Ontbreekt daarna de
 # vastlegging zelf (verlies), dan wordt nooit opnieuw geïnventariseerd (ADR-0032 besluit 8).
 OUD_ANKER = "f-ingebruikname"
-# In de geheimenmap per app (naam: de app in hex) het request_id van de laatste eigen herkomst. Kent het journaal die
-# herkomst niet, dan is het een ouder of gedeeltelijk hersteld journaal: de historie is onbekend (R-HARDE-EIS-6).
+# In de geheimenmap per app (naam: de app in hex) het anker van de herkomstketen: ``<hash> <aantal>``. Elke herkomst
+# bevat de hash van de vorige van die app (``vorige``); ontbreekt een regel ergens in de reeks (ouder of gedeeltelijk
+# hersteld journaal), dan klopt de keten of het anker niet en is de historie onbekend (R-HARDE-EIS-6). Een anker van
+# de vorige versie (alleen het request_id van de laatste herkomst) wordt nog gelezen en daarna vervangen.
 HERKOMST_ANKERS = "herkomst"
+# In de geheimenmap: de eenmalige startregistratie van de keten is gedaan (journalen van vóór de keten krijgen dan hun
+# anker op de bestaande regels). Daarna is een app met herkomsten zonder anker onbekend, nooit "leeg".
+HERKOMST_START = "herkomst-keten"
+
+
+def _schakel(vorige: str, request_id: str, box: str) -> str:
+    return hashlib.sha256(f"{vorige}\n{request_id}\n{box}".encode()).hexdigest()
 
 
 # In de geheimenmap (het deel dat bij herstel terugkomt) staat per gemarkeerde instantie een leeg ankerbestand (naam:
@@ -112,6 +122,7 @@ class Journal:
         self.ankers = secrets_dir / KLUIS_ANKERS
         self.oud_anker = secrets_dir / OUD_ANKER
         self.herkomst_ankers = secrets_dir / HERKOMST_ANKERS
+        self.herkomst_start = secrets_dir / HERKOMST_START
         self._sleutel = os.path.abspath(path)
         # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
         self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
@@ -258,9 +269,8 @@ class Journal:
     ) -> None:
         """Het recept (vorige waarden) en, sinds S-P2-050f, in dezelfde transactie de eigen herkomst."""
         box = self._zegel(values, AAD + request_id.encode())
-        hbox = (
-            self._zegel({**herkomst, "app": app}, AAD_HERKOMST + f"{request_id}:{app}".encode()) if herkomst else None
-        )
+        if herkomst:
+            self._start_keten()
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -268,37 +278,49 @@ class Journal:
                     "INSERT OR REPLACE INTO app_values (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
                     (request_id, app, box, int(time.time())),
                 )
-                if hbox is not None:
-                    conn.execute(
-                        "INSERT INTO recept_herkomst (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
-                        (request_id, app, hbox, int(time.time())),
-                    )
+                anker = self._voeg_herkomst_toe(conn, request_id, app, herkomst) if herkomst else None
                 conn.execute("COMMIT")
             except BaseException:
                 conn.execute("ROLLBACK")
                 raise
-        if hbox is not None:
-            self._zet_herkomst_anker(app, request_id)
+        if anker is not None:
+            self._zet_herkomst_anker(app, anker)
 
     # ------------------------------------------------------------------ herkomst en checkpoints (S-P2-050f)
     def leg_herkomst_vast(self, request_id: str, app: str, herkomst: dict[str, Any]) -> None:
         """Herkomst van een bijwerking zonder recept (catalogusversie), vóór de schrijfaanroep."""
-        hbox = self._zegel({**herkomst, "app": app}, AAD_HERKOMST + f"{request_id}:{app}".encode())
+        self._start_keten()
         with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO recept_herkomst (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
-                (request_id, app, hbox, int(time.time())),
-            )
-        self._zet_herkomst_anker(app, request_id)
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                anker = self._voeg_herkomst_toe(conn, request_id, app, herkomst)
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        self._zet_herkomst_anker(app, anker)
 
-    def _zet_herkomst_anker(self, app: str, request_id: str) -> None:
-        """Na de rij (zoals de kluisankers): een anker zonder rij kan alleen ontstaan door een ouder journaal."""
+    def _voeg_herkomst_toe(self, conn: sqlite3.Connection, request_id: str, app: str, herkomst: dict[str, Any]) -> str:
+        """Binnen de schrijftransactie: alleen op een intacte keten, met de hash van de vorige regel. Geeft het nieuwe
+        anker."""
+        uit, hashes = self._keten(conn, app)
+        self._toets_anker(app, uit, hashes)
+        box = self._zegel({**herkomst, "app": app, "vorige": hashes[-1]}, AAD_HERKOMST + f"{request_id}:{app}".encode())
+        conn.execute(
+            "INSERT INTO recept_herkomst (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
+            (request_id, app, box, int(time.time())),
+        )
+        return f"{_schakel(hashes[-1], request_id, box)} {len(uit) + 1}"
+
+    def _zet_herkomst_anker(self, app: str, anker: str) -> None:
+        """Na de rij (zoals de kluisankers): een anker dat het journaal niet kent, kan alleen ontstaan door een ouder of
+        gedeeltelijk hersteld journaal."""
         try:
             self.herkomst_ankers.mkdir(mode=0o700, exist_ok=True)
             tijdelijk = self.herkomst_ankers / f".{app.encode().hex()}.nieuw"
             fd = os.open(tijdelijk, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, "w") as f:
-                f.write(request_id)
+                f.write(anker)
             os.replace(tijdelijk, self.herkomst_ankers / app.encode().hex())
         except OSError as exc:
             raise JournalUnavailable(type(exc).__name__) from None
@@ -311,26 +333,75 @@ class Journal:
         except OSError:
             raise JournalUnavailable("herkomstanker_onleesbaar") from None
 
-    def herkomsten(self, app: str) -> list[tuple[int, str, dict[str, Any]]]:
-        """``(volgnummer, request_id, herkomst)`` van deze app op volgorde. Een ongeldig zegel, een herkomst van een
-        andere app of een anker in de geheimenmap dat het journaal niet kent (ouder of gedeeltelijk hersteld journaal):
-        :class:`JournalUnavailable` (onbekend, nooit alsnog ``oud`` of "geen migratie")."""
-        anker = self._herkomst_anker(app)
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT id, request_id, box FROM recept_herkomst WHERE app = ? ORDER BY id", (app,)
-            ).fetchall()
-        uit = []
+    def _keten(self, conn: sqlite3.Connection, app: str) -> tuple[list[tuple[int, str, dict[str, Any]]], list[str]]:
+        """De herkomsten van deze app op volgorde en de ketenhash na elke regel (``hashes[0]`` is het begin). Elke regel
+        met ``vorige`` moet aansluiten; een regel zonder ``vorige`` kan alleen vóór het begin van de keten staan."""
+        rows = conn.execute(
+            "SELECT id, request_id, box FROM recept_herkomst WHERE app = ? ORDER BY id", (app,)
+        ).fetchall()
+        uit: list[tuple[int, str, dict[str, Any]]] = []
+        hashes, gestart = [""], False
         for rid, request_id, box in rows:
             h = self._open(box, AAD_HERKOMST + f"{request_id}:{app}".encode())
             if not isinstance(h, dict) or h.get("app") != app:
                 raise JournalUnavailable("herkomst_ongeldig")
+            if "vorige" in h:
+                gestart = True
+                if h["vorige"] != hashes[-1]:
+                    raise JournalUnavailable("herkomst_onvolledig")
+            elif gestart:
+                raise JournalUnavailable("herkomst_onvolledig")
+            hashes.append(_schakel(hashes[-1], str(request_id), str(box)))
             uit.append((int(rid), str(request_id), h))
-        ids = [r for _i, r, _h in uit]
-        if anker is not None and anker not in ids:
+        return uit, hashes
+
+    def _toets_anker(self, app: str, uit: list[tuple[int, str, dict[str, Any]]], hashes: list[str]) -> str | None:
+        """Het anker moet een punt van deze keten aanwijzen (hash en aantal); regels erna zijn latere eigen regels.
+        Geen anker bij herkomsten, of een anker dat niet past: :class:`JournalUnavailable` (``herkomst_onvolledig``).
+        Geeft het anker zoals het nu moet zijn, of ``None`` als het al klopt."""
+        anker = self._herkomst_anker(app)
+        tip = f"{hashes[-1]} {len(uit)}"
+        if anker is None:
+            if uit:
+                raise JournalUnavailable("herkomst_onvolledig")
+            return None
+        if " " not in anker:  # anker van de vorige versie: het request_id van de laatste herkomst
+            if anker not in [r for _i, r, _h in uit]:
+                raise JournalUnavailable("herkomst_onvolledig")
+            return tip
+        waarde, _s, aantal = anker.partition(" ")
+        if not aantal.isdigit():
+            raise JournalUnavailable("herkomstanker_onleesbaar")
+        n = int(aantal)
+        if n >= len(hashes) or hashes[n] != waarde:
             raise JournalUnavailable("herkomst_onvolledig")
-        if ids and anker != ids[-1]:
-            self._zet_herkomst_anker(app, ids[-1])  # aanvullen (een journaal van vóór dit anker, of een onderbreking)
+        return None if anker == tip else tip
+
+    def _start_keten(self) -> None:
+        """Eenmalig: elke app met herkomsten van vóór de keten krijgt zijn anker op de bestaande regels."""
+        if self.herkomst_start.exists():
+            return
+        with self._connect() as conn:
+            apps = [str(r[0]) for r in conn.execute("SELECT DISTINCT app FROM recept_herkomst").fetchall()]
+            for app in apps:
+                if self._herkomst_anker(app) is None:
+                    uit, hashes = self._keten(conn, app)
+                    self._zet_herkomst_anker(app, f"{hashes[-1]} {len(uit)}")
+        try:
+            os.close(os.open(self.herkomst_start, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600))
+        except OSError as exc:
+            raise JournalUnavailable(type(exc).__name__) from None
+
+    def herkomsten(self, app: str) -> list[tuple[int, str, dict[str, Any]]]:
+        """``(volgnummer, request_id, herkomst)`` van deze app op volgorde. Een ongeldig zegel, een herkomst van een
+        andere app, een onderbroken keten of een anker dat niet past (ouder of gedeeltelijk hersteld journaal):
+        :class:`JournalUnavailable` (onbekend, nooit alsnog ``oud`` of "geen migratie")."""
+        self._start_keten()
+        with self._connect() as conn:
+            uit, hashes = self._keten(conn, app)
+        nieuw = self._toets_anker(app, uit, hashes)
+        if nieuw is not None:
+            self._zet_herkomst_anker(app, nieuw)  # bijwerken (anker van de vorige versie, of een onderbreking)
         return uit
 
     def heeft_herkomst(self, request_id: str) -> bool:

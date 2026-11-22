@@ -993,6 +993,19 @@ Status: gebouwd en Sim-getest tegen contractconforme fakes. NIET GEVALIDEERD (ec
   alleen bij de executor). EX15 geldt voor elke imagewijziging: een doel-image of -catalogusversie die vóór een
   gemelde migratie draaide, geeft `database_herstel_vereist`. De executor schrijft na elke herkomst een anker
   (laatste `request_id`) in `secrets_dir/herkomst/`; ontbreekt die herkomst in het journaal, dan `herkomst_onbekend`.
+- **Tweede herstelronde: positieve witte lijst.** Dekking en herkomst gelden alleen als elk onderdeel positief bekend
+  en gelezen is. Een niet gelezen volumelijst van de werklast is onbekende dekking, ook als de configuratie al een
+  dataset aanwijst (Hub: `opslag_gelezen` uit de normalisatie; ook de dekkingsweergave). Bij elk gebruik controleert
+  de executor naam en `createtxg` van de gebonden basissnapshot, ook zonder appdatasets. Een opslagregel van onbekend
+  type in recept of configuratie (een regel met `mount_path` of onder `storage`) is onbekende dekking. Hub en
+  executor vergelijken één image-identiteit (`repo:versie` en `repo@digest`, digest in de tag of apart); een oudere
+  migratieregistratie zonder `van` krijgt de vertrekimage uit het eigen recept, en wat niet te herleiden is, geeft
+  `herkomst_onbekend`. De herkomst is een hash-keten per app: elke regel bevat de hash van de vorige, het anker is
+  `<hash> <aantal>`; een ontbrekende regel waar ook, of een anker dat niet op de keten past, geeft
+  `herkomst_onvolledig` (lezer) en `herkomst_onbekend` (executor). Bestaande herkomsten krijgen bij de eerste lezing
+  eenmalig een ketenbegin (`secrets_dir/herkomst-keten`); een regelverlies van vóór die startregistratie is niet te
+  zien. Een herkomstregel zonder `vorige` na het ketenbegin (bijvoorbeeld na een tijdelijke terugkeer naar een
+  oudere executor) weigert ook.
 - **VERSIE 2.** Herkomst `keten` met ondertekende migratiecontext uit de vertrouwde keten (050g); tot dan is elke
   update `buiten_keten` en wordt een migratie alleen geweigerd als de update haar zelf meldt (restrisico van optie
   3). Hub-kopie van de oud-vastlegging met vergelijking, herstelbediening en de R3-beheerdersbevestiging. Een RPO

@@ -26,11 +26,13 @@ def _inputs(**over: Any) -> CoverageInputs:
                     "naam": "mediaguard",
                     "herkend_als": "mediaguard",
                     "opslag": [{"bron": "/mnt/p/apps/mediaguard/config", "doel": "/data"}],
+                    "opslag_gelezen": True,
                 },
                 {
                     "naam": "ai-server-manager",
                     "herkend_als": "ai-server-manager",
                     "opslag": [{"bron": "/mnt/p/apps/hub", "doel": "/appdata"}],
+                    "opslag_gelezen": True,
                 },
             ]
         ),
@@ -131,6 +133,22 @@ def test_onbekende_bronnen_zijn_unknown() -> None:
     apps = {a["app"]: a for a in cov["apps"]}
     assert apps["mediaguard"]["lokaal_snapshot"] == "unknown" and apps["mediaguard"]["extern"] == "unknown"
     assert cov["bronnen"]["cloudsync"]["reason_code"] == "unreachable"
+
+
+def test_ongelezen_of_onbekende_opslag_is_nooit_gedeeltelijk_gedekt() -> None:
+    # Positieve witte lijst (R-HARDE-EIS-1): een niet gelezen volumelijst of een koppeling buiten elk koppelpunt maakt
+    # de dekking onbekend; een alleen-lezen koppeling en tmpfs tellen niet mee.
+    mg = {"naam": "mediaguard", "herkend_als": "mediaguard", "opslag_gelezen": True}
+    data = "/mnt/p/apps/mediaguard/config"
+    gevallen = [
+        ({**mg, "opslag": [{"bron": data}], "opslag_gelezen": False}, []),
+        ({**mg, "opslag": [{"bron": data}, {"bron": "/var/lib/docker/x", "type": "volume"}]}, []),
+        ({**mg, "opslag": [{"bron": data}, {"bron": "/etc/localtime", "alleen_lezen": True}, {"type": "tmpfs"}]},
+         ["p/apps/mediaguard"]),
+    ]  # fmt: skip
+    for app, verwacht in gevallen:
+        rij = compute(_inputs(apps=ok([app])))["apps"]
+        assert next(a for a in rij if a["app"] == "mediaguard")["datasets"] == verwacht
 
 
 def test_zonder_inventaris_staat_de_hub_er_toch_in() -> None:

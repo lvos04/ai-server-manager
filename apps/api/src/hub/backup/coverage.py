@@ -244,12 +244,16 @@ def compute(inp: CoverageInputs) -> dict[str, Any]:
     for a in apps:
         dsets: list[str] = []
         for m in a.get("opslag") or []:
-            src = m.get("bron")
-            if not src:
-                continue
-            found = _dataset_for_path(str(src), mounts)
-            if found and found not in dsets:
+            if m.get("type") == "tmpfs" or m.get("alleen_lezen") is True:
+                continue  # zoals de executor: tmpfs bewaart niets, een alleen-lezen koppeling wijzigt de app niet
+            found = _dataset_for_path(str(m.get("bron") or ""), mounts) if m.get("bron") else None
+            if not found:
+                dsets = []  # een koppeling buiten elk koppelpunt: dekking onbekend, nooit gedeeltelijk "gedekt"
+                break
+            if found not in dsets:
                 dsets.append(found)
+        if a.get("opslag_gelezen") is not True:
+            dsets = []  # de volumelijst is niet gelezen: onbekend
         app_datasets[str(a["naam"])] = dsets
         for d in dsets:
             apps_by_ds.setdefault(d, []).append(str(a["naam"]))

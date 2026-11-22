@@ -15,7 +15,7 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from asm_policy.etag import image_digests
+from asm_policy.etag import _repo
 
 # Een pre-update-checkpoint is vers: hooguit een uur oud (strenger dan elk RPO van een uur of meer).
 # shortcut: één vaste grens voor alle apps; een kortere RPO uit het manifest (§9) telt nog niet mee, bij 050g/090.
@@ -64,15 +64,25 @@ def mounts_uit_boom(boom: Any) -> list[tuple[str, str]]:
     return uit
 
 
-def _opslagregels(waarde: Any, diepte: int = 0) -> list[Mapping[str, Any]]:
+def _opslagregels(waarde: Any, diepte: int = 0, *, opslag: bool = False) -> list[Mapping[str, Any]]:
+    """Elke opslagregel: een bekende soort, een ``*_config`` van een bekende soort, een regel met ``mount_path`` of
+    elk item onder een sleutel ``storage``. Een regel van een onbekende soort komt zo ook mee (en is dan onbekend)."""
     if diepte > 16:
         return [{"type": "onbekend"}]
     if isinstance(waarde, Mapping):
-        if waarde.get("type") in OPSLAGSOORTEN or "host_path_config" in waarde or "ix_volume_config" in waarde:
+        if (
+            opslag
+            or waarde.get("type") in OPSLAGSOORTEN
+            or "host_path_config" in waarde
+            or "ix_volume_config" in waarde
+            or "mount_path" in waarde
+        ):
             return [waarde]
-        return [r for v in waarde.values() for r in _opslagregels(v, diepte + 1)]
+        return [r for k, v in waarde.items() for r in _opslagregels(v, diepte + 1, opslag=k == "storage")]
     if isinstance(waarde, list):
-        return [r for v in waarde for r in _opslagregels(v, diepte + 1)]
+        return [r for v in waarde for r in _opslagregels(v, diepte + 1, opslag=opslag)]
+    if opslag:
+        return [{"type": "onbekend"}]
     return []
 
 
@@ -136,7 +146,9 @@ def app_datasets(config: Any, boom: Any, app: str, werklast: Any = None, *, ook:
         else:  # anonymous, cifs, nfs, smb, volume of onbekend: daar maakt een ZFS-snapshot geen herstelpunt van
             return None
     volumes = werklast.get("volumes") if isinstance(werklast, Mapping) else None
-    for v in volumes if isinstance(volumes, list) else []:
+    if not isinstance(volumes, list):
+        return None  # de volumelijst van de werklast is niet gelezen: onbekend, ook als de configuratie iets aanwijst
+    for v in volumes:
         if not isinstance(v, Mapping):
             return None
         if v.get("type") == "tmpfs" or "ro" in str(v.get("mode") or "").split(","):
@@ -148,29 +160,57 @@ def app_datasets(config: Any, boom: Any, app: str, werklast: Any = None, *, ook:
     return nodig
 
 
+def image_identiteit(ref: str, digest: Any = None) -> set[str]:
+    """De ene vorm voor een image: ``repo:versie`` (de tag zonder digest) en ``repo@sha256:…``, ongeacht of de digest in
+    de tag of in een apart veld staat (R-HARDE-EIS-5). Zonder tag en digest: leeg (onbekend)."""
+    naam, _s, in_ref = str(ref).partition("@")
+    repo = _repo(naam)
+    tag = naam[len(repo) + 1 :] if naam != repo else ""
+    d = in_ref or (str(digest) if digest else "")
+    return ({f"{repo}:{tag}"} if tag else set()) | ({f"{repo}@{d}"} if d else set())
+
+
+def normaliseer(ids: Iterable[Any]) -> set[str]:
+    """Vastgelegde identiteiten (ook in een oudere schrijfwijze) in de vorm van :func:`image_identiteit`."""
+    uit: set[str] = set()
+    for i in ids:
+        s = str(i)
+        uit |= {s} if s.startswith("versie:") else image_identiteit(s)
+    return uit
+
+
 def identiteiten(staat: Mapping[str, Any]) -> set[str]:
-    """Wat er volgens een ``app_state`` draait: images (``repo:tag``), digests (``repo@sha256:…``) en de
-    catalogusversie (``versie:<v>``). Voor EX15: een terugkeer naar een van deze is een terugkeer naar die versie."""
-    images = [str(i) for i in staat.get("images") or []]
-    uit = {*images, *(str(d) for d in staat.get("digests") or []), *image_digests(images, ())}
+    """Wat er volgens een ``app_state`` draait: images, digests en de catalogusversie (``versie:<v>``). Voor EX15: een
+    terugkeer naar een van deze is een terugkeer naar die versie."""
+    uit = normaliseer([*(staat.get("images") or []), *(staat.get("digests") or [])])
     if staat.get("versie"):
         uit.add(f"versie:{staat['versie']}")
     return uit
 
 
 def doel_identiteiten(image: Mapping[str, Any] | None, catalogusversie: Any = None) -> set[str]:
-    """Waar een bijwerking of terugzetting naartoe gaat, in dezelfde vorm als :func:`identiteiten`."""
+    """Waar een bijwerking of terugzetting naartoe gaat, in dezelfde vorm als :func:`identiteiten` (een digest uit
+    ``expected_image``, in de tag of apart, telt altijd mee)."""
     if isinstance(image, Mapping) and image.get("repository"):
-        repo, tag = str(image["repository"]), str(image.get("tag") or "")
-        return identiteiten({"images": [f"{repo}:{tag}"]})
+        return image_identiteit(f"{image['repository']}:{image.get('tag') or ''}", image.get("digest"))
     return {f"versie:{catalogusversie}"} if catalogusversie else set()
 
 
-def terug_voor_migratie(historie: Iterable[tuple[bool, set[str]]], doel: set[str]) -> bool:
+def _soorten(ids: Iterable[str]) -> set[str]:
+    return {"versie" if i.startswith("versie:") else "image" for i in ids}
+
+
+def terug_voor_migratie(historie: Iterable[tuple[bool, set[str]]], doel: set[str]) -> bool | None:
     """EX15 op elke imagewijziging: ``historie`` is per eigen bijwerking of terugzetting, op volgorde, ``(migratie,
-    identiteiten ervóór)``. Een doel dat vóór de laatste gemelde migratie draaide, vereist databaseherstel."""
-    rijen = list(historie)
+    identiteiten ervóór)``. ``True``: het doel draaide vóór de laatste gemelde migratie (databaseherstel vereist).
+    ``None``: een wijziging tot en met die migratie heeft geen identiteit van de soort van het doel (onbekend)."""
+    rijen = [(m, normaliseer(v)) for m, v in historie]
     laatste = max((i for i, (mig, _v) in enumerate(rijen) if mig), default=None)
+    doel = normaliseer(doel)
     if laatste is None or not doel:
         return False
-    return bool(doel & set().union(*(v for _m, v in rijen[: laatste + 1])))
+    if doel & set().union(*(v for _m, v in rijen[: laatste + 1])):
+        return True
+    if any(not (_soorten(v) & _soorten(doel)) for _m, v in rijen[: laatste + 1]):
+        return None
+    return False

@@ -367,7 +367,8 @@ class Uitvoerder:
                 leeftijd_seconden=leeftijd,
             ), *GEEN
         naam = str(cp["snapshot"]).split("@", 1)[-1]
-        leden: Mapping[str, str] = cp["leden"]
+        # De gebonden basissnapshot telt altijd mee, ook als de app geen datasets heeft (R-HARDE-EIS-2).
+        leden: Mapping[str, str] = {**cp["leden"], str(cp["dataset"]): str(cp["createtxg"])}
 
         eigen: list[str] | None = None
 
@@ -388,15 +389,17 @@ class Uitvoerder:
                         "",
                         config,
                     )
-                gelezen = {d: self._snapshot_rijen(nas, methods, d).get(f"{d}@{naam}") for d in nodig}
+                te_lezen = sorted({*nodig, str(cp["dataset"])})
+                gelezen = {d: self._snapshot_rijen(nas, methods, d).get(f"{d}@{naam}") for d in te_lezen}
             except NasFout as exc:
                 return _nas_fout(exc), "", None
-            if any(gelezen[d] != leden[d] for d in nodig):
+            afwijkend = sorted(d for d in te_lezen if not leden[d] or gelezen[d] != leden[d])
+            if afwijkend:
                 return (
                     weiger(
                         "checkpoint_afwijkend",
                         "Een snapshot van het checkpoint bestaat niet meer of is een andere (createtxg wijkt af).",
-                        datasets=sorted(d for d in nodig if gelezen[d] != leden[d]),
+                        datasets=afwijkend,
                     ),
                     "",
                     config,
@@ -424,6 +427,18 @@ class Uitvoerder:
             return config
 
         return None, hercontrole, eigen
+
+    def _vertrek(self, app: str, request_id: str, h: Mapping[str, Any]) -> set[str]:
+        """Wat er vóór die eigen wijziging draaide: de vastgelegde ``van``, de catalogusversie en de image uit het eigen
+        recept van die wijziging (een registratie van vóór ``van``, R-HARDE-EIS-5)."""
+        ids = cpmod.normaliseer(h.get("van") or [])
+        if v := h.get("van_versie"):
+            ids.add(f"versie:{v}")
+        recept = self.journal.load_values(request_id)
+        image = recept[1].get("image") if recept is not None and recept[0] == app else None
+        if isinstance(image, Mapping):
+            ids |= cpmod.doel_identiteiten(image)
+        return ids
 
     def _herkomst_gate(
         self, params: Mapping[str, Any], app: str, aid: str, doel_ids: set[str]
@@ -460,14 +475,14 @@ class Uitvoerder:
                 {"checkpoints": sorted({str(h.get("checkpoint_id")) for _i, _r, h in vanaf if h.get("migratie")})},
             )
 
-        historie = [
-            (
-                bool(h.get("migratie")),
-                {str(v) for v in h.get("van") or []} | ({f"versie:{v}"} if (v := h.get("van_versie")) else set()),
-            )
-            for _n, _r, h in rijen
-        ]
-        if cpmod.terug_voor_migratie(historie, doel_ids):
+        try:
+            historie = [(bool(h.get("migratie")), self._vertrek(app, rid, h)) for _n, rid, h in rijen]
+        except JournalUnavailable:
+            return None, onbekend
+        terug = cpmod.terug_voor_migratie(historie, doel_ids)
+        if terug is None:
+            return None, onbekend  # de vertrekversie van een wijziging tot en met de migratie is niet te herleiden
+        if terug:
             return None, migratie(rijen)
         if aid != "app.rollback":
             return None, None

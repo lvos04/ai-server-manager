@@ -246,13 +246,15 @@ def apps(raw: Any) -> list[dict[str, Any]]:
                     }
                 )
         mounts: list[dict[str, Any]] = []
-        for v in wl.get("volumes") or []:
+        volumes = wl.get("volumes")
+        for v in volumes if isinstance(volumes, list) else []:
             if isinstance(v, dict):
                 mounts.append(
                     {
                         "bron": _str(v.get("source"), 512),
                         "doel": _str(v.get("destination"), 512),
                         "type": _str(v.get("type"), 16),
+                        "alleen_lezen": "ro" in str(v.get("mode") or "").split(","),
                     }
                 )
         meta = _dict(a.get("metadata"))
@@ -277,6 +279,8 @@ def apps(raw: Any) -> list[dict[str, Any]]:
                 "images": [parse_image(i) for i in images],
                 "poorten": ports,
                 "opslag": mounts,
+                # Alleen een echt gelezen volumelijst zegt iets over de opslag; anders is de dekking onbekend.
+                "opslag_gelezen": isinstance(volumes, list) and all(isinstance(v, dict) for v in volumes),
                 "portals": portals(a.get("portals")),
                 "herkend_als": recognize_app(name, images),
             }
