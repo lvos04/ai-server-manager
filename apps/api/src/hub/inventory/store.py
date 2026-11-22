@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from hub.catalog.identity import continuity
 from hub.inventory.collector import CollectResult
 from hub.models import CatalogApp, InventoryRun, InventorySnapshot
-from hub.timeutil import iso, utcnow
+from hub.timeutil import binnen_venster, iso, utcnow
 from hub.truenas.messages import advice, message
 
 # Interne momentopname naast app.query. De cataloguscontrole vergrendelt geen catalogusrij:
@@ -195,8 +195,9 @@ def kind_state(
             verouderd=last_ok is not None,
         )
         return base
-    if now - attempt.observed_at > timedelta(seconds=ttl_seconds):
+    if not binnen_venster(attempt.observed_at, now, ttl_seconds):
         # Contract 1.3 §6.2: verouderd = unknown met meting_verouderd (laatst bekende data blijft zichtbaar).
+        # Een meettijd verder in de toekomst dan de klokmarge is evenmin vers (R-VEILIG-3).
         base.update(
             reason_code="meting_verouderd",
             melding=message("meting_verouderd"),

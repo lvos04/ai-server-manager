@@ -50,7 +50,7 @@ from hub.monitoring.sources import worst
 from hub.onboarding import service as decisions
 from hub.scopes import BESLUITEN_LEZEN
 from hub.security import Role
-from hub.timeutil import iso, utcnow
+from hub.timeutil import binnen_venster, iso, utcnow
 
 router = APIRouter(tags=["events en connector"])
 UsersOnly = Annotated[Principal, Depends(require_viewer_or_scope(None))]
@@ -209,7 +209,7 @@ def health(db: DB, settings: SettingsDep, _: ViewerOrService) -> dict[str, Any]:
             }
         )
     else:
-        fresh = (now - b.finished_at).total_seconds() < settings.self_backup_interval_seconds + 7200
+        fresh = binnen_venster(b.finished_at, now, settings.self_backup_interval_seconds + 7200)
         checks.append(
             {
                 "name": "eigen_backup",

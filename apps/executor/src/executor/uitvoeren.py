@@ -156,10 +156,24 @@ def _dataset_exists(tree: Any, name: str) -> bool:
 
 
 def pools_gezond(pools: Any) -> tuple[bool, list[dict[str, Any]]]:
-    """Alle pools ``ONLINE`` en ``healthy``. Geen pools of een onverwacht antwoord = onbekend = niet gezond (EX11)."""
-    rows = [p for p in pools if isinstance(p, dict)] if isinstance(pools, list) else []
-    beeld = [{"pool": str(p.get("name")), "status": str(p.get("status")), "healthy": p.get("healthy")} for p in rows]
-    ok = bool(rows) and all(p.get("status") == "ONLINE" and p.get("healthy") is True for p in rows)
+    """Alle pools ``ONLINE`` en ``healthy``. Geen pools of een onverwacht antwoord = onbekend = niet gezond (EX11).
+
+    Positieve witte lijst per rij (R-VEILIG-1): een onleesbare, naamloze of onvolledige rij maakt alles ongezond."""
+    rows = pools if isinstance(pools, list) else []
+    beeld = [
+        {"pool": str(p.get("name")), "status": str(p.get("status")), "healthy": p.get("healthy")}
+        if isinstance(p, dict)
+        else {"pool": None, "status": "onleesbaar", "healthy": None}
+        for p in rows
+    ]
+    ok = bool(rows) and all(
+        isinstance(p, dict)
+        and isinstance(p.get("name"), str)
+        and bool(p["name"])
+        and p.get("status") == "ONLINE"
+        and p.get("healthy") is True
+        for p in rows
+    )
     return ok, beeld
 
 

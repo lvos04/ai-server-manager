@@ -29,7 +29,7 @@ from hub.monitoring.appstatus import app_health
 from hub.monitoring.health import status_value
 from hub.monitoring.timeseries import Sample
 from hub.notify.dispatch import dispatch
-from hub.timeutil import iso, utcnow
+from hub.timeutil import binnen_venster, iso, utcnow
 from hub.truenas.connection import current_target
 from hub.vault import Vault
 
@@ -207,7 +207,7 @@ def _backup_versheid(db: Session, ctx: Context) -> bool:
     # shortcut: nog nooit een geverifieerde back-up is "ontbreekt", geen "verouderd"; de gate is dan wel dicht en een
     # mislukte export geeft al een incident (backup.eigen_mislukt). Versie 2: ook een incident als er na de eerste
     # start te lang geen enkele back-up is.
-    verouderd = b is not None and (ctx.now - b["finished_at"]).total_seconds() > inp.eigen_backup_max_age_seconds
+    verouderd = b is not None and not binnen_venster(b["finished_at"], ctx.now, inp.eigen_backup_max_age_seconds)
     # De stand van vorige keer is het open incident zelf (ook na een mislukte ronde of een handmatige afsluiting).
     voor = engine.active_for(db, rules.BACKUP_VEROUDERD_FP) is not None
     if verouderd != voor:

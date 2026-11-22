@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from hub.timeutil import iso, utcnow
+from hub.timeutil import binnen_venster, iso, utcnow
 
 _RANK = {"Open": 0, "Geblokkeerd": 0, "N.v.t.": 0, "Ingevuld": 1, "Getest": 2}
 
@@ -117,7 +117,12 @@ def _check(name: str, inp: GateInputs) -> dict[str, Any] | None:
         pools = st.get("data") or []
         if not pools:
             return {"soort": "meting", "id": "pools", "status": "unknown", "tekst": "Geen pools gemeten."}
-        bad = [str(p.get("naam")) for p in pools if p.get("gezond") is not True]
+        # Positieve witte lijst per rij (R-VEILIG-1): elke rij moet benoemd, ONLINE en expliciet gezond zijn.
+        bad = [
+            str(p.get("naam")) if isinstance(p, dict) else "onleesbaar"
+            for p in pools
+            if not (isinstance(p, dict) and p.get("naam") and p.get("status") == "ONLINE" and p.get("gezond") is True)
+        ]
         if bad:
             return {
                 "soort": "meting",
@@ -136,12 +141,12 @@ def _check(name: str, inp: GateInputs) -> dict[str, Any] | None:
                 "tekst": "Er is nog geen geverifieerde back-up van de Hub-database.",
             }
         finished: datetime = b["finished_at"]
-        if (inp.now - finished).total_seconds() > inp.eigen_backup_max_age_seconds:
+        if not binnen_venster(finished, inp.now, inp.eigen_backup_max_age_seconds):
             return {
                 "soort": "meting",
                 "id": "eigen_backup",
                 "status": "geblokkeerd",
-                "tekst": f"Laatste geverifieerde Hub-back-up is te oud ({iso(finished)}).",
+                "tekst": f"Laatste geverifieerde Hub-back-up is te oud of ligt in de toekomst ({iso(finished)}).",
             }
         return None
     raise ValueError(name)

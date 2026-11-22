@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from hub import APP_ID
-from hub.timeutil import iso
+from hub.timeutil import binnen_venster, iso
 
 SYNC_IS_GEEN_GARANTIE = "Synchronisatie is geen herstelgarantie; alleen een geslaagde hersteltest telt als bewijs."
 
@@ -214,8 +214,9 @@ def _db_export(app_id: str, inp: CoverageInputs) -> dict[str, Any]:
             return {"status": "ontbreekt", "bron": "pg_dump (ingebouwde database)", "reason_code": "no_verified_backup"}
         finished: datetime = b["finished_at"]
         age = (inp.now - finished).total_seconds()
+        vers = binnen_venster(finished, inp.now, inp.self_backup_max_age_seconds)
         return {
-            "status": "geverifieerd" if age <= inp.self_backup_max_age_seconds else "verouderd",
+            "status": "geverifieerd" if vers else "verouderd",
             "bron": "pg_dump (ingebouwde database), geverifieerd met pg_restore --list + SHA-256",
             "reason_code": None,
             "laatste": iso(finished),

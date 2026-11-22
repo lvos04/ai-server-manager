@@ -38,10 +38,12 @@ def test_echte_backup_geverifieerd(admin: Any, settings: Any, worker_once: Any) 
         fh.write(bytes([last[0] ^ 0xFF]))
     v = admin.post(f"/api/v1/backups/self/{b['id']}/verify", headers=idem()).json()
     assert v["ok"] is False and v["reason_code"] in ("checksum_mismatch", "restore_list_failed")
+    # R-VEILIG-2 (S-P2-060): een afgekeurde export is geen herstelbewijs meer, ook niet in dekking en gezondheid.
     cov = {a["app"]: a for a in admin.get("/api/v1/backups/coverage").json()["apps"]}
-    assert cov["ai-server-manager"]["db_export"]["status"] == "geverifieerd"
+    assert cov["ai-server-manager"]["db_export"]["status"] == "ontbreekt"
+    assert admin.get("/api/v1/backups/self").json()["laatste_geverifieerd"] is None
     assert any(
-        c["name"] == "eigen_backup" and c["status"] == "healthy"
+        c["name"] == "eigen_backup" and c["status"] == "degraded"
         for c in admin.get("/connector/v1/health").json()["checks"]
     )
 

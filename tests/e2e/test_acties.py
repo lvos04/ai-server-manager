@@ -1151,6 +1151,61 @@ def test_beheerder_kan_een_gate_niet_wegklikken(stack: Stack, monkeypatch: pytes
     assert getekend == [] and schrijfaanroepen(nas) == []
 
 
+@pytest.mark.parametrize(
+    ("meting", "code"),
+    [
+        ("pool-tegenstrijdig", "pool_niet_gezond"),
+        ("pool-vlag-ontbreekt", "pool_niet_gezond"),
+        ("pool-in-de-toekomst", "pool_niet_gezond"),
+        ("export-afgekeurd", "backup_gate_rood"),
+    ],
+)
+def test_ongeldige_meting_stopt_voor_ondertekening(
+    stack: Stack, settings: Any, monkeypatch: pytest.MonkeyPatch, meting: str, code: str
+) -> None:
+    """R-VEILIG-1 t/m -3 (S-P2-060): een gate gaat alleen open op aantoonbaar geldige, verse gegevens. Een
+    tegenstrijdige of onvolledige poolrij, een meettijd in de toekomst of een export waarvan de herverificatie
+    mislukte (dump_missing) stopt een al goedgekeurde actie vóór ondertekening. Een andere verse, geverifieerde
+    export opent de back-upgate weer."""
+    from sqlalchemy import select
+
+    from hub.models import InventorySnapshot, SelfBackup
+
+    admin, nas = stack.admin, stack.nas
+    if meting == "export-afgekeurd":
+        assert admin.post("/api/v1/backups/self", headers=idem()).status_code == 202
+        assert stack.worker_once()[-1]["status"] == "geslaagd"
+        stack.toestand.backup = "echt"
+    v = stel_voor(admin, "app.install", app_target("demo-app"), install_params("demo-app")).json()
+    assert v["blokkades"] == [] and keur_goed(admin, v).status_code == 200
+    if meting == "pool-tegenstrijdig":
+        nas.data["pool.query"][0]["status"] = "DEGRADED"  # healthy blijft true
+        stack.vernieuw()
+    elif meting == "pool-vlag-ontbreekt":
+        del nas.data["pool.query"][0]["healthy"]
+        stack.vernieuw()
+    elif meting == "pool-in-de-toekomst":
+        with stack.app.state.sessionmaker() as db:
+            for rij in db.scalars(select(InventorySnapshot).where(InventorySnapshot.kind == "pools")):
+                rij.observed_at += timedelta(days=1)
+            db.commit()
+    else:
+        with stack.app.state.sessionmaker() as db:
+            export = db.scalars(select(SelfBackup)).one()
+        (settings.backups_dir / export.file_name).rename(settings.backups_dir / (export.file_name + ".weg"))
+        r = admin.post(f"/api/v1/backups/self/{export.id}/verify", headers=idem())
+        assert r.status_code == 200 and r.json()["reason_code"] == "dump_missing", r.text
+    getekend = _teken_spion(monkeypatch)
+    _geblokkeerd(voer_uit(admin, v), code)
+    assert getekend == [] and schrijfaanroepen(nas) == []
+    if meting == "export-afgekeurd":
+        assert admin.post("/api/v1/backups/self", headers=idem()).status_code == 202
+        assert stack.worker_once()[-1]["status"] == "geslaagd"
+        r = voer_uit(admin, v)
+        assert r.status_code == 200, r.text
+        assert len(getekend) == 1
+
+
 def _snapshot(stack: Stack, dataset: str, naam: str, recursief: bool = True) -> dict[str, Any]:
     """Een checkpoint via de echte route: ``zfs.snapshot.create`` (R1) door de Hub en de executor."""
     v = stel_voor(

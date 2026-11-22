@@ -1304,7 +1304,18 @@ def test_pool_niet_gezond_of_onbekend_blokkeert_opslagmutaties(stack: Stack, toe
 
 def test_pools_gezond_telt_onbekend_nooit_als_gezond() -> None:
     assert pools_gezond([{"name": "p", "status": "ONLINE", "healthy": True}])[0] is True
-    for beeld in (None, [], "ONLINE", [{"name": "p", "status": "ONLINE"}], [{"name": "p", "healthy": True}]):
+    goed = {"name": "p", "status": "ONLINE", "healthy": True}
+    for beeld in (
+        None,
+        [],
+        "ONLINE",
+        [{"name": "p", "status": "ONLINE"}],
+        [{"name": "p", "healthy": True}],
+        [{**goed, "status": "DEGRADED"}],  # tegenstrijdig (R-VEILIG-1)
+        [{"status": "ONLINE", "healthy": True}],  # naamloos
+        [goed, None],  # onleesbare tweede rij
+        [goed, "ONLINE"],
+    ):
         assert pools_gezond(beeld)[0] is False
     twee = [{"name": "a", "status": "ONLINE", "healthy": True}, {"name": "b", "status": "DEGRADED", "healthy": False}]
     assert pools_gezond(twee) == (

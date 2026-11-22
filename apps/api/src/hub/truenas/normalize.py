@@ -154,7 +154,7 @@ def pools(raw: Any) -> list[dict[str, Any]]:
     out = []
     for p in raw or []:
         if not isinstance(p, dict):
-            continue
+            p = {}  # een onleesbare rij verdwijnt niet stil: ze telt als naamloze, niet gezonde pool (R-VEILIG-1)
         size, alloc, free = _num(p.get("size")), _num(p.get("allocated")), _num(p.get("free"))
         scan = _dict(p.get("scan"))
         status = _str(p.get("status"), 32)
@@ -163,7 +163,8 @@ def pools(raw: Any) -> list[dict[str, Any]]:
             {
                 "naam": _str(p.get("name"), 128),
                 "status": status,
-                "gezond": bool(healthy) if isinstance(healthy, bool) else (status == "ONLINE" if status else None),
+                # Positieve witte lijst: alleen een benoemde pool die ONLINE is én expliciet healthy=true meldt.
+                "gezond": bool(_str(p.get("name"), 128)) and status == "ONLINE" and healthy is True,
                 "waarschuwing": bool(p.get("warning")) if isinstance(p.get("warning"), bool) else None,
                 "grootte_bytes": size,
                 "gebruikt_bytes": alloc,

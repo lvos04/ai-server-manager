@@ -15,7 +15,7 @@ from hub.onboarding.catalog import DECISIONS
 from hub.onboarding.gates import GateInputs, evaluate
 
 POLICY = load_policy()
-GEZOND = {"status": "ok", "data": [{"naam": "p", "gezond": True}]}
+GEZOND = {"status": "ok", "data": [{"naam": "p", "status": "ONLINE", "gezond": True}]}
 HOST = "nas-primary"
 
 
@@ -97,6 +97,74 @@ def test_backupgate_rood_blokkeert_opslagmutaties(backup_uur: float | None) -> N
     uit = _uitkomst(backup_uur=backup_uur)
     assert _codes(uit, ["data_mutatie"]) == {"backup_gate_rood"}
     assert _codes(uit, ["r2_r3_acties"]) == {"backup_gate_rood"}
+
+
+GOEDE_RIJ = {"name": "p", "status": "ONLINE", "healthy": True}
+
+
+@pytest.mark.parametrize(
+    ("rijen", "open_verwacht"),
+    [
+        pytest.param([GOEDE_RIJ], True, id="gezond"),
+        pytest.param([{**GOEDE_RIJ, "status": "DEGRADED"}], False, id="tegenstrijdig"),
+        pytest.param([{**GOEDE_RIJ, "healthy": False}], False, id="online-maar-ongezond"),
+        pytest.param([{"name": "p", "healthy": True}], False, id="status-ontbreekt"),
+        pytest.param([{"name": "p", "status": "ONLINE"}], False, id="gezondheidsvlag-ontbreekt"),
+        pytest.param([{**GOEDE_RIJ, "healthy": "true"}], False, id="gezondheidsvlag-geen-boolean"),
+        pytest.param([{"status": "ONLINE", "healthy": True}], False, id="naam-ontbreekt"),
+        pytest.param([GOEDE_RIJ, None], False, id="onleesbare-tweede-pool"),
+        pytest.param([GOEDE_RIJ, "ONLINE"], False, id="tekst-in-plaats-van-rij"),
+    ],
+)
+def test_elke_poolrij_moet_aantoonbaar_gezond_zijn(rijen: list[Any], open_verwacht: bool) -> None:
+    """R-VEILIG-1 (positieve witte lijst): Hub (normalize + gate) en executor geven per rij hetzelfde oordeel. Alleen
+    een benoemde pool die ONLINE is en expliciet healthy=true meldt, opent de poolgate."""
+    from executor.uitvoeren import pools_gezond
+
+    from hub.truenas.normalize import pools as normaliseer
+
+    uit = _uitkomst(pools={"status": "ok", "data": normaliseer(rijen)})
+    verwacht = set() if open_verwacht else {"pool_niet_gezond"}
+    assert _codes(uit, ["data_mutatie"]) == verwacht
+    assert _codes(uit, ["r2_r3_acties"]) == verwacht
+    assert pools_gezond(rijen)[0] is open_verwacht
+
+
+@pytest.mark.parametrize(
+    "rij",
+    [
+        {"naam": "p", "status": "DEGRADED", "gezond": True},  # tegenstrijdig opgeslagen
+        {"naam": "p", "gezond": True},  # status ontbreekt
+        {"naam": None, "status": "ONLINE", "gezond": True},  # naamloos
+        None,  # onleesbaar
+    ],
+)
+def test_gate_vertrouwt_een_opgeslagen_gezond_vlag_niet_alleen(rij: Any) -> None:
+    """R-VEILIG-1: ook een eerder opgeslagen meting met een tegenstrijdige of onvolledige rij houdt de gate dicht."""
+    uit = _uitkomst(pools={"status": "ok", "data": [{"naam": "q", "status": "ONLINE", "gezond": True}, rij]})
+    assert _codes(uit, ["data_mutatie"]) == {"pool_niet_gezond"}
+
+
+@pytest.mark.parametrize(
+    ("backup_uur", "open_verwacht"),
+    [(-24, False), (-0.1, False), (-0.01, True), (0, True), (25.9, True), (26.1, False)],
+)
+def test_backuptijd_heeft_twee_grenzen(backup_uur: float, open_verwacht: bool) -> None:
+    """R-VEILIG-3: niet ouder dan de grens (26 uur hier) en niet verder in de toekomst dan de klokmarge (60 s)."""
+    codes = _codes(_uitkomst(backup_uur=backup_uur), ["r2_r3_acties"])
+    assert codes == (set() if open_verwacht else {"backup_gate_rood"})
+
+
+def test_binnen_venster() -> None:
+    from hub.timeutil import KLOKMARGE_SECONDEN, binnen_venster
+
+    nu = datetime.now(UTC)
+    assert binnen_venster(nu, nu, 60) and binnen_venster(nu - timedelta(seconds=60), nu, 60)
+    assert binnen_venster(nu + timedelta(seconds=KLOKMARGE_SECONDEN), nu, 60)
+    assert not binnen_venster(nu + timedelta(seconds=KLOKMARGE_SECONDEN + 1), nu, 60)
+    assert not binnen_venster(nu - timedelta(seconds=61), nu, 60)
+    assert not binnen_venster(None, nu, 60)
+    assert binnen_venster((nu - timedelta(seconds=5)).replace(tzinfo=None), nu, 60)  # naïeve tijd = UTC
 
 
 def test_backupbesluiten_niet_getest_is_ook_backupgate_rood() -> None:

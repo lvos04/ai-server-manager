@@ -329,7 +329,7 @@ def _compare(row: Decision, res: CollectResult) -> tuple[Measurement, dict[str, 
         pool_rows: list[dict[str, Any]] = value["pools"]
         if not pool_rows:
             return Measurement("mislukt", "protocol_error", "Geen pools gevonden.", {}, run_id), None, pk.method
-        unhealthy = [p["naam"] for p in pool_rows if not p["gezond"]]
+        unhealthy = [str(p["naam"] or "onleesbaar") for p in pool_rows if not p["gezond"]]
         melding = "Poolstatus gemeten via pool.query." + (f" Niet gezond: {', '.join(unhealthy)}." if unhealthy else "")
         return (
             Measurement(

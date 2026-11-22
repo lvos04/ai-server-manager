@@ -283,7 +283,12 @@ def verify_pre_upgrade(db: Session, settings: Settings, export_id: uuid.UUID) ->
 def latest_verified(db: Session) -> SelfBackup | None:
     return db.scalars(
         select(SelfBackup)
-        .where(SelfBackup.status == "geslaagd", SelfBackup.deleted_at.is_(None))
+        .where(
+            SelfBackup.status == "geslaagd",
+            SelfBackup.deleted_at.is_(None),
+            # Een afgekeurde herverificatie (bv. dump_missing) maakt de export ongeldig als herstelbewijs (R-VEILIG-2).
+            SelfBackup.verification["herverificatie"]["ok"].as_boolean().is_not(False),
+        )
         .order_by(SelfBackup.finished_at.desc())
         .limit(1)
     ).first()

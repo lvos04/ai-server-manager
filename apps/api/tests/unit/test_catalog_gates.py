@@ -104,7 +104,7 @@ def test_nvt_opent_nooit_een_gate() -> None:
 
 def test_data_mutatie_pool_onbekend_of_degraded() -> None:
     base = {"D04": "Ingevuld", "D05": "Getest", "D16": "Ingevuld", "D06": "Getest"}
-    healthy = {"status": "ok", "data": [{"naam": "p", "gezond": True}]}
+    healthy = {"status": "ok", "data": [{"naam": "p", "status": "ONLINE", "gezond": True}]}
     assert _gates(_inputs(base, healthy, backup_age_h=1))["data_mutatie"]["status"] == "toegestaan"
     unk = _gates(_inputs(base, {"status": "unknown", "reason_code": "stale"}, backup_age_h=1))["data_mutatie"]
     assert unk["status"] == "unknown" and unk["toegestaan"] is False
@@ -118,7 +118,7 @@ def test_data_mutatie_pool_onbekend_of_degraded() -> None:
 
 def test_executor_niet_gekoppeld_blokkeert_deploy_en_r2r3() -> None:
     all_ok = {d.id: "Getest" for d in DECISIONS}
-    healthy = {"status": "ok", "data": [{"naam": "p", "gezond": True}]}
+    healthy = {"status": "ok", "data": [{"naam": "p", "status": "ONLINE", "gezond": True}]}
     g = _gates(_inputs(all_ok, healthy, backup_age_h=1, executor=False))
     assert g["deployment"]["status"] == "geblokkeerd" and g["r2_r3_acties"]["status"] == "geblokkeerd"
     g = _gates(_inputs(all_ok, healthy, backup_age_h=1, executor=True))
