@@ -141,8 +141,9 @@ def prepare_dirs() -> None:
     try:
         os.chmod(PGDATA, 0o700)
         os.chmod(DATA / "secrets", 0o700)
+        os.chmod(DATA / "backups", 0o700)  # V-085: de exports bevatten de hele database
     except PermissionError:
-        fail(f"{PGDATA} of secrets is niet van gebruiker {UID}; start de app als root of maak {UID} eigenaar.")
+        fail(f"{PGDATA}, secrets of backups is niet van gebruiker {UID}; start de app als root of maak {UID} eigenaar.")
     SOCKET_DIR.mkdir(parents=True, exist_ok=True)
     os.chmod(SOCKET_DIR, 0o700)
     if root:

@@ -95,6 +95,24 @@ def test_retentie(settings: Any, app: Any) -> None:
     assert len(list(settings.backups_dir.glob("*.dump"))) == 2
 
 
+def test_export_alleen_voor_de_eigenaar_ook_bij_umask_022(settings: Any, app: Any) -> None:
+    """V-085 (R-VEILIG-2, S-P2-070): exportmap 0700 en dump 0600 vanaf aanmaak, ook bij umask 0022 en een al
+    bestaande map 0755 (zoals een eerdere versie of de supervisor die maakte)."""
+    from hub.backup.selfbackup import run_self_backup
+
+    settings.backups_dir.mkdir(parents=True, exist_ok=True)
+    settings.backups_dir.chmod(0o755)
+    oud = os.umask(0o022)
+    try:
+        with app.state.sessionmaker() as db:
+            row = run_self_backup(db, settings, trigger="manual")
+    finally:
+        os.umask(oud)
+    assert row.status == "geslaagd", row.message
+    assert stat.S_IMODE(settings.backups_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE((settings.backups_dir / row.file_name).stat().st_mode) == 0o600
+
+
 def test_retentie_laat_pre_upgrade_export_staan_bij_samenloop(settings: Any, app: Any, tmp_path: Path) -> None:
     """Een oudere export die later afrondt, mag het net gecontroleerde pre-upgrade-archief niet verwijderen."""
     import shutil

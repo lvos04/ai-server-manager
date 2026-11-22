@@ -112,7 +112,8 @@ def _schema_revision(db: Session) -> str | None:
 def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBackup:
     """Maak en verifieer een back-up. Commit zelf (ook bij mislukken) zodat het resultaat altijd zichtbaar is."""
     backups = settings.backups_dir
-    backups.mkdir(parents=True, exist_ok=True)
+    backups.mkdir(mode=0o700, parents=True, exist_ok=True)
+    backups.chmod(0o700)  # V-085: ook een bestaande map; de dumps bevatten de hele database
     started = utcnow()
     stamp = started.strftime("%Y%m%dT%H%M%SZ")
     row = SelfBackup(trigger=trigger, status="bezig", started_at=started, verification={})
@@ -157,6 +158,7 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
             text=True,
             timeout=1800,
             check=False,
+            umask=0o077,  # V-085: de dump is 0600 vanaf aanmaak, ongeacht de umask van het proces
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return fail("pg_dump_failed", f"pg_dump niet uitvoerbaar: {type(exc).__name__}")
