@@ -29,7 +29,7 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -54,6 +54,7 @@ log = logging.getLogger("executor.uitvoeren")
 HERCONTROLE_WAARSCHUWING = "herstelwaarden_buiten_beleid"
 CHECKPOINT_NIET_VASTGELEGD = "checkpoint_niet_vastgelegd"
 _HERCONTROLE_VELDEN = "parameters.app_create.values"
+GEEN: tuple[None, None] = (None, None)
 
 NAS_MELDINGEN = {
     "truenas_onbereikbaar": (503, "TrueNAS is niet bereikbaar; er is niets uitgevoerd."),
@@ -162,6 +163,14 @@ def pools_gezond(pools: Any) -> tuple[bool, list[dict[str, Any]]]:
     return ok, beeld
 
 
+class Geweigerd(Exception):
+    """Vóór de schrijfaanroep geweigerd in :meth:`Uitvoerder._voer_uit` (de dekking veranderde tussentijds)."""
+
+    def __init__(self, uitkomst: Uitkomst) -> None:
+        super().__init__(uitkomst.body.get("code"))
+        self.uitkomst = uitkomst
+
+
 @dataclass
 class Doel:
     """Eigen readback van het doel, vlak vóór of na de uitvoering."""
@@ -212,6 +221,23 @@ class Uitvoerder:
 
     def _snapshot_query(self, nas: NasClient, methods: frozenset[str], dataset: str) -> list[str]:
         return sorted(self._snapshot_rijen(nas, methods, dataset))
+
+    def _checkpoint_leden(
+        self, nas: NasClient, methods: frozenset[str], dataset: str, prop: Mapping[str, Any], txg: str
+    ) -> tuple[dict[str, str], bool]:
+        """Per dataset de teruggelezen eigen snapshot van deze actie. Een recursieve ZFS-snapshot ontstaat in één
+        transactiegroep: alleen een kindsnapshot met dezelfde ``createtxg`` is van deze actie (een oudere met dezelfde
+        naam telt niet). ``recursief`` komt uit dit teruglezen: waar als elk aangekoppeld kind zijn snapshot heeft."""
+        leden = {dataset: txg}
+        if not prop["parameters"].get("recursief"):
+            return leden, False
+        naam = str(prop["parameters"]["naam"])
+        kinderen = sorted({n for _mp, n in cpmod.mounts_uit_boom(nas.call("pool.dataset.query"))
+                           if n.startswith(dataset + "/")})  # fmt: skip
+        for kind in kinderen:
+            if self._snapshot_rijen(nas, methods, kind).get(f"{kind}@{naam}") == txg:
+                leden[kind] = txg
+        return leden, all(k in leden for k in kinderen)
 
     def _lees(self, nas: NasClient, methods: frozenset[str], actie: ActieDef, prop: Mapping[str, Any]) -> Doel:
         target = prop["target"]
@@ -312,8 +338,13 @@ class Uitvoerder:
         return nodig[0], None
 
     # ------------------------------------------------------------------ checkpoint en herkomst (S-P2-050f)
-    def _checkpoint_gate(self, nas: NasClient, methods: frozenset[str], app: str, cp_id: str) -> Uitkomst | None:
-        """Het gebonden checkpoint is van deze executor, vers, nog dezelfde snapshot en dekt alle opslag van de app."""
+    def _checkpoint_gate(
+        self, nas: NasClient, methods: frozenset[str], app: str, cp_id: str, werklast: Any, recept: Any
+    ) -> tuple[Uitkomst | None, Callable[[], Any] | None, list[str] | None]:
+        """Het gebonden checkpoint is van een voltooide eigen snapshotactie van deze executor, vers, en heeft voor elke
+        dataset met data van de app (huidige configuratie, werklast, datasetboom en de te herstellen waarden) een eigen
+        snapshot met dezelfde ``createtxg``. Geeft ook de hercontrole voor vlak vóór de schrijfaanroep en de datasets
+        van de huidige configuratie (die van het recept dat deze actie bewaart; de Hub toetst ze bij terugzetten)."""
 
         def weiger(code: str, reden: str, **details: Any) -> Uitkomst:
             return fout(
@@ -326,46 +357,90 @@ class Uitvoerder:
 
         cp = self.journal.checkpoint(cp_id) if cp_id else None
         if cp is None:
-            return weiger("checkpoint_ontbreekt", "Deze executor heeft dit checkpoint niet zelf gemaakt en vastgelegd.")
+            reden = "Deze executor heeft dit checkpoint niet zelf gemaakt en vastgelegd."
+            return weiger("checkpoint_ontbreekt", reden), *GEEN
         leeftijd = int(time.time()) - int(cp["created_at"])
         if not -300 <= leeftijd <= cpmod.CHECKPOINT_MAX_SECONDEN or self.journal.gewijzigd_na(app, int(cp["grens"])):
             return weiger(
                 "checkpoint_verlopen",
                 "Het checkpoint is ouder dan een uur, of de app is daarna al bijgewerkt of teruggezet.",
                 leeftijd_seconden=leeftijd,
-            )
-        try:
-            rijen = self._snapshot_rijen(nas, methods, str(cp["dataset"]))
-            nodig = cpmod.app_datasets(nas.call("app.config", app), nas.call("pool.dataset.query"), app)
-        except NasFout as exc:
-            return _nas_fout(exc)
-        if rijen.get(str(cp["snapshot"])) != cp["createtxg"]:
-            return weiger(
-                "checkpoint_afwijkend",
-                "De snapshot van het checkpoint bestaat niet meer of is een andere (createtxg wijkt af).",
-            )
-        if nodig is None or not all(cpmod.dekt(str(cp["dataset"]), bool(cp["recursief"]), d) for d in nodig):
-            return weiger(
-                "checkpoint_dekt_niet",
-                "Het checkpoint dekt niet alle opslag van deze app (of de opslag is niet vast te stellen).",
-                datasets=nodig,
-            )
-        return None
+            ), *GEEN
+        naam = str(cp["snapshot"]).split("@", 1)[-1]
+        leden: Mapping[str, str] = cp["leden"]
 
-    def _herkomst_gate(self, params: Mapping[str, Any], app: str, aid: str) -> tuple[str | None, Uitkomst | None]:
+        eigen: list[str] | None = None
+
+        def dekking() -> tuple[Uitkomst | None, str, Any]:
+            nonlocal eigen
+            try:
+                config, boom = nas.call("app.config", app), nas.call("pool.dataset.query")
+                nodig = cpmod.app_datasets(config, boom, app, werklast, ook=recept)
+                eigen = cpmod.app_datasets(config, boom, app, werklast)
+                if nodig is None or not set(nodig) <= set(leden):
+                    return (
+                        weiger(
+                            "checkpoint_dekt_niet",
+                            "Het checkpoint heeft niet voor elke dataset met data van deze app een eigen snapshot "
+                            "(of de opslag is niet vast te stellen).",
+                            datasets=nodig,
+                        ),
+                        "",
+                        config,
+                    )
+                gelezen = {d: self._snapshot_rijen(nas, methods, d).get(f"{d}@{naam}") for d in nodig}
+            except NasFout as exc:
+                return _nas_fout(exc), "", None
+            if any(gelezen[d] != leden[d] for d in nodig):
+                return (
+                    weiger(
+                        "checkpoint_afwijkend",
+                        "Een snapshot van het checkpoint bestaat niet meer of is een andere (createtxg wijkt af).",
+                        datasets=sorted(d for d in nodig if gelezen[d] != leden[d]),
+                    ),
+                    "",
+                    config,
+                )
+            return None, canonical_sha256({"config": config, "nodig": nodig, "snapshots": gelezen}), config
+
+        eerst, gecontroleerd, _config = dekking()
+        if eerst is not None:
+            return eerst, *GEEN
+
+        def hercontrole() -> Any:
+            # shortcut: TrueNAS biedt via deze adapter geen snapshot-hold en geen voorwaardelijke schrijfaanroep; de
+            # executor leest opslag en snapshots vlak vóór de schrijfaanroep opnieuw en weigert bij elk verschil. Een
+            # wijziging binnen dat laatste venster blijft mogelijk; upgraden zodra hold of een ETag-voorwaarde bestaat.
+            nu, staat, config = dekking()
+            if nu is None and staat != gecontroleerd:
+                nu = fout(
+                    409,
+                    "doel_gewijzigd",
+                    "De opslag of de snapshots van de app zijn veranderd sinds de controle; er is niets bijgewerkt of "
+                    "teruggezet. Maak een nieuwe preview en keur opnieuw goed.",
+                )
+            if nu is not None:
+                raise Geweigerd(nu)
+            return config
+
+        return None, hercontrole, eigen
+
+    def _herkomst_gate(
+        self, params: Mapping[str, Any], app: str, aid: str, doel_ids: set[str]
+    ) -> tuple[str | None, Uitkomst | None]:
         """EX15 met optie 3 (ADR-0032 besluit 8): de herkomst komt uit het eigen journaal, nooit uit het verzoek.
-        Geeft de vaste melding (``oud`` of ``buiten_keten``) of een weigering."""
+        Geeft de vaste melding (``oud`` of ``buiten_keten``) of een weigering. Bij elke bijwerking en terugzetting: een
+        doel (image, digest of catalogusversie) dat vóór een vastgelegde migratie draaide, vereist databaseherstel,
+        ongeacht de actienaam (R-HARDE-EIS-5); een onvolledige historie is onbekend (R-HARDE-EIS-6)."""
         try:
             oud: set[tuple[str, str, int]] | None = self.journal.oud_vastlegging()
         except JournalUnavailable:
             oud = None  # verlies raakt alleen recepten zonder eigen herkomst
-        if aid != "app.rollback":
-            return None, None
         onbekend = fout(
             409,
             "herkomst_onbekend",
-            "De executor kan de herkomst van dit herstelpunt niet vaststellen (geen eigen vastlegging, onleesbaar of "
-            "tegenstrijdig); er is niets teruggezet.",
+            "De executor kan de herkomst of de migratiegeschiedenis van deze app niet vaststellen (geen eigen "
+            "vastlegging, onleesbaar, onvolledig of tegenstrijdig); er is niets bijgewerkt of teruggezet.",
             {"herstel_van": params.get("herstel_van")},
         )
         try:
@@ -385,6 +460,17 @@ class Uitvoerder:
                 {"checkpoints": sorted({str(h.get("checkpoint_id")) for _i, _r, h in vanaf if h.get("migratie")})},
             )
 
+        historie = [
+            (
+                bool(h.get("migratie")),
+                {str(v) for v in h.get("van") or []} | ({f"versie:{v}"} if (v := h.get("van_versie")) else set()),
+            )
+            for _n, _r, h in rijen
+        ]
+        if cpmod.terug_voor_migratie(historie, doel_ids):
+            return None, migratie(rijen)
+        if aid != "app.rollback":
+            return None, None
         if "herstel_van" not in params:
             # Catalogusrollback: vanaf de laatste update die van deze versie vertrok (of alles als die er niet is).
             doel = str(params.get("catalog_version"))
@@ -408,6 +494,7 @@ class Uitvoerder:
         request_id: str,
         gevuld: Mapping[str, Any] | None = None,
         herkomst: Mapping[str, Any] | None = None,
+        hercontrole_dekking: Callable[[], Any] | None = None,
     ) -> None:
         params, name = prop["parameters"], doel.naam
         t = float(actie.timeout_seconden)
@@ -432,8 +519,11 @@ class Uitvoerder:
             nas.job(
                 methode, name, {"remove_images": False, "remove_ix_volumes": False}, timeout=t, poll=self.poll_seconds
             )
-        elif aid in ("app.update", "app.rollback") and methode == "app.update":
-            vorige = nas.call("app.config", name)
+        elif aid in ("app.update", "app.rollback") and hercontrole_dekking is None:
+            raise Geweigerd(fout(409, "checkpoint_ontbreekt", "Geen gecontroleerd checkpoint; er is niets uitgevoerd."))
+        elif aid in ("app.update", "app.rollback") and methode == "app.update" and hercontrole_dekking:
+            # Vlak vóór bewaren en schrijfaanroep: dezelfde opslag en snapshots als gecontroleerd (R-HARDE-EIS-3).
+            vorige = hercontrole_dekking()
             vorige = strip_ix(vorige) if isinstance(vorige, dict) else {}
             if aid == "app.update":
                 oud_image = vorige.get("image")
@@ -448,11 +538,13 @@ class Uitvoerder:
             # De huidige waarden eerst (versleuteld) bewaren: daarmee kan deze wijziging worden teruggezet.
             self.journal.save_values(request_id, name, vorige, dict(herkomst) if herkomst else None)
             nas.job(methode, name, {"values": values}, timeout=t, poll=self.poll_seconds)
-        elif aid == "app.update":
+        elif aid == "app.update" and hercontrole_dekking:
+            hercontrole_dekking()
             if herkomst:  # zonder recept: de herkomst apart, ook vóór de schrijfaanroep
                 self.journal.leg_herkomst_vast(request_id, name, dict(herkomst))
             nas.job(methode, name, {"app_version": params["catalog_version"]}, timeout=t, poll=self.poll_seconds)
-        elif aid == "app.rollback":
+        elif aid == "app.rollback" and hercontrole_dekking:
+            hercontrole_dekking()
             if herkomst:
                 self.journal.leg_herkomst_vast(request_id, name, dict(herkomst))
             nas.job(
@@ -764,12 +856,20 @@ class Uitvoerder:
                     }
             herkomst: dict[str, Any] | None = None
             gemeld: str | None = None
+            hercontrole_dekking: Callable[[], Any] | None = None
             if actie.action_id in ("app.update", "app.rollback"):
-                # Pre-update-gate (contract §8, S-P2-050f): fail-closed vóór elke schrijfaanroep.
+                # Pre-update-gate (contract §8, S-P2-050f): fail-closed vóór elke schrijfaanroep. Bij terugzetten telt
+                # ook de opslag in de bewaarde waarden die geschreven gaan worden (R-HARDE-EIS-4).
                 cp_id = str(approval.get("backup_checkpoint_id") or "") if isinstance(approval, Mapping) else ""
-                if (cp_fout := self._checkpoint_gate(nas, methods, doel.naam, cp_id)) is not None:
+                werklast = (doel.app or {}).get("active_workloads")
+                recept = bewaard[1] if bewaard is not None else None
+                cp_fout, hercontrole_dekking, herstel_datasets = self._checkpoint_gate(
+                    nas, methods, doel.naam, cp_id, werklast, recept
+                )
+                if cp_fout is not None:
                     return cp_fout
-                gemeld, ex15 = self._herkomst_gate(prop["parameters"], doel.naam, actie.action_id)
+                doel_ids = cpmod.doel_identiteiten(verwachte_image, prop["parameters"].get("catalog_version"))
+                gemeld, ex15 = self._herkomst_gate(prop["parameters"], doel.naam, actie.action_id, doel_ids)
                 if ex15 is not None:
                     return ex15
                 if gemeld is not None:
@@ -779,7 +879,9 @@ class Uitvoerder:
                     "soort": actie.action_id,
                     "migratie": _migratie(prop["parameters"]),
                     "van_versie": str(doel.readback.get("versie") or ""),
+                    "van": sorted(cpmod.identiteiten(doel.readback)),
                     "checkpoint_id": cp_id,
+                    "herstel_datasets": herstel_datasets,
                 }
             if isinstance(approval, Mapping) and not self.journal.claim_approval_nonce(
                 str(approval["one_time_nonce"]), str(approval["approval_id"])
@@ -824,7 +926,7 @@ class Uitvoerder:
                     )
                 return self._uitvoeren_en_teruglezen(
                     nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, hercontrole, gevuld,
-                    herkomst, gemeld,
+                    herkomst, gemeld, hercontrole_dekking,
                 )  # fmt: skip
         finally:
             nas.close()
@@ -891,12 +993,22 @@ class Uitvoerder:
         gevuld: Mapping[str, Any] | None = None,
         herkomst: Mapping[str, Any] | None = None,
         gemeld: str | None = None,
+        hercontrole_dekking: Callable[[], Any] | None = None,
     ) -> Uitkomst:
         mislukt: NasFout | None = None
         try:
-            self._voer_uit(nas, methode, actie, prop, doel, request_id, gevuld, herkomst)
+            self._voer_uit(nas, methode, actie, prop, doel, request_id, gevuld, herkomst, hercontrole_dekking)
         except NasFout as exc:
             mislukt = exc
+        except Geweigerd as g:
+            # Vóór de schrijfaanroep (alleen leesaanroepen verstuurd): niets uitgevoerd, de rij krijgt "mislukt".
+            code = str(g.uitkomst.body.get("code"))
+            try:
+                self.journal.finish(nonce, status="mislukt", after_hash=doel.hash, detail=code)
+            except JournalUnavailable:
+                self.journal.einde_in_geheugen(nonce, status="mislukt", after_hash=doel.hash, detail=code)
+            log.warning("vlak vóór de schrijfaanroep geweigerd: request_id=%s code=%s", request_id, code)
+            return g.uitkomst
         except Exception as exc:
             if not nas.schrijfaanroep_verstuurd:
                 # Vóór de schrijfaanroep (bv. het journaal of vault.key bij het bewaren van de vorige waarden): er is
@@ -915,7 +1027,7 @@ class Uitvoerder:
         try:
             return self._teruglezen(
                 nas, methods, methode, actie, prop, doel, request_id, nonce, verwachte_image, mislukt, hercontrole,
-                gemeld,
+                gemeld, herkomst,
             )  # fmt: skip
         except JournalUnavailable:
             # Na de aanroep bij TrueNAS kan "er is niets uitgevoerd" niet meer worden beloofd: stop (in het geheugen
@@ -939,6 +1051,7 @@ class Uitvoerder:
         mislukt: NasFout | None,
         hercontrole: Mapping[str, Any] | None = None,
         gemeld: str | None = None,
+        herkomst: Mapping[str, Any] | None = None,
     ) -> Uitkomst:
         try:
             if mislukt is not None:
@@ -970,6 +1083,10 @@ class Uitvoerder:
         if afw:
             return self._stop(request_id, nonce, actie, methode, doel, na, str(afw[0]["code"]), afw)
         extra: dict[str, Any] = {}
+        if herkomst is not None and methode == "app.update":
+            # De datasets van het recept dat deze actie bewaarde: de Hub vraagt bij het terugzetten ook daarvoor een
+            # snapshot (R-HARDE-EIS-4). Alleen namen van datasets, nooit een waarde uit de configuratie.
+            na.readback = {**na.readback, "herstel_datasets": herkomst.get("herstel_datasets")}
         if gemeld is not None:
             extra["herkomst"] = gemeld  # oud of buiten_keten: zichtbaar, het terugzetten ging door (ADR-0032 besluit 8)
         if actie.action_id == "zfs.snapshot.create":
@@ -979,14 +1096,12 @@ class Uitvoerder:
             try:
                 if not txg or not na.readback.get("aanwezig"):
                     raise JournalUnavailable("createtxg")
+                leden, recursief = self._checkpoint_leden(nas, methods, doel.naam, prop, str(txg))
                 self.journal.leg_checkpoint_vast(
-                    request_id,
-                    doel.naam,
-                    str(na.readback["snapshot"]),
-                    str(txg),
-                    bool(prop["parameters"].get("recursief")),
+                    request_id, doel.naam, str(na.readback["snapshot"]), str(txg), recursief, leden
                 )
-            except JournalUnavailable:
+                na.readback = {**na.readback, "leden": leden, "recursief": recursief}
+            except (JournalUnavailable, NasFout):
                 waarsch = [*waarsch, CHECKPOINT_NIET_VASTGELEGD]
         if hercontrole is not None:
             # Alleen melden (KLEIN-85): codes en aantal, nooit een waarde; zonder overtreding verandert er niets.

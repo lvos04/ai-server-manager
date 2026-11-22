@@ -26,6 +26,7 @@ from executorhelpers import (
     Hub,
     approved,
     auth,
+    checkpoint,
     execute,
     nas_hub,
     set_write_key,
@@ -976,7 +977,10 @@ def test_bijwerken_naar_een_emby_image_weigert_de_executor_zelf(stack: Stack) ->
     assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
     assert writes(nas) == [] and nas.updated == []
     zelfde = {"image": {"repository": "ghcr.io/lvos04/my_house", "tag": f"0.2.0@{DIGEST_B}"}}
-    r = execute(c, hub, approved(hub, app_prop(nas, "app.update", "my-house", zelfde), risk_class="R2"))
+    cp = checkpoint(hub, nas=nas)  # de opslag van my-house is een eigen kinddataset
+    r = execute(
+        c, hub, approved(hub, app_prop(nas, "app.update", "my-house", zelfde), risk_class="R2", backup_checkpoint_id=cp)
+    )
     assert r.status_code == 200 and r.json()["methode"] == "app.update", r.text
     assert writes(nas) == ["app.update"]
 
@@ -1138,10 +1142,14 @@ def test_terugzetten_met_waarden_buiten_het_huidige_beleid_gaat_door_met_een_mel
             },
         }
     )
+    # Het ixVolume uit de bewaarde waarden bestaat als dataset; het checkpoint dekt ook die bestemming (R-HARDE-EIS-4).
+    mounts = "ix-apps/app_mounts"
+    for ds in ("ix-apps", mounts, f"{mounts}/demo-app", f"{mounts}/demo-app/proefcache"):
+        nas.add_dataset(f"testpool/{ds}")
     herstel_van = str(uuid.uuid4())
     Journal(hub.settings.replay_db, hub.settings.secrets_dir).save_values(herstel_van, "demo-app", vorige)
     terug = app_prop(nas, "app.rollback", "demo-app", {"herstel_van": herstel_van})
-    req = approved(hub, terug)
+    req = approved(hub, terug, backup_checkpoint_id=checkpoint(hub, "testpool", "testpool@auto-latest", nas=nas))
     with caplog.at_level("INFO", logger="executor"):
         r = execute(c, hub, req)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
@@ -1192,7 +1200,12 @@ def test_terugzetten_gaat_door_als_de_hercontrole_zelf_faalt(stack: Stack, monke
         raise RuntimeError("proef")
 
     monkeypatch.setattr("executor.uitvoeren.validate_parameters", kapot)
-    r = execute(c, hub, approved(hub, app_prop(nas, "app.rollback", "demo-app", {"herstel_van": herstel_van})))
+    tweede = approved(
+        hub,
+        app_prop(nas, "app.rollback", "demo-app", {"herstel_van": herstel_van}),
+        backup_checkpoint_id=checkpoint(hub, "testpool", "testpool@na-terugzetten", nas=nas),
+    )
+    r = execute(c, hub, tweede)
     assert r.status_code == 200 and nas.updated[-1] == ("demo-app", {"values": vorige}), r.text
     assert r.json()["hercontrole"] == {"overtredingen": 1, "codes": ["hercontrole_niet_mogelijk"]}
 
@@ -1221,7 +1234,16 @@ def test_herstelpunt_van_een_andere_app_telt_niet(stack: Stack) -> None:
 def test_catalogusapp_naar_een_vaste_versie_en_terug(stack: Stack) -> None:
     hub, c, nas = stack
     nas.data["app.query"].append(
-        _app("immich", "RUNNING", "ghcr.io/immich-app/server:1.0.0", 2283, 2283, "/m", "/d", catalog_app="immich")
+        _app(
+            "immich",
+            "RUNNING",
+            "ghcr.io/immich-app/server:1.0.0",
+            2283,
+            2283,
+            "/mnt/testpool/apps/immich",
+            "/d",
+            catalog_app="immich",
+        )
     )
     r = execute(c, hub, approved(hub, app_prop(nas, "app.update", "immich", {"catalog_version": "1.0.1"})))
     assert r.status_code == 200 and r.json()["methode"] == "app.upgrade", r.text
@@ -1309,7 +1331,13 @@ def test_snapshot_maken_en_klonen_naar_de_sandbox(tmp_path: Path, versie: str, p
         r = execute(c, hub, signed(hub, prop, risk_class="R1"))
         assert r.status_code == 200, r.text
         assert r.json()["methode"] == f"{prefix}.snapshot.create"
-        assert r.json()["readback"] == {"snapshot": f"{ds}@asm-proef", "aanwezig": True, "createtxg": "1001"}
+        assert r.json()["readback"] == {
+            "snapshot": f"{ds}@asm-proef",
+            "aanwezig": True,
+            "createtxg": "1001",
+            "leden": {ds: "1001"},
+            "recursief": False,
+        }
         assert r.json()["waarschuwingen"] == []  # vastgelegd als checkpoint (S-P2-050f)
         assert r.json()["before_hash"] != r.json()["after_hash"]
         # Dezelfde naam nogmaals: geweigerd vóór de aanroep.

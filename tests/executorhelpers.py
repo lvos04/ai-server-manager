@@ -167,15 +167,43 @@ def signed(
     )
 
 
+_BEGIN, _FINISH = Journal.begin, Journal.finish
+
+
 def checkpoint(
-    hub: Hub, dataset: str = "testpool/apps", snapshot: str = "testpool/apps@auto-latest", createtxg: str = "1000"
+    hub: Hub,
+    dataset: str = "testpool/apps",
+    snapshot: str = "testpool/apps@auto-latest",
+    createtxg: str = "1000",
+    nas: FakeTrueNAS | None = None,
 ) -> str:
-    """Een checkpoint in het eigen journaal van de executor, alsof hij die snapshot zelf maakte (de verificatie zelf
-    blijft echt: bestaan, createtxg, leeftijd en dekking worden bij de uitvoering gecontroleerd)."""
-    request_id = str(uuid.uuid4())
-    Journal(hub.settings.replay_db, hub.settings.secrets_dir).leg_checkpoint_vast(
-        request_id, dataset, snapshot, createtxg, True
+    """Een checkpoint in het eigen journaal van de executor, alsof hij die snapshot zelf maakte met een voltooide
+    ``zfs.snapshot.create`` (de verificatie zelf blijft echt: bestaan en createtxg per dataset, leeftijd en dekking
+    worden bij de uitvoering gecontroleerd). Met ``nas``: recursief, zoals een periodieke taak; de fake krijgt dan voor
+    elke dataset eronder dezelfde snapshot en het checkpoint telt ze als leden."""
+    leden = {dataset: createtxg}
+    if nas is not None:
+        naam = snapshot.split("@", 1)[1]
+        for d in nas.datasets():
+            if d == dataset or d.startswith(dataset + "/"):
+                rijen = nas.data["snapshots"].setdefault(d, [])
+                if not any(x["name"] == f"{d}@{naam}" for x in rijen):
+                    rijen.append({"name": f"{d}@{naam}", "dataset": d, "createtxg": createtxg})
+                leden[d] = createtxg
+    request_id = nonce = str(uuid.uuid4())
+    j = Journal(hub.settings.replay_db, hub.settings.secrets_dir)
+    # Ongebonden (de tests vervangen soms Journal.begin of Journal.finish om een fout na te bootsen).
+    _BEGIN(
+        j,
+        request_id=request_id,
+        nonce=nonce,
+        action_id="zfs.snapshot.create",
+        target={"host_id": "test", "dataset": dataset},
+        methode="pool.snapshot.create",
+        before_hash="voor",
     )
+    j.leg_checkpoint_vast(request_id, dataset, snapshot, createtxg, True, leden)
+    _FINISH(j, nonce, status="uitgevoerd", after_hash="na")
     return request_id
 
 

@@ -981,6 +981,18 @@ Status: gebouwd en Sim-getest tegen contractconforme fakes. NIET GEVALIDEERD (ec
   antwoord en één logregel. De Hub weigert uit zijn eigen administratie hetzelfde (`database_herstel_vereist`,
   `herkomst_onbekend` als het herstelpunt geen eigen uitgevoerde wijziging van dit doel is).
 - **Kluismarkering (050e)** blijft: een gemarkeerde instantie vraagt een recept met alleen verwijzingen.
+- **Herstelronde (R-HARDE-EIS-1 t/m 6).** Dekking: `app.config`, de te herstellen waarden en de schrijfbare
+  bind-koppelingen van de draaiende werklast, plus elke dataset die onder een gekoppeld pad is aangekoppeld; een
+  lege lijst telt alleen bij een draaiende werklast zonder schrijfbare koppelingen, een onbekende koppelsoort nooit.
+  Een recursief checkpoint legt per dataset de teruggelezen snapshot vast (tabel `checkpoint_lid`, alleen leden met
+  de `createtxg` van de eigen snapshot, want ZFS maakt een recursieve snapshot in één txg) en telt alleen als de
+  eigen `zfs.snapshot.create`-journaalrij van dat verzoek is uitgevoerd. Vlak vóór de schrijfaanroep leest de
+  executor config, datasets en snapshots opnieuw; elke afwijking weigert zonder schrijven. Er is geen hold: het
+  venster tussen die laatste lezing en de aanroep zelf blijft (VERSIE 2: ZFS-hold op het checkpoint). Terugzetten
+  vraagt dekking van de recept-bestemmingen (Hub uit de readback `herstel_datasets`; recepten van vóór deze ronde
+  alleen bij de executor). EX15 geldt voor elke imagewijziging: een doel-image of -catalogusversie die vóór een
+  gemelde migratie draaide, geeft `database_herstel_vereist`. De executor schrijft na elke herkomst een anker
+  (laatste `request_id`) in `secrets_dir/herkomst/`; ontbreekt die herkomst in het journaal, dan `herkomst_onbekend`.
 - **VERSIE 2.** Herkomst `keten` met ondertekende migratiecontext uit de vertrouwde keten (050g); tot dan is elke
   update `buiten_keten` en wordt een migratie alleen geweigerd als de update haar zelf meldt (restrisico van optie
   3). Hub-kopie van de oud-vastlegging met vergelijking, herstelbediening en de R3-beheerdersbevestiging. Een RPO

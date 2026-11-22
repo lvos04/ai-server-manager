@@ -558,6 +558,7 @@ class FakeTrueNAS:
         self.unsubscribed: list[str] = []
         self.realtime_silent = False  # True: abonnement aangenomen maar nooit gegevens (time-out-test)
         self.calls: list[tuple[str, Any]] = []
+        self.txg = 1000  # laatste createtxg (transactiegroep) van deze nagebootste pool
         self.mutations: list[str] = []
         self.paths: list[str] = []
         # Schrijven (executor): testknoppen en wat er is ontvangen.
@@ -948,18 +949,21 @@ class FakeTrueNAS:
             ds, name = str(data.get("dataset") or ""), str(data.get("name") or "")
             if ds not in self.datasets():
                 raise FakeCallError("ENOENT", "Dataset does not exist")
-            snaps = self.data["snapshots"].setdefault(ds, [])
-            full = f"{ds}@{name}"
-            if any(x["name"] == full for x in snaps):
+            # Zoals ZFS: recursief = ook elk kind, atomair in één transactiegroep (dezelfde createtxg).
+            leden = [ds, *(n for n in self.datasets() if data.get("recursive") and n.startswith(ds + "/"))]
+            if any(x["name"] == f"{d}@{name}" for d in leden for x in self.data["snapshots"].get(d, [])):
                 raise FakeCallError("EEXIST", "Snapshot already exists")
-            snap = {
-                "name": full,
-                "dataset": ds,
-                "createtxg": str(1000 + len(snaps) + 1),
-                "properties": {"creation": {"parsed": _ms()}},
-            }
-            snaps.append(snap)
-            return snap
+            self.txg += 1
+            for d in leden:
+                self.data["snapshots"].setdefault(d, []).append(
+                    {
+                        "name": f"{d}@{name}",
+                        "dataset": d,
+                        "createtxg": str(self.txg),
+                        "properties": {"creation": {"parsed": _ms()}},
+                    }
+                )
+            return self.data["snapshots"][ds][-1]
         if method in ("pool.snapshot.clone", "zfs.snapshot.clone"):
             data = params[0] if params and isinstance(params[0], dict) else {}
             snap, dst = str(data.get("snapshot") or ""), str(data.get("dataset_dst") or "")

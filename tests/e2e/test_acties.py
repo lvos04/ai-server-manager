@@ -1047,13 +1047,13 @@ def test_zonder_geteste_besluiten_geen_r2_en_geen_opslagmutatie(stack: Stack) ->
     assert schrijfaanroepen(nas) == []
 
 
-def _snapshot(stack: Stack, dataset: str, naam: str) -> dict[str, Any]:
+def _snapshot(stack: Stack, dataset: str, naam: str, recursief: bool = True) -> dict[str, Any]:
     """Een checkpoint via de echte route: ``zfs.snapshot.create`` (R1) door de Hub en de executor."""
     v = stel_voor(
         stack.admin,
         "zfs.snapshot.create",
         {"host_id": "nas-primary", "dataset": dataset},
-        {"naam": naam, "recursief": True},
+        {"naam": naam, "recursief": recursief},
     )
     assert v.status_code == 201 and v.json()["blokkades"] == [], v.text
     r = voer_uit(stack.admin, v.json())
@@ -1144,6 +1144,84 @@ def test_na_een_migratie_alleen_terug_via_database_herstel(stack: Stack) -> None
     # Een herstelpunt dat geen eigen uitgevoerde wijziging van deze app is: herkomst onbekend.
     t = stel_voor(admin, "app.rollback", app_target("demo-app"), {"herstel_van": str(uuid.uuid4())}).json()
     assert _codes(t) == ["herkomst_onbekend"]
+    assert len(nas.updated) == 1
+
+
+def test_hub_vraagt_een_eigen_snapshot_van_elke_aangekoppelde_kinddataset(
+    stack: Stack,
+) -> None:
+    """R-HARDE-EIS-1/2 bij de Hub: de database staat op een kinddataset onder het gekoppelde pad. Een niet-recursieve
+    snapshot van de ouder is geen checkpoint; de recursieve telt alleen met de teruggelezen kindsnapshot."""
+    admin = stack.admin
+    _demo_dataset(stack)
+    stack.nas.add_dataset("testpool/apps/demo-app/database")
+    assert voer_uit(admin, _installeer(stack)).status_code == 200
+    stack.vernieuw()
+    _snapshot(stack, "testpool/apps/demo-app", "alleen-ouder", recursief=False)
+    nieuw = {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}}
+    v = stel_voor(admin, "app.update", app_target("demo-app"), nieuw).json()
+    assert _codes(v) == ["backup_checkpoint_ontbreekt"], v
+    cp = _snapshot(stack, "testpool/apps", "met-kind")  # recursief (de afkoeltijd geldt per dataset)
+    r = keur_goed(admin, haal(admin, v))
+    assert r.status_code == 200 and r.json()["goedkeuring"]["backup_checkpoint_id"] == cp["request_id"], r.text
+
+
+def test_hub_terugzetten_vraagt_ook_dekking_van_het_recept(stack: Stack) -> None:
+    """R-HARDE-EIS-4 bij de Hub: het recept schrijft naar de opslag van vóór de bijwerking (hier photos). Een
+    checkpoint van alleen de huidige opslag is dan geen herstelpunt; een dat beide dekt wel."""
+    admin, nas = stack.admin, stack.nas
+    _demo_dataset(stack)
+    params = install_params("demo-app")
+    params["app_create"]["values"]["storage"][0]["host_path_config"]["path"] = "/mnt/testpool/photos"
+    v = stel_voor(admin, "app.install", app_target("demo-app"), params).json()
+    assert keur_goed(admin, v).status_code == 200 and voer_uit(admin, v).status_code == 200
+    stack.vernieuw()
+    _snapshot(stack, "testpool/photos", "voor-update")
+    v = stel_voor(
+        admin,
+        "app.update",
+        app_target("demo-app"),
+        {"image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"}},
+    )
+    v = v.json()
+    assert keur_goed(admin, v).status_code == 200
+    r = voer_uit(admin, v)
+    assert r.json()["resultaat"]["readback"]["herstel_datasets"] == ["testpool/photos"], r.text
+    # Daarna verhuist de opslag van de app naar zijn eigen dataset (buiten deze keten).
+    app = nas.app("demo-app")
+    assert app is not None
+    app["config"]["storage"][0]["host_path_config"]["path"] = "/mnt/testpool/apps/demo-app"
+    app["active_workloads"]["volumes"][0]["source"] = "/mnt/testpool/apps/demo-app"
+    stack.vernieuw()
+    _snapshot(stack, "testpool/apps/demo-app", "alleen-huidig")
+    t = stel_voor(admin, "app.rollback", app_target("demo-app"), {"herstel_van": v["request_id"]}).json()
+    assert _codes(t) == ["backup_checkpoint_ontbreekt"], t
+    _snapshot(stack, "testpool", "beide")
+    assert keur_goed(admin, haal(admin, t)).status_code == 200
+    assert len(nas.updated) == 1
+
+
+def test_hub_bijwerken_terug_naar_de_image_van_voor_een_migratie(stack: Stack) -> None:
+    """R-HARDE-EIS-5 bij de Hub: ook via app.update (niet alleen app.rollback) is de image van vóór een gemelde
+    migratie alleen met databaseherstel terug te zetten."""
+    admin, nas = stack.admin, stack.nas
+    _demo_dataset(stack)
+    assert voer_uit(admin, _installeer(stack)).status_code == 200
+    stack.vernieuw()
+    oud = install_params("demo-app")["app_create"]["values"]["image"]
+    _snapshot(stack, "testpool/apps/demo-app", "voor-update")
+    nieuw = {
+        "image": {"repository": REPO, "tag": f"1.2.4@{DIGEST_B}"},
+        "upgrade": {"migrations": True},
+    }
+    v = stel_voor(admin, "app.update", app_target("demo-app"), nieuw).json()
+    assert keur_goed(admin, v).status_code == 200 and voer_uit(admin, v).status_code == 200
+    stack.vernieuw()
+    _snapshot(stack, "testpool/apps", "voor-terug")
+    terug = {"image": {"repository": oud["repository"], "tag": oud["tag"]}}
+    t = stel_voor(admin, "app.update", app_target("demo-app"), terug).json()
+    assert _codes(t) == ["database_herstel_vereist"], t
+    _geblokkeerd(keur_goed(admin, t), "database_herstel_vereist")
     assert len(nas.updated) == 1
 
 

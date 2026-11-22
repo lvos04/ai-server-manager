@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from asm_policy.etag import app_etag
-from executorhelpers import Hub, approved, execute, nas_hub, set_write_key, write_nas
+from executorhelpers import Hub, approved, checkpoint, execute, nas_hub, set_write_key, write_nas
 from executorhelpers import client as hub_client
 from fakes.fake_truenas import FakeTrueNAS
 from fastapi.testclient import TestClient
@@ -170,7 +170,7 @@ def test_ongemarkeerde_instantie_houdt_haar_uitkomst(stack: tuple[Hub, TestClien
         str(uuid.uuid4()), "demo-app", "sha256:" + "1" * 64, [{"env": "X", "type": "appgeheim"}]
     )
     prop = _prop(nas, "app.update", {"image": {"repository": "ghcr.io/voorbeeld/my-house", "tag": f"2@{DIGEST_B}"}})
-    r = execute(c, hub, approved(hub, prop))
+    r = execute(c, hub, approved(hub, prop, backup_checkpoint_id=checkpoint(hub, nas=nas)))
     assert r.status_code == 200 and r.json()["methode"] == "app.update", r.text
     assert [m for m in nas.mutations if m != "app.config"] == ["app.update"]
 

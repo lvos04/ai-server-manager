@@ -38,7 +38,7 @@ import os
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -67,12 +67,18 @@ SCHEMA = (
     "CREATE TABLE IF NOT EXISTS checkpoint ("
     " request_id TEXT PRIMARY KEY, dataset TEXT NOT NULL, snapshot TEXT NOT NULL, createtxg TEXT NOT NULL,"
     " recursief INTEGER NOT NULL, grens INTEGER NOT NULL, created_at INTEGER NOT NULL)",
+    # Per checkpoint elke dataset met een eigen, teruggelezen snapshot uit dezelfde actie (R-HARDE-EIS-2).
+    "CREATE TABLE IF NOT EXISTS checkpoint_lid ("
+    " request_id TEXT NOT NULL, dataset TEXT NOT NULL, createtxg TEXT NOT NULL, PRIMARY KEY (request_id, dataset))",
 )
 AAD_HERKOMST = b"executor-recept-herkomst-v1"
 AAD_OUD = b"executor-oud-vastlegging-v1"
 # In de geheimenmap: de eenmalige vastlegging van de recepten van vóór S-P2-050f is gedaan. Ontbreekt daarna de
 # vastlegging zelf (verlies), dan wordt nooit opnieuw geïnventariseerd (ADR-0032 besluit 8).
 OUD_ANKER = "f-ingebruikname"
+# In de geheimenmap per app (naam: de app in hex) het request_id van de laatste eigen herkomst. Kent het journaal die
+# herkomst niet, dan is het een ouder of gedeeltelijk hersteld journaal: de historie is onbekend (R-HARDE-EIS-6).
+HERKOMST_ANKERS = "herkomst"
 
 
 # In de geheimenmap (het deel dat bij herstel terugkomt) staat per gemarkeerde instantie een leeg ankerbestand (naam:
@@ -105,6 +111,7 @@ class Journal:
         self.anker = secrets_dir / KLUIS_ANKER
         self.ankers = secrets_dir / KLUIS_ANKERS
         self.oud_anker = secrets_dir / OUD_ANKER
+        self.herkomst_ankers = secrets_dir / HERKOMST_ANKERS
         self._sleutel = os.path.abspath(path)
         # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
         self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
@@ -270,6 +277,8 @@ class Journal:
             except BaseException:
                 conn.execute("ROLLBACK")
                 raise
+        if hbox is not None:
+            self._zet_herkomst_anker(app, request_id)
 
     # ------------------------------------------------------------------ herkomst en checkpoints (S-P2-050f)
     def leg_herkomst_vast(self, request_id: str, app: str, herkomst: dict[str, Any]) -> None:
@@ -280,10 +289,33 @@ class Journal:
                 "INSERT INTO recept_herkomst (request_id, app, box, created_at) VALUES (?, ?, ?, ?)",
                 (request_id, app, hbox, int(time.time())),
             )
+        self._zet_herkomst_anker(app, request_id)
+
+    def _zet_herkomst_anker(self, app: str, request_id: str) -> None:
+        """Na de rij (zoals de kluisankers): een anker zonder rij kan alleen ontstaan door een ouder journaal."""
+        try:
+            self.herkomst_ankers.mkdir(mode=0o700, exist_ok=True)
+            tijdelijk = self.herkomst_ankers / f".{app.encode().hex()}.nieuw"
+            fd = os.open(tijdelijk, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as f:
+                f.write(request_id)
+            os.replace(tijdelijk, self.herkomst_ankers / app.encode().hex())
+        except OSError as exc:
+            raise JournalUnavailable(type(exc).__name__) from None
+
+    def _herkomst_anker(self, app: str) -> str | None:
+        try:
+            return (self.herkomst_ankers / app.encode().hex()).read_text().strip()
+        except FileNotFoundError:
+            return None
+        except OSError:
+            raise JournalUnavailable("herkomstanker_onleesbaar") from None
 
     def herkomsten(self, app: str) -> list[tuple[int, str, dict[str, Any]]]:
-        """``(volgnummer, request_id, herkomst)`` van deze app op volgorde. Een ongeldig zegel of een herkomst van een
-        andere app: :class:`JournalUnavailable` (onbekend, nooit alsnog ``oud``)."""
+        """``(volgnummer, request_id, herkomst)`` van deze app op volgorde. Een ongeldig zegel, een herkomst van een
+        andere app of een anker in de geheimenmap dat het journaal niet kent (ouder of gedeeltelijk hersteld journaal):
+        :class:`JournalUnavailable` (onbekend, nooit alsnog ``oud`` of "geen migratie")."""
+        anker = self._herkomst_anker(app)
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT id, request_id, box FROM recept_herkomst WHERE app = ? ORDER BY id", (app,)
@@ -294,6 +326,11 @@ class Journal:
             if not isinstance(h, dict) or h.get("app") != app:
                 raise JournalUnavailable("herkomst_ongeldig")
             uit.append((int(rid), str(request_id), h))
+        ids = [r for _i, r, _h in uit]
+        if anker is not None and anker not in ids:
+            raise JournalUnavailable("herkomst_onvolledig")
+        if ids and anker != ids[-1]:
+            self._zet_herkomst_anker(app, ids[-1])  # aanvullen (een journaal van vóór dit anker, of een onderbreking)
         return uit
 
     def heeft_herkomst(self, request_id: str) -> bool:
@@ -302,14 +339,40 @@ class Journal:
                 conn.execute("SELECT 1 FROM recept_herkomst WHERE request_id = ?", (request_id,)).fetchone() is not None
             )
 
+    @staticmethod
+    def _eigen_snapshotactie(conn: sqlite3.Connection, request_id: str, dataset: str, status: str) -> bool:
+        row = conn.execute(
+            "SELECT target FROM journal WHERE request_id = ? AND action_id = 'zfs.snapshot.create' AND status = ?",
+            (request_id, status),
+        ).fetchone()
+        try:
+            return row is not None and json.loads(row[0]).get("dataset") == dataset
+        except (ValueError, AttributeError):
+            return False
+
     def leg_checkpoint_vast(
-        self, request_id: str, dataset: str, snapshot: str, createtxg: str, recursief: bool
+        self,
+        request_id: str,
+        dataset: str,
+        snapshot: str,
+        createtxg: str,
+        recursief: bool,
+        leden: Mapping[str, str] | None = None,
     ) -> None:
         """Na een geslaagde en teruggelezen snapshot: dit is een checkpoint. ``grens`` is de laatste bijwerking die er
-        toen al was; een latere bijwerking van een app maakt het checkpoint voor die app verouderd."""
+        toen al was; een latere bijwerking van een app maakt het checkpoint voor die app verouderd. ``leden``: per
+        dataset de teruggelezen ``createtxg`` van de eigen snapshot (standaard alleen ``dataset``). Alleen bij de eigen,
+        lopende ``zfs.snapshot.create`` van dit request_id op deze dataset; anders :class:`JournalUnavailable`."""
+        leden = dict(leden) if leden is not None else {dataset: createtxg}
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
+                if not self._eigen_snapshotactie(conn, request_id, dataset, "gestart"):
+                    raise JournalUnavailable("geen_eigen_snapshotactie")
+                conn.executemany(
+                    "INSERT INTO checkpoint_lid (request_id, dataset, createtxg) VALUES (?, ?, ?)",
+                    [(request_id, d, str(t)) for d, t in sorted(leden.items())],
+                )
                 grens = int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM recept_herkomst").fetchone()[0])
                 conn.execute(
                     "INSERT INTO checkpoint (request_id, dataset, snapshot, createtxg, recursief, grens, created_at)"
@@ -322,6 +385,8 @@ class Journal:
                 raise
 
     def checkpoint(self, request_id: str) -> dict[str, Any] | None:
+        """Het checkpoint met zijn leden, alleen als het hoort bij een voltooide eigen ``zfs.snapshot.create`` van die
+        dataset (bij elk gebruik opnieuw gecontroleerd); anders ``None``."""
         keys = ("request_id", "dataset", "snapshot", "createtxg", "recursief", "grens", "created_at")
         with self._connect() as conn:
             row = conn.execute(
@@ -329,10 +394,14 @@ class Journal:
                 " WHERE request_id = ?",
                 (request_id,),
             ).fetchone()
-        if row is None:
-            return None
+            if row is None or not self._eigen_snapshotactie(conn, request_id, str(row[1]), "uitgevoerd"):
+                return None
+            leden = conn.execute(
+                "SELECT dataset, createtxg FROM checkpoint_lid WHERE request_id = ?", (request_id,)
+            ).fetchall()
         uit = dict(zip(keys, row, strict=True))
         uit["recursief"] = bool(uit["recursief"])
+        uit["leden"] = {str(d): str(t) for d, t in leden}
         return uit
 
     def gewijzigd_na(self, app: str, grens: int) -> bool:

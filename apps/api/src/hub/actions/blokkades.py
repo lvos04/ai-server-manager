@@ -21,6 +21,7 @@ from asm_policy import Policy
 from asm_policy import checkpoint as cpmod
 from asm_policy.engine import Classification, class_at_least
 from asm_policy.loader import ActieDef
+from asm_policy.params import expected_image
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -59,7 +60,9 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
 
 
 def _app_datasets(db: Session, settings: Settings, app: str) -> list[str] | None:
-    """De datasets van deze app volgens de verse inventaris (opslag → koppelpunt), of ``None`` als dat onbekend is."""
+    """De datasets van deze app volgens de verse inventaris (opslag → koppelpunt, plus elke dataset die daaronder is
+    aangekoppeld), of ``None`` als dat onbekend is. Geen opslag telt alleen bij een draaiende app (positief bewijs uit
+    de werklast); een gestopte app toont geen koppelingen, dus dan onbekend (R-HARDE-EIS-1)."""
     from hub.routers.backups import coverage_inputs
 
     inp = coverage_inputs(db, settings)
@@ -71,11 +74,14 @@ def _app_datasets(db: Session, settings: Settings, app: str) -> list[str] | None
         return None
     uit: list[str] = []
     for m in rij.get("opslag") or []:
-        ds = cpmod.dataset_voor_pad(str(m.get("bron") or ""), mounts)
-        if ds is None:
+        if m.get("type") == "tmpfs":
+            continue
+        lijst = cpmod.onder_pad(str(m.get("bron") or ""), mounts)
+        if lijst is None:
             return None
-        if ds not in uit:
-            uit.append(ds)
+        uit.extend(d for d in lijst if d not in uit)
+    if not uit and rij.get("staat") != "RUNNING":
+        return None
     return uit
 
 
@@ -112,6 +118,17 @@ def verified_checkpoint(
     nodig = _app_datasets(db, settings, app)
     if nodig is None:
         return None, "dekking_onbekend"
+    params = req.parameters if isinstance(req.parameters, dict) else {}
+    if "herstel_van" in params:
+        # Ook de opslag van de waarden die het terugzetten schrijft (R-HARDE-EIS-4): de executor meldde die datasets
+        # bij de bijwerking waarvan het recept is.
+        bron = next((r for r in _eigen_wijzigingen(db, req) if str(r.id) == str(params["herstel_van"])), None)
+        bron_rb = bron.resultaat.get("readback") if bron is not None and isinstance(bron.resultaat, dict) else None
+        extra = bron_rb.get("herstel_datasets") if isinstance(bron_rb, dict) else None
+        if isinstance(extra, list):
+            nodig = [*nodig, *(str(d) for d in extra if str(d) not in nodig)]
+        # shortcut: een recept van vóór deze versie meldt zijn datasets niet; dan toetst alleen de executor (die het
+        # recept zelf leest en een ongedekte bestemming weigert). Vervalt als zulke recepten er niet meer zijn.
     vanaf = now - timedelta(seconds=cpmod.CHECKPOINT_MAX_SECONDEN)
     vorige = _eigen_wijzigingen(db, req)
     if vorige:
@@ -136,20 +153,28 @@ def verified_checkpoint(
             res.get("waarschuwingen") or []
         ):
             continue
-        ds = str((k.target or {}).get("dataset") or "")
-        recursief = bool((k.parameters or {}).get("recursief"))
-        if all(cpmod.dekt(ds, recursief, d) for d in nodig):
+        # Per dataset een eigen, teruggelezen snapshot van die actie (R-HARDE-EIS-2); het verzoek zelf telt niet.
+        leden = rb.get("leden")
+        if isinstance(leden, dict) and all(d in leden for d in nodig):
             return str(k.id), "geverifieerd"
     return None, "geen_passend_checkpoint"
 
 
 def ex15(db: Session, req: ActionRequest) -> list[dict[str, Any]]:
     """EX15 bij de Hub, uit de eigen administratie (ADR-0032 besluit 8): geen terugzetten op alleen de image na een
-    gemelde migratie, en geen herstelpunt dat geen eigen uitgevoerde wijziging van dit doel is."""
-    if req.action_id != "app.rollback":
+    gemelde migratie, en geen herstelpunt dat geen eigen uitgevoerde wijziging van dit doel is. Bij elke bijwerking en
+    terugzetting: een doel (image, digest of catalogusversie) dat vóór een gemelde migratie draaide, vereist
+    databaseherstel, ongeacht de actienaam (R-HARDE-EIS-5)."""
+    if req.action_id not in APP_WIJZIGINGEN:
         return []
     eigen = [r for r in _eigen_wijzigingen(db, req) if r.status == "uitgevoerd"]
     params = req.parameters if isinstance(req.parameters, dict) else {}
+    historie = [(_migratie(r.parameters), cpmod.identiteiten(_huidig(r))) for r in eigen]
+    doel = cpmod.doel_identiteiten(expected_image(params), params.get("catalog_version"))
+    if cpmod.terug_voor_migratie(historie, doel):
+        return [_blok(DATABASE_HERSTEL)]
+    if req.action_id != "app.rollback":
+        return []
     if "herstel_van" in params:
         idx = next((i for i, r in enumerate(eigen) if str(r.id) == str(params["herstel_van"])), None)
         if idx is None:
@@ -160,6 +185,12 @@ def ex15(db: Session, req: ActionRequest) -> list[dict[str, Any]]:
     if any(_migratie(r.parameters) for r in eigen):
         return [_blok(DATABASE_HERSTEL)]
     return []
+
+
+def _huidig(r: ActionRequest) -> dict[str, Any]:
+    """Wat er vóór die wijziging draaide, zoals de preview het toonde (``app_state`` uit de eigen inventaris)."""
+    huidig = r.preview.get("huidig") if isinstance(r.preview, dict) else None
+    return huidig if isinstance(huidig, dict) else {}
 
 
 def _migratie(params: Any) -> bool:

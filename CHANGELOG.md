@@ -17,6 +17,13 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   (`buiten_keten`) en bij de eerste start eenmalig de bestaande recepten als `oud`. Na een gemelde migratie weigeren
   Hub en executor terugzetten op alleen de image (`database_herstel_vereist`); een herstelpunt zonder eigen herkomst
   geeft `herkomst_onbekend`. Sim-getest tegen contractconforme fakes; NIET GEVALIDEERD (echte NAS).
+- Herstelronde (harde eis appgegevens): de dekking telt ook de schrijfbare koppelingen van de draaiende werklast en
+  aangekoppelde kinddatasets; zonder positief bewijs van opslag geen dekking. Een recursief checkpoint telt alleen de
+  per dataset teruggelezen leden met dezelfde `createtxg`, gebonden aan de eigen voltooide snapshotactie. De
+  executor controleert vlak vóór de schrijfaanroep nogmaals (`doel_gewijzigd` of de bestaande codes). Terugzetten
+  vraagt ook dekking van de opslag waar het recept naar schrijft. EX15 geldt ook voor `app.update` terug naar een
+  image of catalogusversie van vóór een gemelde migratie. Een anker per app in de geheimenmap ziet een teruggezet
+  ouder journaal (`herkomst_onbekend`).
 
 ### Vastgelegd — Afzonderlijke geheime overdracht (S-P2-050e, M2)
 

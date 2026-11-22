@@ -94,7 +94,12 @@ def journaal(hub: Hub) -> Journal:
 
 
 def rijen(hub: Hub) -> list[tuple[str, str]]:
-    return [(str(e["status"]), str(e["detail"] or "")) for e in journaal(hub).entries()]
+    # Zonder de snapshotactie achter het checkpoint van approved() (executorhelpers.checkpoint).
+    return [
+        (str(e["status"]), str(e["detail"] or ""))
+        for e in journaal(hub).entries()
+        if e["action_id"] != "zfs.snapshot.create"
+    ]
 
 
 def uitvoerder(hub: Hub) -> Uitvoerder:
