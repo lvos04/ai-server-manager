@@ -8,15 +8,17 @@ claim, ontbrekende ref, extra ref, ander token-veld, andere verzoekhash, verlope
 andere dienst, vreemde handtekening, onbekend veld, ontbrekende plek in de stap, markering bij bijwerken.
 
 S-P2-070: de zoektocht na een volledige installatie-run loopt over de Hub-tabellen (ook audit en logs), de
-executor-datamap, de preview (de diff), de opgevangen logregels en het antwoord van elke route van Hub en executor; de
-tegenproef zet de afscherming uit en moet de zoektocht rood maken (V-003). Een niet-bestaand kluispad weigert vóór
-ondertekening.
+executor-datamap, de preview (de diff), de opgevangen logregels, de uitvoeringsrespons, de versleutelde afgifte en het
+antwoord van elke geregistreerde route van Hub en executor, met de vereiste rol (R-VEILIG-1); de bezochte routes moeten
+gelijk zijn aan de geregistreerde. Tegenproeven: zonder afscherming en met een markering in een bevoegd antwoord wordt
+de zoektocht rood (V-003). Een niet-bestaand kluispad weigert vóór ondertekening.
 """
 
 from __future__ import annotations
 
 import base64
 import copy
+import dataclasses
 import hashlib
 import json
 import logging
@@ -131,41 +133,181 @@ def _scan(keten: Keten, app: Any, geheimen: list[str], hashes: list[str], tekste
             assert m not in tekst
 
 
-def _elke_route(keten: Keten, app: Any, ids: dict[str, str]) -> list[str]:
-    """Het antwoord van elke route uit het schema van de Hub (als beheerder, met de echte id's) en van de executor
-    (S-P2-070). Eerst alle leesroutes, daarna de rest met een lege body; elk antwoord telt mee in de zoektocht."""
+# Geregistreerde routes die de rondgang bewust niet aanroept: (dienst, methode, pad) → reden. Een verouderde regel
+# (route bestaat niet meer) laat de rondgang ook falen.
+NIET_BEZOCHT: dict[tuple[str, str, str], str] = {}
+
+
+def _geregistreerd(server: Any) -> set[tuple[str, str]]:
+    """Alle geregistreerde routes van een dienst, ook buiten het schema (``/``, formulieren, documentatie)."""
+    from fastapi.routing import iter_route_contexts
+    from starlette.routing import Route
+
+    routes = list(iter_route_contexts(server.routes))  # ook de routes van ingesloten routers
+    vreemd = [r for r in routes if not isinstance(r.original_route, Route)]
+    assert not vreemd, vreemd  # een mount of websocket zou ongezien blijven
+    return {(m, r.path) for r in routes for m in (r.methods or ()) if m != "HEAD"}
+
+
+def _vergelijk(dienst: str, server: Any, bezocht: set[tuple[str, str]]) -> None:
+    uitgezonderd = {(m, p) for d, m, p in NIET_BEZOCHT if d == dienst}
+    routes = _geregistreerd(server)
+    assert uitgezonderd <= routes, f"{dienst}: verouderde uitzondering {sorted(uitgezonderd - routes)}"
+    assert routes - uitgezonderd == bezocht, (
+        f"{dienst}: niet bezocht {sorted(routes - uitgezonderd - bezocht)}; onbekend {sorted(bezocht - routes)}"
+    )
+
+
+def _executor_rondgang(keten: Keten, app: Any, ids: dict[str, str]) -> list[str]:
+    """Elke route van de executor met geldige invoer en de vereiste rol: de dienst-JWT van de Hub voor de API, en voor
+    de formulieren herkomst + formuliercode + de huidige schrijfsleutel. Vervangen, ontkoppelen, opnieuw koppelen en
+    de sleutel opnieuw instellen geven elk een bevoegd 200-antwoord met de volledige statuspagina."""
     import httpx
+    from executorhelpers import WRITE_KEY
+    from fastapi.routing import APIRoute, iter_route_contexts
+
+    basis = keten.stack.ex_url
+    ex = next(s.server.config.app for s in keten.stack.servers if s.url == basis)
+    hub_url = next(s.url for s in keten.stack.servers if s.server.config.app is app)
+    with app.state.sessionmaker() as db:
+        sql = "SELECT id FROM service WHERE app_id = 'ai-server-manager-executor'"
+        dienst_id = str(db.execute(sa.text(sql)).scalar_one())
+
+    def dienst() -> dict[str, str]:
+        jwt, _ = app.state.keyring().issue_hub_service_jwt(audience="ai-server-manager-executor", service_id=dienst_id)
+        return {"Authorization": f"Bearer {jwt}", **idem()}
+
+    rid = ids["request_id"]
+    bezocht: set[tuple[str, str]] = set()
+    uit: list[str] = []
+    c = httpx.Client(base_url=basis, headers={"Origin": basis})
+
+    def roep(methode: str, pad: str, verwacht: int, echt: str | None = None, **kw: Any) -> httpx.Response:
+        r = c.request(methode, echt or pad, **kw)
+        assert r.status_code == verwacht, f"executor {methode} {pad}: {r.status_code} {r.text[:300]}"
+        bezocht.add((methode, pad))
+        uit.append(r.text)
+        return r
+
+    def formulier(pad: str, velden: dict[str, str], tekst: str) -> None:
+        csrf = re.search(r'name="csrf" value="([^"]+)"', uit[-1])
+        assert csrf, uit[-1][:300]
+        assert tekst in roep("POST", pad, 200, data={"csrf": csrf.group(1), **velden}).text
+
+    with c:
+        documentatie = [r.path for r in iter_route_contexts(ex.routes) if not isinstance(r.original_route, APIRoute)]
+        for pad in ("/healthz", "/readyz", "/api/v1/status", *documentatie):
+            roep("GET", pad, 200)
+        roep("GET", "/connector/v1/hub-link", 200, headers=dienst())
+        journaal = roep("GET", "/api/v1/executions/{request_id}", 200, f"/api/v1/executions/{rid}", headers=dienst())
+        assert journaal.json()["uitvoeringen"], journaal.text  # het gevulde journaal met dienstcontext
+        # Bevoegd (dienst-JWT), inhoudelijk geweigerd; de geldige uitvoeringsrespons vangt _voer_uit_en_vang.
+        roep("POST", "/api/v1/execute", 422, json={}, headers=dienst())
+        roep("POST", "/connector/v1/hub-link/unlink", 501, headers=dienst())  # capability_unavailable volgens §3.9
+        roep("GET", "/", 200)
+        sleutel = {"truenas_sleutel": WRITE_KEY}
+        formulier("/beheer", {**sleutel, "nieuwe_sleutel": WRITE_KEY, "actie": "vervangen"}, "is vervangen")
+        formulier("/beheer", {**sleutel, "actie": "ontkoppelen"}, "Ontkoppeld van de Hub")
+        r = keten.stack.admin.post("/api/v1/services/pairing-codes", json={"app_id": "ai-server-manager-executor"})
+        assert r.status_code == 201, r.text
+        grant = r.json()
+        koppel = {
+            "hub_adres": hub_url,
+            "koppelcode": grant["koppelcode"],
+            "hub_vingerafdruk": grant["keyset_fingerprint"],
+        }
+        formulier("/koppelen", koppel, "Gekoppeld met de Hub")
+        formulier("/schrijfsleutel", sleutel, "De schrijfsleutel is getest en opgeslagen")
+    _vergelijk("executor", ex, bezocht)
+    return uit
+
+
+def _hub_rondgang(keten: Keten, app: Any, ids: dict[str, str]) -> list[str]:
+    """Elke geregistreerde route van de Hub met de vereiste rol: als beheerder, en een dienstroute (de sessie krijgt
+    401) opnieuw met het service-token van de executor. Leesroutes met de echte id's; schrijfroutes met een lege body
+    (geweigerd ná de autorisatie). Afmelden als laatste."""
+    import httpx
+    from executor.hublink import HubLinkStore
+
+    hub_url = next(s.url for s in keten.stack.servers if s.server.config.app is app)
+    token = HubLinkStore(keten.stack.ex_settings.secrets_dir, allow_loopback=True).read()["service_token"]
+    admin = keten.stack.admin
+    r = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": "home-control-hub"})
+    assert r.status_code == 201, r.text
+    r = admin.post("/api/v1/services/enroll", json=enroll_body("home-control-hub", token=r.json()["enrollment_token"]))
+    assert r.status_code == 200, r.text
+    lezer = r.json()["service_token"]  # een dienst met de leesscopes catalogus.lezen (scopes.SERVICE_SCOPES)
 
     def pad(p: str) -> str:
         for naam, waarde in {**ids, "app_uuid": str(uuid.uuid4())}.items():
             p = p.replace("{" + naam + "}", waarde)
         return re.sub(r"\{[a-z_]+\}", lambda _m: str(uuid.uuid4()), p)
 
-    admin = keten.stack.admin
-    routes = sorted(
-        ((m.upper(), p) for p, ops in app.openapi()["paths"].items() for m in ops),
-        key=lambda r: (r[0] != "GET", r),
-    )
+    routes = sorted(_geregistreerd(app), key=lambda r: (r[0] != "GET", r))
     assert len(routes) > 100  # ondergrens: een lege routelijst kan de zoektocht niet groen maken (V-003)
     afmelden = ("POST", "/api/v1/auth/logout")
-    uit, gelezen = [], 0
+    uit, gelezen, bezocht = [], 0, set()
     for methode, p in [*(r for r in routes if r != afmelden), afmelden]:
         if (methode, p) == afmelden:  # als laatste: tot hier was elke aanroep aangemeld
             assert admin.get("/api/v1/auth/me").status_code == 200
         extra: dict[str, Any] = {} if methode == "GET" else {"json": {}}
         antwoord = admin.request(methode, pad(p), headers=idem(), **extra)
+        if antwoord.status_code == 401 and (methode, p) != afmelden:  # dienstroute: met dienstcontext
+            antwoord = httpx.request(
+                methode, hub_url + pad(p), headers={"Authorization": f"Bearer {token}", **idem()}, **extra
+            )
+        if antwoord.status_code == 403 and antwoord.json().get("code") == "scope_ontbreekt":  # leesscope §4.4
+            antwoord = httpx.request(methode, hub_url + pad(p), headers={"Authorization": f"Bearer {lezer}", **idem()})
+        assert antwoord.status_code not in (401, 403), (
+            f"hub {methode} {p}: {antwoord.status_code} {antwoord.text[:300]}"
+        )
         gelezen += methode == "GET" and antwoord.status_code == 200
+        bezocht.add((methode, p))
         uit.append(antwoord.text)
+        if (methode, p) == ("GET", "/"):
+            assert antwoord.status_code == 200, antwoord.text[:300]
     assert gelezen >= 40  # ondergrens: de leesroutes gaven echt inhoud terug, geen reeks 401/404 (V-003)
-    ex = json.loads((Path(__file__).parents[2] / "docs/openapi/executor.openapi.json").read_text())
-    for p, ops in ex["paths"].items():
-        for m in ops:
-            uit.append(httpx.request(m.upper(), keten.stack.ex_url + pad(p), json={} if m != "get" else None).text)
+    _vergelijk("hub", app, bezocht)
     return uit
 
 
+def _elke_route(keten: Keten, app: Any, ids: dict[str, str]) -> list[str]:
+    """Het antwoord van elke geregistreerde route van executor en Hub (S-P2-070, R-VEILIG-1). De executor eerst: de
+    Hub-rondgang meldt zich aan het eind af."""
+    return [*_executor_rondgang(keten, app, ids), *_hub_rondgang(keten, app, ids)]
+
+
+def _voer_uit_en_vang(admin: Any, v: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> tuple[Any, list[str]]:
+    """Voer uit en vang de bevoegde antwoorden die de Hub en de executor onderling geven: de uitvoeringsrespons van de
+    executor en de versleutelde afgifte van de Hub (beide 200)."""
+    from executor.kluis import Kluis
+
+    from hub import servicecalls
+
+    gevangen: dict[str, tuple[int, str]] = {}
+    call, stuur = servicecalls.call, Kluis.stuur
+
+    def vang_call(base_url: str, method: str, path: str, **kw: Any) -> Any:
+        res = call(base_url, method, path, **kw)
+        if path == "/api/v1/execute":
+            gevangen["uitvoering"] = (res.status, json.dumps(res.body))
+        return res
+
+    def vang_stuur(self: Kluis, link: Any, rest: Any) -> Any:
+        res = stuur(self, link, rest)
+        gevangen["afgifte"] = (res.status, json.dumps(res.body))
+        return res
+
+    with monkeypatch.context() as m:
+        m.setattr(servicecalls, "call", vang_call)
+        m.setattr(Kluis, "stuur", vang_stuur)
+        r = voer_uit(admin, v)
+    assert {k: s for k, (s, _) in gevangen.items()} == {"uitvoering": 200, "afgifte": 200}, gevangen
+    return r, [t for _, t in gevangen.values()]
+
+
 def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
-    kluisketen: Keten, app: Any, caplog: pytest.LogCaptureFixture
+    kluisketen: Keten, app: Any, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     caplog.set_level(logging.DEBUG)
     keten, admin = kluisketen, kluisketen.stack.admin
@@ -179,7 +321,7 @@ def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
     assert [{k: r[k] for k in ("path", "parameter", "ref")} for r in gebonden["vault_refs"]] == [
         {"path": "values.envs[1].value", "parameter": "app_secret_key", "ref": REF}
     ]
-    r = voer_uit(admin, v)
+    r, onderling = _voer_uit_en_vang(admin, v, monkeypatch)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
     assert schrijfaanroepen(keten.stack.nas) == ["app.create"]
     envs = _envs(keten)
@@ -211,6 +353,7 @@ def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
     assert preview["wijziging"]["kluisverwijzingen"] == [{"verwijzing": REF, "waarde": "geheim, niet getoond"}]
     teksten = [
         r.text,
+        *onderling,
         json.dumps(admin.get(f"/api/v1/actions/{v['request_id']}").json()),
         json.dumps(admin.get(f"/api/v1/catalog/plans/{plan['plan_id']}").json()),
         caplog.text,
@@ -253,6 +396,51 @@ def test_koppelketen_vult_geheim_en_token_in_en_het_token_koppelt_eenmalig(
     # Als laatste het antwoord van elke route (de rondgang raakt ook schrijfroutes en het afmelden).
     routes = _elke_route(keten, app, {"request_id": v["request_id"], "plan_id": plan["plan_id"]})
     _scan(keten, app, [geheim, token], [hashlib.sha256(geheim.encode()).hexdigest()], [*routes, caplog.text])
+
+
+def test_rondgang_vindt_een_markering_in_elk_bevoegd_antwoord(
+    kluisketen: Keten, app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Tegenproef (R-VEILIG-1, V-003): een onschuldige markering die uitsluitend in één bevoegd antwoord staat (nooit in
+    de database of de datamap) maakt de zoektocht rood. Per drager een eigen markering."""
+    import secrets
+
+    from executor import app as executor_app
+    from executor.journal import Journal
+
+    from hub import servicecalls
+    from hub.catalog import kluis
+
+    m = {d: secrets.token_hex(12) for d in ("journaal", "statuspagina", "uitvoering", "afgifte")}
+    plan, v = _voorstel(kluisketen)
+    entries, page, call, claim = Journal.entries, executor_app.executor_page, servicecalls.call, kluis.claim
+    monkeypatch.setattr(
+        Journal, "entries", lambda self, rid: [{**rij, "proef": m["journaal"]} for rij in entries(self, rid)]
+    )
+    monkeypatch.setattr(executor_app, "executor_page", lambda **kw: page(**kw) + f"<!-- {m['statuspagina']} -->")
+
+    def call_met(base_url: str, method: str, path: str, **kw: Any) -> Any:
+        # Op de draad, na de opslag voor exacte herhaling in de executor: alleen het antwoord bevat haar.
+        res = call(base_url, method, path, **kw)
+        return (
+            dataclasses.replace(res, body={**(res.body or {}), "proef": m["uitvoering"]})
+            if path == "/api/v1/execute"
+            else res
+        )
+
+    monkeypatch.setattr(servicecalls, "call", call_met)
+    monkeypatch.setattr(kluis, "claim", lambda *a: {**claim(*a), "proef": m["afgifte"]})
+    r, onderling = _voer_uit_en_vang(kluisketen.stack.admin, v, monkeypatch)
+    assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
+    antwoorden = [
+        *onderling,
+        *_elke_route(kluisketen, app, {"request_id": v["request_id"], "plan_id": plan["plan_id"]}),
+    ]
+    for drager, markering in m.items():
+        _scan(kluisketen, app, [markering], [], [])  # niet opgeslagen: alleen het antwoord kan haar bevatten
+        with pytest.raises(AssertionError):
+            _scan(kluisketen, app, [markering], [], antwoorden)
+        assert any(markering in a for a in antwoorden), drager
 
 
 def test_verwisseld_type_weigert_de_executor_zonder_schrijfaanroep(
