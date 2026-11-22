@@ -171,3 +171,35 @@ journaal. Elke uitvoering heeft `action_id`, `target`, `methode`, `status` (`ges
 `afwijking`), `before_hash`, `after_hash` en `detail`. `detail` bevat alleen een stabiele code met de foutnaam van
 TrueNAS of de jobstatus (bv. `truenas_geen_toegang [EACCES]`, `job_mislukt [FAILED]`, `uitkomst_onbekend`), nooit de
 vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbekend verzoek geeft een lege lijst.
+
+## Acties via de eigenaar-connector (S-P2-080)
+
+`sso.oidc.hub.register` en `sso.sessions.revoke` (contract 1.3 §8, tweede tabel) voert de eigenaar uit
+(home-control-hub), niet de executor. De Hub volgt dezelfde stroom, met twee verschillen:
+
+- **Voorstel.** De Hub vraagt `POST /connector/v1/propose` bij de eigenaar (dienst-JWT, `action_id`, `target`,
+  `parameters`, `reason`). Hij neemt alleen `proposal_id` (UUID), `action_id` (gelijk aan het eigen voorstel),
+  `preview_hash` en `resource_etag` (SHA-256, met of zonder `sha256:`), `requires_backup` (ja/nee) en `diff` (JSON,
+  hooguit 8 KiB, geen stuurtekens) over. De `preview_hash` van de eigenaar is de `preview_hash` die de goedkeuring
+  bindt; `expected_version` is `sha256:<resource_etag>`. De eigenaar controleert bij `apply` dat de goedkeuring bij
+  zijn eigen voorstel hoort. `requires_backup` geldt als het beleid of de eigenaar het vraagt. De `diff` gaat in de
+  preview door dezelfde maskeerregel als elke andere wijziging.
+- **Uitvoeren.** Het ondertekende verzoek gaat naar `POST /connector/v1/apply` van de eigenaar. De Hub controleert
+  het vooraf zelf met `uitvoerder` `eigenaar:<app_id>`. Bij elke goedkeuring en elke uitvoering vraagt de Hub
+  opnieuw een voorstel; een andere `resource_etag` of `preview_hash` laat de goedkeuring vervallen (EX19).
+
+| Situatie | Antwoord van de Hub |
+|---|---|
+| eigenaar niet gekoppeld of adres onbekend | `409 eigenaar_niet_gekoppeld` of `409 eigenaar_adres_onbekend` |
+| `propose` of `apply` bestaat niet bij de eigenaar (404, 405 of 501) | `501 capability_unavailable` |
+| eigenaar weigert het voorstel met een foutcode (4xx) | `409 eigenaar_weigerde_voorstel` |
+| onbruikbaar voorstel, 5xx of onbereikbaar | `409 doel_onbekend` |
+| `requires_backup` zonder B12-bewijs van de data van de eigenaar | blokkade `backup_checkpoint_ontbreekt` (`backupbewijs_eigenaar_ontbreekt`) |
+| eigenaar weigert `apply` | `409 uitvoering_geweigerd` met `details.eigenaar` |
+| geen of onbruikbaar antwoord op `apply` | `502 uitkomst_onbekend`; de eigenaar heeft geen journaal voor de Hub, dus ophelderen geeft `409 uitkomst_onbekend` (`journaal` `geen_journaal_eigenaar`) |
+
+De Hub meet nog geen B12-back-up van de Authentik-database. Daarom blijft `sso.oidc.hub.register` geblokkeerd. De
+AI kan geen van beide acties voorstellen: de route laat alleen de aangemelde gebruiker als actor toe en het beleid
+weigert een AI-actor (`ai_mag_voorstellen: false`). `mediaguard.*` blijft gereserveerd tot BG-05 en P3-02
+(`501 capability_unavailable`). Getest met de fake eigenaar `tests/fakes/fake_eigenaar.py` (Sim-getest); de echte
+proef met home-control-hub volgt in S-P2-340.

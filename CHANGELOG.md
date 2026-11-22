@@ -4,6 +4,18 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Acties via de eigenaar-connector (S-P2-080)
+
+- `sso.sessions.revoke` en `sso.oidc.hub.register` lopen nu als ondertekend `ExecutionRequest` naar
+  `POST /connector/v1/apply` van home-control-hub. De Hub vraagt eerst `POST /connector/v1/propose` bij de eigenaar;
+  diens `preview_hash` en `resource_etag` binden de goedkeuring. Een ontbrekende route bij de eigenaar geeft
+  `501 capability_unavailable`; een antwoord zonder volledig bewijs telt nooit als uitgevoerd.
+- `sso.oidc.hub.register` vraagt een back-up. Zonder B12-bewijs van de Authentik-database blijft het geblokkeerd
+  (`backup_checkpoint_ontbreekt`). De AI kan geen van beide voorstellen; `mediaguard.*` blijft gereserveerd.
+- Fake eigenaar `tests/fakes/fake_eigenaar.py` en E2E `tests/e2e/test_eigenaar_acties.py`. Die toetst ook dat de
+  eigenaar een verzoek met een ongeldige of ontbrekende handtekening weigert. Sim-getest; NIET GEVALIDEERD (echte
+  NAS); de echte proef volgt in S-P2-340.
+
 ### Toegevoegd — Geheimen van catalogusapps via de vault (S-P2-070)
 
 - De preview van een installatie toont per kluisverwijzing `{"verwijzing": "vault://app/<app_id>/<parameter>",
