@@ -193,11 +193,11 @@ jobs:
           persist-credentials: false
       - *python312
       - *hub_installatie
-      - name: Git-bibliotheek van de appstore (hash uit zijn eigen lock)
+      - name: Wat de appstore extra nodig heeft (Git en formulieren; hashes uit zijn eigen lock)
         run: |
-          awk '/^dulwich==/{p=1;print;next} p&&/^ /{print;next} {p=0}' .asf-keten/apps/api/requirements.lock \
-            > "$RUNNER_TEMP/dulwich.lock"
-          python -m pip install --require-hashes --no-deps -r "$RUNNER_TEMP/dulwich.lock"
+          awk '/^(dulwich|python-multipart)==/{p=1;print;next} p&&/^ /{print;next} {p=0}' \
+            .asf-keten/apps/api/requirements.lock > "$RUNNER_TEMP/appstore-extra.lock"
+          python -m pip install --require-hashes --no-deps -r "$RUNNER_TEMP/appstore-extra.lock"
           python -m pip check
       - *testdatabase
       - name: Appstore, planner, Hub en executor tegen de nagebootste TrueNAS
