@@ -96,7 +96,9 @@ GEHEIM_DIEPTE = 24  # dieper dan de dieptegrens van het beleid (MAX_PARAMETER_DI
 
 
 def eigen_opdracht(action_id: str, parameters: Mapping[str, Any]) -> list[str]:
-    """De velden ``command`` en ``entrypoint`` die in de waarden van een installatie staan (elke waarde, ook leeg).
+    """De velden ``command`` en ``entrypoint`` die in de waarden van een installatie staan, met elke waarde behalve
+    precies de lege lijst: die zet geen opdracht (de image houdt de eigen) en de gepinde vertaling van de appstore zet
+    haar altijd (S-P2-050g). Ook ``""``, ``None`` of ``[""]`` telt als gezet.
 
     Besluit regisseur (S-P2-040, R-VEILIG-1 optie C): de Hub weigert zo'n voorstel met ``501 capability_unavailable``
     (``details.reden`` = ``eigen_opdracht``) tot er een installatiescherm is dat de opdracht veilig kan tonen; ook een
@@ -107,7 +109,7 @@ def eigen_opdracht(action_id: str, parameters: Mapping[str, Any]) -> list[str]:
     values = ac.get("values") if isinstance(ac, Mapping) else None
     if not isinstance(values, Mapping):
         return []
-    return [k for k in EIGEN_OPDRACHT if k in values]
+    return [k for k in EIGEN_OPDRACHT if k in values and values[k] != []]
 
 
 DEEL_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")  # de delen van een sleutel (``_ . -`` en camelCase)
@@ -377,7 +379,7 @@ def _waarden(standaard: bool, values: Mapping[str, Any]) -> dict[str, Any]:
         regel = IX_PREVIEWREGELS.get(k, WAARDE)
         if regel == NAMEN:
             uit[k] = [e.get("name") for e in _lijst(w) if isinstance(e, Mapping) and e.get("name")]
-        elif regel == GEWEIGERD:
+        elif regel == GEWEIGERD and w != []:
             uit[k] = {"geweigerd": "eigen_opdracht"}  # komt niet voor: het voorstel wordt al geweigerd
         else:
             uit[k] = w

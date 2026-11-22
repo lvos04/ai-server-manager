@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import re
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
@@ -360,6 +361,10 @@ def maak_plan(
     if view.get("catalog_binding") != vijf or not isinstance(view.get("etag"), str):
         # De planner moet precies de binding van de Hub bewaren en teruggeven (§8.2).
         raise _fout(409, "plan_binding_verschilt", "De planner gaf een andere of geen catalogusbinding terug.")
+    if stap is None and (codes := _plannerblokkades(view)):
+        # Geen stap omdat de planner blokkeert (bv. version_unavailable): alleen de vaste codes terug, geen tekst.
+        raise _fout(409, "plan_geblokkeerd", "De planner blokkeert dit plan; er wordt niets voorgesteld.",
+                    {"codes": codes})  # fmt: skip
     if stap is None or not _stap_past(stap["voorstel"], app_name):
         raise _fout(409, "plan_stap_onverwacht", "Het plan bevat niet precies één passende installatiestap.")
     controles = (view.get("plan") or {}).get("controles_na_installatie") or []
@@ -418,6 +423,13 @@ def _tijd(waarde: Any) -> datetime | None:
         return datetime.fromisoformat(str(waarde).replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _plannerblokkades(view: Mapping[str, Any]) -> list[str]:
+    plan = view.get("plan") if isinstance(view.get("plan"), Mapping) else {}
+    assert isinstance(plan, Mapping)
+    codes = {b.get("code") for b in plan.get("blokkades") or [] if isinstance(b, Mapping)}
+    return sorted(c for c in codes if isinstance(c, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,63}", c))[:20]
 
 
 def _stap_past(voorstel: Any, app_name: str) -> bool:

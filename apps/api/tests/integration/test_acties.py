@@ -537,6 +537,15 @@ def test_objectvormen_in_catalogusapp_waarden_worden_geweigerd_en_niet_bewaard(s
     assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
     assert r.json()["details"] == {"reden": "eigen_opdracht", "velden": ["command"]}, r.text
     assert schrijfaanroepen(stack.nas) == []
+    # Precies de lege lijst zet geen opdracht (de vertaling van de appstore zet haar altijd; S-P2-050g): voorgesteld
+    # en zichtbaar als lege lijst. Een lege tekst in de lijst is wel een opdracht.
+    for veld in ("command", "entrypoint"):
+        r = stel_voor(admin, "app.install", app_target("demo"), install_params("demo", **{veld: [""]}))
+        assert r.status_code == 501 and r.json()["details"]["velden"] == [veld], r.text
+    r = stel_voor(admin, "app.install", app_target("demo"), install_params("demo", command=[], entrypoint=[]))
+    assert r.status_code == 201, r.text
+    waarden = r.json()["preview"]["wijziging"]["waarden"]
+    assert waarden["command"] == [] and waarden["entrypoint"] == [], waarden
 
 
 def test_bijwerken_of_terugzetten_naar_een_emby_image_wordt_geweigerd(stack: Stack) -> None:

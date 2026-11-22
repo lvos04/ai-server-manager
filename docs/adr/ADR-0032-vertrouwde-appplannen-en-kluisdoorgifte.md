@@ -1014,6 +1014,49 @@ Status: gebouwd en Sim-getest tegen contractconforme fakes. NIET GEVALIDEERD (ec
   catalogusrollback (nu weigert de Hub na elke gemelde migratie van dit doel). De schaduwinstallatie van besluit 2
   en de updatevariant met handmatige export (besluit 3) blijven dicht.
 
+## Uitvoering deel G (S-P2-050g, 2026-11-22, niveau N5)
+
+Status: Sim-getest. NIET GEVALIDEERD (echte NAS).
+
+- **Volledige keten.** `tests/interop/test_keten_echt.py` (CI-job `keten`) draait de gepinde broncode van
+  appstore-en-fork (`936b2da`) en jelly-leon-platform (`9d59e16`). Elk krijgt een eigen PostgreSQL-database, eigen
+  geheimen en een koppeling met deze Hub via het enrollment-token en de eigen worker. Daarnaast draaien de echte Hub
+  en de echte executor. Alleen TrueNAS (`fakes.fake_truenas`) en de Git-forge achter de https-bron-URL zijn
+  nagebootst: een lokale repo en een documentatieadres, zodat de adrescontrole van de appstore gewoon draait.
+- **Wat de keten aantoont.** De uitgever tekent, de appstore synchroniseert de gepinde bron met verplichte
+  handtekening en de Hub controleert het bewijs zelf (§8.1). Daarna maakt de planner het plan met precies de vijf
+  bindingsvelden (§8.2) en volgen goedkeuring, uitvoering en readback. De terugmelding staat bij de planner als
+  `voltooid` met de `execution_id`. Bijwerken blijft dicht zonder checkpoint en gaat open met een checkpoint via de
+  productieroute. Terugzetten zet precies de vorige waarden terug. Verwijderen laat datasets en snapshots staan.
+- **Negatief.**
+  - Een vervalst manifest of herkomstrecord in de appstore geeft `bewijs_ongeldig` zonder planneroproep.
+  - Een andere hash dan de witte lijst geeft `catalogusversie_niet_toegelaten`. Een digest buiten de release van de
+    regel wordt niet voorgesteld (`digest_verschilt`).
+  - De echte planner weigert een binding die niet bij de claim past, en ook een binding van een gebruiker.
+  - EX15: na een migratie geen terugzetten op alleen de tag. Een gemarkeerde instantie weigeren Hub en executor.
+  - Een kijker maakt geen plan, voorstel, goedkeuring of uitvoering.
+  - V4: alleen een beheerder keurt de R2-stap goed. Een operator, kijker, kind, dienst-token of de AI-runner kan dat
+    niet. De AI-runner heeft geen sessie; ook een door de Hub ondertekend token met de beheerdersrol is geen sessie.
+  - EX47, Emby (stoppen, bijwerken en verwijderen) en een verdwenen versie (`version_unavailable`, bij de appstore
+    en in de trein) blijven geweigerd.
+  - Negen productiemutaties maken elk hun eigen test rood (rapport S-P2-050g).
+- **Twee bouwgaten die de echte keten liet zien.**
+  - De vertaling van de appstore zet altijd `command: []` en `entrypoint: []`. De Hub weigerde daardoor elke
+    vertrouwde Custom App-installatie (`eigen_opdracht`). Precies de lege lijst zet geen opdracht en telt nu niet
+    meer. `""`, `None` en `[""]` blijven geweigerd, zodat besluit 32 blijft gelden.
+  - Een plan zonder stap omdat de planner blokkeert, geeft nu `409 plan_geblokkeerd` met alleen de vaste codes van de
+    planner, zoals `version_unavailable`. Voorheen gaf het `plan_stap_onverwacht` zonder reden.
+- **VERSIE 2.**
+  - *Hub vult `upgrade` uit het manifest.* Het manifest levert `upgrade.migrations`, maar alleen het geverifieerde
+    doelmanifest bij een update mag tellen. Daarvoor is een vertrouwd updateplan nodig. §8.2 en de planner kennen
+    `catalog_binding` alleen bij de installatiepreview (`UpdatePlanIn` heeft geen binding). Tot dan komt de
+    migratiecontext van de aanvrager en kan zij het terugzetten alleen strenger maken. Herkomst `keten` volgt
+    hetzelfde updateplan (contractmelding aan jelly-leon-platform).
+  - De handmatige-stapketen van T3/T9 (`app_native`, `pg_dump`) heeft nog geen bevestigingsroute in de Hub. Er bestaat
+    dus geen bevestiging die een checkpoint zou kunnen openen, en de updatevariant met handmatige export blijft dicht.
+  - Een manifest zonder `compatibility` blokkeert de planner (`vertaling_niet_gereed`), terwijl de Hub het vóór de
+    planner toelaat. Dat is fail-closed, maar de melding kan eerder komen.
+
 ## Open contractmeldingen en tekstvoorstellen
 
 De regisseur laat de eigenaar de open meldingen in eigen opdrachten vaststellen en waar nodig de contractkopieën

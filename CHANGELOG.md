@@ -4,6 +4,17 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Volledige keten appstore → planner → Hub → executor (S-P2-050g, deel G)
+
+- `tests/interop/test_keten_echt.py` en de CI-job `keten` draaien de gepinde appstore-en-fork en jelly-leon-platform,
+  elk met een eigen database en koppeling, met de echte Hub en executor tegen de nagebootste TrueNAS. De keten
+  installeert, werkt bij met een geverifieerd checkpoint, zet terug en verwijdert. Daarnaast de negatieve rijen en
+  negen mutatieproeven. Sim-getest; NIET GEVALIDEERD (echte NAS).
+- Hersteld: de Hub weigerde elke vertrouwde Custom App-installatie, omdat de vertaling altijd `command: []` en
+  `entrypoint: []` zet. Precies de lege lijst telt nu niet als eigen opdracht.
+- Een planner die zonder stap blokkeert, geeft `409 plan_geblokkeerd` met zijn vaste codes (bijvoorbeeld
+  `version_unavailable`).
+
 ### Toegevoegd — Geverifieerde app-checkpoints en pre-update-gate (S-P2-050f, deel F)
 
 - Een geslaagde, teruggelezen `zfs.snapshot.create` is een checkpoint: de executor legt dataset, snapshot,

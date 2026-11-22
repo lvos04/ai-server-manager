@@ -167,6 +167,45 @@ jobs:
           JLP_SOURCE: .jlp-interop
         run: python -m pytest -q tests/interop/test_catalog_availability.py
 
+  keten:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services: *postgres_service
+    steps:
+      - *bron
+      - name: Gepinde appstore voor de volledige keten (S-P2-050g)
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          github-server-url: https://git.medialeon.nl
+          token: ${{ secrets.BRON_LEESTOKEN }}
+          repository: leon/appstore-en-fork
+          ref: 936b2da5723dfea0cb43f4813c37398cc3df1ed4
+          path: .asf-keten
+          persist-credentials: false
+      - name: Gepinde planner voor de volledige keten (S-P2-050g)
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          github-server-url: https://git.medialeon.nl
+          token: ${{ secrets.BRON_LEESTOKEN }}
+          repository: leon/jelly-leon-platform
+          ref: 9d59e16c9e078ca2982d4b523e21360de757eb7a
+          path: .jlp-keten
+          persist-credentials: false
+      - *python312
+      - *hub_installatie
+      - name: Git-bibliotheek van de appstore (hash uit zijn eigen lock)
+        run: |
+          awk '/^dulwich==/{p=1;print;next} p&&/^ /{print;next} {p=0}' .asf-keten/apps/api/requirements.lock \
+            > "$RUNNER_TEMP/dulwich.lock"
+          python -m pip install --require-hashes --no-deps -r "$RUNNER_TEMP/dulwich.lock"
+          python -m pip check
+      - *testdatabase
+      - name: Appstore, planner, Hub en executor tegen de nagebootste TrueNAS
+        env:
+          ASF_SOURCE: .asf-keten
+          JLP_SOURCE: .jlp-keten
+        run: python -m pytest -q tests/interop/test_keten_echt.py
+
   web:
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
@@ -284,7 +323,7 @@ jobs:
   images:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: [python, woning, planner, web]
+    needs: [python, woning, planner, keten, web]
     steps:
       - *bron
       - name: Hub en executor bouwen en de volledige rooktest uitvoeren
