@@ -48,7 +48,7 @@ from asm_policy.loader import ActieDef
 from asm_policy.params import IX_APP, NIET_ALFANUM_RE, expected_image, vault_refs
 
 from hub.actions.doel import Doel
-from hub.redact import LOG_SECRET_KEY_RE, REDACTED, _entropy, redact_text
+from hub.redact import LOG_SECRET_KEY_RE, REDACTED, _entropy, redact, redact_text
 
 SCHEMA = "asm-preview/1"
 GEHEIM_NIET_GETOOND = "geheim, niet getoond"  # S-P2-070 bouwpunt 3: de waarde vult pas de executor in
@@ -362,7 +362,10 @@ def toon_bewaarde_preview(preview: dict[str, Any]) -> dict[str, Any]:
 
 
 def idempotency_response(body: Any) -> Any:
-    """Pas dezelfde weergave toe bij een herhaling van een historisch actieantwoord."""
+    """Pas dezelfde weergave toe bij een herhaling van een historisch actieantwoord, ook de maskering van geneste
+    geheimen in resultaat en foutdetails (R-VEILIG-3)."""
+    if isinstance(body, dict):
+        body = {**body, **{k: redact(body[k]) for k in ("resultaat", "details") if k in body}}
     if isinstance(body, dict) and isinstance(getoond := body.get("preview"), dict):
         return {**body, "preview": toon_bewaarde_preview(getoond)}
     return body
@@ -500,7 +503,8 @@ def _wijziging(actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[s
         return {
             "soort": aid,
             "eigenaar": doel.naam,
-            "voorstel_id": doel.eigenaar["voorstel_id"],
+            # Niet het vluchtige voorstel_id: dat verandert bij elk propose en bindt de inhoud niet (R-VEILIG-1).
+            "preview_hash_eigenaar": doel.eigenaar["preview_hash"],
             "requires_backup": doel.eigenaar["requires_backup"],
             "diff": doel.eigenaar["diff"],
         }
@@ -561,8 +565,6 @@ def bouw(
         "dataretentie": DATA_BLIJFT,
         "terugdraaien": _terugdraaien(actie.action_id, doel),
     }
-    if doel.eigenaar is not None:
-        # De eigenaar controleert bij apply dat de goedkeuring bij zijn eigen voorstel hoort (§8, tweede tabel): de
-        # goedkeuring bindt daarom zijn preview_hash. Beleid, klasse en ETag bindt de goedkeuring apart.
-        return preview, str(doel.eigenaar["preview_hash"])
+    # Ook bij een eigenaaractie bindt de goedkeuring de hele getoonde preview: de diff én de preview_hash van de
+    # eigenaar (die in ``wijziging`` staat). Het ondertekende verzoek draagt die van de eigenaar (service._envelope).
     return preview, canonical_sha256(preview)

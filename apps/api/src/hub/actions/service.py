@@ -55,7 +55,7 @@ from hub.events.envelope import emit
 from hub.keys import KeyRing
 from hub.models import ActionRequest, Approval, Notification, NotificationChannel, Service
 from hub.monitoring.alerts import ERNST_RANK
-from hub.redact import redact_log_text
+from hub.redact import redact, redact_log_text
 from hub.registry import EXECUTOR_APP_ID, service_base_url
 from hub.security import Role
 from hub.timeutil import iso, utcnow
@@ -154,7 +154,7 @@ def weergave(db: Session, req: ActionRequest) -> dict[str, Any]:
         "preview": toon_bewaarde_preview(req.preview) if req.preview_hash else None,
         "blokkades": req.blokkades,
         "goedkeuring": _goedkeuring_dict(ap) if ap is not None else None,
-        "resultaat": req.resultaat,
+        "resultaat": redact(req.resultaat),  # ook een resultaat van vóór R-VEILIG-3
         "aangemaakt_op": iso(req.aangemaakt_op),
         "bijgewerkt_op": iso(req.bijgewerkt_op),
         "geldig_tot": iso(req.geldig_tot),
@@ -910,7 +910,8 @@ def _structuur(waarde: Any, soort: type) -> Any:
     en hooguit :data:`MAX_STRUCTUUR` tekens; anders ``None``."""
     if not isinstance(waarde, soort) or not _schoon(waarde):
         return None
-    return waarde if len(json.dumps(waarde, ensure_ascii=False)) <= MAX_STRUCTUUR else None
+    # Geneste geheime waarden (client_secret, token, …) worden *** vóór opslag (R-VEILIG-3).
+    return redact(waarde) if len(json.dumps(waarde, ensure_ascii=False)) <= MAX_STRUCTUUR else None
 
 
 def _melding(waarde: Any) -> str | None:
@@ -962,10 +963,15 @@ def _stopgegevens(reden: Any, gestopt: Any) -> dict[str, Any]:
     return uit
 
 
-def _bewijs_uitgevoerd(body: Mapping[str, Any], policy_hash: str) -> dict[str, Any] | None:
+def _bewijs_uitgevoerd(body: Mapping[str, Any], policy_hash: str, req: ActionRequest) -> dict[str, Any] | None:
     """Het resultaat van een geslaagde uitvoering, of ``None`` als het bewijs niet volledig is (S-P2-040, R-VEILIG-2):
     ``methode``, ``before_hash``, ``after_hash``, ``uitgevoerd_op`` en ``policy_hash`` (gelijk aan het eigen beleid)
-    moeten er in de juiste vorm zijn. Zonder dat is "uitgevoerd" een onduidelijk antwoord, nooit een succes."""
+    moeten er in de juiste vorm zijn. Zonder dat is "uitgevoerd" een onduidelijk antwoord, nooit een succes. Het
+    antwoord moet ook aantoonbaar bij dit verzoek horen (``request_id`` en ``action_id``) en een readback als object
+    hebben (S-P2-080, R-VEILIG-2)."""
+    readback = _structuur(body.get("readback"), dict)
+    if body.get("request_id") != str(req.id) or body.get("action_id") != req.action_id or readback is None:
+        return None
     bewijs = {
         "methode": _vorm(body.get("methode"), METHODE_RE),
         "before_hash": _vorm(body.get("before_hash"), HASH_RE),
@@ -979,7 +985,7 @@ def _bewijs_uitgevoerd(body: Mapping[str, Any], policy_hash: str) -> dict[str, A
         "status": "uitgevoerd",
         **bewijs,
         "resource_etag": _vorm(body.get("resource_etag"), ETAG_RE),
-        "readback": _structuur(body.get("readback"), dict),
+        "readback": readback,
         "waarschuwingen": _reeks(body.get("waarschuwingen"), CODE_RE),
     }
 
@@ -1204,7 +1210,8 @@ def _envelope(
         approval = {
             "approval_id": str(ap.id),
             "request_id": str(req.id),
-            "preview_hash": ap.preview_hash,
+            # De eigenaar toetst zijn eigen preview_hash (§8); de Hub-hash ervan bond de goedkeuring al (R-VEILIG-1).
+            "preview_hash": doel.eigenaar["preview_hash"] if doel.eigenaar is not None else ap.preview_hash,
             "resource_etag": ap.resource_etag,
             "policy_hash": ap.policy_hash,
             "risk_class": ap.risk_class,
@@ -1595,7 +1602,8 @@ def voer_uit(
         if uitkomst in ("uitgevoerd", "mislukt", "afwijking"):
             return _antwoord(db, req, uitkomst, gegevens, principal.name)
         _onbekend(db, req, f"executor_{exc.reason}", principal.name)
-    if actie.eigenaar is not None and res.status in (404, 405):
+    gecodeerd = isinstance(res.body, dict) and _vorm(res.body.get("code"), CODE_RE) is not None
+    if actie.eigenaar is not None and (res.status in (404, 405) or (res.status == 501 and not gecodeerd)):
         # De eigenaar kent de route apply (nog) niet: niets uitgevoerd, eerlijk capability_unavailable (§6).
         _sluit(
             db,
@@ -1630,7 +1638,7 @@ def _verwerk(
     details: dict[str, Any] = ruw if isinstance(ruw, dict) else {}
     melding = _melding(body.get("message"))
     if res.status == 200 and body.get("status") == "uitgevoerd":
-        resultaat = _bewijs_uitgevoerd(body, policy_hash)
+        resultaat = _bewijs_uitgevoerd(body, policy_hash, req)
         if resultaat is None:
             # R-VEILIG-2: "uitgevoerd" zonder volledig bewijs is een onduidelijk antwoord, nooit een succes.
             _onbekend(db, req, BEWIJS_ONVOLLEDIG, actor, eigenaar=eigenaar)
@@ -1659,7 +1667,10 @@ def _verwerk(
             "TrueNAS heeft de actie niet uitgevoerd; de toestand van het doel is onveranderd.",
             {**velden, "request_id": str(req.id)},
         )
-    if isinstance(code, str) and CODE_RE.fullmatch(code) and res.status != 500:
+    # Alleen een expliciete weigering telt als "niets uitgevoerd": een 4xx of 501 met code, of de eigen 502/503-codes
+    # van de executor. Elke andere 5xx (time-out, gateway) bewijst niets: onbekend (R-VEILIG-4).
+    weigering = 400 <= res.status < 500 or res.status == 501 or (not eigenaar and res.status in (502, 503))
+    if isinstance(code, str) and CODE_RE.fullmatch(code) and weigering:
         # Een gestructureerde weigering van de executor: hij heeft niets uitgevoerd.
         schoon = _van_executor(details, WEIGERING_VELDEN, alleen_aanwezig=True)
         _sluit(

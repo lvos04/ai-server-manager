@@ -10,6 +10,8 @@ De **echte** Hub-API stelt ``sso.sessions.revoke`` en ``sso.oidc.hub.register`` 
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -19,6 +21,7 @@ import httpx
 import pytest
 from actiehelpers import HOST, Stack, bouw_stack, haal, keur_goed, schrijfaanroepen, stel_voor, voer_uit
 from asm_policy import execreq
+from asm_policy.canonical import canonical_sha256
 from conftest import enroll_body, idem
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from executorhelpers import write_nas
@@ -76,6 +79,13 @@ def keten(admin: Any, app: Any, worker_once: Any, tmp_path: Path, monkeypatch: p
         nas.stop()
 
 
+def _bewaarde_preview(keten: Keten, v: dict[str, Any]) -> Any:
+    from hub.models import ActionRequest
+
+    with keten.stack.app.state.sessionmaker() as db:
+        return db.get(ActionRequest, uuid.UUID(v["request_id"])).preview  # type: ignore[union-attr]
+
+
 def _voorstel(keten: Keten, action_id: str = "sso.sessions.revoke", **meer: Any) -> dict[str, Any]:
     r = stel_voor(keten.stack.admin, action_id, DOEL, SESSIES, **meer)
     assert r.status_code == 201, r.text
@@ -88,9 +98,11 @@ def test_intrekken_gaat_ondertekend_naar_de_eigenaar_die_zelf_controleert(keten:
     # EX18: de claim telt niet; het beleid zegt R2 met goedkeuring. De goedkeuring bindt het voorstel van de eigenaar.
     assert v["risk_class"] == "R2" and v["status"] == "wacht_op_goedkeuring" and v["blokkades"] == [], v
     eigen = next(iter(keten.eigenaar.voorstellen.values()))
-    assert v["preview_hash"] == "sha256:" + eigen["preview_hash"]
+    # De goedkeuring bindt de hele getoonde preview (diff én de hash van de eigenaar), niet het vluchtige voorstel-ID.
+    assert v["preview"]["wijziging"]["preview_hash_eigenaar"] == "sha256:" + eigen["preview_hash"]
+    assert v["preview_hash"] == canonical_sha256(_bewaarde_preview(keten, v))
     assert v["resource_etag"] == "sha256:" + keten.eigenaar.etag
-    assert v["preview"]["wijziging"]["voorstel_id"] == eigen["proposal_id"]
+    assert "voorstel_id" not in v["preview"]["wijziging"]
     assert v["preview"]["wijziging"]["diff"] == eigen["diff"]
     assert voer_uit(admin, v).json()["code"] == "goedkeuring_nodig"
     assert keten.apply_paden() == []
@@ -102,7 +114,7 @@ def test_intrekken_gaat_ondertekend_naar_de_eigenaar_die_zelf_controleert(keten:
     assert r.json()["details"]["eigenaar"]["code"] == "capability_unavailable"
     assert keten.apply_paden() == ["/connector/v1/apply"] and len(keten.eigenaar.geaccepteerd) == 1
     verzoek = keten.eigenaar.geaccepteerd[0]
-    assert verzoek["approval"]["preview_hash"] == v["preview_hash"]
+    assert verzoek["approval"]["preview_hash"] == "sha256:" + eigen["preview_hash"]
     assert verzoek["proposal"]["expected_version"] == v["resource_etag"]
     assert haal(admin, v)["status"] == "mislukt"
     assert schrijfaanroepen(keten.stack.nas) == []  # de executor en TrueNAS kregen niets
@@ -231,3 +243,146 @@ def test_eigenaar_niet_gekoppeld(keten: Keten) -> None:
     r = stel_voor(keten.stack.admin, "sso.sessions.revoke", DOEL, SESSIES)
     assert r.status_code == 409 and r.json()["code"] == "eigenaar_niet_gekoppeld", r.text
     assert keten.eigenaar.paths() == []
+
+
+# ------------------------------------------------------------------ S-P2-080 herstel R-VEILIG-1 t/m -5
+def _goedgekeurd(keten: Keten) -> dict[str, Any]:
+    v = _voorstel(keten)
+    assert keur_goed(keten.stack.admin, v).status_code == 200
+    return v
+
+
+def _ontvangst(v: dict[str, Any]) -> dict[str, Any]:
+    """Een volledig 200-antwoord van de eigenaar op apply (§6: resultaat met readback + before/after-hash)."""
+    return {
+        "request_id": v["request_id"],
+        "action_id": v["action_id"],
+        "target": v["target"],
+        "status": "uitgevoerd",
+        "methode": v["action_id"],
+        "before_hash": "sha256:" + "1" * 64,
+        "after_hash": "sha256:" + "2" * 64,
+        "policy_hash": v["policy_hash"],
+        "uitgevoerd_op": "2026-11-22T10:00:00Z",
+        "resource_etag": v["resource_etag"],
+        "readback": {"ingetrokken_sessies": 0},
+        "waarschuwingen": [],
+    }
+
+
+def _events(keten: Keten, soort: str, request_id: str) -> list[Any]:
+    from sqlalchemy import select
+
+    from hub.models import OutboxEvent
+
+    with keten.stack.app.state.sessionmaker() as db:
+        rijen = db.scalars(select(OutboxEvent).where(OutboxEvent.event_type == soort)).all()
+        return [e for e in rijen if (e.payload or {}).get("request_id") == request_id]
+
+
+@pytest.mark.parametrize("toestand", ["volledig", "zonder_readback", "readback_lijst", "ander_verzoek", "andere_actie"])
+def test_uitgevoerd_alleen_met_readback_van_dit_verzoek(keten: Keten, toestand: str) -> None:
+    """R-VEILIG-2: zonder bruikbare readback, of met bewijs van een ander verzoek, is de uitkomst onbekend."""
+    v = _goedgekeurd(keten)
+    antwoord = _ontvangst(v)
+    if toestand == "zonder_readback":
+        del antwoord["readback"]
+    elif toestand == "readback_lijst":
+        antwoord["readback"] = []
+    elif toestand == "ander_verzoek":
+        antwoord["request_id"] = str(uuid.uuid4())
+    elif toestand == "andere_actie":
+        antwoord["action_id"] = "sso.oidc.hub.register"
+    keten.eigenaar.apply_reply = Reply(200, antwoord)
+    r = voer_uit(keten.stack.admin, v)
+    status = haal(keten.stack.admin, v)["status"]
+    if toestand == "volledig":
+        assert (r.status_code, status) == (200, "uitgevoerd"), r.text
+        return
+    assert (r.status_code, r.json()["code"], status) == (502, "uitkomst_onbekend", "onbekend"), r.text
+    assert _events(keten, "action.run.succeeded", v["request_id"]) == []
+
+
+@pytest.mark.parametrize("wijziging", ["diff", "preview_hash", "resource_etag"])
+def test_goedkeuren_bindt_de_inhoud_van_het_getoonde_voorstel(keten: Keten, wijziging: str) -> None:
+    """R-VEILIG-1: ook een andere diff onder dezelfde hash van de eigenaar geeft 409 en een nieuwe preview."""
+    v = _voorstel(keten)
+    tweede = copy.deepcopy(next(iter(keten.eigenaar.voorstellen.values())))
+    if wijziging == "diff":
+        tweede["diff"] = [{"operation": "ongewijzigd", "aantal": 0}]
+    else:
+        tweede[wijziging] = hashlib.sha256(wijziging.encode()).hexdigest()
+    keten.eigenaar.propose_reply = Reply(201, tweede)
+    r = keur_goed(keten.stack.admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "preview_gewijzigd", r.text
+    nu = haal(keten.stack.admin, v)
+    assert nu["goedkeuring"] is None and nu["preview_hash"] != v["preview_hash"]
+    assert keten.apply_paden() == []
+
+
+def test_andere_diff_na_goedkeuring_laat_de_goedkeuring_vervallen(keten: Keten) -> None:
+    """R-VEILIG-1 bij uitvoeren: verandert de inhoud na de goedkeuring, dan vervalt die en gaat er niets naar apply."""
+    v = _goedgekeurd(keten)
+    tweede = copy.deepcopy(next(iter(keten.eigenaar.voorstellen.values())))
+    tweede["diff"] = [{"operation": "alles_intrekken"}]
+    keten.eigenaar.propose_reply = Reply(201, tweede)
+    r = voer_uit(keten.stack.admin, v)
+    assert r.status_code == 409 and r.json()["code"] == "goedkeuring_vervallen", r.text
+    assert "preview_hash" in r.json()["details"]["gewijzigd"]
+    assert keten.apply_paden() == []
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "verwacht"),
+    [
+        (501, {"detail": "Not Implemented"}, (501, "capability_unavailable", "mislukt")),
+        (504, {"code": "gateway_timeout"}, (502, "uitkomst_onbekend", "onbekend")),
+        (503, {"code": "authentik_onbereikbaar"}, (502, "uitkomst_onbekend", "onbekend")),
+        (500, {"code": "interne_fout"}, (502, "uitkomst_onbekend", "onbekend")),
+        (409, {"code": "goedkeuring_past_niet"}, (409, "uitvoering_geweigerd", "mislukt")),
+    ],
+)
+def test_alleen_een_expliciete_weigering_is_mislukt(
+    keten: Keten, status: int, body: dict[str, Any], verwacht: tuple[int, str, str]
+) -> None:
+    """R-VEILIG-4 en -5: een onzekere 5xx is onbekend; een 501 zonder code is capability_unavailable."""
+    v = _goedgekeurd(keten)
+    keten.eigenaar.apply_reply = Reply(status, body)
+    r = voer_uit(keten.stack.admin, v)
+    assert (r.status_code, r.json()["code"], haal(keten.stack.admin, v)["status"]) == verwacht, r.text
+    # Eenmalig: een tweede poging stuurt niets meer naar de eigenaar.
+    assert voer_uit(keten.stack.admin, v).status_code == 409
+    assert len(keten.apply_paden()) == 1
+
+
+@pytest.mark.parametrize("soort", ["readback", "foutdetails"])
+def test_geheimen_van_de_eigenaar_worden_gemaskeerd_voor_opslag(keten: Keten, soort: str) -> None:
+    """R-VEILIG-3: een geneste client_secret uit readback of foutdetails staat nergens: antwoord, leesroute, opslag
+    en een herhaling met dezelfde Idempotency-Key."""
+    from hub.models import ActionRequest
+
+    v = _goedgekeurd(keten)
+    markering = uuid.uuid4().hex
+    if soort == "readback":
+        antwoord = _ontvangst(v)
+        antwoord["readback"] = {"ingetrokken_sessies": 0, "client": {"client_secret": markering}}
+        keten.eigenaar.apply_reply = Reply(200, antwoord)
+    else:
+        keten.eigenaar.apply_reply = Reply(
+            409, {"code": "geweigerd", "details": {"fouten": [{"client_secret": markering}]}}
+        )
+    kop = idem()
+    r = keten.stack.admin.post(f"/api/v1/actions/{v['request_id']}/execute", headers=kop)
+    assert r.status_code == (200 if soort == "readback" else 409), r.text
+    herhaling = keten.stack.admin.post(f"/api/v1/actions/{v['request_id']}/execute", headers=kop)
+    assert herhaling.headers.get("Idempotent-Replay") == "true"
+    with keten.stack.app.state.sessionmaker() as db:
+        opslag = json.dumps(db.get(ActionRequest, uuid.UUID(v["request_id"])).resultaat)  # type: ignore[union-attr]
+    gezien = {
+        "antwoord": r.text,
+        "herhaling": herhaling.text,
+        "leesroute": json.dumps(haal(keten.stack.admin, v)),
+        "opslag": opslag,
+    }
+    assert [k for k, tekst in gezien.items() if markering in tekst] == []
+    assert "***" in opslag

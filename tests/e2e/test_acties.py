@@ -1886,6 +1886,11 @@ ONVOLLEDIG: dict[str, dict[str, Any]] = {
     "ander_beleid": {"policy_hash": "sha256:" + "0" * 64},
     "uitgevoerd_op_ongeldig": {"uitgevoerd_op": "gisteren"},
     "zonder_uitgevoerd_op": {"uitgevoerd_op": WEG},
+    # S-P2-080, R-VEILIG-2: het bewijs hoort bij dit verzoek en heeft een readback als object.
+    "ander_verzoek": {"request_id": "00000000-0000-4000-8000-000000000000"},
+    "andere_actie": {"action_id": "app.stop"},
+    "zonder_readback": {"readback": WEG},
+    "readback_lijst": {"readback": []},
 }
 
 

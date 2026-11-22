@@ -180,9 +180,12 @@ vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbeke
 - **Voorstel.** De Hub vraagt `POST /connector/v1/propose` bij de eigenaar (dienst-JWT, `action_id`, `target`,
   `parameters`, `reason`). Hij neemt alleen `proposal_id` (UUID), `action_id` (gelijk aan het eigen voorstel),
   `preview_hash` en `resource_etag` (SHA-256, met of zonder `sha256:`), `requires_backup` (ja/nee) en `diff` (JSON,
-  hooguit 8 KiB, geen stuurtekens) over. De `preview_hash` van de eigenaar is de `preview_hash` die de goedkeuring
-  bindt; `expected_version` is `sha256:<resource_etag>`. De eigenaar controleert bij `apply` dat de goedkeuring bij
-  zijn eigen voorstel hoort. `requires_backup` geldt als het beleid of de eigenaar het vraagt. De `diff` gaat in de
+  hooguit 8 KiB, geen stuurtekens) over. De preview toont de `diff` en de `preview_hash` van de eigenaar
+  (`wijziging.preview_hash_eigenaar`), niet het vluchtige `proposal_id`. Net als bij elke actie is de `preview_hash`
+  die de goedkeuring bindt de SHA-256 over die hele getoonde preview: een andere diff onder dezelfde hash van de
+  eigenaar geeft bij goedkeuren `409 preview_gewijzigd` en bij uitvoeren `409 goedkeuring_vervallen`. In het
+  ondertekende verzoek staat in `approval.preview_hash` de hash van de eigenaar; `expected_version` is
+  `sha256:<resource_etag>`. De eigenaar controleert bij `apply` dat de goedkeuring bij zijn eigen voorstel hoort. `requires_backup` geldt als het beleid of de eigenaar het vraagt. De `diff` gaat in de
   preview door dezelfde maskeerregel als elke andere wijziging.
 - **Uitvoeren.** Het ondertekende verzoek gaat naar `POST /connector/v1/apply` van de eigenaar. De Hub controleert
   het vooraf zelf met `uitvoerder` `eigenaar:<app_id>`. Bij elke goedkeuring en elke uitvoering vraagt de Hub
@@ -195,8 +198,14 @@ vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbeke
 | eigenaar weigert het voorstel met een foutcode (4xx) | `409 eigenaar_weigerde_voorstel` |
 | onbruikbaar voorstel, 5xx of onbereikbaar | `409 doel_onbekend` |
 | `requires_backup` zonder B12-bewijs van de data van de eigenaar | blokkade `backup_checkpoint_ontbreekt` (`backupbewijs_eigenaar_ontbreekt`) |
-| eigenaar weigert `apply` | `409 uitvoering_geweigerd` met `details.eigenaar` |
+| eigenaar weigert `apply` expliciet (4xx met foutcode) | `409 uitvoering_geweigerd` met `details.eigenaar` |
+| `200 uitgevoerd` zonder volledig bewijs: `methode`, before/after-hash, `policy_hash`, `uitgevoerd_op`, `readback` als object, en `request_id` en `action_id` van dit verzoek | `502 uitkomst_onbekend`, geen succesevent |
+| elke andere 5xx (ook met foutcode, bv. time-out van een gateway) | `502 uitkomst_onbekend`; de goedkeuring blijft verbruikt |
 | geen of onbruikbaar antwoord op `apply` | `502 uitkomst_onbekend`; de eigenaar heeft geen journaal voor de Hub, dus ophelderen geeft `409 uitkomst_onbekend` (`journaal` `geen_journaal_eigenaar`) |
+
+Readback, afwijkingen en foutdetails van de eigenaar en de executor neemt de Hub alleen over in de vaste velden
+hierboven; geneste waarden onder een geheim-achtige naam (`client_secret`, `token`, …) worden `***` vóór opslag
+(`hub.redact.redact`). Dezelfde maskering geldt bij teruglezen en bij een herhaling met dezelfde `Idempotency-Key`.
 
 De Hub meet nog geen B12-back-up van de Authentik-database. Daarom blijft `sso.oidc.hub.register` geblokkeerd. De
 AI kan geen van beide acties voorstellen: de route laat alleen de aangemelde gebruiker als actor toe en het beleid

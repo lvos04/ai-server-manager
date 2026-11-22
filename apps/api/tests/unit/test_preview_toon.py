@@ -95,7 +95,7 @@ def _doel(naam: str = _g(1), **staat: Any) -> Doel:
     return Doel(soort="app", naam=naam, etag="etag-proef", bestaat=True, staat={"naam": naam, **staat})
 
 
-EIGENAAR_VAST = {"soort", "eigenaar", "voorstel_id", "requires_backup"}
+EIGENAAR_VAST = {"soort", "eigenaar", "preview_hash_eigenaar", "requires_backup"}
 
 
 def _eigenaar(n: int) -> Doel:
