@@ -32,7 +32,7 @@ from asm_policy.params import (
     _only,
     _text,
     expected_image,
-    vault_refs,
+    vault_ref_plekken,
 )
 
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -234,8 +234,11 @@ def _kluis(regel: Mapping[str, Any], b: Mapping[str, Any], params: Mapping[str, 
     )
     if verwacht is None or not goed or [{k: r[k] for k in ("path", "parameter", "ref")} for r in refs] != verwacht:
         out.append(_f(f"{w}.vault_refs", "kluisplek_past_niet", "de kluisplekken passen niet bij de toegelaten regel"))
-    elif vault_refs(params) != sorted(r["ref"] for r in verwacht):
-        out.append(_f(f"{w}.vault_refs", "kluisplek_past_niet", "een andere kluisverwijzing in de payload"))
+    elif vault_ref_plekken({k: v for k, v in params.items() if k != "catalog_binding"}) != sorted(
+        ("app_create." + r["path"], r["ref"]) for r in verwacht
+    ):
+        # Exact de vastgelegde plekken: ook een extra plek met een bekende verwijzing weigert (R-VEILIG-4).
+        out.append(_f(f"{w}.vault_refs", "kluisplek_past_niet", "een andere kluisverwijzing of plek in de payload"))
     k = b["koppeling"]
     if koppelbaar(regel):
         if not (

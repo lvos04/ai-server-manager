@@ -173,3 +173,89 @@ def test_ongemarkeerde_instantie_houdt_haar_uitkomst(stack: tuple[Hub, TestClien
     r = execute(c, hub, approved(hub, prop))
     assert r.status_code == 200 and r.json()["methode"] == "app.update", r.text
     assert [m for m in nas.mutations if m != "app.config"] == ["app.update"]
+
+
+# ------------------------------------------------------------------ gebruiksdoel van het afgiftebewijs (R-VEILIG-1)
+@pytest.mark.parametrize("soort", ["hub_service", "user"])
+def test_alleen_een_dienstcontext_met_afgiftekenmerk_bereikt_de_ontsleuteling(
+    monkeypatch: pytest.MonkeyPatch, soort: str
+) -> None:
+    """Ook als de identiteitscontrole een gebruikerscontext doorlaat, ontsleutelt de executor niets."""
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from asm_policy.canonical import canonical_sha256
+
+    from executor import kluis
+
+    rest = {"request_sha256": canonical_sha256({})}
+    velden = {**rest, "claim_sha256": canonical_sha256(rest), "enc": "", "ct": ""}
+    rollen = ["service"] if soort == "hub_service" else ["viewer"]
+    claims = {"token_use": soort, "roles": rollen, "kluis_afgifte": velden}
+    grens = Mock()
+    grens.decrypt.side_effect = ValueError("lege proefbuffer")
+    monkeypatch.setattr(kluis, "SUITE", grens)
+    monkeypatch.setattr(kluis, "verify_hub_jwt", lambda *_a, **_k: claims)
+    k = kluis.Kluis(None, Path("."))  # type: ignore[arg-type]
+    monkeypatch.setattr(k, "opvraag", lambda *_a: rest)
+    monkeypatch.setattr(k, "stuur", lambda *_a: SimpleNamespace(status=200, body={"afgifte": "proef"}))
+    with pytest.raises(KluisFout):
+        k._vraag_op({}, {}, {})
+    assert grens.decrypt.call_count == int(soort == "hub_service")
+
+
+# ------------------------------------------------------------------ onvolledig herstel van het journaal (R-VEILIG-2)
+def _gemarkeerd_en_gekopieerd(tmp_path: Path) -> tuple[Journal, Path]:
+    """Een gebruikte installatie met markering, en een herstelset met alleen de geheimenmap."""
+    import shutil
+
+    from executor.config import Settings
+
+    bestaand = Hub(tmp_path / "origineel").settings
+    Journal(bestaand.replay_db, bestaand.secrets_dir).markeer_kluis(
+        str(uuid.uuid4()), "my-house", "sha256:" + "1" * 64, [{"env": "X", "type": "appgeheim"}]
+    )
+    kopie = Settings(data_dir=tmp_path / "hersteld")
+    shutil.copytree(bestaand.secrets_dir, kopie.secrets_dir)
+    return Journal(kopie.replay_db, kopie.secrets_dir), kopie.replay_db
+
+
+def test_ontbrekend_journaal_is_onbekend_en_wordt_bij_lezen_niet_aangemaakt(tmp_path: Path) -> None:
+    from executor.journal import JournalUnavailable
+
+    hersteld, pad = _gemarkeerd_en_gekopieerd(tmp_path)
+    with pytest.raises(JournalUnavailable):
+        hersteld.kluis_gemarkeerd("my-house")
+    assert not pad.exists()
+
+
+def test_leeg_heraangemaakt_journaal_na_onvolledig_herstel_is_onbekend(tmp_path: Path) -> None:
+    """Het starten maakt het journaal opnieuw (leeg) aan; het anker in de geheimenmap houdt de markering onbekend."""
+    from executor.journal import JournalUnavailable
+
+    hersteld, _pad = _gemarkeerd_en_gekopieerd(tmp_path)
+    assert hersteld.stopped() is None
+    with pytest.raises(JournalUnavailable):
+        hersteld.kluis_gemarkeerd("demo-app")
+
+
+def test_eerste_ingebruikname_heeft_geen_markering(tmp_path: Path) -> None:
+    s = Hub(tmp_path / "nieuw").settings
+    journal = Journal(s.replay_db, s.secrets_dir)
+    assert journal.stopped() is None
+    assert journal.kluis_gemarkeerd("my-house") is False
+
+
+def test_onvolledig_hersteld_journaal_weigert_bijwerken_zonder_nas(stack: tuple[Hub, TestClient, FakeTrueNAS]) -> None:
+    """De hele weg: markering, het journaal valt weg, de executor start het leeg opnieuw en weigert toch."""
+    hub, c, nas = stack
+    Journal(hub.settings.replay_db, hub.settings.secrets_dir).markeer_kluis(
+        str(uuid.uuid4()), "demo-app", "sha256:" + "1" * 64, [{"env": "X", "type": "appgeheim"}]
+    )
+    for pad in hub.settings.replay_db.parent.glob(hub.settings.replay_db.name + "*"):
+        pad.unlink()
+    nas.mutations.clear()
+    prop = _prop(nas, "app.update", {"image": {"repository": "ghcr.io/voorbeeld/my-house", "tag": f"2@{DIGEST_B}"}})
+    r = execute(c, hub, approved(hub, prop))
+    assert r.status_code == 409 and r.json()["code"] == "kluisplekken_recept_ontbreekt", r.text
+    assert nas.mutations == []

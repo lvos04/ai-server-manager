@@ -1235,3 +1235,8 @@ def verwachte_catalogus(params: Mapping[str, Any]) -> str | None:
 def vault_refs(value: Any) -> list[str]:
     """Alle ``vault://app/...``-verwijzingen (geheimen die de Hub pas bij verzenden invult, contract §3.1 a)."""
     return sorted({v for _p, _k, v, _paar in _walk(value) if isinstance(v, str) and VAULT_REF_RE.fullmatch(v)})
+
+
+def vault_ref_plekken(value: Any) -> list[tuple[str, str]]:
+    """Elk voorkomen van een ``vault://app/...``-verwijzing als (pad, verwijzing), gesorteerd: ook dubbele (§8.3)."""
+    return sorted((p, v) for p, _k, v, _paar in _walk(value) if isinstance(v, str) and VAULT_REF_RE.fullmatch(v))

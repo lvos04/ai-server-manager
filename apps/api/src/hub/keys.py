@@ -18,6 +18,12 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 
 ISSUER = "hub"
 MAX_JWT_TTL_SECONDS = 120
+
+
+class JwtVensterVerstreken(ValueError):
+    """Het absolute einde voor een JWT is bij ondertekening al voorbij: geen token."""
+
+
 TOKEN_USE_USER = "user"  # noqa: S105 — soort JWT, geen geheim
 TOKEN_USE_HUB_SERVICE = "hub_service"  # noqa: S105 — soort JWT, geen geheim
 
@@ -140,11 +146,18 @@ class KeyRing:
         )
 
     @staticmethod
-    def _base_claims(audience: str, ttl_seconds: int, now: datetime | None) -> tuple[dict[str, Any], datetime]:
+    def _base_claims(
+        audience: str, ttl_seconds: int, now: datetime | None, uiterlijk: datetime | None = None
+    ) -> tuple[dict[str, Any], datetime]:
         if ttl_seconds > MAX_JWT_TTL_SECONDS:
             raise ValueError("Hub-JWT mag maximaal 120 s geldig zijn (contract §3.4/§4)")
         issued = (now or datetime.now(UTC)).replace(microsecond=0)
         expires = issued + timedelta(seconds=ttl_seconds)
+        if uiterlijk is not None:
+            # Nooit na een absoluut einde (bv. van een kluisafgifte, §8.3): begrensd op het moment van ondertekenen.
+            expires = min(expires, uiterlijk.replace(microsecond=0))
+            if expires <= issued:
+                raise JwtVensterVerstreken
         claims: dict[str, Any] = {
             "iss": ISSUER,
             "aud": audience,
@@ -174,13 +187,15 @@ class KeyRing:
         now: datetime | None = None,
         catalog_request_sha256: str | None = None,
         kluis_afgifte: dict[str, str] | None = None,
+        uiterlijk: datetime | None = None,
     ) -> tuple[str, datetime]:
         """Dienst-JWT waarmee de Hub zich bij een eigen dienst meldt (contract 1.2 §4.3); per aanroep een nieuwe.
 
         ``sub: "hub"``, ``roles: ["service"]``, ``token_use: "hub_service"``, ``service_id`` van de registratie, eigen
-        ``jti`` (replaycache bij de dienst, §4.6). Nooit het service-token van de dienst zelf.
+        ``jti`` (replaycache bij de dienst, §4.6). Nooit het service-token van de dienst zelf. Met ``uiterlijk`` ligt
+        ``exp`` nooit later; is dat moment al voorbij, dan :class:`JwtVensterVerstreken`.
         """
-        claims, expires = self._base_claims(audience, ttl_seconds, now)
+        claims, expires = self._base_claims(audience, ttl_seconds, now, uiterlijk)
         claims.update(
             {
                 "sub": "hub",

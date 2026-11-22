@@ -741,9 +741,21 @@ def bearer_token(authorization: str | None) -> str:
 def verify_hub_authorization(
     authorization: str | None, link: Mapping[str, Any], *, audience: str, now: int | None = None
 ) -> dict[str, Any]:
-    """§4.7 vanaf de header: eerst ``state`` (ook zonder header: ``not_linked``/``revoked``), dan de tokensoort."""
+    """§4.7 vanaf de header: eerst ``state`` (ook zonder header: ``not_linked``/``revoked``), dan de tokensoort. Nooit
+    een afgiftebewijs (§8.3): dat geldt alleen op de claimroute."""
     _check_state(link)
-    return verify_hub_jwt(bearer_token(authorization), link, audience=audience, now=now)
+    return check_doel(verify_hub_jwt(bearer_token(authorization), link, audience=audience, now=now), afgifte=False)
+
+
+AFGIFTE_KENMERK = "kluis_afgifte"
+
+
+def check_doel(claims: dict[str, Any], *, afgifte: bool) -> dict[str, Any]:
+    """Gescheiden gebruiksdoelen (§8.3, R-VEILIG-1): een afgiftebewijs is alleen een Hub-dienst-JWT met het
+    afgiftekenmerk en geldt alleen op de claimroute; elke andere route weigert een token met dat kenmerk."""
+    if (AFGIFTE_KENMERK in claims) != afgifte or (afgifte and claims.get("token_use") != "hub_service"):
+        raise AuthFailed("token_use_invalid")
+    return claims
 
 
 def _check_state(link: Mapping[str, Any]) -> None:
@@ -754,8 +766,11 @@ def _check_state(link: Mapping[str, Any]) -> None:
         raise AuthFailed("not_linked")  # ook een onleesbaar koppelbestand (§3.5, fail-closed)
 
 
-def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: int | None = None) -> dict[str, Any]:
-    """Controlevolgorde van §4.7: state → tokensoort → handtekening/kid → claims → token_use → jti.
+def verify_hub_jwt(
+    token: str, link: Mapping[str, Any], *, audience: str, now: int | None = None, afgifte: bool = False
+) -> dict[str, Any]:
+    """Controlevolgorde van §4.7: state → tokensoort → handtekening/kid → claims → token_use → doel → jti.
+    ``afgifte=True`` alleen op de claimroute (:func:`check_doel`).
 
     ``aud`` moet precies één string zijn (§4.2): een lijst — ook met de eigen ``app_id`` erin — is ``invalid_token``.
     Een JWS-header zonder ``kid`` is ``unknown_key``."""
@@ -804,6 +819,7 @@ def verify_hub_jwt(token: str, link: Mapping[str, Any], *, audience: str, now: i
             raise AuthFailed("token_use_invalid")
     else:
         raise AuthFailed("token_use_invalid")
+    check_doel(claims, afgifte=afgifte)
     if not isinstance(claims.get("jti"), str) or not claims["jti"]:
         raise AuthFailed("jti_missing")
     return claims

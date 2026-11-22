@@ -32,6 +32,7 @@ from executor.hublink import (
     valid_fingerprint,
     valid_pairing_code,
     validate_hub_url,
+    verify_hub_authorization,
     verify_hub_jwt,
 )
 
@@ -355,6 +356,43 @@ def test_inkomende_hub_jwt_redenen_en_volgorde() -> None:
         with pytest.raises(AuthFailed) as exc:
             verify_hub_jwt(token, {**link, **change}, audience=aud)
         assert exc.value.reason == reason, (change, reason)
+
+
+AFGIFTE_RIJEN: list[tuple[str, dict[str, Any], bool, bool]] = [
+    ("gewone route, gewoon dienst-JWT", {}, False, True),
+    ("gewone route, afgiftebewijs", {"kluis_afgifte": {}}, False, False),
+    ("claimroute, afgiftebewijs", {"kluis_afgifte": {}}, True, True),
+    ("claimroute, dienst-JWT zonder kenmerk", {}, True, False),
+    ("claimroute, gebruiker met kenmerk", {"kluis_afgifte": {}, "token_use": "user", "roles": ["viewer"]}, True, False),
+]
+
+
+@pytest.mark.parametrize(("naam", "change", "afgifte", "geldig"), AFGIFTE_RIJEN, ids=[r[0] for r in AFGIFTE_RIJEN])
+def test_afgiftekenmerk_geldt_alleen_op_de_claimroute(
+    naam: str, change: dict[str, Any], afgifte: bool, geldig: bool
+) -> None:
+    """R-VEILIG-1: gescheiden gebruiksdoelen, ook bij een geldige handtekening en dienstidentiteit (§8.3)."""
+    key, x = _signer()
+    sid = str(uuid.uuid4())
+    link = {"state": "gekoppeld", "service_id": sid, "pins": {"jwt": [{"kid": "k1", "jwk": _okp(x)}], "policy": []}}
+    claims = _claims(sid, **change)
+    if change.get("token_use") == "user":
+        claims = {**claims, "sub": str(uuid.uuid4())}
+        claims.pop("service_id")
+    token = _jws(key, "k1", claims)
+    aud = "ai-server-manager-executor"
+    if geldig:
+        assert verify_hub_jwt(token, link, audience=aud, afgifte=afgifte)["jti"] == claims["jti"]
+    else:
+        with pytest.raises(AuthFailed) as exc:
+            verify_hub_jwt(token, link, audience=aud, afgifte=afgifte)
+        assert exc.value.reason == "token_use_invalid", naam
+    if not afgifte:
+        if geldig:
+            assert verify_hub_authorization("Bearer " + token, link, audience=aud)["jti"] == claims["jti"]
+        else:
+            with pytest.raises(AuthFailed):
+                verify_hub_authorization("Bearer " + token, link, audience=aud)
 
 
 def test_sleutelrotaties_pollen_lege_lijst_en_niet_lege_lijst(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

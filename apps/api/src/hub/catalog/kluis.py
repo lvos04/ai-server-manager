@@ -31,7 +31,7 @@ from hub import audit, servicecalls
 from hub.config import Settings
 from hub.deps import Principal
 from hub.errors import HubError
-from hub.keys import KeyRing
+from hub.keys import MAX_JWT_TTL_SECONDS, JwtVensterVerstreken, KeyRing
 from hub.models import ActionRequest, AppGeheim, Approval, CatalogPlan, EnrollmentGrant, KluisAfgifte, Service
 from hub.registry import EXECUTOR_APP_ID
 from hub.security import new_token, sha256_hex
@@ -231,18 +231,22 @@ def claim(
         )
     klaar = _klare_tekst(waarden, token)
     uit = SUITE.encrypt(klaar, X25519PublicKey.from_public_bytes(_unb64(body["ontvanger"])), info=_info(rest))
-    ttl = max(1, min(120, int((eind - now).total_seconds())))
-    jwt, _ = keyring.issue_hub_service_jwt(
-        audience=EXECUTOR_APP_ID,
-        service_id=str(svc.id),
-        ttl_seconds=ttl,
-        kluis_afgifte={
-            "request_sha256": body["request_sha256"],
-            "claim_sha256": canonical_sha256(rest),
-            "enc": _b64(uit[:ENC_LEN]),
-            "ct": _b64(uit[ENC_LEN:]),
-        },
-    )
+    try:
+        # exp nooit na het vastgelegde einde, gemeten bij ondertekening (na de verwerkingstijd; R-VEILIG-3).
+        jwt, _ = keyring.issue_hub_service_jwt(
+            audience=EXECUTOR_APP_ID,
+            service_id=str(svc.id),
+            ttl_seconds=MAX_JWT_TTL_SECONDS,
+            uiterlijk=eind,
+            kluis_afgifte={
+                "request_sha256": body["request_sha256"],
+                "claim_sha256": canonical_sha256(rest),
+                "enc": _b64(uit[:ENC_LEN]),
+                "ct": _b64(uit[ENC_LEN:]),
+            },
+        )
+    except JwtVensterVerstreken:
+        raise _weiger(410, "afgifte_verlopen", "De afgifte is verlopen; keur opnieuw goed.") from None
     audit.record(
         db,
         actor_type="service",

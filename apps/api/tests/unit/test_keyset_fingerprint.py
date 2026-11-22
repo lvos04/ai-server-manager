@@ -93,3 +93,23 @@ def test_keyring_vingerafdruk_over_eigen_sleutels() -> None:
     verwacht = keyset_fingerprint([public_jwk(jwt_key.public_key())], public_jwk(policy_key.public_key()))
     assert ring.keyset_fingerprint() == verwacht
     assert len(verwacht) == 19 and verwacht.count("-") == 3
+
+
+def test_dienst_jwt_nooit_na_het_absolute_einde() -> None:
+    """R-VEILIG-3: ``uiterlijk`` begrenst exp op het moment van ondertekenen; een verstreken einde geeft geen token."""
+    from datetime import UTC, datetime, timedelta
+
+    import jwt as pyjwt
+
+    from hub.keys import JwtVensterVerstreken
+
+    ring = KeyRing(*(Ed25519PrivateKey.generate() for _ in range(3)))
+    nu = datetime.now(UTC)
+    sid = "00000000-0000-4000-8000-000000000001"
+    token, eind = ring.issue_hub_service_jwt(
+        audience="x", service_id=sid, ttl_seconds=120, uiterlijk=nu + timedelta(seconds=5)
+    )
+    exp = pyjwt.decode(token, options={"verify_signature": False})["exp"]
+    assert exp == int(eind.timestamp()) and exp <= (nu + timedelta(seconds=5)).timestamp()
+    with pytest.raises(JwtVensterVerstreken):
+        ring.issue_hub_service_jwt(audience="x", service_id=sid, uiterlijk=nu - timedelta(seconds=1))

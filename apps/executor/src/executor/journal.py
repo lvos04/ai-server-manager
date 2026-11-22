@@ -63,6 +63,11 @@ SCHEMA = (
 )
 
 
+# In de geheimenmap (het deel dat bij herstel terugkomt): deze installatie heeft ooit kluisplekken vastgelegd. Zonder
+# het bijbehorende journaal is de kluismarkering dan onbekend, niet leeg (onvolledig herstel; R-VEILIG-2).
+KLUIS_ANKER = "kluis-in-gebruik"
+
+
 class JournalUnavailable(Exception):
     """Het journaal is niet bruikbaar: niets uitvoeren."""
 
@@ -82,6 +87,7 @@ class Journal:
     def __init__(self, path: Path, secrets_dir: Path) -> None:
         self.path = path
         self.vault = Vault(secrets_dir)
+        self.anker = secrets_dir / KLUIS_ANKER
         self._sleutel = os.path.abspath(path)
         # Een stop die niet kon worden vastgelegd: (reden, nonce, after_hash, detail). Zie de kop van dit bestand.
         self._stop_in_geheugen: tuple[dict[str, Any], str | None, str | None, str] | None = None
@@ -89,9 +95,11 @@ class Journal:
         self._einde_in_geheugen: dict[str, tuple[str, str | None, str]] = {}
 
     @contextlib.contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
+    def _connect(self, *, aanmaken: bool = True) -> Iterator[sqlite3.Connection]:
         try:
             if not self.path.exists():
+                if not aanmaken:
+                    raise FileNotFoundError(self.path)
                 os.close(os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600))
             conn = sqlite3.connect(self.path, timeout=5, isolation_level=None)
         except (OSError, sqlite3.Error) as exc:
@@ -240,11 +248,25 @@ class Journal:
                 " VALUES (?, ?, ?, ?, ?)",
                 (request_id, app, nas_fingerprint, json.dumps(plekken, sort_keys=True), int(time.time())),
             )
+        # Na de rij: een anker zonder rij kan niet ontstaan, een rij zonder anker laat het journaal zelf gelden.
+        try:
+            os.close(os.open(self.anker, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600))
+        except OSError as exc:
+            raise JournalUnavailable(type(exc).__name__) from None
 
     def kluis_gemarkeerd(self, app: str) -> bool:
-        """Onleesbaar journaal: :class:`JournalUnavailable` (de aanroeper weigert dan, §8.3)."""
-        with self._connect() as conn:
-            return conn.execute("SELECT 1 FROM kluismarkering WHERE app = ?", (app,)).fetchone() is not None
+        """Onleesbaar of ontbrekend journaal: :class:`JournalUnavailable` (de aanroeper weigert dan, §8.3). Lezen maakt
+        nooit een journaal aan. Staat het anker er maar heeft het journaal geen enkele markering, dan is het journaal
+        niet mee hersteld: ook onbekend (R-VEILIG-2)."""
+        with self._connect(aanmaken=False) as conn:
+            rijen = conn.execute("SELECT app FROM kluismarkering").fetchall()
+        try:
+            anker = self.anker.exists()
+        except OSError:
+            anker = True
+        if anker and not rijen:
+            raise JournalUnavailable("kluismarkering_onvolledig")
+        return any(r[0] == app for r in rijen)
 
     # ------------------------------------------------------------------ gestopt na een afwijking
     @staticmethod

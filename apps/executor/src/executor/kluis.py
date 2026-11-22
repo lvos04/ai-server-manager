@@ -27,7 +27,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from executor import APP_ID
 from executor.firststart import IDENTITY
-from executor.hublink import HubLinkStore, HubResponse, hub_request, verify_hub_jwt
+from executor.hublink import HubLinkStore, HubResponse, check_doel, hub_request, verify_hub_jwt
 
 PAD = "/api/v1/executor/secret-claims"
 INFO = b"asm-kluis-afgifte-v1"
@@ -189,7 +189,8 @@ class Kluis:
         try:
             res = self.stuur(link, rest)
             jwt = res.body.get("afgifte") if res.status == 200 and isinstance(res.body, dict) else None
-            claims = verify_hub_jwt(str(jwt), link, audience=APP_ID)
+            # Alleen een geverifieerde Hub-dienstcontext met het afgiftekenmerk bereikt de ontsleuteling (R-VEILIG-1).
+            claims = check_doel(verify_hub_jwt(str(jwt), link, audience=APP_ID, afgifte=True), afgifte=True)
             ka = claims.get("kluis_afgifte")
             claim_sha = canonical_sha256(rest)
             if not (

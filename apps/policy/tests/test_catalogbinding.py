@@ -354,6 +354,9 @@ KLUIS_RIJEN: list[tuple[str, Any, dict[str, Any], str]] = [
      {"vault_refs": [
          {"path": "values.envs[0].value", "parameter": "app_secret_key", "ref": KLUISREF, "revision": REVISIE}]},
      "kluisplek_past_niet"),
+    ("extra plek met dezelfde kluisverwijzing",
+     [{"name": "APP_MODE", "value": "a"}, {"name": "APP_SECRET_KEY", "value": KLUISREF},
+      {"name": "API_TOKEN", "value": KLUISREF}], {}, "kluisplek_past_niet"),
     ("koppeling ontbreekt bij een tokenplek", None, {"koppeling": None}, "koppeling_past_niet"),
     ("koppeling met andere soort", None, {"koppeling": {**KOPPELING, "soort": "half"}}, "koppeling_past_niet"),
     ("koppeling met ongeldige vingerafdruk", None, {"koppeling": {**KOPPELING, "hub_key_fingerprint": "x"}},

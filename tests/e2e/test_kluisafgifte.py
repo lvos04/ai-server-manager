@@ -404,3 +404,89 @@ def test_stap_zonder_de_kluisplek_geeft_geen_voorstel(
         assert r.status_code == 409 and r.json()["code"] == "plan_stap_onverwacht", r.text
         with app.state.sessionmaker() as db:
             assert db.execute(sa.text("SELECT count(*) FROM app_geheim")).scalar_one() == 0
+
+
+def test_extra_plek_met_dezelfde_verwijzing_geeft_geen_voorstel(
+    admin: Any,
+    app: Any,
+    nas: Any,  # noqa: F811
+    worker_once: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """R-VEILIG-4: exact de vastgelegde plekken; een tweede plek met een bekende verwijzing krijgt geen voorstel."""
+    stap = copy.deepcopy(KLUISSTAP)
+    stap["app_create"]["values"]["envs"].append({"name": "API_TOKEN", "value": REF})
+    with maak_keten(admin, app, nas, worker_once, tmp_path, monkeypatch, KLUISREGEL, stap) as k:
+        r = _plan(k.stack.admin)
+        if r.status_code == 201:
+            r = _stel_voor(k.stack.admin, r.json())
+        assert r.status_code in (409, 422), r.text
+        assert not schrijfaanroepen(k.stack.nas)
+        with app.state.sessionmaker() as db:
+            assert db.execute(sa.text("SELECT count(*) FROM kluis_afgifte")).scalar_one() == 0
+
+
+def test_exp_van_het_afgiftebewijs_blijft_binnen_de_afgifte_na_verwerkingstijd(
+    kluisketen: Keten, app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R-VEILIG-3: exp wordt bij ondertekening begrensd op de vastgelegde eindtijd, ook na trage verwerking."""
+    import time
+
+    from hub.keys import KeyRing
+
+    _p, v = _voorstel(kluisketen)
+    kluis = app.state.vault()
+    ontsleutel, onderteken = kluis.decrypt, KeyRing._sign
+    gemeten: list[bool] = []
+
+    def traag(ref: str, nonce: Any, pakket: Any) -> Any:
+        if ref.startswith("vault://app/"):
+            time.sleep(2)
+        return ontsleutel(ref, nonce, pakket)
+
+    def meet(self: KeyRing, claims: dict[str, Any]) -> str:
+        if "kluis_afgifte" in claims:
+            with app.state.sessionmaker() as db:
+                einde = db.execute(sa.text("SELECT expires_at FROM kluis_afgifte")).scalar_one()
+            gemeten.append(claims["exp"] <= einde.timestamp())
+        return onderteken(self, claims)
+
+    monkeypatch.setattr(kluis, "decrypt", traag)
+    monkeypatch.setattr(KeyRing, "_sign", meet)
+    assert voer_uit(kluisketen.stack.admin, v).status_code == 200
+    assert gemeten == [True]
+
+
+def test_verstreken_venster_bij_ondertekening_geeft_geen_afgiftebewijs(
+    kluisketen: Keten, app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R-VEILIG-3: is het einde bij ondertekening voorbij, dan 410 en geen installatie (niet even 1 s extra)."""
+    from hub.catalog import kluis as uitgever
+
+    _p, v = _voorstel(kluisketen)
+    gezien: list[tuple[int, Any]] = []
+    from executor.kluis import Kluis
+
+    sturen = Kluis.stuur
+
+    def volg(self: Kluis, link: Any, rest: Any) -> Any:
+        res = sturen(self, link, rest)
+        gezien.append((res.status, res.body.get("code") if isinstance(res.body, dict) else None))
+        return res
+
+    from datetime import timedelta
+
+    uitgeven = uitgever.KeyRing.issue_hub_service_jwt
+
+    def verlopen(self: Any, **k: Any) -> Any:
+        # Alleen het afgiftebewijs: het einde ligt net vóór het moment van ondertekenen (echte begrenzing).
+        if k.get("kluis_afgifte") is not None:
+            k["uiterlijk"] = uitgever.utcnow() - timedelta(seconds=1)
+        return uitgeven(self, **k)
+
+    monkeypatch.setattr(Kluis, "stuur", volg)
+    monkeypatch.setattr(uitgever.KeyRing, "issue_hub_service_jwt", verlopen)
+    r = voer_uit(kluisketen.stack.admin, v)
+    assert r.status_code == 409 and r.json()["details"]["executor"]["code"] == "kluis_afgifte_mislukt", r.text
+    assert gezien == [(410, "afgifte_verlopen")] and kluisketen.stack.nas.created == []
