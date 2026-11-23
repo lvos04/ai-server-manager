@@ -45,6 +45,8 @@ testadressen
 wait_healthy "$hub"
 wait_healthy "$executor"
 
+# shellcheck source=deploy/smoke-controles.sh
+. "$(dirname "${BASH_SOURCE[0]}")/smoke-controles.sh"
 expect() {  # expect <omschrijving> <tekst> <patroon>  (geen grep -q in pipes: pipefail + SIGPIPE)
   if ! printf '%s' "$2" | grep -F -- "$3" >/dev/null; then echo "FOUT: $1: '$3' niet gevonden" >&2; exit 1; fi
   echo "ok: $1"
@@ -111,11 +113,6 @@ for url in "$hub_url/api/v1/services/00000000-0000-4000-8000-000000000000/rotate
     -H 'content-type: application/json' --data-binary @- "$url" || true)"
   test "$code" = 413 || { echo "FOUT: Content-Length > 1 MiB naar $url gaf $code i.p.v. 413" >&2; exit 1; }
 done
-# Geen root-processen meer en de AI-runner als aparte gebruiker:
-uids="$(docker exec -u 568 "$hub" sh -c 'for p in /proc/[0-9]*; do awk "/^Uid:/{print \$2}" $p/status 2>/dev/null; done' | sort -u | tr '\n' ' ')"
-echo "uid's in de Hub-container: $uids"
-case " $uids" in *" 0 "*) echo "FOUT: er draait nog een root-proces" >&2; exit 1;; esac
-case " $uids" in *" 569 "*) ;; *) echo "FOUT: AI-runner draait niet als aparte gebruiker 569" >&2; exit 1;; esac
 # PostgreSQL zonder TCP-poort; naar buiten alleen 30400 (web-UI), de API alleen op 127.0.0.1:8400.
 socks="$(docker exec -u 568 "$hub" sh -c 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk "NR>1 && \$4==\"0A\" {print \$2}"' | sort -u | tr '\n' ' ')"
 echo "luisterende sockets (hex ip:poort): $socks"
@@ -128,6 +125,17 @@ privs() {  # privs <container> <veld>: unieke waarden van <veld> in /proc/<pid>/
     pp=$(awk "/^PPid:/{print \$2}" $p/status 2>/dev/null); [ "$pp" = "$me" ] && continue; [ "$pp" = 0 ] && [ "$pid" != 1 ] && continue;
     awk -v f="$0:" "\$1==f{print \$2}" $p/status 2>/dev/null; done' "$2" | sort -u | tr '\n' ' '
 }
+uid_paren() {  # uid_paren <container>: unieke "reële effectieve" UID per blijvend proces (zelfde uitsluiting als privs)
+  docker exec -u 568 "$1" sh -c 'me=$$; for p in /proc/[0-9]*; do pid=${p#/proc/}; [ "$pid" = "$me" ] && continue;
+    pp=$(awk "/^PPid:/{print \$2}" $p/status 2>/dev/null); [ "$pp" = "$me" ] && continue; [ "$pp" = 0 ] && [ "$pid" != 1 ] && continue;
+    awk "/^Uid:/{print \$2, \$3}" $p/status 2>/dev/null; done' | sort -u
+}
+# Geen root-processen: de Hub draait als 568 met de AI-runner apart als 569, de executor alleen als 568 (exact numeriek).
+v="$(uid_paren "$hub")"; echo "uid's (reëel effectief) in de Hub-container: ${v//$'\n'/ | }"
+uids_toegestaan "Hub: elk proces reëel en effectief 568 of 569" "$v" 568 569 || exit 1
+uid_aanwezig "Hub: AI-runner als aparte gebruiker 569" "$v" 569 || exit 1
+v="$(uid_paren "$executor")"; echo "uid's (reëel effectief) in de executor-container: ${v//$'\n'/ | }"
+uids_toegestaan "executor: elk proces reëel en effectief 568" "$v" 568 || exit 1
 # Contract 1.3 §2.2 (C1.3-ASM-01): ook CapPrm en CapAmb 0 en — bij een start als root — een lege bounding set.
 for c in "$hub" "$executor"; do
   v="$(privs "$c" NoNewPrivs)"; echo "NoNewPrivs in $c: $v"
@@ -145,7 +153,7 @@ for pair in "$hub /usr/local/lib/hub/healthcheck.py" "$executor /usr/local/lib/e
   out="$(docker exec "$1" python "$2" --controle)"
   for want in $'Uid\t568' $'CapEff\t0000000000000000' $'CapPrm\t0000000000000000' $'CapAmb\t0000000000000000' \
               $'CapBnd\t0000000000000000' $'NoNewPrivs\t1'; do
-    expect "healthcheck $1 na de wissel: ${want/$'\t'/ }" "$out" "$want"
+    exacte_regel "healthcheck $1 na de wissel: ${want/$'\t'/ }" "$out" "$want" || exit 1
   done
 done
 # "Custom User 568" aangevinkt: geen eigenaarschapsstap en geen lege bounding set mogelijk; CapEff/CapPrm/CapAmb 0 en
@@ -153,6 +161,7 @@ done
 executor568=$(docker run -d --cidfile "$WORK/executor568.cid" --network none -u 568:568 "$EXEC_IMAGE")
 wait_healthy "$executor568"
 v="$(privs "$executor568" NoNewPrivs)"; test "$v" = "1 " || { echo "FOUT: Custom User 568 zonder no_new_privs" >&2; exit 1; }
+uids_toegestaan "Custom User 568: elk proces reëel en effectief 568" "$(uid_paren "$executor568")" 568 || exit 1
 for f in CapEff CapPrm CapAmb; do
   v="$(privs "$executor568" "$f")"
   test "$v" = "0000000000000000 " || { echo "FOUT: Custom User 568: $f ≠ 0 ($v)" >&2; exit 1; }
@@ -164,11 +173,14 @@ CODE="$(docker logs "$hub" 2>&1 | awk '/SETUPCODE \(eenmalig/ {c=$NF} END {print
 test -n "$CODE"
 PW='Rooktest-Wachtwoord-123!'
 api() { rook_curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' -H 'content-type: application/json' "$@"; }
-test "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"beheerder\",\"password\":\"$PW\"}" \
-  "$hub_url/api/v1/setup/admin")" = 200 && echo "ok: eerste beheerder aangemaakt via de webpoort"
-test "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"tweede\",\"password\":\"$PW\"}" \
-  "$hub_url/api/v1/setup/admin")" = 409 && echo "ok: setupcode is eenmalig"
-EXEC_ID="$(rook_curl -fsS --noproxy '*' "$executor_url/api/v1/status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')"
+# Elke vergelijking via gelijk … || exit 1: onder set -e breekt een mislukte test in een en-lijst het script niet af.
+gelijk "eerste beheerder aangemaakt via de webpoort" "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"beheerder\",\"password\":\"$PW\"}" \
+  "$hub_url/api/v1/setup/admin")" 200 || exit 1
+gelijk "setupcode is eenmalig" "$(api -X POST -d "{\"setup_code\":\"$CODE\",\"username\":\"tweede\",\"password\":\"$PW\"}" \
+  "$hub_url/api/v1/setup/admin")" 409 || exit 1
+exec_id() { rook_curl -fsS --noproxy '*' "$executor_url/api/v1/status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])'; }
+EXEC_ID="$(exec_id)"
+test -n "$EXEC_ID" || { echo "FOUT: geen executor-identiteit gelezen" >&2; exit 1; }
 for how in restart kill; do
   if [ "$how" = restart ]; then docker restart -t 30 "$hub" "$executor" >/dev/null
   else docker kill -s KILL "$hub" "$executor" >/dev/null; docker start "$hub" "$executor" >/dev/null; fi
@@ -176,12 +188,11 @@ for how in restart kill; do
   wait_healthy "$hub"
   wait_healthy "$executor"
   expect "na $how: setup blijft afgerond" "$(rook_curl -fsS --noproxy '*' "$hub_url/api/v1/setup/status")" '"setup_vereist":false'
-  test "$(api -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" "$hub_url/api/v1/auth/login")" = 200 \
-    && echo "ok: na $how: inloggen met het bestaande account"
+  gelijk "na $how: inloggen met het bestaande account" \
+    "$(api -X POST -d "{\"username\":\"beheerder\",\"password\":\"$PW\"}" "$hub_url/api/v1/auth/login")" 200 || exit 1
   n="$(docker logs "$hub" 2>&1 | grep -c 'SETUPCODE (eenmalig' || true)"
   test "$n" = 1 || { echo "FOUT: na $how verscheen een nieuwe setupcode ($n)" >&2; exit 1; }
-  test "$(rook_curl -fsS --noproxy '*' "$executor_url/api/v1/status" | python3 -c 'import json,sys; print(json.load(sys.stdin)["identiteit"]["x"])')" = "$EXEC_ID" \
-    && echo "ok: na $how: executor-identiteit ongewijzigd (geheimen niet overschreven)"
+  gelijk "na $how: executor-identiteit ongewijzigd (geheimen niet overschreven)" "$(exec_id)" "$EXEC_ID" || exit 1
 done
 expect "harde kill: oude postmaster.pid opgeruimd" "$(docker logs "$hub" 2>&1)" 'oude postmaster.pid'
 
