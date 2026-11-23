@@ -391,6 +391,110 @@ def test_geheimen_van_de_eigenaar_worden_gemaskeerd_voor_opslag(keten: Keten, so
 # ------------------------------------------------------------------ S-P2-140b: automation.flows.restore (B11-005)
 FLOWBRON = {**DOEL, "resource": "node_red"}
 MOMENTOPNAME = {"snapshot_id": "0b1c2d3e-4f50-4617-8899-aabbccddeeff"}
+EIGENAARSAANVRAGEN = [
+    pytest.param("automation.flows.restore", FLOWBRON, MOMENTOPNAME, id="flow"),
+    pytest.param("sso.sessions.revoke", DOEL, SESSIES, id="sessies"),
+]
+
+
+def _herstelbewijs(v: dict[str, Any]) -> dict[str, Any]:
+    antwoord = _ontvangst(v)
+    antwoord["readback"] = {
+        **MOMENTOPNAME,
+        "gelezen": True,
+        "gelijk_aan_momentopname": True,
+        "checksum_sha256": antwoord["after_hash"].removeprefix("sha256:"),
+    }
+    return antwoord
+
+
+@pytest.mark.parametrize(("actie", "doel", "parameters"), EIGENAARSAANVRAGEN)
+@pytest.mark.parametrize("veld", ["resource", "parameters", "andere_host", "host_null", "zonder_host", "standaardhost"])
+def test_eigenaarsvoorstel_hoort_bij_de_aanvraag(
+    keten: Keten, actie: str, doel: dict[str, str], parameters: dict[str, Any], veld: str
+) -> None:
+    antwoord = keten.eigenaar._propose({"action_id": actie, "target": dict(doel), "parameters": parameters}).body
+    if veld == "resource":
+        antwoord["target"]["resource"] = "andere_bron"
+    elif veld == "parameters":
+        # Ook een verschil in JSON-type telt: false is geen 0.
+        antwoord["parameters"] = (
+            {"snapshot_id": str(uuid.uuid4())}
+            if actie == "automation.flows.restore"
+            else {**parameters, "all_users": 0}
+        )
+    elif veld == "zonder_host":
+        del antwoord["target"]["host_id"]
+    elif veld == "standaardhost":
+        doel = {k: v for k, v in doel.items() if k != "host_id"}
+    else:
+        antwoord["target"]["host_id"] = None if veld == "host_null" else "andere_host"
+    keten.eigenaar.propose_reply = Reply(201, antwoord)
+    r = stel_voor(keten.stack.admin, actie, doel, parameters)
+    if veld in ("zonder_host", "standaardhost"):
+        assert (r.status_code, r.json()["status"]) == (201, "wacht_op_goedkeuring")
+    else:
+        assert (r.status_code, r.json().get("code")) == (409, "doel_onbekend")
+        assert "preview" not in r.json()
+    assert not keten.apply_paden()
+
+
+def _controleer_onbekende_uitkomst(keten: Keten, v: dict[str, Any]) -> None:
+    admin = keten.stack.admin
+    r = voer_uit(admin, v)
+    bewaard = haal(admin, v)
+    assert (r.status_code, r.json().get("code"), bewaard["status"]) == (502, "uitkomst_onbekend", "onbekend")
+    assert bewaard["goedkeuring"]["gebruikt_op"] is not None
+    assert not _events(keten, "action.run.succeeded", v["request_id"])
+    assert voer_uit(admin, v).status_code == 409
+    assert len(keten.apply_paden()) == 1 and not schrijfaanroepen(keten.stack.nas)
+
+
+@pytest.mark.parametrize(("actie", "doel", "parameters"), EIGENAARSAANVRAGEN)
+def test_onbevestigde_502_van_de_eigenaar(
+    keten: Keten, actie: str, doel: dict[str, str], parameters: dict[str, Any]
+) -> None:
+    admin = keten.stack.admin
+    v = stel_voor(admin, actie, doel, parameters).json()
+    assert keur_goed(admin, v).status_code == 200
+    keten.eigenaar.apply_reply = Reply(502, {"code": "uitvoering_mislukt"})
+    _controleer_onbekende_uitkomst(keten, v)
+
+
+@pytest.mark.parametrize(
+    ("veld", "waarde"),
+    [
+        ("gelezen", False),
+        ("gelezen", 1),
+        ("gelijk_aan_momentopname", False),
+        ("snapshot_id", None),
+        ("snapshot_id", "00000000-0000-0000-0000-000000000001"),
+        ("checksum_sha256", "a" * 64),
+    ],
+    ids=["ongelezen", "geen_boolean", "afwijkend", "snapshot_ontbreekt", "andere_snapshot", "andere_checksum"],
+)
+def test_flowherstel_vergt_bewijs_van_de_gevraagde_momentopname(keten: Keten, veld: str, waarde: Any) -> None:
+    admin = keten.stack.admin
+    v = stel_voor(admin, "automation.flows.restore", FLOWBRON, MOMENTOPNAME).json()
+    assert keur_goed(admin, v).status_code == 200
+    antwoord = _herstelbewijs(v)
+    if waarde is None:
+        del antwoord["readback"][veld]
+    else:
+        antwoord["readback"][veld] = waarde
+    keten.eigenaar.apply_reply = Reply(200, antwoord)
+    _controleer_onbekende_uitkomst(keten, v)
+
+
+@pytest.mark.parametrize(
+    "readback",
+    [{}, {"ingetrokken_sessies": False}, {"ingetrokken_sessies": -1}, {"ingetrokken_sessies": 0, "gelezen": False}],
+    ids=["leeg", "boolean", "negatief", "ongelezen"],
+)
+def test_sessies_intrekken_vergt_een_teruggelezen_aantal(keten: Keten, readback: dict[str, Any]) -> None:
+    v = _goedgekeurd(keten)
+    keten.eigenaar.apply_reply = Reply(200, {**_ontvangst(v), "readback": readback})
+    _controleer_onbekende_uitkomst(keten, v)
 
 
 def test_flowherstel_voorstel_goedkeuring_ondertekend_verzoek_met_de_juiste_vorm(keten: Keten) -> None:
@@ -405,9 +509,10 @@ def test_flowherstel_voorstel_goedkeuring_ondertekend_verzoek_met_de_juiste_vorm
     assert v["preview"]["requires_backup"] is False
     assert voer_uit(admin, v).json()["code"] == "goedkeuring_nodig"
     assert keur_goed(admin, v).status_code == 200
-    keten.eigenaar.apply_reply = Reply(200, _ontvangst(v))
+    keten.eigenaar.apply_reply = Reply(200, _herstelbewijs(v))
     r = voer_uit(admin, v)
     assert r.status_code == 200 and haal(admin, v)["status"] == "uitgevoerd", r.text
+    assert len(_events(keten, "action.run.succeeded", v["request_id"])) == 1
     [verzoek] = keten.eigenaar.geaccepteerd
     voorstel = verzoek["proposal"]
     assert (voorstel["action_id"], voorstel["target"], voorstel["parameters"]) == (

@@ -74,19 +74,22 @@ class FakeEigenaar(FakeHTTP):
         aid = body.get("action_id")
         if aid not in BACKUP:
             return _fout(422, "onbekende_actie")
-        diff = [{"object": "sessies", "operation": "intrekken", "parameters": body.get("parameters")}]
+        if aid == "automation.flows.restore":
+            diff = [{"object": "node_red", "operation": "terugzetten", "parameters": body["parameters"]}]
+        else:
+            diff = [{"object": "sessies", "operation": "intrekken", "parameters": body["parameters"]}]
         voorstel = {
             "proposal_id": str(uuid.uuid4()),
             "action_id": aid,
-            "target": {"system": "authentik"},
-            "parameters": body.get("parameters"),
+            "target": body["target"],
+            "parameters": body["parameters"],
             "resource_etag": self.etag,
             "diff": diff,
             "requires_backup": BACKUP[aid],
         }
-        voorstel["preview_hash"] = canonical_sha256([aid, body.get("parameters"), diff, self.etag]).removeprefix(
-            "sha256:"
-        )
+        voorstel["preview_hash"] = canonical_sha256(
+            [aid, body["target"], body["parameters"], diff, self.etag]
+        ).removeprefix("sha256:")
         self.voorstellen[voorstel["preview_hash"]] = voorstel
         return Reply(201, voorstel)
 

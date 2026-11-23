@@ -218,6 +218,9 @@ vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbeke
   ondertekende verzoek staat in `approval.preview_hash` de hash van de eigenaar; `expected_version` is
   `sha256:<resource_etag>`. De eigenaar controleert bij `apply` dat de goedkeuring bij zijn eigen voorstel hoort. `requires_backup` geldt als het beleid of de eigenaar het vraagt. De `diff` gaat in de
   preview door dezelfde maskeerregel als elke andere wijziging.
+- Bij `sso.sessions.revoke` en `automation.flows.restore` vergelijkt de Hub ook het doel en de parameters uit
+  het eigenaarsvoorstel met de eigen aanvraag. Een weggelaten `host_id` staat voor de standaardhost. Een andere
+  host, extra of ontbrekende velden en verschillen in JSON-type geven `409 doel_onbekend` vóór de preview.
 - **Uitvoeren.** Het ondertekende verzoek gaat naar `POST /connector/v1/apply` van de eigenaar. De Hub controleert
   het vooraf zelf met `uitvoerder` `eigenaar:<app_id>`. Bij elke goedkeuring en elke uitvoering vraagt de Hub
   opnieuw een voorstel; een andere `resource_etag` of `preview_hash` laat de goedkeuring vervallen (EX19).
@@ -237,6 +240,10 @@ vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbeke
 Readback, afwijkingen en foutdetails van de eigenaar en de executor neemt de Hub alleen over in de vaste velden
 hierboven; geneste waarden onder een geheim-achtige naam (`client_secret`, `token`, …) worden `***` vóór opslag
 (`hub.redact.redact`). Dezelfde maskering geldt bij teruglezen en bij een herhaling met dezelfde `Idempotency-Key`.
+
+Voor `sso.sessions.revoke` bevat de teruglezing het gehele, niet-negatieve aantal `ingetrokken_sessies`. Als de
+eigenaar ook `gelezen` meestuurt, moet dat `true` zijn. Een onbevestigde teruglezing of een 502 met
+`uitvoering_mislukt` van de eigenaar laat de uitkomst onbekend. De goedkeuring blijft verbruikt.
 
 De Hub meet nog geen B12-back-up van de Authentik-database. Daarom blijft `sso.oidc.hub.register` geblokkeerd. De
 AI kan geen van beide acties voorstellen: de route laat alleen de aangemelde gebruiker als actor toe en het beleid
@@ -258,7 +265,10 @@ net als `sso.sessions.revoke`:
 | `requires_backup` | `false` in het beleid. De eigenaar legt zelf vóór en na het herstel een versleutelde momentopname vast (`voor_herstel`, `na_herstel`); terugdraaien is een nieuw voorstel naar die momentopname. De Hub meet geen B12-back-up van de Node-RED-data, dus `true` zou het herstel altijd blokkeren zonder extra bescherming. Vraagt de eigenaar in zijn voorstel toch een back-up, dan geldt die (zie hierboven). |
 | wie stelt voor | alleen een mens (`ai_mag_voorstellen: false`): de AI krijgt `422 actor_past_niet`; een flow (`flow.action.requested`) of spraak wordt een geweigerd voorstel met `alleen_beheerder`. Een flow kan zo nooit zijn eigen herstel starten. |
 
-Bewijs bij `200 uitgevoerd`, onzekere 5xx en maskering: zoals in de tabel hierboven. Getest met de fake eigenaar
+Bij `200 uitgevoerd` moeten `readback.gelezen` en `readback.gelijk_aan_momentopname` beide `true` zijn.
+`readback.snapshot_id` moet de UUID uit de goedgekeurde aanvraag zijn. De Hub vergelijkt
+`readback.checksum_sha256` met de 64 hextekens van `after_hash`. Ontbrekend of tegenstrijdig bewijs geeft
+`502 uitkomst_onbekend` en nul succesevents. Getest met de fake eigenaar
 (Sim-getest): `tests/e2e/test_eigenaar_acties.py` (koppen `test_flowherstel_*`, `test_de_ai_kan_flowherstel_*`),
 `apps/api/tests/integration/test_flow_voorstellen.py::test_flow_kan_zijn_eigen_herstel_niet_voorstellen` en
 `apps/policy/tests/test_policy.py` (`test_flowherstel_*`). De proef met de echte home-control-hub volgt in S-P2-340.

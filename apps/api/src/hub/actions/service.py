@@ -35,9 +35,10 @@ from datetime import datetime, timedelta
 from typing import Any, NoReturn
 
 from asm_policy import Policy, execreq
+from asm_policy.canonical import CanonicalError, canonical_json
 from asm_policy.engine import Classification, class_at_least, classify
 from asm_policy.loader import ActieDef
-from asm_policy.params import validate_parameters, validate_target, vault_refs
+from asm_policy.params import HOST_IDS, validate_parameters, validate_target, vault_refs
 from asm_policy.verify import check_decision, check_envelope
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
@@ -1013,6 +1014,23 @@ def _stopgegevens(reden: Any, gestopt: Any) -> dict[str, Any]:
     return uit
 
 
+def _readback_bevestigt(req: ActionRequest, readback: dict[str, Any], after_hash: str) -> bool:
+    """Toets de teruggelezen toestand aan de actie waarvoor de goedkeuring is verbruikt."""
+    if req.action_id == "automation.flows.restore":
+        snapshot_id = _vorm(readback.get("snapshot_id"), UUID_RE)
+        return (
+            readback.get("gelezen") is True
+            and readback.get("gelijk_aan_momentopname") is True
+            and snapshot_id is not None
+            and snapshot_id == req.parameters.get("snapshot_id")
+            and readback.get("checksum_sha256") == after_hash.removeprefix("sha256:")
+        )
+    if req.action_id == "sso.sessions.revoke":
+        aantal = readback.get("ingetrokken_sessies")
+        return readback.get("gelezen", True) is True and type(aantal) is int and aantal >= 0
+    return True
+
+
 def _bewijs_uitgevoerd(body: Mapping[str, Any], policy_hash: str, req: ActionRequest) -> dict[str, Any] | None:
     """Het resultaat van een geslaagde uitvoering, of ``None`` als het bewijs niet volledig is (S-P2-040, R-VEILIG-2):
     ``methode``, ``before_hash``, ``after_hash``, ``uitgevoerd_op`` en ``policy_hash`` (gelijk aan het eigen beleid)
@@ -1022,10 +1040,13 @@ def _bewijs_uitgevoerd(body: Mapping[str, Any], policy_hash: str, req: ActionReq
     readback = _structuur(body.get("readback"), dict)
     if body.get("request_id") != str(req.id) or body.get("action_id") != req.action_id or readback is None:
         return None
+    after_hash = _vorm(body.get("after_hash"), HASH_RE)
+    if after_hash is None or not _readback_bevestigt(req, readback, after_hash):
+        return None
     bewijs = {
         "methode": _vorm(body.get("methode"), METHODE_RE),
         "before_hash": _vorm(body.get("before_hash"), HASH_RE),
-        "after_hash": _vorm(body.get("after_hash"), HASH_RE),
+        "after_hash": after_hash,
         "policy_hash": policy_hash if body.get("policy_hash") == policy_hash else None,
         "uitgevoerd_op": _tijd(body.get("uitgevoerd_op")),
     }
@@ -1153,6 +1174,22 @@ def _eigenaar_onbekend(reden: str) -> HubError:
     )
 
 
+def _zelfde_eigenaarsaanvraag(
+    body: Mapping[str, Any], target: Mapping[str, Any], parameters: Mapping[str, Any]
+) -> bool:
+    eigen_doel = body.get("target")
+    standaardhost = {"host_id": HOST_IDS[0]}
+    if not isinstance(eigen_doel, dict) or eigen_doel.get("host_id", HOST_IDS[0]) not in HOST_IDS:
+        return False
+    if (standaardhost | eigen_doel) != (standaardhost | dict(target)):
+        return False
+    try:
+        # De ondertekening onderscheidt ook false en 0 in geneste parameters.
+        return canonical_json(body.get("parameters")) == canonical_json(dict(parameters))
+    except CanonicalError:
+        return False
+
+
 def _eigenaar_voorstel(
     db: Session,
     settings: Settings,
@@ -1220,6 +1257,10 @@ def _eigenaar_voorstel(
         or body.get("action_id") != actie.action_id
     ):
         raise _eigenaar_onbekend("eigenaar_antwoord_ongeldig")
+    if actie.action_id in ("automation.flows.restore", "sso.sessions.revoke") and not _zelfde_eigenaarsaanvraag(
+        body, target, parameters
+    ):
+        raise _eigenaar_onbekend("eigenaar_aanvraag_wijkt_af")
     return Doel(
         "eigenaar",
         eigenaar,
@@ -1705,7 +1746,7 @@ def _verwerk(
             "een incident gemaakt en er wordt niets herhaald.",
             {**velden, "request_id": str(req.id)},
         )
-    if res.status == 502 and code == "uitvoering_mislukt":
+    if not eigenaar and res.status == 502 and code == "uitvoering_mislukt":
         velden = _van_executor(details, MISLUKT_VELDEN)
         stop = _stopgegevens(velden["reden"], velden.get("gestopt"))
         _sluit(
