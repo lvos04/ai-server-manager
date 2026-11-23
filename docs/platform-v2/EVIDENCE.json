@@ -100,6 +100,16 @@
     "bijgewerkt": "2026-11-22"
   },
   {
+    "id": "B12-005",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit b9ba96f (S-P2-100); tests/e2e/test_hersteltest.py::test_ex14_snapshot_herstel_in_de_zandbak_oude_waarde_terug_productie_onaangeroerd (robot: kloon via R1-voorstel en executor in <pool>/asm-sandbox/<naam>, geslaagd, restore_test vastgelegd), ::test_kapotte_checksum_maakt_het_herstelpunt_ongezond_en_de_pre_update_gate_dicht (echte pg_dump-export eerst geslaagd met gelijke aantallen per tabel in de proefdatabase; daarna kapotte checksum: mislukt, herstelpunt ongezond, app.update geblokkeerd met herstelpunt_ongezond, een nieuwe beoordeling zet ongezond niet terug), ::test_robot_faalt_als_de_productiedatabase_verandert (productie_gewijzigd → ongezond), ::test_kloon_buiten_de_zandbak_wordt_geweigerd_en_telt_niet, ::test_kloon_van_een_andere_snapshot_hoort_niet_bij_het_herstelpunt, ::test_kijker_en_operator_mogen_de_robot_niet_starten; executor weigert een kloon buiten asm-sandbox: apps/executor/tests/test_uitvoeren.py::test_snapshot_buiten_de_sandbox_of_op_een_onbekende_dataset; apps/api/tests/integration/test_hersteltest.py::test_export_in_proefdatabase_gelijke_aantallen_en_altijd_opgeruimd, ::test_bronpad_via_symbolische_koppeling_geweigerd (V-095); apps/api/tests/unit/test_hersteltest.py (HARDE EIS: elk verschil in aantallen per tabel van kijkgeschiedenis of voortgang is mislukt; ongeldige tellingen onbekend; media-herstelpunt zonder database onbekend)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): kloon en hersteltest op een echte TrueNAS en de proefdatabase in de alles-in-één image zijn niet getest; hoort in STAPPEN_P6.md. Database-exports van Emby, de mediaserver en MediaGuard komen via hun connector (nog niet beschikbaar): tot dan is de hersteltest daar onbekend (database_export_ontbreekt), nooit geslaagd.",
+    "opmerking": "POST /api/v1/backups/herstelpunten/{id}/hersteltest (beheerder). Positief bewijs: alleen kloon van elke dataset + gelijke checksum + gelijke aantallen per tabel + onveranderde productie is geslaagd. De robot vraagt geen actie buiten de vaste lijst; terugzetten op productie bestaat niet. VERSIE 2: robot als job, kloon automatisch voorstellen en opruimen met goedkeuring, proef op een eigen PostgreSQL-instantie (de vingerafdruk dekt nu de tabellen die alleen een gebruiker wijzigt).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
+  },
+  {
     "id": "B12-006",
     "status": "Bezig",
     "validatie": "Sim-getest; NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS)",
@@ -108,6 +118,16 @@
     "opmerking": "De gate kan niet worden weggeklikt (geen override). Database-exports van andere apps dan de Hub komen via hun connector (P3); tot dan is een herstelpunt van Emby, de mediaserver of MediaGuard nooit geverifieerd. Het MediaGuard-geval in de e2e gebruikt een herkenning via monkeypatch; de herkenning zelf komt uit asm_policy.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-22"
+  },
+  {
+    "id": "B12-007",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit b9ba96f (S-P2-100); GET /api/v1/backups/rampenscenario (vijf scenario's: poolverlies, uitgelekte sleutel, foutieve appmigratie, MediaGuard terugzetten, verhuizing; met RPO/RTO uit D16 en de laatste hersteltests); apps/api/tests/unit/test_hersteltest.py::test_rampenscenario_dekt_b12_007_zonder_terminalstap (geen terminalstap, V-096); oefening op de teststack zonder de oorspronkelijke NAS: apps/api/tests/integration/test_hersteltest.py::test_rampenscenario_oefening_hub_database_vault_en_koppelingen (echte export in een nieuwe database; met de apart bewaarde vault-sleutel opent het geheim weer, TrueNAS-koppeling terug, alle aantallen per tabel gelijk)",
+    "blokkade": "NIET GEVALIDEERD (hardware): oefening op andere hardware is niet gedaan. Een knop om in een nieuwe Hub een export als database te gebruiken ontbreekt nog (capability_unavailable); het scenario noemt dat eerlijk en wijst naar de oude installatie als terugval.",
+    "opmerking": "Stappen alleen via de Hub en de TrueNAS-web-UI. VERSIE 2: scherm in de web-UI (na A-ONTWERP), herstel-uit-export in de Hub, kwartaaloefening met gemeten RTO.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
   },
   {
     "id": "I01-01-04",
@@ -808,6 +828,26 @@
     "opmerking": "Gate-deel uit S-P2-060; het back-upbeleid (B12-004/B12-006) kwam in S-P2-090. Een mislukte export gaf al een kritiek incident (backup.eigen_mislukt); nu ook een export die te oud wordt (backup.verouderd, ernst kritiek). Nog nooit een geverifieerde export is 'ontbreekt': de gate is dan dicht, maar er komt geen apart incident (VERSIE 2). Open (VERSIE 2, R-VEILIG-4/-5): het incident backup.verouderd sluit nog als het bewijs wegvalt zonder nieuwe export (de gate blijft dan wel dicht), en bij een volle incidentwachtrij kan één overgang twee events geven.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-22"
+  },
+  {
+    "id": "EX13",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit b9ba96f (S-P2-100); apps/api/tests/integration/test_hersteltest.py::test_ex13_externe_back_up_exacte_inhoud_en_database_integriteit (nagebootste download van export, .sha256 en foto: foto byte-gelijk, export met dezelfde SHA-256 hersteld in een proefdatabase met gelijke aantallen per tabel; beschadigde download: mislukt checksum_afwijkend)",
+    "blokkade": "NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS): hersteltest vanaf de echte OneDrive is niet gedaan; hoort in STAPPEN_P6.md.",
+    "opmerking": "De download zelf is in de simulator een gekopieerde map; geen echt account gebruikt.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
+  },
+  {
+    "id": "EX14",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit b9ba96f (S-P2-100); tests/e2e/test_hersteltest.py::test_ex14_snapshot_herstel_in_de_zandbak_oude_waarde_terug_productie_onaangeroerd (nagebootste TrueNAS: appconfig 'oud' in de snapshot, productie daarna 'nieuw'; kloon via R1-voorstel en executor naar testpool/asm-sandbox/proef geeft 'oud', productie blijft 'nieuw'; schrijfaanroepen alleen app.create, pool.snapshot.create, pool.snapshot.clone)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): snapshot-herstel in de zandbak op een echte TrueNAS is niet gedaan; hoort in STAPPEN_P6.md.",
+    "opmerking": "Productie wordt nooit teruggezet: alleen klonen naar <pool>/asm-sandbox/<naam>.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
   },
   {
     "id": "EX27",
