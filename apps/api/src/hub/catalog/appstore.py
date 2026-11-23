@@ -8,16 +8,20 @@ nooit een gegokte entry. Er wordt niets in de appstore gewijzigd.
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
+from asm_policy.canonical import CanonicalError, canonical_sha256
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub.config import Settings
 from hub.keys import KeyRing
 from hub.models import CatalogApp, Service
+from hub.monitoring.monitorplan import uit_manifest
 from hub.registry import service_base_url
 from hub.servicecalls import ServiceCallError, call
 from hub.timeutil import iso, utcnow
@@ -92,6 +96,56 @@ def fetch_entries(base: str, keyring: KeyRing, svc: Service, settings: Settings)
     return entries
 
 
+def _vorig_monitor(previous: dict[str, Any] | None) -> Any:
+    prev = previous or {}
+    return prev.get("monitor") or (prev.get("laatst_bekend") or {}).get("monitor")
+
+
+def fetch_monitor(
+    base: str, keyring: KeyRing, svc: Service, settings: Settings, e: dict[str, Any], previous: dict[str, Any] | None
+) -> dict[str, Any]:
+    """``healthcheck.monitor`` uit het manifest van de laatste versie (monitorplan, C1.3-ASM-20). Alleen als de Hub de
+    manifesthash zelf narekent; een bekende hash wordt niet opnieuw opgehaald. Elke twijfel geeft ``onbekend``."""
+    latest = e.get("latest_version") if isinstance(e.get("latest_version"), dict) else {}
+    assert isinstance(latest, dict)
+    sha = latest.get("manifest_sha256")
+    prev = _vorig_monitor(previous)
+    if isinstance(prev, dict) and isinstance(sha, str) and prev.get("manifest_sha256") == sha:
+        return prev
+    try:
+        vid = str(uuid.UUID(str(latest.get("id"))))
+    except ValueError:
+        return {"status": "onbekend", "reden": "versie_onbekend"}
+    if not isinstance(sha, str):
+        return {"status": "onbekend", "reden": "versie_onbekend"}
+    bearer, _jti = keyring.issue_hub_service_jwt(audience=APPSTORE_APP_ID, service_id=str(svc.id))
+    try:
+        res = call(
+            base,
+            "GET",
+            f"/catalog/v1/versions/{vid}",
+            bearer=bearer,
+            connect_timeout=settings.service_call_connect_timeout,
+            read_timeout=settings.service_call_read_timeout,
+        )
+    except ServiceCallError:
+        return {"status": "onbekend", "reden": "manifest_onbereikbaar"}
+    body = res.body if res.status == 200 and isinstance(res.body, dict) else {}
+    manifest = body.get("manifest")
+    try:
+        herberekend = canonical_sha256(manifest) if isinstance(manifest, Mapping) else None
+    except CanonicalError:
+        herberekend = None
+    if not (
+        herberekend == sha == body.get("manifest_sha256")
+        and body.get("id") == vid
+        and body.get("app_id") == e["app_id"]
+    ):
+        return {"status": "onbekend", "reden": "manifest_ongeldig"}
+    assert isinstance(manifest, Mapping)
+    return uit_manifest(manifest, sha)
+
+
 def sync_appstore(db: Session, settings: Settings, keyring: KeyRing, *, now: datetime | None = None) -> dict[str, Any]:
     now = now or utcnow()
     rows = list(db.scalars(select(CatalogApp)))
@@ -119,7 +173,7 @@ def sync_appstore(db: Session, settings: Settings, keyring: KeyRing, *, now: dat
         key = row.app_id or row.runtime_id
         e = entries.get(key)
         if e is not None:
-            _set(row, _entry(e, now), now)
+            _set(row, {**_entry(e, now), "monitor": fetch_monitor(base, keyring, svc, settings, e, row.appstore)}, now)
             linked += 1
         else:
             _set(

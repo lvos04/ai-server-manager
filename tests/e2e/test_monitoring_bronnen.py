@@ -16,6 +16,7 @@ import pytest
 from conftest import enroll_body, idem, login_as, make_user
 from fakes.fake_monitoring import FakeBeszel, FakeDienst, FakeUptimeKuma, nas_stats
 from fakes.fake_truenas import FakeTrueNAS, _app
+from monitorhulp import bevestig_monitor
 from nashelpers import connect, refresh
 from sqlalchemy import select
 
@@ -84,6 +85,11 @@ def test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_inget
     bron = r.json()["bron"]
     assert bron["status"]["status"] == "ok" and bron["status"]["versie"] == "2.5.9"
 
+    apps = _apps(admin)
+    # Monitorplan (C1.3-ASM-20): zonder handmatig bevestigde monitor nooit gezond, ook niet met een verse Kuma-monitor.
+    p = apps["prowlarr"]["gezondheid"]
+    assert (p["status"], p["reason_code"]) == ("unknown", "niet_bewaakt")
+    bevestig_monitor(app, apps["prowlarr"]["id"])
     apps = _apps(admin)
     # App van derden zonder eigen taken: een verse monitor 'up' maakt hem gezond.
     assert apps["prowlarr"]["gezondheid"]["status"] == "healthy"
@@ -282,6 +288,7 @@ def test_heartbeat_en_connector_health_200_zonder_jobs_is_degraded(
 
         hch = _apps(admin)["home-control-hub"]
         assert hch["adaptertype"] == "eigen_dienst"
+        bevestig_monitor(app, hch["id"])
         bearer = {"Authorization": f"Bearer {token}"}
         now = datetime.now(UTC)
 

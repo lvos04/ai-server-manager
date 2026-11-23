@@ -71,6 +71,8 @@ MELDINGEN: dict[str, str] = {
     "capability_unavailable": "De dienst biedt (nog) geen gezondheidsroute aan; gezond is niet vast te stellen.",
     "dienst_adres_onbekend": "Het adres van de dienst is niet gemeten (NAS-adres uit D03 + hostpoort uit de "
     "inventaris).",
+    "niet_bewaakt": "Niet bewaakt: er is geen handmatig bevestigde monitor in Uptime Kuma voor deze app (monitorplan); "
+    "zonder bevestiging telt de app niet als gezond.",
     "bron_credential_geweigerd": "De monitoringbron weigerde de API-key of het wachtwoord; de monitors gelden als "
     "onbekend tot er geldige gegevens zijn (nooit open of 'nog gezond').",
 }

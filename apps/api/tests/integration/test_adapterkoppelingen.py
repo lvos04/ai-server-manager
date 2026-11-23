@@ -40,7 +40,7 @@ from hub.models import (
     VaultSecret,
     WebSession,
 )
-from hub.monitoring import kuma, sources, timeseries
+from hub.monitoring import kuma, monitorplan, sources, timeseries
 from hub.monitoring.sources import upsert_observation
 from hub.registry import expected_repository
 from hub.routers import adapterkoppelingen, catalog
@@ -56,6 +56,13 @@ ANDERE_APP_ID = "media-source-optimizer"
 URL = "https://adapter.example"
 TWEEDE_BASIS = f"{URL}:8443"
 PEER = str(IPv4Address(bytes((192, 0, 2, 1))))
+
+
+@pytest.fixture(autouse=True)
+def _monitor_bevestigd(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Deze tests gaan over adaptergezondheid; de gate van het monitorplan (C1.3-ASM-20) staat hier open en wordt in
+    test_monitorplan.py en tests/e2e/test_monitoring_bronnen.py zelf getest."""
+    monkeypatch.setattr(monitorplan, "bewaakt", lambda *_a: True)
 
 
 def _bewaar_apps(db: Session, apps: dict[str, tuple[int, ...]]) -> None:

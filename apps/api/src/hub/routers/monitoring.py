@@ -16,7 +16,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 from sqlalchemy import select
 
 from hub import audit
@@ -520,3 +520,73 @@ def confirm_out_of_band(body: OutOfBandIn, db: DB, settings: SettingsDep, princi
     )
     db.flush()
     return idem.save(201, status(db, settings, utcnow()))
+
+
+# ------------------------------------------------------------------ monitorplan per app (C1.3-ASM-20, contract §9)
+class MonitorBevestigingIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    plan_sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$", description="plan_sha256 van de regel die je overnam")
+    bevestigd: StrictBool = Field(description="De monitor staat zo in Uptime Kuma (alleen true)")
+
+    @field_validator("bevestigd")
+    @classmethod
+    def _alleen_true(cls, v: bool) -> bool:
+        if v is not True:
+            raise ValueError("bevestigd moet true zijn")
+        return v
+
+
+@router.get(
+    "/monitorplan",
+    summary="Monitorplan per app (controle, adres, drempel) en de stand; de Hub maakt zelf geen Kuma-monitors aan",
+)
+def monitor_plan(db: DB, _: Operator) -> dict[str, Any]:
+    from hub.monitoring import monitorplan
+
+    return {"uitleg": monitorplan.UITLEG, "items": monitorplan.plan(db), "observed_at": iso(utcnow())}
+
+
+@router.post(
+    "/monitorplan/{app_id}/bevestiging",
+    status_code=201,
+    summary="Eén planregel als 'handmatig bevestigd' vastleggen (admin; audit, gebonden aan de inhoud van de regel)",
+    responses={409: {"description": "regel niet bevestigbaar of intussen gewijzigd (plan_gewijzigd)"}},
+)
+def confirm_monitor(
+    app_id: uuid.UUID, body: MonitorBevestigingIn, db: DB, principal: Admin, idem: Idem
+) -> JSONResponse:
+    from hub.monitoring import monitorplan
+
+    if (replay := idem.replay()) is not None:
+        return replay
+    row = db.get(CatalogApp, app_id)
+    if row is None or not row.aanwezig:
+        raise HubError(404, "not_found", "App niet gevonden.")
+    regel = monitorplan.regel(db, row)
+    if regel["plan_sha256"] is None:
+        raise HubError(
+            409,
+            "plan_niet_bevestigbaar",
+            "Voor deze app is er geen volledige planregel om te bevestigen.",
+            {"stand": regel["stand"], "reden": regel["reden"]},
+        )
+    if body.plan_sha256 != regel["plan_sha256"]:
+        raise HubError(
+            409, "plan_gewijzigd", "De planregel is intussen gewijzigd; neem de huidige regel over.",
+            {"plan_sha256": regel["plan_sha256"]},
+        )  # fmt: skip
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=principal.name,
+        action=monitorplan.BEVESTIGING_ACTIE,
+        target_type="catalog_app",
+        target_id=str(row.id),
+        details={
+            "plan_sha256": regel["plan_sha256"],
+            "controle": regel["controle"],
+            "soort_bewijs": "handmatig bevestigd",
+        },
+    )
+    db.flush()
+    return idem.save(201, monitorplan.regel(db, row))

@@ -116,6 +116,8 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/monitoring/coverage"): "viewer",
     ("GET", "/api/v1/monitoring/out-of-band"): "viewer",
     ("POST", "/api/v1/monitoring/out-of-band/bevestiging"): "admin",
+    ("GET", "/api/v1/monitoring/monitorplan"): "operator",
+    ("POST", "/api/v1/monitoring/monitorplan/{app_id}/bevestiging"): "admin",
     ("GET", "/api/v1/observability/nas"): "viewer",
     ("GET", "/api/v1/metrics/series"): "viewer",
     ("GET", "/api/v1/metrics/query"): "viewer",

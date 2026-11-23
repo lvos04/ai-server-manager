@@ -1775,6 +1775,28 @@
         "title": "Mediaservers",
         "type": "object"
       },
+      "MonitorBevestigingIn": {
+        "additionalProperties": false,
+        "properties": {
+          "bevestigd": {
+            "description": "De monitor staat zo in Uptime Kuma (alleen true)",
+            "title": "Bevestigd",
+            "type": "boolean"
+          },
+          "plan_sha256": {
+            "description": "plan_sha256 van de regel die je overnam",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Plan Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_sha256",
+          "bevestigd"
+        ],
+        "title": "MonitorBevestigingIn",
+        "type": "object"
+      },
       "MsoTestReceipt": {
         "properties": {
           "id": {
@@ -10381,6 +10403,99 @@
           }
         },
         "summary": "Heartbeat van een eigen dienst (Bearer service-token; dedupe op observed_at)",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/monitorplan": {
+      "get": {
+        "operationId": "monitor_plan_api_v1_monitoring_monitorplan_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Monitor Plan Api V1 Monitoring Monitorplan Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Monitorplan per app (controle, adres, drempel) en de stand; de Hub maakt zelf geen Kuma-monitors aan",
+        "tags": [
+          "monitoring"
+        ]
+      }
+    },
+    "/api/v1/monitoring/monitorplan/{app_id}/bevestiging": {
+      "post": {
+        "operationId": "confirm_monitor_api_v1_monitoring_monitorplan__app_id__bevestiging_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "App Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorBevestigingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "regel niet bevestigbaar of intussen gewijzigd (plan_gewijzigd)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Eén planregel als 'handmatig bevestigd' vastleggen (admin; audit, gebonden aan de inhoud van de regel)",
         "tags": [
           "monitoring"
         ]

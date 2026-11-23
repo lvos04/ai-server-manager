@@ -16,7 +16,8 @@ from hub.catalog.identity import same_destination
 from hub.catalog.profiles import BINNENKANT_HUB, BINNENKANT_P3, profile_for
 from hub.config import Settings
 from hub.models import AdapterLink, CatalogApp, HealthObservation, WorkerHeartbeat
-from hub.monitoring.health import TRUENAS_STATE, Component, evaluate, freshen
+from hub.monitoring import monitorplan
+from hub.monitoring.health import MELDINGEN, TRUENAS_STATE, Component, evaluate, freshen
 from hub.timeutil import utcnow
 from hub.truenas.connection import current_target
 
@@ -181,7 +182,7 @@ def app_health(
     # Discovery volgt ook wijzigingen van de ingeschreven dienst (service_id).
     limits = [_source_time(boundaries.get(row.runtime_id)), _source_time(row.bron.get("identiteit_sinds"))]
     since = max((stamp for stamp in limits if stamp is not None), default=None)
-    return evaluate(
+    out = evaluate(
         [runtime, *comps],
         now=now,
         identiteit_gevolgd=row.runtime_id in boundaries,
@@ -190,3 +191,9 @@ def app_health(
         binnenkant_vereist=prof.binnenkant_vereist,
         binnenkant_bron=prof.binnenkant,
     )
+    if out["status"] == "healthy" and not monitorplan.bewaakt(db, row):
+        # Monitorplan (C1.3-ASM-20): zonder handmatig bevestigde monitor in Uptime Kuma nooit gezond.
+        out.update(
+            status="unknown", reason_code="niet_bewaakt", melding=MELDINGEN["niet_bewaakt"], oorzaak="monitorplan"
+        )
+    return out
