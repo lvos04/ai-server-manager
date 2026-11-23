@@ -220,5 +220,5 @@ class KeyRing:
             algorithms=["EdDSA"],
             audience=audience,
             issuer=ISSUER,
-            options={"require": ["exp", "iat", "nbf", "sub", "aud", "iss", "jti"]},
+            options={"require": ["exp", "iat", "nbf", "sub", "aud", "iss", "jti"], "strict_aud": True},
         )

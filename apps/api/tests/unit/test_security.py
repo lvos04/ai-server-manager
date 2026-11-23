@@ -92,6 +92,16 @@ def test_jwt_kortlevend_en_verifieerbaar_via_jwks(keyring: KeyRing) -> None:
         keyring.issue_user_jwt(subject="u1", audience="x", roles=[], ttl_seconds=121)
 
 
+@pytest.mark.parametrize("doelgroepen", [["proefdienst"], ["proefdienst", "andere-proefdienst"]])
+def test_gebruikers_jwt_weigert_doelgroeplijsten(keyring: KeyRing, doelgroepen: list[str]) -> None:
+    token, _ = keyring.issue_user_jwt(subject="proeflezer", audience="proefdienst", roles=["viewer"], ttl_seconds=60)
+    claims = keyring.verify_user_jwt(token, audience="proefdienst")
+    claims["aud"] = doelgroepen
+    met_lijst = jwt.encode(claims, keyring.jwt_signing, algorithm="EdDSA")
+    with pytest.raises(jwt.InvalidAudienceError):
+        keyring.verify_user_jwt(met_lijst, audience="proefdienst")
+
+
 def test_policy_sleutel_verschilt_van_jwt_sleutel(keyring: KeyRing) -> None:
     assert keyring.policy_public_jwk()["x"] != keyring.jwks()["keys"][0]["x"]
 
