@@ -55,7 +55,7 @@ from hub.events.envelope import emit
 from hub.keys import KeyRing
 from hub.models import ActionRequest, Approval, Notification, NotificationChannel, Service
 from hub.monitoring.alerts import ERNST_RANK
-from hub.redact import redact, redact_log_text
+from hub.redact import redact, redact_log_text, redact_text
 from hub.registry import EXECUTOR_APP_ID, service_base_url
 from hub.security import Role
 from hub.timeutil import iso, utcnow
@@ -131,17 +131,31 @@ def _goedkeuring_dict(ap: Approval) -> dict[str, Any]:
     }
 
 
+#: velden die een doel kan hebben (``asm_policy.params.validate_target``); waarden alleen met vaste vorm
+DOEL_VELDEN = ("host_id", "app_id", "dataset", "snapshot", "resource")
+_DOEL_WAARDE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@/:-]{0,199}$")
+
+
+def veilig_doel(target: Any) -> dict[str, Any]:
+    """Positieve witte lijst voor het doel van een geweigerd voorstel (R-VEILIG-1): dat doel is nooit door het schema
+    gegaan, dus alleen bekende velden met een eenvoudige vaste vorm; de rest verdwijnt."""
+    if not isinstance(target, Mapping):
+        return {}
+    return {k: v for k, v in target.items() if k in DOEL_VELDEN and isinstance(v, str) and _DOEL_WAARDE_RE.fullmatch(v)}
+
+
 def weergave(db: Session, req: ActionRequest) -> dict[str, Any]:
     ap = huidige_goedkeuring(db, req)
     return {
         "request_id": str(req.id),
         "status": req.status,
         "action_id": req.action_id,
-        "target": req.target,
+        # Ook bij het lezen van bestaande voorstellen (R-VEILIG-1): geweigerd = alleen veilige doelvelden.
+        "target": veilig_doel(req.target) if req.status == "geweigerd" else req.target,
         "parameters_sha256": (req.preview or {}).get("parameters_sha256"),
-        "reason": req.reden,
+        "reason": redact_text(req.reden or ""),
         "actor": {"type": req.actor_type, "id": req.actor_id},
-        "evidence_ids": req.evidence_ids,
+        "evidence_ids": redact(req.evidence_ids),
         "risk_class": req.risk_class,
         "risk_claim": req.risk_claim,
         "risk_claim_genegeerd": req.risk_claim is not None,
@@ -318,7 +332,7 @@ def _weiger(
         psha: str | None = execreq.parameters_sha256(parameters)
     except (TypeError, ValueError):
         psha = None
-    klein = dict(target) if len(json.dumps(target, default=str)) <= 2048 else {}
+    klein = veilig_doel(target)
     db.add(
         ActionRequest(
             id=request_id,
@@ -330,8 +344,8 @@ def _weiger(
             action_id=action_id[:96],
             target=klein,
             parameters={},
-            reden=reason,
-            evidence_ids=evidence_ids,
+            reden=redact_text(reason),
+            evidence_ids=redact(evidence_ids),
             risk_claim=risk_claim,
             risk_class=cls.risk_class,
             rule_ids=list(cls.rule_ids),

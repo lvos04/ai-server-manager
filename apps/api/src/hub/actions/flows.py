@@ -14,6 +14,10 @@ Vaste regels:
   velden geweigerd. Envelope en payload moeten dezelfde flow en dezelfde actor noemen.
 - Koppeling op ID: het voorstel krijgt een vaste ``request_id`` uit (bron, ``action_request_id``). Hetzelfde verzoek
   vijf keer afgeleverd (ook met een nieuw ``event_id``) geeft één voorstel en dus hooguit één uitvoering (EX46).
+  Dezelfde sleutel met een andere actor, actie, doel, parameters of reden is een conflict in de audit, nooit stil
+  een duplicaat (R-VEILIG-5).
+- Ontvangst en verwerking zitten in één transactie (de inbox commit); na een onderbreking geeft herlevering het
+  voorstel alsnog (R-VEILIG-4). Reden en bewijs-ID's gaan door een vaste vorm of de redactor (R-VEILIG-1).
 - Een te laat afgeleverd verzoek (vervaltijd vanaf ``timestamp_utc`` verstreken) wordt geen voorstel meer.
 - Elke weigering of fout staat in de audit (EX45), alleen met codes en ID's: geen vrije tekst of waarden van de flow.
   Een onverwachte fout is nooit stil: ``uitkomst_onbekend`` in de audit, er is niets voorgesteld.
@@ -26,6 +30,7 @@ import uuid
 from datetime import timedelta
 from typing import Annotated, Any, Literal
 
+from asm_policy import execreq
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -34,15 +39,15 @@ from hub import audit
 from hub.actions import service
 from hub.config import Settings
 from hub.errors import HubError
-from hub.events.envelope import EventEnvelope
+from hub.events.envelope import FLOW_EVENT, EventEnvelope
 from hub.keys import KeyRing
 from hub.models import ActionRequest
+from hub.redact import redact_text
 from hub.timeutil import utcnow
 from hub.vault import Vault
 
 log = logging.getLogger("hub.flows")
 
-FLOW_EVENT = "flow.action.requested"
 FLOW_BRON = "home-control-hub"
 #: vaste naamruimte voor de request_id van een flowverzoek (uuid5 van bron en action_request_id)
 FLOW_NS = uuid.UUID("5d0f4c1e-6b7a-4f63-9a51-1f0b8e2c7a40")
@@ -77,7 +82,7 @@ class FlowVerzoek(_Strikt):
     reason: StrictStr = Field(min_length=1, max_length=500)
     actor: FlowActor
     expected_version: StrictStr | None = Field(default=None, max_length=300)
-    evidence_ids: list[Annotated[StrictStr, Field(min_length=1, max_length=128)]] = Field(max_length=20)
+    evidence_ids: list[uuid.UUID] = Field(max_length=20)  # event-ID's van de aanleiding (vaste vorm)
     expires_in_seconds: StrictInt = Field(ge=MIN_GELDIG_S, le=86400)
     owner: StrictStr = Field(min_length=1, max_length=200)
     flow: FlowInfo
@@ -90,20 +95,19 @@ def request_id_voor(source_app: str, action_request_id: uuid.UUID) -> uuid.UUID:
     return uuid.uuid5(FLOW_NS, f"{source_app}:{action_request_id}")
 
 
-def _weiger(db: Session, env: EventEnvelope, code: str, **details: Any) -> None:
-    """Een flowverzoek dat geen voorstel werd: vastgelegd in de audit (alleen codes en ID's) en gecommit."""
-    flow = env.actor.type == "flow"
+def _weiger(db: Session, env: EventEnvelope, actor: tuple[str, str], code: str, **details: Any) -> None:
+    """Een flowverzoek dat geen voorstel werd: in de audit (alleen codes en ID's). ``actor`` is gecontroleerd: de flow
+    pas na de actorcontrole, daarvoor de geverifieerde bron (R-VEILIG-2). De inbox commit."""
     audit.record(
         db,
-        actor_type="flow" if flow else "service",
-        actor_id=env.actor.id if flow else env.source_app,
+        actor_type=actor[0],
+        actor_id=actor[1],
         action="action.flow_request.refused",
         target_type="event",
         target_id=str(env.event_id),
         details={"code": code, "event_type": env.event_type, "bron": env.source_app, **details},
         trace_id=str(env.trace_id),
     )
-    db.commit()
 
 
 def _velden(exc: ValidationError) -> list[str]:
@@ -112,33 +116,62 @@ def _velden(exc: ValidationError) -> list[str]:
     return sorted({str(e["loc"][0]) if e["loc"] and e["loc"][0] in bekend else "onbekend_veld" for e in exc.errors()})
 
 
+def _zelfde(bestaand: ActionRequest, actor: tuple[str, str], p: FlowVerzoek, reden: str) -> bool:
+    """Is het bestaande voorstel onder deze sleutel dezelfde aanvraag? Vergeleken wordt wat onveranderlijk is
+    bewaard: actor, actie, doel (bij een weigering de veilige velden), reden en de canonieke parameterhash."""
+    try:
+        psha: str | None = execreq.parameters_sha256(p.parameters)
+    except (TypeError, ValueError):
+        psha = None
+    doel = service.veilig_doel(p.target) if bestaand.status == "geweigerd" else p.target
+    return (
+        (bestaand.actor_type, bestaand.actor_id, bestaand.action_id) == (*actor, p.action_id)
+        and bestaand.target == doel
+        and bestaand.reden == reden
+        and (bestaand.preview or {}).get("parameters_sha256") == psha
+    )
+
+
 def verwerk(db: Session, settings: Settings, vault: Vault, keyring: KeyRing, env: EventEnvelope) -> None:
-    """Een nieuw (niet-dubbel) event uit de inbox; doet niets voor andere events. De inbox heeft het event al
-    vastgelegd: wat hier gebeurt, verandert het antwoord aan de bron niet."""
+    """Een nieuw (niet-dubbel) event uit de inbox; doet niets voor andere events. Loopt in de transactie van de inbox
+    (die commit); het voorstel zelf in een savepoint, zodat een fout alleen het voorstel terugdraait."""
     if env.event_type != FLOW_EVENT or env.source_app != FLOW_BRON:
         return
+    bron = ("service", FLOW_BRON)  # geverifieerd: source_app is gelijk aan de app van het service-token
     try:
         p = FlowVerzoek.model_validate(env.payload)
     except ValidationError as exc:
-        _weiger(db, env, "payload_ongeldig", velden=_velden(exc))
+        _weiger(db, env, bron, "payload_ongeldig", velden=_velden(exc))
         return
     ids = {"action_request_id": str(p.action_request_id), "action_id": p.action_id, "flow_id": str(p.flow.id)}
     eigen = f"flow:{p.flow.id}"
     if (env.actor.type, env.actor.id) != ("flow", eigen) or p.actor.id != eigen or env.entity.type != "flow":
-        _weiger(db, env, "actor_past_niet", **ids)
+        _weiger(db, env, bron, "actor_past_niet", **ids)
         return
+    flow = ("flow", eigen)
     if env.entity.id != str(p.flow.id):
-        _weiger(db, env, "flow_past_niet", **ids)
+        _weiger(db, env, flow, "flow_past_niet", **ids)
         return
     now = utcnow()
     resterend = int((env.timestamp_utc + timedelta(seconds=p.expires_in_seconds) - now).total_seconds())
     if resterend < MIN_GELDIG_S:
-        _weiger(db, env, "verzoek_verlopen", **ids)
+        _weiger(db, env, flow, "verzoek_verlopen", **ids)
         return
     request_id = request_id_voor(env.source_app, p.action_request_id)
-    if db.get(ActionRequest, request_id) is not None:
-        return  # al eerder afgeleverd (EX46): één voorstel
-    evidence = [f"event:{env.event_id}", *p.evidence_ids][:20]
+    reden = redact_text(p.reason.strip()) or p.action_id
+
+    def al_bekend() -> bool:
+        bestaand = db.get(ActionRequest, request_id, populate_existing=True)
+        if bestaand is None:
+            return False
+        if not _zelfde(bestaand, flow, p, reden):
+            _weiger(db, env, flow, "idempotentie_conflict", request_id=str(request_id), **ids)
+        return True  # al eerder afgeleverd (EX46): één voorstel
+
+    if al_bekend():
+        return
+    evidence = [f"event:{env.event_id}", *map(str, p.evidence_ids)][:20]
+    sp = db.begin_nested()
     try:
         service.voorcontrole(db, p.action_id, p.target, p.parameters)
         service.stel_voor(
@@ -146,12 +179,12 @@ def verwerk(db: Session, settings: Settings, vault: Vault, keyring: KeyRing, env
             settings,
             vault,
             None,
-            actor=("flow", eigen),
+            actor=flow,
             request_id=request_id,
             action_id=p.action_id,
             target=p.target,
             parameters=p.parameters,
-            reason=p.reason.strip() or p.action_id,
+            reason=reden,
             risk_claim=None,  # een flow claimt niets; de risk_claim van de flow telt nooit (EX18)
             evidence_ids=evidence,
             expected_version=p.expected_version,
@@ -159,19 +192,19 @@ def verwerk(db: Session, settings: Settings, vault: Vault, keyring: KeyRing, env
             keyring=keyring,
             trace_id=str(env.trace_id),
         )
-        db.commit()
+        sp.commit()
     except service.Bewaard:
-        db.commit()  # beleid weigert: rij ``geweigerd`` en ``action.proposal.refused`` met actor flow (EX45)
+        sp.commit()  # beleid weigert: rij ``geweigerd`` en ``action.proposal.refused`` met actor flow (EX45)
     except HubError as exc:
-        db.rollback()
-        if exc.code != "verzoek_bestaat_al":
-            _weiger(db, env, exc.code, **ids)
+        sp.rollback()
+        if exc.code != "verzoek_bestaat_al" or not al_bekend():
+            _weiger(db, env, flow, exc.code, **ids)
     except IntegrityError:
-        db.rollback()  # gelijktijdige levering van hetzelfde verzoek: de ander maakte het voorstel
-        if db.get(ActionRequest, request_id) is None:
-            _weiger(db, env, "uitkomst_onbekend", **ids)
+        sp.rollback()  # gelijktijdige levering van hetzelfde verzoek: de ander maakte het voorstel
+        if not al_bekend():
+            _weiger(db, env, flow, "uitkomst_onbekend", **ids)
     except Exception as exc:
-        db.rollback()
+        sp.rollback()
         # alleen de soort fout: de tekst van een databasefout kan waarden van de flow bevatten
         log.error("flowverzoek %s niet verwerkt: %s", env.event_id, type(exc).__name__)
-        _weiger(db, env, "uitkomst_onbekend", **ids)
+        _weiger(db, env, flow, "uitkomst_onbekend", **ids)

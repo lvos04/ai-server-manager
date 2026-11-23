@@ -15,6 +15,10 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
   een mens mag voorstellen, wordt geweigerd; de weigering staat in de audit met actor `flow`. Een payload buiten de
   witte lijst, een andere flow in envelope en payload of een te laat afgeleverd verzoek wordt geen voorstel en staat
   als `action.flow_request.refused` in de audit. Een onbekende `schema_version` blijft een zichtbare `422`.
+- Herstel R-VEILIG-1 t/m -5: positieve witte lijst vóór opslag voor reden, bewijs-ID's en doel van een (geweigerd)
+  voorstel en voor de flowpayload in de inbox, ook bij het lezen van bestaande regels; de audit noemt vóór de
+  actorcontrole de geverifieerde bron; ontvangst en flowverwerking in één transactie; een bekende sleutel met andere
+  inhoud is een zichtbaar conflict (`409 bron_id_conflict` of `idempotentie_conflict` in de audit).
 - Sim-getest met een nagebootste home-control-hub. NIET GEVALIDEERD (echte NAS): geen echte Node-RED aangesloten.
 
 ### Toegevoegd — Back-up: hersteltest-robot en rampenscenario (S-P2-100)

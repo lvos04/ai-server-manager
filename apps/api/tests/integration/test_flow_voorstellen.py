@@ -239,3 +239,130 @@ def test_flow_event_van_een_andere_bron_wordt_geen_voorstel(stack: Stack) -> Non
     r = c.post("/api/v1/events/inbox", json=ev, headers={"Authorization": f"Bearer {svc['service_token']}"})
     assert r.status_code == 202, r.text
     assert _rijen(stack.app) == [] and flow_audit(stack.app) == []
+
+
+# ---------------------------------------------------------------------- herstel R-VEILIG (S-P2-140)
+MARKERING = "voorbeeldmarkering"  # synthetisch; de gewone redactor herkent "Bearer <markering>"
+
+
+def _zet(app: Any, model: Any, sleutel: Any, **waarden: Any) -> None:
+    """Boots een regel van vóór het herstel na (alleen testgegevens)."""
+    with app.state.sessionmaker() as db:
+        rij = db.get(model, sleutel)
+        for k, v in waarden.items():
+            setattr(rij, k, v)
+        db.commit()
+
+
+def test_r_veilig_1_weigering_bewaart_en_toont_alleen_veilige_velden(stack: Stack, hch: Any) -> None:
+    ev = flow_event("app.voorbeeld", {"app_id": "my-house", "toelichting": f"Bearer {MARKERING}"})
+    ev["payload"]["reason"] = f"Flow: Bearer {MARKERING}"
+    assert _stuur(hch, ev).status_code == 202
+    v = haal(stack.admin, flow_request_id(ev))
+    assert v["status"] == "geweigerd" and v["target"] == {"app_id": "my-house"}
+    assert MARKERING not in str(v)
+    (rij,) = _rijen(stack.app)
+    assert MARKERING not in str((rij.target, rij.reden, rij.evidence_ids))
+    # Een bestaande regel van vóór het herstel wordt bij het lezen ook geschoond.
+    vuil = f"Bearer {MARKERING}"
+    _zet(stack.app, ActionRequest, rij.id, target={"toelichting": vuil}, reden=vuil, evidence_ids=[vuil])
+    assert MARKERING not in str(haal(stack.admin, flow_request_id(ev)))
+    # Een bewijs-ID buiten de vaste vorm (event-ID) wordt geen voorstel.
+    ander = flow_event("app.restart", app_target("my-house"), seq=2)
+    ander["payload"]["evidence_ids"] = [f"Bearer {MARKERING}"]
+    r = _stuur(hch, ander)
+    assert r.status_code == 202 and len(_rijen(stack.app)) == 1
+    regels = [a for a in flow_audit(stack.app) if a["action"] == "action.flow_request.refused"]
+    assert [a["details"]["velden"] for a in regels] == [["evidence_ids"]]
+
+
+def test_r_veilig_2_audit_noemt_de_geverifieerde_bron_bij_een_ongeldige_flow_id(hch: Any, stack: Stack) -> None:
+    ev = flow_event("app.restart", app_target("my-house"))
+    ev["actor"]["id"] = "gewone vrije proeftekst"
+    regel = _geweigerd(hch, stack.app, ev, "actor_past_niet")
+    assert regel["actor"] == "service:home-control-hub" and regel["target"] == ev["event_id"]
+    assert "vrije proeftekst" not in str(flow_audit(stack.app))
+
+
+def test_r_veilig_3_inbox_bewaart_en_toont_alleen_de_witte_lijst(stack: Stack, hch: Any) -> None:
+    ev = flow_event("app.restart", app_target("my-house"))
+    ev["payload"]["extra_proefveld"] = "gewone vrije proeftekst"
+    _geweigerd(hch, stack.app, ev, "payload_ongeldig")
+    (item,) = stack.admin.get("/api/v1/events").json()["items"]
+    assert set(item["payload"]) == {
+        "action_request_id",
+        "action_id",
+        "trigger_event_id",
+        "expires_in_seconds",
+        "inhoud_sha256",
+    }
+    from sqlalchemy import select
+
+    with stack.app.state.sessionmaker() as db:
+        rij = db.scalars(select(InboxEvent)).one()
+        assert "proeftekst" not in str(rij.payload) and "Flow: test" not in str(rij.payload)
+    # Een bestaande regel met de volledige payload wordt bij het lezen gefilterd.
+    _zet(stack.app, InboxEvent, rij.seq, payload=ev["payload"])
+    (item,) = stack.admin.get("/api/v1/events").json()["items"]
+    assert "proeftekst" not in str(item["payload"]) and "target" not in item["payload"]
+
+
+def test_r_veilig_4_herlevering_na_onderbreking_geeft_een_voorstel(
+    stack: Stack, hch: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hub.actions import flows
+
+    ev = flow_event("app.restart", app_target("my-house"))
+
+    def onderbreek(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("gesimuleerde onderbreking")
+
+    with monkeypatch.context() as tijdelijk:
+        tijdelijk.setattr(flows, "verwerk", onderbreek)
+        with pytest.raises(RuntimeError):
+            _stuur(hch, ev)
+    from sqlalchemy import func, select
+
+    with stack.app.state.sessionmaker() as db:
+        assert db.scalar(select(func.count()).select_from(InboxEvent)) == 0  # niets half vastgelegd
+    r = _stuur(hch, ev)
+    assert (r.status_code, r.json()["status"]) == (202, "accepted")
+    assert [str(r.id) for r in _rijen(stack.app)] == [flow_request_id(ev)]
+    assert [a["action"] for a in flow_audit(stack.app)] == ["action.proposal.created"]
+
+
+def test_r_veilig_5_hergebruikt_bronvolgnummer_is_een_zichtbaar_conflict(stack: Stack, hch: Any) -> None:
+    eerste = flow_event("app.restart", app_target("my-house"), seq=1)
+    tweede = flow_event("app.restart", app_target("my-house"), seq=1)  # teruggezette outbox-teller
+    assert _stuur(hch, eerste).status_code == 202
+    r = _stuur(hch, tweede)
+    assert (r.status_code, r.json()["code"]) == (409, "bron_id_conflict"), r.text
+    assert [str(x.id) for x in _rijen(stack.app)] == [flow_request_id(eerste)]
+    audit = stack.admin.get("/api/v1/audit", params={"actie": "event.inbox.conflict"}).json()["items"]
+    assert [a["doel_id"] for a in audit] == [tweede["event_id"]]
+    # Dezelfde aanvraag-ID met een andere actie: conflict in de audit, het bestaande voorstel blijft gelijk.
+    ander = flow_event(
+        "app.stop",
+        app_target("my-house"),
+        flow_id=uuid.UUID(eerste["entity"]["id"]),
+        action_request_id=uuid.UUID(eerste["payload"]["action_request_id"]),
+        seq=3,
+    )
+    (voor,) = _rijen(stack.app)
+    assert _stuur(hch, ander).status_code == 202
+    (rij,) = _rijen(stack.app)
+    assert (rij.action_id, rij.status, rij.actor_id) == ("app.restart", voor.status, voor.actor_id)
+    regels = [a for a in flow_audit(stack.app) if a["action"] == "action.flow_request.refused"]
+    assert [a["details"]["code"] for a in regels] == ["idempotentie_conflict"]
+
+
+def test_r_veilig_5_gelijktijdige_levering_geeft_een_voorstel(stack: Stack) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    eerste = flow_event("app.restart", app_target("my-house"))
+    tweede = {**eerste, "event_id": str(uuid.uuid4()), "source_event_id": "2"}
+    with koppel_hch(stack.admin, stack.app) as zender, ThreadPoolExecutor(max_workers=2) as pool:
+        codes = list(pool.map(lambda e: zender.post("/api/v1/events/inbox", json=e).status_code, [eerste, tweede]))
+    assert codes == [202, 202]
+    assert [str(r.id) for r in _rijen(stack.app)] == [flow_request_id(eerste)]
+    assert [a["action"] for a in flow_audit(stack.app)] == ["action.proposal.created"]

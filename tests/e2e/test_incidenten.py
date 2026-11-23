@@ -74,7 +74,8 @@ def test_100_identieke_crashes_geven_een_doorlopend_incident(
                 event_id=first_id if i == 0 else None,
             ),
         )
-    # Dubbele levering (zelfde event_id) en een herhaling op bron-id tellen niet mee (dedupe in de inbox).
+    # Dubbele levering (zelfde event_id en inhoud) en een herhaling op bron-id tellen niet mee (dedupe in de inbox);
+    # andere inhoud onder dezelfde sleutel is een conflict (S-P2-140, R-VEILIG-5).
     post(
         admin,
         svc,
@@ -82,6 +83,7 @@ def test_100_identieke_crashes_geven_een_doorlopend_incident(
             "home-control-hub",
             "automation.node_red.crashed",
             ("app", "node-red"),
+            {"naam": "Node-RED", "exit_code": 137},
             event_id=first_id,
         ),
     )

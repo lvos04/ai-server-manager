@@ -8326,6 +8326,9 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "description": "bron_id_conflict: bekende event_id of bron-id met andere inhoud (in de audit)"
+          },
           "422": {
             "content": {
               "application/json": {

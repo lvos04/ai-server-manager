@@ -69,6 +69,7 @@ JOBS_STIL_NA_S = 15 * 60
 @router.post(
     "/api/v1/events/inbox",
     summary="Event ontvangen (service-token); dedupe op event_id en bron-id; flow.action.requested wordt een voorstel",
+    responses={409: {"description": "bron_id_conflict: bekende event_id of bron-id met andere inhoud (in de audit)"}},
 )
 def inbox(
     env: EventEnvelope,
@@ -81,8 +82,28 @@ def inbox(
     if env.source_app != principal.service_app_id:
         raise HubError(403, "source_mismatch", "source_app moet gelijk zijn aan de app van het service-token.")
     status, row = accept(db, env, service_id=uuid.UUID(principal.id))
+    if status == "conflict":
+        # R-VEILIG-5: dezelfde sleutel met andere inhoud; zichtbaar voor de bron en in de audit, er is niets opgeslagen.
+        audit.record(
+            db,
+            actor_type="service",
+            actor_id=env.source_app,
+            action="event.inbox.conflict",
+            target_type="event",
+            target_id=str(env.event_id),
+            details={"bestaand_event_id": str(row.event_id), "event_type": env.event_type},
+            trace_id=str(env.trace_id),
+        )
+        db.commit()
+        raise HubError(
+            409,
+            "bron_id_conflict",
+            "Er is al een ander event met deze event_id of dit bronvolgnummer; er is niets opgeslagen of voorgesteld.",
+            {"event_id": str(row.event_id)},
+        )
     if status == "accepted":
         flows.verwerk(db, settings, vault, keyring, env)  # B01-008; doet niets voor andere events
+    db.commit()  # ontvangst en flowverwerking samen (R-VEILIG-4): na een onderbreking is er niets half vastgelegd
     code = 202 if status == "accepted" else 200
     return JSONResponse({"status": status, "event_id": str(row.event_id), "seq": row.seq}, status_code=code)
 

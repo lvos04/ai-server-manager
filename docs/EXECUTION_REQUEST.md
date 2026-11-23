@@ -263,9 +263,17 @@ risicoklasse. Uitvoeren blijft `POST /api/v1/actions/{id}/execute` door een gebr
 | schemafout, doel onleesbaar, enz. | idem, met de foutcode van het voorstel (bv. `parameters_ongeldig`, `doel_onbekend`) |
 | onverwachte fout | idem, `uitkomst_onbekend`; er is niets voorgesteld |
 | beleid weigert (shell, boiler, destructief, buiten de allowlist, alleen een mens) | voorstel `geweigerd` met actor `flow` en audit `action.proposal.refused` (EX45) |
-| hetzelfde verzoek opnieuw afgeleverd (zelfde `event_id`, of nieuw `event_id` met dezelfde `action_request_id`) | één voorstel: `request_id` = uuid5 van bron en `action_request_id` (EX46) |
+| hetzelfde verzoek opnieuw afgeleverd (zelfde `event_id`, of nieuw `event_id` met dezelfde `action_request_id`) | één voorstel: `request_id` = uuid5 van bron en `action_request_id` (EX46); ook bij gelijktijdige levering |
+| bekende `event_id` of bron-id (`source_app`, `source_event_id`) met andere inhoud | `409 bron_id_conflict` aan de bron, niets bewaard, audit `event.inbox.conflict` (nooit stil `duplicate`) |
+| bekende `action_request_id` met een andere actor, actie, doel, parameters of reden | geen tweede voorstel, het bestaande blijft gelijk, audit `action.flow_request.refused` met `idempotentie_conflict` |
+| onderbreking tussen ontvangst en verwerking | ontvangst en voorstel zitten in één transactie: niets is vastgelegd, herlevering geeft precies één voorstel |
 
-De audit bevat alleen codes en ID's, nooit de reden, het doel of de parameters van de flow. Getest met een nagebootste
+De audit bevat alleen codes en ID's, nooit de reden, het doel of de parameters van de flow. Vóór de actorcontrole is de
+actor van een weigering de geverifieerde bron (`service:home-control-hub`), nooit de vrije actor-ID uit het event. De
+inbox bewaart en toont van een flowverzoek alleen een positieve witte lijst met vaste vorm (`action_request_id`,
+`action_id`, `trigger_event_id`, `expires_in_seconds` en `inhoud_sha256`, de hash van de volledige aanvraag); bestaande
+regels worden bij het lezen gefilterd. Bewijs-ID's van een flow zijn event-ID's (UUID), de reden gaat door de redactor
+en een geweigerd voorstel bewaart en toont alleen bekende doelvelden met vaste vorm. Getest met een nagebootste
 home-control-hub (Sim-getest): `apps/api/tests/integration/test_flow_voorstellen.py` en
 `tests/e2e/test_flow_acties.py`. Het terugmelden van de uitkomst aan home-control-hub
 (`/integrations/v1/automation/action-requests/{id}/result`) en het scherm Automatisering met een link naar de
