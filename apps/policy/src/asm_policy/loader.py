@@ -37,6 +37,7 @@ PARAMETER_SCHEMAS = (
     "snapshot_clone",
     "notification_send",
     "eigenaar",
+    "flow_restore",
 )
 
 

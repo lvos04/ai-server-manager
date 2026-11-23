@@ -386,3 +386,88 @@ def test_geheimen_van_de_eigenaar_worden_gemaskeerd_voor_opslag(keten: Keten, so
     }
     assert [k for k, tekst in gezien.items() if markering in tekst] == []
     assert "***" in opslag
+
+
+# ------------------------------------------------------------------ S-P2-140b: automation.flows.restore (B11-005)
+FLOWBRON = {**DOEL, "resource": "node_red"}
+MOMENTOPNAME = {"snapshot_id": "0b1c2d3e-4f50-4617-8899-aabbccddeeff"}
+
+
+def test_flowherstel_voorstel_goedkeuring_ondertekend_verzoek_met_de_juiste_vorm(keten: Keten) -> None:
+    """Positief: voorstel bij de eigenaar → menselijke goedkeuring (R2) → ondertekend ExecutionRequest naar
+    ``/connector/v1/apply`` met precies het Hub-doel en ``{snapshot_id}``; uitgevoerd alleen met readback van dit
+    verzoek."""
+    admin = keten.stack.admin
+    r = stel_voor(admin, "automation.flows.restore", FLOWBRON, MOMENTOPNAME, risk_claim="R0")
+    assert r.status_code == 201, r.text
+    v = r.json()
+    assert v["risk_class"] == "R2" and v["status"] == "wacht_op_goedkeuring" and v["blokkades"] == [], v
+    assert v["preview"]["requires_backup"] is False
+    assert voer_uit(admin, v).json()["code"] == "goedkeuring_nodig"
+    assert keur_goed(admin, v).status_code == 200
+    keten.eigenaar.apply_reply = Reply(200, _ontvangst(v))
+    r = voer_uit(admin, v)
+    assert r.status_code == 200 and haal(admin, v)["status"] == "uitgevoerd", r.text
+    [verzoek] = keten.eigenaar.geaccepteerd
+    voorstel = verzoek["proposal"]
+    assert (voorstel["action_id"], voorstel["target"], voorstel["parameters"]) == (
+        "automation.flows.restore",
+        FLOWBRON,
+        MOMENTOPNAME,
+    )
+    assert voorstel["actor"]["type"] == "user" and verzoek["approval"]["risk_class"] == "R2"
+    assert verzoek["approval"]["preview_hash"].startswith("sha256:") and verzoek["signature"]
+    assert schrijfaanroepen(keten.stack.nas) == []
+
+
+@pytest.mark.parametrize(
+    ("target", "parameters"),
+    [
+        pytest.param(FLOWBRON, {**MOMENTOPNAME, "flows": []}, id="extra_parameter"),
+        pytest.param(FLOWBRON, {"snapshot_id": "laatste"}, id="geen_uuid"),
+        pytest.param(FLOWBRON, {}, id="zonder_snapshot_id"),
+        pytest.param(DOEL, MOMENTOPNAME, id="zonder_flowbron"),
+        pytest.param({**FLOWBRON, "app_id": "my-house"}, MOMENTOPNAME, id="andere_eigenaar"),
+        pytest.param({"type": "source", "id": "node_red"}, MOMENTOPNAME, id="doelvorm_van_de_eigenaar"),
+    ],
+)
+def test_flowherstel_met_ander_doel_of_andere_parameters_wordt_niets(
+    keten: Keten, target: dict[str, Any], parameters: dict[str, Any]
+) -> None:
+    r = stel_voor(keten.stack.admin, "automation.flows.restore", target, parameters)
+    assert r.status_code == 422 and r.json()["code"] == "parameters_ongeldig", r.text
+    assert keten.eigenaar.paths() == []
+
+
+def test_de_ai_kan_flowherstel_niet_voorstellen(keten: Keten) -> None:
+    r = stel_voor(
+        keten.stack.admin, "automation.flows.restore", FLOWBRON, MOMENTOPNAME, actor={"type": "ai", "id": "hub-ai"}
+    )
+    assert r.status_code == 422 and r.json()["code"] == "actor_past_niet", r.text
+    assert keten.eigenaar.paths() == []
+
+
+def test_flowherstel_ondertekend_met_andere_parameters_of_actor_weigert_de_eigenaar(keten: Keten) -> None:
+    """Ook een geldig ondertekend verzoek met andere parameters, een flow of de AI als actor wordt bij apply
+    geweigerd (de eigenaar rekent zelf met hetzelfde beleid)."""
+    v = stel_voor(keten.stack.admin, "automation.flows.restore", FLOWBRON, MOMENTOPNAME).json()
+    assert keur_goed(keten.stack.admin, v).status_code == 200
+    assert voer_uit(keten.stack.admin, v).status_code == 501
+    goed = keten.eigenaar.geaccepteerd[0]
+    keys = keten.stack.app.state.keyring()
+
+    def opnieuw(wijzig: Any) -> httpx.Response:
+        body = copy.deepcopy(goed)
+        body.pop("signature", None)
+        wijzig(body)
+        body["nonce"] = str(uuid.uuid4())
+        return keten.direct_apply(execreq.sign(body, keys.policy_signing))
+
+    r = opnieuw(lambda b: b["proposal"].update(parameters={**MOMENTOPNAME, "credentials": "x"}))
+    assert r.status_code >= 400 and len(keten.eigenaar.geaccepteerd) == 1, r.text
+    r = opnieuw(lambda b: b["proposal"].update(target={**FLOWBRON, "app_id": "my-house"}))
+    assert r.status_code >= 400 and len(keten.eigenaar.geaccepteerd) == 1, r.text
+    for actor in ({"type": "flow", "id": "flow-1"}, {"type": "ai", "id": "hub-ai"}):
+        r = opnieuw(lambda b, a=actor: b["proposal"].update(actor=a))
+        assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
+    assert len(keten.eigenaar.geaccepteerd) == 1

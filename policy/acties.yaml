@@ -193,3 +193,17 @@ acties:
     max_per_uur: 10
     timeout_seconden: 120
     verwacht: {}
+  automation.flows.restore:
+    omschrijving: Node-RED-flows terugzetten naar een momentopname (B11-005, via home-control-hub).
+    uitvoerder: eigenaar:home-control-hub
+    truenas: []
+    doel: eigenaar
+    klasse: R2
+    parameters: flow_restore
+    requires_backup: false
+    ai_mag_voorstellen: false
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}

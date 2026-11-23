@@ -25,7 +25,7 @@ from fakes.fake_http import FakeHTTP, Reply, Seen
 
 APP_ID = "home-control-hub"
 UITVOERDER = f"eigenaar:{APP_ID}"
-BACKUP = {"sso.oidc.hub.register": True, "sso.sessions.revoke": False}
+BACKUP = {"sso.oidc.hub.register": True, "sso.sessions.revoke": False, "automation.flows.restore": False}
 
 
 def _fout(status: int, code: str, message: str = "Geweigerd.", details: dict[str, Any] | None = None) -> Reply:

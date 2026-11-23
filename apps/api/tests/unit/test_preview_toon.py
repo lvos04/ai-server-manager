@@ -209,6 +209,14 @@ GEVALLEN = [
     ),
     Geval("sso_registreren", "sso.oidc.hub.register", {"x": _g(73)}, _eigenaar(75), EIGENAAR_VAST, {"host_id": HOST}),
     Geval("sso_intrekken", "sso.sessions.revoke", {"x": _g(74)}, _eigenaar(76), EIGENAAR_VAST, {"host_id": HOST}),
+    Geval(
+        "flows_terugzetten",
+        "automation.flows.restore",
+        {"snapshot_id": _g(77)},
+        _eigenaar(78),
+        EIGENAAR_VAST,
+        {"host_id": HOST, "app_id": "home-control-hub", "resource": "node_red"},
+    ),
 ]
 
 

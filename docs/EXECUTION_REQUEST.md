@@ -244,6 +244,25 @@ weigert een AI-actor (`ai_mag_voorstellen: false`). `mediaguard.*` blijft gerese
 (`501 capability_unavailable`). Getest met de fake eigenaar `tests/fakes/fake_eigenaar.py` (Sim-getest); de echte
 proef met home-control-hub volgt in S-P2-340.
 
+### Flows terugzetten: `automation.flows.restore` (S-P2-140b, B11-005)
+
+Contractbesluit van ai-server-manager als eigenaar van het beleid (2026-11-23). Deze actie volgt de stroom hierboven,
+net als `sso.sessions.revoke`:
+
+| Veld | Waarde |
+|---|---|
+| uitvoerder | `eigenaar:home-control-hub` (`POST /connector/v1/propose` en `/apply`; niet de executor) |
+| klasse | R2: altijd goedkeuring door een beheerder, gebonden aan de preview van de eigenaar |
+| doel (`target`) | het Hub-doel `{host_id?, app_id: "home-control-hub", resource}`; `resource` is verplicht en noemt de flowbron bij home-control-hub; nu alleen `node_red` (afgestemd met home-control-hub S-P2-340, dat precies `{app_id: home-control-hub, resource: node_red}` met optioneel `host_id` accepteert). Elk ander veld, een andere `app_id` of de eigen vorm van de eigenaar (`{type, id}`) → `422 parameters_ongeldig`. home-control-hub leest dit doel (S-P2-340). |
+| `parameters` | precies `{snapshot_id}` met een UUID in kleine letters (schema `flow_restore`); een extra of ontbrekend veld → `422 parameters_ongeldig` |
+| `requires_backup` | `false` in het beleid. De eigenaar legt zelf vóór en na het herstel een versleutelde momentopname vast (`voor_herstel`, `na_herstel`); terugdraaien is een nieuw voorstel naar die momentopname. De Hub meet geen B12-back-up van de Node-RED-data, dus `true` zou het herstel altijd blokkeren zonder extra bescherming. Vraagt de eigenaar in zijn voorstel toch een back-up, dan geldt die (zie hierboven). |
+| wie stelt voor | alleen een mens (`ai_mag_voorstellen: false`): de AI krijgt `422 actor_past_niet`; een flow (`flow.action.requested`) of spraak wordt een geweigerd voorstel met `alleen_beheerder`. Een flow kan zo nooit zijn eigen herstel starten. |
+
+Bewijs bij `200 uitgevoerd`, onzekere 5xx en maskering: zoals in de tabel hierboven. Getest met de fake eigenaar
+(Sim-getest): `tests/e2e/test_eigenaar_acties.py` (koppen `test_flowherstel_*`, `test_de_ai_kan_flowherstel_*`),
+`apps/api/tests/integration/test_flow_voorstellen.py::test_flow_kan_zijn_eigen_herstel_niet_voorstellen` en
+`apps/policy/tests/test_policy.py` (`test_flowherstel_*`). De proef met de echte home-control-hub volgt in S-P2-340.
+
 ## Voorstellen van een flow (S-P2-140, B01-008)
 
 De Hub bouwt geen eigen flow-editor: flows leven in Node-RED achter home-control-hub (B11). Vraagt een flow daar een

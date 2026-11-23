@@ -98,6 +98,8 @@ from asm_policy.loader import ActieDef, Policy
 
 APP_NAME_RE = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
 DATASET_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*(/[A-Za-z0-9_.:-]+)*$")
+#: flowbronnen van home-control-hub (``automation.flows.restore``: ``target.resource``, S-P2-140b; nu alleen Node-RED)
+FLOWBRONNEN = ("node_red",)
 SNAP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
 SANDBOX_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 CATALOG_APP_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
@@ -299,7 +301,13 @@ def validate_target(actie: ActieDef, target: Any) -> list[Fout]:
         out += _only(target, "target", {"host_id", "app_id", "resource"}, {"app_id"})
         if target.get("app_id") != actie.eigenaar:
             out.append(_f("target.app_id", "buiten_scope", f"deze actie hoort bij {actie.eigenaar}"))
-        if "resource" in target:
+        if actie.parameters == "flow_restore":
+            # Het Hub-doel blijft {host_id, app_id, resource}; resource noemt de flowbron (S-P2-140b, contractbesluit).
+            if "resource" not in target:
+                out.append(_f("target.resource", "verplicht", "de flowbron is verplicht"))
+            elif target["resource"] not in FLOWBRONNEN:
+                out.append(_f("target.resource", "buiten_scope", "alleen de flowbron node_red"))
+        elif "resource" in target:
             out += _text(target["resource"], "target.resource", max_len=200)
     return out
 
@@ -363,6 +371,12 @@ def validate_parameters(policy: Policy, actie: ActieDef, target: Mapping[str, An
         return out
     if schema == "eigenaar":
         return _size(params, "parameters", MAX_EIGENAAR_BYTES)
+    if schema == "flow_restore":
+        # Precies {snapshot_id: <uuid>}; de eigenaar controleert bij propose en apply opnieuw (B11-005).
+        out = _only(params, "parameters", {"snapshot_id"}, {"snapshot_id"})
+        if "snapshot_id" in params:
+            out += _text(params["snapshot_id"], "parameters.snapshot_id", max_len=36, pattern=UUID_RE)
+        return out
     if schema == "app_update":
         return _app_update(params)
     if schema == "app_rollback":

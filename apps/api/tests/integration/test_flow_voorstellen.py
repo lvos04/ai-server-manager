@@ -142,6 +142,16 @@ def test_actie_boven_de_rechten_van_een_flow_geweigerd(stack: Stack, hch: Any) -
     assert "ACTOR:alleen_mens" in v["rule_ids"]
 
 
+def test_flow_kan_zijn_eigen_herstel_niet_voorstellen(stack: Stack, hch: Any) -> None:
+    """S-P2-140b: ``automation.flows.restore`` stelt alleen een mens voor, nooit een flow (ook niet met geldig doel)."""
+    doel = {"host_id": HOST, "app_id": "home-control-hub", "resource": "node_red"}
+    ev = flow_event("automation.flows.restore", doel, {"snapshot_id": "0b1c2d3e-4f50-4617-8899-aabbccddeeff"})
+    assert _stuur(hch, ev).status_code == 202
+    v = haal(stack.admin, flow_request_id(ev))
+    assert v["status"] == "geweigerd" and "alleen_beheerder" in [b["code"] for b in v["blokkades"]], v
+    assert "ACTOR:alleen_mens" in v["rule_ids"]
+
+
 @pytest.mark.parametrize(
     ("action_id", "target", "parameters", "code"),
     [

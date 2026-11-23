@@ -4,6 +4,14 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Beleid: flows terugzetten via home-control-hub (S-P2-140b)
+
+- Nieuwe actie `automation.flows.restore` in `policy/acties.yaml` (B11-005): eigenaar-connector van home-control-hub,
+  R2, parameters alleen `{snapshot_id}` (schema `flow_restore`), doel `{host_id, app_id, resource}` met `resource: node_red`
+  verplicht, geen B12-back-upeis (de eigenaar maakt zelf een momentopname vóór en na). Alleen een mens kan dit
+  voorstellen; AI en flows niet. Nieuwe `policy_hash`: Hub- en executor-image samen opnieuw bouwen.
+- Sim-getest met de fake eigenaar. De proef met de echte home-control-hub volgt in S-P2-340.
+
 ### Toegevoegd — Automatiseringen zonder code, Hub-kant (S-P2-140)
 
 - B01-008: het event `flow.action.requested` van home-control-hub wordt een gewoon voorstel met actor `flow`, met

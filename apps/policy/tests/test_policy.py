@@ -2716,3 +2716,78 @@ def test_ixvolume_zonder_acl_en_met_eigen_namen_blijft_geldig() -> None:
         )
     ]  # fmt: skip
     assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, install_params(storage=regels)) == []
+
+
+# ------------------------------------------------------------------ S-P2-140b: automation.flows.restore (B11-005)
+FLOWBRON = {"host_id": HOST, "app_id": "home-control-hub", "resource": "node_red"}
+MOMENTOPNAME = "0b1c2d3e-4f50-4617-8899-aabbccddeeff"
+
+
+def test_flowherstel_staat_in_het_beleid_als_eigenaaractie_r2_alleen_voor_een_mens() -> None:
+    actie = POLICY.acties["automation.flows.restore"]
+    assert (actie.uitvoerder, actie.eigenaar, actie.doel, actie.klasse) == (
+        "eigenaar:home-control-hub",
+        "home-control-hub",
+        "eigenaar",
+        "R2",
+    )
+    assert actie.parameters == "flow_restore" and not actie.ai_mag_voorstellen and not actie.requires_backup
+    assert "automation.flows.restore" not in POLICY.executor_allowlist()
+    mens = classify(
+        POLICY,
+        action_id="automation.flows.restore",
+        target=FLOWBRON,
+        parameters={"snapshot_id": MOMENTOPNAME},
+        actor_type="user",
+    )
+    assert not mens.geweigerd and mens.requires_approval and mens.risk_class == "R2", mens
+    for actor in ("ai", "flow", "voice", "service", "system"):
+        niet_mens = classify(
+            POLICY,
+            action_id="automation.flows.restore",
+            target=FLOWBRON,
+            parameters={"snapshot_id": MOMENTOPNAME},
+            actor_type=actor,
+        )
+        assert "alleen_beheerder" in [b.code for b in niet_mens.blokkades], actor
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({}, id="leeg"),
+        pytest.param({"snapshot_id": MOMENTOPNAME, "extra": 1}, id="extra_veld"),
+        pytest.param({"snapshot_id": MOMENTOPNAME.upper()}, id="hoofdletters"),
+        pytest.param({"snapshot_id": "laatste"}, id="geen_uuid"),
+        pytest.param({"snapshot_id": 7}, id="getal"),
+        pytest.param({"snapshot_id": [MOMENTOPNAME]}, id="lijst"),
+        pytest.param({"flows": [{"type": "exec"}]}, id="vrije_flows"),
+        pytest.param([MOMENTOPNAME], id="geen_object"),
+    ],
+)
+def test_flowherstel_alleen_precies_snapshot_id(params: Any) -> None:
+    assert _codes(params, "automation.flows.restore", FLOWBRON)
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        pytest.param({"host_id": HOST, "app_id": "home-control-hub"}, id="zonder_resource"),
+        pytest.param({"host_id": HOST, "app_id": "my-house", "resource": "node_red"}, id="andere_eigenaar"),
+        pytest.param({"host_id": HOST, "app_id": "home-control-hub", "resource": "../x"}, id="resource_pad"),
+        pytest.param({"host_id": HOST, "app_id": "home-control-hub", "resource": ""}, id="resource_leeg"),
+        pytest.param({"host_id": HOST, "app_id": "home-control-hub", "resource": "node_red2"}, id="andere_bron"),
+        pytest.param({"host_id": HOST, "app_id": "home-control-hub", "resource": ["node_red"]}, id="resource_lijst"),
+        pytest.param({"type": "source", "id": "node_red"}, id="vorm_van_de_eigenaar"),
+        pytest.param({"host_id": HOST, "app_id": "home-control-hub", "resource": "node_red", "x": 1}, id="extra"),
+    ],
+)
+def test_flowherstel_alleen_het_hub_doel_met_de_flowbron(target: dict[str, Any]) -> None:
+    assert validate_target(POLICY.acties["automation.flows.restore"], target)
+
+
+def test_flowherstel_geldig_doel_en_parameters() -> None:
+    assert validate_target(POLICY.acties["automation.flows.restore"], FLOWBRON) == []
+    zonder_host = {"app_id": "home-control-hub", "resource": "node_red"}
+    assert validate_target(POLICY.acties["automation.flows.restore"], zonder_host) == []
+    assert _codes({"snapshot_id": MOMENTOPNAME}, "automation.flows.restore", FLOWBRON) == []

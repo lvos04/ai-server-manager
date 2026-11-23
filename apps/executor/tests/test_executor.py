@@ -79,6 +79,7 @@ def test_execute_eerst_aanmelden_dan_vorm(tmp_path: Path) -> None:
         ("onbekend", "actie_niet_toegestaan"),
         ("notification.send", "actie_niet_toegestaan"),  # hoort bij de Hub (Gotify), niet bij de executor
         ("sso.sessions.revoke", "actie_niet_toegestaan"),  # hoort bij de eigenaar-connector
+        ("automation.flows.restore", "actie_niet_toegestaan"),  # idem (S-P2-140b)
     ],
 )
 def test_buiten_de_allowlist_altijd_geweigerd(tmp_path: Path, action: str, code: str) -> None:
