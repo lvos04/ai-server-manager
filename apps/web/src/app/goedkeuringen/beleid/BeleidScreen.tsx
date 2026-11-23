@@ -11,6 +11,7 @@ import { Melding } from "@/components/Melding";
 import { PageHeader } from "@/components/PageHeader";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import type { Beleid, BeleidsActie } from "@/lib/acties";
+import { vasteFout } from "@/lib/acties";
 import type { HubApiError } from "@/lib/api";
 import { formatDuration, formatTime } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
@@ -45,7 +46,7 @@ export function BeleidScreen() {
             <p>Beleid ophalen mislukt. Dit overzicht is geen basis voor een nieuwe actie.</p>
           </Melding>
         ) : null}
-        {s.error && !b ? <ErrorPanel error={s.error} title="Risicobeleid onbekend" onRetry={() => void s.reload()} /> : null}
+        {s.error && !b ? <ErrorPanel vast={vasteFout} error={s.error} title="Risicobeleid onbekend" onRetry={() => void s.reload()} /> : null}
         {!b && !s.error ? <Loading text="Beleid ophalen…" /> : null}
         {leeg ? (
           <Melding soort="onbekend" titel="Risicobeleid onbekend">

@@ -44,7 +44,11 @@ test("R2-voorstel: in de wachtlijst en de kopteller, detail met preview, diff, â
   const preview = page.getByTestId("actie-preview");
   await expect(preview).toContainText("app.uninstall");
   await expect(preview.locator("[data-risico=R2]")).toBeVisible();
+  // R-VEILIG-2 (RV-10): de echte uninstall-preview is eenduidig "Was â†’ (verwijderd)" en zegt wat er met de data gebeurt.
+  await expect(page.getByTestId("diff").locator("[data-diff]")).toHaveCount(1);
   await expect(page.getByTestId("diff").locator("[data-diff=verwijderd]")).toContainText("media-source-optimizer");
+  await expect(page.getByTestId("diff").locator("[data-diff=toegevoegd]")).toHaveCount(0);
+  await expect(page.getByTestId("diff-gevolgen")).toContainText("App-data in ix-volumes blijft staan.");
   await expect(preview).toContainText("Back-up vereist");
   // De vrije reden van het voorstel komt nergens in beeld.
   await expect(page.locator("main")).not.toContainText("e2e S-P2-170");
@@ -166,7 +170,7 @@ test("R3 (gesimuleerd verzoek): twee stappen, naam typen; zonder naam doet de ge
     request_id: id, status: "wacht_op_goedkeuring", action_id: "app.uninstall", target: { host_id: "nas-primary", app_id: "proef-app" },
     actor: { type: "user", id: "beheerder" }, risk_class: "R3", risk_claim: "R1", risk_claim_genegeerd: true, rule_ids: ["PROEF-R3"],
     goedkeuring_nodig: true, policy_hash: H("a"), uitvoerder: "executor", resource_etag: '"proef-1"', preview_hash: H("b"),
-    preview: { omschrijving: "App verwijderen", requires_backup: false, kritiek: false, huidig: {}, wijziging: { soort: "verwijderen", app: "proef-app" }, dataretentie: "Data blijft staan.", terugdraaien: "Opnieuw installeren." },
+    preview: { omschrijving: "App verwijderen", requires_backup: false, kritiek: false, huidig: {}, wijziging: { soort: "verwijderen", app: "proef-app", alleen_containers: true, remove_ix_volumes: false, remove_images: false }, dataretentie: "Data blijft staan.", terugdraaien: "Opnieuw installeren." },
     blokkades: [], goedkeuring: null, resultaat: null, aangemaakt_op: new Date(nu).toISOString(), bijgewerkt_op: new Date(nu).toISOString(),
     geldig_tot: new Date(nu + 900_000).toISOString(), gestart_op: null, uitgevoerd_op: null,
   };
@@ -218,4 +222,37 @@ test("risicobeleid: alleen lezen met policy_hash en de vaste zin", async ({ page
   await expectAccessible(page, "risicobeleid");
   await expectNoHorizontalScroll(page, "risicobeleid");
   await expectTouchTargets(page, "risicobeleid");
+});
+
+test("R-VEILIG-1 (RV-8): na uitvoeren nooit de vrije executormelding of details-JSON in de DOM", async ({ page }) => {
+  for (const [status, code, tekst] of [
+    [409, "uitvoering_geweigerd", "De executor heeft de actie geweigerd; er is niets uitgevoerd."],
+    [501, "capability_unavailable", "Deze handeling is nog niet beschikbaar bij de uitvoerder; er is niets uitgevoerd."],
+  ] as const) {
+    const id = randomUUID();
+    const nu = Date.now();
+    const H = (c: string) => `sha256:${c.repeat(64)}`;
+    await page.route(`**/api/v1/actions/${id}**`, (r) =>
+      r.request().method() === "POST"
+        ? r.fulfill({ status, json: { code, message: "VRIJE-EXECUTOR-MELDING-1", details: { request_id: id, executor: { code: "x_y", message: "VRIJE-EXECUTOR-MELDING-2" } }, trace_id: "t-rv8" } })
+        : r.fulfill({
+            json: {
+              request_id: id, status: "klaar", action_id: "app.restart", target: { host_id: "nas-primary", app_id: "proef-app" }, actor: { type: "user", id: "beheerder" },
+              risk_class: "R1", risk_claim: null, risk_claim_genegeerd: false, rule_ids: ["PROEF"], goedkeuring_nodig: false, policy_hash: H("a"), uitvoerder: "executor",
+              resource_etag: '"proef-1"', preview_hash: H("b"), preview: { omschrijving: "App herstarten", requires_backup: false, huidig: {}, wijziging: { soort: "herstarten", app: "proef-app" } },
+              blokkades: [], goedkeuring: null, resultaat: null, aangemaakt_op: new Date(nu).toISOString(), bijgewerkt_op: new Date(nu).toISOString(),
+              geldig_tot: new Date(nu + 900_000).toISOString(), gestart_op: null, uitgevoerd_op: null,
+            },
+          }),
+    );
+    await page.goto(`/goedkeuringen/${id}`);
+    await ready(page);
+    await page.getByTestId("uitvoeren").click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Uitvoeren" }).click();
+    const paneel = page.getByTestId("error-panel");
+    await expect(paneel).toContainText(tekst);
+    await expect(paneel).toContainText(code);
+    expect(await page.content()).not.toContain("VRIJE-EXECUTOR-MELDING");
+    await expect(paneel).not.toContainText("Technische details");
+  }
 });

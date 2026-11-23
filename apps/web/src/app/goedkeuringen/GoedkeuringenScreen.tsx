@@ -11,7 +11,7 @@ import { Melding } from "@/components/Melding";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { doelNaam, statusView, weigerReden, type ActieLijst, type ActieVerzoek } from "@/lib/acties";
+import { doelNaam, statusView, weigerReden, type ActieLijst, type ActieVerzoek, vasteFout } from "@/lib/acties";
 import { apiGet } from "@/lib/api";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
@@ -109,7 +109,7 @@ export function GoedkeuringenScreen() {
             <p>Goedkeuringen ophalen mislukt. Dit is de laatst bekende lijst; open een verzoek voor de actuele stand.</p>
           </Melding>
         ) : null}
-        {s.error && !s.data ? <ErrorPanel error={s.error} title="Goedkeuringen ophalen mislukt" onRetry={() => void s.reload()} /> : null}
+        {s.error && !s.data ? <ErrorPanel vast={vasteFout} error={s.error} title="Goedkeuringen ophalen mislukt" onRetry={() => void s.reload()} /> : null}
         {!s.data && !s.error ? <Loading text="Goedkeuringen ophalen…" /> : null}
         {s.data && !items.length && !s.stale ? (
           <p data-testid="leeg">{filter === "wacht_op_goedkeuring" ? "Geen openstaande goedkeuringen." : "Geen voorstellen voor dit filter."}</p>
@@ -123,7 +123,7 @@ export function GoedkeuringenScreen() {
             ))}
           </ul>
         ) : null}
-        {meerFout ? <ErrorPanel error={meerFout} title="Meer laden mislukt" /> : null}
+        {meerFout ? <ErrorPanel vast={vasteFout} error={meerFout} title="Meer laden mislukt" /> : null}
         {cursor ? (
           <div>
             <Button onClick={() => void meer()}>Meer laden</Button>

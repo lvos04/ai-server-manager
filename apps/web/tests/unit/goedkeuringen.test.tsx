@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RisicoBadge } from "@/components/ActiePreview";
+import { ErrorPanel } from "@/components/ErrorPanel";
 import { ALLEEN_BEHEERDER, foutVerval, GoedkeuringsPagina, HERSTELPUNT_ONTBREEKT } from "@/components/GoedkeuringsPagina";
 import { eindTekst, UitvoeringsTijdlijn } from "@/components/UitvoeringsTijdlijn";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   statusView,
   vervallen,
   VOORSTEL_VERLOPEN,
+  vasteFout,
   weigerReden,
   type ActieVerzoek,
   type BeleidsActie,
@@ -52,7 +54,7 @@ function verzoek(extra: Partial<ActieVerzoek> = {}): ActieVerzoek {
       omschrijving: "App verwijderen",
       requires_backup: false,
       huidig: { versie: "1.0" },
-      wijziging: { soort: "verwijderen", app: "demo-app", alleen_containers: true },
+      wijziging: { soort: "verwijderen", app: "demo-app", alleen_containers: true, remove_ix_volumes: false, remove_images: false },
       dataretentie: "Datasets en data blijven staan.",
       terugdraaien: "Opnieuw installeren.",
     },
@@ -77,6 +79,28 @@ beforeEach(() => {
   proef.rol = "admin";
 });
 
+describe("vaste fouttekst na een handeling (R-VEILIG-1, RV-8)", () => {
+  it.each([
+    [409, "uitvoering_geweigerd"],
+    [501, "capability_unavailable"],
+    [500, "iets_nieuws"],
+  ])("HTTP %s %s: geen vrije executortekst en geen details-JSON in de HTML", (status, code) => {
+    const e = new HubApiError(status, code, "VRIJE-EXECUTOR-MELDING-501", { executor: { code: "x_y", message: "VRIJE-EXECUTOR-MELDING" } }, "trace-1");
+    const html = renderToStaticMarkup(<ErrorPanel error={e} title="De handeling is niet gelukt" vast={vasteFout} />);
+    expect(html).not.toContain("VRIJE-EXECUTOR");
+    expect(html).not.toContain("Technische details");
+    expect(html).not.toContain("x_y");
+    expect(html).toContain(code);
+    expect(html).toContain("trace-1");
+    expect(html).toContain(vasteFout(e));
+  });
+
+  it("een onbekende code krijgt een vaste tekst, een bekende code haar eigen tekst", () => {
+    expect(vasteFout(new HubApiError(409, "uitvoering_geweigerd", "x"))).toBe("De executor heeft de actie geweigerd; er is niets uitgevoerd.");
+    expect(vasteFout(new HubApiError(500, "toString", "x"))).toBe(vasteFout(new HubApiError(500, "raar", "x")));
+  });
+});
+
 describe("diff (C-20)", () => {
   it("toont van/naar als één gewijzigde regel en laat gelijke velden weg", () => {
     const { regels, onveilig } = diffRegels({ huidig: { app: "x" }, wijziging: { soort: "bijwerken", app: "x", van: "1.0", naar: "1.1" } });
@@ -84,10 +108,32 @@ describe("diff (C-20)", () => {
     expect(regels).toEqual([{ soort: "gewijzigd", veld: "naar", was: "1.0", wordt: "1.1" }]);
   });
 
-  it("markeert verwijderen en toont een geheim alleen als ***", () => {
-    const { regels } = diffRegels({ wijziging: { soort: "verwijderen", app: "demo", wachtwoord: "***" } });
-    expect(regels[0]).toEqual({ soort: "verwijderd", veld: "app", was: "demo" });
+  it("toont een geheim alleen als ***", () => {
+    const { regels } = diffRegels({ wijziging: { soort: "bijwerken", app: "demo", wachtwoord: "***" } });
     expect(regels).toContainEqual({ soort: "toegevoegd", veld: "wachtwoord", wordt: "*** (geheim, niet getoond)" });
+  });
+
+  // R-VEILIG-2 (RV-10): de echte uninstall-preview van de backend (preview.py _wijziging) is eenduidig verwijderen.
+  const UNINSTALL = { soort: "verwijderen", app: "my-house", alleen_containers: true, remove_ix_volumes: false, remove_images: false };
+
+  it("verwijderen: alleen 'Was → (verwijderd)', nooit toegevoegd, en zegt wat er met de appdata gebeurt", () => {
+    const { regels, onveilig, gevolgen } = diffRegels({ huidig: {}, wijziging: UNINSTALL });
+    expect(onveilig).toBe(false);
+    expect(regels).toEqual([{ soort: "verwijderd", veld: "app", was: "my-house" }]);
+    expect(gevolgen).toEqual([
+      "Alleen de containers van de app worden verwijderd.",
+      "App-data in ix-volumes blijft staan.",
+      "Images blijven staan.",
+    ]);
+    expect(diffRegels({ wijziging: { ...UNINSTALL, remove_ix_volumes: true } }).gevolgen).toContain("App-data in ix-volumes wordt verwijderd.");
+  });
+
+  it.each([
+    ["onbekend veld", { ...UNINSTALL, wachtwoord: "***" }],
+    ["lot van de appdata ontbreekt", { soort: "verwijderen", app: "my-house", remove_images: false }],
+    ["geen ja/nee", { ...UNINSTALL, remove_ix_volumes: "nee" }],
+  ])("verwijderen blokkeert als het gevolg niet eenduidig is (%s)", (_n, wijziging) => {
+    expect(diffRegels({ wijziging }).onveilig).toBe(true);
   });
 
   it.each([

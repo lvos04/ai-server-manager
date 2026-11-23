@@ -8,7 +8,7 @@ import { Loading } from "@/components/Loading";
 import { Melding } from "@/components/Melding";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { statusView, type ActieVerzoek, type Hashes } from "@/lib/acties";
+import { statusView, type ActieVerzoek, type Hashes, vasteFout } from "@/lib/acties";
 import type { HubApiError } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
@@ -44,7 +44,7 @@ export function GoedkeuringScreen({ id }: { id: string }) {
       </Melding>
     );
   } else if (s.error) {
-    inhoud = <ErrorPanel error={s.error} title="Goedkeuring ophalen mislukt" onRetry={() => void s.reload()} />;
+    inhoud = <ErrorPanel vast={vasteFout} error={s.error} title="Goedkeuring ophalen mislukt" onRetry={() => void s.reload()} />;
   } else {
     inhoud = <Loading text="Goedkeuring ophalen…" />;
   }

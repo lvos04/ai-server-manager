@@ -17,6 +17,7 @@ export function ErrorPanel({
   alert = true,
   className,
   kind,
+  vast,
 }: {
   error: unknown;
   onRetry?: () => void;
@@ -24,9 +25,11 @@ export function ErrorPanel({
   alert?: boolean;
   className?: string;
   kind?: boolean;
+  /** Vaste tekst per code in plaats van het serverbericht; dan ook geen `details` in de DOM (ontwerp P2 "Zichtbare gegevens"). */
+  vast?: (error: unknown) => string;
 }) {
   const e = error instanceof HubApiError ? error : null;
-  const message = e ? e.message : error instanceof Error ? error.message : "Onbekende fout.";
+  const message = vast ? vast(error) : e ? e.message : error instanceof Error ? error.message : "Onbekende fout.";
   const offline = e?.code === "network_error" || e?.code === "api_unavailable";
   const Icon = offline ? WifiOff : OctagonX;
   if (kind) {
@@ -75,7 +78,7 @@ export function ErrorPanel({
               </div>
             </dl>
             {e.traceId ? <KopieerVeld label="Trace-ID" waarde={e.traceId} /> : null}
-            {Object.keys(e.details).length ? (
+            {!vast && Object.keys(e.details).length ? (
               <details>
                 <summary className="min-h-touch cursor-pointer py-2 font-semibold">Technische details</summary>
                 <pre className="overflow-x-auto rounded-sm bg-card p-2 text-sm whitespace-pre-wrap text-foreground">{JSON.stringify(e.details, null, 2)}</pre>

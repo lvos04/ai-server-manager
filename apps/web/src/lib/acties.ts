@@ -5,6 +5,7 @@
  * een weigeringsreden, een foutbericht van de executor) komt nooit in beeld. De server beslist over elk recht; de UI
  * leest alleen de sessierol uit `GET /api/v1/auth/me` om bediening te verbergen.
  */
+import { HubApiError } from "./api";
 import type { StatusView } from "./status";
 
 export type RisicoKlasse = "R0" | "R1" | "R2" | "R3";
@@ -265,12 +266,13 @@ function plat(w: unknown, pad: string, diepte: number, uit: Map<string, string>)
  * Was/Wordt per veld uit `preview.huidig` en `preview.wijziging`. `onveilig` = er staat een regel in die niet volledig
  * en veilig kan worden uitgelegd (te lang, stuurtekens, te diep of geen gewone waarde): dan blokkeert de goedkeuring.
  */
-export function diffRegels(preview: Preview | null | undefined): { regels: DiffRegel[]; onveilig: boolean } {
+export function diffRegels(preview: Preview | null | undefined): { regels: DiffRegel[]; onveilig: boolean; gevolgen?: string[] } {
   const wijziging = preview?.wijziging;
   if (!wijziging || typeof wijziging !== "object" || Array.isArray(wijziging)) return { regels: [], onveilig: true };
   try {
     const huidig = new Map<string, string>();
     if (preview?.huidig && typeof preview.huidig === "object") plat(preview.huidig, "", 0, huidig);
+    if ((wijziging as Record<string, unknown>).soort === "verwijderen") return verwijderen(wijziging as Record<string, unknown>);
     const { soort: _soort, van, ...rest } = wijziging as Record<string, unknown>;
     void _soort;
     const nieuw = new Map<string, string>();
@@ -287,15 +289,58 @@ export function diffRegels(preview: Preview | null | undefined): { regels: DiffR
       if (was === undefined) regels.push({ soort: "toegevoegd", veld, wordt });
       else if (was !== wordt) regels.push({ soort: "gewijzigd", veld, was, wordt });
     }
-    if ((wijziging as Record<string, unknown>).soort === "verwijderen") {
-      const app = (wijziging as Record<string, unknown>).app;
-      regels.unshift({ soort: "verwijderd", veld: "app", was: blad(app) });
-    }
     return { regels, onveilig: false };
   } catch (e) {
     if (e instanceof Onveilig) return { regels: [], onveilig: true };
     throw e;
   }
+}
+
+/**
+ * Verwijderen (app.uninstall, preview.py `_wijziging`): één regel "app: Was → (verwijderd)" en de opties als vaste
+ * gevolgen. Een onbekend veld of een gevolg dat niet ja/nee is, blokkeert (HARDE EIS: geen misleiding bij dataverlies).
+ */
+function verwijderen(w: Record<string, unknown>): { regels: DiffRegel[]; onveilig: boolean; gevolgen: string[] } {
+  const { soort: _s, app, alleen_containers, remove_ix_volumes, remove_images, ...over } = w;
+  void _s;
+  const jaNee = (x: unknown) => typeof x === "boolean";
+  if (Object.keys(over).length || !jaNee(remove_ix_volumes) || !jaNee(remove_images) || (alleen_containers !== undefined && !jaNee(alleen_containers))) {
+    return { regels: [], onveilig: true, gevolgen: [] };
+  }
+  const gevolgen = [
+    ...(alleen_containers ? ["Alleen de containers van de app worden verwijderd."] : []),
+    remove_ix_volumes ? "App-data in ix-volumes wordt verwijderd." : "App-data in ix-volumes blijft staan.",
+    remove_images ? "Images worden verwijderd." : "Images blijven staan.",
+  ];
+  return { regels: [{ soort: "verwijderd", veld: "app", was: blad(app) }], onveilig: false, gevolgen };
+}
+
+/**
+ * Vaste tekst per bekende foutcode van een actieroute (R-VEILIG-1). Het vrije bericht en `details` (ook die van de
+ * executor) komen nooit in beeld; een onbekende code krijgt één vaste tekst.
+ */
+const ACTIE_FOUT: Record<string, string> = {
+  forbidden: "Je hebt geen recht voor deze handeling.",
+  not_found: "Dit verzoek is niet gevonden.",
+  status_past_niet: "Dit verzoek staat niet meer in de stand voor deze handeling. Lees de stand opnieuw.",
+  goedkeuring_al_gebruikt: "Deze goedkeuring is al gebruikt. Keur het voorstel opnieuw goed.",
+  goedkeuring_vervallen: "De goedkeuring is vervallen. Keur het voorstel opnieuw goed.",
+  nog_bezig: "Dit verzoek wordt nog uitgevoerd. Wacht op de uitkomst.",
+  actie_geblokkeerd: "Deze actie is nu geblokkeerd; er is niets uitgevoerd.",
+  executor_niet_gekoppeld: "De executor is niet gekoppeld; er is niets uitgevoerd. Koppel hem op zijn eigen statuspagina.",
+  executor_adres_onbekend: "Het adres van de executor is onbekend; er is niets uitgevoerd.",
+  uitvoering_geweigerd: "De executor heeft de actie geweigerd; er is niets uitgevoerd.",
+  capability_unavailable: "Deze handeling is nog niet beschikbaar bij de uitvoerder; er is niets uitgevoerd.",
+  uitvoering_mislukt: "De uitvoering is mislukt. Bekijk de uitvoering op deze pagina.",
+  uitkomst_onbekend: "De uitkomst is onbekend. Laat de Hub de stand ophelderen.",
+  network_error: "De Hub is niet bereikbaar. De uitkomst is onbekend tot de stand opnieuw is gelezen.",
+  api_unavailable: "De Hub is niet bereikbaar. De uitkomst is onbekend tot de stand opnieuw is gelezen.",
+};
+export const ONBEKENDE_FOUT = "De Hub meldde een onbekende fout. Lees de stand opnieuw voordat je iets herhaalt.";
+
+export function vasteFout(e: unknown): string {
+  const c = e instanceof HubApiError ? e.code : "";
+  return Object.hasOwn(ACTIE_FOUT, c) ? ACTIE_FOUT[c]! : ONBEKENDE_FOUT;
 }
 
 /** Een getypte resultaatcode in woorden; nooit het vrije foutbericht. */

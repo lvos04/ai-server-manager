@@ -14,8 +14,7 @@ import {
   weigerReden,
   werkwoord,
   type ActieVerzoek,
-  type Hashes,
-} from "@/lib/acties";
+  type Hashes, vasteFout } from "@/lib/acties";
 import type { HubApiError } from "@/lib/api";
 import { hasRole, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
@@ -315,7 +314,7 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
         </Melding>
       ) : null}
       <ActiePreview v={v} verouderd={verouderd} />
-      {fout && fout.code !== "preview_gewijzigd" && fout.code !== "voorstel_verlopen" && fout.status !== 403 ? <ErrorPanel error={fout} title="De handeling is niet gelukt" /> : null}
+      {fout && fout.code !== "preview_gewijzigd" && fout.code !== "voorstel_verlopen" && fout.status !== 403 ? <ErrorPanel vast={vasteFout} error={fout} title="De handeling is niet gelukt" /> : null}
       {beslissing}
       {uitvoeren}
       {v.status !== "wacht_op_goedkeuring" ? <UitvoeringsTijdlijn v={v} verouderd={verouderd} /> : null}
