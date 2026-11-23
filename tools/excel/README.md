@@ -24,6 +24,23 @@ nieuwe rij of faserij met zo'n (start)status wordt geweigerd: exitcode 2 en er w
 voor één ID wint de voorzichtigste status. Dezelfde invoer twee keer verwerken verandert de tweede keer niets
 (idempotent). Bij een wijziging in het origineel komt er een `.xlsx.bak` naast; verwijder die na controle.
 
+## Afvinken door de gebruiker
+
+Besluit van de gebruiker van 2026-11-23 (zie `docs/platform-v2/OVERDRACHT/STATUS.md`, kop "Besluiten van de gebruiker
+(2026-11-23)").
+
+- **Wie mag afvinken:** alleen de gebruiker, zelf in de Excel, door in de statuscel *Gereed* (Werkpakketten, Fasen) of
+  *Geslaagd* (Testmatrix) te kiezen. Een agent doet dat nooit, ook niet op verzoek, en zet het ook nooit in een
+  `EVIDENCE.json`. Het hulpmiddel zet zelf nooit *Gereed* of *Geslaagd* (zie **Regels**).
+- **Wat het hulpmiddel ermee doet:** staat in de statuscel van een rij al *Gereed* of *Geslaagd* uit de keuzelijst van
+  dat blad, dan laat `--evidence` die cel staan. Bewijs, *Validatie*, *Blokkade / opmerking* en *Bijgewerkt* worden wel
+  bijgewerkt. De rij komt in de lijst `handmatig_afgevinkt` van de JSON-uitvoer (`id`, `blad`, `status`); het aantal
+  staat in `bijgewerkt_per_blad.handmatig_afgevinkt`. Meldt het bewijs voor zo'n rij *Geblokkeerd* of *Mislukt*, dan
+  volgt een waarschuwing (tegenstrijdig): het vinkje wordt niet aangepast, de gebruiker beoordeelt het zelf.
+- **Niet beschermd:** een waarde buiten de keuzelijst van het blad (bijvoorbeeld *Klaar*, of *Geslaagd* op
+  Werkpakketten) en elke andere status; die krijgen gewoon de status uit het bewijs. Een rij zonder handmatig vinkje
+  krijgt nooit *Gereed*/*Geslaagd*, ook niet als het bewijs dat vraagt.
+
 ```bash
 python3 -m venv /tmp/excel-venv && /tmp/excel-venv/bin/pip install -r tools/excel/requirements-test.txt
 # B03 2.0: werkpakketten, testrijen en de faserij P4-0
@@ -46,5 +63,5 @@ python3 -m venv /tmp/excel-venv && /tmp/excel-venv/bin/pip install -r tools/exce
 
 **Tests.** `python -m pytest -q tools/excel/tests` (CI-job `excel`): een klein, met de hand opgebouwd test-werkboek met
 dezelfde onderdelen als de afvinklijst (rij-aantallen, tabel- en validatiebereiken, Dashboard-formules en fasenblok,
-databar, byte-gelijke andere bladen, idempotentie, weigeren van *Gereed*/*Geslaagd*, routering van bewijs) en een test op
+databar, byte-gelijke andere bladen, idempotentie, weigeren van *Gereed*/*Geslaagd*, handmatig afvinken laten staan, routering van bewijs) en een test op
 de echte Excel in een tijdelijke kopie met de B03-invoer uit `docs/platform-v2/08_EXCEL/b03/`.

@@ -645,6 +645,117 @@ def test_contractpunten_en_reviews_in_eigen_overzicht(klein, capsys):
     assert not ue.is_extern("B01-001") and not ue.is_extern("JLT-12") and not ue.is_extern("C1.3")
 
 
+def _vink_af(pad: Path, sheet: str, rid: str, status: str) -> None:
+    """Simuleert de gebruiker die in de Excel zelf een status kiest."""
+    wb = ue.Werkboek(pad)
+    lay = ue.LAYOUT[sheet]
+    row = next(r for r in ue.data_rows(wb.blad(sheet)) if ue.row_id(r, lay["id"]) == rid)
+    ue.set_cell(row, lay["status"], status)
+    wb.schrijf(pad)
+
+
+def _bewijs(map_: Path, regels: list[dict]) -> Path:
+    ev = map_ / "repo3" / "docs" / "platform-v2" / "EVIDENCE.json"
+    ev.parent.mkdir(parents=True, exist_ok=True)
+    ev.write_text(json.dumps(regels, ensure_ascii=False), encoding="utf-8")
+    return ev
+
+
+def test_handmatig_afgevinkt_blijft_staan(klein, capsys):
+    """S-P6-52 (besluit gebruiker 2026-11-23, optie 1): een 'Gereed'/'Geslaagd' van de gebruiker blijft staan; bewijs,
+    validatie, blokkade en datum worden wel bijgewerkt; de rijen staan in 'handmatig_afgevinkt'."""
+    _vink_af(klein["xlsx"], "Werkpakketten", "B01-001", "Gereed")
+    _vink_af(klein["xlsx"], "Testmatrix", "EX01", "Geslaagd")
+    ev = _bewijs(
+        klein["dir"],
+        [
+            {
+                "id": "B01-001",
+                "status": "Bezig",
+                "validatie": "Unit-getest",
+                "bewijs": "b1",
+                "bijgewerkt": "2026-11-23",
+            },
+            {"id": "EX01", "status": "Bezig", "validatie": "Sim-getest", "bewijs": "e1", "bijgewerkt": "2026-11-23"},
+            {"id": "B03-001", "status": "Bezig", "bewijs": "b3", "bijgewerkt": "2026-11-23"},
+        ],
+    )
+    uit = klein["dir"] / "uit.xlsx"
+    argv = ["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]
+    assert ue.main(argv) == 0
+    resultaat = json.loads(capsys.readouterr().out)
+    na = onderdelen(uit)
+    wp, tm = blad(na, 2), blad(na, 3)
+    assert (waarde(wp, "J2"), waarde(wp, "K2"), waarde(wp, "O2"), waarde(wp, "Q2")) == (
+        "Gereed",
+        "b1",
+        "Unit-getest",
+        "2026-11-23",
+    )
+    assert (waarde(tm, "F2"), waarde(tm, "G2"), waarde(tm, "I2")) == ("Geslaagd", "e1", "Sim-getest")
+    assert waarde(wp, "J3") == "Bezig"  # rij zonder handmatige status volgt het bewijs
+    assert resultaat["handmatig_afgevinkt"] == [
+        {"id": "B01-001", "blad": "Werkpakketten", "status": "Gereed"},
+        {"id": "EX01", "blad": "Testmatrix", "status": "Geslaagd"},
+    ]
+    assert resultaat["bijgewerkt_per_blad"]["handmatig_afgevinkt"] == 2
+    assert not [w for w in resultaat["waarschuwingen"] if "tegenstrijdig" in w]
+    # tweede run met dezelfde invoer verandert niets meer (idempotent)
+    shutil.copy2(uit, klein["xlsx"])
+    eerste = klein["xlsx"].read_bytes()
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev)]) == 0
+    assert json.loads(capsys.readouterr().out)["gewijzigde_onderdelen"] == []
+    assert klein["xlsx"].read_bytes() == eerste
+
+
+@pytest.mark.parametrize("bewijsstatus", ["Geblokkeerd", "Mislukt"])
+def test_handmatig_afgevinkt_tegenstrijdig_bewijs_waarschuwt(klein, capsys, bewijsstatus):
+    _vink_af(klein["xlsx"], "Testmatrix", "EX02", "Geslaagd")
+    ev = _bewijs(klein["dir"], [{"id": "EX02", "status": bewijsstatus, "bewijs": "x", "bijgewerkt": "2026-11-23"}])
+    uit = klein["dir"] / "uit.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]) == 0
+    resultaat = json.loads(capsys.readouterr().out)
+    assert waarde(blad(onderdelen(uit), 3), "F3") == "Geslaagd"  # het vinkje blijft; het gereedschap past het niet aan
+    assert any("EX02" in w and "tegenstrijdig" in w and bewijsstatus in w for w in resultaat["waarschuwingen"])
+
+
+def test_handmatige_waarde_buiten_lijst_niet_beschermd(klein, capsys):
+    """Negatief: 'Klaar' staat niet in de lijst van het blad en wordt overschreven met de status uit het bewijs;
+    'Geslaagd' hoort niet bij Werkpakketten en wordt dus ook niet beschermd."""
+    _vink_af(klein["xlsx"], "Werkpakketten", "B01-001", "Klaar")
+    _vink_af(klein["xlsx"], "Werkpakketten", "B03-001", "Geslaagd")
+    ev = _bewijs(
+        klein["dir"],
+        [
+            {"id": "B01-001", "status": "Bezig", "bijgewerkt": "2026-11-23"},
+            {"id": "B03-001", "status": "Bezig", "bijgewerkt": "2026-11-23"},
+        ],
+    )
+    uit = klein["dir"] / "uit.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]) == 0
+    resultaat = json.loads(capsys.readouterr().out)
+    wp = blad(onderdelen(uit), 2)
+    assert (waarde(wp, "J2"), waarde(wp, "J3")) == ("Bezig", "Bezig")
+    assert resultaat["handmatig_afgevinkt"] == []
+
+
+def test_zonder_handmatige_status_nooit_gereed(klein, capsys):
+    """Negatief: bewijs dat 'Gereed'/'Geslaagd' vraagt, geeft op een rij zonder handmatige status nog steeds 'Bezig'."""
+    ev = _bewijs(
+        klein["dir"],
+        [
+            {"id": "B03-004", "status": "Gereed", "bijgewerkt": "2026-11-23"},
+            {"id": "EX01", "status": "Geslaagd", "bijgewerkt": "2026-11-23"},
+        ],
+    )
+    uit = klein["dir"] / "uit.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]) == 0
+    resultaat = json.loads(capsys.readouterr().out)
+    na = onderdelen(uit)
+    assert waarde(blad(na, 2), "J4") == "Bezig" and waarde(blad(na, 3), "F2") == "Bezig"
+    assert resultaat["handmatig_afgevinkt"] == []
+
+
 def test_herberekening_en_verwijzingen():
     assert ue.shift_ref("$A$2:$A$306", 307, 5, True) == "$A$2:$A$311"
     assert ue.shift_ref("$A$2:$A$306", 40, 1, False) == "$A$2:$A$307"

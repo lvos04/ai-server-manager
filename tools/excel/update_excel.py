@@ -33,6 +33,11 @@ Regels (PLATFORM_CONTRACTEN.md §11, keuze van de gebruiker):
 - 'Gereed' en 'Geslaagd' worden NOOIT door dit hulpmiddel gezet. Bewijs met zo'n
   status wordt teruggezet naar 'Bezig' met een waarschuwing; een nieuwe rij met
   zo'n (start)status wordt geweigerd en er wordt niets geschreven.
+- Wat de gebruiker zelf afvinkt, blijft staan (besluit 2026-11-23): staat in de
+  statuscel al 'Gereed'/'Geslaagd' uit de lijst van het blad, dan schrijft het
+  bewijs die cel niet over (bewijs, validatie, blokkade en datum wel). Zulke rijen
+  staan in ``handmatig_afgevinkt`` van de uitvoer; bewijs 'Geblokkeerd'/'Mislukt'
+  geeft een waarschuwing (tegenstrijdig).
 - Meerdere bewijsregels voor dezelfde ID worden samengevoegd; de
   voorzichtigste status wint.
 - Idempotent: dezelfde invoer twee keer verwerken verandert de tweede keer niets.
@@ -1028,7 +1033,14 @@ def route(rid: str) -> str:
     return "Werkpakketten"
 
 
-def update_sheet(wb: Werkboek, sheet: str, evidence: dict[str, list[dict]], warnings: list[str], stats: dict) -> None:
+def update_sheet(
+    wb: Werkboek,
+    sheet: str,
+    evidence: dict[str, list[dict]],
+    warnings: list[str],
+    stats: dict,
+    handmatig: list[dict],
+) -> None:
     root = wb.blad(sheet)
     lay = LAYOUT[sheet]
     rows = data_rows(root)
@@ -1052,7 +1064,16 @@ def update_sheet(wb: Werkboek, sheet: str, evidence: dict[str, list[dict]], warn
         if rid not in evidence:
             continue
         m = merge(evidence[rid], sheet, warnings)
-        if m["status"]:
+        # Besluit gebruiker 2026-11-23: een 'Gereed'/'Geslaagd' die de gebruiker zelf koos, blijft staan.
+        huidig = cell_text(find_cell(row, lay["status"]))
+        if huidig in FORBIDDEN and huidig in ALLOWED[sheet]:
+            handmatig.append({"id": rid, "blad": sheet, "status": huidig})
+            if m["status"] in ("Geblokkeerd", "Mislukt"):
+                warnings.append(
+                    f"{rid} ({sheet}): handmatig '{huidig}' maar het bewijs meldt '{m['status']}' "
+                    "(tegenstrijdig; het vinkje is niet aangepast, controleer het zelf)"
+                )
+        elif m["status"]:
             set_cell(row, lay["status"], m["status"])
         if m["bewijs"]:
             set_cell(row, lay["bewijs"], m["bewijs"][:32000])
@@ -1175,6 +1196,7 @@ def run(args: argparse.Namespace) -> dict:
     # 2. bewijs samenvoegen
     by_sheet: dict[str, dict[str, list[dict]]] = {s: {} for s in LAYOUT}
     overzicht: list[dict] = []
+    handmatig: list[dict] = []
     for p in args.evidence:
         try:
             items = json.loads(Path(p).read_text(encoding="utf-8"))
@@ -1199,7 +1221,8 @@ def run(args: argparse.Namespace) -> dict:
             by_sheet["Fasen"].setdefault(e["id"], []).append(e)
     if args.evidence or args.program:
         for sheet in LAYOUT:
-            update_sheet(wb, sheet, by_sheet[sheet], warnings, stats)
+            update_sheet(wb, sheet, by_sheet[sheet], warnings, stats, handmatig)
+        stats["handmatig_afgevinkt"] = len(handmatig)
         for sheet, leftovers in by_sheet.items():
             for rid in leftovers:
                 warnings.append(f"{rid}: geen rij gevonden in blad {sheet}")
@@ -1223,6 +1246,7 @@ def run(args: argparse.Namespace) -> dict:
         "bijgewerkt_per_blad": stats,
         "gewijzigde_onderdelen": gewijzigd,
         "contractpunten_en_reviews": sorted(overzicht, key=lambda r: (r["id"], r["repo"])),
+        "handmatig_afgevinkt": handmatig,
         "waarschuwingen": warnings,
     }
 
