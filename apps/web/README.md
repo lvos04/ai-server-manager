@@ -14,7 +14,7 @@ lucide-react. Platformcomponenten: `StatusBadge` (C-03/C-03a), `StatCard` (C-05)
 (C-02), `ResponsiveList` (C-34), `Subnav` (C-62), `Controles` (C-58), `Aftellen` (C-22), `LineChart` (C-32, recharts).
 Productnaam: **TrueNAS Home Platform**; "Hub" is de centrale app daarin.
 
-## Schermen (P0 + P1 + contract 1.2)
+## Schermen
 
 | Pad | Inhoud | Bron |
 |---|---|---|
@@ -24,14 +24,25 @@ Productnaam: **TrueNAS Home Platform**; "Hub" is de centrale app daarin.
 | `/server`, `/server/metrieken`, `/server/meetdekking`, `/server/logs` | inventaris; live metingen en grafieken; dekking per metriek × bron; log-index (operator) | `/api/v1/inventory*`, `/observability/nas`, `/metrics/*`, `/monitoring/coverage`, `/logs*` |
 | `/apps`, `/apps/[id]?tab=…` | appcatalogus; appdetail met gezondheid per onderdeel en tabs (acties volgen in P2) | `/api/v1/apps*` |
 | `/problemen`, `/problemen/[id]` | incidenten-inbox en -detail | `/api/v1/incidents*` |
-| `/backups` | back-upgate, dekking per app en dataset, eigen Hub-back-up | `/api/v1/backups/*`, gates |
+| `/backups` | back-upgate met voorwaarden, vier appmeldingen, dekking per app en dataset, eigen Hub-export | `/api/v1/backups/*`, gates |
+| `/backups/herstelpunten`, `/backups/extern` | punten per app met RPO, databasebewijs en leeftijd, afzonderlijke stand en eindtijd van D04-uploadtaken | `/api/v1/backups/herstelpunten`, `/coverage` en `/extern` onder dezelfde prefix |
+| `/backups/hersteltests`, `/backups/rampenscenarios` | zandbakproef voor de beheerder, bewijsrecords voor de kijker en stappen per scenario | Hub-acties en de back-uproutes `restore-tests`, `herstelpunten/{id}/hersteltest` en `rampenscenario` |
+| `/automatisering` | flows, flowdetail, testmodus, ontvangen eventtypen, actieverzoeken en flowherstel | diensteninventaris, `/api/v1/events` en `/api/v1/actions` |
 | `/instellingen/…` | account · toegang (rollen, sessies, SSO) · noodaccount (H6) · diensten (H5) · monitoring en meldingen · apparaat · audit · over | `/api/v1/auth/*`, `/users`, `/sessions`, `/services*`, `/monitoring/*`, `/notifications*`, `/audit*` |
 | `/kijken`, `/zoeken`, `/ik` | kindschil (alleen rol kind) | — |
-| `/ai` (P2), `/automatisering` (P2), `/media` (P3/P4), `/huis` (P3), `/netwerk` (P5), `/kosten` (P5) | "Nog niet beschikbaar — volgt in fase Px" — geen nepdata | — |
+| `/ai` (P2), `/media` (P3/P4), `/huis` (P3), `/netwerk` (P5), `/kosten` (P5) | "Nog niet beschikbaar — volgt in fase Px" — geen nepdata | — |
 
 Navigatie volgens `01_ARCHITECTUUR/08_UI_EN_INTERACTIES.md`: onder 1024 px een ondernavigatie (Home, Apps, Problemen,
 AI, Meer), vanaf 1024 px een zijbalk (Home, Server, Media, Huis, Netwerk, Automatisering, Backups, Kosten,
 Instellingen) met een kopbalk (Problemen-teller, AI, gebruikersmenu).
+
+### Back-ups en automatisering (S-P2-190)
+
+Bij **Backups → Hersteltests** kiest de beheerder een herstelpunt. **Nieuwe hersteltest** opent de R1-actie-preview voor een kloon in de zandbak. Bij meerdere datasets doorloopt de beheerder deze stap voor elke dataset. Na het uitvoeren van de kloon kan de beheerder terug naar Hersteltests. De Hub start de robot met de ID’s van de uitgevoerde kloonverzoeken. De robot controleert de kloon, de database en de ongewijzigde productie. Het directe antwoord bevat het deelbewijs. De blijvende lijst bevat afzonderlijke bewijsrecords. Bij een onduidelijk antwoord leest de Hub eerst de lijst opnieuw.
+
+De automatiseringshistorie toont per verzoek de beleidsklasse, de goedkeuringsvereiste en het verloop. **Bekijk actie-preview** opent het bestaande verzoek. Bij flowherstel levert de API de momentopname-ID pas in het gecontroleerde resultaat van de eigenaar. De beheerder kan een voorgestelde monitorregel in **Instellingen → Monitoring** handmatig bevestigen na overname in Uptime Kuma. De bevestiging hoort bij de hash van die regel en heeft een neutrale badge.
+
+De Hub heeft geen browserroute voor de flowdefinities, droogtest, volledige runhistorie, momentopnamelijst of geverifieerde editorbestemming. De tijd van een inventarislezing staat apart van de ontbrekende flowmeettijd. Ook de oefendatum per rampenscenario, het blijvend opvraagbare robotdeelbewijs en de bestandstelling en versleuteling van een externe upload zijn nog niet beschikbaar. De schermspecificatie staat in `docs/ontwerp/HUB_P2_ONTWERP.md`, S-110 t/m S-115 en S-120 t/m S-127.
 
 ## Regels die de UI afdwingt
 

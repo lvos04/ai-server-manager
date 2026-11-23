@@ -112,7 +112,7 @@ const AANVRAGER: Record<string, string> = { user: "gebruiker", ai: "AI", flow: "
 export function ActiePreview({ v, kop: Kop = "h2", verouderd, kinderen }: { v: ActieVerzoek; kop?: "h2" | "h3"; verouderd?: boolean; kinderen?: ReactNode }) {
   const k = risicoKlasse(v.risk_class);
   const claim = risicoKlasse(v.risk_claim);
-  const { regels, onveilig, gevolgen } = diffRegels(v.preview);
+  const { regels, onveilig, gevolgen } = diffRegels(v.preview, v.action_id);
   const backup = v.preview?.requires_backup;
   const herstelpunt = v.goedkeuring?.backup_checkpoint_id ?? null;
   return (

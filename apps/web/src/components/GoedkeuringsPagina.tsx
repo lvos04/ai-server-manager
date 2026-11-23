@@ -7,6 +7,8 @@ import {
   doelNaam,
   naamKlopt,
   risicoKlasse,
+  toonbareFout,
+  vasteFout,
   vervallen,
   vervallenTekst,
   VOORSTEL_VERLOPEN,
@@ -14,7 +16,8 @@ import {
   weigerReden,
   werkwoord,
   type ActieVerzoek,
-  type Hashes, vasteFout } from "@/lib/acties";
+  type Hashes,
+} from "@/lib/acties";
 import type { HubApiError } from "@/lib/api";
 import { hasRole, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
@@ -38,8 +41,12 @@ export const NAAM_EERST = "Typ eerst de exacte naam van het doel";
 export function beslisBlokkade(v: ActieVerzoek, verval: string | null, verouderd: boolean, metBackup = true): string | null {
   if (verval) return verval;
   if (verouderd) return "Verouderde gegevens: de laatste lezing is mislukt. Ververs eerst de pagina.";
+  if (v.action_id === "automation.flows.restore") {
+    if (typeof v.preview?.requires_backup !== "boolean") return "De back-upvereiste van de eigenaar is onbekend.";
+    if (v.blokkades.length) return "Het beleid blokkeert dit herstelvoorstel.";
+  }
   if (v.blokkades.length) return `Geblokkeerd: ${v.blokkades.map((b) => b.reden).join(" ")}`;
-  if (!v.preview_hash || !v.resource_etag || diffRegels(v.preview).onveilig) return ONVEILIGE_DIFF;
+  if (!v.preview_hash || !v.resource_etag || diffRegels(v.preview, v.action_id).onveilig) return ONVEILIGE_DIFF;
   if (metBackup && v.preview?.requires_backup && !v.goedkeuring?.backup_checkpoint_id) return HERSTELPUNT_ONTBREEKT;
   return null;
 }
@@ -314,7 +321,7 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
         </Melding>
       ) : null}
       <ActiePreview v={v} verouderd={verouderd} />
-      {fout && fout.code !== "preview_gewijzigd" && fout.code !== "voorstel_verlopen" && fout.status !== 403 ? <ErrorPanel vast={vasteFout} error={fout} title="De handeling is niet gelukt" /> : null}
+      {fout && fout.code !== "preview_gewijzigd" && fout.code !== "voorstel_verlopen" && fout.status !== 403 ? <ErrorPanel vast={vasteFout} error={toonbareFout(fout)} title="De handeling is niet gelukt" /> : null}
       {beslissing}
       {uitvoeren}
       {v.status !== "wacht_op_goedkeuring" ? <UitvoeringsTijdlijn v={v} verouderd={verouderd} /> : null}

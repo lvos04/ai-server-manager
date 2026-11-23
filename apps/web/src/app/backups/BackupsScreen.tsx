@@ -1,273 +1,142 @@
 "use client";
 
 import Link from "next/link";
-import { ErrorPanel } from "@/components/ErrorPanel";
 import { Freshness, useNow } from "@/components/Freshness";
-import { Loading } from "@/components/Loading";
+import { Leesstand } from "@/components/Leesstand";
 import { PageHeader } from "@/components/PageHeader";
+import { ResponsiveList } from "@/components/ResponsiveList";
 import { StatusBadge } from "@/components/StatusBadge";
-import { TableWrap } from "@/components/TableWrap";
+import { appNaam, backupGate, BRONNAMEN, datasetNaam, gateVoorwaarde, meettijd, meldreden, uren, verseApp } from "@/lib/backups";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { coverageCounts } from "@/lib/home";
-import { coverageStatus, gateStatus, kindStatus, testResult } from "@/lib/status";
-import type { AppBackup, Coverage, Gate, SelfBackupList } from "@/lib/types";
-import { useApi } from "@/lib/use-api";
+import { coverageStatus, gateStatus, testResult } from "@/lib/status";
+import type { Coverage, CoverageApp, Gate, SelfBackupList } from "@/lib/types";
+import { useMeting } from "@/lib/use-meting";
+import { BackupNav } from "./BackupNav";
 
 const BRON_LABEL: Record<string, string> = {
-  apps: "Apps (app.query)",
-  datasets: "Datasets",
-  snapshot_tasks: "Snapshot-taken",
-  latest_snapshots: "Laatste snapshots",
-  cloudsync: "Cloud-sync (OneDrive)",
-  replication: "Replicatie",
+  apps: "App-inventaris", datasets: "Datasets", snapshot_tasks: "Snapshot-taken",
+  latest_snapshots: "Laatste snapshots", cloudsync: "Cloud-sync", replication: "Replicatie",
 };
-
-function actueel(rij: AppBackup, nu: number, verouderd: boolean) {
-  return !verouderd && !!rij.observed_at && Date.parse(rij.observed_at) <= nu
-    && !!rij.geldig_tot && Date.parse(rij.geldig_tot) >= nu;
-}
 
 export function BackupsScreen() {
   const nu = useNow(1000).getTime();
-  const coverage = useApi<Coverage>("/api/v1/backups/coverage", 30_000);
-  const gate = useApi<Gate>("/api/v1/gates/backup_gate", 30_000);
-  const r2 = useApi<Gate>("/api/v1/gates/r2_r3_acties", 30_000);
-  const self = useApi<SelfBackupList>("/api/v1/backups/self");
+  const coverage = useMeting<Coverage>("/api/v1/backups/coverage");
+  const gate = useMeting<Gate>("/api/v1/gates/backup_gate");
+  const r2 = useMeting<Gate>("/api/v1/gates/r2_r3_acties");
+  const self = useMeting<SelfBackupList>("/api/v1/backups/self");
   const c = coverage.data;
-  const meldingen = Object.entries(c?.app_backups ?? {});
-  const vereistGedekt = (id: string) => {
-    const rij = c?.app_backups?.[id];
-    return rij?.status === "gedekt" && actueel(rij, nu, coverage.stale);
-  };
-  const mgGedekt = vereistGedekt("mediaguard");
-  const dekkingBevestigd = mgGedekt && vereistGedekt("emby_exportarchief") && meldingen.every(([, rij]) =>
-    !rij.vereist || (rij.status === "gedekt" && actueel(rij, nu, coverage.stale))
-  );
-  const apps = (c?.apps ?? []).map((app) =>
-    app.db_export.bron === "MediaGuard-herstelrapport" && !mgGedekt
-      ? { ...app, volledige_appbackup: false, db_export: { ...app.db_export, status: "unknown" } }
-      : app
-  );
-  const counts = coverageCounts(c && { ...c, apps });
-
-  return (
-    <>
-      <PageHeader
-        title="Backups"
-        intro="Dekking per app en dataset: lokale snapshots, externe kopie (OneDrive), app-consistente database-export en de laatste hersteltest. Alleen-lezen."
-      />
-      <div className="stack">
-        <section className="card stack" aria-labelledby="gate-titel" data-testid="sectie-backupgate">
-          <div className="stat-head">
-            <h2 id="gate-titel">Back-upgate</h2>
-            {gate.data ? <StatusBadge view={gateStatus(gate.stale || (gate.data.toegestaan && !dekkingBevestigd) ? "unknown" : gate.data.status)} /> : null}
-          </div>
-          {gate.error ? <ErrorPanel error={gate.error} /> : null}
-          {gate.data ? (
-            <>
-              <p>
-                Een geslaagde synchronisatie is geen herstelgarantie. Zolang deze gate dicht is, zijn R2/R3-acties niet
-                beschikbaar
-                {r2.data ? (
-                  <>
-                    {" "}
-                    (R2/R3-acties: <StatusBadge view={gateStatus(r2.stale || (r2.data.toegestaan && !dekkingBevestigd) ? "unknown" : r2.data.status)} />)
-                  </>
-                ) : null}
-                .
-              </p>
-              {gate.data.redenen.length ? (
-                <ul>
-                  {gate.data.redenen.map((r) => (
-                    <li key={`${r.soort}-${r.id}`}>{r.tekst}</li>
-                  ))}
-                </ul>
-              ) : null}
-              <p className="meta">Afgeleid op {formatDateTime(gate.data.afgeleid_op)}. Een gate kan niet worden weggeklikt.</p>
-            </>
-          ) : null}
+  const oud = coverage.stale;
+  const vers = (...ids: string[]) => !oud && ids.every(id => {
+    const b = c?.bronnen[id];
+    return b?.status === "ok" && !b.verouderd && !!meettijd(b.observed_at, nu) && nu - Date.parse(b.observed_at!) <= 900_000;
+  });
+  const lokaal = vers("snapshot_tasks", "latest_snapshots", "datasets");
+  const extern = vers("cloudsync", "replication", "datasets");
+  const counts = coverageCounts(c);
+  const status = backupGate(gate.data, c, gate.stale || (gate.data?.toegestaan === true && oud), nu);
+  const dbVers = (a: CoverageApp) => vers("apps") && (a.db_export.bron !== "MediaGuard-herstelrapport"
+    || (verseApp(c, "mediaguard", nu) && c?.app_backups?.mediaguard?.status === "gedekt"));
+  const volledig = (a: CoverageApp) => a.volledige_appbackup && dbVers(a) && a.db_export.status === "geverifieerd"
+    && ((lokaal && a.lokaal_snapshot === "gedekt") || (extern && a.extern === "gedekt"));
+  const badge = (waarde: string, actueel: boolean) => <StatusBadge view={coverageStatus(actueel ? waarde : "unknown")} />;
+  const test = (t: { resultaat: string; uitgevoerd_op: string } | null) => t && (oud || !meettijd(t.uitgevoerd_op, nu) || !["mislukt", "geslaagd"].includes(t.resultaat))
+    ? badge("unknown", false) : <StatusBadge view={testResult(t?.resultaat)} />;
+  return <>
+    <PageHeader title="Backups" intro="Dekking per app en dataset, herstelpunten en hersteltests." />
+    <BackupNav />
+    <div className="stack">
+      <section className="card stack" aria-labelledby="gate-titel" data-testid="sectie-backupgate">
+        <div className="stat-head"><h2 id="gate-titel">Back-upgate</h2><StatusBadge view={gateStatus(status)} /></div>
+        <Leesstand bron={gate} naam="Back-upgate" />
+        {status === "geblokkeerd" && <p>Gate dicht. Bijwerken wacht op de volgende voorwaarden.</p>}
+        {status === "unknown" && <p>De voorwaarden zijn niet aantoonbaar vervuld. Bijwerken blijft geblokkeerd.</p>}
+        {gate.data?.redenen.map((r, i) => {
+          const [tekst, href] = gateVoorwaarde(r);
+          return <p key={i}><Link className="losse-link" href={href}>{tekst}</Link></p>;
+        })}
+        {gate.data?.vereist && !gate.stale && <ul aria-label="Overige gatevoorwaarden">
+          {[
+            ...gate.data.vereist.besluiten.map(b => b.id), ...gate.data.vereist.metingen,
+          ].filter(id => !gate.data!.redenen.some(r => r.id === id)).map(id => {
+            const naam = ({ D04: "Externe back-up (D04)", D05: "Snapshotbeleid (D05)", D16: "Hersteldoelen (D16)", eigen_backup: "Eigen Hub-export", extern_backup: "Externe upload", ...BRONNAMEN } as Record<string, string>)[id];
+            if (!naam) return null;
+            const meting = c?.app_backups?.[id];
+            const uitleg = Object.hasOwn(BRONNAMEN, id)
+              ? meting?.vereist === false ? "Niet vereist" : !oud && meting?.status === "gedekt" && verseApp(c, id, nu) ? "Bevestigd" : "Onbekend"
+              : status === "unknown" ? "Geen afzonderlijke blokkade gemeld" : "Voldoet volgens de gate";
+            return <li key={id}>{naam} · {uitleg}</li>;
+          })}
+        </ul>}
+        {r2.data && <p>R2/R3-acties · <StatusBadge view={gateStatus(backupGate(r2.data, c, r2.stale || (r2.data.toegestaan && (oud || status !== "toegestaan")), nu))} /></p>}
+        <Freshness bron="Hub · back-upgate" observedAt={meettijd(gate.data?.afgeleid_op, nu)} verouderd={gate.stale} />
+      </section>
+      <Leesstand bron={coverage} naam="Back-updekking" />
+      {c && <>
+        <section className="card stack" aria-labelledby="bronnen-titel">
+          <h2 id="bronnen-titel">Bronnen van de dekking</h2>
+          <p>{counts.fresh && vers(...Object.keys(BRON_LABEL))
+            ? `${c.apps.filter(volledig).length} van ${counts.totaal} apps hebben een volledige app-back-up.`
+            : "Niet alle bronnen zijn actueel. De dekking is deels onbekend."}</p>
+          <ul className="plain-list">{Object.entries(BRON_LABEL).map(([id, naam]) => <li key={id}>
+            {naam} · {vers(id) ? "Vers" : "Onbekend"} · gemeten {formatDateTime(meettijd(c.bronnen[id]?.observed_at, nu))}
+          </li>)}</ul>
+          <p>Synchronisatie is geen herstelgarantie.</p>
+          <h3 id="appmeldingen">Back-upmeldingen</h3>
+          <ul className="plain-list" aria-label="Back-upmeldingen">
+            {Object.entries(BRONNAMEN).map(([id, naam]) => {
+              const rij = c.app_backups?.[id];
+              const verlopen = !!rij && rij.status !== "unknown" && !verseApp(c, id, nu);
+              const stand = verlopen || oud || id === "media-source-optimizer" ? "unknown" : rij?.status;
+              return <li key={id} className="row justify-between">
+                <span>{naam}<br /><span className="meta">
+                  {verlopen || oud ? "Geen actuele meting." : stand !== "gedekt" ? meldreden(rij?.reden) : null}
+                  {stand === "degraded" && " Niet gedekt."}
+                  {stand === "gedekt" && rij?.leeftijd_uren != null && ` Bij controle ${formatNumber(rij.leeftijd_uren)} uur oud.`}
+                  {id === "emby_exportarchief" && stand === "gedekt" && rij?.aanwezig && " Archief aanwezig."}
+                  {rij?.vereist === false && " Niet vereist voor de gate."}
+                  {rij?.observed_at && ` Gemeten ${formatDateTime(meettijd(rij.observed_at, nu))}.`}
+                </span></span>
+                <StatusBadge view={stand === "degraded" ? { tone: "degraded", label: "Beperkt" } : coverageStatus(stand)} />
+              </li>;
+            })}
+          </ul>
         </section>
-
-        {coverage.error ? <ErrorPanel error={coverage.error} /> : null}
-        {!c && coverage.loading ? <Loading /> : null}
-        {c ? (
-          <>
-            <section className="card stack" aria-labelledby="bronnen-titel">
-              <h2 id="bronnen-titel">Bronnen van de dekking</h2>
-              <p>
-                {counts.fresh
-                  ? `${counts.volledig} van ${counts.totaal} apps hebben een volledige app-back-up.`
-                  : "Niet alle bronnen zijn actueel: de dekking is daarom deels onbekend."}
-              </p>
-              <ul className="plain-list">
-                {Object.entries(c.bronnen).map(([k, b]) => (
-                  <li key={k} className="row" style={{ justifyContent: "space-between" }}>
-                    <span>
-                      {BRON_LABEL[k] ?? k}
-                      <br />
-                      <span className="meta">{b.observed_at ? `gemeten ${formatDateTime(b.observed_at)}` : "nooit gemeten"}</span>
-                    </span>
-                    {kindStatus(b.status, b.verouderd) ? <StatusBadge view={kindStatus(b.status, b.verouderd)!} /> : <span className="text-sm">Vers</span>}
-                  </li>
-                ))}
-              </ul>
-              <p className="meta">{c.opmerking}</p>
-              {meldingen.length ? <>
-                <h3>Back-upmeldingen</h3>
-                <ul className="plain-list" aria-label="Back-upmeldingen">
-                  {meldingen.map(([id, rij]) => {
-                    const verlopen = rij.status !== "unknown" && !actueel(rij, nu, coverage.stale);
-                    return (
-                      <li key={id} className="row" style={{ justifyContent: "space-between" }}>
-                        <span>
-                          {rij.naam}
-                          <br />
-                          <span className="meta">
-                            {verlopen ? "Geen actuele meting." : rij.reden}
-                            {rij.aanwezig === true && !verlopen ? " Archief aanwezig." : null}
-                            {rij.leeftijd_uren != null && !verlopen ? ` Bij controle ${formatNumber(rij.leeftijd_uren)} uur oud.` : null}
-                            {rij.plaats && !verlopen ? ` Kopie in ${rij.plaats}.` : null}
-                            {rij.observed_at ? ` Gemeten ${formatDateTime(rij.observed_at)}.` : null}
-                          </span>
-                        </span>
-                        <StatusBadge view={coverageStatus(verlopen ? "unknown" : rij.status)} />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </> : null}
-            </section>
-
-            <section className="card stack" aria-labelledby="apps-titel" data-testid="dekking-apps">
-              <h2 id="apps-titel">Per app</h2>
-              <TableWrap label="Back-updekking per app">
-                <table>
-                  <caption className="sr-only">Back-updekking per app</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">App</th>
-                      <th scope="col">Lokaal snapshot</th>
-                      <th scope="col">Extern</th>
-                      <th scope="col">DB-export</th>
-                      <th scope="col">Hersteltest</th>
-                      <th scope="col">Volledig</th>
-                      <th scope="col">RPO / RTO (D16)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {apps.map((a) => (
-                      <tr key={a.app}>
-                        <th scope="row">
-                          {a.app}
-                          {a.redenen.length ? <div className="meta" style={{ fontWeight: 400 }}>{a.redenen.join(" ")}</div> : null}
-                        </th>
-                        <td>
-                          <StatusBadge view={coverageStatus(a.lokaal_snapshot)} />
-                        </td>
-                        <td>
-                          <StatusBadge view={coverageStatus(a.extern)} />
-                          {a.extern === "gedekt" && !a.extern_herstelgarantie ? <div className="meta">geen herstelgarantie</div> : null}
-                        </td>
-                        <td>
-                          <StatusBadge view={coverageStatus(a.db_export.status)} />
-                          {a.db_export.reason_code ? <div className="meta">{a.db_export.reason_code}</div> : null}
-                        </td>
-                        <td>
-                          <StatusBadge view={testResult(a.laatste_hersteltest?.resultaat)} />
-                          {a.laatste_hersteltest ? <div className="meta">{formatDateTime(a.laatste_hersteltest.uitgevoerd_op)}</div> : null}
-                        </td>
-                        <td>{a.volledige_appbackup ? <StatusBadge view={{ tone: "neutral", label: "Ja", icon: "geslaagd" }} /> : <StatusBadge view={{ tone: "neutral", label: "Nee", icon: "min" }} />}</td>
-                        <td>
-                          {a.rpo_rto.bron ? (
-                            <>
-                              RPO {formatNumber(a.rpo_rto.rpo_uren)} u: <StatusBadge view={coverageStatus(a.rpo_rto.rpo_status)} />
-                              <br />
-                              RTO {formatNumber(a.rpo_rto.rto_uren)} u: <StatusBadge view={coverageStatus(a.rpo_rto.rto_status)} />
-                            </>
-                          ) : (
-                            <>
-                              <StatusBadge view={{ tone: "unknown", label: "Geen doel" }} />
-                              <div className="meta">
-                                <Link href="/onboarding/besluit/D16" className="losse-link">
-                                  Leg RPO/RTO vast in D16
-                                </Link>
-                              </div>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </TableWrap>
-            </section>
-
-            <section className="card stack" aria-labelledby="datasets-titel" data-testid="dekking-datasets">
-              <h2 id="datasets-titel">Per dataset</h2>
-              <TableWrap label="Back-updekking per dataset">
-                <table>
-                  <caption className="sr-only">Back-updekking per dataset</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Dataset</th>
-                      <th scope="col">Apps</th>
-                      <th scope="col">Lokaal snapshot</th>
-                      <th scope="col">Extern (OneDrive e.d.)</th>
-                      <th scope="col">Hersteltest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {c.datasets.map((d) => (
-                      <tr key={d.dataset}>
-                        <th scope="row">
-                          <code>{d.dataset}</code>
-                        </th>
-                        <td>{d.apps.join(", ") || "—"}</td>
-                        <td>
-                          <StatusBadge view={coverageStatus(d.lokaal_snapshot.status)} />
-                          {d.lokaal_snapshot.laatste_snapshot ? <div className="meta">laatste {formatDateTime(d.lokaal_snapshot.laatste_snapshot)}</div> : null}
-                        </td>
-                        <td>
-                          <StatusBadge view={coverageStatus(d.extern.status)} />
-                          {d.extern.cloud_sync.map((cs) => (
-                            <div className="meta" key={`${cs.omschrijving}`}>
-                              {cs.omschrijving ?? "taak"} ({cs.provider ?? "?"}): {cs.laatste_job_staat ?? "onbekend"}
-                              {cs.laatste_job_beeindigd ? `, ${formatDateTime(cs.laatste_job_beeindigd)}` : ""}
-                            </div>
-                          ))}
-                        </td>
-                        <td>
-                          <StatusBadge view={testResult(d.laatste_hersteltest?.resultaat)} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </TableWrap>
-              <Freshness observedAt={counts.observedAt} bron="TrueNAS-inventaris (snapshot-taken, snapshots, cloud-sync, replicatie)" verouderd={!counts.fresh && counts.observedAt !== null} label="Oudste bron gemeten" />
-            </section>
-          </>
-        ) : null}
-
-        <section className="card stack" aria-labelledby="eigen-titel" data-testid="sectie-eigen-backup">
-          <h2 id="eigen-titel">Database van de Hub zelf</h2>
-          {self.error ? <ErrorPanel error={self.error} /> : null}
-          {self.data ? (
-            self.data.laatste_geverifieerd ? (
-              <p>
-                <StatusBadge view={{ tone: "neutral", label: "Geverifieerd", icon: "geslaagd" }} /> Laatste geverifieerde export (pg_dump + SHA-256 + pg_restore --list):{" "}
-                {formatDateTime(self.data.laatste_geverifieerd.beeindigd_op)}
-                {self.data.laatste_geverifieerd.inhoudsopgave_items ? ` (${self.data.laatste_geverifieerd.inhoudsopgave_items} items)` : ""}.
-              </p>
-            ) : (
-              <p>
-                <StatusBadge view={{ tone: "unknown", label: "Ontbreekt" }} /> Er is nog geen geverifieerde export van de Hub-database. De worker maakt die
-                dagelijks; een export telt pas als geslaagd na controle van checksum en inhoudsopgave.
-              </p>
-            )
-          ) : null}
+        <section className="card stack" aria-labelledby="apps-titel" data-testid="dekking-apps">
+          <h2 id="apps-titel">Per app</h2>
+          <ResponsiveList items={c.apps} label="Back-updekking per app" sleutel={a => a.app} tabelVanaf={768} kolommen={[
+            { kop: "App", cel: a => <><Link className="losse-link break-all" href={`/backups/herstelpunten?app=${encodeURIComponent(appNaam(a.app))}`}>{appNaam(a.app)}</Link>
+              <p>{oud ? "Volledigheid onbekend" : volledig(a) ? "Volledige appback-up" : "Geen volledige appback-up aangetoond"}</p></> },
+            { kop: "Back-updekking", cel: a => <>
+              <p>Lokaal snapshot · {badge(a.lokaal_snapshot, lokaal && vers("apps"))}</p>
+              <p>Extern · {badge(a.extern, extern && vers("apps"))}</p>
+              <p>DB-export · {badge(a.db_export.status, dbVers(a))}</p>
+              {a.db_export.reason_code === "capability_unavailable" && <span className="meta block break-all">Niet beschikbaar (capability_unavailable)</span>}
+            </> },
+            { kop: "Laatste hersteltest", cel: a => <>{test(a.laatste_hersteltest)} {formatDateTime(meettijd(a.laatste_hersteltest?.uitgevoerd_op, nu))}</> },
+            { kop: "Hersteldoelen", cel: a => a.rpo_rto?.bron ? <>RPO {uren(a.rpo_rto.rpo_uren)} · {badge(a.rpo_rto.rpo_status, !oud)}<br />RTO {uren(a.rpo_rto.rto_uren)} · {badge(a.rpo_rto.rto_status, !oud)}</> : <Link className="losse-link" href="/onboarding/besluit/D16">Leg RPO/RTO vast in D16</Link> },
+          ]} />
         </section>
-      </div>
-    </>
-  );
+        <section className="card stack" aria-labelledby="datasets-titel" data-testid="dekking-datasets">
+          <h2 id="datasets-titel">Per dataset</h2>
+          {!c.datasets.length && <p>{vers("datasets") ? "Geen datasets voor deze selectie." : "Datasets onbekend."}</p>}
+          <ResponsiveList items={c.datasets} label="Back-updekking per dataset" sleutel={d => d.dataset} tabelVanaf={768} kolommen={[
+            { kop: "Dataset", cel: d => <span className="break-all">{datasetNaam(d.dataset) ?? "Onbekend"}</span> },
+            { kop: "Apps", className: "break-all", cel: d => d.apps.map(appNaam).join(", ") || "Onbekend" },
+            { kop: "Lokaal snapshot", cel: d => <>{badge(d.lokaal_snapshot.status, lokaal)} {formatDateTime(meettijd(d.lokaal_snapshot.laatste_snapshot, nu))}</> },
+            { kop: "Extern", cel: d => badge(d.extern.status, extern) },
+            { kop: "Hersteltest", cel: d => test(d.laatste_hersteltest) },
+          ]} />
+          <Freshness observedAt={meettijd(counts.observedAt, nu)} bron="TrueNAS-inventaris" verouderd={oud || !counts.fresh} label="Oudste bron gemeten" />
+        </section>
+      </>}
+      <section className="card stack" aria-labelledby="eigen-titel" data-testid="sectie-eigen-backup">
+        <h2 id="eigen-titel">Database van de Hub zelf</h2>
+        <Leesstand bron={self} naam="Eigen back-up" />
+        {self.data && <p>{self.stale ? "Laatste export onbekend." : self.data.laatste_geverifieerd
+          ? `Geverifieerde export · checksum en inhoudsopgave gecontroleerd op ${formatDateTime(self.data.laatste_geverifieerd.beeindigd_op)}.`
+          : "Er is nog geen geverifieerde export van de Hub-database."}</p>}
+      </section>
+    </div>
+  </>;
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { RisicoBadge } from "@/components/ActiePreview";
+import { useNow } from "@/components/Freshness";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { KopieerVeld } from "@/components/KopieerVeld";
 import { Loading } from "@/components/Loading";
@@ -12,8 +13,11 @@ import { Melding } from "@/components/Melding";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import { RolMelding } from "@/components/RolMelding";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { werkwoord, type ActieLijst, type Beleid } from "@/lib/acties";
+import { vasteFout, werkwoord, type ActieLijst, type Beleid } from "@/lib/acties";
 import { APP_DOEL, appActies, beschermd, beschermingVoor, EMBY_ZIN, isEmby, terugzetPunten, updateDoel, wieBeslist, type AppActie } from "@/lib/appbeheer";
+import { backupGate, gateVoorwaarde, puntenReden, type Herstelpunt } from "@/lib/backups";
+import type { Coverage, Gate } from "@/lib/types";
+import { useMeting } from "@/lib/use-meting";
 import type { CatalogDetail } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/format";
 import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
@@ -62,7 +66,7 @@ function BeleidStand({ beleid }: { beleid: ApiState<Beleid> }) {
       </Melding>
     );
   }
-  if (beleid.error) return <ErrorPanel error={beleid.error} title="Toegestane acties onbekend" onRetry={() => void beleid.reload()} alert={false} />;
+  if (beleid.error) return <ErrorPanel vast={vasteFout} error={beleid.error} title="Toegestane acties onbekend" onRetry={() => void beleid.reload()} alert={false} />;
   return <Loading text="Acties ophalen…" />;
 }
 
@@ -74,6 +78,19 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
   const updates = useApi<ActieLijst>(operator ? "/api/v1/actions?action_id=app.update&status=uitgevoerd&limit=50" : null);
   const regels = beleid.data ? beschermingVoor(beleid.data, app) : [];
   const bruikbaar = Boolean(beleid.data && !beleid.stale);
+  const nu = useNow(1000).getTime();
+  const controleer = operator && bruikbaar && !regels.length;
+  const gate = useMeting<Gate>(controleer ? "/api/v1/gates/backup_gate" : null);
+  const dekking = useMeting<Coverage>(controleer ? "/api/v1/backups/coverage" : null);
+  const herstel = useMeting<{ items: Herstelpunt[] }>(controleer ? `/api/v1/backups/herstelpunten?app=${encodeURIComponent(app.naam)}` : null);
+  const stand = backupGate(gate.data, dekking.data, gate.stale || (gate.data?.toegestaan === true && dekking.stale), nu);
+  const rij = dekking.data?.apps.find(a => a.app === app.naam);
+  const eigenPunten = herstel.data?.items.filter(p => p.app === app.naam);
+  const reden = stand === "geblokkeerd" ? (gate.data?.redenen[0] ? gateVoorwaarde(gate.data.redenen[0])[0] : "De back-upgate is dicht.")
+    : stand !== "toegestaan" ? "De back-upgate is onbekend."
+    : !eigenPunten || herstel.stale ? "De herstelpunten zijn onbekend."
+    : eigenPunten.length && !eigenPunten.some(p => puntenReden(p, rij?.herkend_als ?? app.app_id, rij?.rpo_rto.rpo_uren, nu) === null)
+      ? "Er is geen bruikbaar geverifieerd herstelpunt binnen de RPO." : null;
   const doel = updateDoel(app);
   const punten = updates.data ? terugzetPunten(updates.data.items, app.naam) : [];
   const c = app.catalogus ?? {};
@@ -122,11 +139,12 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
         <Uitleg regels={regels} />
       ) : (
         <div className="flex flex-col gap-3">
+          {reden && <p id="versies-backupreden">{reden} <Link href="/backups" className="losse-link">Bekijk de back-upgate</Link></p>}
           {"parameters" in doel ? (
             <div className="flex flex-col gap-1">
               <p>Bijwerken opent eerst een voorstel met preview, risicoklasse en de vereiste back-up. Er gebeurt nog niets.</p>
               <div>
-                <Button variant="primair" bezig={voorstel.busy} onClick={() => void voorstel.stel("app.update", doel.parameters)} data-testid="bijwerken">
+                <Button variant="primair" uit={!!reden} aria-describedby={reden ? "versies-backupreden" : undefined} bezig={voorstel.busy} onClick={() => void voorstel.stel("app.update", doel.parameters)} data-testid="bijwerken">
                   Bijwerken naar {doel.naar}
                 </Button>
               </div>
@@ -137,14 +155,14 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
             </Melding>
           )}
           {updates.error ? (
-            <ErrorPanel error={updates.error} title="Terugzetpaden ophalen mislukt" alert={false} />
+            <ErrorPanel vast={vasteFout} error={updates.error} title="Terugzetpaden ophalen mislukt" alert={false} />
           ) : !updates.data ? (
             <Loading text="Terugzetpaden ophalen…" regels={1} />
           ) : punten.length ? (
             <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="terugzetpunten">
               {punten.map((p) => (
                 <li key={p.request_id} className="flex flex-wrap items-center gap-2">
-                  <Button bezig={voorstel.busy} onClick={() => void voorstel.stel("app.rollback", { herstel_van: p.request_id })}>
+                  <Button uit={!!reden || updates.stale} aria-describedby={reden ? "versies-backupreden" : undefined} bezig={voorstel.busy} onClick={() => void voorstel.stel("app.rollback", { herstel_van: p.request_id })}>
                     Terugzetten naar de stand vóór de bijwerking van {p.uitgevoerd_op ? formatDateTime(p.uitgevoerd_op) : "onbekend tijdstip"}
                   </Button>
                 </li>
@@ -158,7 +176,7 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
               </p>
             </Melding>
           )}
-          {voorstel.error ? <ErrorPanel error={voorstel.error} title="Voorstel maken mislukt" /> : null}
+          {voorstel.error ? <ErrorPanel vast={vasteFout} error={voorstel.error} title="Voorstel maken mislukt" /> : null}
         </div>
       )}
     </div>
@@ -280,7 +298,7 @@ export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<B
       {verwijderen && operator && bruikbaar && !beschermd(regels, "app.uninstall") ? (
         <ControleerWatBlijft app={app} sluit={() => setVerwijderen(false)} voorstel={voorstel} />
       ) : null}
-      {voorstel.error ? <ErrorPanel error={voorstel.error} title="Voorstel maken mislukt" /> : null}
+      {voorstel.error ? <ErrorPanel vast={vasteFout} error={voorstel.error} title="Voorstel maken mislukt" /> : null}
     </div>
   );
 }

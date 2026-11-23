@@ -68,6 +68,8 @@ const SCHERMEN: Scherm[] = [
   { naam: "problemen", rol: "beheerder", pad: "/problemen" },
   { naam: "probleem-detail", rol: "beheerder", pad: () => (incidentId() ? `/problemen/${incidentId()}` : null) },
   { naam: "backups", rol: "beheerder", pad: "/backups" },
+  ...["herstelpunten", "extern", "hersteltests", "rampenscenarios"].map(deel => ({ naam: `backups-${deel}`, rol: "beheerder" as const, pad: `/backups/${deel}` })),
+  { naam: "kijker-hersteltests", rol: "kijker", pad: "/backups/hersteltests" },
   { naam: "goedkeuringen", rol: "beheerder", pad: "/goedkeuringen" },
   { naam: "goedkeuring-r2", rol: "beheerder", pad: () => (actieId() ? `/goedkeuringen/${actieId()}` : null) },
   { naam: "risicobeleid", rol: "beheerder", pad: "/goedkeuringen/beleid" },
@@ -93,6 +95,7 @@ const SCHERMEN: Scherm[] = [
   { naam: "huis", rol: "beheerder", pad: "/huis" },
   { naam: "netwerk", rol: "beheerder", pad: "/netwerk" },
   { naam: "automatisering", rol: "beheerder", pad: "/automatisering" },
+  ...["detail", "testmodus", "eventtypen", "historie", "versies"].map(deel => ({ naam: `automatisering-${deel}`, rol: "beheerder" as const, pad: `/automatisering/${deel}` })),
   { naam: "kosten", rol: "beheerder", pad: "/kosten" },
   { naam: "niet-gevonden", rol: "beheerder", pad: "/bestaat-niet" },
   {

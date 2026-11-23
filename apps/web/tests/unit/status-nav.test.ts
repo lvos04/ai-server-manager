@@ -57,7 +57,7 @@ describe("navigatie exact volgens 08_UI", () => {
   it("latere fasen volgens 06_FASERING (Problemen en Huis zijn beschikbaar)", () => {
     expect(PLANNED.problemen).toBeUndefined();
     expect(PLANNED.ai?.fase).toBe("P2");
-    expect(PLANNED.automatisering?.fase).toBe("P2");
+    expect(PLANNED.automatisering).toBeUndefined();
     expect(PLANNED.huis).toBeUndefined();
     expect(PLANNED.netwerk?.fase).toBe("P5");
     expect(PLANNED.kosten?.fase).toBe("P5");

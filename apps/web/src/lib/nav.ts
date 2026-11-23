@@ -109,12 +109,6 @@ export const PLANNED: Record<string, PlannedScreen> = {
     wat: "Apparaten in het netwerk, DNS-filtering met een geteste terugvalroute en privacy-instellingen.",
     bron: "AdGuard Home en NetAlertX (B10).",
   },
-  automatisering: {
-    titel: "Automatisering",
-    fase: "P2",
-    wat: "Flows zonder code met testmodus, geschiedenis en veiligheidsgrenzen; acties alleen via voorstel en beleid.",
-    bron: "Node-RED met door het beleid begrensde actienodes (B11).",
-  },
   kosten: {
     titel: "Kosten",
     fase: "P5",

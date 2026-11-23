@@ -229,3 +229,13 @@ describe("installatiewizard (S-047)", () => {
     expect(planCatalogus(plan({ release: { catalog: { train: "stable", app: geheim, version: "1.0" } } }))).toBeNull();
   });
 });
+
+it("een dichte back-upgate houdt de bijwerkknop uit en toont de reden", () => {
+  proef.data["/api/v1/gates/backup_gate"] = { status: "geblokkeerd", toegestaan: false, redenen: [
+    { soort: "meting", id: "eigen_backup", status: "geblokkeerd", tekst: "interne proefnotitie" },
+  ] };
+  const html = renderToStaticMarkup(<Versies app={app({ installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.2.3" } })} beleid={staat(BELEID)} />);
+  expect(html.match(/<button[^>]+data-testid="bijwerken"[^>]*>/)?.[0]).toContain('aria-disabled="true"');
+  expect(html).toContain("Hub-database");
+  expect(html).not.toContain("interne proefnotitie");
+});

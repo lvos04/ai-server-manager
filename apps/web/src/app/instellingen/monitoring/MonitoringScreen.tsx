@@ -1,5 +1,7 @@
 "use client";
 
+import { Monitorplan } from "./Monitorplan";
+
 import { BellOff, CircleSlash, PlugZap, Plus, Send } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Controles, type Controle } from "@/components/Controles";
@@ -488,6 +490,8 @@ export function MonitoringScreen() {
             ) : null}
           </section>
         ) : null}
+
+        {op && <Monitorplan admin={admin} />}
 
         <section className="card" aria-labelledby="regels-titel" data-testid="alertregels">
           <h2 id="regels-titel">Alertregels</h2>

@@ -178,7 +178,6 @@ test("nog niet beschikbare schermen tonen eerlijk de fase en geen gegevens", asy
   const expected: Record<string, string> = {
     "/ai": "P2",
     "/netwerk": "P5",
-    "/automatisering": "P2",
     "/kosten": "P5",
   };
   for (const [path, fase] of Object.entries(expected)) {

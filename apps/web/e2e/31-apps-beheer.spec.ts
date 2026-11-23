@@ -79,6 +79,23 @@ test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-u
   await expectAccessible(page, "versies");
   await expectNoHorizontalScroll(page, "versies");
   await expectTouchTargets(page, "versies");
+  // Met de echte dichte gate kan bijwerken geen voorstel maken.
+  await expect(page.getByTestId("bijwerken")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#versies-backupreden")).toBeVisible();
+
+  // Isoleer de afzonderlijke checkpointcontrole: alleen de twee gate-lezingen zijn hier positief.
+  // De echte Hub beslist bij het voorstel opnieuw en weigert nog steeds bij ontbrekend herstelpunt.
+  await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { id: "backup_gate", status: "toegestaan", toegestaan: true, redenen: [], afgeleid_op: new Date().toISOString() } }));
+  await page.route("**/api/v1/backups/coverage", async r => {
+    const echt = await (await r.fetch()).json();
+    const tijd = { observed_at: new Date().toISOString(), geldig_tot: new Date(Date.now() + 600_000).toISOString() };
+    for (const [id, rij] of Object.entries(echt.app_backups) as [string, Record<string, unknown>][]) {
+      Object.assign(rij, tijd, { status: id === "media-source-optimizer" ? "unknown" : "gedekt", vereist: id !== "media-source-optimizer" });
+    }
+    await r.fulfill({ json: echt });
+  });
+  await page.reload();
+  await expect(page.getByTestId("bijwerken")).toBeEnabled();
   await page.getByTestId("bijwerken").click();
   await page.waitForURL(/\/goedkeuringen\/[0-9a-f-]{36}$/);
   await ready(page);

@@ -101,6 +101,7 @@ export interface Gate {
   status: "toegestaan" | "geblokkeerd" | "unknown";
   toegestaan: boolean;
   redenen: GateReason[];
+  vereist?: { besluiten: { id: string; minimaal: string }[]; metingen: string[]; gates: string[] };
   afgeleid_op: string;
 }
 

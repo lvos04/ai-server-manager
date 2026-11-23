@@ -5,6 +5,8 @@
  * een weigeringsreden, een foutbericht van de executor) komt nooit in beeld. De server beslist over elk recht; de UI
  * leest alleen de sessierol uit `GET /api/v1/auth/me` om bediening te verbergen.
  */
+import { UUID } from "./backups";
+import { FLOWHERSTEL, flowDiff } from "./flowherstel";
 import { HubApiError } from "./api";
 import type { StatusView } from "./status";
 
@@ -124,7 +126,7 @@ const STATUS: Record<string, StatusView> = {
 
 /** Een onbekende status is nooit een succes. */
 export function statusView(status: string): StatusView {
-  return STATUS[status] ?? { tone: "unknown", label: "Onbekende status" };
+  return Object.hasOwn(STATUS, status) ? STATUS[status]! : { tone: "unknown", label: "Onbekende status" };
 }
 
 const ACTIE_WERKWOORD: Record<string, string> = {
@@ -267,7 +269,8 @@ function plat(w: unknown, pad: string, diepte: number, uit: Map<string, string>)
  * Was/Wordt per veld uit `preview.huidig` en `preview.wijziging`. `onveilig` = er staat een regel in die niet volledig
  * en veilig kan worden uitgelegd (te lang, stuurtekens, te diep of geen gewone waarde): dan blokkeert de goedkeuring.
  */
-export function diffRegels(preview: Preview | null | undefined): { regels: DiffRegel[]; onveilig: boolean; gevolgen?: string[] } {
+export function diffRegels(preview: Preview | null | undefined, actie?: string): { regels: DiffRegel[]; onveilig: boolean; gevolgen?: string[] } {
+  if (actie === FLOWHERSTEL) return flowDiff(preview);
   const wijziging = preview?.wijziging;
   if (!wijziging || typeof wijziging !== "object" || Array.isArray(wijziging)) return { regels: [], onveilig: true };
   try {
@@ -342,6 +345,13 @@ export const ONBEKENDE_FOUT = "De Hub meldde een onbekende fout. Lees de stand o
 export function vasteFout(e: unknown): string {
   const c = e instanceof HubApiError ? e.code : "";
   return Object.hasOwn(ACTIE_FOUT, c) ? ACTIE_FOUT[c]! : ONBEKENDE_FOUT;
+}
+
+/** Alleen vaste foutcodes en een geldige trace-identificatie komen op de lees- en herstelschermen. */
+export function toonbareFout(e: unknown): unknown {
+  if (!(e instanceof HubApiError)) return e;
+  const code = Object.hasOwn(ACTIE_FOUT, e.code) || ["unauthorized", "validation_error", "plan_gewijzigd", "bevestiging_verouderd"].includes(e.code) ? e.code : "onbekend";
+  return new HubApiError(e.status, code, "", {}, e.traceId && UUID.test(e.traceId) ? e.traceId : undefined);
 }
 
 /** Een getypte resultaatcode in woorden; nooit het vrije foutbericht. */
