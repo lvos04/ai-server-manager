@@ -1,13 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo } from "@playwright/test";
 import { createHmac } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { afdrukBestand, afdrukMap } from "./afdrukmap";
 
 export const STATE_DIR = process.env.HUB_E2E_STATE_DIR ?? path.join(__dirname, ".state");
 export const ADMIN_STATE = path.join(__dirname, ".auth", "beheerder.json");
-// HUB_E2E_SHOTS: andere afdrukmap per fase (bv. docs/screenshots/p3); standaard de P1-map.
-export const SCREENSHOT_DIR = path.resolve(process.env.HUB_E2E_SHOTS ?? path.join(__dirname, "..", "..", "..", "docs", "screenshots", "p1"));
+// HUB_E2E_SHOTS: fasemap onder docs/screenshots (p1, p2, p3, …); leeg of niet gezet = p1 (zie afdrukmap.ts).
+export const SCREENSHOT_ROOT = path.resolve(__dirname, "..", "..", "..", "docs", "screenshots");
 export const ADMIN = { username: "beheerder", password: "Correct-Paard-Batterij-Nietje-42" };  // gitleaks:allow -- synthetische testwaarde
 export const VIEWER = { username: "kijker", password: "Kijker-Wachtwoord-Lang-2026" };  // gitleaks:allow -- synthetische testwaarde
 export const KIND = { username: "kind", password: "Kind-Wachtwoord-Lang-2026" };  // gitleaks:allow -- synthetische testwaarde
@@ -151,13 +152,12 @@ export async function expectTouchTargets(page: Page, label: string): Promise<voi
 }
 
 export async function shot(page: Page, info: TestInfo, name: string, fullPage = true): Promise<void> {
-  const dir = path.join(SCREENSHOT_DIR, info.project.name);
-  mkdirSync(dir, { recursive: true });
+  const dir = afdrukMap(SCREENSHOT_ROOT, process.env.HUB_E2E_SHOTS, info.project.name);
   // JPEG (kwaliteit 60, CSS-pixels) houdt de repo klein; volledige pagina als bewijs. In de afdrukmodus staat de vaste
   // ondernavigatie onderaan de pagina (anders tekent de browser hem midden in een lange afbeelding).
   await page.evaluate(() => document.documentElement.setAttribute("data-afdruk", ""));
   try {
-    await page.screenshot({ path: path.join(dir, `${name}.jpg`), fullPage, animations: "disabled", type: "jpeg", quality: 60, scale: "css" });
+    await page.screenshot({ path: afdrukBestand(dir, name), fullPage, animations: "disabled", type: "jpeg", quality: 60, scale: "css" });
   } finally {
     await page.evaluate(() => document.documentElement.removeAttribute("data-afdruk"));
   }
