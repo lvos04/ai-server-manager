@@ -97,12 +97,15 @@ test("appcatalogus: slechtste status eerst, ‘Draait’ is nooit gezond, acties
   await page.getByRole("tab", { name: "Acties" }).click();
   await expect(page).toHaveURL(/tab=acties/);
   const acties = page.getByTestId("app-acties");
-  for (const id of ["app.restart", "app.stop", "app.update", "app.rollback", "app.delete"]) {
-    await expect(acties.getByTestId(`actie-${id}`)).toHaveAttribute("aria-disabled", "true");
+  // S-P2-180, HARDE EIS: MediaGuard is beschermd (policy/apps.yaml) → geen knop voor stoppen, bijwerken, terugzetten of
+  // verwijderen, wel de uitleg waarom niet; herstarten blijft een gewoon voorstel.
+  await expect(acties.getByTestId("beschermd")).toBeVisible();
+  for (const id of ["app.stop", "app.update", "app.rollback", "app.uninstall"]) {
+    await expect(acties.getByTestId(`actie-${id}`)).toHaveCount(0);
+    await expect(acties.getByTestId(`rij-${id}`)).toContainText("Niet in de Hub");
   }
-  await expect(acties).toContainText("Volgt in fase P2");
-  await expect(acties).toContainText("risico bepaalt het beleid");
-  await expect(acties).not.toContainText(/R[0-3] ·/);
+  await expect(acties.getByTestId("actie-app.restart")).toBeVisible();
+  await expect(acties).toContainText("De klasse komt uit het risicobeleid");
   await page.getByRole("tab", { name: "Metrieken" }).click();
   await expect(page.getByTestId("capability-per-app")).toContainText("capability_unavailable");
   await page.goBack();

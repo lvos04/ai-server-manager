@@ -63,6 +63,8 @@ const SCHERMEN: Scherm[] = [
   { naam: "app-logs", rol: "beheerder", pad: () => (appId() ? `/apps/${appId()}?tab=logs` : null) },
   { naam: "app-versies", rol: "beheerder", pad: () => (appId() ? `/apps/${appId()}?tab=versies` : null) },
   { naam: "app-acties", rol: "beheerder", pad: () => (appId() ? `/apps/${appId()}?tab=acties` : null) },
+  { naam: "appstore", rol: "beheerder", pad: "/apps/catalogus" },
+  { naam: "app-installeren", rol: "beheerder", pad: "/apps/installeren" },
   { naam: "problemen", rol: "beheerder", pad: "/problemen" },
   { naam: "probleem-detail", rol: "beheerder", pad: () => (incidentId() ? `/problemen/${incidentId()}` : null) },
   { naam: "backups", rol: "beheerder", pad: "/backups" },
