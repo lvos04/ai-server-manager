@@ -37,11 +37,11 @@ export function huidigeStap(plan: InstallPlan | null, blok: string | null): numb
 function Stappen({ huidig, geblokkeerd }: { huidig: number; geblokkeerd: boolean }) {
   return (
     <nav aria-label="Stappen van de installatie" data-testid="wizard-stappen">
-      <ol className="m-0 flex list-none flex-wrap gap-2 p-0 lg:flex-nowrap">
+      <ol className="m-0 flex list-none flex-wrap gap-2 p-0 xl:flex-nowrap">
         {STAPPEN.map((titel, i) => {
           const t: Toestand = i < huidig ? "klaar" : i === huidig ? (geblokkeerd ? "geblokkeerd" : "huidig") : "open";
           return (
-            <li key={titel} className="flex items-center gap-2 lg:flex-1" aria-current={i === huidig ? "step" : undefined} data-toestand={t}>
+            <li key={titel} className="flex items-center gap-2 xl:flex-1" aria-current={i === huidig ? "step" : undefined} data-toestand={t}>
               <span
                 className={cn(
                   "inline-flex size-8 shrink-0 items-center justify-center rounded-full border-2 font-mono text-sm font-bold",
@@ -50,14 +50,12 @@ function Stappen({ huidig, geblokkeerd }: { huidig: number; geblokkeerd: boolean
                   t === "geblokkeerd" && "border-dashed border-gate bg-gate-bg text-gate-ink",
                   t === "open" && "border-border-strong bg-card",
                 )}
-                aria-hidden="true"
               >
-                {t === "klaar" ? <Check className="size-4" /> : t === "geblokkeerd" ? <Lock className="size-4" /> : i + 1}
+                {/* De stand staat ook als tekst in de vorm: status nooit alleen kleur of icoon. */}
+                {t === "klaar" ? <Check className="size-4" aria-hidden="true" /> : t === "geblokkeerd" ? <Lock className="size-4" aria-hidden="true" /> : <span aria-hidden="true">{i + 1}</span>}
+                <span className="sr-only">{t === "klaar" ? "Klaar: " : t === "geblokkeerd" ? "Geblokkeerd: " : t === "open" ? "Nog niet: " : "Nu: "}</span>
               </span>
-              <span className="sr-only lg:not-sr-only lg:text-sm">
-                {titel}
-                <span className="sr-only">{t === "klaar" ? " (klaar)" : t === "geblokkeerd" ? " (geblokkeerd)" : t === "open" ? " (nog niet)" : ""}</span>
-              </span>
+              <span className="sr-only xl:not-sr-only xl:text-sm">{titel}</span>
             </li>
           );
         })}
