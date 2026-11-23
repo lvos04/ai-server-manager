@@ -4,6 +4,8 @@ fake appstore is geen bewijs voor de echte appstore of Uptime Kuma)."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from types import SimpleNamespace
 from typing import Any
@@ -14,6 +16,7 @@ from conftest import idem, login_as, make_user
 from fakes.fake_appstore import FakeAppstore
 from sqlalchemy import select
 
+from hub.monitoring import monitorplan
 from hub.monitoring.monitorplan import uit_manifest
 
 pytestmark = pytest.mark.integration
@@ -29,6 +32,10 @@ MANIFEST = {
 }
 SHA = canonical_sha256(MANIFEST)
 PLAN = "/api/v1/monitoring/monitorplan"
+
+
+def _bronblok(app: Any) -> dict[str, Any]:
+    return monitorplan.gecontroleerd_manifest(MANIFEST, SHA, "gotify", app.state.keyring().identity)
 
 
 def _app(app: Any, naam: str, appstore: dict[str, Any], host_poort: int = 30080) -> str:
@@ -74,7 +81,7 @@ def _plan(client: Any) -> dict[str, dict[str, Any]]:
 
 
 def test_plan_bevestigen_en_inhoudsbinding(admin: Any, app: Any) -> None:
-    gotify = _app(app, "gotify", {"status": "gekoppeld", "monitor": uit_manifest(MANIFEST, SHA)})
+    gotify = _app(app, "gotify", {"status": "gekoppeld", "monitor": _bronblok(app)})
     zonder = _app(app, "zonder", {"status": "gekoppeld", "monitor": uit_manifest({"healthcheck": {}}, SHA)})
     _app(app, "vreemd", {"status": "niet_in_appstore"})
     _app(app, "vervalst", {"status": "gekoppeld", "monitor": {**uit_manifest(MANIFEST, SHA), "host_poort": "1"}})
@@ -133,8 +140,8 @@ def test_plan_bevestigen_en_inhoudsbinding(admin: Any, app: Any) -> None:
 
     with app.state.sessionmaker() as db:
         ev = db.scalars(select(AuditEvent).where(AuditEvent.action == "monitoring.monitorplan.bevestigd")).all()
-    assert len(ev) == 1 and ev[0].details["soort_bewijs"] == "handmatig bevestigd"
-    assert ev[0].details["plan_sha256"] == sha and ev[0].target_id == gotify
+    assert len(ev) == 1 and ev[0].target_id == gotify
+    assert ev[0].details == {"app_id": gotify, "plan_sha256": sha, "soort_bewijs": "handmatig bevestigd"}
 
     # Een andere hostpoort is een ander plan: de oude bevestiging geldt niet meer en een vertraagde bevestiging van
     # het oude plan wordt geweigerd.
@@ -155,7 +162,7 @@ def test_gezondheid_zonder_bevestigde_monitor_is_niet_gezond(
     from hub.models import CatalogApp
     from hub.monitoring import appstatus
 
-    gotify = _app(app, "gotify", {"status": "gekoppeld", "monitor": uit_manifest(MANIFEST, SHA)})
+    gotify = _app(app, "gotify", {"status": "gekoppeld", "monitor": _bronblok(app)})
     _d03(admin)
     monkeypatch.setattr(appstatus, "evaluate", lambda *_a, **_k: {"status": "healthy", "reason_code": None})
     monkeypatch.setattr(appstatus, "truenas_component", lambda *_a: None)
@@ -186,11 +193,26 @@ def test_manifest_uit_de_appstore_alleen_met_nagerekende_hash(app: Any, settings
         entry = {"app_id": "gotify", "latest_version": {"id": vid, "manifest_sha256": SHA}}
 
         blok = fetch_monitor(store.url, keyring, svc, settings, entry, None)
-        assert blok == uit_manifest(MANIFEST, SHA) and blok["status"] == "ok"
-        # Bekende hash: geen nieuwe opvraag.
+        assert monitorplan.normaliseer(blok) == uit_manifest(MANIFEST, SHA) and blok["status"] == "ok"
+        # Bewezen herkomst: geen nieuwe opvraag. Met een gewijzigde drempel moet de bron opnieuw worden gelezen.
         aantal = len(store.paths())
         assert fetch_monitor(store.url, keyring, svc, settings, entry, {"monitor": blok}) == blok
         assert len(store.paths()) == aantal
+        gewijzigd = {**blok, "monitor": {**blok["monitor"], "interval_s": 61}}
+        assert fetch_monitor(store.url, keyring, svc, settings, entry, {"monitor": gewijzigd}) == blok
+        assert len(store.paths()) == aantal + 1
+
+        for pad in ("/health?weergave=proeftekst", "/health#proeftekst"):
+            hc = MANIFEST["healthcheck"]
+            manifest = {**MANIFEST, "healthcheck": {**hc, "monitor": {**hc["monitor"], "pad": pad}}}
+            sha = canonical_sha256(manifest)
+            store.routes = {f"/catalog/v1/versions/{vid}": {**versie, "manifest": manifest, "manifest_sha256": sha}}
+            bron = {**entry, "latest_version": {"id": vid, "manifest_sha256": sha}}
+            assert fetch_monitor(store.url, keyring, svc, settings, bron, None) == {
+                "status": "ongeldig",
+                "reden": "monitor_ongeldig",
+                "manifest_sha256": sha,
+            }
 
         anders = {**MANIFEST, "healthcheck": {**MANIFEST["healthcheck"], "monitor": {"pad": "/x"}}}
         store.routes = {f"/catalog/v1/versions/{vid}": {**versie, "manifest": anders}}  # hash klopt niet meer
@@ -200,11 +222,131 @@ def test_manifest_uit_de_appstore_alleen_met_nagerekende_hash(app: Any, settings
         }
         store.routes = {f"/catalog/v1/versions/{vid}": {**versie, "app_id": "andere-app"}}
         assert fetch_monitor(store.url, keyring, svc, settings, entry, None)["reden"] == "manifest_ongeldig"
+        andere_app = {**MANIFEST, "app_id": "andere-app"}
+        andere_sha = canonical_sha256(andere_app)
+        store.routes = {
+            f"/catalog/v1/versions/{vid}": {**versie, "manifest": andere_app, "manifest_sha256": andere_sha}
+        }
+        andere_entry = {**entry, "latest_version": {"id": vid, "manifest_sha256": andere_sha}}
+        assert fetch_monitor(store.url, keyring, svc, settings, andere_entry, None)["reden"] == "manifest_ongeldig"
         store.routes = {f"/catalog/v1/versions/{vid}": 404}
         assert fetch_monitor(store.url, keyring, svc, settings, entry, None)["reden"] == "manifest_ongeldig"
         geen_id = {"app_id": "gotify", "latest_version": {"manifest_sha256": SHA}}
         assert fetch_monitor(store.url, keyring, svc, settings, geen_id, None)["reden"] == "versie_onbekend"
         store.offline()
         assert fetch_monitor(store.url, keyring, svc, settings, entry, None)["reden"] == "manifest_onbereikbaar"
+        assert (
+            fetch_monitor(store.url, keyring, svc, settings, entry, {"monitor": gewijzigd})["reden"]
+            == "manifest_onbereikbaar"
+        )
     finally:
         store.stop()
+
+
+def test_opgeslagen_monitor_moet_bij_het_manifest_en_de_app_horen(admin: Any, app: Any) -> None:
+    from hub.models import CatalogApp
+
+    _d03(admin)
+    goed = _bronblok(app)
+    bron = {"status": "gekoppeld", "app_id": "gotify", "manifest_sha256": SHA, "monitor": goed}
+    ref = _app(app, "gotify", bron)
+    sha = _plan(admin)["gotify"]["plan_sha256"]
+    assert sha
+    pad = f"{PLAN}/{ref}/bevestiging"
+    body = {"bevestigd": True, "plan_sha256": sha}
+    assert admin.post(pad, headers=idem(), json=body).status_code == 201
+    for invoer in (
+        {**bron, "monitor": {**goed, "monitor": {**goed["monitor"], "interval_s": 61}}},
+        {**bron, "monitor": {**goed, "manifest_sha256": None}},
+        {**bron, "monitor": {k: v for k, v in goed.items() if k != "bronbewijs"}},
+        {**bron, "manifest_sha256": canonical_sha256({})},
+        {k: v for k, v in bron.items() if k != "manifest_sha256"},
+        {k: v for k, v in bron.items() if k != "app_id"},
+        {**bron, "app_id": "andere-app"},
+    ):
+        with app.state.sessionmaker.begin() as db:
+            db.get(CatalogApp, uuid.UUID(ref)).appstore = invoer
+        regel = _plan(admin)["gotify"]
+        assert (regel["stand"], regel["controle"], regel["plan_sha256"], regel["bewaakt"]) == (
+            "ontbreekt",
+            None,
+            None,
+            False,
+        )
+        assert admin.post(pad, headers=idem(), json=body).json()["code"] == "plan_niet_bevestigbaar"
+    _app(app, "andere-app", {**bron, "app_id": "andere-app"})
+    assert _plan(admin)["andere-app"]["stand"] == "ontbreekt"
+
+
+@pytest.mark.parametrize("achtervoegsel", ["?weergave=proeftekst", "#proeftekst"])
+def test_oud_monitoradres_in_appdetail_en_herhaalantwoord(admin: Any, app: Any, achtervoegsel: str) -> None:
+    from hub import audit
+    from hub.catalog.appstore import sync_appstore
+    from hub.models import AuditEvent, CatalogApp, IdempotencyRecord
+
+    _d03(admin)
+    goed = _bronblok(app)
+    bron = {"status": "gekoppeld", "app_id": "gotify", "manifest_sha256": SHA, "monitor": goed}
+    ref = _app(app, "gotify", bron)
+    sha = _plan(admin)["gotify"]["plan_sha256"]
+    pad = f"{PLAN}/{ref}/bevestiging"
+    body = {"bevestigd": True, "plan_sha256": sha}
+    sleutel = idem()
+    eerste = admin.post(pad, headers=sleutel, json=body)
+    assert eerste.status_code == 201 and eerste.json()["controle"]
+    assert admin.post(pad, headers=sleutel, json=body).json() == eerste.json()
+    oud = {**goed["monitor"], "pad": goed["monitor"]["pad"] + achtervoegsel}
+    vorige_bron = {**bron, "monitor": {**goed, "monitor": oud}}
+    ontvangst_id = uuid.UUID(sleutel["Idempotency-Key"])
+    with app.state.sessionmaker.begin() as db:
+        rec = db.scalars(select(IdempotencyRecord).where(IdempotencyRecord.key == ontvangst_id)).one()
+        controle = {**rec.response_body["controle"], "adres": rec.response_body["controle"]["adres"] + achtervoegsel}
+        # Oude, intern consistente bevestiging: ook het oorspronkelijke verzoek hoort bij dit oude adres.
+        oude_sha = canonical_sha256({"app": ref, "controle": controle})
+        oud_verzoek = {**body, "plan_sha256": oude_sha}
+        canoniek = json.dumps(oud_verzoek, sort_keys=True, separators=(",", ":"))
+        rec.request_hash = hashlib.sha256(f"{pad}\n{canoniek}".encode()).hexdigest()
+        rec.response_body = {
+            **rec.response_body,
+            "controle": controle,
+            "plan_sha256": oude_sha,
+            "bevestiging": {**rec.response_body["bevestiging"], "plan_sha256": oude_sha},
+        }
+        audit.record(
+            db,
+            actor_type="user",
+            actor_id="test",
+            action=monitorplan.BEVESTIGING_ACTIE,
+            target_type="catalog_app",
+            target_id=ref,
+            details={"plan_sha256": oude_sha, "controle": controle},
+        )
+
+    make_user(admin, "kijker-monitor", "viewer")
+    with login_as(app, "kijker-monitor") as kijker:
+        for cache in (vorige_bron, {"status": "unknown", "laatst_bekend": vorige_bron}):
+            with app.state.sessionmaker.begin() as db:
+                db.get(CatalogApp, uuid.UUID(ref)).appstore = cache
+            detail = kijker.get(f"/api/v1/apps/{ref}")
+            assert detail.status_code == 200 and "proeftekst" not in detail.text
+            assert _plan(admin)["gotify"]["stand"] == "ontbreekt"
+
+    with app.state.sessionmaker.begin() as db:
+        assert sync_appstore(db, app.state.settings, app.state.keyring())["status"] == "unknown"
+        bewaard = db.get(CatalogApp, uuid.UUID(ref)).appstore["laatst_bekend"]["monitor"]
+        assert bewaard == {"status": "ongeldig", "reden": "monitor_ongeldig"}
+    herhaald = admin.post(pad, headers=sleutel, json=oud_verzoek)
+    assert herhaald.status_code == 201 and herhaald.headers["Idempotent-Replay"] == "true"
+    assert herhaald.json()["stand"] == "ontbreekt" and not herhaald.json()["bewaakt"]
+    assert "proeftekst" not in herhaald.text
+    with app.state.sessionmaker() as db:
+        rec = db.scalars(select(IdempotencyRecord).where(IdempotencyRecord.key == ontvangst_id)).one()
+        assert rec.response_body == herhaald.json()
+        regels = db.scalars(select(AuditEvent).where(AuditEvent.action == monitorplan.BEVESTIGING_ACTIE)).all()
+        assert len(regels) == 2
+        assert audit.verify(db)["status"] == "intact"
+    zichtbaar = admin.get("/api/v1/audit", params={"actie": monitorplan.BEVESTIGING_ACTIE})
+    assert zichtbaar.status_code == 200 and "proeftekst" not in zichtbaar.text
+    assert [r["details"] for r in zichtbaar.json()["items"]] == [
+        {"app_id": ref, "plan_sha256": h, "soort_bewijs": "handmatig bevestigd"} for h in (oude_sha, sha)
+    ]

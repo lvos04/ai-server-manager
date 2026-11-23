@@ -540,10 +540,10 @@ class MonitorBevestigingIn(BaseModel):
     "/monitorplan",
     summary="Monitorplan per app (controle, adres, drempel) en de stand; de Hub maakt zelf geen Kuma-monitors aan",
 )
-def monitor_plan(db: DB, _: Operator) -> dict[str, Any]:
+def monitor_plan(db: DB, _: Operator, settings: SettingsDep) -> dict[str, Any]:
     from hub.monitoring import monitorplan
 
-    return {"uitleg": monitorplan.UITLEG, "items": monitorplan.plan(db), "observed_at": iso(utcnow())}
+    return {"uitleg": monitorplan.UITLEG, "items": monitorplan.plan(db, settings), "observed_at": iso(utcnow())}
 
 
 @router.post(
@@ -553,16 +553,17 @@ def monitor_plan(db: DB, _: Operator) -> dict[str, Any]:
     responses={409: {"description": "regel niet bevestigbaar of intussen gewijzigd (plan_gewijzigd)"}},
 )
 def confirm_monitor(
-    app_id: uuid.UUID, body: MonitorBevestigingIn, db: DB, principal: Admin, idem: Idem
+    app_id: uuid.UUID, body: MonitorBevestigingIn, db: DB, principal: Admin, idem: Idem, settings: SettingsDep
 ) -> JSONResponse:
     from hub.monitoring import monitorplan
 
+    idem.response_filter = lambda antwoord: monitorplan.bevestigingsantwoord(antwoord, app_id, body.plan_sha256)
     if (replay := idem.replay()) is not None:
         return replay
     row = db.get(CatalogApp, app_id)
     if row is None or not row.aanwezig:
         raise HubError(404, "not_found", "App niet gevonden.")
-    regel = monitorplan.regel(db, row)
+    regel = monitorplan.regel(db, row, settings)
     if regel["plan_sha256"] is None:
         raise HubError(
             409,
@@ -582,11 +583,7 @@ def confirm_monitor(
         action=monitorplan.BEVESTIGING_ACTIE,
         target_type="catalog_app",
         target_id=str(row.id),
-        details={
-            "plan_sha256": regel["plan_sha256"],
-            "controle": regel["controle"],
-            "soort_bewijs": "handmatig bevestigd",
-        },
+        details=monitorplan.bevestigingsbewijs(str(app_id), regel["plan_sha256"]),
     )
     db.flush()
-    return idem.save(201, monitorplan.regel(db, row))
+    return idem.save(201, monitorplan.regel(db, row, settings))

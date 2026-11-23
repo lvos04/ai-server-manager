@@ -6,6 +6,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from asm_policy.canonical import canonical_sha256
+
 from hub import audit
 from hub.models import CatalogApp
 from hub.monitoring import monitorplan
@@ -19,15 +21,30 @@ def bevestig_monitor(app: Any, catalog_app_id: Any) -> None:
         assert row is not None
         tcp = [p for p in row.poorten or [] if p.get("protocol") == "tcp" and p.get("host_poort")]
         assert tcp, "app zonder gemeten TCP-hostpoort"
-        blok = {
-            "status": "ok",
-            "monitor": MONITOR,
-            "container_poort": tcp[0]["container_poort"],
-            "host_poort": tcp[0]["host_poort"],
-            "manifest_sha256": "sha256:" + "c" * 64,
+        app_id = row.app_id or row.runtime_id
+        manifest = {
+            "app_id": app_id,
+            "healthcheck": {"port": "web", "monitor": MONITOR},
+            "network": {
+                "ports": [
+                    {
+                        "name": "web",
+                        "protocol": "tcp",
+                        "container_port": tcp[0]["container_poort"],
+                        "host_port": tcp[0]["host_poort"],
+                    }
+                ]
+            },
         }
-        row.appstore = {**(row.appstore or {}), "monitor": blok}
-        regel = monitorplan.regel(db, row)
+        sha = canonical_sha256(manifest)
+        blok = monitorplan.gecontroleerd_manifest(manifest, sha, app_id, app.state.keyring().identity)
+        row.appstore = {
+            "status": "gekoppeld",
+            "app_id": app_id,
+            "manifest_sha256": sha,
+            "monitor": blok,
+        }
+        regel = monitorplan.regel(db, row, app.state.settings)
         assert regel["plan_sha256"], regel
         audit.record(
             db,

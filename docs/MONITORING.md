@@ -27,7 +27,10 @@ direct onbekend en meldt de Hub dat de key vervangen moet worden.
 
 De Hub stelt per app een monitorplan op uit het register (NAS-adres uit D03 + de gemeten hostpoort) en
 `healthcheck.monitor` uit het manifest in de appstore: welke controle (HTTP), welk adres en welke drempel (verwachte
-status, timeout, interval). Het manifest telt alleen als de Hub de manifesthash zelf nagerekend heeft.
+status, timeout, interval). Gebruik een pad zoals `/readyz`. Met een querystring of fragment krijgt de regel de stand
+`ontbreekt`. De Hub controleert de manifesthash en vergelijkt de app-ID in het manifest met die van de catalogusversie.
+Bij het bewaren bindt de Hub de monitorvelden aan die hash en app-ID met een handtekening. Een ouder of gewijzigd
+monitorblok zonder geldig bewijs wordt pas weer bruikbaar nadat de synchronisatie het manifest heeft gecontroleerd.
 
 **De Hub maakt geen monitors aan in Uptime Kuma en past Kuma niet aan.** Zo neem je een regel over:
 

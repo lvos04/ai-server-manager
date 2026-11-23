@@ -9,19 +9,17 @@ nooit een gegokte entry. Er wordt niets in de appstore gewijzigd.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
-from asm_policy.canonical import CanonicalError, canonical_sha256
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub.config import Settings
 from hub.keys import KeyRing
 from hub.models import CatalogApp, Service
-from hub.monitoring.monitorplan import uit_manifest
+from hub.monitoring import monitorplan
 from hub.registry import service_base_url
 from hub.servicecalls import ServiceCallError, call
 from hub.timeutil import iso, utcnow
@@ -30,14 +28,34 @@ APPSTORE_APP_ID = "appstore-en-fork"
 MAX_PAGES = 10
 
 
-def _unknown(reason: str, now: datetime, previous: dict[str, Any] | None, detail: Any = None) -> dict[str, Any]:
+def _filter_monitor(bron: dict[str, Any], app_id: str, settings: Settings, *, openbaar: bool) -> dict[str, Any]:
+    out = {k: v for k, v in bron.items() if k != "laatst_bekend"}
+    if "monitor" in out:
+        blok = monitorplan.lees_monitor(bron, app_id, settings)
+        if openbaar:
+            blok.pop("bronbewijs", None)
+        out["monitor"] = blok
+    return out
+
+
+def openbaar_detail(row: CatalogApp, settings: Settings) -> dict[str, Any]:
+    bron = row.appstore or {"status": "unknown", "reden": "nog_niet_gesynchroniseerd"}
+    app_id = row.app_id or row.runtime_id
+    out = _filter_monitor(bron, app_id, settings, openbaar=True)
+    vorig = bron.get("laatst_bekend")
+    if isinstance(vorig, dict):
+        out["laatst_bekend"] = _filter_monitor(vorig, app_id, settings, openbaar=True)
+    return out
+
+
+def _unknown(reason: str, now: datetime, row: CatalogApp, settings: Settings, detail: Any = None) -> dict[str, Any]:
     out: dict[str, Any] = {"status": "unknown", "reden": reason, "laatste_poging": iso(now)}
     if detail is not None:
         out["detail"] = detail
-    if previous and previous.get("status") in ("gekoppeld", "niet_in_appstore"):
-        out["laatst_bekend"] = {k: v for k, v in previous.items() if k != "laatst_bekend"}
-    elif previous and previous.get("laatst_bekend"):
-        out["laatst_bekend"] = previous["laatst_bekend"]
+    previous = row.appstore or {}
+    bekend = previous if previous.get("status") in ("gekoppeld", "niet_in_appstore") else previous.get("laatst_bekend")
+    if isinstance(bekend, dict):
+        out["laatst_bekend"] = _filter_monitor(bekend, row.app_id or row.runtime_id, settings, openbaar=False)
     return out
 
 
@@ -96,28 +114,24 @@ def fetch_entries(base: str, keyring: KeyRing, svc: Service, settings: Settings)
     return entries
 
 
-def _vorig_monitor(previous: dict[str, Any] | None) -> Any:
-    prev = previous or {}
-    return prev.get("monitor") or (prev.get("laatst_bekend") or {}).get("monitor")
-
-
 def fetch_monitor(
     base: str, keyring: KeyRing, svc: Service, settings: Settings, e: dict[str, Any], previous: dict[str, Any] | None
 ) -> dict[str, Any]:
     """``healthcheck.monitor`` uit het manifest van de laatste versie (monitorplan, C1.3-ASM-20). Alleen als de Hub de
-    manifesthash zelf narekent; een bekende hash wordt niet opnieuw opgehaald. Elke twijfel geeft ``onbekend``."""
+    manifesthash en de app-ID in de inhoud én de envelop controleert. Alleen een bewezen blok is herbruikbaar."""
     latest = e.get("latest_version") if isinstance(e.get("latest_version"), dict) else {}
     assert isinstance(latest, dict)
     sha = latest.get("manifest_sha256")
-    prev = _vorig_monitor(previous)
-    if isinstance(prev, dict) and isinstance(sha, str) and prev.get("manifest_sha256") == sha:
-        return prev
     try:
         vid = str(uuid.UUID(str(latest.get("id"))))
     except ValueError:
         return {"status": "onbekend", "reden": "versie_onbekend"}
-    if not isinstance(sha, str):
+    app_id = e.get("app_id")
+    if not monitorplan.geldige_hash(sha) or not isinstance(app_id, str) or not app_id:
         return {"status": "onbekend", "reden": "versie_onbekend"}
+    cached = monitorplan.uit_cache(monitorplan.monitorbron(previous or {}), app_id, sha, keyring.identity.public_key())
+    if cached is not None:
+        return cached
     bearer, _jti = keyring.issue_hub_service_jwt(audience=APPSTORE_APP_ID, service_id=str(svc.id))
     try:
         res = call(
@@ -131,19 +145,9 @@ def fetch_monitor(
     except ServiceCallError:
         return {"status": "onbekend", "reden": "manifest_onbereikbaar"}
     body = res.body if res.status == 200 and isinstance(res.body, dict) else {}
-    manifest = body.get("manifest")
-    try:
-        herberekend = canonical_sha256(manifest) if isinstance(manifest, Mapping) else None
-    except CanonicalError:
-        herberekend = None
-    if not (
-        herberekend == sha == body.get("manifest_sha256")
-        and body.get("id") == vid
-        and body.get("app_id") == e["app_id"]
-    ):
+    if body.get("manifest_sha256") != sha or body.get("id") != vid or body.get("app_id") != app_id:
         return {"status": "onbekend", "reden": "manifest_ongeldig"}
-    assert isinstance(manifest, Mapping)
-    return uit_manifest(manifest, sha)
+    return monitorplan.gecontroleerd_manifest(body.get("manifest"), sha, app_id, keyring.identity)
 
 
 def sync_appstore(db: Session, settings: Settings, keyring: KeyRing, *, now: datetime | None = None) -> dict[str, Any]:
@@ -152,20 +156,20 @@ def sync_appstore(db: Session, settings: Settings, keyring: KeyRing, *, now: dat
     svc = db.scalars(select(Service).where(Service.app_id == APPSTORE_APP_ID, Service.status == "active")).first()
     if svc is None:
         for row in rows:
-            _set(row, _unknown("appstore_niet_gekoppeld", now, row.appstore), now)
+            _set(row, _unknown("appstore_niet_gekoppeld", now, row, settings), now)
         db.flush()
         return {"status": "unknown", "reden": "appstore_niet_gekoppeld"}
     base, reason = service_base_url(db, settings, svc)
     if base is None:
         for row in rows:
-            _set(row, _unknown("appstore_adres_onbekend", now, row.appstore, reason), now)
+            _set(row, _unknown("appstore_adres_onbekend", now, row, settings, reason), now)
         db.flush()
         return {"status": "unknown", "reden": "appstore_adres_onbekend", "detail": reason}
     try:
         entries = fetch_entries(base, keyring, svc, settings)
     except ServiceCallError as exc:
         for row in rows:
-            _set(row, _unknown("appstore_onbereikbaar", now, row.appstore, exc.reason), now)
+            _set(row, _unknown("appstore_onbereikbaar", now, row, settings, exc.reason), now)
         db.flush()
         return {"status": "unknown", "reden": "appstore_onbereikbaar", "detail": exc.reason}
     linked = 0

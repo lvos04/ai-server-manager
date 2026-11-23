@@ -191,7 +191,7 @@ def app_health(
         binnenkant_vereist=prof.binnenkant_vereist,
         binnenkant_bron=prof.binnenkant,
     )
-    if out["status"] == "healthy" and not monitorplan.bewaakt(db, row):
+    if out["status"] == "healthy" and not monitorplan.bewaakt(db, row, settings):
         # Monitorplan (C1.3-ASM-20): zonder handmatig bevestigde monitor in Uptime Kuma nooit gezond.
         out.update(
             status="unknown", reason_code="niet_bewaakt", melding=MELDINGEN["niet_bewaakt"], oorzaak="monitorplan"

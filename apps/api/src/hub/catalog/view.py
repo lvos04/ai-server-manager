@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from hub.catalog.appstore import openbaar_detail
 from hub.catalog.discovery import deep_link
 from hub.catalog.profiles import profile_for
 from hub.config import Settings
@@ -127,7 +128,7 @@ def detail(
             "dienst": None
             if svc is None
             else {"id": str(svc.id), "app_id": svc.app_id, "status": svc.status, "versie": svc.version},
-            "appstore": row.appstore or {"status": "unknown", "reden": "nog_niet_gesynchroniseerd"},
+            "appstore": openbaar_detail(row, settings),
             "bron": {k: v for k, v in row.bron.items() if k != "identiteit_sinds"},
             "acties": actions(link, role),
             "alleen_lezen": True,

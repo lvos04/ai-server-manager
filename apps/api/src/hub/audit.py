@@ -306,6 +306,12 @@ def verify(db: Session, data_dir: Path | None = None, *, batch: int = 1000) -> d
 
 
 def to_dict(r: AuditEvent) -> dict[str, Any]:
+    from hub.monitoring.monitorplan import BEVESTIGING_ACTIE, bevestigingsbewijs
+
+    details = r.details
+    if r.action == BEVESTIGING_ACTIE:
+        # Oude kettingrijen blijven verifieerbaar. Toon ook daarvan alleen het openbare bewijs.
+        details = bevestigingsbewijs(r.target_id, (details or {}).get("plan_sha256"))
     return {
         "id": r.id,
         "op": iso(r.at),
@@ -314,7 +320,7 @@ def to_dict(r: AuditEvent) -> dict[str, Any]:
         "actie": r.action,
         "doel_type": r.target_type,
         "doel_id": r.target_id,
-        "details": r.details,
+        "details": details,
         "trace_id": r.trace_id,
         "ketting_nr": r.ketting_nr,
         "prev_hash": r.prev_hash,

@@ -76,6 +76,18 @@ def test_opgeslagen_blok_wordt_bij_lezen_opnieuw_gecontroleerd() -> None:
     assert normaliseer({**goed, "extra": "genegeerd"}) == goed  # alleen de witte lijst komt terug
 
 
+@pytest.mark.parametrize("pad", ["/health?weergave=proef", "/health#proef", "/health?", "/health#", "/health\n"])
+def test_alleen_monitorpad_bij_inname_en_herlezing(pad: str) -> None:
+    monitor = {**MON, "pad": pad}
+    assert uit_manifest(_manifest(monitor=monitor), SHA)["status"] == "ongeldig"
+    assert normaliseer({**uit_manifest(_manifest(), SHA), "monitor": monitor}) is None
+
+
+@pytest.mark.parametrize("sha", [None, "", "proef", "sha256:" + "z" * 64])
+def test_monitor_zonder_geldige_manifesthash_is_onbruikbaar(sha: str | None) -> None:
+    assert normaliseer({**uit_manifest(_manifest(), SHA), "manifest_sha256": sha}) is None
+
+
 def _row(*poorten: tuple[int | None, int | None, str]) -> Any:
     return SimpleNamespace(poorten=[{"container_poort": c, "host_poort": h, "protocol": p} for c, h, p in poorten])
 
