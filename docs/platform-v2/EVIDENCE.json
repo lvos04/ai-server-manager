@@ -888,5 +888,15 @@
     "opmerking": "Hub-deel; flow-deel in home-control-hub. Koppeling op ID: request_id = uuid5 van bron en action_request_id. Een hergebruikte bron-ID met andere inhoud wordt geweigerd (409), niet samengevoegd; de bron-ID moet aan de kant van home-control-hub uniek blijven na herstel.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-23"
+  },
+  {
+    "id": "REVIEW-ai-server-manager-excel-afvinken",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "commits 933dda5 (besluit gebruiker 2026-11-23 in OVERDRACHT/STATUS.md), 205e321 (tools/excel/update_excel.py update_sheet + uitvoer handmatig_afgevinkt; README kop 'Afvinken door de gebruiker'); tools/excel/tests/test_update_excel.py::test_handmatig_afgevinkt_blijft_staan (ook idempotent), ::test_handmatig_afgevinkt_tegenstrijdig_bewijs_waarschuwt, ::test_handmatige_waarde_buiten_lijst_niet_beschermd, ::test_zonder_handmatige_status_nooit_gereed, ::test_weigert_gereed_en_geslaagd; pytest -q tools/excel/tests 16 passed; proefrun met --out naar een kopie buiten de repo en tweede run zonder gewijzigde onderdelen; CI-job excel op de push van S-P6-52",
+    "blokkade": "",
+    "opmerking": "Besluit gebruiker 2026-11-23 (optie 1): het gereedschap laat een status die de gebruiker zelf in de Excel heeft afgevinkt staan, meldt die rijen in handmatig_afgevinkt en waarschuwt bij bewijs 'Geblokkeerd'/'Mislukt'; het zet die status zelf nooit. NIET GEVALIDEERD: of het Excel-programma van de gebruiker de keuzelijst en de opmaak na handmatig afvinken en een volgende run intact laat, is alleen met openpyxl getest, niet in het echte programma. De echte Excel is in deze stap niet geschreven.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
   }
 ]
