@@ -33,7 +33,9 @@ Besluit van de gebruiker van 2026-11-23 (zie `docs/platform-v2/OVERDRACHT/STATUS
   *Geslaagd* (Testmatrix) te kiezen. Een agent doet dat nooit, ook niet op verzoek, en zet het ook nooit in een
   `EVIDENCE.json`. Het hulpmiddel zet zelf nooit *Gereed* of *Geslaagd* (zie **Regels**).
 - **Wat het hulpmiddel ermee doet:** staat in de statuscel van een rij al *Gereed* of *Geslaagd* uit de keuzelijst van
-  dat blad, dan laat `--evidence` die cel staan. Bewijs, *Validatie*, *Blokkade / opmerking* en *Bijgewerkt* worden wel
+  dat blad als letterlijke waarde (ook met gedeeltelijke opmaak), dan laat `--evidence` die cel staan. Een formule in de
+  statuscel telt nooit als keuze, ook niet als haar resultaat *Gereed* is: bewijs overschrijft haar, en de herberekening
+  schrijft *Gereed*/*Geslaagd* nooit als resultaat in een statuscel (met een waarschuwing). Bewijs, *Validatie*, *Blokkade / opmerking* en *Bijgewerkt* worden wel
   bijgewerkt. De rij komt in de lijst `handmatig_afgevinkt` van de JSON-uitvoer (`id`, `blad`, `status`); het aantal
   staat in `bijgewerkt_per_blad.handmatig_afgevinkt`. Meldt het bewijs voor zo'n rij *Geblokkeerd* of *Mislukt*, dan
   volgt een waarschuwing (tegenstrijdig): het vinkje wordt niet aangepast, de gebruiker beoordeelt het zelf.

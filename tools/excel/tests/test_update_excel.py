@@ -756,6 +756,70 @@ def test_zonder_handmatige_status_nooit_gereed(klein, capsys):
     assert resultaat["handmatig_afgevinkt"] == []
 
 
+def _zet_cel_xml(pad: Path, sheet: str, ref: str, binnen: str, t: str | None) -> None:
+    """Vervangt de inhoud van één cel door eigen XML (inline opgemaakte tekst of een formule)."""
+    wb = ue.Werkboek(pad)
+    rij = next(r for r in ue.data_rows(wb.blad(sheet)) if r.get("r") == re.sub(r"[A-Z]", "", ref))
+    cel = ue._cell_for(rij, ue.col_index(ref))
+    for kind in list(cel):
+        cel.remove(kind)
+    for k in ("t", "s"):
+        cel.attrib.pop(k, None)
+    if t:
+        cel.set("t", t)
+    for kind in etree.fromstring(f"<x:c {NSDECL}>{binnen}</x:c>"):
+        cel.append(kind)
+    wb.schrijf(pad)
+
+
+def _cel_xml(pad: Path, nr: int, ref: str) -> bytes:
+    return etree.tostring(next(c for c in blad(onderdelen(pad), nr).iter(X + "c") if c.get("r") == ref))
+
+
+def test_handmatig_opgemaakte_tekst_blijft_staan(klein, capsys):
+    """R-EERLIJK-1: 'Gereed' als inline opgemaakte tekst ('Ge' vet + 'reed') is een geldige handmatige keuze; de cel
+    blijft na twee runs byte-gelijk (waarde en opmaak)."""
+    opgemaakt = "<x:is><x:r><x:rPr><x:b/></x:rPr><x:t>Ge</x:t></x:r><x:r><x:t>reed</x:t></x:r></x:is>"
+    _zet_cel_xml(klein["xlsx"], "Werkpakketten", "J2", opgemaakt, "inlineStr")
+    cel_voor = _cel_xml(klein["xlsx"], 2, "J2")
+    ev = _bewijs(klein["dir"], [{"id": "B01-001", "status": "Bezig", "bewijs": "b1", "bijgewerkt": "2026-11-23"}])
+    een, twee = klein["dir"] / "een.xlsx", klein["dir"] / "twee.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(een)]) == 0
+    assert json.loads(capsys.readouterr().out)["handmatig_afgevinkt"] == [
+        {"id": "B01-001", "blad": "Werkpakketten", "status": "Gereed"}
+    ]
+    assert ue.main(["--xlsx", str(een), "--evidence", str(ev), "--out", str(twee)]) == 0
+    assert json.loads(capsys.readouterr().out)["gewijzigde_onderdelen"] == []
+    assert _cel_xml(een, 2, "J2") == _cel_xml(twee, 2, "J2") == cel_voor
+    assert openpyxl.load_workbook(twee)["Werkpakketten"]["J2"].value == "Gereed"
+    assert waarde(blad(onderdelen(twee), 2), "K2") == "b1"
+
+
+@pytest.mark.parametrize("cache", ["", "Gereed"])
+@pytest.mark.parametrize("bewijs", [None, "Geblokkeerd"])
+def test_formule_in_statuskolom_is_geen_handmatige_keuze(klein, capsys, cache, bewijs):
+    """R-EERLIJK-2: alleen een letterlijke status telt als handmatige keuze. Een formule (=B3 met 'Gereed' in B3) wordt
+    door bewijs gewoon overschreven, en de herberekening schrijft nooit 'Gereed' in de cache van een statuscel."""
+    _zet_cel_xml(klein["xlsx"], "Werkpakketten", "B3", "<x:v>Gereed</x:v>", "str")
+    _zet_cel_xml(klein["xlsx"], "Werkpakketten", "J3", f"<x:f>B3</x:f>{'<x:v>Gereed</x:v>' if cache else ''}", "str")
+    cel_voor = _cel_xml(klein["xlsx"], 2, "J3")
+    regels = [{"id": "B01-001", "status": "Bezig", "bijgewerkt": "2026-11-23"}]
+    if bewijs:
+        regels.append({"id": "B03-001", "status": bewijs, "bewijs": "x", "bijgewerkt": "2026-11-23"})
+    ev = _bewijs(klein["dir"], regels)
+    uit = klein["dir"] / "uit.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]) == 0
+    resultaat = json.loads(capsys.readouterr().out)
+    assert resultaat["handmatig_afgevinkt"] == []
+    assert not [w for w in resultaat["waarschuwingen"] if "tegenstrijdig" in w]
+    cel = next(c for c in blad(onderdelen(uit), 2).iter(X + "c") if c.get("r") == "J3")
+    if bewijs:
+        assert cel.find(X + "f") is None and ue.cell_text(cel) == bewijs
+    else:
+        assert _cel_xml(uit, 2, "J3") == cel_voor  # cache niet door het gereedschap op 'Gereed' gezet
+        assert any("Werkpakketten!J3" in w and "Gereed" in w for w in resultaat["waarschuwingen"])
+
+
 def test_herberekening_en_verwijzingen():
     assert ue.shift_ref("$A$2:$A$306", 307, 5, True) == "$A$2:$A$311"
     assert ue.shift_ref("$A$2:$A$306", 40, 1, False) == "$A$2:$A$307"
@@ -771,10 +835,27 @@ def test_herberekening_en_verwijzingen():
 
 # ------------------------------------------------------------------ test op de echte Excel (tijdelijke kopie)
 @pytest.mark.skipif(not (EXCEL.exists() and B03.exists()), reason="echte Excel of B03-invoer ontbreekt")
-def test_echte_excel_in_tijdelijke_kopie(tmp_path: Path):
+def eindstatussen(delen: dict[str, bytes]) -> set[tuple[int, str, str]]:
+    """(blad, ID, waarde) van elke statuscel met 'Gereed'/'Geslaagd' (letterlijk of als formulecache)."""
+    uit = set()
+    for nr, kol in ((2, 10), (3, 6), (4, 5), (5, 4)):
+        for rij in blad(delen, nr).find(X + "sheetData").findall(X + "row")[1:]:
+            tekst = ue.cell_text(ue.find_cell(rij, kol))
+            if tekst in ue.FORBIDDEN:
+                uit.add((nr, ue.row_id(rij), tekst))
+    return uit
+
+
+@pytest.mark.parametrize("met_vinkje", [False, True])
+def test_echte_excel_in_tijdelijke_kopie(tmp_path: Path, met_vinkje: bool):
     kopie = tmp_path / "echt.xlsx"
     shutil.copy2(EXCEL, kopie)
+    if met_vinkje:  # R-EERLIJK-4: een bestaande handmatige keuze van de gebruiker mag blijven staan
+        eerste_id = ids(blad(onderdelen(kopie), 2))[0]
+        _vink_af(kopie, "Werkpakketten", eerste_id, "Gereed")
     voor = onderdelen(kopie)
+    if met_vinkje:
+        assert (2, eerste_id, "Gereed") in eindstatussen(voor)
     rijen = json.loads((B03 / "werkpakketten.json").read_text(encoding="utf-8"))
     testen = json.loads((B03 / "testen.json").read_text(encoding="utf-8"))
     meta = json.loads((B03 / "EXCEL_TAKEN_PER_REPO.json").read_text(encoding="utf-8"))["per_test"]
@@ -818,10 +899,8 @@ def test_echte_excel_in_tijdelijke_kopie(tmp_path: Path):
         tid = ue.row_id(rij)
         if tid in meta:
             assert ue.cell_text(ue.find_cell(rij, 5)) == meta[tid]["prioriteit"]
-    # geen eindstatus
-    for root, kol in ((wp, 10), (tm, 6), (fa, 4)):
-        for rij in root.find(X + "sheetData").findall(X + "row")[1:]:
-            assert ue.cell_text(ue.find_cell(rij, kol)) not in {"Gereed", "Geslaagd"}
+    # geen nieuwe eindstatus: alleen de handmatige keuzes van vóór de run (per blad en ID) staan er nog
+    assert eindstatussen(na) == eindstatussen(voor)
     # Dashboard telt alle rijen
     assert waarde(db, "B9") == str(len(wids)) and waarde(db, "B14") == str(len(tids))
     assert [waarde(db, f"A{r}") for r in range(26, 26 + len(fids))] == fids

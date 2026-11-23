@@ -34,7 +34,7 @@ Regels (PLATFORM_CONTRACTEN.md §11, keuze van de gebruiker):
   status wordt teruggezet naar 'Bezig' met een waarschuwing; een nieuwe rij met
   zo'n (start)status wordt geweigerd en er wordt niets geschreven.
 - Wat de gebruiker zelf afvinkt, blijft staan (besluit 2026-11-23): staat in de
-  statuscel al 'Gereed'/'Geslaagd' uit de lijst van het blad, dan schrijft het
+  statuscel al letterlijk (geen formule) 'Gereed'/'Geslaagd' uit de lijst van het blad, dan schrijft het
   bewijs die cel niet over (bewijs, validatie, blokkade en datum wel). Zulke rijen
   staan in ``handmatig_afgevinkt`` van de uitvoer; bewijs 'Geblokkeerd'/'Mislukt'
   geeft een waarschuwing (tegenstrijdig).
@@ -170,6 +170,11 @@ def row_index(ref: str) -> int:
     return int(m.group(1))
 
 
+def _tekstdelen(el) -> str:
+    """Tekst van een <si> of <is>: ook alle opgemaakte delen (<r><t>), zonder uitspraakhulp (<rPh>)."""
+    return "".join(t.text or "" for t in el.iter(X + "t") if t.getparent().tag != X + "rPh")
+
+
 def cell_text(c) -> str:
     if c is None:
         return ""
@@ -181,8 +186,8 @@ def cell_text(c) -> str:
             except (ValueError, IndexError):
                 return v.text
         return v.text
-    t = c.find(f"{X}is/{X}t")
-    return t.text if t is not None and t.text else ""
+    inline = c.find(X + "is")
+    return _tekstdelen(inline) if inline is not None else ""
 
 
 def find_cell(row, col: int):
@@ -322,7 +327,7 @@ class Werkboek:
         _SST = []
         if "xl/sharedStrings.xml" in self.origineel:
             sst = etree.fromstring(self.origineel["xl/sharedStrings.xml"])
-            _SST = ["".join(t.text or "" for t in si.iter(X + "t")) for si in sst.findall(X + "si")]
+            _SST = [_tekstdelen(si) for si in sst.findall(X + "si")]
         wb = etree.fromstring(self.origineel["xl/workbook.xml"])
         rels = _parse_rels(self.origineel["xl/_rels/workbook.xml.rels"])
         self.paden: dict[str, str] = {}
@@ -947,6 +952,13 @@ def herbereken(wb: Werkboek, warnings: list[str]) -> int:
                 warnings.append(f"{naam}!{c.get('r')}: formule niet herberekend ({exc!r}); opgeslagen resultaat blijft")
                 continue
             t, tekst = _format(w)
+            lay = LAYOUT.get(naam)
+            if tekst in FORBIDDEN and lay and col_index(c.get("r")) == lay["status"] and row_index(c.get("r")) > 1:
+                warnings.append(
+                    f"{naam}!{c.get('r')}: formule in de statuskolom geeft '{tekst}'; niet weggeschreven "
+                    "(alleen de gebruiker vinkt af, met een letterlijke keuze)"
+                )
+                continue
             v = c.find(X + "v")
             huidig = (c.get("t") or "n", v.text if v is not None and v.text is not None else "")
             if huidig == (t, tekst):
@@ -1065,7 +1077,9 @@ def update_sheet(
             continue
         m = merge(evidence[rid], sheet, warnings)
         # Besluit gebruiker 2026-11-23: een 'Gereed'/'Geslaagd' die de gebruiker zelf koos, blijft staan.
-        huidig = cell_text(find_cell(row, lay["status"]))
+        statuscel = find_cell(row, lay["status"])
+        # Alleen een letterlijke waarde is een keuze van de gebruiker; een formule (of haar cache) nooit.
+        huidig = cell_text(statuscel) if statuscel is not None and statuscel.find(X + "f") is None else ""
         if huidig in FORBIDDEN and huidig in ALLOWED[sheet]:
             handmatig.append({"id": rid, "blad": sheet, "status": huidig})
             if m["status"] in ("Geblokkeerd", "Mislukt"):
