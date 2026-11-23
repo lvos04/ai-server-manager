@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, type TestInfo } from "@playwright/test";
+import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -172,12 +172,41 @@ export async function expectTouchTargets(page: Page, label: string): Promise<voi
 }
 
 export async function shot(page: Page, info: TestInfo, name: string, fullPage = true): Promise<void> {
+  if (process.env.HUB_E2E_SHOTS === "p2") return;
+  await schrijfAfdruk(page, info, name, fullPage);
+}
+
+/** P2 in beide thema's. Een uitsnede kan een enkel paneel tonen zonder verbindingsgegevens elders op de pagina. */
+export async function p2Afdrukken(page: Page, info: TestInfo, naam: string, paneel?: Locator): Promise<void> {
+  if (process.env.HUB_E2E_SHOTS !== "p2") return;
+  const voorkeur = await page.evaluate(() => localStorage.getItem("hub-thema"));
+  try {
+    for (const thema of ["licht", "donker"] as const) {
+      await setTheme(page, thema);
+      await schrijfAfdruk(page, info, `${naam}-${thema}`, true, paneel);
+    }
+  } finally {
+    await page.evaluate((waarde) => {
+      if (waarde === null) localStorage.removeItem("hub-thema");
+      else localStorage.setItem("hub-thema", waarde);
+      window.dispatchEvent(new Event("hub-thema-gewijzigd"));
+    }, voorkeur);
+  }
+}
+
+async function schrijfAfdruk(page: Page, info: TestInfo, name: string, fullPage: boolean, paneel?: Locator): Promise<void> {
   const dir = afdrukMap(SCREENSHOT_ROOT, process.env.HUB_E2E_SHOTS, info.project.name);
   // JPEG (kwaliteit 60, CSS-pixels) houdt de repo klein; volledige pagina als bewijs. In de afdrukmodus staat de vaste
   // ondernavigatie onderaan de pagina (anders tekent de browser hem midden in een lange afbeelding).
   await page.evaluate(() => document.documentElement.setAttribute("data-afdruk", ""));
   try {
-    await page.screenshot({ path: afdrukBestand(dir, name), fullPage, animations: "disabled", type: "jpeg", quality: 60, scale: "css" });
+    const opties = { path: afdrukBestand(dir, name), animations: "disabled", type: "jpeg", quality: 60, scale: "css" } as const;
+    if (paneel) await paneel.screenshot(opties);
+    else {
+      // Een bediende knop kan de pagina hebben verschoven. Bewaar de vaste kop bovenaan de volledige P2-afdruk.
+      const style = process.env.HUB_E2E_SHOTS === "p2" ? "html[data-afdruk] header.sticky { position: static !important; }" : undefined;
+      await page.screenshot({ ...opties, fullPage, style });
+    }
   } finally {
     await page.evaluate(() => document.documentElement.removeAttribute("data-afdruk"));
   }

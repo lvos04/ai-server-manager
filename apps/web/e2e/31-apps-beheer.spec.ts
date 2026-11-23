@@ -6,7 +6,7 @@
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { control, expectAccessible, expectNoHorizontalScroll, expectTouchTargets, leesToegestaneBackupGate, ready } from "./helpers";
+import { control, expectAccessible, expectNoHorizontalScroll, expectTouchTargets, leesToegestaneBackupGate, p2Afdrukken, ready } from "./helpers";
 
 async function csrf(ctx: BrowserContext): Promise<string> {
   return (await ctx.cookies()).find((c) => c.name === "hub_csrf")?.value ?? "";
@@ -74,7 +74,7 @@ test("HARDE EIS · MediaGuard (echte app): Versies zonder bijwerk- of terugzetkn
   await geenKnop(page);
 });
 
-test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-up zichtbaar en goedkeuren uit", async ({ page }) => {
+test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-up zichtbaar en goedkeuren uit", async ({ page }, info) => {
   const id = await appId(page, "my-house");
   await detailMet(page, id, { installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.4.15" } });
   await page.goto(`/apps/${id}?tab=versies`);
@@ -83,6 +83,7 @@ test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-u
   await expectAccessible(page, "versies");
   await expectNoHorizontalScroll(page, "versies");
   await expectTouchTargets(page, "versies");
+  await p2Afdrukken(page, info, "app-versies");
   // Met de echte dichte gate kan bijwerken geen voorstel maken.
   await expect(page.getByTestId("bijwerken")).toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#versies-backupreden")).toBeVisible();
@@ -109,15 +110,17 @@ test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-u
   expect(posts).toEqual([]);
 });
 
-test("verwijderen: eerst ‘Controleer wat blijft’ met focus op Annuleren en de datazin, daarna het R2-voorstel", async ({ page }) => {
+test("verwijderen: eerst ‘Controleer wat blijft’ met focus op Annuleren en de datazin, daarna het R2-voorstel", async ({ page }, info) => {
   const id = await appId(page, "media-source-optimizer");
   await page.goto(`/apps/${id}?tab=acties`);
   await ready(page);
   await expect(page.getByTestId("rij-app.uninstall")).toContainText("Goedkeuring nodig");
+  await p2Afdrukken(page, info, "app-acties");
   await page.getByTestId("actie-app.uninstall").click();
   const controle = page.getByTestId("verwijderen-controle");
   await expect(controle).toContainText("Controleer wat blijft · stap 1 van 2");
   await expect(page.getByTestId("data-blijft")).toHaveText("Alleen de container wordt verwijderd. Je gegevens blijven bewaard.");
+  await p2Afdrukken(page, info, "app-verwijderen");
   await expect(page.getByTestId("verwijderen-annuleren")).toBeFocused();
   await expect(controle.locator("input")).toHaveCount(0);
   await expectAccessible(page, "verwijderen-controle");
@@ -131,12 +134,13 @@ test("verwijderen: eerst ‘Controleer wat blijft’ met focus op Annuleren en d
   await expect(page.getByTestId("verzoek-status")).toContainText("Wacht op goedkeuring");
 });
 
-test("appstore en wizard zonder manifestbron: C-12, ‘Volgende’ uit, Enter maakt niets, geen YAML- of compose-veld", async ({ page }) => {
+test("appstore en wizard zonder manifestbron: C-12, ‘Volgende’ uit, Enter maakt niets, geen YAML- of compose-veld", async ({ page }, info) => {
   await page.goto("/apps/catalogus");
   await ready(page);
   await expect(page.getByTestId("catalogus-nog-niet")).toContainText("de Hub kan de installeerbare manifests nog niet ophalen");
   await expectAccessible(page, "appstore");
   await expectNoHorizontalScroll(page, "appstore");
+  await p2Afdrukken(page, info, "appstore");
   const posts: string[] = [];
   page.on("request", (r) => {
     if (r.method() === "POST" && /\/api\/v1\/(catalog|actions)/.test(r.url())) posts.push(r.url());
@@ -156,6 +160,7 @@ test("appstore en wizard zonder manifestbron: C-12, ‘Volgende’ uit, Enter ma
   await expect(page.locator("main")).not.toContainText(/yaml|compose/i);
   await expectAccessible(page, "wizard-kies-app");
   await expectNoHorizontalScroll(page, "wizard-kies-app");
+  await p2Afdrukken(page, info, "installatiewizard");
   await expectTouchTargets(page, "wizard-kies-app");
 });
 
@@ -177,7 +182,7 @@ const PLAN = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-test("wizard met een plan: geblokkeerde controle vooraf houdt tegen; de preview lekt geen geheim; ‘Volgende’ opent het voorstel", async ({ page }) => {
+test("wizard met een plan: geblokkeerde controle vooraf houdt tegen; de preview lekt geen geheim; ‘Volgende’ opent het voorstel", async ({ page }, info) => {
   const GEHEIM = "GEHEIM-TESTWAARDE-S-P2-180"; // gitleaks:allow -- synthetische testwaarde
   let plan: Record<string, unknown> = PLAN({ status: "geblokkeerd", reden: "planner_niet_klaar" });
   await page.route("**/api/v1/catalog/plans/99999999-2222-4333-8444-555555555555", (r) => r.fulfill({ json: plan }));
@@ -210,6 +215,7 @@ test("wizard met een plan: geblokkeerde controle vooraf houdt tegen; de preview 
   await expect(preview).toContainText("Niet beschikbaar — het installatieplan levert dit nog niet aan de browser.");
   await expect(page.getByTestId("controles-na")).toContainText("Open");
   expect(await page.content()).not.toContain(GEHEIM);
+  await p2Afdrukken(page, info, "installatiepreview");
   await expectAccessible(page, "wizard-preview");
   await expectNoHorizontalScroll(page, "wizard-preview");
   await page.getByTestId("wizard-volgende").click();

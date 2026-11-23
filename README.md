@@ -12,7 +12,7 @@ contract 1.3 voor alle punten die hoofdstuk 1 van die lijst als **NU** markeert 
 open in [`docs/platform-v2/EVIDENCE.json`](docs/platform-v2/EVIDENCE.json). De statuspagina van de executor en de Hub-UI
 volgen Peil 1.1.1.
 
-## Stand (versie 0.1.0, fase P0 + P1 + contract 1.3 — backend en web-UI)
+## Stand van versie 0.1.0
 
 Contract 1.3 in deze repo (ADR-0029): enroll-antwoord `"1.3"` met `rotation_sequence` en een tolerante `base_url`;
 oude tokens pas ingetrokken bij het eerste gebruik van een nieuw token; vingerafdruk over alle policy-sleutels;
@@ -33,6 +33,7 @@ niets op een echte NAS.
 | AI | volgt later in P2; staat standaard uit, geen modellen, geen betaalde aanroepen | — |
 | P1 deel 1 (backend, ADR-0021) | **appcatalogus** (B01-002: identiteit = TrueNAS-app-id, idempotente discovery, installatiewijze, image/tag/digest + readback, opslag → dataset, deep-link, appstore-koppeling), **gezondheidsmodel** (truenas/buitenkant/binnenkant, verouderd = unknown), **bronnen** Uptime Kuma, Beszel (alleen het NAS-systeem), connector-health en heartbeat van eigen diensten (B09-002), **tijdreeksen** ruw → 5 min → 1 uur met retentie, **alerts** met drempel/duur/hysterese en **Gotify**-meldingen zonder pushstorm (B09-003, `notification.send` R0), **live NAS-metingen** uit `reporting.realtime` (B01-004) en **meetdekking** (B09-001). Uitleg: [`docs/MONITORING.md`](docs/MONITORING.md) | Sim-getest (fakes TrueNAS, Uptime Kuma, Beszel, Gotify, appstore, eigen dienst); **NIET GEVALIDEERD** tegen echte installaties; UI-schermen volgen in de P1-webstap |
 | P1 deel 2 (backend, ADR-0022/0023) | **incidenten-inbox** (B01-005: dedupe/correlatie per vingerafdruk, herstel sluit alleen het eigen incident, heropenen, erkennen/snooze met verval, escalatie, readback bij oplossen, hypothese met zekerheid en bewijs of "ik weet het niet"), **log-index** (B09-004: alleen geschoond — geheimen, tokens, IP-adressen — begrensd, met trace_id en supportbundel), **out-of-band** (B09-005: Hub niet in het meldpad van Uptime Kuma; EX23 nooit "gedekt"), **runbooks** (B09-006: acht getypeerde scenario's, veilige modus), **SSO-login via OIDC** (B01-006: code + PKCE, groep→rol, sessie-intrekking, noodlogin blijft werken) en een **append-only auditspoor met hash-ketting**. Uitleg: [`docs/INCIDENTEN.md`](docs/INCIDENTEN.md), [`docs/RUNBOOKS.md`](docs/RUNBOOKS.md), [`docs/SSO.md`](docs/SSO.md) | Sim-getest (fakes OIDC/Authentik, home-control-hub, Uptime Kuma, Gotify, TrueNAS); **NIET GEVALIDEERD** tegen echte Authentik/Kuma/Gotify/NAS; UI-schermen volgen in de P1-webstap |
+| P2 | Goedkeuringen met actie-preview, appbeheer, back-ups, automatisering en het monitorplan per app. De AI-pagina meldt ‘Nog niet beschikbaar’. [Schermafdrukken met testgegevens](docs/screenshots/p2/) | Lokale teststack met nagebootste diensten |
 | P3 (bestaande apps, alleen-lezen) | **koppelen** van MediaGuard, MSO en my_house onder Instellingen → Diensten; scherm **Media** (MediaGuard-cijfers, noodstop, MSO-gezondheid) en scherm **Huis** (woningoverzicht van my_house), zonder knoppen die iets veranderen; adaptergezondheid in de appcatalogus; back-upgate voor de bestaande apps en het Emby-archief. Ontbreekt een alleen-lezen bron, dan staat er "onbekend" met de reden. **Kosten** volgt in versie 2. Uitleg: [`docs/ADAPTERKOPPELINGEN.md`](docs/ADAPTERKOPPELINGEN.md); schermafdrukken: [`docs/screenshots/p3/`](docs/screenshots/p3/) | Sim-getest (simulators van MediaGuard, MSO en my_house); **NIET GEVALIDEERD (echte NAS)** |
 
 Echte NAS-, hardware- en accounttests zijn in deze bouwomgeving niet mogelijk. Zie
@@ -69,6 +70,11 @@ Details over de web-UI: [`apps/web/README.md`](apps/web/README.md).
 `deploy/dev/compose.yaml` is alleen voor ontwikkeling/CI. Variabelen: [`.env.example`](.env.example) (geen echte
 waarden; de Custom App heeft geen verplichte variabelen).
 
+De rooktest vergelijkt de `policy_hash` van Hub, executor en repository. Een uitvoeringsverzoek met een geldig
+dienst-JWT en een ontbrekende beleidshandtekening moet HTTP 422 opleveren. De draaiende AI-runner heeft UID 569.
+De proef controleert dat deze gebruiker de kluissleutel niet mag openen en dat de runner bij een leesbare
+proefsleutel of databasemap met exitcode 78 stopt.
+
 ## Mappen
 
 | Map | Inhoud |
@@ -82,7 +88,7 @@ waarden; de Custom App heeft geen verplichte variabelen).
 | `deploy/manifest` | manifesten (manifeststandaard v1, `install.method: custom_app`) |
 | `policy/`, `apps/policy` | risicobeleid, validatorpin en het gedeelde pakket `asm_policy` dat Hub en executor allebei gebruiken |
 | `docs/openapi`, `docs/adr` | OpenAPI-export en besluiten (ADR's) |
-| `docs/screenshots/p0` | schermafbeeldingen (mobiel en desktop) uit de Playwright-suite |
+| `docs/screenshots/` | schermafbeeldingen uit de Playwright-suite, gegroepeerd per fase en schermbreedte |
 | `docs/platform-v2` | pakketdocumentatie, contracten, Excel-taken en `EVIDENCE.json` |
 
 Licentie: **GPL-3.0** (zie [`LICENSE`](LICENSE); besluit van de eigenaar, 2026-11-09).

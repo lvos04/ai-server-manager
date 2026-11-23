@@ -80,6 +80,22 @@ Schermafbeeldingen: `docs/screenshots/p1/<project>/<scherm>-<licht|donker>.webp`
 `HUB_E2E_SHOTS=<map>` schrijft ze naar een andere map; P3 (Diensten, Media, Huis, Kosten en de toestanden van Media
 en koppelen via `HUB_MEDIA_SHOTS` en `HUB_KOPPELSCHERM_SHOTS`) staat in `docs/screenshots/p3/`.
 
+Met `HUB_E2E_SHOTS=p2 make web-e2e` vanuit de repo-root legt de suite de P2-schermen vast zodra hun testtoestand
+zichtbaar is. De map `docs/screenshots/p2/` bevat ook de huidige appcatalogus en AI-pagina in beide thema’s. Het monitorplan
+toont twee synthetische planregels als afzonderlijk paneel. De browser schrijft JPEG-bestanden. Zet ze vanuit de
+repo-root met Pillow om naar het WebP-formaat van de ingecheckte afdrukken.
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+from PIL import Image
+
+for bron in Path("docs/screenshots/p2").glob("*/*.jpg"):
+    with Image.open(bron) as beeld:
+        beeld.save(bron.with_suffix(".webp"), quality=84, method=4)
+PY
+```
+
 Tegen de alles-in-één image (zelfde suite):
 
 ```sh

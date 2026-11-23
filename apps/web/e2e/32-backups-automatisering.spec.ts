@@ -1,14 +1,15 @@
 /** Teststack met lokale leesfixtures voor bronuitval, ontbrekend databasebewijs en een meerstaps zandbakproef. */
 import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { expectAccessible, expectNoHorizontalScroll, ready, VIEWER } from "./helpers";
+import { expectAccessible, expectNoHorizontalScroll, p2Afdrukken, ready, VIEWER } from "./helpers";
 
-test("back-upgate, databasebewijs, upload en oefendatum hebben afzonderlijke bronnen", async ({ page }) => {
+test("back-upgate, databasebewijs, upload en oefendatum hebben afzonderlijke bronnen", async ({ page }, info) => {
   await page.goto("/backups");
   await ready(page);
   const gate = page.getByTestId("sectie-backupgate");
   await expect(gate).toContainText("Gate dicht");
   await expect(gate.getByRole("link").first()).toBeVisible();
+  await p2Afdrukken(page, info, "backups");
 
   const punt = randomUUID(), checkpoint = randomUUID();
   await page.route("**/api/v1/backups/herstelpunten*", r => r.fulfill({ json: { items: [{
@@ -18,18 +19,21 @@ test("back-upgate, databasebewijs, upload en oefendatum hebben afzonderlijke bro
   await page.getByRole("link", { name: "Herstelpunten", exact: true }).first().click();
   await expect(page.getByText("Telt niet mee. De vereiste database-export ontbreekt.")).toBeVisible();
   await expectNoHorizontalScroll(page, "herstelpunt");
+  await p2Afdrukken(page, info, "herstelpunten");
   await page.route("**/api/v1/backups/extern", r => r.fulfill({ json: { status: "ok", max_leeftijd_s: 60, taken: [
     { id: 1, status: "ok", beeindigd: new Date(Date.now() - 3600_000).toISOString(), fout: "interne proefnotitie" },
   ] } }));
   await page.getByRole("link", { name: "Externe back-up", exact: true }).click();
   await expect(page.getByText("Laatste upload te oud").first()).toBeVisible();
   await expect(page.locator("main")).not.toContainText("interne proefnotitie");
+  await p2Afdrukken(page, info, "externe-backup");
   await page.getByRole("link", { name: "Rampenscenario’s", exact: true }).click();
   await expect(page.locator("main")).toContainText("Laatste oefening onbekend");
   await expect(page.locator("main ol[data-genummerd] li").first()).toBeVisible();
+  await p2Afdrukken(page, info, "rampenscenarios");
 });
 
-test("zonder Node-RED blijft de laatste inventarisatietijd herkenbaar en opent geen editor", async ({ page }) => {
+test("zonder Node-RED blijft de laatste inventarisatietijd herkenbaar en opent geen editor", async ({ page }, info) => {
   const datum = "2026-09-20T12:15:00Z";
   await page.route("**/api/v1/registry/services", r => r.fulfill({ json: {
     status: "unknown", observed_at: datum, items: [{ app: "node-red", basis_url: "https://editor.example", verouderd: true }],
@@ -42,6 +46,7 @@ test("zonder Node-RED blijft de laatste inventarisatietijd herkenbaar en opent g
   await expect(page.locator("main")).not.toContainText("Geen flows");
   await expect(page.locator('main a[href^="https:"]')).toHaveCount(0);
   await expectAccessible(page, "flowbron-onbekend");
+  await p2Afdrukken(page, info, "flows");
 });
 
 test("een echte testkijker leest hersteltests zonder startknop en de robot weigert met 403", async ({ page, browser }) => {
@@ -128,7 +133,7 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
   await expect(page.getByText("De controlesom wijkt af. Het herstelpunt is ongezond.")).toBeVisible();
 });
 
-test("flowhistorie volgt de cursor en toont één regel per verzoek zonder vrije actor- of redenvelden", async ({ page }) => {
+test("flowhistorie volgt de cursor en toont één regel per verzoek zonder vrije actor- of redenvelden", async ({ page }, info) => {
   const id = randomUUID(), volgende = randomUUID(), flow = randomUUID();
   const eerste = { request_id: id, actor: { type: "flow", id: `flow:${flow}` }, action_id: "app.restart", risk_class: "R2",
     goedkeuring_nodig: true, status: "onbekend", reason: "interne proefnotitie" };
@@ -139,6 +144,7 @@ test("flowhistorie volgt de cursor en toont één regel per verzoek zonder vrije
   await ready(page);
   await page.getByRole("button", { name: "Meer verzoeken laden" }).click();
   await expect(page.getByRole("link", { name: /Bekijk actie-preview/ })).toHaveCount(2);
+  await p2Afdrukken(page, info, "flowhistorie");
   await expect(page.locator("main")).toContainText("Uitkomst onbekend");
   await expect(page.locator("main")).toContainText("reden niet weer te geven");
   await expect(page.locator("main")).not.toContainText("interne proefnotitie");

@@ -5,7 +5,7 @@
  */
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, ready } from "./helpers";
+import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, p2Afdrukken, ready } from "./helpers";
 
 const DOEL = (app: string) => ({ host_id: "nas-primary", app_id: app });
 const KIJKER = { username: "kijker-acties", password: "Kijker-Acties-Lang-2026" }; // gitleaks:allow -- synthetische testwaarde
@@ -24,7 +24,7 @@ async function stelVoor(page: Page, action_id: string, app: string, extra: Recor
   return (await res.json()) as { request_id: string; status: string; risk_class: string; blokkades: unknown[] };
 }
 
-test("R2-voorstel: in de wachtlijst en de kopteller, detail met preview, diff, ‘Waarom R2?’ en gebonden velden", async ({ page }) => {
+test("R2-voorstel: in de wachtlijst en de kopteller, detail met preview, diff, ‘Waarom R2?’ en gebonden velden", async ({ page }, info) => {
   const v = await stelVoor(page, "app.uninstall", "media-source-optimizer");
   expect(v.risk_class).toBe("R2");
   expect(v.status).toBe("wacht_op_goedkeuring");
@@ -37,6 +37,7 @@ test("R2-voorstel: in de wachtlijst en de kopteller, detail met preview, diff, �
   await expectAccessible(page, "goedkeuringen");
   await expectNoHorizontalScroll(page, "goedkeuringen");
   await expectTouchTargets(page, "goedkeuringen");
+  await p2Afdrukken(page, info, "goedkeuringen");
 
   await rij.click();
   await ready(page);
@@ -62,6 +63,7 @@ test("R2-voorstel: in de wachtlijst en de kopteller, detail met preview, diff, �
   await expectAccessible(page, "goedkeuring-r2");
   await expectNoHorizontalScroll(page, "goedkeuring-r2");
   await expectTouchTargets(page, "goedkeuring-r2");
+  await p2Afdrukken(page, info, "actie-preview-r2");
 });
 
 test("een uitgeschakelde of geblokkeerde goedkeurknop doet echt niets (V-065)", async ({ page }) => {
@@ -162,7 +164,7 @@ test("een verlopen voorstel kan niet worden goedgekeurd", async ({ page }, info)
   expect((await r.json()).code).toBe("voorstel_verlopen");
 });
 
-test("R3 (gesimuleerd verzoek): twee stappen, naam typen; zonder naam doet de gevaarknop niets, dubbel drukken één keer", async ({ page }) => {
+test("R3 (gesimuleerd verzoek): twee stappen, naam typen; zonder naam doet de gevaarknop niets, dubbel drukken één keer", async ({ page }, info) => {
   const id = randomUUID();
   const nu = Date.now();
   const H = (c: string) => `sha256:${c.repeat(64)}`;
@@ -201,12 +203,13 @@ test("R3 (gesimuleerd verzoek): twee stappen, naam typen; zonder naam doet de ge
   await expect(gevaar).not.toHaveAttribute("aria-disabled", "true");
   await expectAccessible(page, "goedkeuring-r3-stap-2");
   await expectTouchTargets(page, "goedkeuring-r3-stap-2");
+  await p2Afdrukken(page, info, "goedkeuring-r3");
   await gevaar.dblclick();
   await expect(page.getByTestId("verzoek-status")).toContainText("Goedgekeurd");
   expect(goedgekeurd).toBe(1);
 });
 
-test("risicobeleid: alleen lezen met policy_hash en de vaste zin", async ({ page }) => {
+test("risicobeleid: alleen lezen met policy_hash en de vaste zin", async ({ page }, info) => {
   await page.goto("/goedkeuringen/beleid");
   await ready(page);
   await expect(page.locator("main")).toContainText("Het beleid kan niet door de AI worden gewijzigd.");
@@ -222,9 +225,10 @@ test("risicobeleid: alleen lezen met policy_hash en de vaste zin", async ({ page
   await expectAccessible(page, "risicobeleid");
   await expectNoHorizontalScroll(page, "risicobeleid");
   await expectTouchTargets(page, "risicobeleid");
+  await p2Afdrukken(page, info, "risicobeleid");
 });
 
-test("R-VEILIG-1 (RV-8): na uitvoeren nooit de vrije executormelding of details-JSON in de DOM", async ({ page }) => {
+test("R-VEILIG-1 (RV-8): na uitvoeren nooit de vrije executormelding of details-JSON in de DOM", async ({ page }, info) => {
   for (const [status, code, tekst] of [
     [409, "uitvoering_geweigerd", "De executor heeft de actie geweigerd; er is niets uitgevoerd."],
     [501, "capability_unavailable", "Deze handeling is nog niet beschikbaar bij de uitvoerder; er is niets uitgevoerd."],
@@ -254,5 +258,6 @@ test("R-VEILIG-1 (RV-8): na uitvoeren nooit de vrije executormelding of details-
     await expect(paneel).toContainText(code);
     expect(await page.content()).not.toContain("VRIJE-EXECUTOR-MELDING");
     await expect(paneel).not.toContainText("Technische details");
+    if (status === 409) await p2Afdrukken(page, info, "uitvoering-geweigerd");
   }
 });

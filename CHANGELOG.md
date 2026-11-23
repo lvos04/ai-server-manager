@@ -4,6 +4,16 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Rooktest en schermafdrukken van P2 (S-P2-220)
+
+- De netwerkloze executor ontvangt een geldig dienst-JWT. Als alleen de handtekening onder het uitvoeringsverzoek
+  ontbreekt, controleert de rooktest HTTP 422 en de veldfout voor `signature`. Met een geldige handtekening en
+  gebonden goedkeuring weigert de executor nog steeds een installatie met `privileged` (EX47).
+- De Hub-rooktest controleert het proces van de AI-runner als UID 569 en diens toegang tot de kluissleutel.
+  Een afzonderlijke proefsleutel en een toegankelijke proefdatabasemap leiden elk tot exitcode 78.
+- De beleidsvergelijking heeft een tegenproef met een gewijzigd bestand in een kopie. De P2-schermen zijn opgenomen
+  in de schermafdrukmodus `HUB_E2E_SHOTS=p2`, met mobiele, tablet- en desktopweergaven in beide thema’s.
+
 ### Samengevat — wat P3 aan de Hub toevoegt (S-P3-170)
 
 - **Bestaande apps koppelen.** Onder Instellingen → Diensten koppel je MediaGuard (kijkersleutel), MSO (alleen de
