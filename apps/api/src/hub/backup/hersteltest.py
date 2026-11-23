@@ -3,12 +3,18 @@
 De robot controleert of een herstelpunt (B12-006) echt terug te zetten is, zonder productie aan te raken:
 
 1. **Kloon in de zandbak.** Per dataset van het herstelpunt een uitgevoerde ``zfs.snapshot.clone_to_sandbox`` (R1, via
-   voorstel → executor) van precies die snapshot naar ``<pool>/asm-sandbox/<naam>``, teruggelezen als aanwezig. De
-   robot klont zelf niets en zet nooit een snapshot terug op productie: dat staat niet op de vaste lijst.
-2. **Database-export in een proefdatabase.** De export (``pg_dump``) moet dezelfde SHA-256 hebben als vastgelegd; dan
-   herstelt ``pg_restore`` hem in een eigen proefdatabase ``hersteltest_<id>`` en telt de robot per tabel de rijen in
-   de export en in de herstelde kopie (HARDE EIS: kijkgeschiedenis en voortgang tellen mee als tabel). Daarna gaat de
-   proefdatabase altijd weg.
+   voorstel → executor) van precies die snapshot naar ``<pool>/asm-sandbox/<naam>``, teruggelezen als aanwezig. Bij de
+   toets leest de Hub de kloon en de snapshot opnieuw (alleen lezen): de snapshot heeft nog de ``createtxg`` van het
+   herstelpunt (dezelfde generatie), de kloon heeft die snapshot als ``origin`` en er is niets in geschreven
+   (``written`` 0). Een gewijzigde of onleesbare kloon is geen bewijs (R-HARDE-EIS-4). De robot klont zelf niets en zet
+   nooit een snapshot terug op productie: dat staat niet op de vaste lijst.
+2. **Database-export in een proefdatabase.** De robot zet eerst een eigen kopie van de export vast en leest daarna
+   alleen die. De kopie moet dezelfde SHA-256 hebben als vastgelegd; dan herstelt ``pg_restore`` hem in een eigen
+   proefdatabase ``hersteltest_<id>`` en vergelijkt de robot per tabel het aantal rijen en de inhoudshash van de
+   herstelde kopie met wat bij het maken van de export is vastgelegd (HARDE EIS: kijkgeschiedenis en voortgang tellen
+   mee als tabel; R-HARDE-EIS-5). Daarna gaat de proefdatabase altijd weg. Een proefdatabase draagt een eigen
+   merkteken; een achtergebleven exemplaar (processtop) ruimt de volgende toets op, nooit een andere database
+   (R-HARDE-EIS-6).
 3. **Productie onveranderd.** Een vingerafdruk van de productiedatabase vóór en na; een verschil is ``mislukt``.
 
 Positief bewijs: alleen een kloon van elke dataset, een gelijke checksum, gelijke aantallen per tabel en een
@@ -21,12 +27,15 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import math
 import re
+import shutil
 import subprocess
+import tempfile
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -36,15 +45,22 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from sqlalchemy.orm import Session
 
-from hub.actions.blokkades import DATABASE_VERPLICHT
-from hub.backup.selfbackup import EXPECTED_TABLES, sha256_file
+from hub.actions.beleid import get_policy
+from hub.actions.blokkades import DATABASE_VERPLICHT, _inventarisrij, herkenningen
+from hub.actions.doel import DoelOnbekend, lees_klonen
+from hub.backup.selfbackup import EXPECTED_TABLES, database_inhoud, sha256_file
 from hub.config import Settings
 from hub.models import ActionRequest, Herstelpunt, RestoreTest, SelfBackup
 from hub.timeutil import utcnow
+from hub.vault import Vault
 
 SANDBOX = "asm-sandbox"
 SANDBOX_NAAM_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,62}$")
 PROEF_RE = re.compile(r"^hersteltest_[0-9a-f]{12}$")
+# Merkteken (COMMENT ON DATABASE) plus de naam van de productiedatabase: alleen zo'n proefdatabase is aantoonbaar eigen.
+MERK = "ai-server-manager hersteltest-robot"
+# Elke lopende proef houdt dit slot gedeeld vast; opruimen kan alleen met het slot exclusief (er loopt dan geen proef).
+PROEF_SLOT = 0x41534D485354
 # shortcut: de vingerafdruk dekt de tabellen die alleen door een gebruiker veranderen; tabellen die de Hub zelf steeds
 # bijschrijft (audit, inventaris, metingen) zouden elke test laten mislukken. Een verkeerd gerichte pg_restore raakt
 # deze tabellen altijd mee. Versie 2: de proef op een eigen PostgreSQL-instantie, dan telt de hele database.
@@ -88,9 +104,13 @@ def _uitgevoerd(db: Session, ruw: Any, action_id: str) -> ActionRequest | None:
     return req if req is not None and req.action_id == action_id and req.status == "uitgevoerd" else None
 
 
-def controleer_klonen(db: Session, hp: Herstelpunt, kloon_ids: list[uuid.UUID]) -> Deel:
+LeesKlonen = Callable[[dict[str, str]], dict[str, dict[str, Any]]]
+
+
+def controleer_klonen(db: Session, hp: Herstelpunt, kloon_ids: list[uuid.UUID], lees: LeesKlonen) -> Deel:
     """Elke dataset van het herstelpunt heeft precies één uitgevoerde, teruggelezen kloon van zijn eigen snapshot in
-    ``<pool>/asm-sandbox/<naam>``, gemaakt na die snapshot. Koppeling alleen op ID."""
+    ``<pool>/asm-sandbox/<naam>``, gemaakt na die snapshot. Koppeling alleen op ID. Daarna ``lees`` (nu uit TrueNAS):
+    dezelfde snapshotgeneratie (``createtxg``) en een onveranderde kloon (``origin`` en ``written`` 0)."""
     snap = hp.snapshot if isinstance(hp.snapshot, dict) else {}
     maak = _uitgevoerd(db, snap.get("actie_id"), "zfs.snapshot.create")
     naam = (maak.parameters or {}).get("naam") if maak is not None else None
@@ -120,6 +140,23 @@ def controleer_klonen(db: Session, hp: Herstelpunt, kloon_ids: list[uuid.UUID]) 
         gezien[bron] = str(doel)
     if set(gezien) != verwacht:
         return Deel("onbekend", "kloon_ontbreekt", {"ontbreekt": sorted(verwacht - set(gezien))})
+    rb_maak = (maak.resultaat or {}).get("readback") if isinstance(maak.resultaat, dict) else None
+    leden = rb_maak.get("leden") if isinstance(rb_maak, dict) else None
+    try:
+        nu = lees(gezien)
+    except DoelOnbekend:
+        return Deel("onbekend", "kloon_niet_te_lezen")
+    for bron, doel in gezien.items():
+        txg = leden.get(bron.split("@", 1)[0]) if isinstance(leden, dict) else None
+        st = nu.get(doel) if isinstance(nu, dict) else None
+        if not (isinstance(st, dict) and isinstance(txg, str) and txg):
+            return Deel("onbekend", "kloon_niet_te_lezen", {"kloon": doel})
+        if st.get("createtxg") != txg:
+            return Deel("onbekend", "snapshot_andere_generatie", {"kloon": doel})
+        if st.get("origin") != bron or type(st.get("written")) is not int:
+            return Deel("onbekend", "kloon_niet_te_lezen", {"kloon": doel})
+        if st["written"] != 0:
+            return Deel("onbekend", "kloon_gewijzigd", {"kloon": doel})
     return Deel("geslaagd", None, {"klonen": dict(sorted(gezien.items()))})
 
 
@@ -135,33 +172,6 @@ def _veilig_pad(pad: Path, wortel: Path) -> bool:
             return False
         deel = deel.parent
     return pad.is_file()
-
-
-def dump_tellingen(pad: Path, pg_restore_bin: str) -> dict[str, int] | None:
-    """Rijen per tabel zoals ze in de export staan (``COPY``-blokken van ``pg_restore --data-only``), gestreamd."""
-    tellingen: dict[str, int] = {}
-    huidig: str | None = None
-    try:
-        with subprocess.Popen(
-            [pg_restore_bin, "--data-only", "--file=-", str(pad)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ) as proc:
-            assert proc.stdout is not None
-            for regel in proc.stdout:
-                if huidig is None:
-                    m = re.match(r"^COPY (\S+) .*FROM stdin;$", regel)
-                    if m:
-                        huidig = m.group(1).replace('"', "")
-                        tellingen[huidig] = 0
-                elif regel == "\\.\n":
-                    huidig = None
-                else:
-                    tellingen[huidig] += 1
-    except OSError:
-        return None
-    return tellingen if proc.returncode == 0 and huidig is None and tellingen else None
 
 
 def _tabel_tellingen(conn: psycopg.Connection[Any], tabellen: list[str]) -> dict[str, int]:
@@ -191,28 +201,82 @@ def vingerafdruk(libpq_url: str) -> str | None:
     return h.hexdigest()
 
 
+def _ruim_eigen_resten_op(conn: psycopg.Connection[Any], merk: str) -> None:
+    """Verwijder achtergebleven proefdatabases (bv. na een processtop): alleen met de eigen naamvorm, het eigen
+    merkteken en de eigen rol als eigenaar. Een andere database blijft altijd staan."""
+    rijen = conn.execute(
+        "SELECT datname FROM pg_database WHERE datdba = (SELECT oid FROM pg_roles WHERE rolname = current_user) "
+        "AND shobj_description(oid, 'pg_database') = %s",
+        (merk,),
+    ).fetchall()
+    for (naam,) in rijen:
+        if PROEF_RE.fullmatch(naam):
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(naam)))
+
+
 @contextlib.contextmanager
 def proefdatabase(libpq_url: str, naam: str | None = None) -> Iterator[str]:
-    """Een lege proefdatabase op dezelfde server; de verbindings-URL ervan. Altijd weer weg, ook bij een fout."""
+    """Een lege proefdatabase op dezelfde server; de verbindings-URL ervan. Altijd weer weg, ook bij een fout; blijft er
+    na een processtop toch een achter, dan ruimt de volgende proef hem op (alleen aantoonbaar eigen, R-HARDE-EIS-6)."""
     naam = naam or f"hersteltest_{uuid.uuid4().hex[:12]}"
     productie = conninfo_to_dict(libpq_url).get("dbname")
     if not PROEF_RE.fullmatch(naam) or naam == productie:
         raise ValueError("ongeldige naam voor een proefdatabase")
+    merk = f"{MERK}: {productie}"
     with psycopg.connect(libpq_url, autocommit=True, connect_timeout=10) as conn:
+        if conn.execute("SELECT pg_try_advisory_lock(%s)", (PROEF_SLOT,)).fetchone() == (True,):
+            try:
+                _ruim_eigen_resten_op(conn, merk)
+                conn.execute("SELECT pg_advisory_lock_shared(%s)", (PROEF_SLOT,))
+            finally:
+                conn.execute("SELECT pg_advisory_unlock(%s)", (PROEF_SLOT,))
+        else:
+            conn.execute("SELECT pg_advisory_lock_shared(%s)", (PROEF_SLOT,))
         conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(naam)))
-    try:
-        yield make_conninfo(libpq_url, dbname=naam)
-    finally:
-        with psycopg.connect(libpq_url, autocommit=True, connect_timeout=10) as conn:
+        try:
+            conn.execute(sql.SQL("COMMENT ON DATABASE {} IS {}").format(sql.Identifier(naam), sql.Literal(merk)))
+            yield make_conninfo(libpq_url, dbname=naam)
+        finally:
             conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(naam)))
 
 
-def herstel_in(doel_url: str, pad: Path, pg_restore_bin: str) -> Deel:
-    """Zet de export terug in een (lege) doeldatabase en vergelijk de aantallen per tabel met de export."""
-    voor = dump_tellingen(pad, pg_restore_bin)
-    if voor is None:
-        return Deel("mislukt", "export_onleesbaar")
-    ontbreekt = [t for t in EXPECTED_TABLES if f"public.{t}" not in voor]
+def _geldige_inhoud(v: Any) -> bool:
+    return (
+        isinstance(v, dict)
+        and bool(v)
+        and all(
+            isinstance(t, str)
+            and isinstance(w, dict)
+            and set(w) == {"rijen", "sha256"}
+            and type(w["rijen"]) is int
+            and w["rijen"] >= 0
+            and isinstance(w["sha256"], str)
+            and re.fullmatch(r"[0-9a-f]{64}", w["sha256"]) is not None
+            for t, w in v.items()
+        )
+    )
+
+
+def _manifest_inhoud(pad: Path, verwacht_sha: Any = None) -> Any:
+    """De bij het maken vastgelegde inhoud uit het ``.json``-bestand naast de export (OSError/ValueError bij lezen)."""
+    manifest = json.loads(pad.with_name(pad.name + ".json").read_text())
+    if not isinstance(manifest, dict) or (verwacht_sha is not None and manifest.get("sha256") != verwacht_sha):
+        return None
+    ver = manifest.get("verificatie")
+    return ver.get("inhoud") if isinstance(ver, dict) else None
+
+
+def herstel_in(doel_url: str, pad: Path, pg_restore_bin: str, verwacht: Any = None) -> Deel:
+    """Zet de export terug in een (lege) doeldatabase en vergelijk per tabel aantal en inhoudshash met ``verwacht`` (bij
+    het maken van de export vastgelegd; zonder opgave uit het ``.json``-bestand ernaast)."""
+    if verwacht is None:
+        try:
+            verwacht = _manifest_inhoud(pad)
+        except (OSError, ValueError):
+            return Deel("mislukt", "export_onleesbaar")
+    if not _geldige_inhoud(verwacht):
+        return Deel("onbekend", "inhoud_onbekend")
+    ontbreekt = [t for t in EXPECTED_TABLES if f"public.{t}" not in verwacht]
     if ontbreekt:
         return Deel("mislukt", "tabellen_ontbreken", {"ontbrekend": ontbreekt})
     try:
@@ -228,35 +292,72 @@ def herstel_in(doel_url: str, pad: Path, pg_restore_bin: str) -> Deel:
     if proc.returncode != 0:
         return Deel("mislukt", "herstel_mislukt")  # stderr niet doorgeven: kan inhoud uit de export bevatten
     with psycopg.connect(doel_url, autocommit=True, connect_timeout=10) as conn:
-        na = _tabel_tellingen(conn, sorted(voor))
-    uit = vergelijk_tellingen(voor, na)
-    uit.bewijs["tellingen"] = na if uit.resultaat == "geslaagd" else uit.bewijs.get("verschil")
+        aanwezig = {
+            f"{s}.{t}"
+            for s, t in conn.execute(
+                "SELECT schemaname, tablename FROM pg_tables "
+                "WHERE schemaname NOT IN ('pg_catalog', 'information_schema')"
+            )
+        }
+        if not set(verwacht) <= aanwezig:
+            return Deel("mislukt", "tabellen_ontbreken", {"ontbrekend": sorted(set(verwacht) - aanwezig)})
+        na = _tabel_tellingen(conn, sorted(verwacht))
+    uit = vergelijk_tellingen({t: w["rijen"] for t, w in verwacht.items()}, na)
+    if uit.resultaat != "geslaagd":
+        uit.bewijs["tellingen"] = uit.bewijs.get("verschil")
+        return uit
+    # pg_dump naast pg_restore (zelfde installatie): dezelfde tekstvorm als bij het maken van de export.
+    herstelde = database_inhoud(doel_url, str(Path(pg_restore_bin).with_name("pg_dump")))
+    if herstelde is None:
+        return Deel("mislukt", "herstel_onleesbaar")
+    anders = sorted(t for t in set(verwacht) | set(herstelde) if verwacht.get(t) != herstelde.get(t))
+    if anders:
+        return Deel("mislukt", "inhoud_wijkt_af", {"tabellen": anders})
+    uit.bewijs["tellingen"] = na
     return uit
 
 
-def toets_dumpbestand(settings: Settings, pad: Path, wortel: Path, verwacht_sha: Any) -> Deel:
-    """Checksum, herstel in een proefdatabase en tellingen voor één exportbestand (eigen export of extern gedownload,
-    EX13). Het pad mag niet via een symbolische koppeling buiten ``wortel`` uitkomen."""
+def toets_dumpbestand(
+    settings: Settings, pad: Path, wortel: Path, verwacht_sha: Any, verwacht_inhoud: Any = None
+) -> Deel:
+    """Checksum, herstel in een proefdatabase en vergelijking per tabel voor één exportbestand (eigen export of extern
+    gedownload, EX13). Het pad mag niet via een symbolische koppeling buiten ``wortel`` uitkomen. De robot leest alleen
+    een eigen, vastgezette kopie; elke leesfout is ``mislukt`` (R-HARDE-EIS-2)."""
     if not _veilig_pad(pad, wortel):
         return Deel("mislukt", "bronpad_ongeldig")
     if not (isinstance(verwacht_sha, str) and re.fullmatch(r"[0-9a-f]{64}", verwacht_sha)):
         return Deel("onbekend", "checksum_onbekend")
-    if sha256_file(pad) != verwacht_sha:
-        return Deel("mislukt", "checksum_afwijkend")
-    try:
-        with proefdatabase(settings.libpq_url) as doel:
-            uit = herstel_in(doel, pad, settings.pg_restore_bin)
-    except (psycopg.Error, ValueError):
-        return Deel("onbekend", "proefdatabase_niet_beschikbaar")
+    settings.backups_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".hersteltest-", dir=settings.backups_dir) as map_:
+        kopie = Path(map_) / pad.name
+        try:
+            shutil.copyfile(pad, kopie)
+            if verwacht_inhoud is None:
+                verwacht_inhoud = _manifest_inhoud(pad, verwacht_sha)
+            gelijk = sha256_file(kopie) == verwacht_sha
+        except (OSError, ValueError):
+            return Deel("mislukt", "export_onleesbaar")
+        if not gelijk:
+            return Deel("mislukt", "checksum_afwijkend")
+        try:
+            with proefdatabase(settings.libpq_url) as doel:
+                uit = herstel_in(doel, kopie, settings.pg_restore_bin, verwacht_inhoud or {})
+        except (psycopg.Error, ValueError):
+            return Deel("onbekend", "proefdatabase_niet_beschikbaar")
     uit.bewijs["sha256"] = verwacht_sha
     return uit
 
 
 def toets_export(db: Session, settings: Settings, hp: Herstelpunt) -> Deel:
-    """De database-export bij het herstelpunt. HARDE EIS: zonder export bij een media-app is het ``onbekend``."""
+    """De database-export bij het herstelpunt. HARDE EIS: zonder export bij een media-app is het ``onbekend``; de app
+    wordt herkend zoals de pre-update-gate dat doet (naam, catalogusapp en image; R-HARDE-EIS-1)."""
     dbx = hp.db_export if isinstance(hp.db_export, dict) else None
     if dbx is None:
         if hp.app.lower() in DATABASE_VERPLICHT:
+            return Deel("onbekend", "database_export_ontbreekt")
+        if not _inventarisrij(db, settings, hp.app):
+            return Deel("onbekend", "app_onbekend")  # zonder meting is niet te zeggen dat het geen media-app is
+        if herkenningen(db, settings, get_policy(), hp.app) & DATABASE_VERPLICHT:
             return Deel("onbekend", "database_export_ontbreekt")
         return Deel("geslaagd", None, {"database": "geen"})
     if dbx.get("bron") != "pg_dump":
@@ -269,7 +370,10 @@ def toets_export(db: Session, settings: Settings, hp: Herstelpunt) -> Deel:
         return Deel("onbekend", "export_niet_beschikbaar")
     if row.sha256 != dbx.get("sha256"):
         return Deel("mislukt", "checksum_afwijkend")
-    return toets_dumpbestand(settings, settings.backups_dir / row.file_name, settings.backups_dir, dbx.get("sha256"))
+    inhoud = (row.verification or {}).get("inhoud") if isinstance(row.verification, dict) else None
+    return toets_dumpbestand(
+        settings, settings.backups_dir / row.file_name, settings.backups_dir, dbx.get("sha256"), inhoud or {}
+    )
 
 
 def samen(delen: list[Deel]) -> Deel:
@@ -281,14 +385,19 @@ def samen(delen: list[Deel]) -> Deel:
 
 
 def voer_uit(
-    db: Session, settings: Settings, hp: Herstelpunt, kloon_ids: list[uuid.UUID], *, door: str
+    db: Session, settings: Settings, vault: Vault, hp: Herstelpunt, kloon_ids: list[uuid.UUID], *, door: str
 ) -> dict[str, Any]:
     """De hele hersteltest voor één herstelpunt. ``mislukt`` → herstelpunt ``ongezond``; het resultaat komt als
     bewijsrecord in ``restore_test`` (alleen vaste velden, geen vrije tekst); de route legt het auditrecord vast."""
     start = time.monotonic()
     voor = vingerafdruk(settings.libpq_url)
-    kloon = controleer_klonen(db, hp, kloon_ids)
-    export = toets_export(db, settings, hp) if kloon.resultaat == "geslaagd" else Deel("onbekend", "niet_getoetst")
+    kloon = controleer_klonen(db, hp, kloon_ids, lambda k: lees_klonen(db, vault, settings, k))
+    export = Deel("onbekend", "niet_getoetst")
+    if kloon.resultaat == "geslaagd":
+        try:
+            export = toets_export(db, settings, hp)
+        except Exception:  # fail-closed: een fout bij het toetsen van een gekoppelde export is nooit een doorlaat
+            export = Deel("mislukt" if hp.db_export else "onbekend", "toets_fout")
     na = vingerafdruk(settings.libpq_url)
     if voor is None or na is None:
         productie = Deel("onbekend", "productie_niet_te_meten")

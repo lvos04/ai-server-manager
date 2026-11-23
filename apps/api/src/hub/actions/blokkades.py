@@ -102,13 +102,16 @@ def _inventarisrij(db: Session, settings: Settings, app: str) -> dict[str, Any]:
     return next((a for a in rijen or [] if isinstance(a, dict) and a.get("naam") == app), {})
 
 
-def herkenningen(db: Session, settings: Settings, policy: Policy, app: str, cls: Classification) -> set[str]:
-    """Alle namen waaronder deze app bekend is: appnaam, catalogusapp, herkenning uit de inventaris en het beleid."""
+def herkenningen(
+    db: Session, settings: Settings, policy: Policy, app: str, cls: Classification | None = None
+) -> set[str]:
+    """Alle namen waaronder deze app bekend is: appnaam, catalogusapp, herkenning uit de inventaris (naam en image)
+    en het beleid; ook de hersteltest-robot gebruikt deze herkenning (zonder classificatie, R-HARDE-EIS-1)."""
     rij = _inventarisrij(db, settings, app)
     cat = str(rij.get("catalogus_app") or "") or None
     # De gemeten catalogusnaam telt zelf mee, zodat de strengste RPO over alle namen geldt (R-HARDE-EIS-2).
     uit = {app.lower(), *([cat.lower()] if cat else []), *recognize_all(policy, app, catalogus=cat)}
-    uit |= {str(x).lower() for x in (rij.get("herkend_als"), cls.herkend_als) if x}
+    uit |= {str(x).lower() for x in (rij.get("herkend_als"), cls.herkend_als if cls else None) if x}
     return uit
 
 

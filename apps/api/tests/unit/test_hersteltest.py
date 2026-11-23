@@ -94,3 +94,56 @@ def test_rampenscenario_dekt_b12_007_zonder_terminalstap() -> None:
     assert not TERMINAL.search(rampenscenario.REGEL.replace("terminal", ""))
     mg = next(s for s in rampenscenario.SCENARIOS if s["id"] == "mediaguard_terugzetten")
     assert any("database" in t and "HARDE EIS" in t for t in mg["stappen"])
+
+
+def test_inhoudshash_per_tabel_volgorde_maakt_niet_uit_elke_waarde_wel() -> None:
+    """R-HARDE-EIS-5: aantal en hash per tabel uit de COPY-blokken; een andere waarde bij gelijk aantal is anders."""
+    from hub.backup.selfbackup import copy_inhoud
+
+    def blok(*rijen: bytes) -> list[bytes]:
+        return [b"SET x = 1;\n", b"COPY public.kijk (a, b) FROM stdin;\n", *(r + b"\n" for r in rijen), b"\\.\n"]
+
+    a = copy_inhoud(blok(b"1\t120", b"2\t345"))
+    assert a is not None and a["public.kijk"]["rijen"] == 2
+    assert copy_inhoud(blok(b"2\t345", b"1\t120")) == a
+    assert copy_inhoud(blok(b"1\t121", b"2\t345")) != a
+    assert (
+        copy_inhoud(blok(b"1\t120", b"1\t120"))["public.kijk"] != copy_inhoud(blok(b"2\t345", b"2\t345"))["public.kijk"]
+    )  # type: ignore[index]
+    assert copy_inhoud(blok(b"1\t120")[:-1]) is None  # afgebroken blok
+    assert copy_inhoud([]) is None
+
+
+@pytest.mark.parametrize(
+    "verwacht",
+    [None, {}, {"t": {"rijen": 1}}, {"t": {"rijen": True, "sha256": "a" * 64}}, {"t": {"rijen": 1, "sha256": "x"}}],
+)
+def test_zonder_geldige_vastgelegde_inhoud_geen_herstel(verwacht: object, tmp_path: Path) -> None:
+    pad = tmp_path / "x.dump"
+    uit = ht.herstel_in("postgresql://niet-gebruikt@/x", pad, "pg_restore", verwacht if verwacht is not None else {})
+    assert (uit.resultaat, uit.reden) == ("onbekend", "inhoud_onbekend")
+
+
+def test_poolverlies_bewaart_de_schijven_en_stopt_zonder_doel_en_back_up() -> None:
+    """R-HARDE-EIS-10: de oorspronkelijke schijven blijven terugval; eerst een apart doel en een bruikbare back-up met
+    de appgegevens, en stoppen als dat ontbreekt. Pas daarna een nieuwe pool, nooit op de oorspronkelijke schijven."""
+    stappen = next(s for s in rampenscenario.SCENARIOS if s["id"] == "poolverlies")["stappen"]
+
+    def eerste(*woorden: str) -> int:
+        return next(i for i, t in enumerate(stappen) if all(w in t for w in woorden))
+
+    bewaar = eerste("oorspronkelijke schijven", "onaangeroerd")
+    doel, backup = eerste("apart doel"), eerste("back-up met de appgegevens")
+    stop, nieuw = eerste("STOP", "ontbreekt"), eerste("nieuwe pool aan")
+    assert bewaar < doel < backup < stop < nieuw
+    assert "aparte doel" in stappen[nieuw]
+    assert not any("pool opnieuw aan" in t for t in stappen)
+
+
+def test_verhuizing_noemt_de_ondertekensleutels_en_herkoppeling() -> None:
+    """R-HARDE-EIS-7: de verhuizing bewaart naast de vault-sleutel ook de ondertekensleutels van de Hub, of koppelt
+    elke dienst gecontroleerd opnieuw; de natest eist dat bestaande diensten nieuwe berichten aanvaarden."""
+    s = next(s for s in rampenscenario.SCENARIOS if s["id"] == "verhuizing")
+    tekst = " ".join(s["stappen"])
+    assert all(n in tekst for n in rampenscenario.VERHUIS_GEHEIMEN) and "opnieuw met een nieuwe koppelcode" in tekst
+    assert any("aanvaardt een nieuw ondertekend bericht" in t for t in s["natest"])

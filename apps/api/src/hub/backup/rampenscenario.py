@@ -10,6 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from hub.firststart import ED25519_KEYS, VAULT_KEY
+
+# Verhuizing (R-HARDE-EIS-7): naast de export gaan precies deze bestanden uit de geheimenmap van de Hub mee, apart en
+# beveiligd bewaard. Zonder de ondertekensleutels weigeren gekoppelde diensten de berichten van de nieuwe Hub.
+VERHUIS_GEHEIMEN = (VAULT_KEY, *ED25519_KEYS)
+
 REGEL = (
     "Herstel loopt alleen via de Hub en de TrueNAS-web-UI, nooit via een terminal op de NAS. Kijkgeschiedenis, "
     "hervatpunten en MediaGuard-voortgang gaan alleen terug samen met hun database, via de eigenaar, en tellen pas als "
@@ -31,11 +37,21 @@ SCENARIOS: list[dict[str, Any]] = [
         "wanneer": "TrueNAS meldt de pool als FAULTED of hij is weg; de Hub toont de poolgate dicht.",
         "stappen": [
             NOODSTOP,
-            "Vervang of herstel de schijven via de TrueNAS-web-UI (Storage) en maak de pool opnieuw aan.",
+            "Laat de oorspronkelijke schijven van de pool onaangeroerd als terugval: niet wissen, niet opnieuw "
+            "gebruiken en geen nieuwe pool erop aanmaken. Haal ze er alleen uit en bewaar ze apart.",
+            "Bevestig eerst een apart doel: nieuwe schijven (TrueNAS-web-UI, Storage → Disks) met genoeg ruimte, los "
+            "van de oorspronkelijke.",
+            "Bevestig daarna een bruikbare back-up met de appgegevens: in de TrueNAS-web-UI (Data Protection → Cloud "
+            "Sync Tasks) staat een geslaagde externe back-up van de appdata én van de Hub-export (met .sha256 en "
+            ".json), van na de laatste wijziging die je wilt houden.",
+            "STOP als een van beide ontbreekt of twijfelachtig is: doe dan niets meer aan de pool en de schijven en "
+            "vraag hulp. Een nieuwe pool zonder bevestigde back-up kan de laatste kopie kosten.",
+            "Maak pas daarna op het aparte doel een nieuwe pool aan (TrueNAS-web-UI, Storage).",
             "Zet de externe back-up terug via de TrueNAS-web-UI (Data Protection → Cloud Sync Tasks, richting PULL "
             "naar een nieuwe dataset), nooit over een bestaande dataset heen.",
             "Installeer de Hub en de executor opnieuw als Custom App (zie CUSTOM_APP.md) met de teruggezette datamap.",
-            "Laat de hersteltest-robot per app een herstelpunt toetsen vóórdat een app weer wordt bijgewerkt.",
+            "Laat de hersteltest-robot per app een herstelpunt toetsen vóórdat een app weer wordt bijgewerkt. Pas als "
+            "alles weer werkt, mogen de oorspronkelijke schijven een andere bestemming krijgen.",
         ],
         "natest": _NATEST_HUB,
     },
@@ -91,16 +107,26 @@ SCENARIOS: list[dict[str, Any]] = [
         "titel": "Verhuizen naar andere hardware",
         "wanneer": "De NAS wordt vervangen of de Hub moet op een andere machine verder.",
         "stappen": [
-            "Maak in de Hub een verse eigen export (Hub-API POST /api/v1/backups/self) en bewaar de export, de "
-            "herstelbestanden (.sha256 en .json) en de vault-sleutel apart van de NAS.",
-            "Installeer op de nieuwe machine de Hub als Custom App (zie CUSTOM_APP.md). Een knop om in de nieuwe Hub "
-            "een export als database te gebruiken is er in deze versie nog niet (capability_unavailable); de "
-            "oefening hiervan loopt alleen op de teststack. Gebruik tot dan de oude installatie als terugval.",
+            "Maak in de Hub een verse eigen export (Hub-API POST /api/v1/backups/self) en bewaar de export en de "
+            "herstelbestanden (.sha256 en .json) apart van de NAS.",
+            "Bewaar ook de geheimenbestanden van de Hub apart en beveiligd (versleutelde opslag, niet op de NAS, niet "
+            "in de export): " + ", ".join(VERHUIS_GEHEIMEN) + ". De vault-sleutel opent de geheimen; de drie "
+            "ondertekensleutels zijn de identiteit van de Hub die elke gekoppelde dienst heeft vastgepind.",
+            "Installeer op de nieuwe machine de Hub als Custom App (zie CUSTOM_APP.md) en zet vóór de eerste start "
+            "precies die bestanden terug in de geheimenmap van de nieuwe Hub; de Hub zet de rechten zelf strak. Een "
+            "knop om in de nieuwe Hub een export als database te gebruiken is er in deze versie nog niet "
+            "(capability_unavailable); de oefening hiervan loopt alleen op de teststack. Gebruik tot dan de oude "
+            "installatie als terugval.",
+            "Ontbreken de ondertekensleutels, dan weigeren gekoppelde diensten de nieuwe Hub (unknown_key): koppel "
+            "dan elke dienst gecontroleerd opnieuw met een nieuwe koppelcode in de Hub, één voor één, en controleer "
+            "per dienst de natest. Gebruik nooit nieuwe sleutels onder de oude naam.",
             "Koppel de executor opnieuw met een nieuwe koppelcode en stel de TrueNAS-sleutel opnieuw in.",
         ],
         "natest": [
             "De teruggezette export heeft dezelfde checksum als in het .sha256-bestand.",
             "De vault opent de opgeslagen geheimen; de TrueNAS- en executorkoppeling staan er weer.",
+            "Elke gekoppelde dienst aanvaardt een nieuw ondertekend bericht van de nieuwe Hub (geen unknown_key bij "
+            "die dienst).",
         ],
     },
 ]

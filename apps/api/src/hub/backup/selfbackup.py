@@ -3,7 +3,9 @@
 Een back-up krijgt pas status ``geslaagd`` als **alle** controles slagen — nooit op alleen een exitcode:
 1. ``pg_dump -Fc`` eindigt met 0 en schreef een niet-leeg bestand met de ``PGDMP``-header;
 2. ``pg_restore --list`` kan de inhoudsopgave lezen en die bevat de verwachte tabellen (incl. data);
-3. de SHA-256 is na het hernoemen opnieuw berekend en gelijk.
+3. de SHA-256 is na het hernoemen opnieuw berekend en gelijk;
+   daarbij leggen we per tabel het aantal rijen en een inhoudshash vast (``inhoud``), waarmee de hersteltest-robot de
+   herstelde waarden vergelijkt (R-HARDE-EIS-5);
 4. na de retentie zijn dezelfde export, inhoudsopgave, controlesom en herstelgegevens opnieuw gecontroleerd.
 Automatische retentie geldt alleen voor gewone exports. Elke pre-upgrade-export behoudt ook zijn eigen
 ``.hold`` voor eerdere Hub-versies.
@@ -22,6 +24,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -55,6 +58,55 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _pg_env() -> dict[str, str]:
+    """Vaste tijdzone voor pg_dump: de tekstvorm van timestamptz in de export en in de vergelijking is dan gelijk."""
+    return {**os.environ, "PGTZ": "UTC"}
+
+
+_COPY_RE = re.compile(rb"^COPY (\S+) .*FROM stdin;$")
+
+
+def copy_inhoud(regels: Iterable[bytes]) -> dict[str, dict[str, Any]] | None:
+    """Per tabel het aantal rijen en een inhoudshash uit de ``COPY``-blokken van een pg_dump-tekst. De hash is de som
+    (mod 2**256) van de SHA-256 per rij: onafhankelijk van de volgorde, gevoelig voor elke gewijzigde waarde."""
+    uit: dict[str, dict[str, Any]] = {}
+    huidig: str | None = None
+    som = 0
+    for regel in regels:
+        if huidig is None:
+            m = _COPY_RE.match(regel.rstrip(b"\n"))
+            if m:
+                huidig, som = m.group(1).decode().replace('"', ""), 0
+                uit[huidig] = {"rijen": 0, "sha256": ""}
+        elif regel == b"\\.\n":
+            uit[huidig]["sha256"] = f"{som:064x}"
+            huidig = None
+        else:
+            uit[huidig]["rijen"] += 1
+            som = (som + int.from_bytes(hashlib.sha256(regel.rstrip(b"\n")).digest())) % 2**256
+    return uit if huidig is None and uit else None
+
+
+def _stroom_inhoud(argv: list[str]) -> dict[str, dict[str, Any]] | None:
+    try:
+        with subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=_pg_env()) as proc:
+            assert proc.stdout is not None
+            uit = copy_inhoud(proc.stdout)
+    except OSError:
+        return None
+    return uit if proc.returncode == 0 else None
+
+
+def dump_inhoud(path: Path, pg_restore_bin: str) -> dict[str, dict[str, Any]] | None:
+    """Rijen en inhoudshash per tabel zoals ze in de export staan (gestreamd)."""
+    return _stroom_inhoud([pg_restore_bin, "--data-only", "--file=-", str(path)])
+
+
+def database_inhoud(libpq_url: str, pg_dump_bin: str) -> dict[str, dict[str, Any]] | None:
+    """Rijen en inhoudshash per tabel van een (herstelde) database, met dezelfde pg_dump-tekstvorm als de export."""
+    return _stroom_inhoud([pg_dump_bin, "--data-only", "--format=plain", f"--dbname={libpq_url}"])
 
 
 def _tool_version(binary: str) -> str | None:
@@ -158,6 +210,7 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
             text=True,
             timeout=1800,
             check=False,
+            env=_pg_env(),
             umask=0o077,  # V-085: de dump is 0600 vanaf aanmaak, ongeacht de umask van het proces
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -170,6 +223,9 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
     ver = verify_dump(partial, settings.pg_restore_bin)
     if not ver.ok:
         return fail(ver.reason_code or "verify_failed", ver.message, ver.details)
+    inhoud = dump_inhoud(partial, settings.pg_restore_bin)
+    if inhoud is None:
+        return fail("restore_list_failed", "pg_restore kan de gegevens van de export niet lezen.")
     digest = sha256_file(partial)
     os.replace(partial, final)
     if sha256_file(final) != digest:
@@ -184,7 +240,11 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
         "pg_dump": row.tool_version,
         "gemaakt_op": iso(utcnow()),
         "aanleiding": trigger,
-        "verificatie": {"pg_restore_list_entries": ver.details.get("entries"), "tabellen": list(EXPECTED_TABLES)},
+        "verificatie": {
+            "pg_restore_list_entries": ver.details.get("entries"),
+            "tabellen": list(EXPECTED_TABLES),
+            "inhoud": inhoud,
+        },
     }
     manifest_file = backups / (name + ".json")
     manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
@@ -197,7 +257,12 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
     )
     row.file_name, row.size_bytes, row.sha256 = name, final.stat().st_size, digest
     row.toc_entries = int(ver.details.get("entries") or 0)
-    row.verification = {"pg_restore_list": "ok", "entries": ver.details.get("entries"), "sha256_herberekend": True}
+    row.verification = {
+        "pg_restore_list": "ok",
+        "entries": ver.details.get("entries"),
+        "sha256_herberekend": True,
+        "inhoud": inhoud,
+    }
     try:
         apply_retention(db, settings, keep_id=None if trigger == "pre-upgrade" else row.id)
         verification = reverify(db, settings, row)

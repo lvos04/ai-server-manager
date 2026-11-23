@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
@@ -17,13 +17,14 @@ from hub.backup import coverage as cov
 from hub.backup import hersteltest, rampenscenario
 from hub.backup.selfbackup import latest_verified, reverify, to_dict
 from hub.config import Settings
-from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer
+from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer, get_vault
 from hub.errors import HubError
 from hub.inventory.store import kind_state
 from hub.jobs import job_dict
 from hub.models import Decision, Herstelpunt, Job, RestoreTest, SelfBackup, Service
 from hub.timeutil import iso, utcnow
 from hub.truenas.connection import current_target
+from hub.vault import Vault
 
 router = APIRouter(prefix="/api/v1/backups", tags=["back-up en herstel"])
 
@@ -161,14 +162,20 @@ class HersteltestIn(BaseModel):
     summary="Hersteltest-robot (B12-005): kloon in de zandbak, export in een proefdatabase, productie onveranderd",
 )
 def run_hersteltest(
-    herstelpunt_id: uuid.UUID, body: HersteltestIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem
+    herstelpunt_id: uuid.UUID,
+    body: HersteltestIn,
+    db: DB,
+    settings: SettingsDep,
+    vault: Annotated[Vault, Depends(get_vault)],
+    principal: Admin,
+    idem: Idem,
 ) -> JSONResponse:
     if (replay := idem.replay()) is not None:
         return replay
     hp = db.get(Herstelpunt, herstelpunt_id)
     if hp is None:
         raise HubError(404, "not_found", "Herstelpunt niet gevonden.")
-    uit = hersteltest.voer_uit(db, settings, hp, body.klonen, door=principal.name)
+    uit = hersteltest.voer_uit(db, settings, vault, hp, body.klonen, door=principal.name)
     audit.record(
         db,
         actor_type="user",

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -70,15 +70,52 @@ def _dataset_exists(tree: Any, name: str) -> bool:
     return False
 
 
-async def _snapshots(client: TrueNASClient, dataset: str) -> list[str]:
+async def _snapshot_rijen(client: TrueNASClient, dataset: str) -> list[dict[str, Any]]:
     got = await client.call("core.get_methods")
     methods = {str(m) for m in got} if isinstance(got, dict | list) else set()
     method = next((m for m in ("pool.snapshot.query", "zfs.snapshot.query") if m in methods), None)
     if method is None:
         raise DoelOnbekend("capability_unavailable", "deze TrueNAS-versie kent geen leesmethode voor snapshots")
     rows = await client.call(method, [[["dataset", "=", dataset]]])
-    names = [str(r.get("name")) for r in rows or [] if isinstance(r, dict)]
-    return sorted(n for n in names if n.split("@", 1)[0] == dataset)
+    return [r for r in rows or [] if isinstance(r, dict) and str(r.get("name")).split("@", 1)[0] == dataset]
+
+
+async def _snapshots(client: TrueNASClient, dataset: str) -> list[str]:
+    return sorted(str(r.get("name")) for r in await _snapshot_rijen(client, dataset))
+
+
+def _eigenschap(node: Mapping[str, Any], naam: str) -> Any:
+    """ZFS-eigenschap uit ``pool.dataset.query`` (``{"parsed": ...}`` of de waarde zelf); ``None`` als die ontbreekt."""
+    v = node.get(naam)
+    return v.get("parsed") if isinstance(v, dict) else v
+
+
+def _zoek_dataset(tree: Any, name: str) -> Mapping[str, Any] | None:
+    for node in tree if isinstance(tree, list) else []:
+        if isinstance(node, dict):
+            if node.get("id") == name or node.get("name") == name:
+                return node
+            if (gevonden := _zoek_dataset(node.get("children"), name)) is not None:
+                return gevonden
+    return None
+
+
+async def _klonen(client: TrueNASClient, klonen: Mapping[str, str]) -> dict[str, dict[str, Any]]:
+    uit: dict[str, dict[str, Any]] = {}
+    for snapshot, doel in klonen.items():
+        tree = await client.call(
+            "pool.dataset.query", [[["id", "=", doel]], {"extra": {"properties": ["origin", "written"]}}]
+        )
+        node = _zoek_dataset(tree, doel)
+        rij = next(
+            (r for r in await _snapshot_rijen(client, snapshot.split("@", 1)[0]) if r.get("name") == snapshot), None
+        )
+        uit[doel] = {
+            "origin": _eigenschap(node, "origin") if node is not None else None,
+            "written": _eigenschap(node, "written") if node is not None else None,
+            "createtxg": str(rij.get("createtxg") or "") or None if rij is not None else None,
+        }
+    return uit
 
 
 def vorige_images(db: Session, actie: ActieDef, target: Mapping[str, Any], parameters: Mapping[str, Any]) -> list[str]:
@@ -169,6 +206,17 @@ def lees_doel(
     if actie.doel == "eigenaar":
         # Een eigenaaractie leest de Hub alleen via het voorstel van de eigenaar (service._eigenaar_voorstel).
         raise DoelOnbekend("eigenaar_via_connector", "Dit doel leest alleen de eigenaar-connector.")
+    na_actie = vorige_images(db, actie, target, parameters)
+    return _op_nas(db, vault, settings, lambda client: _lees(client, policy, actie, target, parameters, na_actie))
+
+
+def lees_klonen(db: Session, vault: Vault, settings: Settings, klonen: Mapping[str, str]) -> dict[str, dict[str, Any]]:
+    """Per kloon (snapshot → zandbakdataset) nu uit TrueNAS: ``origin`` en ``written`` van de kloon en de ``createtxg``
+    van de snapshot (hersteltest-robot, R-HARDE-EIS-4). Ontbreekt een waarde, dan ``None``: nooit een aanname."""
+    return _op_nas(db, vault, settings, lambda client: _klonen(client, klonen))
+
+
+def _op_nas[T](db: Session, vault: Vault, settings: Settings, werk: Callable[[TrueNASClient], Awaitable[T]]) -> T:
     nas = current_target(db)
     if nas is None:
         raise DoelOnbekend("not_configured", "Besluit D03 (NAS-adres) is nog niet ingevuld.")
@@ -176,9 +224,8 @@ def lees_doel(
     if not api_key:
         raise DoelOnbekend("not_configured", "Er is nog geen alleen-lezen-API-key ingesteld.")
     tls = tls_for(connection_row(db), nas, settings)
-    na_actie = vorige_images(db, actie, target, parameters)
 
-    async def run() -> Doel:
+    async def run() -> T:
         async with TrueNASClient(
             nas.url,
             api_key,
@@ -186,7 +233,7 @@ def lees_doel(
             connect_timeout=settings.truenas_connect_timeout,
             read_timeout=settings.truenas_read_timeout,
         ) as client:
-            return await _lees(client, policy, actie, target, parameters, na_actie)
+            return await werk(client)
 
     try:
         return asyncio.run(run())

@@ -564,6 +564,7 @@ class FakeTrueNAS:
         # inhoud (EX14). Los van ``pool.dataset.query``, zodat de API-vorm gelijk blijft.
         self.inhoud: dict[str, Any] = {}
         self.snapshot_inhoud: dict[str, Any] = {}
+        self.klonen: dict[str, str] = {}  # kloon → snapshot; ``origin`` en ``written`` zoals ZFS ze bij een kloon meldt
         self.mutations: list[str] = []
         self.paths: list[str] = []
         # Schrijven (executor): testknoppen en wat er is ontvangen.
@@ -808,6 +809,18 @@ class FakeTrueNAS:
         if method == "interface.query":
             return []
         value = self.data.get(method)
+        if method == "pool.dataset.query" and self.klonen:
+            value = copy.deepcopy(value)
+            stapel = list(value)
+            while stapel:
+                node = stapel.pop()
+                stapel.extend(node.get("children") or [])
+                snap = self.klonen.get(node["id"])
+                if snap is not None:  # written: 0 zolang de kloon gelijk is aan zijn snapshot
+                    gelijk = self.inhoud.get(node["id"]) == self.snapshot_inhoud.get(snap)
+                    node["origin"] = {"parsed": snap, "rawvalue": snap, "value": snap}
+                    node["written"] = {"parsed": 0 if gelijk else 4096, "rawvalue": "0" if gelijk else "4096"}
+            return value
         if method == "app.query" and isinstance(value, list):
             return [{k: v for k, v in a.items() if k != "config" and not k.startswith("_")} for a in value]
         return value
@@ -982,6 +995,7 @@ class FakeTrueNAS:
                 raise FakeCallError("EEXIST", "Dataset already exists")
             self.add_dataset(dst)
             self.inhoud[dst] = copy.deepcopy(self.snapshot_inhoud.get(snap))
+            self.klonen[dst] = snap
             return True
         if method in ("pool.dataset.delete", "pool.snapshottask.create"):
             raise FakeCallError("EPERM", "Niet ondersteund in de fake")

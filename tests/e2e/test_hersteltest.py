@@ -212,3 +212,88 @@ def test_kijker_en_operator_mogen_de_robot_niet_starten(stack: Stack) -> None:
         assert r.status_code == 403, r.text
         assert c.get("/api/v1/backups/rampenscenario").status_code == 200
     assert stack.admin.get("/api/v1/backups/restore-tests").json()["items"] == []
+
+
+def test_media_app_onder_een_andere_naam_zonder_export_is_onbekend(stack: Stack) -> None:
+    """R-HARDE-EIS-1: de robot herkent een app zoals de pre-update-gate (naam, catalogusapp en image). MediaGuard
+    onder de naam ``mediaguard-core`` zonder database-export is onbekend, nooit geslaagd."""
+    from hub.models import Herstelpunt
+    from hub.timeutil import utcnow
+
+    naam, bron = "mediaguard-core", "testpool/apps/mediaguard"
+    stack.nas.app("mediaguard").update(name=naam, id=naam)
+    stack.nas.add_dataset("testpool/asm-sandbox")
+    stack.vernieuw()
+    cp = _snapshot(stack, bron, "voor-update")
+    assert stel_voor(stack.admin, "app.update", app_target(naam), NIEUW).status_code == 403  # gate herkent hem
+    with stack.app.state.sessionmaker() as db:
+        hp = Herstelpunt(app=naam, checkpoint_id=cp["request_id"], gemaakt_op=utcnow(), status="geverifieerd",
+                         snapshot={"actie_id": cp["request_id"], "datasets": [bron]}, db_export=None)  # fmt: skip
+        db.add(hp)
+        db.commit()
+        punt = {"id": str(hp.id)}
+    kloon = _kloon(stack, f"{bron}@voor-update", "testpool/asm-sandbox/media")
+    assert kloon.status_code == 200, kloon.text
+    uit = _robot(stack, punt, [kloon.json()["request_id"]])
+    assert (uit["resultaat"], uit["reden"]) == ("onbekend", "database_export_ontbreekt"), uit
+
+
+def test_gewijzigde_kloon_of_andere_snapshotgeneratie_is_geen_bewijs(stack: Stack) -> None:
+    """R-HARDE-EIS-4: de robot leest kloon en snapshot opnieuw. Is er in de kloon geschreven, of is de snapshot met
+    dezelfde naam een andere (createtxg), dan is er geen positief bewijs: onbekend, status ongemoeid."""
+    hp, _ = _herstelpunt(stack)
+    doel = "testpool/asm-sandbox/proef"
+    kloon = _kloon(stack, f"{DS}@voor-update", doel).json()["request_id"]
+    assert _robot(stack, hp, [kloon])["resultaat"] == "geslaagd"
+
+    stack.nas.inhoud[doel] = {"config": "gewijzigd in de proefkopie"}
+    uit = _robot(stack, hp, [kloon])
+    assert (uit["resultaat"], uit["reden"]) == ("onbekend", "kloon_gewijzigd"), uit
+    stack.nas.inhoud[doel] = {"config": "oud"}
+    assert _robot(stack, hp, [kloon])["resultaat"] == "geslaagd"
+
+    [rij] = stack.nas.data["snapshots"][DS]
+    rij["createtxg"] = str(int(rij["createtxg"]) + 100)  # zelfde naam, opnieuw gemaakt: andere generatie
+    uit = _robot(stack, hp, [kloon])
+    assert (uit["resultaat"], uit["reden"]) == ("onbekend", "snapshot_andere_generatie"), uit
+    assert _status(stack) == ("geverifieerd", None)
+
+
+def test_onleesbare_export_maakt_ongezond_en_houdt_de_update_tegen(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch, settings: Any
+) -> None:
+    """R-HARDE-EIS-2: een gekoppelde export die bestaat maar niet te lezen is: mislukt, herstelpunt ongezond, en de
+    goedkeuring blijft 409, ook bij een tweede beoordeling nadat het bestand weer leesbaar is."""
+    _met_export(stack, monkeypatch)
+    hp, upd = _herstelpunt(stack)
+    kloon = _kloon(stack, f"{DS}@voor-update", "testpool/asm-sandbox/proef").json()["request_id"]
+    dump = next(settings.backups_dir.glob("hub-*.dump"))
+    dump.chmod(0)
+    try:
+        if os.access(dump, os.R_OK):
+            pytest.skip("draait met rechten die elk bestand kunnen lezen")
+        uit = _robot(stack, hp, [kloon])
+    finally:
+        dump.chmod(0o600)
+    assert (uit["resultaat"], uit["reden"], uit["status_herstelpunt"]) == ("mislukt", "export_onleesbaar", "ongezond")
+    for _ in range(2):  # herbeoordeling zet 'ongezond' niet terug
+        r = keur_goed(stack.admin, haal(stack.admin, upd))
+        assert r.status_code == 409 and r.json()["code"] == "actie_geblokkeerd", r.text
+    assert _status(stack) == ("ongezond", "export_onleesbaar")
+
+
+def test_onverwachte_fout_bij_een_gekoppelde_export_is_mislukt(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
+    """R-HARDE-EIS-2: ook een onvoorziene fout bij het toetsen van een gekoppelde export geeft geen HTTP 500 die het
+    afkeuren overslaat, maar mislukt en ongezond."""
+    from hub.backup import hersteltest as ht
+
+    _met_export(stack, monkeypatch)
+    hp, _ = _herstelpunt(stack)
+    kloon = _kloon(stack, f"{DS}@voor-update", "testpool/asm-sandbox/proef").json()["request_id"]
+
+    def kapot(*_: Any) -> Any:
+        raise RuntimeError("onverwacht")
+
+    monkeypatch.setattr(ht, "toets_export", kapot)
+    uit = _robot(stack, hp, [kloon])
+    assert (uit["resultaat"], uit["reden"], uit["status_herstelpunt"]) == ("mislukt", "toets_fout", "ongezond")
