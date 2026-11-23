@@ -4,7 +4,7 @@ import hashlib
 import json
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from ipaddress import IPv4Address
 from typing import Any
 from unittest.mock import Mock
@@ -1058,6 +1058,38 @@ def test_my_house_wist_metingen_en_behoudt_bevestigingen(
 
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+@pytest.mark.parametrize(
+    ("microseconde", "verwacht"),
+    [
+        (0, "2026-01-02T03:04:05.000Z"),
+        (999, "2026-01-02T03:04:05.000Z"),
+        (123_999, "2026-01-02T03:04:05.123Z"),
+    ],
+)
+def test_my_house_meettijd_heeft_vaste_milliseconden_bij_herhaling(
+    admin: TestClient,
+    doel: dict[str, Any],
+    huis_simulatie: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    microseconde: int,
+    verwacht: str,
+) -> None:
+    code, _, _ = huis_simulatie
+    pad = maak_koppeling(admin, doel, code) + "/test"
+    klok = datetime(2026, 1, 2, 3, 4, 5, microseconde, tzinfo=UTC)
+    monkeypatch.setattr(my_house, "utcnow", lambda: klok)
+    sleutel = idem()
+
+    eerste = admin.post(pad, headers=sleutel)
+    eerste.raise_for_status()
+    assert eerste.json()["my_house"]["observed_at"] == verwacht
+    herhaling = admin.post(pad, headers=sleutel)
+    herhaling.raise_for_status()
+    assert herhaling.headers["Idempotent-Replay"] == "true"
+    assert herhaling.json()["my_house"]["observed_at"] == verwacht
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
 def test_my_house_upgrade_wist_oude_herhalingen_en_status_zonder_meettijd(
     admin: Any, app: Any, doel: dict[str, Any], huis_simulatie: Any, settings: Settings
 ) -> None:
@@ -1119,7 +1151,7 @@ def test_my_house_bronmeettijd_bepaalt_gezondheid_en_herhaling(
         assert detail["verbinding"]["status"] == "healthy"
         health = detail["gezondheid"]
         assert (health["status"], health["reason_code"]) == ("unknown", "meting_verouderd")
-        assert health["observed_at"] == gemeten.isoformat().replace("+00:00", "Z")
+        assert health["observed_at"] == gemeten.isoformat(timespec="milliseconds").replace("+00:00", "Z")
         assert admin.get(ROUTE).json()["items"][0]["gezondheid"] == health
         admin.post(f"{path}/test", headers=idem()).raise_for_status()
     toestand["extra_checks"] = [

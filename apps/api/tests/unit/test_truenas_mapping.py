@@ -158,7 +158,7 @@ def test_cloudsync_zonder_credentials_en_onedrive_detectie() -> None:
     assert out[0]["is_onedrive"] is True and out[1]["is_onedrive"] is False and out[1]["provider"] == "S3"
     text = str(out)
     assert "S3CRET" not in text and "T0KEN" not in text and "abcdefghijklmnop" not in text
-    assert out[0]["laatste_job"]["beeindigd"] == "2023-11-14T22:13:20Z"
+    assert out[0]["laatste_job"]["beeindigd"] == "2023-11-14T22:13:20.000Z"
 
 
 def test_gpu_identiteit_is_pci_slot() -> None:
@@ -175,11 +175,11 @@ def test_gpu_identiteit_is_pci_slot() -> None:
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        ({"$date": 1700000000000}, "2023-11-14T22:13:20Z"),
-        (1700000000, "2023-11-14T22:13:20Z"),
-        ("1700000000", "2023-11-14T22:13:20Z"),
-        ("2023-11-14T22:13:20Z", "2023-11-14T22:13:20Z"),
-        ({"parsed": {"$date": 1700000000000}}, "2023-11-14T22:13:20Z"),
+        ({"$date": 1700000000000}, "2023-11-14T22:13:20.000Z"),
+        (1700000000, "2023-11-14T22:13:20.000Z"),
+        ("1700000000", "2023-11-14T22:13:20.000Z"),
+        ("2023-11-14T22:13:20Z", "2023-11-14T22:13:20.000Z"),
+        ({"parsed": {"$date": 1700000000000}}, "2023-11-14T22:13:20.000Z"),
         (None, None),
         ("onzin", None),
         (True, None),

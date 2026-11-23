@@ -221,13 +221,17 @@ def test_samenstelling_adapterprofiel(buitenstatus: str | None, adapterstatus: s
         comps.append(C("buitenkant", buitenstatus, age_s=20))
     assert _ev(comps, vereist=True, bron="adapter_p3")["status"] == verwacht
     if verwacht == "healthy":
-        assert _ev(comps, vereist=True, bron="adapter_p3")["observed_at"] == "2026-11-09T11:59:30Z"
+        assert _ev(comps, vereist=True, bron="adapter_p3")["observed_at"] == "2026-11-09T11:59:30.000Z"
 
 
 def test_onbekende_adapter_wint_van_andere_binnenkant_en_behoudt_meettijd() -> None:
     adapter = Component("binnenkant", "adapter_p3", "unknown", "meting_verouderd", NOW - timedelta(seconds=901))
     r = _ev([C("truenas", "healthy"), C("binnenkant", "healthy"), adapter], vereist=True, bron="adapter_p3")
-    assert (r["status"], r["reason_code"], r["observed_at"]) == ("unknown", "meting_verouderd", "2026-11-09T11:44:59Z")
+    assert (r["status"], r["reason_code"], r["observed_at"]) == (
+        "unknown",
+        "meting_verouderd",
+        "2026-11-09T11:44:59.000Z",
+    )
 
 
 def test_gewijzigde_serveridentiteit_blokkeert_toeschrijving_van_crash() -> None:
@@ -244,7 +248,7 @@ def test_adapter_zonder_meettijd_behoudt_bij_offline_inventaris_de_laatst_bekend
     assert (r["status"], r["reason_code"], r["observed_at"]) == (
         "unknown",
         "adapter_niet_gekoppeld",
-        "2026-11-09T11:45:00Z",
+        "2026-11-09T11:45:00.000Z",
     )
     assert r["componenten"][1]["observed_at"] is None
 

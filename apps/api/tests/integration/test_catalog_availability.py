@@ -348,7 +348,7 @@ def test_meting_versheid_en_geen_bronaanroepen_per_leesverzoek(
     worker_once(schedule=True)
     calls = list(fake_nas.calls)
     meting = read()
-    assert meting == {**PIN, "beschikbaar": "ja", "gemeten_op": "2026-11-18T15:00:00Z"}
+    assert meting == {**PIN, "beschikbaar": "ja", "gemeten_op": "2026-11-18T15:00:00.000Z"}
     assert read(version="1.4.7")["beschikbaar"] == "nee"
     assert read(version="1.4.6")["beschikbaar"] == "ja"
     assert read(train="community") == {
