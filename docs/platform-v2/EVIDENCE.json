@@ -858,5 +858,35 @@
     "opmerking": "Hub-, beleid- en executordeel. Voorstellen door flows, AI of diensten hebben in de Hub nog geen eigen ingang (alleen gebruikerssessies); de gedeelde classificatie weigert de boiler voor elke actor. Energie lezen gebeurt niet in de Hub maar bij my_house en home-control-hub; dat deel is daar te bewijzen.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-22"
+  },
+  {
+    "id": "B01-008",
+    "status": "Bezig",
+    "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit 433dbfd (S-P2-140): apps/api/src/hub/actions/flows.py, inbox in apps/api/src/hub/routers/events.py; apps/api/tests/integration/test_flow_voorstellen.py::test_flowverzoek_wordt_voorstel_met_actor_flow_en_dezelfde_classificatie, ::test_r2_van_een_flow_wacht_op_menselijke_goedkeuring, ::test_geen_shell_en_geen_boiler_via_een_flow, ::test_onbekende_actie_geweigerd_en_in_audit, ::test_onbekende_schemaversie_is_een_zichtbare_fout, ::test_payload_buiten_de_witte_lijst_geweigerd_en_in_audit, ::test_envelope_en_payload_moeten_dezelfde_flow_noemen, ::test_entity_moet_de_flow_zijn, ::test_te_laat_afgeleverd_verzoek_wordt_geen_voorstel, ::test_schemafout_in_de_parameters_is_zichtbaar, ::test_flow_event_van_een_andere_bron_wordt_geen_voorstel; tests/e2e/test_flow_acties.py (nagebootste home-control-hub, echte executor, fake TrueNAS); 19 van de 21 integratietests rood zonder de koppeling in de inbox, groen erna",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): geen echte Node-RED aangesloten; zie STAPPEN_P6.md (S-P6-19). De proef tegen de echte home-control-hub volgt in S-P2-340.",
+    "opmerking": "Hub-deel; flow-deel in home-control-hub. De Hub bouwt geen eigen flow-editor; flow.action.requested van home-control-hub wordt een voorstel met actor flow met dezelfde classificatie, gates en goedkeuring. Uitvoeren blijft een handeling van een gebruiker. VERSIE 2: uitkomst terugmelden aan home-control-hub (action-requests/{id}/result) en het scherm Automatisering met een link naar de Node-RED-editor (UI vraagt eerst A-ONTWERP).",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
+  },
+  {
+    "id": "EX45",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit 433dbfd (S-P2-140): apps/api/tests/integration/test_flow_voorstellen.py::test_dataset_verwijderen_via_flow_geweigerd_en_in_audit (pool.dataset.delete: geweigerd, actor flow, action.proposal.refused in de audit, ook een beheerder kan het niet uitvoeren), ::test_actie_boven_de_rechten_van_een_flow_geweigerd (ai_mag_voorstellen false: ACTOR:alleen_mens), ::test_geen_shell_en_geen_boiler_via_een_flow; tests/e2e/test_flow_acties.py::test_dataset_verwijderen_via_flow_bereikt_de_executor_nooit (geen schrijfaanroep op de fake TrueNAS)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): geen echte Node-RED aangesloten; zie STAPPEN_P6.md (S-P6-19). De proef tegen de echte home-control-hub volgt in S-P2-340.",
+    "opmerking": "Hub-deel; flow-deel in home-control-hub. Action-policy weigert; flow blijft auditbaar.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
+  },
+  {
+    "id": "EX46",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "commit 433dbfd (S-P2-140): apps/api/tests/integration/test_flow_voorstellen.py::test_vijf_keer_hetzelfde_event_geeft_een_voorstel; tests/e2e/test_flow_acties.py::test_vijf_keer_afgeleverd_geeft_een_voorstel_en_een_uitvoering (vijf keer hetzelfde event plus een nieuwe aflevering met een ander event_id: één voorstel, één app.redeploy op de fake TrueNAS, een tweede uitvoering geweigerd)",
+    "blokkade": "NIET GEVALIDEERD (echte NAS): geen echte Node-RED aangesloten; zie STAPPEN_P6.md (S-P6-19). De proef tegen de echte home-control-hub volgt in S-P2-340.",
+    "opmerking": "Hub-deel; flow-deel in home-control-hub. Koppeling op ID: request_id = uuid5 van bron en action_request_id.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
   }
 ]
