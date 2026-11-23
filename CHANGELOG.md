@@ -4,6 +4,17 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Monitorplan per app (S-P2-150)
+
+- C1.3-ASM-20: `GET /api/v1/monitoring/monitorplan` (operator) geeft per app uit het register en
+  `healthcheck.monitor` van het manifest (hash door de Hub nagerekend) een plan: controle, adres en drempel. De Hub maakt
+  geen monitors aan in Uptime Kuma.
+- `POST /api/v1/monitoring/monitorplan/{app_id}/bevestiging` (alleen admin): de beheerder bevestigt een regel als
+  "handmatig bevestigd" (audit), gebonden aan de inhoud van de regel (`plan_sha256`; afwijkend → `409 plan_gewijzigd`).
+- Een app zonder bevestigde monitor is "niet bewaakt" en telt niet als gezond (`unknown`, `niet_bewaakt`); een app
+  zonder `healthcheck.monitor` krijgt de regel "ontbreekt".
+- Sim-getest met een nagebootste appstore. NIET GEVALIDEERD (echte NAS): bevestiging in de echte Uptime Kuma.
+
 ### Toegevoegd — Beleid: flows terugzetten via home-control-hub (S-P2-140b)
 
 - Nieuwe actie `automation.flows.restore` in `policy/acties.yaml` (B11-005): eigenaar-connector van home-control-hub,

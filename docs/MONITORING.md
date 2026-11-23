@@ -23,6 +23,27 @@ Statussen: UP → gezond, DOWN → down, PENDING → verminderd, MAINTENANCE →
 verse meting, dan wordt de monitor **onbekend** (nooit "nog gezond"). Weigert Kuma de key, dan worden alle monitors
 direct onbekend en meldt de Hub dat de key vervangen moet worden.
 
+## Monitorplan per app (C1.3-ASM-20, contract 1.3 §9)
+
+De Hub stelt per app een monitorplan op uit het register (NAS-adres uit D03 + de gemeten hostpoort) en
+`healthcheck.monitor` uit het manifest in de appstore: welke controle (HTTP), welk adres en welke drempel (verwachte
+status, timeout, interval). Het manifest telt alleen als de Hub de manifesthash zelf nagerekend heeft.
+
+**De Hub maakt geen monitors aan in Uptime Kuma en past Kuma niet aan.** Zo neem je een regel over:
+
+1. `GET /api/v1/monitoring/monitorplan` (operator) toont per app de stand: `ontbreekt` (geen of ongeldige
+   `healthcheck.monitor`, of geen manifest), `onvolledig` (NAS-adres of hostpoort niet eenduidig gemeten),
+   `voorgesteld` of `handmatig bevestigd`.
+2. Maak in Uptime Kuma zelf een HTTP-monitor met precies dat adres, die verwachte status, timeout en interval.
+3. Bevestig de regel: `POST /api/v1/monitoring/monitorplan/{app_id}/bevestiging` (alleen admin) met de
+   `plan_sha256` van de regel en `bevestigd: true`. De regel heet dan "handmatig bevestigd", nooit "gevalideerd door de
+   Hub"; de bevestiging staat in de audit.
+
+Verandert het adres of de drempel (bv. een andere hostpoort), dan is het een ander plan: de app is weer **niet
+bewaakt** en een bevestiging van het oude plan wordt geweigerd (`409 plan_gewijzigd`). Een app zonder handmatig
+bevestigde monitor telt nooit als gezond (`unknown`, reden `niet_bewaakt`). Bevestiging in de echte Uptime Kuma: NIET
+GEVALIDEERD (echte NAS).
+
 ## Beszel (live meetwaarden van de NAS)
 
 1. Maak in Beszel een **gebruiker met rol `readonly`** die alleen het NAS-systeem ziet (Beszel kent geen API-tokens).
