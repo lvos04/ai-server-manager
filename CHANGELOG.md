@@ -4,6 +4,25 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Samengevat — wat P3 aan de Hub toevoegt (S-P3-170)
+
+- **Bestaande apps koppelen.** Onder Instellingen → Diensten koppel je MediaGuard (kijkersleutel), MSO (alleen de
+  openbare verbindingstest, zonder sleutel) en my_house (koppelcode). De Hub bewaart een sleutel versleuteld en toont
+  daarna alleen de laatste vier tekens, de meettijd en de status. Ontkoppelen van my_house wist de opgeslagen
+  metingen.
+- **Media.** Een nieuw scherm met de cijfers van MediaGuard (wanted, mislukte jobs, AV1-encodes, incidenten), de noodstop en de
+  gezondheid van MSO. Alles is alleen-lezen: er zijn geen knoppen die iets in MediaGuard of MSO veranderen. Waar geen
+  bijwerkingsvrije bron bestaat (downloads, mediaservers) staat eerlijk "onbekend" met de reden.
+- **Huis.** Een nieuw scherm met het woningoverzicht van my_house: temperaturen, lichtstanden en sensoren met hun
+  meettijd. Verouderde metingen zijn zichtbaar verouderd; bij een weigering of storing verdwijnen oude waarden.
+- **Appcatalogus en incidenten.** De gezondheid van gekoppelde apps komt uit de adapter. Pas na herhaalde ongunstige
+  metingen ontstaat een incident.
+- **Back-upgate.** De Hub toetst de back-updekking van MediaGuard en my_house en het Emby-archief. Ontbreekt bewijs of
+  is het verouderd, dan blijft de gate dicht.
+- **Kosten** blijft in deze versie het scherm "nog niet beschikbaar" (energie en kosten volgen in versie 2).
+- Schermafdrukken van Diensten (koppelen), Media, Huis en Kosten met alleen testgegevens:
+  [`docs/screenshots/p3/`](docs/screenshots/p3/). Alles is Sim-getest; niets is gevalideerd op een echte NAS.
+
 ### Toegevoegd — Monitorplan per app (S-P2-150)
 
 - C1.3-ASM-20: `GET /api/v1/monitoring/monitorplan` (operator) geeft per app uit het register en
