@@ -66,6 +66,8 @@ catalogus, bronnen, diensten, incidenten, noodaccount, SSO) → `mobiel-360`, `m
 (elk scherm in licht én donker: axe, horizontaal scrollen, aanraakdoelen ≥ 44 px) → `afsluiting` (NAS offline met
 O-03, browser offline + service worker, rolrechten, kind, intrekken, vervalste `X-Forwarded-For`).
 Schermafbeeldingen: `docs/screenshots/p1/<project>/<scherm>-<licht|donker>.webp` (P0: `docs/screenshots/p0/`).
+`HUB_E2E_SHOTS=<map>` schrijft ze naar een andere map; P3 (Diensten, Media, Huis, Kosten en de toestanden van Media
+en koppelen via `HUB_MEDIA_SHOTS` en `HUB_KOPPELSCHERM_SHOTS`) staat in `docs/screenshots/p3/`.
 
 Tegen de alles-in-één image (zelfde suite):
 

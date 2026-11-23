@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { huisMeting } from "../tests/unit/fixtures/huis";
-import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, ready, setTheme } from "./helpers";
+import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, ready, setTheme, shot } from "./helpers";
 
 const koppelingen = "/api/v1/adapterkoppelingen";
 const overzicht = `${koppelingen}/proef/huis`;
@@ -36,7 +36,7 @@ test("een lijstweigering wist eerder gelezen woningen tot de lijst opnieuw leesb
   await expect(woning).toBeVisible();
 });
 
-test("Huis leest, markeert verouderde sensoren en herstelt met het toetsenbord", async ({ page }) => {
+test("Huis leest, markeert verouderde sensoren en herstelt met het toetsenbord", async ({ page }, info) => {
   const meting = huisMeting();
   let status = 503;
   const methodes: string[] = [];
@@ -81,6 +81,7 @@ test("Huis leest, markeert verouderde sensoren en herstelt met het toetsenbord",
   await expectNoHorizontalScroll(page, "Huis");
   await expectTouchTargets(page, "Huis");
   await expectAccessible(page, "Huis");
+  await shot(page, info, "huis-gevuld-donker");  // thema staat na de lus hierboven op donker
 
   status = 409;
   await page.reload();

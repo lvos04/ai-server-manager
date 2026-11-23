@@ -44,11 +44,11 @@ const SCREENS: Screen[] = [
   { path: "/instellingen/over", name: "instellingen-over", heading: /^Over deze Hub$/ },
   { path: "/meer", name: "meer", heading: /^Meer$/ },
   { path: "/ai", name: "ai", heading: /^AI$/ },
-  { path: "/media", name: "media", heading: /^Media$/ },
-  { path: "/huis", name: "huis", heading: /^Huis$/ },
+  { path: "/media", name: "media", heading: /^Media$/, shot: true },
+  { path: "/huis", name: "huis", heading: /^Huis$/, shot: true },
   { path: "/netwerk", name: "netwerk", heading: /^Netwerk$/ },
   { path: "/automatisering", name: "automatisering", heading: /^Automatisering$/ },
-  { path: "/kosten", name: "kosten", heading: /^Kosten$/ },
+  { path: "/kosten", name: "kosten", heading: /^Kosten$/, shot: true },
 ];
 
 test("navigatie volgens 08_UI: ondernavigatie op mobiel/tablet, zijbalk op desktop; merk TrueNAS Home Platform", async ({ page }, info) => {
