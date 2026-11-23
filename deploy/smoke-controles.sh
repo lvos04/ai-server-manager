@@ -44,3 +44,11 @@ uid_aanwezig() {
   echo "FOUT: $1: geen proces als UID $3" >&2
   return 1
 }
+
+# De hash moet uit alle drie de beleidskopieën gelezen zijn, ook bij een gecachte image-build.
+controleer_policy_hash() {
+  [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FOUT: geen geldige policy_hash in de Hub-image" >&2; return 1; }
+  [ "$1" = "$2" ] || { echo "FOUT: policy_hash van de Hub- en de executor-image verschilt" >&2; return 1; }
+  [ "$1" = "$3" ] || { echo "FOUT: policy_hash van de images verschilt van policy/ in de repo" >&2; return 1; }
+  echo "ok: policy_hash gelijk in de Hub-image, de executor-image en policy/ in de repo"
+}

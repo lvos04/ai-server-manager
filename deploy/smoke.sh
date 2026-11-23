@@ -62,10 +62,7 @@ docker cp "$REPO_DIR/policy" "$executor:/repo-policy"
 repo_hash="$(docker exec -u 568 "$executor" python -c \
   'from pathlib import Path; from asm_policy import policy_hash; print(policy_hash(Path("/repo-policy")))')"
 echo "policy_hash: hub $hub_hash, executor $exec_hash, repo $repo_hash"
-[[ "$hub_hash" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FOUT: geen geldige policy_hash in de Hub-image" >&2; exit 1; }
-test "$hub_hash" = "$exec_hash" || { echo "FOUT: policy_hash van de Hub- en de executor-image verschilt" >&2; exit 1; }
-test "$hub_hash" = "$repo_hash" || { echo "FOUT: policy_hash van de images verschilt van policy/ in de repo" >&2; exit 1; }
-echo "ok: policy_hash gelijk in de Hub-image, de executor-image en policy/ in de repo"
+controleer_policy_hash "$hub_hash" "$exec_hash" "$repo_hash" || exit 1
 expect "hub healthz" "$(rook_curl -fsS --noproxy '*' "$hub_url/healthz")" '"status":"ok"'
 expect "hub readyz" "$(rook_curl -fsS --noproxy '*' "$hub_url/readyz")" '"status":"ready"'
 expect "setup vereist" "$(rook_curl -fsS --noproxy '*' "$hub_url/api/v1/setup/status")" '"setup_vereist":true'
@@ -134,6 +131,9 @@ uid_paren() {  # uid_paren <container>: unieke "reële effectieve" UID per blijv
 v="$(uid_paren "$hub")"; echo "uid's (reëel effectief) in de Hub-container: ${v//$'\n'/ | }"
 uids_toegestaan "Hub: elk proces reëel en effectief 568 of 569" "$v" 568 569 || exit 1
 uid_aanwezig "Hub: AI-runner als aparte gebruiker 569" "$v" 569 || exit 1
+# Onderscheid een geweigerde opening als 569 van een ontbrekend bestand. De proef leest geen sleutelinhoud.
+docker exec -u 568:568 "$hub" test -s /appdata/secrets/vault.key
+docker exec -i -u 569:569 "$hub" python - < "$REPO_DIR/tests/rooktest_airunner.py"
 v="$(uid_paren "$executor")"; echo "uid's (reëel effectief) in de executor-container: ${v//$'\n'/ | }"
 uids_toegestaan "executor: elk proces reëel en effectief 568" "$v" 568 || exit 1
 # Contract 1.3 §2.2 (C1.3-ASM-01): ook CapPrm en CapAmb 0 en — bij een start als root — een lege bounding set.
@@ -167,6 +167,13 @@ for f in CapEff CapPrm CapAmb; do
   test "$v" = "0000000000000000 " || { echo "FOUT: Custom User 568: $f ≠ 0 ($v)" >&2; exit 1; }
 done
 echo "ok: executor als Custom User 568: geen capabilities, no_new_privs"
+
+# De netwerkloze executor krijgt een eigen testkoppeling. Het dienst-JWT is geldig, alleen de
+# handtekening onder het uitvoeringsverzoek ontbreekt. De gewone executor houdt zijn eigen koppelstatus.
+for bestand in executorhub.py policyhelpers.py rooktest_executor.py; do
+  docker cp "$REPO_DIR/tests/$bestand" "$executor568:/appdata/$bestand"
+done
+docker exec -u 568:568 "$executor568" python /appdata/rooktest_executor.py
 
 # Herstart zonder dataverlies: eerste beheerder via de setupcode uit de log, dan herstart en harde kill.
 CODE="$(docker logs "$hub" 2>&1 | awk '/SETUPCODE \(eenmalig/ {c=$NF} END {print c}')"

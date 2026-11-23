@@ -4,28 +4,20 @@ daarmee zijn ondertekend (contract 1.3 §4.2–§4.7), een gepinde policy-sleute
 
 from __future__ import annotations
 
-import base64
-import json
-import time
 import uuid
 from pathlib import Path
 from typing import Any
 
 from asm_policy import load_policy
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from executor.app import create_app
-from executor.config import Settings
-from executor.firststart import ensure_secrets
-from executor.hublink import HubLinkStore
 from executor.journal import Journal
 from executor.naslink import NasLinkStore
 from executor.truenas import fetch_fingerprint
+from executorhub import AUD, Hub, b64, linked_fields  # noqa: F401 — ook beschikbaar voor de bestaande executortests
 from fakes.fake_truenas import FakeTrueNAS, KeyProfile
 from fastapi.testclient import TestClient
 from policyhelpers import POLICY_DIR, approval_for, execution_request
 
-AUD = "ai-server-manager-executor"
 POLICY = load_policy(POLICY_DIR)
 READ_KEY = "readonly-test-key-0123456789"
 WRITE_KEY = "schrijf-test-key-aaaabbbbcccc"
@@ -33,90 +25,6 @@ NAS_HOST = "127.0.0.1"
 UNLINK = "/connector/v1/hub-link/unlink"
 # Toegestane Host voor formulier-POST's (§3.7 punt 4): een naam onder .local.
 BASE = "http://executor.local"
-
-
-def b64(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-
-def linked_fields(**change: Any) -> dict[str, Any]:
-    """Minimaal leesbare velden van een gekoppelde toestand (§3.5)."""
-    fields: dict[str, Any] = {
-        "state": "gekoppeld",
-        "app_id": AUD,
-        "hub_url": "http://192.0.2.5:30400",
-        "service_id": str(uuid.uuid4()),
-        "via": "koppelcode",
-        "first_linked_at": "2026-11-09T12:00:00Z",
-        "linked_at": "2026-11-09T12:00:00Z",
-        "confirmed_at": "2026-11-09T12:00:01Z",
-        "service_token": "svc_" + "a" * 43,
-        "service_token_last4": "aaaa",
-        "pins": {
-            "jwt": [],
-            "policy": [],
-            "keyset_fingerprint": "MEGG-8GFG-2E4Y-K2RQ",
-            "rotation_sequence": 0,
-        },
-    }
-    fields.update(change)
-    return fields
-
-
-class Hub:
-    """Gepinde Hub-sleutel in een gekoppelde ``hub-link.json`` en ondertekende JWT's daarmee."""
-
-    def __init__(self, data_dir: Path, **instellingen: Any) -> None:
-        raw = (serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        self.key = Ed25519PrivateKey.generate()
-        self.x = b64(self.key.public_key().public_bytes(*raw))
-        # Aparte policy-sleutel (§4.5): alleen daarmee telt de handtekening onder een ExecutionRequest.
-        self.policy_key = Ed25519PrivateKey.generate()
-        self.policy_x = b64(self.policy_key.public_key().public_bytes(*raw))
-        self.sid = str(uuid.uuid4())
-        settings = Settings(data_dir=data_dir, **instellingen)
-        ensure_secrets(settings.secrets_dir)
-        with HubLinkStore(settings.secrets_dir).update() as link:
-            link.update(
-                linked_fields(
-                    service_id=self.sid,
-                    pins={
-                        "jwt": [
-                            {
-                                "kid": "k1",
-                                "jwk": {"kty": "OKP", "crv": "Ed25519", "x": self.x},
-                            }
-                        ],
-                        "policy": [{"kid": "p1", "jwk": {"kty": "OKP", "crv": "Ed25519", "x": self.policy_x}}],
-                        "keyset_fingerprint": "MEGG-8GFG-2E4Y-K2RQ",
-                        "rotation_sequence": 0,
-                    },
-                )
-            )
-        self.settings = settings
-
-    def jwt(self, *, header: dict[str, Any] | None = None, **change: Any) -> str:
-        t = int(time.time())
-        claims: dict[str, Any] = {
-            "iss": "hub",
-            "aud": AUD,
-            "sub": "hub",
-            "token_use": "hub_service",
-            "roles": ["service"],
-            "service_id": self.sid,
-            "iat": t,
-            "nbf": t,
-            "exp": t + 60,
-            "jti": str(uuid.uuid4()),
-        }
-        claims.update(change)
-        claims = {k: v for k, v in claims.items() if v is not None}
-        head = b64(json.dumps(header or {"alg": "EdDSA", "typ": "JWT", "kid": "k1"}).encode())
-        body = b64(json.dumps(claims).encode())
-        return f"{head}.{body}.{b64(self.key.sign(f'{head}.{body}'.encode()))}"
-
-    def user_jwt(self, roles: list[str]) -> str:
-        return self.jwt(sub=str(uuid.uuid4()), token_use="user", roles=roles, service_id=None)
 
 
 def client(hub: Hub) -> TestClient:

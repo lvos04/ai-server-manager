@@ -2,7 +2,8 @@
 
 S-P3-170 herstel R-TECH-2 en -3: UID's worden exact numeriek vergeleken (5680 is niet 568), elk blijvend proces moet
 reëel én effectief een toegestane UID hebben, en een afwijkende executor-identiteit na herstart of harde stop breekt
-de rooktest af. Draait zonder Docker; de volledige rooktest draait in de CI-job ``images``.
+de rooktest af. De P2-proef wijzigt een beleidsbestand in een tijdelijke kopie en toetst dezelfde hashvergelijking
+als de images. De volledige rooktest draait in de CI-job ``images``.
 """
 
 from __future__ import annotations
@@ -92,3 +93,29 @@ def test_smoke_gebruikt_de_exacte_controles() -> None:
     assert 'uids_toegestaan "executor: elk proces reëel en effectief 568" "$v" 568 || exit 1' in tekst
     assert 'exacte_regel "healthcheck $1 na de wissel:' in tekst
     assert re.search(r"for how in restart kill; do", tekst)
+
+
+def test_policy_hash_van_beide_images_en_de_repo(tmp_path: Path) -> None:
+    from shutil import copytree
+
+    from asm_policy import load_policy
+
+    bron = REPO / "policy"
+    kopie = copytree(bron, tmp_path / "policy")
+    hub = load_policy(bron).hash
+    vergelijk = 'controleer_policy_hash "$1" "$2" "$3"'
+    assert bash(vergelijk, hub, load_policy(kopie).hash, hub).returncode == 0
+    # Alleen de ruwe bytes van de eigen kopie veranderen. Het beleid blijft leesbaar.
+    with (kopie / "acties.yaml").open("ab") as f:
+        f.write(b"\n# Afwijkende kopie voor de rooktest.\n")
+    ander = load_policy(kopie).hash
+    assert ander != hub
+    for waarden in [(hub, ander, hub), (hub, hub, ander), ("", "", "")]:
+        assert bash(vergelijk, *waarden).returncode == 1
+
+
+def test_imageproeven_zijn_aangesloten() -> None:
+    tekst = SMOKE.read_text(encoding="utf-8")
+    assert 'controleer_policy_hash "$hub_hash" "$exec_hash" "$repo_hash" || exit 1' in tekst
+    assert 'docker exec -i -u 569:569 "$hub" python - < "$REPO_DIR/tests/rooktest_airunner.py"' in tekst
+    assert 'docker exec -u 568:568 "$executor568" python /appdata/rooktest_executor.py' in tekst

@@ -69,7 +69,13 @@ image-hub:
 image-executor:
 	$(NICE) docker buildx build --load $(PROXY_ARGS) $(CA_SECRET) -f deploy/executor/Dockerfile -t ai-server-manager-executor:dev .
 
+# BuildKit herhaalt de uitvoer van een gecachte Dockerfile-laag niet. Lees beide waarden uit de gebouwde images.
 images: image-hub image-executor
+	@set -e; for image in ai-server-manager:dev ai-server-manager-executor:dev; do \
+		printf '%s ' "$$image"; \
+		docker run --rm --network none --read-only --user 568:568 --entrypoint python "$$image" \
+			-c 'from asm_policy import load_policy; print("policy_hash:", load_policy().hash)'; \
+	done
 
 smoke:
 	bash deploy/smoke.sh ai-server-manager:dev ai-server-manager-executor:dev
