@@ -378,3 +378,14 @@ vraagt ("mogen wel starten zodra de regisseur dat vastlegt in STATUS.md").
 - **Nulmeting S-P3-000:** afgevinkt op 2026-11-16. Het dossier staat lokaal op de bouwmachine en hoort niet in de repo.
 - **Contract:** blijft 1.3 tijdens P3 (V-018), met één uitzondering: de geplande contractronde van C-12. Die komt vóór
   de P3-schrijvers in appstore-en-fork. Een contractwijziging is nooit een losse stap van A-BOUW.
+
+## Besluiten van de gebruiker (2026-11-23)
+
+- **Afvinken door de gebruiker blijft staan (keuzemenu van de regisseur, stap S-P6-52).** Vraag: wat doet het
+  Excel-gereedschap (`tools/excel/update_excel.py`) met een "Gereed" of "Geslaagd" die de gebruiker zelf in de Excel
+  heeft gezet, als een volgende run voor die rij bewijs uit een `EVIDENCE.json` verwerkt? Antwoord: optie 1 "Laten
+  staan". Het gereedschap laat een handmatige "Gereed"/"Geslaagd" in de statuscel staan, meldt die rijen in zijn
+  uitvoer (lijst `handmatig_afgevinkt`) en waarschuwt als het bewijs voor zo'n rij "Geblokkeerd" of "Mislukt" meldt
+  (tegenstrijdig bewijs). Het gereedschap en geen enkele agent zet zelf ooit "Gereed" of "Geslaagd"; dat blijft alleen
+  de gebruiker. Niet gekozen: optie 2 (geen wijziging; de gebruiker vinkt pas af na de allerlaatste run) en optie 3
+  (iets anders). Geen BG-besluit; het contract (§1.1, §1.2) wordt niet geraakt.
