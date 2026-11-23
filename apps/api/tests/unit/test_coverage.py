@@ -305,3 +305,236 @@ def test_herstelpunt_telt_alleen_geverifieerd_en_binnen_rpo(
     rpo_s = None if rpo_uur is None else rpo_uur * 3600
     gemaakt = NOW - timedelta(hours=uur_oud)
     assert beoordeel_herstelpunt(namen=namen, db_export=db_export, gemaakt_op=gemaakt, rpo_s=rpo_s, now=NOW) == verwacht
+
+
+def test_bestaande_bronnen_en_ontbrekend_archief() -> None:
+    rows = compute(_inputs())["app_backups"]
+    assert set(rows) == {"mediaguard", "media-source-optimizer", "my_house", "emby_exportarchief"}
+    assert all(r["status"] == "unknown" for r in rows.values())
+    assert rows["emby_exportarchief"]["reden"] == "nog niet gemaakt (overname, P4-0)"
+    assert rows["emby_exportarchief"]["plaats"] is None
+    assert "leesrecht" in rows["media-source-optimizer"]["reden"]
+
+
+@pytest.mark.parametrize(
+    ("wijziging", "verwacht"),
+    [
+        ("geen", "gedekt"),
+        ("oude back-up", "degraded"),
+        ("ontbrekende fork", "degraded"),
+        ("fork niet geverifieerd", "degraded"),
+        ("dubbele fork-ID", "unknown"),
+        ("verkeerd type", "unknown"),
+        ("tijd zonder Z", "unknown"),
+        ("te oude pagina", "unknown"),
+        ("geen sleutelmatch", "degraded"),
+        ("ongeldige checksum", "unknown"),
+        ("deel in toekomst", "unknown"),
+        ("uitval", "unknown"),
+    ],
+)
+def test_herstelrapport_per_onderdeel(wijziging: str, verwacht: str) -> None:
+    from backupfixtures import herstelpagina
+
+    from hub.backup.appdekking import AppBronnen, herstelrapport
+
+    body = herstelpagina(NOW, 49 if wijziging == "oude back-up" else 0.5)
+    report = body["items"][0]
+    if wijziging == "ontbrekende fork":
+        report["forks"].pop()
+    if wijziging == "fork niet geverifieerd":
+        report["forks"][0]["verified"] = False
+    if wijziging == "dubbele fork-ID":
+        report["forks"].append(report["forks"][0])
+    if wijziging == "verkeerd type":
+        report["core"]["verified"] = "true"
+    if wijziging == "tijd zonder Z":
+        report["encoder"]["created_at"] = NOW.isoformat()
+    if wijziging == "te oude pagina":
+        body["observed_at"] = iso(NOW - timedelta(seconds=901))
+    if wijziging == "geen sleutelmatch":
+        report["bundle"]["key_match"] = False
+    if wijziging == "ongeldige checksum":
+        report["core"]["sha256"] = "ongeldig"
+    if wijziging == "deel in toekomst":
+        report["forks"][0]["created_at"] = iso(NOW + timedelta(seconds=2))
+    if wijziging == "uitval":
+        body.update(status="unknown", items=[], total=None, reason_code="vrije bronmelding")
+    report["vrije_tekst"] = "privébronveld"
+    bron = AppBronnen(metingen={"mediaguard": herstelrapport(body, NOW, 900)})
+    rij = compute(_inputs(app_bronnen=bron))["app_backups"]["mediaguard"]
+    assert rij["status"] == verwacht
+    assert "privébronveld" not in str(rij) and "vrije bronmelding" not in str(rij)
+    if "fork" in wijziging and verwacht == "degraded":
+        assert "fork" in rij["reden"].lower()
+
+
+def test_p2_groen_zonder_appmetingen_sluit_gate_en_actie() -> None:
+    from asm_policy import load_policy
+
+    from hub.actions.blokkades import uit_gates
+    from hub.onboarding.gates import GateInputs, evaluate
+
+    inp = GateInputs(
+        decisions=dict.fromkeys(("D04", "D05", "D16", "D06"), ("Getest", None)),
+        pools_state=ok([{"naam": "test", "gezond": True, "status": "ONLINE"}]),
+        eigen_backup={"finished_at": NOW},
+        eigen_backup_max_age_seconds=3600,
+        extern_backup={"status": "ok"},
+        executor_gekoppeld=True,
+        now=NOW,
+    )
+    result = evaluate(inp)
+    gate = next(g for g in result if g["id"] == "backup_gate")
+    assert gate["toegestaan"] is False
+    assert {"mediaguard", "emby_exportarchief", "media-source-optimizer", "my_house"} == {
+        r["id"] for r in gate["redenen"]
+    }
+    assert [b["code"] for b in uit_gates(load_policy(), result, ["data_mutatie"])] == ["backup_gate_rood"]
+
+
+def test_exportarchief_bewijst_leeftijd_en_zelfstandige_kopie(tmp_path: Any) -> None:
+    import hashlib
+    import json
+    import shutil
+
+    from hub.backup.appdekking import AppBronnen
+    from hub.backup.emby_archief import lees_archief
+
+    bron, kopie = tmp_path / "overname", tmp_path / "backups"
+    bron.mkdir()
+    kopie.mkdir()
+
+    def rij() -> dict[str, Any]:
+        meting = lees_archief(bron, kopie, NOW)
+        return AppBronnen(metingen={"emby_exportarchief": meting}, rpo_uren={"emby": 24}).item(
+            "emby_exportarchief", NOW
+        )
+
+    assert rij()["status"] == "unknown" and rij()["aanwezig"] is False
+    archief = {
+        "schema": "jelly-leon/emby-kijkgegevens-export/1",
+        "tool": {"naam": "jelly-leon-emby-overname", "versie": "1.0"},
+        "bron": {"product": "Emby Server", "server_id": "proefserver", "server_naam": "proef", "versie": "1"},
+        "bibliotheken": [],
+        "plugins": [],
+        "classificaties": [],
+        "items": {
+            "film": {"id": "film", "type": "Movie", "naam": "Film", "provider_ids": {}, "pad": None, "grootte": 1}
+        },
+        "gebruikers": [
+            {
+                "id": "proef",
+                "naam": "testpersoon",
+                "beleid": {"IsAdministrator": False},
+                "configuratie": {"RememberAudioSelections": True},
+                "heeft_wachtwoord": True,
+                "zichtbaar": ["film"],
+                "kijkgegevens": {
+                    "film": {
+                        "gezien": True,
+                        "aantal": 2,
+                        "laatst": NOW.strftime("%Y-%m-%dT%H:%M:%S.0000000Z"),
+                        "positie": 1200000,
+                        "favoriet": True,
+                        "beoordeling": 8.0,
+                        "vind_ik_leuk": None,
+                    }
+                },
+                "spoorkeuzes": {
+                    "film": {
+                        "audio": {"type": "Audio", "codec": "aac", "taal": "nl", "titel": None},
+                        "ondertitel": None,
+                    }
+                },
+                "spoorkeuzes_niet_gelezen": [],
+                "benoemde_favorieten": ["film"],
+            },
+        ],
+    }
+    bestand = bron / "emby-export.json"
+
+    def schrijf(opname, mapje):
+        inhoud = json.dumps(opname, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        data = json.dumps(
+            {**opname, "gemaakt": iso(NOW - timedelta(hours=2)), "inhoud_sha256": hashlib.sha256(inhoud).hexdigest()}
+        ).encode()
+        (mapje / bestand.name).write_bytes(data)
+        (mapje / "emby-export.json.sha256").write_text(f"{hashlib.sha256(data).hexdigest()}  {bestand.name}\n")
+
+    for ongeldig in ({**archief, "bron": {"product": "Emby Server"}}, {**archief, "items": {"film": {"id": "film"}}}):
+        for mapje in (bron, kopie):
+            schrijf(ongeldig, mapje)
+        assert rij()["status"] == "unknown"
+    schrijf(archief, bron)
+    assert rij()["status"] == "degraded" and rij()["aanwezig"] is True
+    shutil.copyfile(bestand, kopie / bestand.name)
+    shutil.copyfile(bron / "emby-export.json.sha256", kopie / "emby-export.json.sha256")
+    goed = rij()
+    assert (goed["status"], goed["leeftijd_uren"], goed["plaats"]) == ("gedekt", 2, "backups/emby-export.json")
+    assert "testpersoon" not in str(goed)
+    grenzen = AppBronnen(
+        metingen={"emby_exportarchief": lees_archief(bron, kopie, NOW)}, rpo_uren={"emby": 24, "emby_exportarchief": 1}
+    )
+    assert grenzen.item("emby_exportarchief", NOW)["status"] == "degraded"
+    (kopie / bestand.name).write_bytes(bestand.read_bytes() + b" ")
+    assert rij()["status"] == "degraded"
+    (kopie / bestand.name).unlink()
+    (kopie / bestand.name).symlink_to(bestand)
+    assert rij()["status"] != "gedekt"
+
+
+@pytest.mark.parametrize(
+    ("state", "age", "failures", "verwacht"),
+    [
+        ("ok", 3.2, 0, "gedekt"),
+        ("warn", 40, 0, "degraded"),
+        ("error", None, 1, "degraded"),
+        ("ok", True, 0, "unknown"),
+        ("ok", 0.5, False, "unknown"),
+        ("ok", 36, 0, "degraded"),
+        ("ok", 2.0, 1, "degraded"),
+        ("anders", 1, 0, "unknown"),
+    ],
+)
+def test_huis_backupcheck(state: Any, age: Any, failures: Any, verwacht: str) -> None:
+    from hub.backup.appdekking import AppBronnen, huisrapport
+
+    raw = {"key": "backup", "state": state, "age_h": age, "auto_failures": failures, "auto_last_error": None}
+    meting = huisrapport({"checks": [raw]}, NOW)
+    bron = AppBronnen(metingen={"my_house": meting})
+    assert bron.item("my_house", NOW)["status"] == verwacht
+    assert bron.item("my_house", NOW + timedelta(seconds=901))["status"] == "unknown"
+    dubbel = huisrapport({"checks": [raw, raw]}, NOW)
+    assert dubbel.status == "unknown"
+
+
+def test_gate_weegt_mso_en_de_harde_eis_afzonderlijk() -> None:
+    from backupfixtures import groene_appmetingen
+
+    from hub.backup.appdekking import EMBY, MG, MSO
+    from hub.onboarding.gates import GateInputs, evaluate
+
+    bronnen = groene_appmetingen(NOW)
+    inp = GateInputs(
+        decisions=dict.fromkeys(("D04", "D05", "D16"), ("Getest", None)),
+        pools_state=ok([]),
+        eigen_backup={"finished_at": NOW},
+        eigen_backup_max_age_seconds=3600,
+        extern_backup={"status": "ok"},
+        now=NOW,
+        app_bronnen=bronnen,
+    )
+
+    def redenen() -> set[str]:
+        return {r["id"] for g in evaluate(inp) if g["id"] == "backup_gate" for r in g["redenen"]}
+
+    assert redenen() == set()
+    bronnen.afwezig.clear()
+    bronnen.metingen[MSO] = bronnen.metingen[MG]
+    assert redenen() == {MSO}
+    bronnen.afwezig.update({MSO, MG, EMBY})
+    bronnen.metingen.pop(EMBY)
+    assert redenen() == {EMBY}
+    bronnen.metingen.pop(MG)
+    assert redenen() == {EMBY, MG}

@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from backupfixtures import groene_appmetingen
 from pydantic import ValidationError
 
 from hub.onboarding.catalog import BY_ID, D10_VAST, DECISIONS, validate_value
@@ -80,6 +81,7 @@ def _inputs(
         pools_state=pools or {"status": "unknown", "reason_code": "not_configured"},
         eigen_backup=None if backup_age_h is None else {"finished_at": now - timedelta(hours=backup_age_h)},
         eigen_backup_max_age_seconds=26 * 3600,
+        app_bronnen=groene_appmetingen(now),
         executor_gekoppeld=executor,
         extern_backup=extern,
         now=now,

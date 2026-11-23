@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from asm_policy import load_policy
 from asm_policy.engine import classify
+from backupfixtures import groene_appmetingen
 
 from hub.actions.blokkades import nodige_gates, uit_gates
 from hub.onboarding.catalog import DECISIONS
@@ -35,6 +36,7 @@ def _uitkomst(
             pools_state=GEZOND if pools is None else pools,
             eigen_backup=None if backup_uur is None else {"finished_at": now - timedelta(hours=backup_uur)},
             eigen_backup_max_age_seconds=26 * 3600,
+            app_bronnen=groene_appmetingen(now),
             executor_gekoppeld=executor,
             extern_backup={"status": "ok", "reden": None, "taken": []},
             now=now,

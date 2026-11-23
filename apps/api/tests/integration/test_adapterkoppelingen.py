@@ -2617,3 +2617,86 @@ def test_mediaguard_overzicht_alleen_voor_mediaguard(admin, app, settings, doel,
     link = admin.post(ROUTE, json=mso, headers=idem()).json()["id"]
     monkeypatch.setattr(outbound, "request", Mock(side_effect=AssertionError("geen bronverzoek")))
     assert admin.get(f"{ROUTE}/{link}/mediaguard").status_code == 404
+
+
+def test_backupdekking_herstelrapport_uitval_en_oude_herhaling(admin, app, settings, mgbron, periodic_run, caplog):
+    from backupfixtures import herstelpagina
+
+    from hub.backup.bronmetingen import SLEUTEL, TAAK
+    from hub.models import HubSetting
+
+    pad, antwoorden, spoor, _, prive = mgbron
+    pagina = herstelpagina(utcnow())
+    pagina["items"][0]["vrije_tekst"] = prive
+    antwoorden["backups"] = pagina
+
+    def ronde():
+        assert periodic_run(TAAK)[TAAK]["status"] == "ok"
+        dekking = admin.get("/api/v1/backups/coverage").json()
+        gate = admin.get("/api/v1/gates/backup_gate").json()
+        with app.state.sessionmaker() as db:
+            opslag = db.get(HubSetting, SLEUTEL).waarde
+        assert prive not in str((opslag, gate, dekking)) and prive not in caplog.text
+        assert gate["toegestaan"] is False
+        assert any(r["id"] == "emby_exportarchief" for r in gate["redenen"])
+        return dekking["app_backups"]["mediaguard"], {r["id"] for r in gate["redenen"]}
+
+    rij, redenen = ronde()
+    assert rij["status"] == "gedekt" and "mediaguard" not in redenen
+    assert [call[0] for call in spoor] == ["/api/v1/auth/me", "/connector/v1/discover", "/connector/v1/items"]
+    assert spoor[-1][1] == {"type": "backups", "limit": "1"}
+    antwoorden["backups"] = outbound.Response(503, b"")
+    assert ronde()[0]["status"] == "unknown"
+    antwoorden["backups"] = pagina
+    rij, redenen = ronde()
+    assert rij["status"] == "unknown" and "mediaguard" in redenen
+    antwoorden["backups"] = herstelpagina(utcnow())
+    assert ronde()[0]["status"] == "gedekt"
+    with app.state.sessionmaker.begin() as db:
+        snapshot = db.scalars(select(InventorySnapshot).where(InventorySnapshot.kind == "apps")).one()
+        snapshot.data = [{**entry, "catalogus_app": "mediapakket"} for entry in snapshot.data]
+        einde_inventaris = utcnow() + timedelta(seconds=60)
+        snapshot.observed_at = einde_inventaris - timedelta(seconds=settings.inventory_max_age_seconds)
+    assert ronde()[0]["geldig_tot"] == iso(einde_inventaris)
+    d16 = {"per_app": [{"app_id": "mediapakket", "rpo_uren": 0.25, "rto_uren": 1}]}
+    assert admin.put("/api/v1/decisions/D16/waarde", json={"waarde": d16}, headers=idem()).status_code == 200
+    assert ronde()[0]["status"] == "degraded"
+    link_id = pad.split("/")[-2]
+    assert admin.delete(f"{ROUTE}/{link_id}", headers=idem()).status_code == 200
+    assert admin.get("/api/v1/backups/coverage").json()["app_backups"]["mediaguard"]["status"] == "unknown"
+
+
+@pytest.mark.parametrize("doel", ["my_house"], indirect=True)
+def test_backupdekking_huis_leest_alleen_backupcheck(admin, doel, huis_simulatie, periodic_run):
+    from hub.backup.bronmetingen import TAAK
+
+    code, toestand, calls = huis_simulatie
+    assert admin.post(ROUTE, json=doel, headers=invoer(code)).status_code == 201
+    toestand["extra_checks"] = [
+        {"key": "backup", "state": "ok", "age_h": 2.5, "auto_failures": 0, "auto_last_error": None, "detail": code}
+    ]
+    calls.clear()
+    assert periodic_run(TAAK)[TAAK]["status"] == "ok"
+    rij = admin.get("/api/v1/backups/coverage").json()["app_backups"]["my_house"]
+    assert rij["status"] == "gedekt" and code not in str(rij)
+    assert calls == [("GET", "/api/v1/pairing/identity"), ("GET", "/api/v1/system/status")]
+    toestand["extra_checks"][0]["state"] = "error"
+    periodic_run(TAAK)
+    assert admin.get("/api/v1/backups/coverage").json()["app_backups"]["my_house"]["status"] == "degraded"
+
+
+def test_backupdekking_dubbele_instantie_sluit_poort_voor_bronverkeer(admin, app, mgbron, periodic_run):
+    from backupfixtures import herstelpagina
+
+    from hub.backup.bronmetingen import TAAK
+
+    _, antwoorden, spoor, _, _ = mgbron
+    antwoorden["backups"] = herstelpagina(utcnow())
+    assert periodic_run(TAAK)[TAAK]["status"] == "ok"
+    assert admin.get("/api/v1/backups/coverage").json()["app_backups"]["mediaguard"]["status"] == "gedekt"
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {APP_ID: (443, 8443), "mediaguard-tweede": (8444,)})
+    spoor.clear()
+    assert admin.get("/api/v1/backups/coverage").json()["app_backups"]["mediaguard"]["status"] == "unknown"
+    assert periodic_run(TAAK)[TAAK]["status"] == "ok"
+    assert not spoor

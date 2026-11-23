@@ -19,6 +19,7 @@ from hub import audit
 from hub.adapters import basis, mediaguard, mediaguard_lezen, mso, my_house
 from hub.adapters.binding import binding_is_current, published_ports, registered_peers, registered_port, target_matches
 from hub.adapters.health import stored_health
+from hub.backup.appdekking import Meting, huisrapport
 from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, Viewer, get_vault
 from hub.errors import HubError
@@ -334,6 +335,11 @@ def _house_credential(db: DB, vault: Vault, row: AdapterLink, now: datetime) -> 
     if token is None or my_house.TOKEN.fullmatch(token) is None:
         raise OutboundError("bron_credential_geweigerd")
     return my_house.Credential(token, expires)
+
+
+def lees_huisbackup(db: DB, settings: Settings, vault: Vault, row: AdapterLink, target: CatalogApp) -> Meting:
+    credential = _house_credential(db, vault, row, utcnow())
+    return huisrapport(*_house_adapter(db, settings, row, target).backupstatus(credential.token))
 
 
 def _house_renew(

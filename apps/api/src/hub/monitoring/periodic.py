@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from hub.backup import bronmetingen
 from hub.catalog.discovery import is_inventory_fresh
 from hub.config import Settings
 from hub.inventory.store import kind_state
@@ -299,6 +300,11 @@ def _task_logs(db: Session, ctx: Context) -> dict[str, Any]:
 
 
 TASKS: list[Task] = [
+    Task(
+        bronmetingen.TAAK,
+        lambda s: min(300, s.inventory_interval_seconds),
+        lambda db, ctx: bronmetingen.verzamel(db, ctx.settings, ctx.vault),
+    ),
     Task("nas_meten", lambda s: s.nas_metrics_interval_seconds, _task_nas),
     Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
     Task("my_house_vernieuwen", lambda _s: 3600, _task_my_house),

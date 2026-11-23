@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from hub.backup.appdekking import NAMEN, AppBronnen
 from hub.timeutil import binnen_venster, iso, utcnow
 
 _RANK = {"Open": 0, "Geblokkeerd": 0, "N.v.t.": 0, "Ingevuld": 1, "Getest": 2}
@@ -38,7 +39,7 @@ GATES: tuple[GateDef, ...] = (
         "backup_gate",
         "Back-upgate",
         (("D04", "Ingevuld"), ("D05", "Getest"), ("D16", "Ingevuld")),
-        ("eigen_backup", "extern_backup"),
+        ("eigen_backup", "extern_backup", *NAMEN),
     ),
     GateDef(
         "data_mutatie",
@@ -85,6 +86,7 @@ class GateInputs:
     # Uitkomst van :func:`hub.backup.offsite.beoordeel` (B12-004); ``None`` = niet gemeten (telt nooit als groen).
     extern_backup: dict[str, Any] | None = None
     now: datetime = field(default_factory=utcnow)
+    app_bronnen: AppBronnen = field(default_factory=AppBronnen)
 
 
 def _decision_reason(did: str, status: str, needed: str) -> dict[str, Any] | None:
@@ -164,6 +166,16 @@ def _check(name: str, inp: GateInputs) -> dict[str, Any] | None:
             "id": "extern_backup",
             "status": "geblokkeerd" if probleem else "unknown",
             "tekst": f"Externe back-up (OneDrive) niet aantoonbaar actueel: {e.get('status')} ({e.get('reden')}).",
+        }
+    if name in NAMEN:
+        rij = inp.app_bronnen.item(name, inp.now)
+        if not rij["vereist"] or rij["status"] == "gedekt":
+            return None
+        return {
+            "soort": "meting",
+            "id": name,
+            "status": "geblokkeerd" if rij["status"] == "degraded" else "unknown",
+            "tekst": f"{rij['naam']}: {rij['reden']}",
         }
     raise ValueError(name)
 

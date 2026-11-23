@@ -167,6 +167,10 @@ test("Backups: dekking per app, sync ≠ herstelgarantie, back-upgate dicht (gee
   await ready(page);
   await expect(page.getByTestId("sectie-backupgate")).toContainText("Geblokkeerd");
   await expect(page.getByTestId("dekking-apps")).toContainText("capability_unavailable");
+  const meldingen = page.getByRole("list", { name: "Back-upmeldingen" });
+  await expect(meldingen.getByRole("listitem")).toHaveCount(4);
+  await expect(meldingen.getByText("Emby-exportarchief", { exact: false }).first()).toContainText("nog niet gemaakt");
+  await expect(meldingen).toContainText("Geen toegestane onderhoudsroute met leesrecht.");
   await expect(page.locator("main")).toContainText("Synchronisatie is geen herstelgarantie");
 });
 

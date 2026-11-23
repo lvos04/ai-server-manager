@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ErrorPanel } from "@/components/ErrorPanel";
-import { Freshness } from "@/components/Freshness";
+import { Freshness, useNow } from "@/components/Freshness";
 import { Loading } from "@/components/Loading";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -10,7 +10,7 @@ import { TableWrap } from "@/components/TableWrap";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { coverageCounts } from "@/lib/home";
 import { coverageStatus, gateStatus, kindStatus, testResult } from "@/lib/status";
-import type { Coverage, Gate, SelfBackupList } from "@/lib/types";
+import type { AppBackup, Coverage, Gate, SelfBackupList } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
 const BRON_LABEL: Record<string, string> = {
@@ -22,13 +22,33 @@ const BRON_LABEL: Record<string, string> = {
   replication: "Replicatie",
 };
 
+function actueel(rij: AppBackup, nu: number, verouderd: boolean) {
+  return !verouderd && !!rij.observed_at && Date.parse(rij.observed_at) <= nu
+    && !!rij.geldig_tot && Date.parse(rij.geldig_tot) >= nu;
+}
+
 export function BackupsScreen() {
-  const coverage = useApi<Coverage>("/api/v1/backups/coverage");
-  const gate = useApi<Gate>("/api/v1/gates/backup_gate");
-  const r2 = useApi<Gate>("/api/v1/gates/r2_r3_acties");
+  const nu = useNow(1000).getTime();
+  const coverage = useApi<Coverage>("/api/v1/backups/coverage", 30_000);
+  const gate = useApi<Gate>("/api/v1/gates/backup_gate", 30_000);
+  const r2 = useApi<Gate>("/api/v1/gates/r2_r3_acties", 30_000);
   const self = useApi<SelfBackupList>("/api/v1/backups/self");
   const c = coverage.data;
-  const counts = coverageCounts(c);
+  const meldingen = Object.entries(c?.app_backups ?? {});
+  const vereistGedekt = (id: string) => {
+    const rij = c?.app_backups?.[id];
+    return rij?.status === "gedekt" && actueel(rij, nu, coverage.stale);
+  };
+  const mgGedekt = vereistGedekt("mediaguard");
+  const dekkingBevestigd = mgGedekt && vereistGedekt("emby_exportarchief") && meldingen.every(([, rij]) =>
+    !rij.vereist || (rij.status === "gedekt" && actueel(rij, nu, coverage.stale))
+  );
+  const apps = (c?.apps ?? []).map((app) =>
+    app.db_export.bron === "MediaGuard-herstelrapport" && !mgGedekt
+      ? { ...app, volledige_appbackup: false, db_export: { ...app.db_export, status: "unknown" } }
+      : app
+  );
+  const counts = coverageCounts(c && { ...c, apps });
 
   return (
     <>
@@ -40,7 +60,7 @@ export function BackupsScreen() {
         <section className="card stack" aria-labelledby="gate-titel" data-testid="sectie-backupgate">
           <div className="stat-head">
             <h2 id="gate-titel">Back-upgate</h2>
-            {gate.data ? <StatusBadge view={gateStatus(gate.data.status)} /> : null}
+            {gate.data ? <StatusBadge view={gateStatus(gate.stale || (gate.data.toegestaan && !dekkingBevestigd) ? "unknown" : gate.data.status)} /> : null}
           </div>
           {gate.error ? <ErrorPanel error={gate.error} /> : null}
           {gate.data ? (
@@ -51,7 +71,7 @@ export function BackupsScreen() {
                 {r2.data ? (
                   <>
                     {" "}
-                    (R2/R3-acties: <StatusBadge view={gateStatus(r2.data.status)} />)
+                    (R2/R3-acties: <StatusBadge view={gateStatus(r2.stale || (r2.data.toegestaan && !dekkingBevestigd) ? "unknown" : r2.data.status)} />)
                   </>
                 ) : null}
                 .
@@ -92,6 +112,30 @@ export function BackupsScreen() {
                 ))}
               </ul>
               <p className="meta">{c.opmerking}</p>
+              {meldingen.length ? <>
+                <h3>Back-upmeldingen</h3>
+                <ul className="plain-list" aria-label="Back-upmeldingen">
+                  {meldingen.map(([id, rij]) => {
+                    const verlopen = rij.status !== "unknown" && !actueel(rij, nu, coverage.stale);
+                    return (
+                      <li key={id} className="row" style={{ justifyContent: "space-between" }}>
+                        <span>
+                          {rij.naam}
+                          <br />
+                          <span className="meta">
+                            {verlopen ? "Geen actuele meting." : rij.reden}
+                            {rij.aanwezig === true && !verlopen ? " Archief aanwezig." : null}
+                            {rij.leeftijd_uren != null && !verlopen ? ` Bij controle ${formatNumber(rij.leeftijd_uren)} uur oud.` : null}
+                            {rij.plaats && !verlopen ? ` Kopie in ${rij.plaats}.` : null}
+                            {rij.observed_at ? ` Gemeten ${formatDateTime(rij.observed_at)}.` : null}
+                          </span>
+                        </span>
+                        <StatusBadge view={coverageStatus(verlopen ? "unknown" : rij.status)} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </> : null}
             </section>
 
             <section className="card stack" aria-labelledby="apps-titel" data-testid="dekking-apps">
@@ -111,7 +155,7 @@ export function BackupsScreen() {
                     </tr>
                   </thead>
                   <tbody>
-                    {c.apps.map((a) => (
+                    {apps.map((a) => (
                       <tr key={a.app}>
                         <th scope="row">
                           {a.app}

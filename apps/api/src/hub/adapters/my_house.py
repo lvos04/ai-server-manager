@@ -609,6 +609,12 @@ class Adapter:
         expires_at = _validate(TypeAdapter(Timestamp), data.get("expires_at"))
         return _credential(data.get("token"), expires_at, now, old=old)
 
+    def backupstatus(self, token: str) -> tuple[Any, datetime]:
+        """Lees alleen de bevestigde identiteit en de systeemchecks, zonder het token te vernieuwen."""
+        self._identity(token)
+        gevraagd = utcnow()
+        return self._request(Route.SYSTEM, token=token), gevraagd
+
     def snapshot(self, token: str) -> Snapshot:
         return self.read_snapshot(token, partial=True).project(utcnow())
 

@@ -283,3 +283,33 @@ Na herkoppeling zoekt de Hub het open probleem voor dezelfde catalogusinstantie 
 Dat omvat ook een storing die de incidentenworker nog moet verwerken. De eerste verse
 gezonde meting sluit dat incident. De regressieproef is
 `test_eerste_gezonde_meting_na_herkoppeling_sluit_incident`.
+
+## Back-upmeldingen van bestaande apps (S-P3-100)
+
+Op **Backups** staat per bron de uitkomst, met de meettijd en waar beschikbaar de leeftijd van de back-up.
+De worker meet elke inventarisronde, uiterlijk om de vijf minuten. De Hub toetst bij het openen van het
+scherm en bij een actie opnieuw de koppeling, de meettijd en de maximale back-upleeftijd.
+Een ontbrekende meting, dubbele instantie of verlopen koppeling geeft **Onbekend**.
+
+| Onderdeel | Wat als bewijs telt |
+| --- | --- |
+| MediaGuard-voortgang | De bevestigde kijkersleutel leest het afzonderlijke herstelrapport via `GET /connector/v1/items?type=backups`. Kern- en encoder-database, versleutelde bundel met sleutelmatch, externe kopie en alle forkback-ups moeten geverifieerd zijn. De Hub controleert de vier standaard-fork-ID’s, aanvullende gerapporteerde forks en het rollbackbeleid. Een ontbrekende fork geeft **Niet gedekt**. De oudste vereiste back-up mag maximaal 48 uur oud zijn. |
+| Media Source Optimizer | **Onbekend**. De machinelezer heeft geen toegestane onderhoudsroute met leesrecht. Een openbare gezondheidsprobe bewijst geen back-up. |
+| my_house | De bevestigde adapter leest de check `backup` uit `GET /api/v1/system/status`. Alleen een actuele `ok` met geldige leeftijd en zonder automatische back-upfouten telt. De bron rondt op tienden van een uur af. De Hub houdt rekening met die afronding bij de grens van 36 uur. |
+| Emby-exportarchief | De Hub controleert het blijvende JSON-exportarchief, zijn inhoudshash en de SHA-256-bestandscontrole. Een afzonderlijke kopie in de back-up moet bytegelijk zijn en een eigen geldige bestandscontrole hebben. Het scherm vermeldt de plaats van die kopie en de leeftijd sinds de export. |
+
+P4-0 levert de export aan. De twee vaste leesplaatsen onder de Hub-datamap zijn
+`overname/emby-export.json` en `backups/emby-export.json`, elk met `emby-export.json.sha256` ernaast.
+De Hub leest gewone bestanden tot 32 MiB. Gedeelde bestandsidentiteit, een symbolische link, een onvolledige
+export of een afwijkende controlesom sluit de gate. Zonder archief verschijnt **nog niet gemaakt (overname, P4-0)**.
+Voor de toegestane archiefleeftijd geldt de kortste RPO uit D16 voor `emby` en `emby_exportarchief`.
+De vormcontrole gebruikt het schema `tools/emby-overname/schemas/emby-kijkgegevens-export.schema.json`
+van `jelly-leon` op commit `5536a068ef0499180a0d8357eaeb2577c846a857`. De Hub bewaart geen server-ID of kijkgegevens.
+Bij gekoppelde apps telt ook een kortere RPO onder de appnaam, het runtime-ID of de catalogusnaam.
+De Hub geeft alleen status, vaste redenen, tijden en de vaste kopielocatie door.
+
+De bestaande back-upgate vereist altijd bewijs voor Emby en MediaGuard, naast de geverifieerde Hub-export,
+de externe back-up en de besluiten. MSO en my_house tellen mee zolang een verse inventaris hun afwezigheid
+niet bevestigt. De strengste meettermijn is die van de bron of vijftien minuten. Na een storing kan alleen
+een nieuwere bronmeting de dekking herstellen. De controle van het eigen herstelpunt vóór een update
+en de afzonderlijke hersteltest blijven vereist waar het actiebeleid dat voorschrijft.

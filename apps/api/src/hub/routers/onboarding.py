@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub import audit
-from hub.backup import offsite
+from hub.backup import bronmetingen, offsite
 from hub.backup.selfbackup import latest_verified
 from hub.config import Settings
 from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer, get_vault
@@ -224,6 +224,7 @@ def gate_inputs(db: Session, settings: Settings) -> gates_mod.GateInputs:
     storingen = db.get(HubSetting, offsite.STORINGEN_KEY)
     return gates_mod.GateInputs(
         decisions=decisions,
+        app_bronnen=bronmetingen.lees(db, settings),
         pools_state=kind_state(db, "pools", target=url, ttl_seconds=settings.inventory_max_age_seconds),
         extern_backup=offsite.beoordeel(
             decisions.get("D04"),

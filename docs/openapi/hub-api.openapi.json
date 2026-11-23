@@ -137,6 +137,118 @@
         "title": "ApiKeyIn",
         "type": "object"
       },
+      "AppBackupView": {
+        "properties": {
+          "aanwezig": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aanwezig"
+          },
+          "geldig_tot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geldig Tot"
+          },
+          "gemaakt_op": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gemaakt Op"
+          },
+          "leeftijd_uren": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leeftijd Uren"
+          },
+          "naam": {
+            "title": "Naam",
+            "type": "string"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "plaats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plaats"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          },
+          "status": {
+            "enum": [
+              "gedekt",
+              "degraded",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "vereist": {
+            "title": "Vereist",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "naam",
+          "status",
+          "reden",
+          "observed_at",
+          "geldig_tot",
+          "gemaakt_op",
+          "leeftijd_uren",
+          "aanwezig",
+          "plaats",
+          "vereist"
+        ],
+        "title": "AppBackupView",
+        "type": "object"
+      },
       "AppId": {
         "enum": [
           "mediaguard",
@@ -574,6 +686,56 @@
           "totp"
         ],
         "title": "ConfirmIn",
+        "type": "object"
+      },
+      "CoverageView": {
+        "properties": {
+          "afgeleid_op": {
+            "title": "Afgeleid Op",
+            "type": "string"
+          },
+          "app_backups": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AppBackupView"
+            },
+            "title": "App Backups",
+            "type": "object"
+          },
+          "apps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "bronnen": {
+            "additionalProperties": true,
+            "title": "Bronnen",
+            "type": "object"
+          },
+          "datasets": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Datasets",
+            "type": "array"
+          },
+          "opmerking": {
+            "title": "Opmerking",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apps",
+          "datasets",
+          "bronnen",
+          "app_backups",
+          "opmerking",
+          "afgeleid_op"
+        ],
+        "title": "CoverageView",
         "type": "object"
       },
       "Device": {
@@ -7172,9 +7334,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Coverage Api V1 Backups Coverage Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CoverageView"
                 }
               }
             },

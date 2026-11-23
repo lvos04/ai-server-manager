@@ -308,7 +308,21 @@ export interface CoverageDataset {
   laatste_hersteltest: { resultaat: string; uitgevoerd_op: string } | null;
 }
 
+export interface AppBackup {
+  naam: string;
+  status: "gedekt" | "degraded" | "unknown";
+  reden: string | null;
+  observed_at: string | null;
+  geldig_tot: string | null;
+  gemaakt_op: string | null;
+  leeftijd_uren: number | null;
+  aanwezig: boolean | null;
+  plaats: string | null;
+  vereist: boolean;
+}
+
 export interface Coverage {
+  app_backups?: Record<string, AppBackup>;
   apps: CoverageApp[];
   datasets: CoverageDataset[];
   bronnen: Record<string, { status: string; reason_code: string | null; observed_at: string | null; verouderd: boolean }>;

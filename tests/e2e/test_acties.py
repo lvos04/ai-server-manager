@@ -1037,6 +1037,15 @@ def test_backup_gate_rood_blokkeert_opslagmutaties(stack: Stack, backup: str) ->
     assert r.status_code == 200 and schrijfaanroepen(nas) == ["app.create"], r.text
 
 
+def test_ontbrekende_appmetingen_blokkeren_ook_na_goedkeuring(stack: Stack) -> None:
+    admin = stack.admin
+    voorstel = stel_voor(admin, "app.install", app_target("demo-app"), install_params("demo-app")).json()
+    assert keur_goed(admin, voorstel).status_code == 200
+    stack.toestand.app_backups = "echt"
+    _geblokkeerd(voer_uit(admin, voorstel), "backup_gate_rood")
+    assert schrijfaanroepen(stack.nas) == []
+
+
 def test_zonder_geteste_besluiten_geen_r2_en_geen_opslagmutatie(stack: Stack) -> None:
     """De echte toestand zonder testinvoer: besluiten Open, geen geverifieerde Hub-back-up."""
     admin, nas = stack.admin, stack.nas

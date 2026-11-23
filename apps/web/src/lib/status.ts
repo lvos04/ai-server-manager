@@ -147,6 +147,8 @@ export function coverageStatus(status: string | null | undefined): StatusView {
       return { tone: "neutral", label: "Gedekt", icon: "geslaagd" };
     case "geverifieerd":
       return { tone: "neutral", label: "Geverifieerd", icon: "geslaagd" };
+    case "degraded":
+      return { tone: "degraded", label: "Niet gedekt" };
     case "niet_gedekt":
       return { tone: "neutral", label: "Niet gedekt", icon: "min" };
     case "ontbreekt":

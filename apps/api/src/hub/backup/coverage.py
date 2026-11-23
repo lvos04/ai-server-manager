@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from hub import APP_ID
+from hub.backup.appdekking import MG, NAMEN, AppBronnen
 from hub.timeutil import binnen_venster, iso
 
 SYNC_IS_GEEN_GARANTIE = "Synchronisatie is geen herstelgarantie; alleen een geslaagde hersteltest telt als bewijs."
@@ -37,6 +38,7 @@ class CoverageInputs:
     enrolled_apps: set[str]
     extra_datasets: list[str] = field(default_factory=list)  # uit D02 (appdata/media)
     now: datetime = field(default_factory=lambda: datetime.now(UTC))
+    app_bronnen: AppBronnen = field(default_factory=AppBronnen)
 
 
 def _ok(state: dict[str, Any]) -> bool:
@@ -263,6 +265,7 @@ def compute(inp: CoverageInputs) -> dict[str, Any]:
     datasets_cov = [dataset_coverage(by_name[d], inp, apps_by_ds) for d in relevant]
     ds_cov = {c["dataset"]: c for c in datasets_cov}
 
+    app_backups = {app: inp.app_bronnen.item(app, inp.now) for app in NAMEN}
     app_rows: list[dict[str, Any]] = []
     for a in apps:
         name = str(a["naam"])
@@ -282,6 +285,20 @@ def compute(inp: CoverageInputs) -> dict[str, Any]:
             else "unknown"
         )
         db_export = _db_export(app_key, inp)
+        if (
+            a.get("herkend_als") == MG
+            and MG in inp.app_bronnen.runtime_ids
+            and a.get("runtime_id") == inp.app_bronnen.runtime_ids[MG]
+            and app_backups[MG]["status"] == "gedekt"
+        ):
+            mg = app_backups[MG]
+            db_export = {
+                "status": "geverifieerd",
+                "bron": "MediaGuard-herstelrapport",
+                "reason_code": None,
+                "laatste": mg["gemaakt_op"],
+                "leeftijd_uren": mg["leeftijd_uren"],
+            }
         test = _restore_for(app_key, None, inp.restore_tests) or _restore_for(name, None, inp.restore_tests)
         redenen: list[str] = []
         if not dsets:
@@ -390,6 +407,7 @@ def compute(inp: CoverageInputs) -> dict[str, Any]:
     return {
         "apps": sorted(app_rows, key=lambda r: str(r["app"])),
         "datasets": datasets_cov,
+        "app_backups": app_backups,
         "bronnen": bronnen,
         "opmerking": SYNC_IS_GEEN_GARANTIE + " Een snapshot zonder app-consistente database-export telt niet als "
         "volledige app-back-up.",

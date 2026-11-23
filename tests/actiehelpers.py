@@ -60,6 +60,7 @@ class Toestand:
 
     besluiten: dict[str, tuple[str, Any]] | None = field(default_factory=lambda: dict(ALLE_BESLUITEN))
     backup: str = "vers"  # vers | geen | oud | echt
+    app_backups: str = "vers"  # vers | echt (appmetingen en exportarchief)
     extern: str = "vers"  # vers | echt (de echte beoordeling van de OneDrive-taken uit D04, B12-004)
 
 
@@ -86,6 +87,8 @@ class Stack:
 
 def zet_gate_invoer(monkeypatch: Any, toestand: Toestand) -> None:
     """Besluiten, eigen en externe back-up als *gemeten invoer* zetten; pool en executor blijven echt gemeten."""
+    from backupfixtures import groene_appmetingen
+
     from hub.actions import blokkades
     from hub.routers.onboarding import gate_inputs as echte
     from hub.timeutil import utcnow
@@ -101,6 +104,8 @@ def zet_gate_invoer(monkeypatch: Any, toestand: Toestand) -> None:
             inp.eigen_backup = {"finished_at": oud, "sha256": "sha256:" + "c" * 64, "id": str(uuid.uuid4())}
         elif toestand.backup == "geen":
             inp.eigen_backup = None
+        if toestand.app_backups == "vers":
+            inp.app_bronnen = groene_appmetingen(inp.now)
         if toestand.extern == "vers":
             inp.extern_backup = {"status": "ok", "reden": None, "taken": []}
         return inp

@@ -13,8 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub import audit
+from hub.backup import bronmetingen, hersteltest, rampenscenario
 from hub.backup import coverage as cov
-from hub.backup import hersteltest, rampenscenario
 from hub.backup.selfbackup import latest_verified, reverify, to_dict
 from hub.config import Settings
 from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer, get_vault
@@ -74,11 +74,6 @@ def coverage_inputs(db: Session, settings: Settings) -> cov.CoverageInputs:
     def st(kind: str) -> dict[str, Any]:
         return kind_state(db, kind, target=url, ttl_seconds=settings.inventory_max_age_seconds)
 
-    rpo: dict[str, dict[str, float]] = {}
-    d16 = db.get(Decision, "D16")
-    if d16 is not None and d16.status in ("Ingevuld", "Getest") and isinstance(d16.waarde, dict):
-        for item in d16.waarde.get("per_app") or []:
-            rpo[str(item["app_id"])] = {"rpo_uren": float(item["rpo_uren"]), "rto_uren": float(item["rto_uren"])}
     extra: list[str] = []
     d02 = db.get(Decision, "D02")
     if d02 is not None and d02.status in ("Ingevuld", "Getest") and isinstance(d02.waarde, dict):
@@ -92,7 +87,7 @@ def coverage_inputs(db: Session, settings: Settings) -> cov.CoverageInputs:
         latest_snapshots=st("latest_snapshots"),
         cloudsync=st("cloudsync"),
         replication=st("replication"),
-        rpo_rto=rpo,
+        rpo_rto=bronmetingen.rpo_doelen(db),
         self_backup={"finished_at": b.finished_at, "sha256": b.sha256, "id": str(b.id)}
         if b and b.finished_at
         else None,
@@ -100,10 +95,37 @@ def coverage_inputs(db: Session, settings: Settings) -> cov.CoverageInputs:
         restore_tests=[restore_dict(r) for r in db.scalars(select(RestoreTest))],
         enrolled_apps={s.app_id for s in db.scalars(select(Service).where(Service.status == "active"))},
         extra_datasets=extra,
+        app_bronnen=bronmetingen.lees(db, settings),
     )
 
 
-@router.get("/coverage", summary="Dekking per app en dataset (lokaal, extern, DB-export, hersteltest, RPO/RTO)")
+class AppBackupView(BaseModel):
+    naam: str
+    status: Literal["gedekt", "degraded", "unknown"]
+    reden: str | None
+    observed_at: str | None
+    geldig_tot: str | None
+    gemaakt_op: str | None
+    leeftijd_uren: float | None
+    aanwezig: bool | None
+    plaats: str | None
+    vereist: bool
+
+
+class CoverageView(BaseModel):
+    apps: list[dict[str, Any]]
+    datasets: list[dict[str, Any]]
+    bronnen: dict[str, Any]
+    app_backups: dict[str, AppBackupView]
+    opmerking: str
+    afgeleid_op: str
+
+
+@router.get(
+    "/coverage",
+    response_model=CoverageView,
+    summary="Dekking per app en dataset (lokaal, extern, DB-export, hersteltest, RPO/RTO)",
+)
 def get_coverage(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
     return cov.compute(coverage_inputs(db, settings))
 
