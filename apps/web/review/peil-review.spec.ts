@@ -48,6 +48,7 @@ interface Scherm {
 
 const appId = () => p1State().app_id ?? null;
 const incidentId = () => p1State().incident_id ?? null;
+const actieId = () => p1State().actie_id ?? null;
 
 const SCHERMEN: Scherm[] = [
   // Beheerder: alle schermen uit 08_UI + P1 + contract 1.2
@@ -65,6 +66,9 @@ const SCHERMEN: Scherm[] = [
   { naam: "problemen", rol: "beheerder", pad: "/problemen" },
   { naam: "probleem-detail", rol: "beheerder", pad: () => (incidentId() ? `/problemen/${incidentId()}` : null) },
   { naam: "backups", rol: "beheerder", pad: "/backups" },
+  { naam: "goedkeuringen", rol: "beheerder", pad: "/goedkeuringen" },
+  { naam: "goedkeuring-r2", rol: "beheerder", pad: () => (actieId() ? `/goedkeuringen/${actieId()}` : null) },
+  { naam: "risicobeleid", rol: "beheerder", pad: "/goedkeuringen/beleid" },
   { naam: "onboarding", rol: "beheerder", pad: "/onboarding" },
   { naam: "besluit-D02", rol: "beheerder", pad: "/onboarding/besluit/D02" },
   { naam: "besluit-D03", rol: "beheerder", pad: "/onboarding/besluit/D03" },
@@ -103,6 +107,7 @@ const SCHERMEN: Scherm[] = [
   { naam: "kijker-toegang", rol: "kijker", pad: "/instellingen/toegang" },
   { naam: "kijker-besluit-D03", rol: "kijker", pad: "/onboarding/besluit/D03" },
   { naam: "kijker-diensten", rol: "kijker", pad: "/instellingen/diensten" },
+  { naam: "kijker-goedkeuring", rol: "kijker", pad: () => (actieId() ? `/goedkeuringen/${actieId()}` : null) },
   // Kind (O-05): eigen schil Home · Kijken · Zoeken · Ik en een kindvriendelijke 403
   { naam: "kind-home", rol: "kind", pad: "/" },
   { naam: "kind-kijken", rol: "kind", pad: "/kijken" },

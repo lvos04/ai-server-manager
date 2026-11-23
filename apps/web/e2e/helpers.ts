@@ -40,6 +40,8 @@ export interface StackState {
 export interface P1State {
   app_id?: string;
   incident_id?: string;
+  /** Een R2-voorstel dat op goedkeuring wacht (Peil-review van S-P2-170). */
+  actie_id?: string;
 }
 
 export function p1State(): P1State {
