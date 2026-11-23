@@ -10,7 +10,7 @@ import copy
 import threading
 import uuid
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -240,9 +240,11 @@ def test_installeren_met_goedkeuring_en_verwijderen_zonder_dataverlies(stack: St
     g = r.json()["goedkeuring"]
     assert r.json()["status"] == "goedgekeurd" and g["approved_by"] == "beheerder" and g["gebruikt_op"] is None
     assert {k: g[k] for k in hashes(v)} == hashes(v) and "one_time_nonce" not in r.text
-    from asm_policy.execreq import parse_ts
-
-    assert timedelta(0) < parse_ts(g["expires_at"]) - parse_ts(g["approved_at"]) <= timedelta(minutes=15)
+    # De Hub-API schrijft de hele seconden van een goedkeuring met vaste milliseconden.
+    tijdformaat = "%Y-%m-%dT%H:%M:%S.000Z"
+    goedgekeurd = datetime.strptime(g["approved_at"], tijdformaat)
+    verloopt = datetime.strptime(g["expires_at"], tijdformaat)
+    assert timedelta(0) < verloopt - goedgekeurd <= timedelta(minutes=15)
     assert schrijfaanroepen(nas) == []
 
     # R2 uitvoeren: alleen een beheerder.
