@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CircleUserRound, Inbox, KeyRound, LifeBuoy, LogOut, Server, WifiOff } from "lucide-react";
+import { Bot, CircleUserRound, ClipboardCheck, Inbox, KeyRound, LifeBuoy, LogOut, Server, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/nav";
 import { useOnline, useServiceWorker } from "@/lib/pwa";
 import { hasRole, ROLE_LABEL, SessionProvider, useSession } from "@/lib/session";
+import { WACHTLIJST, type ActieLijst } from "@/lib/acties";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { Aftellen } from "./Aftellen";
@@ -235,6 +236,47 @@ function Navigation({ pathname, problemen }: { pathname: string; problemen: numb
   );
 }
 
+/**
+ * Goedkeuringen in de kopbalk (S-062): alleen de wachtlijst telt. Met een vervolgcursor "50+" (ten minste); verouderd of
+ * onbekend: geen getal maar een gestippeld vraagteken.
+ */
+function GoedkeuringenLink({ pathname }: { pathname: string }) {
+  const { state } = useSession();
+  const ok = state.status === "auth" && hasRole(state.me.user.role, "viewer");
+  const s = useApi<ActieLijst>(ok ? WACHTLIJST : null, 30_000);
+  if (!ok) return null;
+  const n = s.data && !s.stale ? s.data.items.length : null;
+  const meer = Boolean(s.data?.next_cursor);
+  return (
+    <Link
+      href="/goedkeuringen"
+      className="inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-lg px-2 font-semibold text-foreground no-underline hover:bg-accent aria-[current=page]:bg-accent aria-[current=page]:shadow-[inset_0_-3px_0_var(--primary)] lg:px-3 [&_svg]:size-5"
+      aria-current={pathname.startsWith("/goedkeuringen") ? "page" : undefined}
+      data-testid="kop-goedkeuringen"
+    >
+      <ClipboardCheck aria-hidden="true" />
+      <span className="sr-only lg:not-sr-only">Goedkeuringen</span>
+      {n === null ? (
+        s.data || s.error ? (
+          <>
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-dashed border-unknown px-1 text-sm leading-none font-bold text-unknown-ink" aria-hidden="true">
+              ?
+            </span>
+            <span className="sr-only">, aantal onbekend</span>
+          </>
+        ) : null
+      ) : n > 0 ? (
+        <>
+          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-foreground px-1.5 text-sm leading-none font-bold text-background" aria-hidden="true" data-testid="kop-goedkeuringen-teller">
+            {meer ? `${n}+` : n}
+          </span>
+          <span className="sr-only">, {meer ? `ten minste ${n}` : n} wachtend</span>
+        </>
+      ) : null}
+    </Link>
+  );
+}
+
 function Header({ problemen }: { problemen: number | null }) {
   const pathname = normalizePath(usePathname() || "/");
   return (
@@ -254,6 +296,7 @@ function Header({ problemen }: { problemen: number | null }) {
           Problemen
           <ProblemenTeller count={problemen} />
         </Link>
+        <GoedkeuringenLink pathname={pathname} />
         <Link
           href="/ai"
           className="hidden min-h-touch items-center gap-2 rounded-lg px-3 font-semibold text-foreground no-underline hover:bg-accent lg:inline-flex [&_svg]:size-5"
