@@ -293,7 +293,7 @@ Een ontbrekende meting, dubbele instantie of verlopen koppeling geeft **Onbekend
 
 | Onderdeel | Wat als bewijs telt |
 | --- | --- |
-| MediaGuard-voortgang | De bevestigde kijkersleutel leest het afzonderlijke herstelrapport via `GET /connector/v1/items?type=backups`. Kern- en encoder-database, versleutelde bundel met sleutelmatch, externe kopie en alle forkback-ups moeten geverifieerd zijn. De Hub controleert de vier standaard-fork-ID’s, aanvullende gerapporteerde forks en het rollbackbeleid. Een ontbrekende fork geeft **Niet gedekt**. De oudste vereiste back-up mag maximaal 48 uur oud zijn. |
+| MediaGuard-voortgang | De bevestigde kijkersleutel leest het afzonderlijke herstelrapport via `GET /connector/v1/items?type=backups`. Kern- en encoder-database, versleutelde bundel met sleutelmatch, externe kopie en alle forkback-ups moeten geverifieerd zijn. De Hub rekent de SHA-256 van de volledige connectorpagina na volgens de bronberekening voor `snapshot_id`. Hij controleert de vier standaard-fork-ID’s, aanvullende gerapporteerde forks en het rollbackbeleid. Een ontbrekende fork geeft **Niet gedekt**. De oudste vereiste back-up mag maximaal 48 uur oud zijn. |
 | Media Source Optimizer | **Onbekend**. De machinelezer heeft geen toegestane onderhoudsroute met leesrecht. Een openbare gezondheidsprobe bewijst geen back-up. |
 | my_house | De bevestigde adapter leest de check `backup` uit `GET /api/v1/system/status`. Alleen een actuele `ok` met geldige leeftijd en zonder automatische back-upfouten telt. De bron rondt op tienden van een uur af. De Hub houdt rekening met die afronding bij de grens van 36 uur. |
 | Emby-exportarchief | De Hub controleert het blijvende JSON-exportarchief, zijn inhoudshash en de SHA-256-bestandscontrole. Een afzonderlijke kopie in de back-up moet bytegelijk zijn en een eigen geldige bestandscontrole hebben. Het scherm vermeldt de plaats van die kopie en de leeftijd sinds de export. |
@@ -304,12 +304,30 @@ De Hub leest gewone bestanden tot 32 MiB. Gedeelde bestandsidentiteit, een symbo
 export of een afwijkende controlesom sluit de gate. Zonder archief verschijnt **nog niet gemaakt (overname, P4-0)**.
 Voor de toegestane archiefleeftijd geldt de kortste RPO uit D16 voor `emby` en `emby_exportarchief`.
 De vormcontrole gebruikt het schema `tools/emby-overname/schemas/emby-kijkgegevens-export.schema.json`
-van `jelly-leon` op commit `5536a068ef0499180a0d8357eaeb2577c846a857`. De Hub bewaart geen server-ID of kijkgegevens.
+van `jelly-leon` op commit `5536a068ef0499180a0d8357eaeb2577c846a857`. De Hub neemt geen server-ID of kijkgegevens over in de meetopslag of de API.
+De lokale bronreferentie `HUB_EMBY_INVENTARIS_SHA256` bevat de vooraf bevestigde bestands-SHA-256 van
+`inventaris.json` uit het overnamecommando `inventaris`. De worker leest dat bestand uit `overnamebron/`
+en vergelijkt de server-ID en alle gebruikersnamen uit die inventaris met het archief. Bij een nieuwe gebruiker of een
+andere server vraagt de overname een nieuwe bronbevestiging. Een gewijzigde referentie trekt de eerdere meting in.
+
+P4-0 levert in deze afzonderlijke, voor de Hub alleen-lezen map ook `exportbewijs.json` en
+`emby-export.log.jsonl` uit dezelfde voltooide bronrun. Het bewijs bevat de standaard JSON-uitvoer van
+het overnamecommando `export`, aangevuld met `leeslog_sha256` van het bijbehorende leeslog bij de bron.
+De velden `sha256`, `inhoud_sha256`, `gebruikers` en `items_met_kijkgegevens` binden de tellingen aan het
+exacte archief. De worker controleert in het log de geslaagde bronlezingen voor de inventaris, kijkgegevens,
+benoemde favorieten en de vereiste spoorkeuzes per gebruiker en item. Een expliciet leeg standaardspoor in
+een uitgelezen afspeelantwoord is geldig. Ontbrekend leesbewijs geeft **Onbekend**. Beide archiefmappen
+kunnen worden vervangen zonder de afzonderlijk bevestigde inventaris of dit leesbewijs te wijzigen.
+
 Bij gekoppelde apps telt ook een kortere RPO onder de appnaam, het runtime-ID of de catalogusnaam.
 De Hub geeft alleen status, vaste redenen, tijden en de vaste kopielocatie door.
 
 De bestaande back-upgate vereist altijd bewijs voor Emby en MediaGuard, naast de geverifieerde Hub-export,
 de externe back-up en de besluiten. MSO en my_house tellen mee zolang een verse inventaris hun afwezigheid
-niet bevestigt. De strengste meettermijn is die van de bron of vijftien minuten. Na een storing kan alleen
+niet bevestigt. Daarbij tellen de catalogusnaam, de naam van de app, het runtime-ID en de image-identiteit.
+Een onbekende of tegenstrijdige identiteit houdt de gate dicht. Alleen de opgeslagen uitkomst van de
+laatste succesvolle meetpoging telt. Een lopende of mislukte meetpoging trekt de voorgaande uitkomst in.
+Na terugkeer van een adapter moet de meettijd van het bronrapport voorbij de inventarisgrens
+`identiteit_sinds` liggen. De strengste meettermijn is die van de bron of vijftien minuten. Na een storing kan alleen
 een nieuwere bronmeting de dekking herstellen. De controle van het eigen herstelpunt vóór een update
 en de afzonderlijke hersteltest blijven vereist waar het actiebeleid dat voorschrijft.

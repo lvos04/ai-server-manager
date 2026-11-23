@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HUB_", extra="ignore")
 
     data_dir: Path = Path("/appdata")
+    emby_inventaris_sha256: str | None = None  # Lokaal bevestigde inventaris uit de overname.
     database_url: str = f"postgresql+psycopg://hub@/hub?host={DEFAULT_SOCKET_DIR}"
 
     host: str = "0.0.0.0"  # noqa: S104 — de container publiceert precies één poort

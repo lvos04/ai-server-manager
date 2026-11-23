@@ -334,7 +334,7 @@ def test_bestaande_bronnen_en_ontbrekend_archief() -> None:
     ],
 )
 def test_herstelrapport_per_onderdeel(wijziging: str, verwacht: str) -> None:
-    from backupfixtures import herstelpagina
+    from backupfixtures import bevestig_herstelpagina, herstelpagina
 
     from hub.backup.appdekking import AppBronnen, herstelrapport
 
@@ -361,6 +361,7 @@ def test_herstelrapport_per_onderdeel(wijziging: str, verwacht: str) -> None:
     if wijziging == "uitval":
         body.update(status="unknown", items=[], total=None, reason_code="vrije bronmelding")
     report["vrije_tekst"] = "privébronveld"
+    bevestig_herstelpagina(body)
     bron = AppBronnen(metingen={"mediaguard": herstelrapport(body, NOW, 900)})
     rij = compute(_inputs(app_bronnen=bron))["app_backups"]["mediaguard"]
     assert rij["status"] == verwacht
@@ -398,68 +399,38 @@ def test_exportarchief_bewijst_leeftijd_en_zelfstandige_kopie(tmp_path: Any) -> 
     import json
     import shutil
 
+    from backupfixtures import archiefopname, exportbewijs, inventaris_referentie
+
     from hub.backup.appdekking import AppBronnen
     from hub.backup.emby_archief import lees_archief
 
     bron, kopie = tmp_path / "overname", tmp_path / "backups"
     bron.mkdir()
     kopie.mkdir()
+    pin = inventaris_referentie(tmp_path)
 
     def rij() -> dict[str, Any]:
-        meting = lees_archief(bron, kopie, NOW)
+        meting = lees_archief(bron, kopie, NOW, pin)
         return AppBronnen(metingen={"emby_exportarchief": meting}, rpo_uren={"emby": 24}).item(
             "emby_exportarchief", NOW
         )
 
     assert rij()["status"] == "unknown" and rij()["aanwezig"] is False
-    archief = {
-        "schema": "jelly-leon/emby-kijkgegevens-export/1",
-        "tool": {"naam": "jelly-leon-emby-overname", "versie": "1.0"},
-        "bron": {"product": "Emby Server", "server_id": "proefserver", "server_naam": "proef", "versie": "1"},
-        "bibliotheken": [],
-        "plugins": [],
-        "classificaties": [],
-        "items": {
-            "film": {"id": "film", "type": "Movie", "naam": "Film", "provider_ids": {}, "pad": None, "grootte": 1}
-        },
-        "gebruikers": [
-            {
-                "id": "proef",
-                "naam": "testpersoon",
-                "beleid": {"IsAdministrator": False},
-                "configuratie": {"RememberAudioSelections": True},
-                "heeft_wachtwoord": True,
-                "zichtbaar": ["film"],
-                "kijkgegevens": {
-                    "film": {
-                        "gezien": True,
-                        "aantal": 2,
-                        "laatst": NOW.strftime("%Y-%m-%dT%H:%M:%S.0000000Z"),
-                        "positie": 1200000,
-                        "favoriet": True,
-                        "beoordeling": 8.0,
-                        "vind_ik_leuk": None,
-                    }
-                },
-                "spoorkeuzes": {
-                    "film": {
-                        "audio": {"type": "Audio", "codec": "aac", "taal": "nl", "titel": None},
-                        "ondertitel": None,
-                    }
-                },
-                "spoorkeuzes_niet_gelezen": [],
-                "benoemde_favorieten": ["film"],
-            },
-        ],
-    }
+    archief = archiefopname(NOW - timedelta(hours=2))
     bestand = bron / "emby-export.json"
 
     def schrijf(opname, mapje):
-        inhoud = json.dumps(opname, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        inhoud = json.dumps(
+            {k: v for k, v in opname.items() if k != "gemaakt"},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode()
         data = json.dumps(
             {**opname, "gemaakt": iso(NOW - timedelta(hours=2)), "inhoud_sha256": hashlib.sha256(inhoud).hexdigest()}
         ).encode()
         (mapje / bestand.name).write_bytes(data)
+        exportbewijs(tmp_path, json.loads(data), hashlib.sha256(data).hexdigest(), gelezen_sporen={"proef": ["film"]})
         (mapje / "emby-export.json.sha256").write_text(f"{hashlib.sha256(data).hexdigest()}  {bestand.name}\n")
 
     for ongeldig in ({**archief, "bron": {"product": "Emby Server"}}, {**archief, "items": {"film": {"id": "film"}}}):
@@ -474,7 +445,8 @@ def test_exportarchief_bewijst_leeftijd_en_zelfstandige_kopie(tmp_path: Any) -> 
     assert (goed["status"], goed["leeftijd_uren"], goed["plaats"]) == ("gedekt", 2, "backups/emby-export.json")
     assert "testpersoon" not in str(goed)
     grenzen = AppBronnen(
-        metingen={"emby_exportarchief": lees_archief(bron, kopie, NOW)}, rpo_uren={"emby": 24, "emby_exportarchief": 1}
+        metingen={"emby_exportarchief": lees_archief(bron, kopie, NOW, pin)},
+        rpo_uren={"emby": 24, "emby_exportarchief": 1},
     )
     assert grenzen.item("emby_exportarchief", NOW)["status"] == "degraded"
     (kopie / bestand.name).write_bytes(bestand.read_bytes() + b" ")
@@ -538,3 +510,74 @@ def test_gate_weegt_mso_en_de_harde_eis_afzonderlijk() -> None:
     assert redenen() == {EMBY}
     bronnen.metingen.pop(MG)
     assert redenen() == {EMBY, MG}
+
+
+def test_herstelrapport_weigert_andere_controlesom() -> None:
+    from backupfixtures import herstelpagina
+
+    from hub.backup.appdekking import herstelrapport
+
+    body = herstelpagina(NOW)
+    assert herstelrapport(body, NOW, 900).status == "gedekt"
+    som = body["snapshot_id"]
+    body["snapshot_id"] = ("0" if som[0] != "0" else "1") + som[1:]
+    assert herstelrapport(body, NOW, 900).status == "unknown"
+
+
+@pytest.mark.parametrize(
+    "geval",
+    [
+        "zonder_leesbewijs",
+        "sporen_overgeslagen",
+        "andere_bron",
+        "gebruiker_ontbreekt",
+        "andere_export",
+        "geen_bronreferentie",
+        "andere_gebruiker_leest_spoor",
+        "verwisseld_leeslog",
+        "onbekende_spoorvoorkeuren",
+    ],
+)
+def test_exportarchief_vereist_bevestigde_bron_en_volledige_lezing(tmp_path, geval):
+    from backupfixtures import archiefopname, exportbewijs, inventaris_referentie, schrijf_archiefpaar
+
+    from hub.backup.emby_archief import lees_archief
+
+    pin = inventaris_referentie(
+        tmp_path, namen=("testpersoon", "tweede") if geval == "gebruiker_ontbreekt" else ("testpersoon",)
+    )
+    opname = archiefopname(NOW, server="andere-proefbron" if geval == "andere_bron" else "proefserver")
+    if geval == "sporen_overgeslagen":
+        opname["gebruikers"][0]["spoorkeuzes"] = {}
+    if geval == "onbekende_spoorvoorkeuren":
+        opname["gebruikers"][0].update(configuratie={}, spoorkeuzes={})
+    if geval == "andere_gebruiker_leest_spoor":
+        from copy import deepcopy
+
+        tweede = deepcopy(opname["gebruikers"][0])
+        tweede.update(id="ander", naam="tweede")
+        opname["gebruikers"].append(tweede)
+        pin = inventaris_referentie(tmp_path, namen=("testpersoon", "tweede"))
+    digest = schrijf_archiefpaar(tmp_path, opname)
+    if geval != "zonder_leesbewijs":
+        exportbewijs(
+            tmp_path,
+            opname,
+            "0" * 64 if geval == "andere_export" else digest,
+            gelezen_sporen={} if geval == "sporen_overgeslagen" else {"proef": ["film"]},
+        )
+    if geval == "verwisseld_leeslog":
+        log = tmp_path / "overnamebron" / "emby-export.log.jsonl"
+        log.write_bytes(log.read_bytes().replace(b'"status": 200', b'"status": 201'))
+    meting = lees_archief(
+        tmp_path / "overname", tmp_path / "backups", NOW, None if geval == "geen_bronreferentie" else pin
+    )
+    assert meting.status == "unknown" and meting.aanwezig is True
+
+
+@pytest.mark.parametrize("rauw", [None, {}, [{}, None]])
+def test_onvolledige_appinventaris_bewijst_geen_afwezigheid(rauw):
+    from hub.truenas import normalize
+
+    with pytest.raises(ValueError, match="onvolledig"):
+        normalize.apps(rauw)

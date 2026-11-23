@@ -2620,7 +2620,7 @@ def test_mediaguard_overzicht_alleen_voor_mediaguard(admin, app, settings, doel,
 
 
 def test_backupdekking_herstelrapport_uitval_en_oude_herhaling(admin, app, settings, mgbron, periodic_run, caplog):
-    from backupfixtures import herstelpagina
+    from backupfixtures import bevestig_herstelpagina, herstelpagina
 
     from hub.backup.bronmetingen import SLEUTEL, TAAK
     from hub.models import HubSetting
@@ -2628,6 +2628,7 @@ def test_backupdekking_herstelrapport_uitval_en_oude_herhaling(admin, app, setti
     pad, antwoorden, spoor, _, prive = mgbron
     pagina = herstelpagina(utcnow())
     pagina["items"][0]["vrije_tekst"] = prive
+    bevestig_herstelpagina(pagina)
     antwoorden["backups"] = pagina
 
     def ronde():
@@ -2700,3 +2701,196 @@ def test_backupdekking_dubbele_instantie_sluit_poort_voor_bronverkeer(admin, app
     assert admin.get("/api/v1/backups/coverage").json()["app_backups"]["mediaguard"]["status"] == "unknown"
     assert periodic_run(TAAK)[TAAK]["status"] == "ok"
     assert not spoor
+
+
+@pytest.fixture
+def groene_backupbron(app, settings, mgbron, periodic_run):
+    from backupfixtures import archiefopname, exportbewijs, herstelpagina, inventaris_referentie, schrijf_archiefpaar
+
+    from hub.backup import bronmetingen
+    from hub.models import Decision
+    from hub.onboarding.gates import GateInputs, evaluate
+
+    _, antwoorden, _, _, _ = mgbron
+    opname = archiefopname(utcnow())
+    settings.emby_inventaris_sha256 = inventaris_referentie(settings.data_dir)
+    exportbewijs(
+        settings.data_dir, opname, schrijf_archiefpaar(settings.data_dir, opname), gelezen_sporen={"proef": ["film"]}
+    )
+    antwoorden["backups"] = herstelpagina(utcnow())
+    with app.state.sessionmaker.begin() as db:
+        d16 = db.get(Decision, "D16")
+        d16.status, d16.waarde = "Getest", {"per_app": [{"app_id": "emby", "rpo_uren": 1, "rto_uren": 1}]}
+
+    def toegang():
+        with app.state.sessionmaker() as db:
+            bronnen = bronmetingen.lees(db, settings)
+        nu = utcnow()
+        inp = GateInputs(
+            dict.fromkeys(("D04", "D05", "D16"), ("Getest", None)),
+            {"status": "ok", "data": []},
+            {"finished_at": nu},
+            3600,
+            extern_backup={"status": "ok"},
+            app_bronnen=bronnen,
+            now=nu,
+        )
+        return next(g["toegestaan"] for g in evaluate(inp) if g["id"] == "backup_gate")
+
+    assert periodic_run(bronmetingen.TAAK)[bronmetingen.TAAK]["status"] == "ok"
+    assert toegang()
+    return toegang
+
+
+def test_backupdekking_mislukte_meetpoging(admin, app, settings, mgbron, periodic_run, groene_backupbron):
+    from backupfixtures import herstelpagina
+
+    from hub.backup import bronmetingen
+    from hub.backup.appdekking import EMBY, MG
+    from hub.models import HubSetting
+
+    _, antwoorden, _, _, _ = mgbron
+    kopie = settings.backups_dir / "emby-export.json"
+    inhoud = kopie.read_bytes()
+    oud_rapport = antwoorden["backups"]
+    kopie.unlink()
+    antwoorden["backups"] = outbound.Response(503, b"")
+
+    def schrijffout(sessie, *_args):
+        if any(isinstance(r, HubSetting) and r.sleutel == bronmetingen.SLEUTEL for r in sessie.dirty):
+            raise OSError("Schrijffout in de testopslag")
+
+    event.listen(Session, "before_flush", schrijffout)
+    try:
+        assert periodic_run(bronmetingen.TAAK)[bronmetingen.TAAK]["status"] == "failed"
+    finally:
+        event.remove(Session, "before_flush", schrijffout)
+    rijen = admin.get("/api/v1/backups/coverage").json()["app_backups"]
+    assert not groene_backupbron() and rijen[EMBY]["status"] == rijen[MG]["status"] == "unknown"
+    kopie.write_bytes(inhoud)
+    antwoorden["backups"] = oud_rapport
+    assert periodic_run(bronmetingen.TAAK)[bronmetingen.TAAK]["status"] == "ok"
+    assert not groene_backupbron()
+    antwoorden["backups"] = herstelpagina(utcnow())
+    assert periodic_run(bronmetingen.TAAK)[bronmetingen.TAAK]["status"] == "ok" and groene_backupbron()
+
+
+def test_backupdekking_bron_na_onderbreking(admin, app, settings, mgbron, periodic_run, groene_backupbron):
+    from backupfixtures import herstelpagina
+
+    from hub.backup import bronmetingen
+
+    _, antwoorden, verkeer, _, _ = mgbron
+    with app.state.sessionmaker.begin() as db:
+        origineel = is_inventory_fresh(db, settings)["data"]
+        bewaar_inventaris(db, [])
+        discover(db, settings)
+    assert not groene_backupbron()
+    with app.state.sessionmaker.begin() as db:
+        bewaar_inventaris(db, origineel)
+        discover(db, settings)
+    verkeer.clear()
+    assert not groene_backupbron() and not verkeer
+    assert admin.get("/api/v1/backups/coverage").json()["app_backups"]["mediaguard"]["status"] == "unknown"
+    periodic_run(bronmetingen.TAAK)
+    assert not groene_backupbron()
+    antwoorden["backups"] = herstelpagina(utcnow())
+    periodic_run(bronmetingen.TAAK)
+    assert groene_backupbron()
+
+
+@pytest.mark.parametrize(
+    "mso",
+    [
+        {"id": "taak-a", "metadata": {"name": "media-source-optimizer"}},
+        {"id": "mso", "name": "taak-a"},
+        {"name": "mediaguard-twee", "active_workloads": {"images": ["test/mso:1"]}},
+        {"id": "taak-a"},
+    ],
+)
+def test_backupdekking_mso_identiteit(admin, app, settings, doel, mso):
+    from backupfixtures import groene_appmetingen
+
+    from hub.backup import bronmetingen
+    from hub.backup.appdekking import MSO
+    from hub.onboarding.gates import GateInputs, evaluate
+
+    with app.state.sessionmaker.begin() as db:
+        oude = is_inventory_fresh(db, settings)["data"]
+        bewaar_inventaris(db, [*oude, *normalize.apps([{**mso, "state": "STOPPED"}])])
+    with app.state.sessionmaker() as db:
+        werkelijk = bronmetingen.lees(db, settings)
+    nu = utcnow()
+    bronnen = groene_appmetingen(nu)
+    bronnen.afwezig = werkelijk.afwezig
+    assert bronnen.item(MSO, nu)["vereist"]
+    poort = GateInputs(
+        dict.fromkeys(("D04", "D05", "D16"), ("Getest", None)),
+        {"status": "ok", "data": []},
+        {"finished_at": nu},
+        3600,
+        extern_backup={"status": "ok"},
+        app_bronnen=bronnen,
+        now=nu,
+    )
+    assert not next(g["toegestaan"] for g in evaluate(poort) if g["id"] == "backup_gate")
+
+
+def test_backupdekking_inventaris_en_oude_meetrij(admin, app, settings, mgbron, periodic_run, groene_backupbron):
+    from backupfixtures import herstelpagina
+
+    from hub.backup import bronmetingen
+    from hub.models import HubSetting, PeriodicTask
+
+    pin = settings.emby_inventaris_sha256
+    settings.emby_inventaris_sha256 = None
+    assert not groene_backupbron()
+    settings.emby_inventaris_sha256 = pin
+    assert groene_backupbron()
+
+    with app.state.sessionmaker.begin() as db:
+        bron = db.get(HubSetting, bronmetingen.SLEUTEL)
+        geldige_ronde = bron.waarde["meetronde"]
+        bron.waarde = {k: v for k, v in bron.waarde.items() if k != "meetronde"}
+    assert not groene_backupbron()
+    with app.state.sessionmaker.begin() as db:
+        poging = db.get(PeriodicTask, bronmetingen.TAAK)
+        poging.details, poging.laatste_status = {"meetronde": "nieuwere-poging"}, None
+    with app.state.sessionmaker.begin() as db:
+        # Een ingehaalde worker kan de nog lopende poging ook met de oude geldige meetrij niet voltooien.
+        assert bronmetingen.verzamel(db, settings, app.state.vault(), geldige_ronde) == {"aantal": 0}
+    assert not groene_backupbron()
+    mgbron[1]["backups"] = herstelpagina(utcnow())
+    assert periodic_run(bronmetingen.TAAK)[bronmetingen.TAAK]["status"] == "ok"
+    assert groene_backupbron()
+
+
+@pytest.mark.parametrize("andere_bron", [False, True], ids=["sporen_overgeslagen", "andere_bron"])
+def test_backupdekking_vervangend_archief(admin, app, settings, periodic_run, groene_backupbron, andere_bron):
+    from backupfixtures import archiefopname, exportbewijs, schrijf_archiefpaar
+
+    from hub.backup import bronmetingen
+    from hub.backup.appdekking import EMBY
+    from hub.models import HubSetting
+
+    opname = archiefopname(utcnow())
+    gelezen = {}
+    if andere_bron:
+        opname["bron"]["server_id"] = "tweede-proefbron"
+        opname["gebruikers"][0].update(id="andere-kijker", naam="tweede-testpersoon")
+        gelezen = {"andere-kijker": ["film"]}
+    else:
+        opname["gebruikers"][0]["spoorkeuzes"] = {}
+    digest = schrijf_archiefpaar(settings.data_dir, opname)
+    exportbewijs(settings.data_dir, opname, digest, gelezen_sporen=gelezen)
+    assert periodic_run(bronmetingen.TAAK)[bronmetingen.TAAK]["status"] == "ok"
+    dekking = admin.get("/api/v1/backups/coverage").json()
+    poort = admin.get("/api/v1/gates/backup_gate").json()
+    assert dekking["app_backups"][EMBY]["status"] == "unknown"
+    assert EMBY in {reden["id"] for reden in poort["redenen"]} and not groene_backupbron()
+    with app.state.sessionmaker() as db:
+        meting = db.get(HubSetting, bronmetingen.SLEUTEL).waarde
+    uitvoer = json.dumps([dekking, poort, meting])
+    assert all(
+        waarde not in uitvoer for waarde in ("tweede-proefbron", "andere-kijker", "tweede-testpersoon", "testpersoon")
+    )

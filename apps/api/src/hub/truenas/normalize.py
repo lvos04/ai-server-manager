@@ -221,10 +221,11 @@ def datasets(raw: Any) -> list[dict[str, Any]]:
 
 
 def apps(raw: Any) -> list[dict[str, Any]]:
+    # Een onleesbare app.query mag geen lege of gedeeltelijke inventaris als afwezigheidsbewijs opleveren.
+    if not isinstance(raw, list) or not all(isinstance(a, dict) for a in raw):
+        raise ValueError("De app-inventaris is onvolledig.")
     out = []
-    for a in raw or []:
-        if not isinstance(a, dict):
-            continue
+    for a in raw:
         name = _str(a.get("name") or a.get("id"), 128) or ""
         wl = _dict(a.get("active_workloads"))
         images = [str(i) for i in (wl.get("images") or []) if i]

@@ -12,8 +12,9 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -43,6 +44,7 @@ class Context:
     vault: Vault
     keyring: KeyRing | None
     now: datetime
+    meetronde: str | None = None
 
 
 @dataclass(frozen=True)
@@ -303,7 +305,7 @@ TASKS: list[Task] = [
     Task(
         bronmetingen.TAAK,
         lambda s: min(300, s.inventory_interval_seconds),
-        lambda db, ctx: bronmetingen.verzamel(db, ctx.settings, ctx.vault),
+        lambda db, ctx: bronmetingen.verzamel(db, ctx.settings, ctx.vault, ctx.meetronde),
     ),
     Task("nas_meten", lambda s: s.nas_metrics_interval_seconds, _task_nas),
     Task("bronnen_pollen", lambda s: s.monitoring_interval_seconds, _task_sources),
@@ -319,7 +321,9 @@ TASKS: list[Task] = [
 ]
 
 
-def _claim(db: Session, task: Task, now: datetime, force: bool, settings: Settings) -> PeriodicTask | None:
+def _claim(
+    db: Session, task: Task, now: datetime, force: bool, settings: Settings, meetronde: str | None
+) -> PeriodicTask | None:
     row = db.scalars(
         select(PeriodicTask).where(PeriodicTask.naam == task.naam).with_for_update(skip_locked=True)
     ).first()
@@ -339,6 +343,12 @@ def _claim(db: Session, task: Task, now: datetime, force: bool, settings: Settin
     if recent and not force:
         db.rollback()
         return None
+    if meetronde is not None:
+        storing = row.laatst_klaar if row.laatste_status == "failed" else row.laatst_gestart
+        row.details = {"meetronde": meetronde}
+        if row.laatste_status != "ok" and storing is not None:
+            row.details["storing_sinds"] = storing.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        row.laatste_status, row.laatste_reden = None, None
     row.laatst_gestart = now
     db.commit()
     return row
@@ -360,8 +370,10 @@ def run_due(
         if only is not None and task.naam not in only:
             continue
         ctx = Context(settings, vault, keyring, now or utcnow())
+        if task.naam == bronmetingen.TAAK:
+            ctx.meetronde = str(uuid4())
         with factory() as db:
-            if _claim(db, task, ctx.now, force, settings) is None:
+            if _claim(db, task, ctx.now, force, settings, ctx.meetronde) is None:
                 continue
             started = time.monotonic()
             try:
@@ -372,8 +384,8 @@ def run_due(
                 db.rollback()
                 log.exception("periodieke taak %s mislukt", task.naam)
                 details, status, reason = {"fout": type(exc).__name__}, "failed", "exception"
-            row = db.get(PeriodicTask, task.naam)
-            if row is not None:
+            row = db.get(PeriodicTask, task.naam, with_for_update=True, populate_existing=True)
+            if row is not None and (ctx.meetronde is None or row.details.get("meetronde") == ctx.meetronde):
                 row.laatst_klaar = ctx.now if now is not None else utcnow()
                 row.laatste_status, row.laatste_reden = status, reason
                 row.duur_ms = int((time.monotonic() - started) * 1000)

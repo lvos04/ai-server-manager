@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import re
 from dataclasses import dataclass, field
@@ -30,6 +32,8 @@ REDENEN = {
     "ontbreekt": "nog niet gemaakt (overname, P4-0)",
     "kopie": "Geen afzonderlijke back-upkopie met overeenkomende controlesommen.",
     "rpo": "De maximale archiefleeftijd is nog niet vastgelegd in D16.",
+    "leesbewijs": "Het leesbewijs van de bevestigde overnamebron ontbreekt of wijkt af.",
+    "meetronde": "De laatste meetpoging heeft geen bevestigde resultaten.",
     "volgorde": "Geen nieuwe bronmeting sinds de laatste storing.",
 }
 
@@ -84,6 +88,7 @@ class AppBronnen:
     rpo_uren: dict[str, float] = field(default_factory=dict)
     runtime_ids: dict[str, str] = field(default_factory=dict)
     binding_tot: dict[str, datetime] = field(default_factory=dict)
+    identiteit_sinds: dict[str, datetime] = field(default_factory=dict)
 
     def item(self, app: str, now: datetime) -> dict[str, Any]:
         m = self.metingen.get(app)
@@ -95,6 +100,8 @@ class AppBronnen:
             m, reden = None, "mso"
         elif m is None:
             reden = "ontbreekt" if app == EMBY else "geen_meting"
+        elif app in self.identiteit_sinds and m.observed_at <= self.identiteit_sinds[app]:
+            reden = "volgorde"
         elif (
             m.observed_at > now
             or not binnen_venster(m.observed_at, now, m.max_age_s)
@@ -206,14 +213,16 @@ def herstelrapport(body: dict[str, Any], now: datetime, max_age_s: int) -> Metin
     try:
         pagina = tijd(body.get("observed_at"))
         cijfer, items = mediaguard_lezen.pagina("backups", body, now, max_age_s)
-        snapshot = body.get("snapshot_id")
-        if (
-            cijfer.status != "gemeten"
-            or cijfer.waarde != 1
-            or len(items) != 1
-            or not isinstance(snapshot, str)
-            or not re.fullmatch(r"[a-f0-9]{64}", snapshot)
-        ):
+        if cijfer.status != "gemeten" or cijfer.waarde != 1 or len(items) != 1:
+            return onbekend
+        # De bron hasht zijn volledige JSON-items vóór de selectie van de velden die de Hub mag bewaren.
+        canoniek = json.dumps(
+            ["backups", pagina.isoformat(), body["reason_code"], items],
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        if body.get("snapshot_id") != hashlib.sha256(canoniek.encode()).hexdigest():
             return onbekend
         rapport = _Rapport.model_validate(items[0])
         gemeten = tijd(rapport.observed_at)
@@ -236,7 +245,7 @@ def herstelrapport(body: dict[str, Any], now: datetime, max_age_s: int) -> Metin
                 reden = "fork" if isinstance(deel, _Fork) else reden or "onderdeel"
         if tijden and not binnen_venster(min(tijden), now, BACKUP_UREN[MG] * 3600) and reden != "fork":
             reden = "oud"
-    except ValueError:
+    except (ValueError, TypeError, RecursionError):
         return onbekend
     if not FORKS.issubset(ids) or any(not f.name for f in rapport.forks):
         reden = "fork"
