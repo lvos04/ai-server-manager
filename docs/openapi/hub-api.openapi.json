@@ -1082,6 +1082,27 @@
         "title": "HeartbeatIn",
         "type": "object"
       },
+      "HersteltestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "klonen": {
+            "description": "De uitgevoerde zfs.snapshot.clone_to_sandbox-voorstellen (één per dataset van het herstelpunt).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Klonen",
+            "type": "array"
+          }
+        },
+        "required": [
+          "klonen"
+        ],
+        "title": "HersteltestIn",
+        "type": "object"
+      },
       "Home": {
         "properties": {
           "active": {
@@ -7213,6 +7234,96 @@
           }
         },
         "summary": "Herstelpunten per app (B12-006): snapshot, database-export en status",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/herstelpunten/{herstelpunt_id}/hersteltest": {
+      "post": {
+        "operationId": "run_hersteltest_api_v1_backups_herstelpunten__herstelpunt_id__hersteltest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "herstelpunt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Herstelpunt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HersteltestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hersteltest-robot (B12-005): kloon in de zandbak, export in een proefdatabase, productie onveranderd",
+        "tags": [
+          "back-up en herstel"
+        ]
+      }
+    },
+    "/api/v1/backups/rampenscenario": {
+      "get": {
+        "operationId": "get_rampenscenario_api_v1_backups_rampenscenario_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Rampenscenario Api V1 Backups Rampenscenario Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rampenscenario (B12-007): herstelstappen via de Hub en de TrueNAS-web-UI",
         "tags": [
           "back-up en herstel"
         ]

@@ -121,6 +121,25 @@ Zo'n export van een andere app levert pas haar connector; tot dan blijft het her
 `niet_geverifieerd`. De beheerder kan dit niet wegklikken. In `Approval.backup_checkpoint_id` staat het checkpoint dat
 de executor zelf opnieuw controleert (tabel hierboven).
 
+**Hersteltest-robot (B12-005, S-P2-100).** `POST /api/v1/backups/herstelpunten/{id}/hersteltest` (beheerder) toetst
+een herstelpunt zonder productie aan te raken. Eerst klont de beheerder per dataset van het herstelpunt de snapshot
+naar `<pool>/asm-sandbox/<naam>`, met het gewone voorstel `zfs.snapshot.clone_to_sandbox` (R1, via de executor). De
+robot krijgt de ID's van die uitgevoerde voorstellen (`klonen`) en kijkt alleen naar het eigen journaal: precies één
+teruggelezen kloon per snapshot van het herstelpunt, gemaakt na die snapshot. Daarna zet hij de database-export (alleen
+met dezelfde SHA-256 als vastgelegd) met `pg_restore` in een eigen proefdatabase `hersteltest_<id>` en telt hij per
+tabel de rijen in de export en in de kopie. De proefdatabase gaat daarna altijd weg. Een vingerafdruk van de
+productiedatabase vóór en na moet gelijk zijn. Uitkomst: `geslaagd` alleen bij alles positief; een kapotte checksum,
+afwijkende aantallen of een gewijzigde productie is `mislukt` en maakt het herstelpunt `ongezond` (de pre-update-gate
+geeft dan `backup_checkpoint_ontbreekt` met reden `herstelpunt_ongezond`; een latere beoordeling zet dat niet terug).
+Wat niet te meten is, is `onbekend` en laat de status ongemoeid. HARDE EIS: bij Emby, de mediaserver en MediaGuard
+zonder database-export is de uitkomst `onbekend` (`database_export_ontbreekt`). Elke uitkomst komt in
+`GET /api/v1/backups/restore-tests` en in het auditspoor (`backup.hersteltest`). De robot vraagt geen enkele actie
+buiten de vaste lijst: een snapshot terugzetten op productie bestaat niet.
+
+**Rampenscenario (B12-007).** `GET /api/v1/backups/rampenscenario` geeft per scenario (poolverlies, uitgelekte sleutel,
+foutieve appmigratie, MediaGuard terugzetten, verhuizing) de stappen en de natest, met de RPO/RTO uit D16 en de laatste
+hersteltests. Alle stappen lopen via de Hub en de TrueNAS-web-UI, nooit via een terminal op de NAS.
+
 Tussen deze stappen kan de executor ook weigeren om een reden die niet in het verzoek zit. Ook dan is er niets
 uitgevoerd:
 

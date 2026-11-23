@@ -29,6 +29,7 @@ De werklast van daarvoor bewaart de fake apart (``_werklast``) en zet hij terug 
 from __future__ import annotations
 
 import asyncio
+import copy
 import datetime as dt
 import hashlib
 import ipaddress
@@ -559,6 +560,10 @@ class FakeTrueNAS:
         self.realtime_silent = False  # True: abonnement aangenomen maar nooit gegevens (time-out-test)
         self.calls: list[tuple[str, Any]] = []
         self.txg = 1000  # laatste createtxg (transactiegroep) van deze nagebootste pool
+        # Nagebootste inhoud per dataset (bv. appconfig): een snapshot bevriest hem, een kloon krijgt die bevroren
+        # inhoud (EX14). Los van ``pool.dataset.query``, zodat de API-vorm gelijk blijft.
+        self.inhoud: dict[str, Any] = {}
+        self.snapshot_inhoud: dict[str, Any] = {}
         self.mutations: list[str] = []
         self.paths: list[str] = []
         # Schrijven (executor): testknoppen en wat er is ontvangen.
@@ -955,6 +960,7 @@ class FakeTrueNAS:
                 raise FakeCallError("EEXIST", "Snapshot already exists")
             self.txg += 1
             for d in leden:
+                self.snapshot_inhoud[f"{d}@{name}"] = copy.deepcopy(self.inhoud.get(d))
                 self.data["snapshots"].setdefault(d, []).append(
                     {
                         "name": f"{d}@{name}",
@@ -975,6 +981,7 @@ class FakeTrueNAS:
             if dst in self.datasets():
                 raise FakeCallError("EEXIST", "Dataset already exists")
             self.add_dataset(dst)
+            self.inhoud[dst] = copy.deepcopy(self.snapshot_inhoud.get(snap))
             return True
         if method in ("pool.dataset.delete", "pool.snapshottask.create"):
             raise FakeCallError("EPERM", "Niet ondersteund in de fake")

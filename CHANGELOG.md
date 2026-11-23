@@ -4,6 +4,18 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Back-up: hersteltest-robot en rampenscenario (S-P2-100)
+
+- B12-005: hersteltest-robot (`POST /api/v1/backups/herstelpunten/{id}/hersteltest`, beheerder). Toetst per
+  herstelpunt de kloon in `<pool>/asm-sandbox/<naam>` (R1-voorstel via de executor), zet de database-export terug in
+  een eigen proefdatabase (checksum, `pg_restore`, aantallen per tabel) en controleert dat de productiedatabase niet
+  veranderde. Mislukt → herstelpunt `ongezond` en de pre-update-gate dicht (`herstelpunt_ongezond`).
+- EX14: snapshot-herstel in de zandbak geeft de oude waarde terug; productie blijft onaangeroerd (Sim).
+- EX13: hersteltest van een gedownloade externe back-up (exacte inhoud en database-integriteit) in de simulator.
+- B12-007: rampenscenario met vijf stappenlijsten (`GET /api/v1/backups/rampenscenario`), zonder terminalstap;
+  oefening op de teststack herstelt de Hub-database, de vault en de koppelingen zonder de oorspronkelijke NAS.
+- Sim-getest. NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware).
+
 ### Toegevoegd — Back-up: OneDrive-verificatie, herstelpunten per app en pre-update-gate (S-P2-090)
 
 - B12-004: de Hub toetst de OneDrive-uploadtaken uit D04 via de alleen-lezen inventaris (`cloudsync.query`). Een

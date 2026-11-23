@@ -355,20 +355,20 @@ class Herstelpunt(Base):
     gemaakt_op: Mapped[datetime] = mapped_column(TS)
     snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # {actie_id, datasets}
     db_export: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    status: Mapped[str] = mapped_column(String(24))  # geverifieerd | niet_geverifieerd
+    status: Mapped[str] = mapped_column(String(24))  # geverifieerd | niet_geverifieerd | ongezond (hersteltest)
     reden: Mapped[str | None] = mapped_column(String(64), nullable=True)
     vastgelegd_op: Mapped[datetime] = mapped_column(TS, default=utcnow)
 
 
 class RestoreTest(Base):
-    """Expliciet bewijsrecord van een echte hersteltest (handmatig; de Hub voert in P0 zelf geen restore uit)."""
+    """Bewijsrecord van een echte hersteltest: handmatig vastgelegd, of door de hersteltest-robot (B12-005)."""
 
     __tablename__ = "restore_test"
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     app_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     dataset: Mapped[str | None] = mapped_column(String(512), nullable=True)
     soort: Mapped[str] = mapped_column(String(16))  # foto|database|dataset|config
-    resultaat: Mapped[str] = mapped_column(String(16))  # geslaagd|mislukt
+    resultaat: Mapped[str] = mapped_column(String(16))  # geslaagd|mislukt|onbekend (onbekend: alleen de robot)
     omgeving: Mapped[str] = mapped_column(String(256))
     omschrijving: Mapped[str] = mapped_column(Text)
     referentie: Mapped[str] = mapped_column(String(512), default="")

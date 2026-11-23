@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from hub import audit
 from hub.backup import coverage as cov
+from hub.backup import hersteltest, rampenscenario
 from hub.backup.selfbackup import latest_verified, reverify, to_dict
 from hub.config import Settings
 from hub.deps import DB, Admin, Idem, Operator, SettingsDep, Viewer
@@ -143,6 +144,54 @@ def list_herstelpunten(db: DB, _: Viewer, app: str | None = None) -> dict[str, A
         ],
         "regel": "Alleen een geverifieerd herstelpunt jonger dan de RPO uit D16 telt; voor Emby, de mediaserver en "
         "MediaGuard alleen met de database erin.",
+    }
+
+
+class HersteltestIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    klonen: list[uuid.UUID] = Field(
+        min_length=1,
+        max_length=32,
+        description="De uitgevoerde zfs.snapshot.clone_to_sandbox-voorstellen (één per dataset van het herstelpunt).",
+    )
+
+
+@router.post(
+    "/herstelpunten/{herstelpunt_id}/hersteltest",
+    summary="Hersteltest-robot (B12-005): kloon in de zandbak, export in een proefdatabase, productie onveranderd",
+)
+def run_hersteltest(
+    herstelpunt_id: uuid.UUID, body: HersteltestIn, db: DB, settings: SettingsDep, principal: Admin, idem: Idem
+) -> JSONResponse:
+    if (replay := idem.replay()) is not None:
+        return replay
+    hp = db.get(Herstelpunt, herstelpunt_id)
+    if hp is None:
+        raise HubError(404, "not_found", "Herstelpunt niet gevonden.")
+    uit = hersteltest.voer_uit(db, settings, hp, body.klonen, door=principal.name)
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=principal.name,
+        action="backup.hersteltest",
+        target_type="herstelpunt",
+        target_id=str(hp.id),
+        details={"resultaat": uit["resultaat"], "reden": uit["reden"], "restore_test": uit["restore_test"]},
+    )
+    return idem.save(200, uit)
+
+
+@router.get("/rampenscenario", summary="Rampenscenario (B12-007): herstelstappen via de Hub en de TrueNAS-web-UI")
+def get_rampenscenario(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
+    inp = coverage_inputs(db, settings)
+    return {
+        "scenarios": rampenscenario.SCENARIOS,
+        "rpo_rto": inp.rpo_rto,
+        "laatste_hersteltests": [
+            {k: t[k] for k in ("app_id", "resultaat", "duur_minuten", "uitgevoerd_op")}
+            for t in sorted(inp.restore_tests, key=lambda t: str(t["uitgevoerd_op"]), reverse=True)[:20]
+        ],
+        "regel": rampenscenario.REGEL,
     }
 
 

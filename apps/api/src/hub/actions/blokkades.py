@@ -8,7 +8,8 @@ voegt toe wat alleen de Hub kan weten:
 - **noodstop**: een beheerder kan alle uitvoering stilleggen (Hub-instelling ``acties.noodstop``);
 - **anti-flap**: afkoeltijd en maximum per uur per (actie, doel) — voor iedereen, niet alleen voor de AI;
 - **herstelpunt**: een actie met ``requires_backup`` heeft een geverifieerd herstelpunt (B12-006) nodig, jonger dan de
-  RPO van die app uit D16; voor Emby, de mediaserver en MediaGuard alleen met de database erin (HARDE EIS).
+  RPO van die app uit D16; voor Emby, de mediaserver en MediaGuard alleen met de database erin (HARDE EIS). Een
+  herstelpunt dat de hersteltest-robot ``ongezond`` verklaarde (B12-005), telt nooit.
 
 Een blokkade geldt óók met goedkeuring; er is geen route om er een weg te klikken. Onbekend telt als geblokkeerd.
 """
@@ -24,7 +25,7 @@ from asm_policy import checkpoint as cpmod
 from asm_policy.engine import Classification, class_at_least, recognize_all
 from asm_policy.loader import ActieDef
 from asm_policy.params import expected_image
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -163,6 +164,11 @@ def _leg_vast(db: Session, app: str, k: ActionRequest, datasets: list[str], dbx:
     stmt = pg_insert(Herstelpunt).values(
         id=uuid.uuid4(), app=app, checkpoint_id=str(k.id), gemaakt_op=k.uitgevoerd_op, **waarden
     )
+    # Een herstelpunt dat de hersteltest-robot ``ongezond`` verklaarde, blijft ongezond (S-P2-100): een latere
+    # beoordeling van alleen de snapshot mag die uitkomst niet overschrijven.
+    ongezond = Herstelpunt.status == "ongezond"
+    waarden["status"] = case((ongezond, Herstelpunt.status), else_=stmt.excluded.status)
+    waarden["reden"] = case((ongezond, Herstelpunt.reden), else_=stmt.excluded.reden)
     db.execute(stmt.on_conflict_do_update(constraint="uq_herstelpunt_checkpoint_app", set_=waarden))
 
 
@@ -256,6 +262,11 @@ def verified_checkpoint(
                 namen=alle, db_export=dbx, gemaakt_op=k.uitgevoerd_op, rpo_s=rpo_s, now=now
             )
             _leg_vast(db, app, k, list(leden), dbx, status, reden)
+            bewaard = db.scalar(
+                select(Herstelpunt.status).where(Herstelpunt.checkpoint_id == str(k.id), Herstelpunt.app == app)
+            )
+            if bewaard == "ongezond":
+                return None, "herstelpunt_ongezond"  # de hersteltest faalde: de pre-update-gate blijft dicht
             return (str(k.id), "geverifieerd") if telt else (None, str(reden))
     return None, "geen_passend_checkpoint"
 
