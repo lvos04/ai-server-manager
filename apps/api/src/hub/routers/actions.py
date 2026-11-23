@@ -9,8 +9,9 @@ Eén weg voor elke wijziging buiten de Hub:
 3. ``POST /api/v1/actions/{id}/execute`` — de Hub controleert alles opnieuw, ondertekent een ``ExecutionRequest`` en
    stuurt dat naar de executor. De executor controleert zelf nog eens en voert uit met readback.
 
-De Hub heeft geen schrijfsleutel van TrueNAS en geen route om een blokkade weg te klikken. Alleen gebruikerssessies:
-voorstellen door diensten, flows of AI krijgen een eigen ingang in een latere fase.
+De Hub heeft geen schrijfsleutel van TrueNAS en geen route om een blokkade weg te klikken. Deze routes zijn alleen voor
+gebruikerssessies. Een flow stelt voor via het event ``flow.action.requested`` in de inbox (``hub/actions/flows.py``,
+B01-008); diensten en de AI krijgen een eigen ingang in een latere fase.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from sqlalchemy import select
 from hub import audit
 from hub.actions import beleid, service
 from hub.actions import blokkades as blok_mod
-from hub.catalog import kluis, plannen
+from hub.catalog import plannen
 from hub.deps import (
     DB,
     Admin,
@@ -194,25 +195,7 @@ def propose(
     if body.actor is not None and (body.actor.type != "user" or body.actor.id != principal.name):
         # Een voorstel namens iemand anders bestaat hier niet: de actor is altijd de aangemelde gebruiker.
         raise HubError(422, "actor_past_niet", "actor in het voorstel past niet bij de aangemelde gebruiker.")
-    if "catalog_binding" in body.parameters:
-        # Een catalogusbinding komt alleen uit een eigen plan van de Hub (§8.2), nooit van de aanvrager.
-        raise HubError(
-            422,
-            "catalog_binding_alleen_via_plan",
-            "Een catalogusinstallatie loopt via /api/v1/catalog/plans; een eigen catalog_binding wordt geweigerd.",
-        )
-    doelnaam = body.target.get("app_id") if isinstance(body.target, dict) else None
-    if (
-        (body.action_id == "app.update" and "image" in body.parameters)
-        or (body.action_id == "app.rollback" and "herstel_van" in body.parameters)
-    ) and kluis.gemarkeerd(db, str(doelnaam)):
-        # §8.3: zonder recept met alleen verwijzingen zou app.config de ingevulde geheimen in het journaal brengen.
-        raise HubError(
-            409,
-            "kluisplekken_recept_ontbreekt",
-            "Deze app kreeg bij de installatie geheimen uit de kluis. Bijwerken of terugzetten via de waarden kan pas "
-            "met het recept met alleen verwijzingen; er is niets voorgesteld.",
-        )
+    service.voorcontrole(db, body.action_id, body.target, body.parameters)
 
     def werk() -> tuple[int, dict[str, Any]]:
         return 201, service.stel_voor(

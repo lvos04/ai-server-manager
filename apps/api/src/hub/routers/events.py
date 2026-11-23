@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 
 from hub import APP_ID, __version__, audit
+from hub.actions import flows
 from hub.backup.selfbackup import latest_verified
 from hub.backup.selfbackup import to_dict as backup_dict
 from hub.config import DEFAULT_MAX_AGE_SECONDS
@@ -32,10 +33,13 @@ from hub.deps import (
     ViewerOrService,
     decode_cursor,
     encode_cursor,
+    get_keyring,
+    get_vault,
     require_viewer_or_scope,
 )
 from hub.errors import HubError
 from hub.events.envelope import EventEnvelope, accept, inbox_to_dict, outbox_to_envelope
+from hub.keys import KeyRing
 from hub.models import (
     AuditEvent,
     Decision,
@@ -51,19 +55,34 @@ from hub.onboarding import service as decisions
 from hub.scopes import BESLUITEN_LEZEN
 from hub.security import Role
 from hub.timeutil import binnen_venster, iso, utcnow
+from hub.vault import Vault
 
 router = APIRouter(tags=["events en connector"])
+VaultDep = Annotated[Vault, Depends(get_vault)]
+KeyRingDep = Annotated[KeyRing, Depends(get_keyring)]
 UsersOnly = Annotated[Principal, Depends(require_viewer_or_scope(None))]
 DecisionReader = Annotated[Principal, Depends(require_viewer_or_scope(BESLUITEN_LEZEN))]
 # Een wachtrij die niet afneemt (oudste wachtende job ouder dan dit) → jobs degraded (§6 regel 3).
 JOBS_STIL_NA_S = 15 * 60
 
 
-@router.post("/api/v1/events/inbox", summary="Event ontvangen (service-token); dedupe op event_id en bron-id")
-def inbox(env: EventEnvelope, db: DB, principal: ServiceP) -> JSONResponse:
+@router.post(
+    "/api/v1/events/inbox",
+    summary="Event ontvangen (service-token); dedupe op event_id en bron-id; flow.action.requested wordt een voorstel",
+)
+def inbox(
+    env: EventEnvelope,
+    db: DB,
+    settings: SettingsDep,
+    vault: VaultDep,
+    keyring: KeyRingDep,
+    principal: ServiceP,
+) -> JSONResponse:
     if env.source_app != principal.service_app_id:
         raise HubError(403, "source_mismatch", "source_app moet gelijk zijn aan de app van het service-token.")
     status, row = accept(db, env, service_id=uuid.UUID(principal.id))
+    if status == "accepted":
+        flows.verwerk(db, settings, vault, keyring, env)  # B01-008; doet niets voor andere events
     code = 202 if status == "accepted" else 200
     return JSONResponse({"status": status, "event_id": str(row.event_id), "seq": row.seq}, status_code=code)
 

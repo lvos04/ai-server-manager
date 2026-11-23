@@ -243,3 +243,30 @@ AI kan geen van beide acties voorstellen: de route laat alleen de aangemelde geb
 weigert een AI-actor (`ai_mag_voorstellen: false`). `mediaguard.*` blijft gereserveerd tot BG-05 en P3-02
 (`501 capability_unavailable`). Getest met de fake eigenaar `tests/fakes/fake_eigenaar.py` (Sim-getest); de echte
 proef met home-control-hub volgt in S-P2-340.
+
+## Voorstellen van een flow (S-P2-140, B01-008)
+
+De Hub bouwt geen eigen flow-editor: flows leven in Node-RED achter home-control-hub (B11). Vraagt een flow daar een
+actie aan, dan stuurt home-control-hub het event `flow.action.requested` (contract 1.3 §7) naar
+`POST /api/v1/events/inbox`. De Hub maakt er een gewoon ActionProposal van met actor `flow`
+(`hub/actions/flows.py`): dezelfde classificatie, gates, preview, goedkeuring en ondertekende uitvoering als hierboven,
+met de regels voor een niet-menselijke actor (`ai_mag_voorstellen: false` → geweigerd). Een flow claimt geen
+risicoklasse. Uitvoeren blijft `POST /api/v1/actions/{id}/execute` door een gebruiker; R2/R3 vraagt een beheerder.
+
+| Geval | Uitkomst |
+|---|---|
+| bron is niet `home-control-hub` (eigenaar van het domein `flow`, §7) | event bewaard als informatie, geen voorstel |
+| `schema_version` onbekend of envelope ongeldig | `422` aan de bron, niets bewaard |
+| payload buiten de witte lijst (onbekend veld, verkeerd type, geen echte boolean) | event bewaard, geen voorstel, audit `action.flow_request.refused` met `payload_ongeldig` en alleen bekende veldnamen |
+| actor of entity van envelope en payload noemen niet dezelfde flow | idem, `actor_past_niet` of `flow_past_niet` |
+| vervaltijd vanaf `timestamp_utc` verstreken (te laat afgeleverd) | idem, `verzoek_verlopen` |
+| schemafout, doel onleesbaar, enz. | idem, met de foutcode van het voorstel (bv. `parameters_ongeldig`, `doel_onbekend`) |
+| onverwachte fout | idem, `uitkomst_onbekend`; er is niets voorgesteld |
+| beleid weigert (shell, boiler, destructief, buiten de allowlist, alleen een mens) | voorstel `geweigerd` met actor `flow` en audit `action.proposal.refused` (EX45) |
+| hetzelfde verzoek opnieuw afgeleverd (zelfde `event_id`, of nieuw `event_id` met dezelfde `action_request_id`) | één voorstel: `request_id` = uuid5 van bron en `action_request_id` (EX46) |
+
+De audit bevat alleen codes en ID's, nooit de reden, het doel of de parameters van de flow. Getest met een nagebootste
+home-control-hub (Sim-getest): `apps/api/tests/integration/test_flow_voorstellen.py` en
+`tests/e2e/test_flow_acties.py`. Het terugmelden van de uitkomst aan home-control-hub
+(`/integrations/v1/automation/action-requests/{id}/result`) en het scherm Automatisering met een link naar de
+Node-RED-editor volgen later; de echte proef met home-control-hub volgt in S-P2-340.

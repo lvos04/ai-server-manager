@@ -294,7 +294,7 @@ def _fouten_dict(fouten: list[Any]) -> dict[str, Any]:
 def _weiger(
     db: Session,
     policy: Policy,
-    principal: Principal,
+    actor: tuple[str, str],
     *,
     request_id: uuid.UUID,
     action_id: str,
@@ -325,8 +325,8 @@ def _weiger(
             aangemaakt_op=now,
             bijgewerkt_op=now,
             geldig_tot=now,
-            actor_type="user",
-            actor_id=principal.name,
+            actor_type=actor[0],
+            actor_id=actor[1],
             action_id=action_id[:96],
             target=klein,
             parameters={},
@@ -346,8 +346,8 @@ def _weiger(
     )
     audit.record(
         db,
-        actor_type="user",
-        actor_id=principal.name,
+        actor_type=actor[0],
+        actor_id=actor[1],
         action="action.proposal.refused",
         target_type="action_request",
         target_id=str(request_id),
@@ -413,11 +413,34 @@ def _lees(
         ) from None
 
 
+def voorcontrole(db: Session, action_id: str, target: Mapping[str, Any], parameters: Mapping[str, Any]) -> None:
+    """Controles vóór elk voorstel van buiten de Hub (gebruiker of flow); een eigen plan van de Hub slaat ze over."""
+    if "catalog_binding" in parameters:
+        # Een catalogusbinding komt alleen uit een eigen plan van de Hub (§8.2), nooit van de aanvrager.
+        raise HubError(
+            422,
+            "catalog_binding_alleen_via_plan",
+            "Een catalogusinstallatie loopt via /api/v1/catalog/plans; een eigen catalog_binding wordt geweigerd.",
+        )
+    doelnaam = target.get("app_id")
+    if (
+        (action_id == "app.update" and "image" in parameters)
+        or (action_id == "app.rollback" and "herstel_van" in parameters)
+    ) and kluis.gemarkeerd(db, str(doelnaam)):
+        # §8.3: zonder recept met alleen verwijzingen zou app.config de ingevulde geheimen in het journaal brengen.
+        raise HubError(
+            409,
+            "kluisplekken_recept_ontbreekt",
+            "Deze app kreeg bij de installatie geheimen uit de kluis. Bijwerken of terugzetten via de waarden kan pas "
+            "met het recept met alleen verwijzingen; er is niets voorgesteld.",
+        )
+
+
 def stel_voor(
     db: Session,
     settings: Settings,
     vault: Vault,
-    principal: Principal,
+    principal: Principal | None,
     *,
     request_id: uuid.UUID,
     action_id: str,
@@ -430,7 +453,15 @@ def stel_voor(
     expires_in_seconds: int,
     trace_id: str,
     keyring: KeyRing | None = None,
+    actor: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
+    """Zonder ``actor`` is de aangemelde gebruiker de actor; een flow (B01-008) geeft ``("flow", <id>)`` en krijgt
+    precies dezelfde classificatie, gates en goedkeuring, met de regels voor een niet-menselijke actor."""
+    if actor is None:
+        if principal is None:
+            raise ValueError("stel_voor zonder gebruiker vraagt een actor")
+        actor = ("user", principal.name)
+    actor_type = actor[0]
     policy = get_policy()
     if db.get(ActionRequest, request_id) is not None:
         raise HubError(409, "verzoek_bestaat_al", "Er bestaat al een actieverzoek met deze Idempotency-Key.")
@@ -446,12 +477,12 @@ def stel_voor(
         "trace_id": trace_id,
     }
     # Stap 1: het beleid zonder kennis van het doel. risk_claim telt nergens mee (EX18).
-    cls = classify(policy, action_id=aid, target=target, parameters=parameters, actor_type="user")
+    cls = classify(policy, action_id=aid, target=target, parameters=parameters, actor_type=actor_type)
     if cls.geweigerd:
         _weiger(
             db,
             policy,
-            principal,
+            actor,
             cls=cls,
             status=403,
             code="actie_geweigerd",
@@ -462,7 +493,7 @@ def stel_voor(
         _weiger(
             db,
             policy,
-            principal,
+            actor,
             cls=cls,
             status=501,
             code="capability_unavailable",
@@ -474,7 +505,7 @@ def stel_voor(
         _weiger(
             db,
             policy,
-            principal,
+            actor,
             cls=cls,
             status=403,
             code="actie_niet_toegestaan",
@@ -505,7 +536,12 @@ def stel_voor(
     doel = _lees(db, vault, settings, policy, actie, target, parameters, keyring=keyring, reden=reason)
     cls = _met_eigenaar(
         classify(
-            policy, action_id=aid, target=target, parameters=parameters, actor_type="user", herkend_als=doel.herkend_als
+            policy,
+            action_id=aid,
+            target=target,
+            parameters=parameters,
+            actor_type=actor_type,
+            herkend_als=doel.herkend_als,
         ),
         doel,
     )
@@ -513,7 +549,7 @@ def stel_voor(
         _weiger(
             db,
             policy,
-            principal,
+            actor,
             cls=cls,
             status=403,
             code="actie_geweigerd",
@@ -535,8 +571,8 @@ def stel_voor(
         aangemaakt_op=now,
         bijgewerkt_op=now,
         geldig_tot=now + timedelta(seconds=expires_in_seconds),
-        actor_type="user",
-        actor_id=principal.name,
+        actor_type=actor_type,
+        actor_id=actor[1],
         action_id=aid,
         target=target,
         parameters=parameters,
@@ -560,8 +596,8 @@ def stel_voor(
     req.blokkades, _ = blok_mod.dynamisch(db, settings, policy, actie, cls, req, now=now)
     audit.record(
         db,
-        actor_type="user",
-        actor_id=principal.name,
+        actor_type=actor_type,
+        actor_id=actor[1],
         action="action.proposal.created",
         target_type="action_request",
         target_id=str(req.id),

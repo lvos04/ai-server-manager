@@ -8337,7 +8337,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Event ontvangen (service-token); dedupe op event_id en bron-id",
+        "summary": "Event ontvangen (service-token); dedupe op event_id en bron-id; flow.action.requested wordt een voorstel",
         "tags": [
           "events en connector"
         ]

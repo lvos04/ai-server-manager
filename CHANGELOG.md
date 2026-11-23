@@ -4,6 +4,19 @@ Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact
 
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
+### Toegevoegd — Automatiseringen zonder code, Hub-kant (S-P2-140)
+
+- B01-008: het event `flow.action.requested` van home-control-hub wordt een gewoon voorstel met actor `flow`, met
+  dezelfde classificatie, gates, goedkeuring en ondertekende uitvoering als elk ander voorstel. De Hub bouwt geen eigen
+  flow-editor en voert een flowverzoek nooit vanzelf uit.
+- EX46 (Hub-deel): vijf keer hetzelfde event, of een nieuwe aflevering van hetzelfde actieverzoek, geeft één voorstel
+  en hooguit één uitvoering (vaste `request_id` uit bron en `action_request_id`).
+- EX45 (Hub-deel): een flow die een dataset wil verwijderen, een shell- of boileractie vraagt of een actie die alleen
+  een mens mag voorstellen, wordt geweigerd; de weigering staat in de audit met actor `flow`. Een payload buiten de
+  witte lijst, een andere flow in envelope en payload of een te laat afgeleverd verzoek wordt geen voorstel en staat
+  als `action.flow_request.refused` in de audit. Een onbekende `schema_version` blijft een zichtbare `422`.
+- Sim-getest met een nagebootste home-control-hub. NIET GEVALIDEERD (echte NAS): geen echte Node-RED aangesloten.
+
 ### Toegevoegd — Back-up: hersteltest-robot en rampenscenario (S-P2-100)
 
 - B12-005: hersteltest-robot (`POST /api/v1/backups/herstelpunten/{id}/hersteltest`, beheerder). Toetst per
