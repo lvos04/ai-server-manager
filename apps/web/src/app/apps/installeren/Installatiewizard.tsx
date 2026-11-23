@@ -3,6 +3,8 @@
 import { Check, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { vasteFout } from "@/lib/acties";
+import { isUuid } from "@/lib/uuid";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { useNow } from "@/components/Freshness";
 import { KopieerVeld } from "@/components/KopieerVeld";
@@ -142,7 +144,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
   const maakVoorstel = async () => {
     if (!plan || reden || propose.busy) return;
     const r = await propose.run(`/api/v1/catalog/plans/${plan.plan_id}/steps/${plan.step_id}/propose`);
-    if (r && typeof r.request_id === "string" && /^[0-9a-f-]{36}$/.test(r.request_id)) router.push(`/goedkeuringen/${r.request_id}`);
+    if (r && isUuid(r.request_id)) router.push(`/goedkeuringen/${r.request_id}`);
     else void p.reload();
   };
 
@@ -164,7 +166,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
           <p>Dit installatieplan is niet gevonden.</p>
         </Melding>
       ) : (
-        <ErrorPanel error={p.error} title="Plan ophalen mislukt" onRetry={() => void p.reload()} />
+        <ErrorPanel vast={vasteFout} error={p.error} title="Plan ophalen mislukt" onRetry={() => void p.reload()} />
       );
   } else if (!plan) {
     inhoud = <Loading text="Plan ophalen…" />;
@@ -212,7 +214,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
         </h2>
         {!operator ? <RolMelding>Installeren kan pas vanaf de rol operator.</RolMelding> : null}
         {inhoud}
-        {propose.error ? <ErrorPanel error={propose.error} title="Voorstel maken mislukt" /> : null}
+        {propose.error ? <ErrorPanel vast={vasteFout} error={propose.error} title="Voorstel maken mislukt" /> : null}
         <div data-actiebalk="" className="flex flex-col gap-2">
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Link href="/apps/catalogus" className={buttonVariants({ variant: "stil" })}>

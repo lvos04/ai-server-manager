@@ -292,10 +292,10 @@ def test_beschermde_apps_en_alleen_beheerder() -> None:
         POLICY, action_id="app.update", target=APP, parameters={}, actor_type="user", herkend_als="mediaguard"
     )
     assert "mediaguard_upgradebewijs_ontbreekt" in [b.code for b in mg.blokkades]
-    mg_ok = classify(
+    herstart = classify(
         POLICY, action_id="app.restart", target=APP, parameters={}, actor_type="user", herkend_als="mediaguard"
     )
-    assert not mg_ok.geweigerd
+    assert herstart.geweigerd and "mediaguard_upgradebewijs_ontbreekt" in [b.code for b in herstart.blokkades]
     sso = {"host_id": HOST, "app_id": "home-control-hub", "resource": "hub"}
     ai = classify(POLICY, action_id="sso.sessions.revoke", target=sso, parameters={}, actor_type="ai")
     assert "alleen_beheerder" in [b.code for b in ai.blokkades]
@@ -450,10 +450,10 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_een_catalogusapp_niet() -
         c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=h)
         assert c.risk_class == "R2" and c.requires_approval and "STOP-EENRICHTING" in c.rule_ids, app
     # Een catalogusapp: draaiend én gestopt R1, zonder goedkeuring.
-    for staat, images in (("RUNNING", ["jellyfin/jellyfin:10.11.0"]), ("STOPPED", [])):
-        jf = herken_app(POLICY, "films", _readback("films", staat, images, catalogus="jellyfin"))
-        assert jf.volledig and jf.na_stop_herkenbaar
-        c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=jf)
+    for staat, images in (("RUNNING", ["voorbeeld/takenlijst:1.0"]), ("STOPPED", [])):
+        catalogus = herken_app(POLICY, "films", _readback("films", staat, images, catalogus="takenlijst"))
+        assert catalogus.volledig and catalogus.na_stop_herkenbaar
+        c = classify(POLICY, action_id="app.stop", target=APP, parameters={}, actor_type="user", herkend_als=catalogus)
         assert not c.geweigerd and c.risk_class == "R1" and not c.requires_approval, staat
         assert "STOP-EENRICHTING" not in c.rule_ids
     # Beschermd blijft beschermd: Emby als Custom App met een Emby-image wordt geweigerd, ook met goedkeuring.
@@ -479,7 +479,7 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_een_catalogusapp_niet() -
     assert w is None and eigen is not None and eigen.risk_class == "R2"
     # Dezelfde catalogusapp als R1 zonder goedkeuring: geen weigering.
     req = execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R1", now=NU)
-    _a, eigen, w = check_decision(POLICY, req, now=NU, herkend_als=jf, uitvoerder="executor")
+    _a, eigen, w = check_decision(POLICY, req, now=NU, herkend_als=catalogus, uitvoerder="executor")
     assert w is None and eigen is not None and eigen.risk_class == "R1"
 
 

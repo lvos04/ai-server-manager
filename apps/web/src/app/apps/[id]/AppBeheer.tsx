@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { RisicoBadge } from "@/components/ActiePreview";
 import { useNow } from "@/components/Freshness";
+import { isUuid } from "@/lib/uuid";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { KopieerVeld } from "@/components/KopieerVeld";
 import { Loading } from "@/components/Loading";
@@ -14,7 +15,7 @@ import { ResponsiveList } from "@/components/ResponsiveList";
 import { RolMelding } from "@/components/RolMelding";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { vasteFout, werkwoord, type ActieLijst, type Beleid } from "@/lib/acties";
-import { APP_DOEL, appActies, beschermd, beschermingVoor, EMBY_ZIN, isEmby, terugzetPunten, updateDoel, wieBeslist, type AppActie } from "@/lib/appbeheer";
+import { APP_DOEL, appActies, EMBY_ZIN, terugzetPunten, updateDoel, wieBeslist, type AppActie } from "@/lib/appbeheer";
 import { backupGate, gateVoorwaarde, puntenReden, type Herstelpunt } from "@/lib/backups";
 import type { Coverage, Gate } from "@/lib/types";
 import { useMeting } from "@/lib/use-meting";
@@ -37,21 +38,20 @@ function useVoorstel(app: CatalogDetail) {
     if (a.busy) return;
     // De reden is een vaste tekst; vrije tekst van de gebruiker gaat nooit mee.
     const r = await a.run("/api/v1/actions", { body: { action_id: actionId, target: APP_DOEL(app.naam), parameters, reason: `Hub appdetail: ${actionId}` } });
-    if (r) router.push(`/goedkeuringen/${r.request_id}`);
+    if (isUuid(r?.request_id)) router.push(`/goedkeuringen/${r.request_id}`);
   };
   return { ...a, stel };
 }
 
-function Uitleg({ regels }: { regels: Beleid["beschermd"] }) {
+function Uitleg({ rijen }: { rijen: AppActie[] }) {
+  const regels = [...new Map(rijen.flatMap((r) => r.blokkades.map((b) => [b.id, b] as const))).values()];
   if (!regels.length) return null;
+  const onbekend = regels.some((b) => b.code === "actiebeleid_onbekend" || b.code === "doel_niet_herkenbaar");
   return (
-    <Melding soort="info" icon={ShieldCheck} titel="Beschermde app" data-testid="beschermd">
-      {isEmby(regels) ? <p className="font-semibold">{EMBY_ZIN}</p> : null}
-      <p>Stoppen, bijwerken, terugzetten en verwijderen staan voor deze app niet in de Hub.</p>
+    <Melding soort={onbekend ? "onbekend" : "info"} icon={ShieldCheck} titel={onbekend ? "Bescherming onbekend" : "Beschermde app"} data-testid="beschermd">
+      {regels.some((b) => b.code === "emby_nooit_door_platform") ? <p className="font-semibold">{EMBY_ZIN}</p> : null}
       <ul className="list-disc pl-6">
-        {regels.map((r) => (
-          <li key={r.id}>{r.reden}</li>
-        ))}
+        {regels.map((r) => <li key={r.id}>{r.reden}</li>)}
       </ul>
     </Melding>
   );
@@ -76,10 +76,12 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
   const operator = hasRole(role, "operator");
   const voorstel = useVoorstel(app);
   const updates = useApi<ActieLijst>(operator ? "/api/v1/actions?action_id=app.update&status=uitgevoerd&limit=50" : null);
-  const regels = beleid.data ? beschermingVoor(beleid.data, app) : [];
+  const rijen = beleid.data ? appActies(beleid.data, app) : [];
+  const bijwerken = rijen.find((r) => r.actie.action_id === "app.update");
+  const terugzetten = rijen.find((r) => r.actie.action_id === "app.rollback");
   const bruikbaar = Boolean(beleid.data && !beleid.stale);
   const nu = useNow(1000).getTime();
-  const controleer = operator && bruikbaar && !regels.length;
+  const controleer = operator && bruikbaar && (bijwerken?.blokkades.length === 0 || terugzetten?.blokkades.length === 0);
   const gate = useMeting<Gate>(controleer ? "/api/v1/gates/backup_gate" : null);
   const dekking = useMeting<Coverage>(controleer ? "/api/v1/backups/coverage" : null);
   const herstel = useMeting<{ items: Herstelpunt[] }>(controleer ? `/api/v1/backups/herstelpunten?app=${encodeURIComponent(app.naam)}` : null);
@@ -131,16 +133,15 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
       <p className="text-sm text-muted-foreground">Een eerder gezien image bewijst op zichzelf geen veilig terugzetpad.</p>
 
       <h2 className="text-lg">Bijwerken en terugzetten</h2>
+      {bruikbaar ? <Uitleg rijen={rijen} /> : null}
       {!operator ? (
         <RolMelding>Je kijkt als {ROLE_LABEL[role ?? "viewer"]}: bijwerken en terugzetten kan pas vanaf de rol operator.</RolMelding>
       ) : !bruikbaar ? (
         <BeleidStand beleid={beleid} />
-      ) : regels.length ? (
-        <Uitleg regels={regels} />
       ) : (
         <div className="flex flex-col gap-3">
-          {reden && <p id="versies-backupreden">{reden} <Link href="/backups" className="losse-link">Bekijk de back-upgate</Link></p>}
-          {"parameters" in doel ? (
+          {controleer && reden && <p id="versies-backupreden">{reden} <Link href="/backups" className="losse-link">Bekijk de back-upgate</Link></p>}
+          {bijwerken?.blokkades.length === 0 && ("parameters" in doel ? (
             <div className="flex flex-col gap-1">
               <p>Bijwerken opent eerst een voorstel met preview, risicoklasse en de vereiste back-up. Er gebeurt nog niets.</p>
               <div>
@@ -153,8 +154,8 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
             <Melding soort="nogniet" titel="Bijwerken" data-testid="bijwerken-niet">
               <p>{doel.reden}</p>
             </Melding>
-          )}
-          {updates.error ? (
+          ))}
+          {terugzetten?.blokkades.length === 0 && (updates.error ? (
             <ErrorPanel vast={vasteFout} error={updates.error} title="Terugzetpaden ophalen mislukt" alert={false} />
           ) : !updates.data ? (
             <Loading text="Terugzetpaden ophalen…" regels={1} />
@@ -175,7 +176,7 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
                 <Link href="/backups">Bekijk herstelpunten</Link>
               </p>
             </Melding>
-          )}
+          ))}
           {voorstel.error ? <ErrorPanel vast={vasteFout} error={voorstel.error} title="Voorstel maken mislukt" /> : null}
         </div>
       )}
@@ -240,11 +241,11 @@ export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<B
   const [verwijderen, setVerwijderen] = useState(false);
   const bruikbaar = Boolean(beleid.data && !beleid.stale);
   const rijen = beleid.data ? appActies(beleid.data, app) : [];
-  const regels = beleid.data ? beschermingVoor(beleid.data, app) : [];
+  const magVerwijderen = rijen.find((r) => r.actie.action_id === "app.uninstall")?.blokkades.length === 0;
 
   const handeling = (r: AppActie) => {
     const id = r.actie.action_id;
-    if (r.weigering) return <span className="text-sm">Niet in de Hub: {r.weigering}</span>;
+    if (r.blokkades.length) return <span className="text-sm">Niet in de Hub: {r.blokkades[0]!.reden}</span>;
     if (!operator || !bruikbaar) return <span className="text-sm">Geen handeling</span>;
     if (id === "app.update" || id === "app.rollback") {
       return (
@@ -271,7 +272,7 @@ export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<B
     <div className="flex flex-col gap-3" data-testid="app-acties">
       {!operator ? <RolMelding>Je kijkt als {ROLE_LABEL[role ?? "viewer"]}: acties voorstellen kan pas vanaf de rol operator.</RolMelding> : null}
       <BeleidStand beleid={beleid} />
-      <Uitleg regels={regels} />
+      <Uitleg rijen={rijen} />
       {beleid.data ? (
         rijen.length ? (
           <ResponsiveList
@@ -295,7 +296,7 @@ export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<B
       <p className="text-sm text-muted-foreground">
         De klasse komt uit het risicobeleid. Het voorstel zelf controleert het doel opnieuw; de server beslist.
       </p>
-      {verwijderen && operator && bruikbaar && !beschermd(regels, "app.uninstall") ? (
+      {verwijderen && operator && bruikbaar && magVerwijderen ? (
         <ControleerWatBlijft app={app} sluit={() => setVerwijderen(false)} voorstel={voorstel} />
       ) : null}
       {voorstel.error ? <ErrorPanel vast={vasteFout} error={voorstel.error} title="Voorstel maken mislukt" /> : null}

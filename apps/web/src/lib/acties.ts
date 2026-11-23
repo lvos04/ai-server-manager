@@ -5,10 +5,10 @@
  * een weigeringsreden, een foutbericht van de executor) komt nooit in beeld. De server beslist over elk recht; de UI
  * leest alleen de sessierol uit `GET /api/v1/auth/me` om bediening te verbergen.
  */
-import { UUID } from "./backups";
 import { FLOWHERSTEL, flowDiff } from "./flowherstel";
 import { HubApiError } from "./api";
 import type { StatusView } from "./status";
+import { isUuid } from "./uuid";
 
 export type RisicoKlasse = "R0" | "R1" | "R2" | "R3";
 
@@ -324,7 +324,17 @@ function verwijderen(w: Record<string, unknown>): { regels: DiffRegel[]; onveili
  * executor) komen nooit in beeld; een onbekende code krijgt één vaste tekst.
  */
 const ACTIE_FOUT: Record<string, string> = {
+  unauthorized: "Meld je opnieuw aan.",
   forbidden: "Je hebt geen recht voor deze handeling.",
+  validation_error: "De Hub kan deze invoer niet verwerken.",
+  plan_gewijzigd: "Het plan is gewijzigd. Lees het opnieuw.",
+  bevestiging_verouderd: "De bevestiging is verouderd. Lees de stand opnieuw.",
+  policy_niet_beschikbaar: "Het risicobeleid kan niet worden gelezen.",
+  actie_geweigerd: "Het risicobeleid weigert deze actie.",
+  plan_vervallen: "Het installatieplan is verlopen. Maak een nieuw plan.",
+  plan_geblokkeerd: "De controle vooraf blokkeert dit installatieplan.",
+  plan_bewijs_gewijzigd: "Het installatieplan is gewijzigd. Maak een nieuw plan.",
+  plan_status_past_niet: "De huidige stap staat geen voorstel toe. Lees het installatieplan opnieuw.",
   not_found: "Dit verzoek is niet gevonden.",
   status_past_niet: "Dit verzoek staat niet meer in de stand voor deze handeling. Lees de stand opnieuw.",
   goedkeuring_al_gebruikt: "Deze goedkeuring is al gebruikt. Keur het voorstel opnieuw goed.",
@@ -342,16 +352,19 @@ const ACTIE_FOUT: Record<string, string> = {
 };
 export const ONBEKENDE_FOUT = "De Hub meldde een onbekende fout. Lees de stand opnieuw voordat je iets herhaalt.";
 
+export function vasteFoutcode(e: unknown): string | undefined {
+  return e instanceof HubApiError && Object.hasOwn(ACTIE_FOUT, e.code) ? e.code : undefined;
+}
+
 export function vasteFout(e: unknown): string {
-  const c = e instanceof HubApiError ? e.code : "";
-  return Object.hasOwn(ACTIE_FOUT, c) ? ACTIE_FOUT[c]! : ONBEKENDE_FOUT;
+  const code = vasteFoutcode(e);
+  return code ? ACTIE_FOUT[code]! : ONBEKENDE_FOUT;
 }
 
 /** Alleen vaste foutcodes en een geldige trace-identificatie komen op de lees- en herstelschermen. */
 export function toonbareFout(e: unknown): unknown {
   if (!(e instanceof HubApiError)) return e;
-  const code = Object.hasOwn(ACTIE_FOUT, e.code) || ["unauthorized", "validation_error", "plan_gewijzigd", "bevestiging_verouderd"].includes(e.code) ? e.code : "onbekend";
-  return new HubApiError(e.status, code, "", {}, e.traceId && UUID.test(e.traceId) ? e.traceId : undefined);
+  return new HubApiError(e.status, vasteFoutcode(e) ?? "onbekend", "", {}, isUuid(e.traceId) ? e.traceId : undefined);
 }
 
 /** Een getypte resultaatcode in woorden; nooit het vrije foutbericht. */

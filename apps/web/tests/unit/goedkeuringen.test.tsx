@@ -85,13 +85,14 @@ describe("vaste fouttekst na een handeling (R-VEILIG-1, RV-8)", () => {
     [501, "capability_unavailable"],
     [500, "iets_nieuws"],
   ])("HTTP %s %s: geen vrije executortekst en geen details-JSON in de HTML", (status, code) => {
-    const e = new HubApiError(status, code, "VRIJE-EXECUTOR-MELDING-501", { executor: { code: "x_y", message: "VRIJE-EXECUTOR-MELDING" } }, "trace-1");
+    const e = new HubApiError(status, code, "VRIJE-EXECUTOR-MELDING-501", { executor: { code: "x_y", message: "VRIJE-EXECUTOR-MELDING" } }, "8db21b66-018b-4091-8c47-11fe08dc40d9");
     const html = renderToStaticMarkup(<ErrorPanel error={e} title="De handeling is niet gelukt" vast={vasteFout} />);
     expect(html).not.toContain("VRIJE-EXECUTOR");
     expect(html).not.toContain("Technische details");
     expect(html).not.toContain("x_y");
-    expect(html).toContain(code);
-    expect(html).toContain("trace-1");
+    if (code === "iets_nieuws") expect(html).not.toContain(code);
+    else expect(html).toContain(code);
+    expect(html).toContain("8db21b66-018b-4091-8c47-11fe08dc40d9");
     expect(html).toContain(vasteFout(e));
   });
 

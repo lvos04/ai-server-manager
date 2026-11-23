@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from hub.actions.beleid import appbeleid
 from hub.adapters.health import stored_health
 from hub.catalog.discovery import deep_link, image_info, install_method, readback_digests, storage
 from hub.catalog.profiles import ADAPTER_TYPES, PROFILES, SOORTEN, profile_for
@@ -22,6 +23,37 @@ NOW = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
 
 
 # ------------------------------------------------------------------ herkenning en normalisatie
+@pytest.mark.parametrize(
+    ("naam", "catalogus", "images", "code"),
+    [
+        ("media-source-optimizer", "ix-app", ["voorbeeld/mso:1", "emby/embyserver:4.8"], "emby_nooit_door_platform"),
+        ("films", "jellyfin", [], "mediaserver_migratie_vraagt_rapport"),
+        ("films", "ix-app", [], "doel_niet_herkenbaar"),
+        ("taken", "takenlijst", [], None),
+    ],
+)
+def test_appbeleid_uit_de_inventaris(naam: str, catalogus: str, images: list[str], code: str | None) -> None:
+    rijen = norm.apps(
+        [
+            {
+                "name": naam,
+                "custom_app": False,
+                "metadata": {"name": catalogus},
+                "active_workloads": {"container_details": [{"image": image} for image in images]},
+            }
+        ]
+    )
+    inventaris = {"status": "ok", "geldig_tot": NOW.isoformat(), "per_runtime_id": {naam: rijen}}
+    oordeel = appbeleid(naam, naam, inventaris)
+    assert oordeel is not None
+    for actie in ("app.restart", "app.stop", "app.update", "app.rollback", "app.uninstall"):
+        codes = [b["code"] for b in oordeel["acties"][actie]["blokkades"]]
+        assert codes == ([code] if code else [])
+    assert appbeleid(naam, naam, {**inventaris, "status": "unknown"}) is None
+    assert appbeleid(naam, naam, {**inventaris, "per_runtime_id": {naam: rijen * 2}}) is None
+    assert appbeleid("ander", naam, inventaris) is None
+
+
 @pytest.mark.parametrize(
     ("name", "image", "expected"),
     [

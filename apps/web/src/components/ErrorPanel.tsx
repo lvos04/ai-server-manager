@@ -1,6 +1,7 @@
 "use client";
 
 import { OctagonX, RotateCw, WifiOff } from "lucide-react";
+import { toonbareFout } from "@/lib/acties";
 import { HubApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { KopieerVeld } from "./KopieerVeld";
@@ -28,22 +29,25 @@ export function ErrorPanel({
   /** Vaste tekst per code in plaats van het serverbericht; dan ook geen `details` in de DOM (ontwerp P2 "Zichtbare gegevens"). */
   vast?: (error: unknown) => string;
 }) {
-  const e = error instanceof HubApiError ? error : null;
+  const toonbaar = vast ? toonbareFout(error) : error;
+  const e = toonbaar instanceof HubApiError ? toonbaar : null;
+  const code = e?.code ?? (vast ? "onbekend" : undefined);
+  const traceId = e?.traceId;
   const message = vast ? vast(error) : e ? e.message : error instanceof Error ? error.message : "Onbekende fout.";
   const offline = e?.code === "network_error" || e?.code === "api_unavailable";
   const Icon = offline ? WifiOff : OctagonX;
   if (kind) {
     return (
-      <div className={cn("flex flex-col gap-2 rounded-lg border-2 border-down bg-down-bg p-4 text-down-ink", className)} role={alert ? "alert" : undefined} data-testid="error-panel" data-code={e?.code}>
+      <div className={cn("flex flex-col gap-2 rounded-lg border-2 border-down bg-down-bg p-4 text-down-ink", className)} role={alert ? "alert" : undefined} data-testid="error-panel" data-code={code}>
         <p className="font-bold">Er ging iets mis. Vraag het aan een volwassene.</p>
         <details>
           <summary className="min-h-touch cursor-pointer py-2 font-semibold">Details voor een volwassene</summary>
           <p>
-            Code <code>{e?.code ?? "onbekend"}</code>
-            {e?.traceId ? (
+            Code <code>{code ?? "onbekend"}</code>
+            {traceId ? (
               <>
                 {" "}
-                · Trace-ID <code>{e.traceId}</code>
+                · Trace-ID <code>{traceId}</code>
               </>
             ) : null}
           </p>
@@ -60,7 +64,7 @@ export function ErrorPanel({
       )}
       role={alert ? "alert" : undefined}
       data-testid="error-panel"
-      data-code={e?.code}
+      data-code={code}
     >
       <Icon aria-hidden="true" className={cn("size-5 shrink-0 sm:mt-0.5", offline ? "text-unknown" : "text-down")} />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -72,12 +76,12 @@ export function ErrorPanel({
               <div>
                 <dt>Code</dt>
                 <dd>
-                  <code className="rounded-sm bg-card px-1.5 py-0.5 text-foreground">{e.code}</code>
+                  <code className="rounded-sm bg-card px-1.5 py-0.5 text-foreground">{code}</code>
                   {e.status ? ` · HTTP ${e.status}` : null}
                 </dd>
               </div>
             </dl>
-            {e.traceId ? <KopieerVeld label="Trace-ID" waarde={e.traceId} /> : null}
+            {traceId ? <KopieerVeld label="Trace-ID" waarde={traceId} /> : null}
             {!vast && Object.keys(e.details).length ? (
               <details>
                 <summary className="min-h-touch cursor-pointer py-2 font-semibold">Technische details</summary>

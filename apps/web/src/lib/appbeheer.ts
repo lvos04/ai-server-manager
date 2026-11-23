@@ -3,7 +3,8 @@
  * welke klasse het beleid noemt, wanneer bijwerken of terugzetten een getypt doel heeft, en de stand van een
  * installatieplan. De server beslist; deze hulpen bepalen alleen wat de UI aanbiedt. Bij twijfel: geen knop.
  */
-import type { ActieVerzoek, Beleid, BeleidsActie } from "./acties";
+import type { ActieVerzoek, Beleid, BeleidsActie, Blokkade } from "./acties";
+import { risicoKlasse } from "./acties";
 import type { CatalogDetail } from "./catalog";
 
 export const APP_DOEL = (naam: string) => ({ host_id: "nas-primary", app_id: naam });
@@ -11,57 +12,32 @@ export const APP_DOEL = (naam: string) => ({ host_id: "nas-primary", app_id: naa
 /** De appacties in de volgorde van het ontwerp (S-045); alleen wat ook in het beleid staat, verschijnt. */
 const VOLGORDE = ["app.restart", "app.start", "app.stop", "app.update", "app.rollback", "app.uninstall"] as const;
 
-/** HARDE EIS (STAPPEN_P2 S-P2-180 bouwpunt 6): een beschermde app krijgt nooit een knop om te stoppen, bij te werken of te verwijderen. */
-const BESCHERMD_ALTIJD = new Set(["app.stop", "app.update", "app.rollback", "app.uninstall"]);
-
 export const CATALOGUS_NOG_NIET = "Nog niet beschikbaar — de Hub kan de installeerbare manifests nog niet ophalen";
 
 export const EMBY_ZIN = "Emby blijft beschikbaar. Alleen jij kunt Emby verwijderen.";
 
-/** Een vaste, herkenbare naam (zoals de herkenning in het beleid); al het andere telt niet als naam. */
-const NAAM_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
-
-function namen(app: Pick<CatalogDetail, "app_id" | "naam" | "runtime_id">): Set<string> {
-  return new Set([app.app_id, app.naam, app.runtime_id].filter((n): n is string => typeof n === "string" && NAAM_RE.test(n)));
-}
-
-/** De beschermingsregels uit `policy/apps.yaml` (sectie `beschermd`) die op deze app slaan. */
-export function beschermingVoor(beleid: Pick<Beleid, "beschermd">, app: Pick<CatalogDetail, "app_id" | "naam" | "runtime_id">): Beleid["beschermd"] {
-  const n = namen(app);
-  return beleid.beschermd.filter((r) => n.has(r.app));
-}
-
-export function isEmby(regels: Beleid["beschermd"]): boolean {
-  return regels.some((r) => r.app === "emby");
-}
-
-/** Of deze actie voor een app met deze regels geweigerd wordt (en dus geen knop krijgt). */
-export function beschermd(regels: Beleid["beschermd"], actionId: string): boolean {
-  if (!regels.length) return false;
-  return BESCHERMD_ALTIJD.has(actionId) || regels.some((r) => r.acties === null || r.acties.includes(actionId));
-}
+const ONBEKEND: Blokkade = {
+  id: "onbekend",
+  code: "actiebeleid_onbekend",
+  reden: "De bescherming van deze app is onbekend. Vernieuw de inventaris om de beschikbare acties te zien.",
+};
 
 export interface AppActie {
   actie: BeleidsActie;
   klasse: string;
-  /** null = toegestaan; anders de vaste uitleg uit het beleid waarom hier geen knop staat. */
-  weigering: string | null;
-}
-
-/** De klasse zoals het beleid haar voor dit soort doel noemt: kritiek, Custom App of de basisklasse. */
-export function klasseVoor(actie: BeleidsActie, app: Pick<CatalogDetail, "app_id" | "installatiewijze">, kritiek: string[]): string {
-  if (app.app_id && kritiek.includes(app.app_id) && actie.risk_class_kritiek) return actie.risk_class_kritiek;
-  if (app.installatiewijze === "custom_app" && actie.risk_class_custom_app) return actie.risk_class_custom_app;
-  return actie.risk_class;
+  blokkades: Blokkade[];
 }
 
 export function appActies(beleid: Beleid, app: CatalogDetail): AppActie[] {
-  const regels = beschermingVoor(beleid, app);
+  const oordeel = app.actiebeleid;
+  const zelfdeBeleid = oordeel && oordeel.policy_hash === beleid.policy_hash;
   return VOLGORDE.flatMap((id) => {
     const actie = beleid.acties.find((a) => a.action_id === id && a.doel === "app");
     if (!actie) return [];
-    const weigering = beschermd(regels, id) ? (regels.find((r) => r.acties === null || r.acties.includes(id)) ?? regels[0]!).reden : null;
-    return [{ actie, klasse: klasseVoor(actie, app, beleid.kritieke_apps ?? []), weigering }];
+    const regel = zelfdeBeleid ? oordeel.acties?.[id] : undefined;
+    const klasse = risicoKlasse(regel?.risk_class);
+    if (!klasse || !Array.isArray(regel?.blokkades)) return [{ actie, klasse: "Onbekend", blokkades: [ONBEKEND] }];
+    return [{ actie, klasse, blokkades: regel.blokkades }];
   });
 }
 

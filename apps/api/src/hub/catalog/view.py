@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from hub.actions.beleid import appbeleid
 from hub.catalog.appstore import openbaar_detail
 from hub.catalog.discovery import deep_link
 from hub.catalog.profiles import profile_for
@@ -131,6 +132,7 @@ def detail(
             "appstore": openbaar_detail(row, settings),
             "bron": {k: v for k, v in row.bron.items() if k != "identiteit_sinds"},
             "acties": actions(link, role),
+            "actiebeleid": appbeleid(row.naam, row.runtime_id, inv_state) if row.aanwezig else None,
             "alleen_lezen": True,
         }
     )

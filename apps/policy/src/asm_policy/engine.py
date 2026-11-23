@@ -14,7 +14,7 @@ Regels (in deze volgorde, de strengste wint):
 5. Onbekende action_id (niet in de allowlist) → ``known=False``: Hub en executor geven 403 ``actie_niet_toegestaan``
    en voeren niets uit.
 6. Basisklasse uit ``acties.yaml``; kritieke apps (``apps.yaml``) → ``klasse_kritiek``. Nooit lager.
-7. Beschermde apps (Emby altijd; Hub/executor niet stoppen; MediaGuard en de mediaserver geen update zonder bewijs)
+7. De verboden acties per beschermde app staan in ``apps.yaml`` onder ``beschermd``
    → geweigerd. Is van een bestaande app niet vast te stellen wat erin draait (geen image te zien, zoals bij een
    gestopte app, en geen catalogusapp), dan kan het een beschermde app zijn → elke actie op die app geweigerd.
 8. Een actie met ``ai_mag_voorstellen: false`` van een AI- of flow-actor → geweigerd.

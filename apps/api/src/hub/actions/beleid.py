@@ -11,7 +11,14 @@ from functools import lru_cache
 from typing import Any
 
 from asm_policy import Policy, PolicyError, load_policy
-from asm_policy.engine import DOEL_ONHERKENBAAR, STOP_EENRICHTING, STOP_EENRICHTING_REDEN, Herkenning, classify
+from asm_policy.engine import (
+    DOEL_ONHERKENBAAR,
+    STOP_EENRICHTING,
+    STOP_EENRICHTING_REDEN,
+    Herkenning,
+    classify,
+    herken_app,
+)
 from asm_policy.loader import ActieDef, default_policy_dir, is_read_only
 
 from hub.errors import HubError
@@ -36,6 +43,56 @@ def get_policy() -> Policy:
 
 # Een draaiende Custom App (ix-app of compose): wat erin draait is te zien, maar na een stop niet meer.
 CUSTOM_APP = Herkenning((), True, False)
+
+
+def appbeleid(naam: str, runtime_id: str, inventaris: dict[str, Any]) -> dict[str, Any] | None:
+    """Statische beslissing per appactie op de actuele inventaris. Het voorstel en de executor lezen zelf opnieuw."""
+    rijen = inventaris.get("per_runtime_id", {}).get(runtime_id, [])
+    if (
+        inventaris.get("status") != "ok"
+        or not inventaris.get("geldig_tot")
+        or len(rijen) != 1
+        or rijen[0].get("naam") != naam
+        or naam != runtime_id
+    ):
+        return None
+    app = rijen[0]
+    images = app.get("images")
+    if not isinstance(images, list) or any(
+        not isinstance(i, dict) or not isinstance(i.get("image"), str) for i in images
+    ):
+        return None
+    try:
+        policy = get_policy()
+    except HubError:
+        return None  # de alleen-lezen catalogus blijft beschikbaar
+    # normalize.apps bewaart alle gemeten images, ook die uit container_details. Gebruik dezelfde herkenning als bij
+    # de directe actie, inclusief de catalogusnaam en een gestopte Custom App waarvan de image niet te zien is.
+    herkend = herken_app(
+        policy,
+        naam,
+        {
+            "metadata": {"name": app.get("catalogus_app")},
+            "custom_app": app.get("custom_app"),
+            "active_workloads": {"images": [i["image"] for i in images]},
+        },
+    )
+    acties = {}
+    for a in policy.acties.values():
+        if a.doel == "app":
+            oordeel = classify(
+                policy,
+                action_id=a.action_id,
+                target={"app_id": naam},
+                parameters={},
+                actor_type="user",
+                herkend_als=herkend,
+            )
+            acties[a.action_id] = {
+                "risk_class": oordeel.risk_class,
+                "blokkades": [b.as_dict() for b in oordeel.blokkades],
+            }
+    return {"policy_hash": policy.hash, "geldig_tot": inventaris["geldig_tot"], "acties": acties}
 
 
 def _klasse_custom_app(policy: Policy, a: ActieDef) -> str | None:

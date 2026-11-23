@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Beleid, BeleidsActie } from "@/lib/acties";
-import { appActies, beschermd, beschermingVoor, PLAN_VERLOPEN, planBlokkade, planCatalogus, planDigests, terugzetPunten, updateDoel, type InstallPlan } from "@/lib/appbeheer";
+import type { Beleid, BeleidsActie, Blokkade } from "@/lib/acties";
+import { appActies, PLAN_VERLOPEN, planBlokkade, planCatalogus, planDigests, terugzetPunten, updateDoel, type InstallPlan } from "@/lib/appbeheer";
 import type { CatalogDetail } from "@/lib/catalog";
 
 const proef = vi.hoisted(() => ({ rol: "admin" as string, data: {} as Record<string, unknown> }));
@@ -38,12 +38,22 @@ const BELEID: Beleid = {
   ],
   verboden: [],
   gereserveerd: [],
-  beschermd: [
-    { id: "APP-EMBY", app: "emby", acties: null, reden: "Het platform stopt, updatet of verwijdert Emby nooit." },
-    { id: "APP-MEDIAGUARD", app: "mediaguard", acties: ["app.update", "app.rollback", "app.uninstall"], reden: "Geen MediaGuard-update zonder upgradebewijs." },
-  ],
+  beschermd: [],
   kritieke_apps: ["authentik"],
 };
+
+const EMBY: Blokkade = { id: "APP-EMBY", code: "emby_nooit_door_platform", reden: "Het platform stopt, updatet of verwijdert Emby nooit." };
+const MG: Blokkade = { id: "APP-MEDIAGUARD", code: "mediaguard_upgradebewijs_ontbreekt", reden: "MediaGuard blijft draaien." };
+
+function actiebeleid(blokkades: Blokkade[] = []): NonNullable<CatalogDetail["actiebeleid"]> {
+  return {
+    policy_hash: BELEID.policy_hash,
+    geldig_tot: new Date(Date.now() + 60_000).toISOString(),
+    acties: Object.fromEntries(BELEID.acties.filter((a) => a.doel === "app").map((a) => [
+      a.action_id, { risk_class: a.risk_class_custom_app ?? a.risk_class, blokkades },
+    ])),
+  };
+}
 
 function app(extra: Partial<CatalogDetail> = {}): CatalogDetail {
   return {
@@ -78,6 +88,7 @@ function app(extra: Partial<CatalogDetail> = {}): CatalogDetail {
     dienst: null,
     bron: null,
     acties: [],
+    actiebeleid: actiebeleid(),
     ...extra,
   };
 }
@@ -91,29 +102,38 @@ beforeEach(() => {
 });
 
 describe("bescherming (HARDE EIS)", () => {
-  it("Emby: elke appactie geweigerd; MediaGuard: stoppen, bijwerken, terugzetten en verwijderen geweigerd", () => {
-    const emby = beschermingVoor(BELEID, app({ naam: "emby", runtime_id: "emby", app_id: "emby" }));
-    for (const id of ["app.restart", "app.stop", "app.update", "app.rollback", "app.uninstall"]) expect(beschermd(emby, id)).toBe(true);
-    const mg = beschermingVoor(BELEID, app({ naam: "mediaguard", runtime_id: "mediaguard", app_id: "mediaguard" }));
-    expect(beschermd(mg, "app.stop")).toBe(true);
-    expect(beschermd(mg, "app.restart")).toBe(false);
-    expect(beschermd(beschermingVoor(BELEID, app()), "app.uninstall")).toBe(false);
+  it.each([EMBY, MG])("het serveroordeel blokkeert ook onder een vrije naam ($id)", (blokkade) => {
+    const alias = app({ naam: "kijkkamer", app_id: null, actiebeleid: actiebeleid([blokkade]) });
+    const rijen = appActies(BELEID, alias);
+    for (const id of ["app.restart", "app.stop", "app.update", "app.rollback", "app.uninstall"]) {
+      expect(rijen.find((r) => r.actie.action_id === id)?.blokkades).toEqual([blokkade]);
+    }
+    expect(appActies(BELEID, app()).find((r) => r.actie.action_id === "app.uninstall")?.blokkades).toEqual([]);
   });
 
-  it("herkent de app ook op de herkende app_id onder een andere naam", () => {
-    expect(beschermingVoor(BELEID, app({ naam: "mediaserver", runtime_id: "mediaserver", app_id: "emby" }))).toHaveLength(1);
-  });
+  it.each([undefined, null, { ...actiebeleid(), policy_hash: "oud" }, { ...actiebeleid(), acties: {} }])(
+    "beide tabs blijven dicht zonder passend serveroordeel", (oordeel) => {
+      const doel = app({ actiebeleid: oordeel, installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.3.0" } });
+      for (const Tab of [Acties, Versies]) {
+        const html = renderToStaticMarkup(<Tab app={doel} beleid={staat(BELEID)} />);
+        expect(knoppen(html)).toEqual([]);
+        expect(html).not.toContain("Via Versies");
+        expect(html).toContain("De bescherming van deze app is onbekend");
+      }
+    },
+  );
 
   it("tab Acties bij Emby: geen enkele actieknop, wel de vaste zin en de reden uit het beleid", () => {
-    const html = renderToStaticMarkup(<Acties app={app({ naam: "emby", runtime_id: "emby", app_id: "emby" })} beleid={staat(BELEID)} />);
+    const html = renderToStaticMarkup(<Acties app={app({ naam: "emby", runtime_id: "emby", app_id: "emby", actiebeleid: actiebeleid([EMBY]) })} beleid={staat(BELEID)} />);
     expect(knoppen(html)).toEqual([]);
     expect(html).toContain("Emby blijft beschikbaar. Alleen jij kunt Emby verwijderen.");
     expect(html).toContain("Het platform stopt, updatet of verwijdert Emby nooit.");
   });
 
-  it("tab Versies bij MediaGuard: geen knop om bij te werken of terug te zetten", () => {
+  it.each(["admin", "viewer"])("tab Versies bij MediaGuard: bescherming zichtbaar voor %s zonder bijwerk- of terugzetknop", (rol) => {
+    proef.rol = rol;
     const html = renderToStaticMarkup(
-      <Versies app={app({ naam: "mediaguard", runtime_id: "mediaguard", app_id: "mediaguard", installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.3.0" } })} beleid={staat(BELEID)} />,
+      <Versies app={app({ naam: "mediaguard", runtime_id: "mediaguard", app_id: "mediaguard", actiebeleid: actiebeleid([MG]), installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.3.0" } })} beleid={staat(BELEID)} />,
     );
     expect(knoppen(html)).toEqual([]);
     expect(html).not.toContain("Terugzetten naar");
@@ -130,8 +150,11 @@ describe("tab Acties (S-045)", () => {
   it("klasse per doel: Custom App en kritieke app volgens het beleid", () => {
     const rijen = (a: CatalogDetail) => Object.fromEntries(appActies(BELEID, a).map((r) => [r.actie.action_id, r.klasse]));
     expect(rijen(app())["app.stop"]).toBe("R2");
-    expect(rijen(app({ installatiewijze: "catalog_app" }))["app.stop"]).toBe("R1");
-    expect(rijen(app({ app_id: "authentik" }))["app.restart"]).toBe("R2");
+    const oordeel = actiebeleid();
+    oordeel.acties["app.stop"]!.risk_class = "R1";
+    oordeel.acties["app.restart"]!.risk_class = "R2";
+    expect(rijen(app({ installatiewijze: "catalog_app", actiebeleid: oordeel }))["app.stop"]).toBe("R1");
+    expect(rijen(app({ app_id: "authentik", actiebeleid: oordeel }))["app.restart"]).toBe("R2");
     expect(rijen(app())).not.toHaveProperty("notification.send");
   });
 

@@ -344,6 +344,46 @@ def main_nas_only() -> int:
     return 0
 
 
+def _leesplan(db_url: str) -> dict[str, str]:
+    """Eén leesbaar installatieplan met een extra proefveld in de zojuist aangemaakte testdatabase."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from hub.models import CatalogPlan
+
+    plan_id, markering = uuid.uuid4(), f"proefveld-{uuid.uuid4()}"
+    engine = create_engine(db_url)
+    try:
+        with Session(engine) as db, db.begin():
+            db.add(
+                CatalogPlan(
+                    id=plan_id,
+                    soort="install",
+                    app_id="review-app",
+                    app_name="review-app",
+                    instance_id=uuid.uuid4(),
+                    planner_service_id=uuid.uuid4(),
+                    binding={
+                        "release": {
+                            "catalog": {"train": "stable", "app": "review-app", "version": "1.0"},
+                            "proefveld": markering,
+                        }
+                    },
+                    plan_etag="review",
+                    step_id="installeren",
+                    status="klaar_voor_voorstel",
+                    expires_at=datetime.now(UTC) + timedelta(hours=2),
+                    controles_na_installatie=[],
+                    created_by="beheerder",
+                )
+            )
+    finally:
+        engine.dispose()
+    return {"id": str(plan_id), "markering": markering}
+
+
 def main() -> int:
     import psycopg
     import uvicorn
@@ -406,6 +446,7 @@ def main() -> int:
                 "readonly_key": READONLY_KEY,
                 "write_key": WRITE_KEY,
                 "database": db_name,
+                "leesplan": _leesplan(db_url),
                 "executor_url": f"http://127.0.0.1:{EXECUTOR_PORT}",
                 "executor_sleutel": EXECUTOR_SLEUTEL,
                 "executor_sleutel_nieuw": EXECUTOR_SLEUTEL_NIEUW,

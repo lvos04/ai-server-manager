@@ -15,6 +15,7 @@ export const KIND = { username: "kind", password: "Kind-Wachtwoord-Lang-2026" };
 export const NOOD = { username: "nood", password: "Paraplu-Vuurtoren-Lang-Genoeg-2026!" };
 
 export interface StackState {
+  leesplan?: { id: string; markering: string };
   api_url?: string;
   control_url: string;
   fake_nas_port: number;
@@ -100,6 +101,20 @@ export async function setNas(online: boolean): Promise<void> {
 }
 
 /** Toegankelijkheid (axe-core, WCAG 2.2 A/AA). Elke overtreding laat de test falen. */
+export async function leesToegestaneBackupGate(page: Page): Promise<void> {
+  // Isoleer de afzonderlijke checkpointcontrole: alleen de twee gate-lezingen zijn hier positief.
+  // De echte Hub beslist bij het voorstel opnieuw en weigert nog steeds bij ontbrekend herstelpunt.
+  await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { id: "backup_gate", status: "toegestaan", toegestaan: true, redenen: [], afgeleid_op: new Date().toISOString() } }));
+  await page.route("**/api/v1/backups/coverage", async r => {
+    const echt = await (await r.fetch()).json();
+    const tijd = { observed_at: new Date().toISOString(), geldig_tot: new Date(Date.now() + 600_000).toISOString() };
+    for (const [id, rij] of Object.entries(echt.app_backups) as [string, Record<string, unknown>][]) {
+      Object.assign(rij, tijd, { status: id === "media-source-optimizer" ? "unknown" : "gedekt", vereist: id !== "media-source-optimizer" });
+    }
+    await r.fulfill({ json: echt });
+  });
+}
+
 export async function expectAccessible(page: Page, label: string): Promise<void> {
   const res = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   const summary = res.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 5).join(" | ")}`);

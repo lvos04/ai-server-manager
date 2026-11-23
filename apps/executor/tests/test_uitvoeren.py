@@ -120,14 +120,16 @@ def test_stoppen_en_starten_geven_een_nieuwe_etag(stack: Stack) -> None:
     catalogusnaam en start gewoon; een gestopte Custom App toont geen image meer, dus starten wordt dan geweigerd."""
     hub, c, nas = stack
     nas.data["app.query"].append(
-        _app("films", "RUNNING", "jellyfin/jellyfin:10.11.0", 30013, 8096, "/mnt/t/f", "/c", catalog_app="jellyfin")
+        _app(
+            "takenlijst", "RUNNING", "voorbeeld/takenlijst:1.0", 31240, 8080, "/mnt/t/f", "/c", catalog_app="takenlijst"
+        )
     )
-    voor = etag(nas, "films")
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "films"), risk_class="R1"))
+    voor = etag(nas, "takenlijst")
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "takenlijst"), risk_class="R1"))
     assert r.status_code == 200, r.text
     assert r.json()["readback"]["staat"] == "STOPPED" and r.json()["resource_etag"] != voor
-    assert r.json()["resource_etag"] == etag(nas, "films")
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "films"), risk_class="R1"))
+    assert r.json()["resource_etag"] == etag(nas, "takenlijst")
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.start", "takenlijst"), risk_class="R1"))
     assert r.status_code == 200 and r.json()["resource_etag"] == voor, r.text
     r = execute(c, hub, approved(hub, app_prop(nas, "app.stop", "my-house"), risk_class="R2"))
     assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
@@ -156,9 +158,11 @@ def test_stoppen_van_een_custom_app_alleen_met_goedkeuring_van_een_beheerder(sta
     assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
     assert r.json()["methode"] == "app.stop" and writes(nas) == ["app.stop"]
     nas.data["app.query"].append(
-        _app("films", "RUNNING", "jellyfin/jellyfin:10.11.0", 30013, 8096, "/mnt/t/f", "/c", catalog_app="jellyfin")
+        _app(
+            "takenlijst", "RUNNING", "voorbeeld/takenlijst:1.0", 31240, 8080, "/mnt/t/f", "/c", catalog_app="takenlijst"
+        )
     )
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "films"), risk_class="R1"))
+    r = execute(c, hub, signed(hub, app_prop(nas, "app.stop", "takenlijst"), risk_class="R1"))
     assert r.status_code == 200 and r.json()["readback"]["staat"] == "STOPPED", r.text
     assert writes(nas) == ["app.stop", "app.stop"]
 
@@ -376,16 +380,18 @@ def test_emby_onder_een_andere_naam_wordt_herkend_op_de_image(stack: Stack) -> N
 
 
 def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(stack: Stack) -> None:
-    """ADR-0030 besluit 21: de naam wijst naar Jellyfin, de image naar Emby. Op naam alleen zou stoppen en herstarten
-    R1 zijn; de executor leest zelf de image terug en weigert met de Emby-regel."""
+    """ADR-0030 besluit 21: de naam wijst naar MSO, de image naar Emby. Op naam alleen zou stoppen en herstarten
+    mogelijk zijn; de executor leest zelf de image terug en weigert met de Emby-regel."""
     hub, c, nas = stack
-    nas.data["app.query"] = [a for a in nas.data["app.query"] if a["name"] != "jellyfin"]
-    nas.data["app.query"].append(_app("jellyfin", "RUNNING", "emby/embyserver:4.8.10.0", 8096, 8096, "/mnt/t/e", "/c"))
+    nas.data["app.query"] = [a for a in nas.data["app.query"] if a["name"] != "media-source-optimizer"]
+    nas.data["app.query"].append(
+        _app("media-source-optimizer", "RUNNING", "emby/embyserver:4.8.10.0", 8096, 8096, "/mnt/t/e", "/c")
+    )
     for action in ("app.stop", "app.restart"):
-        r = execute(c, hub, signed(hub, app_prop(nas, action, "jellyfin"), risk_class="R1"))
+        r = execute(c, hub, signed(hub, app_prop(nas, action, "media-source-optimizer"), risk_class="R1"))
         assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
         assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
-    app = nas.app("jellyfin")
+    app = nas.app("media-source-optimizer")
     assert writes(nas) == [] and app is not None and app["state"] == "RUNNING"
 
 
@@ -420,6 +426,35 @@ def test_gestopte_app_zonder_zichtbare_image_weigert_de_executor_zelf(
         assert code in [b["code"] for b in r.json()["details"]["blokkades"]], (action, r.text)
     app = nas.app(naam)
     assert writes(nas) == [] and app is not None and app["state"] == "STOPPED"
+
+
+@pytest.mark.parametrize(
+    "naam", ["emby", "mediaguard", "jelly-leon", "jellyfin", "ai-server-manager", "ai-server-manager-executor"]
+)
+def test_executor_weigert_beschermde_appacties_ook_met_goedkeuring(stack: Stack, naam: str) -> None:
+    hub, client, nas = stack
+    # Een vrije appnaam dwingt de executor zelf naar de teruggelezen image te kijken.
+    alias = "doelapp"
+    regel = next(b for b in POLICY.beschermd if b.app == naam)
+    nas.data["app.query"].append(_app(alias, "RUNNING", f"voorbeeld/{naam}:1.0", 31241, 8080, "/mnt/t/doel", "/data"))
+    acties = {
+        "app.stop": {},
+        "app.uninstall": {},
+        "app.update": {"catalog_version": "1.4.15"},
+        "app.rollback": {"catalog_version": "1.4.13"},
+    }
+    if naam in {"emby", "mediaguard", "jelly-leon", "jellyfin"}:
+        acties["app.restart"] = {}
+    for actie, parameters in acties.items():
+        verzoek = approved(hub, app_prop(nas, actie, alias, parameters), risk_class="R3")
+        antwoord = execute(client, hub, verzoek)
+        assert antwoord.status_code == 403 and antwoord.json()["code"] == "actie_geweigerd", (
+            naam,
+            actie,
+            antwoord.text,
+        )
+        assert regel.code in [b["code"] for b in antwoord.json()["details"]["blokkades"]]
+        assert not writes(nas) and nas.app(alias)["state"] == "RUNNING"
 
 
 def test_de_executor_wijzigt_zichzelf_niet(stack: Stack) -> None:

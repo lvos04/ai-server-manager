@@ -1,4 +1,5 @@
 /** Appcatalogus (B01-002): typen en weergavehulpen. */
+import type { Blokkade } from "./acties";
 import type { StatusView } from "./status";
 import { healthView } from "./status";
 import { formatTime } from "./format";
@@ -62,6 +63,11 @@ export interface CatalogList {
 }
 
 export interface CatalogDetail extends CatalogApp {
+  actiebeleid?: {
+    policy_hash: string;
+    geldig_tot: string;
+    acties: Record<string, { risk_class: string; blokkades: Blokkade[] }>;
+  } | null;
   gezondheid: Gezondheid & { componenten: Component[] };
   deep_link_detail: { url: string | null; reden: string | null; bron: string | null };
   catalogus: Record<string, unknown> | null;

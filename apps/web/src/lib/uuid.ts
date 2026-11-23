@@ -1,3 +1,7 @@
+export function isUuid(value: unknown): value is string {
+  return typeof value === "string" && value.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 /**
  * UUID v4 voor Idempotency-Key's. `crypto.randomUUID` bestaat alleen in een "secure context" (HTTPS of localhost);
  * de Hub draait in P0 vaak via http://<NAS-adres>:30400, dus valt dit terug op `crypto.getRandomValues` (dat wél

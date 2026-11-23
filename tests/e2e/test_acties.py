@@ -107,30 +107,29 @@ def test_r1_herstart_zonder_goedkeuring_met_readback(stack: Stack) -> None:
 
 
 def test_operator_voert_r1_uit_kijker_niet(stack: Stack) -> None:
-    """``jellyfin`` is hier een catalogusapp: stoppen blijft R1 (een Custom App stoppen is R2, zie
-    test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder). In de fake staat jellyfin gestopt; de test
-    zet hem eerst aan, zodat "gestopt" na afloop iets bewijst (R-VEILIG-6 van S-P2-005, V-003)."""
+    """Een operator mag een onbeschermde catalogusapp stoppen. Een kijker mag alleen het voorstel lezen."""
     nas = stack.nas
-    nas._set_state(nas.app("jellyfin"), "RUNNING")
-    assert nas.app("jellyfin")["state"] == "RUNNING"
+    _gestopte_app(nas, "takenlijst", "voorbeeld/takenlijst:1.0", "takenlijst")
+    nas._set_state(nas.app("takenlijst"), "RUNNING")
+    assert nas.app("takenlijst")["state"] == "RUNNING"
     make_user(stack.admin, "oscar", "operator")
     make_user(stack.admin, "vera", "viewer")
     oscar, vera = login_as(stack.app, "oscar"), login_as(stack.app, "vera")
-    assert stel_voor(vera, "app.stop", app_target("jellyfin")).status_code == 403
-    r = stel_voor(oscar, "app.stop", app_target("jellyfin"))
+    assert stel_voor(vera, "app.stop", app_target("takenlijst")).status_code == 403
+    r = stel_voor(oscar, "app.stop", app_target("takenlijst"))
     assert r.status_code == 201, r.text
     v = r.json()
     assert v["actor"] == {"type": "user", "id": "oscar"} and v["risk_class"] == "R1"
     assert vera.get(f"/api/v1/actions/{v['request_id']}").status_code == 200  # lezen mag
     assert voer_uit(vera, v).status_code == 403
-    assert schrijfaanroepen(nas) == [] and nas.app("jellyfin")["state"] == "RUNNING"
+    assert schrijfaanroepen(nas) == [] and nas.app("takenlijst")["state"] == "RUNNING"
     r = voer_uit(oscar, v)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
-    assert schrijfaanroepen(nas) == ["app.stop"] and nas.app("jellyfin")["state"] == "STOPPED"
+    assert schrijfaanroepen(nas) == ["app.stop"] and nas.app("takenlijst")["state"] == "STOPPED"
     # Een voorstel namens iemand anders bestaat niet.
-    r = stel_voor(oscar, "app.start", app_target("jellyfin"), actor={"type": "user", "id": "beheerder"})
+    r = stel_voor(oscar, "app.start", app_target("takenlijst"), actor={"type": "user", "id": "beheerder"})
     assert r.status_code == 422 and r.json()["code"] == "actor_past_niet", r.text
-    r = stel_voor(oscar, "app.start", app_target("jellyfin"), actor={"type": "ai", "id": "oscar"})
+    r = stel_voor(oscar, "app.start", app_target("takenlijst"), actor={"type": "ai", "id": "oscar"})
     assert r.status_code == 422 and r.json()["code"] == "actor_past_niet", r.text
 
 
@@ -171,24 +170,28 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_van_een_beheerder(
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
     assert naar_executor == [v["request_id"]] and schrijfaanroepen(nas) == ["app.stop"]
     assert nas.app("my-house")["state"] == "STOPPED"
-    # Een catalogusapp stoppen blijft R1: een operator voert het zonder goedkeuring uit, en starten kan weer. In de fake
-    # staat jellyfin gestopt: eerst aanzetten, anders bewijst "gestopt" niets (R-VEILIG-6 van S-P2-005, V-003).
-    nas._set_state(nas.app("jellyfin"), "RUNNING")
-    assert nas.app("jellyfin")["state"] == "RUNNING"
-    r = stel_voor(oscar, "app.stop", app_target("jellyfin"))
+    # Een onbeschermde catalogusapp kan na het stoppen ook weer starten.
+    _gestopte_app(nas, "takenlijst", "voorbeeld/takenlijst:1.0", "takenlijst")
+    nas._set_state(nas.app("takenlijst"), "RUNNING")
+    assert nas.app("takenlijst")["state"] == "RUNNING"
+    r = stel_voor(oscar, "app.stop", app_target("takenlijst"))
     assert r.status_code == 201, r.text
     w = r.json()
     assert w["risk_class"] == "R1" and w["goedkeuring_nodig"] is False and w["status"] == "klaar"
     assert "STOP-EENRICHTING" not in w["rule_ids"] and w["preview"]["terugdraaien"] == "Starten met app.start."
-    assert voer_uit(oscar, w).status_code == 200 and nas.app("jellyfin")["state"] == "STOPPED"
+    assert voer_uit(oscar, w).status_code == 200 and nas.app("takenlijst")["state"] == "STOPPED"
     assert schrijfaanroepen(nas) == ["app.stop", "app.stop"]
-    r = stel_voor(oscar, "app.start", app_target("jellyfin"))
+    r = stel_voor(oscar, "app.start", app_target("takenlijst"))
     assert r.status_code == 201, r.text
     s = r.json()
     assert s["risk_class"] == "R1" and s["status"] == "klaar" and s["blokkades"] == [], r.text
     r = voer_uit(oscar, s)
     assert r.status_code == 200 and r.json()["status"] == "uitgevoerd", r.text
-    assert nas.app("jellyfin")["state"] == "RUNNING" and schrijfaanroepen(nas) == ["app.stop", "app.stop", "app.start"]
+    assert nas.app("takenlijst")["state"] == "RUNNING" and schrijfaanroepen(nas) == [
+        "app.stop",
+        "app.stop",
+        "app.start",
+    ]
 
 
 def test_kritieke_app_is_r2_ook_als_de_aanvrager_r0_claimt(stack: Stack) -> None:
@@ -528,7 +531,7 @@ def test_doel_wijzigt_tussen_voorstel_en_goedkeuring(stack: Stack) -> None:
     assert r.status_code == 409 and r.json()["code"] == "preview_gewijzigd", r.text
     assert haal(admin, v)["goedkeuring"] is None and schrijfaanroepen(nas) == []
     # Een voorstel met een verouderde expected_version wordt niet eens aangenomen.
-    r = stel_voor(admin, "app.stop", app_target("mediaguard"), expected_version="sha256:" + "0" * 64)
+    r = stel_voor(admin, "app.stop", app_target("media-source-optimizer"), expected_version="sha256:" + "0" * 64)
     assert r.status_code == 409 and r.json()["code"] == "doel_gewijzigd", r.text
 
 
@@ -756,20 +759,27 @@ def test_gestopte_custom_app_kan_niet_via_het_platform_starten_een_catalogusapp_
 def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(
     stack: Stack, monkeypatch: pytest.MonkeyPatch, action_id: str
 ) -> None:
-    """ADR-0030 besluit 21: wijst de naam naar een andere bekende app (hier ``jellyfin``) en de image naar Emby, dan
-    geldt ook de Emby-regel. Met alleen de eerste herkenning zou dit Jellyfin zijn: R1 en zonder goedkeuring uit te
-    voeren. Geweigerd bij het voorstel; er gaat niets naar de executor."""
+    """De naam wijst naar MSO en de image naar Emby. De Hub moet ook op de image toetsen.
+    Het voorstel wordt geweigerd voordat het de executor bereikt."""
     from fakes.fake_truenas import _app, _image
 
     admin, nas = stack.admin, stack.nas
     naar_executor = _naar_executor(monkeypatch)
-    nas.data["app.query"] = [a for a in nas.data["app.query"] if a["name"] != "jellyfin"]
+    nas.data["app.query"] = [a for a in nas.data["app.query"] if a["name"] != "media-source-optimizer"]
     nas.data["app.query"].append(
-        _app("jellyfin", "RUNNING", EMBY_IMAGE, 30013, 8096, "/mnt/testpool/apps/jellyfin", "/config")
+        _app(
+            "media-source-optimizer",
+            "RUNNING",
+            EMBY_IMAGE,
+            30013,
+            8096,
+            "/mnt/testpool/apps/media-source-optimizer",
+            "/config",
+        )
     )
     nas.data["app.image.query"].append(_image(EMBY_IMAGE))
     key = str(uuid.uuid4())
-    body = {"action_id": action_id, "target": app_target("jellyfin"), "parameters": {}, "reason": "test"}
+    body = {"action_id": action_id, "target": app_target("media-source-optimizer"), "parameters": {}, "reason": "test"}
     r = admin.post("/api/v1/actions", json=body, headers={"Idempotency-Key": key})
     assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
     assert "emby_nooit_door_platform" in _codes(r.json()["details"]), r.text
@@ -1527,7 +1537,7 @@ def test_afwijking_stopt_alles_en_wordt_een_incident(stack: Stack, periodic_run:
     afw = [i for i in incidenten if i["soort"] == "actie.afwijking"]
     assert len(afw) == 1 and afw[0]["ernst"] == "kritiek", incidenten
     # De executor voert daarna niets meer uit tot een beheerder hem vrijgeeft; de Hub meldt dat eerlijk.
-    w = stel_voor(admin, "app.restart", app_target("mediaguard")).json()
+    w = stel_voor(admin, "app.restart", app_target("media-source-optimizer")).json()
     r = voer_uit(admin, w)
     assert r.status_code == 409 and r.json()["code"] == "uitvoering_geweigerd", r.text
     assert r.json()["details"]["executor"]["code"] == "executor_gestopt"
@@ -2197,7 +2207,7 @@ def test_te_groot_of_onleesbaar_executorantwoord(stack: Stack, monkeypatch: pyte
     # Een afwijking met een reusachtige lijst afwijkingen: die lijst valt weg, de rest blijft.
     afw = {"reden": "staat_verschilt", "gestopt": True, "afwijkingen": [{"code": "x", "gevonden": "A" * 900_000}]}
     _vervals(monkeypatch, 409, {"code": "afwijking", "message": "m", "details": afw})
-    w = stel_voor(admin, "app.restart", app_target("mediaguard")).json()
+    w = stel_voor(admin, "app.restart", app_target("media-source-optimizer")).json()
     r = voer_uit(admin, w)
     assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text[:300]
     assert haal(admin, w)["resultaat"]["afwijkingen"] is None

@@ -4,6 +4,7 @@ import { CircleSlash, Info, SquareArrowOutUpRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { vasteFout } from "@/lib/acties";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { Freshness } from "@/components/Freshness";
 import { KopieerVeld } from "@/components/KopieerVeld";
@@ -179,7 +180,8 @@ export function AppDetail({ id }: { id: string }) {
   const app = useApi<CatalogDetail>(`/api/v1/apps/${id}`, 60_000);
   const beleid = useApi<Beleid>("/api/v1/policy", 60_000);
   const gezondheid = app.data?.gezondheid;
-  const nu = useCatalogClock(gezondheid ? [gezondheid, ...gezondheid.componenten].map(vervalgrens) : []);
+  const beschermingTot = Date.parse(app.data?.actiebeleid?.geldig_tot ?? "");
+  const nu = useCatalogClock([beschermingTot, ...(gezondheid ? [gezondheid, ...gezondheid.componenten].map(vervalgrens) : [])]);
   const incidents = useApi<IncidentList>(app.data ? `/api/v1/incidents?status=alle&limit=5&q=${encodeURIComponent(app.data.naam)}` : null);
   const router = useRouter();
   const pathname = usePathname();
@@ -191,7 +193,7 @@ export function AppDetail({ id }: { id: string }) {
     return (
       <>
         <PageHeader title="App" kruimel={[{ label: "Server", href: "/server" }, { label: "Apps", href: "/apps" }, { label: "App" }]} />
-        <ErrorPanel error={app.error} onRetry={() => void app.reload()} />
+        <ErrorPanel vast={vasteFout} error={app.error} onRetry={() => void app.reload()} />
       </>
     );
   }
@@ -200,6 +202,7 @@ export function AppDetail({ id }: { id: string }) {
   const bron = app.data.gezondheid;
   const a = {
     ...app.data,
+    actiebeleid: !ophaalfout && beschermingTot > nu ? app.data.actiebeleid : null,
     gezondheid: {
       ...actueleMeting(bron, ophaalfout, nu),
       componenten: bron.componenten.map((c) => actueleMeting(c, ophaalfout, nu)),

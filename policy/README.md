@@ -8,7 +8,7 @@ ingebakken in de Hub-image én de executor-image (`/usr/local/share/asm/policy`,
 | Bestand | Inhoud |
 |---|---|
 | `acties.yaml` | allowlist van `action_id`'s: uitvoerder, TrueNAS-methoden, minimale risicoklasse R0–R3, parameterschema, back-upeis, anti-flap |
-| `apps.yaml` | herkenning van apps, kritieke apps (herstart wordt R2) en beschermde apps (Emby nooit; Hub/executor niet stoppen; MediaGuard en de mediaserver geen update zonder bewijs) |
+| `apps.yaml` | herkenning op naam, catalogusapp en images, kritieke apps en de verboden acties per beschermd doel. De Hub levert zijn beslissing per actie aan beide beheertabs. De executor toetst zijn eigen meting. |
 | `blokkades.yaml` | wat altijd geweigerd wordt (shell, destructief, beveiligingsbeleid, betaald, database, netwerk, boiler), gereserveerde acties en de dynamische blokkades (pool, back-upgate, noodstop, cooldown, herstelpunt) |
 | `catalogus.yaml` | gedeelde `ASF_COMMIT` voor C-12 en manifestvalidatie, lege witte lijst voor catalogusinstallaties |
 

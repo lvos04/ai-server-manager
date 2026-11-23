@@ -1,12 +1,12 @@
 /**
  * S-P2-180: Versies, Acties, Appstore, installatiewizard en verwijderen (ontwerp HUB_P2_ONTWERP.md S-044 t/m S-048).
  * Tegen de echte Hub-API met de fake TrueNAS (Sim-getest). Alleen waar de fake NAS het geval niet kent, vervangt een
- * page.route één leesantwoord: een Emby-app, een catalogusapp met een nieuwere versie en een installatieplan (de Hub
+ * page.route één leesantwoord: een catalogusapp met een nieuwere versie en een installatieplan (de Hub
  * heeft nog geen browserroute om een plan te kiezen). Elke schrijfroute naar /api/v1/actions blijft de echte server.
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, ready } from "./helpers";
+import { control, expectAccessible, expectNoHorizontalScroll, expectTouchTargets, leesToegestaneBackupGate, ready } from "./helpers";
 
 async function csrf(ctx: BrowserContext): Promise<string> {
   return (await ctx.cookies()).find((c) => c.name === "hub_csrf")?.value ?? "";
@@ -43,8 +43,12 @@ const geenKnop = async (page: Page) => {
 };
 
 test("HARDE EIS · Emby: geen knop in Acties of Versies, de vaste zin staat er, en de route weigert met 403", async ({ page }) => {
-  const id = await appId(page, "my-house");
-  await detailMet(page, id, { naam: "emby", runtime_id: "emby", app_id: "emby", titel: "Emby", installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "4.9.2" } });
+  expect((await control("/nas/app", { naam: "emby", image: "emby/embyserver:4.8.10", poort: 31228 })).status).toBe(200);
+  await page.goto("/server");
+  await ready(page);
+  await page.getByTestId("inventaris-vernieuwen").click();
+  await expect(page.getByTestId("vernieuwen-status")).toContainText("Inventaris vernieuwd", { timeout: 60_000 });
+  const id = await appId(page, "emby");
   await page.goto(`/apps/${id}?tab=acties`);
   await ready(page);
   await expect(page.getByTestId("beschermd")).toContainText("Emby blijft beschikbaar. Alleen jij kunt Emby verwijderen.");
@@ -83,17 +87,7 @@ test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-u
   await expect(page.getByTestId("bijwerken")).toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#versies-backupreden")).toBeVisible();
 
-  // Isoleer de afzonderlijke checkpointcontrole: alleen de twee gate-lezingen zijn hier positief.
-  // De echte Hub beslist bij het voorstel opnieuw en weigert nog steeds bij ontbrekend herstelpunt.
-  await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { id: "backup_gate", status: "toegestaan", toegestaan: true, redenen: [], afgeleid_op: new Date().toISOString() } }));
-  await page.route("**/api/v1/backups/coverage", async r => {
-    const echt = await (await r.fetch()).json();
-    const tijd = { observed_at: new Date().toISOString(), geldig_tot: new Date(Date.now() + 600_000).toISOString() };
-    for (const [id, rij] of Object.entries(echt.app_backups) as [string, Record<string, unknown>][]) {
-      Object.assign(rij, tijd, { status: id === "media-source-optimizer" ? "unknown" : "gedekt", vereist: id !== "media-source-optimizer" });
-    }
-    await r.fulfill({ json: echt });
-  });
+  await leesToegestaneBackupGate(page);
   await page.reload();
   await expect(page.getByTestId("bijwerken")).toBeEnabled();
   await page.getByTestId("bijwerken").click();
