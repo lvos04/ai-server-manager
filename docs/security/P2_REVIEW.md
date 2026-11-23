@@ -44,6 +44,8 @@ De policy weigert ook een onbekende actie, het verwijderen van een dataset, een 
 
 ## Bevindingen en vervolg
 
+Herstelcommit `c99fb11684c13432ed4fc1a2decf4d40c67a0ab9` bevat beide wijzigingen, dit reviewverslag en de regressietests.
+
 Op de herstelbasis `b5185ae` faalden drie van de negen reviewerproeven. Na het herstel waren alle negen groen. De bestaande rooktest `deploy/smoke.sh` bevestigde in het gebouwde Hub-image de afzonderlijke runneridentiteit 569. De volledige suite op de herstelversie telde 3.918 testgevallen zonder fouten of overgeslagen tests. In het JUnit-verslag zijn alle 55 benoemde repositorytests teruggevonden, samen 101 testgevallen.
 
 **R-VEILIG-1 · blokkerend, lokaal hersteld.** Op de basiscommit gaf de runner bij een leesbare synthetische databaserij en het bijbehorende PostgreSQL-gegevensbestand exitcode 0, zowel met AI uit als aan. Ook een I/O-fout op een testsleutel gaf 0. Volgens contract §8 moet de runner zijn eigen rechten toetsen. Bij de start controleert hij nu de PostgreSQL-datamap en de socketmap met de rechten van het proces. Zowel het kunnen lezen van een map als het kunnen bereiken van een bekende naam erin geeft exitcode 78. Dit werkt ook als er nog geen socketbestand is. Een leesbare sleutel en een onverwachte controlefout geven dezelfde vaste melding. De runner hoeft hiervoor geen verbinding te openen of sleutelinhoud te lezen. De reviewerproef met de eigen PostgreSQL-instantie staat in `proeven-rveilig2/test_runnergrenzen.py` bij het rolrapport. De blijvende regressieproeven zijn onder meer `apps/api/tests/unit/test_airunner.py::test_weigert_bij_toegankelijke_databasemap` en `apps/api/tests/unit/test_airunner.py::test_vaste_weigering_bij_sleutelcontrole`.

@@ -770,6 +770,16 @@
     "bijgewerkt": "2026-11-15"
   },
   {
+    "id": "B02-011",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "docs/security/P2_REVIEW.md en herstelcommit c99fb11684c13432ed4fc1a2decf4d40c67a0ab9 voor R-VEILIG-1 en R-VEILIG-2. Zie .lokaal/ketens/S-P2-210/RAPPORT-R-VEILIG-2.md en .lokaal/ketens/S-P2-210/RAPPORT-A-HERSTEL.md.",
+    "blokkade": "NIET GEVALIDEERD (echte NAS)",
+    "opmerking": "De reviewerproeven, de regressietests van de Hub en de rooktest van de images zijn lokaal uitgevoerd. De gerichte herreview en R-EERLIJK volgen. De afzonderlijke veiligheidssuite van S-P2-130 hoort bij versie 2.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-23"
+  },
+  {
     "id": "B01-007",
     "status": "Bezig",
     "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS)",
