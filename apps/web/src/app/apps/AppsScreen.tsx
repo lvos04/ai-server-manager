@@ -100,19 +100,24 @@ export function AppsScreen() {
       <PageHeader
         title="Apps"
         kruimel={[{ label: "Server", href: "/server" }, { label: "Apps" }]}
-        intro="Alle apps op je NAS met gezondheid, versie, herkomst en eigenaar. Alleen lezen: beheeracties volgen in fase P2."
+        intro="Alle apps op je NAS met gezondheid, versie, herkomst en eigenaar. Beheeracties staan per app onder Versies en Acties en lopen altijd via een voorstel."
         meta={
           d
             ? `Catalogus bijgewerkt ${formatTime(d.observed_at, now)} · inventaris van ${d.inventaris.observed_at ? formatTime(d.inventaris.observed_at, now) : "onbekend"} (TrueNAS app.query)`
             : undefined
         }
         actions={
-          hasRole(role, "operator") ? (
-            <Button bezig={discover.busy} onClick={async () => (await discover.run("/api/v1/apps/discover")) && void list.reload()} data-testid="catalogus-bijwerken">
-              <RefreshCw aria-hidden="true" />
-              Catalogus bijwerken
-            </Button>
-          ) : null
+          <>
+            <Link href="/apps/catalogus" className={buttonVariants({ variant: "secundair" })} data-testid="naar-appstore">
+              Appstore
+            </Link>
+            {hasRole(role, "operator") ? (
+              <Button bezig={discover.busy} onClick={async () => (await discover.run("/api/v1/apps/discover")) && void list.reload()} data-testid="catalogus-bijwerken">
+                <RefreshCw aria-hidden="true" />
+                Catalogus bijwerken
+              </Button>
+            ) : null}
+          </>
         }
       />
       <Subnav items={SERVER_SUBNAV} label="Server" />

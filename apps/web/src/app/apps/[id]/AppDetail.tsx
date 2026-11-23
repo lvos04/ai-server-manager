@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleSlash, Hourglass, Info, SquareArrowOutUpRight } from "lucide-react";
+import { CircleSlash, Info, SquareArrowOutUpRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -20,9 +20,11 @@ import { actueleMeting, appHealth, COMPONENT_LABEL, EIGENAAR, INSTALLATIE, meetT
 import { formatDateTime, formatTime } from "@/lib/format";
 import type { IncidentList } from "@/lib/incidents";
 import { PERIODES, queryPath, RESOLUTIE_LABEL, toRows, type Periode, type QueryResult, type Series } from "@/lib/metrics";
-import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
+import { hasRole, useRole } from "@/lib/session";
 import { appState, healthView, type StatusView } from "@/lib/status";
 import { useApi } from "@/lib/use-api";
+import type { Beleid } from "@/lib/acties";
+import { Acties, Versies } from "./AppBeheer";
 import { useCatalogClock } from "@/lib/use-catalog-clock";
 
 const TABS = ["status", "metrieken", "logs", "versies", "acties"] as const;
@@ -173,52 +175,9 @@ function Logs({ app }: { app: CatalogDetail }) {
   );
 }
 
-const P2_ACTIES = [
-  { id: "app.restart", label: "Herstarten" },
-  { id: "app.stop", label: "Stoppen" },
-  { id: "app.update", label: "Bijwerken" },
-  { id: "app.rollback", label: "Terugzetten" },
-  { id: "app.delete", label: "Verwijderen (container)" },
-];
-
-function Acties({ app }: { app: CatalogDetail }) {
-  const role = useRole();
-  if (!hasRole(role, "operator")) return <RolMelding>Je kijkt als {ROLE_LABEL[role ?? "viewer"]}: acties zijn er pas vanaf de rol operator.</RolMelding>;
-  return (
-    <div className="flex flex-col gap-3" data-testid="app-acties">
-      <Melding soort="nogniet" icon={Hourglass} titel="Nog niet beschikbaar — volgt in fase P2 (veilig automatiseren)">
-        <p>
-          Dan opent elke actie eerst een voorstel met preview, het risico volgens het beleid, een back-up vooraf en een controle na
-          uitvoering. Tot dan wijzigt de Hub niets aan apps.
-        </p>
-      </Melding>
-      <ul className="m-0 flex list-none flex-col divide-y divide-border p-0">
-        {P2_ACTIES.map((a) => (
-          <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-            <span className="flex flex-col">
-              <strong>{a.label}</strong>
-              <span className="text-sm" id={`reden-${a.id}`}>
-                <code>{a.id}</code> · Volgt in fase P2 · risico bepaalt het beleid
-              </span>
-            </span>
-            <Button uit aria-describedby={`reden-${a.id}`} data-testid={`actie-${a.id}`}>
-              <Hourglass aria-hidden="true" />
-              {a.label}
-              <span className="sr-only">: {app.titel}</span>
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <p className="text-sm">
-        <strong>Data verwijderen (R3)</strong> staat hier bewust niet. Dat is een aparte flow met een eigen bevestiging en wordt nooit door
-        de AI aangeboden.
-      </p>
-    </div>
-  );
-}
-
 export function AppDetail({ id }: { id: string }) {
   const app = useApi<CatalogDetail>(`/api/v1/apps/${id}`, 60_000);
+  const beleid = useApi<Beleid>("/api/v1/policy", 60_000);
   const gezondheid = app.data?.gezondheid;
   const nu = useCatalogClock(gezondheid ? [gezondheid, ...gezondheid.componenten].map(vervalgrens) : []);
   const incidents = useApi<IncidentList>(app.data ? `/api/v1/incidents?status=alle&limit=5&q=${encodeURIComponent(app.data.naam)}` : null);
@@ -360,26 +319,10 @@ export function AppDetail({ id }: { id: string }) {
           <Logs app={a} />
         </TabsContent>
         <TabsContent value="versies">
-          <dl className="kv">
-            <dt>Huidige tag</dt>
-            <dd>{a.image.tag ?? "onbekend"}</dd>
-            <dt>Digest</dt>
-            <dd>
-              <code>{a.image.digest ?? "onbekend"}</code>
-            </dd>
-          </dl>
-          <h2 className="text-lg">Gezien</h2>
-          <ol className="m-0 flex list-none flex-col gap-1 p-0">
-            {a.image_historie.map((h, i) => (
-              <li key={i} className="text-sm">
-                {formatDateTime(h.op)} · {h.repository}:{h.tag} · <code>{h.digest ?? "digest onbekend"}</code>
-              </li>
-            ))}
-          </ol>
-          <Melding soort="nogniet" titel="Bijwerken en terugzetten volgen in fase P2" />
+          <Versies app={a} beleid={beleid} />
         </TabsContent>
         <TabsContent value="acties">
-          <Acties app={a} />
+          <Acties app={a} beleid={beleid} />
         </TabsContent>
       </Tabs>
     </>

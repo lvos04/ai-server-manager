@@ -91,6 +91,7 @@ export interface Beleid {
   verboden: { id: string; code: string; reden: string }[];
   gereserveerd: { id: string; code: string; reden: string }[];
   beschermd: { id: string; app: string; acties: string[] | null; reden: string }[];
+  kritieke_apps?: string[];
 }
 
 export const WACHTLIJST = "/api/v1/actions?status=wacht_op_goedkeuring&limit=50";
