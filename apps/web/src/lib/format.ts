@@ -10,6 +10,13 @@ const dateTimeFmt = new Intl.DateTimeFormat("nl-NL", {
 const dateFmt = new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", year: "numeric" });
 const numFmt = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 });
 
+export function brontijd(tijd: string | null | undefined): number {
+  if (typeof tijd !== "string" || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(tijd)) return NaN;
+  const datum = tijd.slice(0, 10);
+  const dag = new Date(datum + "T00:00:00Z");
+  return Number.isFinite(dag.getTime()) && dag.toISOString().startsWith(datum) ? Date.parse(tijd) : NaN;
+}
+
 export function parseIso(iso: string | null | undefined): Date | null {
   if (!iso) return null;
   const d = new Date(iso);

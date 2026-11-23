@@ -20,6 +20,7 @@ import {
 } from "@/lib/acties";
 import type { HubApiError } from "@/lib/api";
 import { hasRole, useRole } from "@/lib/session";
+import { KLOON } from "@/lib/backups";
 import { useAction } from "@/lib/use-action";
 import { ActiePreview, ONVEILIGE_DIFF } from "./ActiePreview";
 import { Aftellen } from "./Aftellen";
@@ -264,12 +265,12 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
     );
   }
 
-  // Uitvoeren: R0/R1 door een operator, R2/R3 alleen door een beheerder na een geldige goedkeuring.
+  // Een zandbakkloon vereist ook bij R1 een beheerder.
   const klaar = v.status === "klaar" && operator;
   const goedgekeurd = v.status === "goedgekeurd";
   const goedkeuringVerlopen = goedgekeurd && v.goedkeuring?.expires_at ? Date.parse(v.goedkeuring.expires_at) <= nu.getTime() : false;
   let uitvoeren = null;
-  if (goedgekeurd && (!admin || geenRecht)) {
+  if ((goedgekeurd || (v.status === "klaar" && v.action_id === KLOON)) && (!admin || geenRecht)) {
     uitvoeren = <RolMelding>Alleen een beheerder kan dit uitvoeren.</RolMelding>;
   } else if (klaar || goedgekeurd) {
     const uitBlok = goedkeuringVerlopen ? "Goedkeuring verlopen. Keur het voorstel opnieuw goed." : beslisBlokkade(v, verval, verouderd, false);

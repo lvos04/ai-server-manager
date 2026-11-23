@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { ErrorPanel } from "@/components/ErrorPanel";
-import { Freshness } from "@/components/Freshness";
+import { Freshness, useNow } from "@/components/Freshness";
 import { Leesstand } from "@/components/Leesstand";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { toonbareFout, vasteFout } from "@/lib/acties";
-import { appNaam, UUID } from "@/lib/backups";
+import { vasteFout } from "@/lib/acties";
+import { appNaam, meettijd, UUID } from "@/lib/backups";
 import type { StatusView } from "@/lib/status";
 import { useAction } from "@/lib/use-action";
 import { useMeting } from "@/lib/use-meting";
@@ -58,21 +58,23 @@ function Planregel({ r, oud, admin, opnieuw }: { r: Regel; oud: boolean; admin: 
       <dt>Time-out</dt><dd>{c.timeout_s} s</dd><dt>Interval</dt><dd>{c.interval_s} s</dd></dl>}
     {stand.tone !== "neutral" && <p id={`reden-${r.app.id}`}>{uitleg}</p>}
     {admin && stand.tone !== "neutral" && <Button uit={!mag} bezig={a.busy} onClick={() => void bevestig()} aria-describedby={`reden-${r.app.id}`}>Handmatig bevestigen</Button>}
-    {a.error && <ErrorPanel error={toonbareFout(a.error)} vast={vasteFout} title="Bevestiging onbekend" onRetry={() => { void opnieuw().then(() => setGewijzigd(false)); }} />}
+    {a.error && <ErrorPanel error={a.error} vast={vasteFout} title="Bevestiging onbekend" onRetry={() => { void opnieuw().then(() => setGewijzigd(false)); }} />}
   </li>;
 }
 
 export function Monitorplan({ admin }: { admin: boolean }) {
   const bron = useMeting<{ items: Regel[]; observed_at: string }>("/api/v1/monitoring/monitorplan");
+  const gemeten = meettijd(bron.data?.observed_at, useNow(1000).getTime());
+  const oud = bron.stale || !gemeten;
   return <section id="monitorplan" className="stack" aria-labelledby="monitorplan-titel">
     <h2 id="monitorplan-titel">Monitorplan per app</h2>
     <p>De bevestiging legt vast welke regel de beheerder heeft overgenomen in Uptime Kuma. De appstatus komt uit de eigen meting.</p>
     <Leesstand bron={bron} naam="Monitorplan" />
     {bron.data && <>
-      {!bron.data.items.length && !bron.stale && <p>Geen apps voor dit monitorplan.</p>}
+      {!bron.data.items.length && !oud && <p>Geen apps voor dit monitorplan.</p>}
       <ul className="plain-list stack">{bron.data.items.filter(r => UUID.test(r.app.id)).map(r =>
-        <Planregel key={`${r.app.id}-${r.plan_sha256}`} r={r} oud={bron.stale} admin={admin} opnieuw={bron.reload} />)}</ul>
-      <Freshness bron="Hub · monitorplan" observedAt={bron.data.observed_at} verouderd={bron.stale} />
+        <Planregel key={`${r.app.id}-${r.plan_sha256}`} r={r} oud={oud} admin={admin} opnieuw={bron.reload} />)}</ul>
+      <Freshness bron="Hub · monitorplan" observedAt={gemeten} verouderd={bron.stale} />
     </>}
   </section>;
 }

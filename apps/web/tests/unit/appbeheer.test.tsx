@@ -1,10 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HubApiError } from "@/lib/api";
+import { BRONNAMEN } from "@/lib/backups";
 import type { Beleid, BeleidsActie, Blokkade } from "@/lib/acties";
 import { appActies, PLAN_VERLOPEN, planBlokkade, planCatalogus, planDigests, terugzetPunten, updateDoel, type InstallPlan } from "@/lib/appbeheer";
 import type { CatalogDetail } from "@/lib/catalog";
 
-const proef = vi.hoisted(() => ({ rol: "admin" as string, data: {} as Record<string, unknown> }));
+const proef = vi.hoisted(() => ({
+  rol: "admin", data: {} as Record<string, unknown>, fouten: new Map<string, HubApiError>(), oud: new Set<string>(),
+}));
 
 vi.mock("@/lib/session", () => {
   const rank: Record<string, number> = { kind: 0, viewer: 1, operator: 2, admin: 3 };
@@ -14,12 +18,16 @@ vi.mock("@/lib/session", () => {
     ROLE_LABEL: { viewer: "kijker", operator: "operator", admin: "beheerder", kind: "kind" },
   };
 });
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined }), usePathname: () => "/backups" }));
 vi.mock("@/lib/use-api", () => ({
-  useApi: (pad: string | null) => ({ data: pad ? proef.data[pad.split("?")[0]!] : undefined, error: undefined, loading: false, stale: false, lastOk: null, etag: null, reload: async () => undefined }),
+  useApi: (pad: string | null) => {
+    const bron = pad?.split("?")[0] ?? "";
+    return { data: proef.data[bron], error: proef.fouten.get(bron), loading: false, stale: proef.oud.has(bron), lastOk: null, etag: null, reload: async () => undefined };
+  },
 }));
 
 const { Acties, Versies, ALLEEN_CONTAINER, GEEN_TERUGZETPAD } = await import("@/app/apps/[id]/AppBeheer");
+const { BackupsScreen } = await import("@/app/backups/BackupsScreen");
 const { Installatiewizard } = await import("@/app/apps/installeren/Installatiewizard");
 
 function actie(action_id: string, extra: Partial<BeleidsActie> = {}): BeleidsActie {
@@ -99,6 +107,8 @@ const knoppen = (html: string) => [...html.matchAll(/data-testid="(actie-[^"]+|b
 beforeEach(() => {
   proef.rol = "admin";
   proef.data = {};
+  proef.fouten.clear();
+  proef.oud.clear();
 });
 
 describe("bescherming (HARDE EIS)", () => {
@@ -261,4 +271,56 @@ it("een dichte back-upgate houdt de bijwerkknop uit en toont de reden", () => {
   expect(html.match(/<button[^>]+data-testid="bijwerken"[^>]*>/)?.[0]).toContain('aria-disabled="true"');
   expect(html).toContain("Hub-database");
   expect(html).not.toContain("interne proefnotitie");
+});
+
+const catalogusApp = () => app({ installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.2.3" } });
+
+it.each([
+  "gedekt", "verplichte onbekende MSO", "verlopen inventaris", "ontbrekende inventarisbron", "ontbrekende inventarislijst",
+  "MSO aanwezig onder een alias", "onherkende app", "ontbrekende export", "export niet geverifieerd", "exportlezing verouderd",
+])("overzicht en beide versieknoppen delen de gate bij %s", (situatie) => {
+  const doel = catalogusApp();
+  const tijd = new Date(Date.now() - 1000).toISOString();
+  const geldig = new Date(Date.now() + 60_000).toISOString();
+  const mso = "media-source-optimizer";
+  const bron = { status: "ok", observed_at: tijd, verouderd: false };
+  const exportPad = "/api/v1/backups/self";
+  const appRij = { app: doel.naam, herkend_als: situatie === "MSO aanwezig onder een alias" ? mso : situatie === "onherkende app" ? null : doel.naam,
+    rpo_rto: { rpo_uren: 24 }, db_export: { status: "geverifieerd", bron: "pg_dump" }, volledige_appbackup: true, lokaal_snapshot: "gedekt" };
+  proef.data["/api/v1/gates/backup_gate"] = { status: "toegestaan", toegestaan: true, afgeleid_op: tijd, redenen: [],
+    vereist: { metingen: ["eigen_backup", ...Object.keys(BRONNAMEN)], besluiten: [], gates: [] } };
+  const bronnen = Object.fromEntries(["apps", "datasets", "snapshot_tasks", "latest_snapshots", "replication", "cloudsync"].map(id => [id, { ...bron }]));
+  if (situatie === "verlopen inventaris") bronnen.apps!.observed_at = new Date(Date.now() - 3600_000).toISOString();
+  if (situatie === "ontbrekende inventarisbron") delete bronnen.apps;
+  proef.data["/api/v1/backups/coverage"] = { apps: situatie === "ontbrekende inventarislijst" ? undefined : [appRij], datasets: [], bronnen,
+    app_backups: Object.fromEntries(Object.keys(BRONNAMEN).map(id => [id, { observed_at: tijd, geldig_tot: geldig,
+      status: id === mso ? "unknown" : "gedekt", vereist: id !== mso || situatie === "verplichte onbekende MSO" }])) };
+  const eigen = { id: doel.id, beeindigd_op: tijd, status: situatie === "export niet geverifieerd" ? "mislukt" : "geslaagd",
+    sha256: "a".repeat(64), inhoudsopgave_items: 10 };
+  proef.data[exportPad] = situatie === "ontbrekende export" ? { laatste_geverifieerd: null, items: [] } : { laatste_geverifieerd: eigen, items: [eigen] };
+  if (situatie === "exportlezing verouderd") proef.oud.add(exportPad);
+  proef.data["/api/v1/actions"] = { items: [{ action_id: "app.update", status: "uitgevoerd", target: { app_id: doel.naam }, request_id: doel.id, uitgevoerd_op: tijd }] };
+  proef.data["/api/v1/backups/herstelpunten"] = { items: [{ id: doel.id, app: doel.naam, checkpoint_id: doel.id, gemaakt_op: tijd,
+    snapshot: { actie_id: doel.id, datasets: ["proef/app"] }, status: "geverifieerd", reden: null }] };
+
+  const overzicht = renderToStaticMarkup(<BackupsScreen />);
+  const gate = overzicht.match(/data-testid="sectie-backupgate"[^]*?<\/section>/)?.[0];
+  expect(gate).toBeDefined();
+  expect(gate!.includes(">Toegestaan<")).toBe(situatie === "gedekt");
+  const versies = renderToStaticMarkup(<Versies app={doel} beleid={staat(BELEID)} />);
+  const knoppen = [...versies.matchAll(/(<button\b[^>]*>)(Bijwerken naar|Terugzetten naar)/g)];
+  expect(knoppen.map(m => m[2])).toEqual(["Bijwerken naar", "Terugzetten naar"]);
+  expect(knoppen.map(m => m[1]!.includes('aria-disabled="true"'))).toEqual([situatie !== "gedekt", situatie !== "gedekt"]);
+});
+
+it.each(["proef-foutcode", "forbidden"])("Versies filtert de foutcode %s met bijbehorend kopieerveld", (code) => {
+  const bekend = code === "forbidden";
+  const trace = catalogusApp().id;
+  proef.fouten.set("/api/v1/actions", new HubApiError(403, code, "proef-bericht", { extra: "proef-detail" }, bekend ? trace : "proef-trace"));
+  const html = renderToStaticMarkup(<Versies app={catalogusApp()} beleid={staat(BELEID)} />);
+  expect(html).toContain(bekend ? 'data-code="forbidden"' : 'data-code="onbekend"');
+  expect(html).toContain(bekend ? "Je hebt geen recht voor deze handeling." : "De Hub meldde een onbekende fout.");
+  expect(html).not.toMatch(/proef-(foutcode|bericht|detail|trace)|Technische details/);
+  expect(/Kopiëren<span[^>]*>: Trace-ID<\/span>/.test(html)).toBe(bekend);
+  if (bekend) expect(html).toContain(trace);
 });

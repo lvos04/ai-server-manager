@@ -2,7 +2,7 @@
 import type { Blokkade } from "./acties";
 import type { StatusView } from "./status";
 import { healthView } from "./status";
-import { formatTime } from "./format";
+import { brontijd, formatTime } from "./format";
 
 interface Meting {
   status: string;
@@ -104,13 +104,6 @@ export function sortApps(items: CatalogApp[], opNaam = false): CatalogApp[] {
   return [...items].sort(
     (a, b) => (opNaam ? 0 : (RANG[a.gezondheid.status] ?? 2) - (RANG[b.gezondheid.status] ?? 2)) || a.titel.localeCompare(b.titel, "nl"),
   );
-}
-
-function brontijd(tijd: string | null | undefined): number {
-  if (!tijd || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(tijd)) return NaN;
-  const datum = tijd.slice(0, 10);
-  const dag = new Date(datum + "T00:00:00Z");
-  return Number.isFinite(dag.getTime()) && dag.toISOString().startsWith(datum) ? Date.parse(tijd) : NaN;
 }
 
 /** De API levert de kortste geldigheidsduur van de bronnen voor deze status. */

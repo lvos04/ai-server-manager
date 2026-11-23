@@ -121,10 +121,27 @@ it("geen onbekende of verlopen appmeting opent de gate; een ontbrekende MSO-lees
   const tijd = { observed_at: new Date(nu - 1).toISOString(), geldig_tot: new Date(nu + 1).toISOString() };
   const app_backups = Object.fromEntries(Object.keys(BRONNAMEN).map(naam => [naam, { ...tijd,
     status: naam === "media-source-optimizer" ? "unknown" : "gedekt", vereist: naam !== "media-source-optimizer" }]));
-  const gate = { status: "toegestaan", toegestaan: true, redenen: [], afgeleid_op: new Date(nu).toISOString() };
-  expect(backupGate(gate as never, { app_backups } as never, false, nu)).toBe("toegestaan");
-  expect(backupGate(gate as never, { app_backups } as never, false, nu + 2)).toBe("unknown");
-  expect(backupGate(gate as never, { app_backups } as never, true, nu)).toBe("unknown");
-  app_backups["media-source-optimizer"]!.vereist = true;
+  const gate = { status: "toegestaan", toegestaan: true, redenen: [], afgeleid_op: new Date(nu).toISOString(),
+    vereist: { besluiten: [], metingen: Object.keys(BRONNAMEN), gates: [] } };
+  const dekking = { app_backups, apps: [], bronnen: { apps: { status: "ok", observed_at: tijd.observed_at, verouderd: false } } };
   expect(backupGate(gate as never, { app_backups } as never, false, nu)).toBe("unknown");
+  expect(backupGate(gate as never, dekking as never, false, nu)).toBe("toegestaan");
+  expect(backupGate(gate as never, dekking as never, false, nu + 2)).toBe("unknown");
+  expect(backupGate(gate as never, dekking as never, true, nu)).toBe("unknown");
+  app_backups["media-source-optimizer"]!.vereist = true;
+  expect(backupGate(gate as never, dekking as never, false, nu)).toBe("unknown");
+});
+
+it("het monitorplan geeft alleen een bestaand meettijdstip weer in het datetime-attribuut", async () => {
+  const { Monitorplan } = await import("@/app/instellingen/monitoring/Monitorplan");
+  const pad = "/api/v1/monitoring/monitorplan";
+  for (const observed_at of ["proef-meettijd", "2026-02-30T10:00:00Z", new Date(Date.now() + 3600_000).toISOString()]) {
+    bron.data[pad] = { items: [], observed_at };
+    const html = renderToStaticMarkup(<Monitorplan admin />);
+    expect(html).toContain("Nog nooit gemeten");
+    expect(html).not.toMatch(/<time\b/);
+    expect(html).not.toContain(observed_at);
+  }
+  bron.data[pad] = { items: [], observed_at: "2024-02-29T11:00:00+01:00" };
+  expect(renderToStaticMarkup(<Monitorplan admin />)).toContain('dateTime="2024-02-29T10:00:00.000Z"');
 });

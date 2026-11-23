@@ -257,6 +257,20 @@ describe("rechten komen van de server (O-06)", () => {
     const html = pagina(verzoek({ status: "klaar", risk_class: "R1" }));
     expect(knop(html, "uitvoeren")).not.toContain('aria-disabled="true"');
   });
+
+  it.each(["viewer", "operator", "admin"])("bestaand R1-kloonvoorstel toont de uitvoerknop alleen aan een beheerder (%s)", (rol) => {
+    proef.rol = rol;
+    const v = verzoek({ action_id: "zfs.snapshot.clone_to_sandbox", status: "klaar", risk_class: "R1",
+      preview: { omschrijving: "Zandbakkloon", requires_backup: false,
+        wijziging: { soort: "snapshot_klonen", snapshot: "proef/app@voorbeeld", naar: "proef/asm-sandbox/voorbeeld" } } });
+    const uitvoer = knop(pagina(v), "uitvoeren");
+    if (rol === "admin") {
+      expect(uitvoer).not.toBeNull();
+      expect(uitvoer).not.toContain('aria-disabled="true"');
+    } else {
+      expect(uitvoer).toBeNull();
+    }
+  });
 });
 
 describe("weigeringsreden (R-ONTWERP-1)", () => {

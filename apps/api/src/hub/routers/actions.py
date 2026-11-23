@@ -195,7 +195,7 @@ def propose(
     if body.actor is not None and (body.actor.type != "user" or body.actor.id != principal.name):
         # Een voorstel namens iemand anders bestaat hier niet: de actor is altijd de aangemelde gebruiker.
         raise HubError(422, "actor_past_niet", "actor in het voorstel past niet bij de aangemelde gebruiker.")
-    service.voorcontrole(db, body.action_id, body.target, body.parameters)
+    service.voorcontrole(db, body.action_id, body.target, body.parameters, principal)
 
     def werk() -> tuple[int, dict[str, Any]]:
         return 201, service.stel_voor(
@@ -322,8 +322,11 @@ def execute(
     principal: Operator,
     idem: Idem,
 ) -> JSONResponse:
+    # Gebruik de opgeslagen actie en de huidige rol, ook bij een idempotente herhaling.
+    req = service.haal(db, request_id, vergrendel=True)
+    service.controleer_kloonrol(req.action_id, principal)
+
     def werk() -> tuple[int, dict[str, Any]]:
-        req = service.haal(db, request_id, vergrendel=True)
         plannen.hercontroleer(db, settings, keyring, req)
         try:
             return service.voer_uit(db, settings, vault, keyring, principal, req, trace_id=trace_id_of(request))

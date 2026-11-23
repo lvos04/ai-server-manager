@@ -200,6 +200,31 @@ def test_robot_faalt_als_de_productiedatabase_verandert(stack: Stack, monkeypatc
     assert (uit["resultaat"], uit["reden"], uit["status_herstelpunt"]) == ("mislukt", "productie_gewijzigd", "ongezond")
 
 
+@pytest.mark.parametrize("rol", ["viewer", "operator"])
+def test_kloon_vergt_beheerder_bij_voorstel_en_uitvoering(stack: Stack, rol: str) -> None:
+    from conftest import login_as, make_user
+
+    stack.nas.add_dataset(DS)
+    stack.nas.add_dataset("testpool/asm-sandbox")
+    stack.vernieuw()
+    _snapshot(stack, DS, "rolproef")
+    actie = "zfs.snapshot.clone_to_sandbox"
+    bron = {"host_id": "nas-primary", "snapshot": f"{DS}@rolproef"}
+    doel = {"doel_dataset": "testpool/asm-sandbox/rolproef"}
+    bestaand = stel_voor(stack.admin, actie, bron, doel)
+    assert bestaand.status_code == 201 and bestaand.json()["status"] == "klaar"
+    make_user(stack.admin, f"proef-{rol}", rol)
+    gebruiker = login_as(stack.app, f"proef-{rol}")
+    try:
+        voorstel = stel_voor(gebruiker, actie, bron, doel)
+        uitvoering = voer_uit(gebruiker, bestaand.json())
+        assert (voorstel.status_code, uitvoering.status_code) == (403, 403)
+        assert haal(stack.admin, bestaand.json())["status"] == "klaar"
+        assert schrijfaanroepen(stack.nas) == ["pool.snapshot.create"]
+    finally:
+        gebruiker.close()
+
+
 def test_kijker_en_operator_mogen_de_robot_niet_starten(stack: Stack) -> None:
     from conftest import login_as, make_user
 

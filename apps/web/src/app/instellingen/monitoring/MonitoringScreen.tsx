@@ -5,7 +5,9 @@ import { Monitorplan } from "./Monitorplan";
 import { BellOff, CircleSlash, PlugZap, Plus, Send } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Controles, type Controle } from "@/components/Controles";
+import { vasteFout } from "@/lib/acties";
 import { ErrorPanel } from "@/components/ErrorPanel";
+import { useNow } from "@/components/Freshness";
 import { Field } from "@/components/Field";
 import { Loading } from "@/components/Loading";
 import { Melding } from "@/components/Melding";
@@ -14,6 +16,7 @@ import { RolMelding } from "@/components/RolMelding";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, formatTime } from "@/lib/format";
+import { meettijd } from "@/lib/backups";
 import { hasRole, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
 import { useApi } from "@/lib/use-api";
@@ -93,12 +96,30 @@ const MELDING_STATUS: Record<string, string> = {
   dead_letter: "Opgegeven (dead-letter)",
 };
 
+const REDEN: Record<string, string> = {
+  api_key_geweigerd: "Uptime Kuma weigerde de API-sleutel.", api_key_ontbreekt: "De API-sleutel voor Uptime Kuma ontbreekt.",
+  niets_ingesteld: "Stel een API-sleutel of een statuspagina in.", statuspagina_niet_gevonden: "De statuspagina is niet gevonden.",
+  inloggen_mislukt: "Beszel weigerde de aanmelding.", inloggegevens_ontbreken: "De aanmeldgegevens voor Beszel ontbreken.",
+  geen_leesrecht: "Het leesrecht ontbreekt.", nas_systeem_niet_gekoppeld: "Kies het te meten systeem in Beszel.",
+  geen_metingen: "Beszel heeft nog geen metingen.", antwoord_ongeldig: "De bron gaf een onverwacht antwoord.",
+  niet_bereikbaar: "De dienst is niet bereikbaar.", tijdslimiet: "De dienst reageerde niet op tijd.",
+  tls_fout: "Het certificaat wordt niet vertrouwd.", redirect_niet_gevolgd: "De dienst gaf een doorverwijzing.",
+  token_geweigerd: "Gotify weigerde het applicatietoken.", token_ontbreekt: "Het applicatietoken ontbreekt.",
+  verlopen: "De melding is verlopen.", achterhaald: "De melding is achterhaald.",
+  stille_uren: "De stille uren zijn actief.", rate_limit: "De verzendlimiet is bereikt.",
+};
+
+function meldreden(code: string | null) {
+  return code && Object.hasOwn(REDEN, code) ? REDEN[code] : "De reden is onbekend.";
+}
+
 /** C-60 BronKaart: soort + versie, adres, sleutel ••••4, uitgelezen-pil (neutraal) of Storing met reden. */
 function BronKaart({ b, admin, onWijziging }: { b: Bron; admin: boolean; onWijziging: () => void }) {
   const test = useAction<{ resultaat: Record<string, unknown> }>();
   const [nieuw, setNieuw] = useState("");
   const patch = useAction();
   const fout = b.status.status === "fout";
+  const laatstOk = meettijd(b.status.laatste_ok, useNow(60_000).getTime());
   return (
     <article className={`flex min-w-0 flex-col gap-3 rounded-lg bg-card p-4 ${fout ? "border-2 border-down" : "border border-border"}`} data-testid={`bron-${b.naam}`} aria-labelledby={`bron-${b.id}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -107,15 +128,15 @@ function BronKaart({ b, admin, onWijziging }: { b: Bron; admin: boolean; onWijzi
         </h3>
         {fout ? (
           <StatusBadge view={{ tone: "down", label: "Uitlezen mislukt" }} />
-        ) : b.status.status === "ok" && !b.status.verouderd ? (
-          <StatusBadge view={{ tone: "neutral", label: `Uitgelezen om ${formatTime(b.status.laatste_ok)}`, icon: "geslaagd" }} />
+        ) : b.status.status === "ok" && !b.status.verouderd && laatstOk ? (
+          <StatusBadge view={{ tone: "neutral", label: `Uitgelezen om ${formatTime(laatstOk)}`, icon: "geslaagd" }} />
         ) : (
-          <StatusBadge view={{ tone: b.status.laatste_ok ? "stale" : "unknown", label: b.status.laatste_ok ? "Verouderd" : "Nog niet uitgelezen" }} />
+          <StatusBadge view={{ tone: laatstOk ? "stale" : "unknown", label: laatstOk ? "Verouderd" : "Nog niet uitgelezen" }} />
         )}
       </div>
       {fout ? (
         <p className="text-sm" data-testid="bron-reden">
-          {b.status.melding || b.status.reden} {b.status.laatste_ok ? `Laatst gelukt om ${formatDateTime(b.status.laatste_ok)}.` : "Nog nooit gelukt."} Metingen uit deze bron zijn nu onbekend.
+          {meldreden(b.status.reden)} {laatstOk ? `Laatst gelukt om ${formatDateTime(laatstOk)}.` : "Laatste geslaagde meting onbekend."} Metingen uit deze bron zijn nu onbekend.
         </p>
       ) : null}
       <dl className="kv">
@@ -145,7 +166,7 @@ function BronKaart({ b, admin, onWijziging }: { b: Bron; admin: boolean; onWijzi
           </Button>
         </div>
       ) : null}
-      {test.error ? <ErrorPanel error={test.error} /> : null}
+      {test.error ? <ErrorPanel vast={vasteFout} error={test.error} /> : null}
       {admin && fout && (b.status.reden ?? "").includes("credential") ? (
         <form
           className="flex flex-col gap-2"
@@ -166,7 +187,7 @@ function BronKaart({ b, admin, onWijziging }: { b: Bron; admin: boolean; onWijzi
               {b.soort === "beszel" ? "Wachtwoord vervangen" : "Sleutel vervangen"}
             </Button>
           </div>
-          {patch.error ? <ErrorPanel error={patch.error} /> : null}
+          {patch.error ? <ErrorPanel vast={vasteFout} error={patch.error} /> : null}
         </form>
       ) : null}
     </article>
@@ -179,6 +200,7 @@ function BronToevoegen({ onKlaar }: { onKlaar: () => void }) {
   const create = useAction<{ id: string }>();
   const test = useAction<{ resultaat: { status?: string; reden?: string } ; bron: Bron }>();
   const [uitkomst, setUitkomst] = useState<Bron | null>(null);
+  const laatstOk = meettijd(uitkomst?.status.laatste_ok, useNow(1000).getTime());
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!soort) return;
@@ -237,7 +259,8 @@ function BronToevoegen({ onKlaar }: { onKlaar: () => void }) {
           )}
         </>
       ) : null}
-      {create.error ? <ErrorPanel error={create.error} title="Opslaan mislukt" /> : null}
+      {create.error ? <ErrorPanel vast={vasteFout} error={create.error} title="Opslaan mislukt" /> : null}
+      {test.error ? <ErrorPanel vast={vasteFout} error={test.error} title="Uitlezen mislukt" /> : null}
       <div>
         <Button type="submit" variant="primair" uit={!soort} aria-describedby="bron-uitleg" bezig={create.busy || test.busy} data-testid="opslaan-en-testen">
           <PlugZap aria-hidden="true" />
@@ -249,7 +272,9 @@ function BronToevoegen({ onKlaar }: { onKlaar: () => void }) {
       </div>
       {uitkomst ? (
         <p role="status" data-testid="bron-testuitkomst">
-          {uitkomst.status.status === "ok" ? `Opgeslagen en uitgelezen om ${formatTime(uitkomst.status.laatste_ok)}.` : `Opgeslagen; uitlezen mislukt: ${uitkomst.status.melding || uitkomst.status.reden || "onbekend"}.`}
+          {uitkomst.status.status === "ok"
+            ? laatstOk ? `Opgeslagen en uitgelezen om ${formatTime(laatstOk)}.` : "Opgeslagen en uitgelezen. De meettijd is onbekend."
+            : `Opgeslagen; uitlezen mislukt. ${meldreden(uitkomst.status.reden)}`}
         </p>
       ) : null}
     </form>
@@ -299,10 +324,10 @@ function KanaalKaart({ k, admin, onWijziging }: { k: Kanaal; admin: boolean; onW
         <p role="status" data-testid="testmelding-uitkomst">
           {test.result.verzonden
             ? `Om ${formatTime(new Date().toISOString())} door Gotify aangenomen. Of hij op je telefoon aankwam, kan de Hub niet zien.`
-            : `Niet aangenomen: ${test.result.melding || test.result.reden}.`}
+            : `Niet aangenomen. ${meldreden(test.result.reden)}`}
         </p>
       ) : null}
-      {test.error ? <ErrorPanel error={test.error} /> : null}
+      {test.error ? <ErrorPanel vast={vasteFout} error={test.error} /> : null}
       {admin && gestopt ? (
         <form
           className="flex flex-col gap-2"
@@ -322,7 +347,7 @@ function KanaalKaart({ k, admin, onWijziging }: { k: Kanaal; admin: boolean; onW
               Token vervangen
             </Button>
           </div>
-          {patch.error ? <ErrorPanel error={patch.error} /> : null}
+          {patch.error ? <ErrorPanel vast={vasteFout} error={patch.error} /> : null}
         </form>
       ) : null}
     </article>
@@ -362,7 +387,7 @@ function KanaalToevoegen({ onKlaar }: { onKlaar: () => void }) {
           </select>
         )}
       </Field>
-      {create.error ? <ErrorPanel error={create.error} title="Opslaan mislukt" /> : null}
+      {create.error ? <ErrorPanel vast={vasteFout} error={create.error} title="Opslaan mislukt" /> : null}
       <div>
         <Button type="submit" variant="primair" bezig={create.busy}>
           <Plus aria-hidden="true" />
@@ -436,7 +461,7 @@ function OutOfBandKaart({ o, admin, onWijziging }: { o: OutOfBand; admin: boolea
               <Field id="oob-notitie" label="Notitie (optioneel)">
                 {(a) => <input {...a} value={f.notitie} onChange={(e) => setF({ ...f, notitie: e.target.value })} maxLength={500} />}
               </Field>
-              {save.error ? <ErrorPanel error={save.error} /> : null}
+              {save.error ? <ErrorPanel vast={vasteFout} error={save.error} /> : null}
               <div>
                 <Button type="submit" variant="primair" bezig={save.busy}>
                   Vastleggen
@@ -471,7 +496,7 @@ export function MonitoringScreen() {
         {op ? (
           <section aria-labelledby="bronnen-titel" className="flex flex-col gap-3" data-testid="monitoringbronnen">
             <h2 id="bronnen-titel">Monitoringbronnen</h2>
-            {bronnen.error ? <ErrorPanel error={bronnen.error} alert={false} /> : null}
+            {bronnen.error ? <ErrorPanel vast={vasteFout} error={bronnen.error} alert={false} /> : null}
             {!bronnen.data && bronnen.loading ? <Loading /> : null}
             {bronnen.data && !bronnen.data.items.length ? <p>Nog geen monitoringbron. Zonder bron is de gezondheid van apps van buitenaf onbekend.</p> : null}
             <div className="grid items-start gap-4 xl:grid-cols-2">
@@ -495,7 +520,7 @@ export function MonitoringScreen() {
 
         <section className="card" aria-labelledby="regels-titel" data-testid="alertregels">
           <h2 id="regels-titel">Alertregels</h2>
-          {regels.error ? <ErrorPanel error={regels.error} alert={false} /> : null}
+          {regels.error ? <ErrorPanel vast={vasteFout} error={regels.error} alert={false} /> : null}
           {regels.data && !regels.data.items.length ? <p>Nog geen alertregels.</p> : null}
           {regels.data?.items.length ? (
             <ResponsiveList
@@ -537,14 +562,14 @@ export function MonitoringScreen() {
               ]}
             />
           ) : null}
-          {demp.error ? <ErrorPanel error={demp.error} /> : null}
+          {demp.error ? <ErrorPanel vast={vasteFout} error={demp.error} /> : null}
           <p className="text-sm">Regels bewerken kan alleen een beheerder; dat volgt in deze UI later (de API kan het al).</p>
         </section>
 
         {op ? (
           <section aria-labelledby="kanalen-titel" className="flex flex-col gap-3" id="meldingen" data-testid="meldingskanalen">
             <h2 id="kanalen-titel">Meldingskanalen</h2>
-            {kanalen.error ? <ErrorPanel error={kanalen.error} alert={false} /> : null}
+            {kanalen.error ? <ErrorPanel vast={vasteFout} error={kanalen.error} alert={false} /> : null}
             {kanalen.data && !kanalen.data.items.length ? <p>Nog geen meldingskanaal. Zonder kanaal verstuurt de Hub geen meldingen.</p> : null}
             <div className="grid items-start gap-4 xl:grid-cols-2">
               {kanalen.data?.items.map((k) => (
@@ -563,12 +588,12 @@ export function MonitoringScreen() {
           </section>
         ) : null}
 
-        {oob.data ? <OutOfBandKaart o={oob.data} admin={admin} onWijziging={() => void oob.reload()} /> : oob.error ? <ErrorPanel error={oob.error} alert={false} /> : null}
+        {oob.data ? <OutOfBandKaart o={oob.data} admin={admin} onWijziging={() => void oob.reload()} /> : oob.error ? <ErrorPanel vast={vasteFout} error={oob.error} alert={false} /> : null}
 
         {op ? (
           <section className="card" aria-labelledby="log-titel" data-testid="meldingenlog">
             <h2 id="log-titel">Meldingenlogboek</h2>
-            {log.error ? <ErrorPanel error={log.error} alert={false} /> : null}
+            {log.error ? <ErrorPanel vast={vasteFout} error={log.error} alert={false} /> : null}
             {log.data && !log.data.items.length ? <p>Nog geen meldingen verzonden.</p> : null}
             {log.data?.items.length ? (
               <ResponsiveList
@@ -581,7 +606,7 @@ export function MonitoringScreen() {
                   { kop: "Wanneer", cel: (m) => formatDateTime(m.aangemaakt_op) },
                   { kop: "Melding", cel: (m) => m.titel },
                   { kop: "Ernst", cel: (m) => ERNST[m.ernst] ?? m.ernst },
-                  { kop: "Status", cel: (m) => `${MELDING_STATUS[m.status] ?? m.status}${m.reden ? ` (${m.reden})` : ""}` },
+                  { kop: "Status", cel: (m) => `${Object.hasOwn(MELDING_STATUS, m.status) ? MELDING_STATUS[m.status] : "Onbekend"}${m.reden ? ` · ${meldreden(m.reden)}` : ""}` },
                 ]}
               />
             ) : null}

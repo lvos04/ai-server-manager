@@ -75,7 +75,7 @@ test("HARDE EIS · MediaGuard (echte app): Versies zonder bijwerk- of terugzetkn
 });
 
 test("bijwerken zonder herstelpunt: voorstel met preview, blokkade van de back-up zichtbaar en goedkeuren uit", async ({ page }) => {
-  const id = await appId(page, "media-source-optimizer");
+  const id = await appId(page, "my-house");
   await detailMet(page, id, { installatiewijze: "catalog_app", catalogus: { upgrade_beschikbaar: true, nieuwste_versie: "1.4.15" } });
   await page.goto(`/apps/${id}?tab=versies`);
   await ready(page);

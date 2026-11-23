@@ -428,8 +428,22 @@ def _lees(
         ) from None
 
 
-def voorcontrole(db: Session, action_id: str, target: Mapping[str, Any], parameters: Mapping[str, Any]) -> None:
+def controleer_kloonrol(action_id: str, principal: Principal | None) -> None:
+    if action_id.strip().lower() == "zfs.snapshot.clone_to_sandbox" and (
+        principal is None or principal.kind != "user" or principal.role != Role.admin
+    ):
+        raise HubError(403, "forbidden", "Alleen een beheerder mag een zandbakkloon voorstellen of uitvoeren.")
+
+
+def voorcontrole(
+    db: Session,
+    action_id: str,
+    target: Mapping[str, Any],
+    parameters: Mapping[str, Any],
+    principal: Principal | None = None,
+) -> None:
     """Controles vóór elk voorstel van buiten de Hub (gebruiker of flow); een eigen plan van de Hub slaat ze over."""
+    controleer_kloonrol(action_id, principal)
     if "catalog_binding" in parameters:
         # Een catalogusbinding komt alleen uit een eigen plan van de Hub (§8.2), nooit van de aanvrager.
         raise HubError(

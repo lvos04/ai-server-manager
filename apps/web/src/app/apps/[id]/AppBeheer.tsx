@@ -16,8 +16,8 @@ import { RolMelding } from "@/components/RolMelding";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { vasteFout, werkwoord, type ActieLijst, type Beleid } from "@/lib/acties";
 import { APP_DOEL, appActies, EMBY_ZIN, terugzetPunten, updateDoel, wieBeslist, type AppActie } from "@/lib/appbeheer";
-import { backupGate, gateVoorwaarde, puntenReden, type Herstelpunt } from "@/lib/backups";
-import type { Coverage, Gate } from "@/lib/types";
+import { gateVoorwaarde, meettijd, puntenReden, type Herstelpunt } from "@/lib/backups";
+import { useBackupGate } from "@/lib/use-backup-gate";
 import { useMeting } from "@/lib/use-meting";
 import type { CatalogDetail } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/format";
@@ -82,11 +82,9 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
   const bruikbaar = Boolean(beleid.data && !beleid.stale);
   const nu = useNow(1000).getTime();
   const controleer = operator && bruikbaar && (bijwerken?.blokkades.length === 0 || terugzetten?.blokkades.length === 0);
-  const gate = useMeting<Gate>(controleer ? "/api/v1/gates/backup_gate" : null);
-  const dekking = useMeting<Coverage>(controleer ? "/api/v1/backups/coverage" : null);
+  const { gate, dekking, stand } = useBackupGate(controleer, nu);
   const herstel = useMeting<{ items: Herstelpunt[] }>(controleer ? `/api/v1/backups/herstelpunten?app=${encodeURIComponent(app.naam)}` : null);
-  const stand = backupGate(gate.data, dekking.data, gate.stale || (gate.data?.toegestaan === true && dekking.stale), nu);
-  const rij = dekking.data?.apps.find(a => a.app === app.naam);
+  const rij = Array.isArray(dekking.data?.apps) ? dekking.data.apps.find(a => a.app === app.naam) : undefined;
   const eigenPunten = herstel.data?.items.filter(p => p.app === app.naam);
   const reden = stand === "geblokkeerd" ? (gate.data?.redenen[0] ? gateVoorwaarde(gate.data.redenen[0])[0] : "De back-upgate is dicht.")
     : stand !== "toegestaan" ? "De back-upgate is onbekend."
@@ -110,7 +108,7 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
         <dt>Nieuwste catalogusversie</dt>
         <dd>
           {typeof c.nieuwste_versie === "string" ? c.nieuwste_versie : "Beschikbare versie onbekend"}
-          {app.bron?.observed_at ? <span className="text-sm text-muted-foreground"> · TrueNAS, gemeten {formatDateTime(app.bron.observed_at)}</span> : null}
+          {app.bron?.observed_at ? <span className="text-sm text-muted-foreground"> · TrueNAS, gemeten {formatDateTime(meettijd(app.bron.observed_at, nu))}</span> : null}
         </dd>
       </dl>
       <KopieerVeld label="Image-digest" waarde={app.image.digest ?? "onbekend"} />

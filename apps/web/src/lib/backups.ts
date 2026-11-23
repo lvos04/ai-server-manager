@@ -1,7 +1,8 @@
-import type { Coverage, Gate, GateReason } from "./types";
-import { formatNumber, parseIso } from "./format";
+import type { Coverage, Gate, GateReason, SelfBackupList } from "./types";
+import { brontijd, formatNumber } from "./format";
 
 export const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+export const KLOON = "zfs.snapshot.clone_to_sandbox";
 export const APP_ID = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 export const DATASET = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*(?:\/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*$/;
 export const BRONNAMEN: Record<string, string> = {
@@ -17,29 +18,49 @@ export function datasetNaam(id: unknown) {
   return typeof id === "string" && id.length <= 200 && DATASET.test(id) ? id : null;
 }
 
-const TIJDSTIP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
-
 export function meettijd(tijd: string | null | undefined, nu: number) {
-  if (!tijd || !TIJDSTIP.test(tijd)) return null;
-  const datum = parseIso(tijd);
-  return datum && datum.getTime() <= nu ? datum.toISOString() : null;
+  const moment = brontijd(tijd);
+  return moment <= nu ? new Date(moment).toISOString() : null;
 }
 
 export function verseApp(c: Coverage | undefined, id: string, nu: number) {
   const rij = c?.app_backups?.[id];
   return !!rij && id !== "media-source-optimizer" && !!meettijd(rij.observed_at, nu)
-    && TIJDSTIP.test(rij.geldig_tot ?? "") && Date.parse(rij.geldig_tot ?? "") >= nu;
+    && brontijd(rij.geldig_tot) >= nu;
 }
 
-export function backupGate(gate: Gate | undefined, c: Coverage | undefined, oud: boolean, nu: number): Gate["status"] {
+export function verseBron(c: Coverage | undefined, id: string, nu: number) {
+  const bron = c?.bronnen?.[id];
+  const tijd = meettijd(bron?.observed_at, nu);
+  return bron?.status === "ok" && bron.verouderd === false && tijd !== null && nu - Date.parse(tijd) <= 900_000
+    && (id !== "apps" || Array.isArray(c?.apps));
+}
+
+export function optioneelAfwezig(c: Coverage | undefined, id: string, nu: number) {
+  return (id === "my_house" || id === "media-source-optimizer") && c?.app_backups?.[id]?.vereist === false
+    && verseBron(c, "apps", nu) && Array.isArray(c.apps)
+    && c.apps.every(a => typeof a?.app === "string" && a.app.toLowerCase() !== id
+      && typeof a.herkend_als === "string" && a.herkend_als.length > 0 && a.herkend_als.toLowerCase() !== id);
+}
+
+export function geverifieerdeExport(eigen: SelfBackupList | undefined, nu: number) {
+  const b = eigen?.laatste_geverifieerd;
+  return b?.status === "geslaagd" && /^[0-9a-f]{64}$/.test(b.sha256 ?? "")
+    && Number.isInteger(b.inhoudsopgave_items) && (b.inhoudsopgave_items ?? 0) > 0 && meettijd(b.beeindigd_op, nu) ? b : null;
+}
+
+export function backupGate(gate: Gate | undefined, c: Coverage | undefined, oud: boolean, nu: number, eigen?: SelfBackupList): Gate["status"] {
   if (!gate || oud) return "unknown";
   if (gate.status === "geblokkeerd" && !gate.toegestaan) return "geblokkeerd";
   if (!meettijd(gate.afgeleid_op, nu) || nu - Date.parse(gate.afgeleid_op) > 90_000) return "unknown";
-  if (gate.status !== "toegestaan" || !gate.toegestaan || !Array.isArray(gate.redenen) || gate.redenen.length) return "unknown";
+  if (gate.status !== "toegestaan" || gate.toegestaan !== true || !Array.isArray(gate.redenen) || gate.redenen.length) return "unknown";
+  if (!verseBron(c, "apps", nu) || !Array.isArray(c?.apps)) return "unknown";
+  const metingen = gate.vereist?.metingen;
+  if ((!Array.isArray(metingen) || metingen.includes("eigen_backup")) && !geverifieerdeExport(eigen, nu)) return "unknown";
   const allesGedekt = Object.keys(BRONNAMEN).every((id) => {
     const rij = c?.app_backups?.[id];
     if (!rij) return false;
-    if (id !== "mediaguard" && id !== "emby_exportarchief" && rij.vereist === false) return true;
+    if (optioneelAfwezig(c, id, nu)) return true;
     return rij.status === "gedekt" && verseApp(c, id, nu);
   });
   return allesGedekt ? "toegestaan" : "unknown";

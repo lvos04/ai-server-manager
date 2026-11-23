@@ -143,3 +143,75 @@ test("flowhistorie volgt de cursor en toont één regel per verzoek zonder vrije
   await expect(page.locator("main")).toContainText("reden niet weer te geven");
   await expect(page.locator("main")).not.toContainText("interne proefnotitie");
 });
+
+test("monitoring filtert fouttekst, details, kopieervelden en tijdattributen", async ({ page }) => {
+  const vrij = { code: "proef-foutcode", message: "proef-bericht", details: { account: "proef-detail" }, trace_id: "proef-trace" };
+  const trace = randomUUID();
+  const tijd = new Date(Date.now() - 1000).toISOString();
+  let bekend = false;
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: async (waarde: string) => { document.documentElement.dataset.kopie = waarde; } } });
+  });
+  await page.route("**/api/v1/monitoring/sources", r => r.fulfill({ status: 403, json: bekend ? { ...vrij, code: "forbidden", trace_id: trace } : vrij }));
+  await page.route("**/api/v1/monitoring/monitorplan", r => r.fulfill({ json: { items: [], observed_at: bekend ? tijd : "proef-meettijd" } }));
+  await page.goto("/automatisering");
+  await ready(page);
+  await page.getByRole("link", { name: "Bekijk het monitorplan per app" }).click();
+  const paneel = page.getByTestId("monitoringbronnen").getByTestId("error-panel");
+  const plan = page.locator("#monitorplan");
+  await expect(paneel).toBeVisible();
+  await expect(plan.getByTestId("freshness")).toBeVisible();
+  await expect(paneel).toHaveAttribute("data-code", "onbekend");
+  await expect(paneel).toContainText("De Hub meldde een onbekende fout.");
+  await expect(paneel.locator("details, pre")).toHaveCount(0);
+  await expect(paneel.getByRole("button", { name: /Kopiëren/ })).toHaveCount(0);
+  expect(await paneel.evaluate(n => n.outerHTML)).not.toMatch(/proef-(foutcode|bericht|detail|trace)/);
+  await expect(plan.getByTestId("freshness")).toContainText("Nog nooit gemeten");
+  await expect(plan.locator("time")).toHaveCount(0);
+  expect(await plan.evaluate(n => n.outerHTML)).not.toContain("proef-meettijd");
+
+  bekend = true;
+  await page.reload();
+  await expect(paneel).toHaveAttribute("data-code", "forbidden");
+  await expect(paneel).toContainText("Je hebt geen recht voor deze handeling.");
+  await expect(paneel.locator("details, pre")).toHaveCount(0);
+  expect(await paneel.evaluate(n => n.outerHTML)).not.toMatch(/proef-(bericht|detail)/);
+  await paneel.getByRole("button", { name: /^Kopiëren\s*:\s*Trace-ID$/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-kopie", trace);
+  await expect(plan.locator("time")).toHaveAttribute("datetime", tijd);
+});
+
+test("een positieve back-upgate vraagt verse inventaris en de verplichte eigen export", async ({ page }) => {
+  const tijd = (delta: number) => new Date(Date.now() + delta).toISOString();
+  const mso = "media-source-optimizer";
+  const namen = ["mediaguard", "emby_exportarchief", "my_house", mso];
+  let inventarisVers = false;
+  let exportAanwezig = true;
+  await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { status: "toegestaan", toegestaan: true, redenen: [],
+    vereist: { besluiten: [], metingen: ["eigen_backup", ...namen], gates: [] }, afgeleid_op: tijd(-1000) } }));
+  const eigen = { id: randomUUID(), status: "geslaagd", beeindigd_op: tijd(-1000), sha256: "a".repeat(64), inhoudsopgave_items: 10 };
+  await page.route("**/api/v1/backups/self", r => r.fulfill({ json: { items: exportAanwezig ? [eigen] : [], laatste_geverifieerd: exportAanwezig ? eigen : null } }));
+  await page.route("**/api/v1/backups/coverage", r => r.fulfill({ json: { apps: [], datasets: [],
+    app_backups: Object.fromEntries(namen.map(id => [id, { vereist: id !== mso, status: id === mso ? "unknown" : "gedekt",
+      observed_at: tijd(-1000), geldig_tot: tijd(60_000) }])),
+    bronnen: Object.fromEntries(["apps", "datasets", "snapshot_tasks", "latest_snapshots", "replication", "cloudsync"].map(id => {
+      const oud = id === "apps" && !inventarisVers;
+      return [id, { status: "ok", observed_at: tijd(oud ? -3600_000 : -1000), verouderd: oud }];
+    })) } }));
+  await page.goto("/backups");
+  await ready(page);
+  const gate = page.getByTestId("sectie-backupgate");
+  await expect(page.getByText("Niet alle bronnen zijn actueel. De dekking is deels onbekend.")).toBeVisible();
+  await expect(gate).toContainText("Bijwerken blijft geblokkeerd.");
+  await expect(gate.getByText("Toegestaan", { exact: true })).toHaveCount(0);
+
+  inventarisVers = true;
+  await page.reload();
+  await expect(gate.getByText("Toegestaan", { exact: true })).toBeVisible();
+  exportAanwezig = false;
+  await page.reload();
+  await expect(page.getByTestId("sectie-eigen-backup")).toContainText("Er is nog geen geverifieerde export");
+  await expect(gate).toContainText("Eigen Hub-export · Geen geverifieerde export aangetoond");
+  await expect(gate).toContainText("Bijwerken blijft geblokkeerd.");
+  await expect(gate.getByText("Toegestaan", { exact: true })).toHaveCount(0);
+});

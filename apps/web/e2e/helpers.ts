@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo } from "@playwright/test";
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afdrukBestand, afdrukMap } from "./afdrukmap";
@@ -100,21 +100,26 @@ export async function setNas(online: boolean): Promise<void> {
   expect(res.ok).toBeTruthy();
 }
 
-/** Toegankelijkheid (axe-core, WCAG 2.2 A/AA). Elke overtreding laat de test falen. */
+/** Positieve leesfixture voor de afzonderlijke serverproef met een ontbrekend app-herstelpunt. */
 export async function leesToegestaneBackupGate(page: Page): Promise<void> {
-  // Isoleer de afzonderlijke checkpointcontrole: alleen de twee gate-lezingen zijn hier positief.
-  // De echte Hub beslist bij het voorstel opnieuw en weigert nog steeds bij ontbrekend herstelpunt.
-  await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { id: "backup_gate", status: "toegestaan", toegestaan: true, redenen: [], afgeleid_op: new Date().toISOString() } }));
+  const mso = "media-source-optimizer";
+  await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { id: "backup_gate", status: "toegestaan", toegestaan: true,
+    vereist: { besluiten: [], metingen: ["eigen_backup", "mediaguard", "emby_exportarchief", "my_house", mso], gates: [] }, redenen: [], afgeleid_op: new Date().toISOString() } }));
+  const eigen = { id: randomUUID(), beeindigd_op: new Date().toISOString(), status: "geslaagd", sha256: "a".repeat(64), inhoudsopgave_items: 10 };
+  await page.route("**/api/v1/backups/self", r => r.fulfill({ json: { items: [eigen], laatste_geverifieerd: eigen } }));
   await page.route("**/api/v1/backups/coverage", async r => {
-    const echt = await (await r.fetch()).json();
+    const dekking = await (await r.fetch()).json();
     const tijd = { observed_at: new Date().toISOString(), geldig_tot: new Date(Date.now() + 600_000).toISOString() };
-    for (const [id, rij] of Object.entries(echt.app_backups) as [string, Record<string, unknown>][]) {
-      Object.assign(rij, tijd, { status: id === "media-source-optimizer" ? "unknown" : "gedekt", vereist: id !== "media-source-optimizer" });
+    dekking.bronnen.apps = { status: "ok", verouderd: false, observed_at: tijd.observed_at };
+    dekking.apps = dekking.apps.filter((a: { app: string; herkend_als: string | null }) => a.herkend_als && a.app !== mso && a.herkend_als !== mso);
+    for (const [id, rij] of Object.entries(dekking.app_backups) as [string, Record<string, unknown>][]) {
+      Object.assign(rij, tijd, { status: id === mso ? "unknown" : "gedekt", vereist: id !== mso });
     }
-    await r.fulfill({ json: echt });
+    await r.fulfill({ json: dekking });
   });
 }
 
+/** Toegankelijkheid (axe-core, WCAG 2.2 A/AA). Elke overtreding laat de test falen. */
 export async function expectAccessible(page: Page, label: string): Promise<void> {
   const res = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   const summary = res.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(" ")).slice(0, 5).join(" | ")}`);

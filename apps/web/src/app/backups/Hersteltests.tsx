@@ -7,14 +7,13 @@ import { Leesstand } from "@/components/Leesstand";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import { Button } from "@/components/ui/button";
 import { type ActieVerzoek, toonbareFout, vasteFout } from "@/lib/acties";
-import { appNaam, datasetNaam, puntDatasets, UUID, type Herstelpunt, type TestRecord } from "@/lib/backups";
+import { appNaam, datasetNaam, KLOON, puntDatasets, UUID, type Herstelpunt, type TestRecord } from "@/lib/backups";
 import { formatDateTime } from "@/lib/format";
 import { useRole } from "@/lib/session";
 import { testResult } from "@/lib/status";
 import { useAction } from "@/lib/use-action";
 import { useMeting, usePaginaLijst } from "@/lib/use-meting";
 
-const KLOON = "zfs.snapshot.clone_to_sandbox";
 const sleutel = (v: ActieVerzoek) => v.request_id;
 const SOORT: Record<string, string> = { foto: "Foto", database: "Database", dataset: "Dataset", config: "Configuratie" };
 const uitkomst = (s?: string) => s === "geslaagd" || s === "mislukt" ? testResult(s).label : "Onbekend";

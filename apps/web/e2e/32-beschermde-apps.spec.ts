@@ -169,7 +169,7 @@ test("een lezer opent het plan van een andere testgebruiker met uitsluitend lees
 });
 
 test("bijwerken toont de concrete back-upblokkade en verwijderen benoemt het behoud in beide stappen", async ({ page }) => {
-  const id = await appId(page, "media-source-optimizer");
+  const id = await appId(page, "my-house");
   const api = "/api/v1/apps/" + id;
   const detail = await (await page.request.get(api)).json();
   await page.route("**" + api, r => r.fulfill({json: {...detail, installatiewijze: "catalog_app",

@@ -6,11 +6,12 @@ import { Leesstand } from "@/components/Leesstand";
 import { PageHeader } from "@/components/PageHeader";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import { StatusBadge } from "@/components/StatusBadge";
-import { appNaam, backupGate, BRONNAMEN, datasetNaam, gateVoorwaarde, meettijd, meldreden, uren, verseApp } from "@/lib/backups";
+import { appNaam, backupGate, BRONNAMEN, datasetNaam, gateVoorwaarde, geverifieerdeExport, meettijd, meldreden, optioneelAfwezig, uren, verseApp, verseBron } from "@/lib/backups";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { coverageCounts } from "@/lib/home";
 import { coverageStatus, gateStatus, testResult } from "@/lib/status";
-import type { Coverage, CoverageApp, Gate, SelfBackupList } from "@/lib/types";
+import type { CoverageApp, Gate } from "@/lib/types";
+import { useBackupGate } from "@/lib/use-backup-gate";
 import { useMeting } from "@/lib/use-meting";
 import { BackupNav } from "./BackupNav";
 
@@ -21,20 +22,17 @@ const BRON_LABEL: Record<string, string> = {
 
 export function BackupsScreen() {
   const nu = useNow(1000).getTime();
-  const coverage = useMeting<Coverage>("/api/v1/backups/coverage");
-  const gate = useMeting<Gate>("/api/v1/gates/backup_gate");
+  const { gate, dekking: coverage, eigen: self, stand: status } = useBackupGate(true, nu);
   const r2 = useMeting<Gate>("/api/v1/gates/r2_r3_acties");
-  const self = useMeting<SelfBackupList>("/api/v1/backups/self");
+  const laatsteExport = geverifieerdeExport(self.data, nu);
   const c = coverage.data;
+  const apps = Array.isArray(c?.apps) ? c.apps : null;
+  const datasets = Array.isArray(c?.datasets) ? c.datasets : null;
   const oud = coverage.stale;
-  const vers = (...ids: string[]) => !oud && ids.every(id => {
-    const b = c?.bronnen[id];
-    return b?.status === "ok" && !b.verouderd && !!meettijd(b.observed_at, nu) && nu - Date.parse(b.observed_at!) <= 900_000;
-  });
+  const vers = (...ids: string[]) => !oud && ids.every(id => verseBron(c, id, nu));
   const lokaal = vers("snapshot_tasks", "latest_snapshots", "datasets");
   const extern = vers("cloudsync", "replication", "datasets");
-  const counts = coverageCounts(c);
-  const status = backupGate(gate.data, c, gate.stale || (gate.data?.toegestaan === true && oud), nu);
+  const counts = coverageCounts(apps ? c : undefined);
   const dbVers = (a: CoverageApp) => vers("apps") && (a.db_export.bron !== "MediaGuard-herstelrapport"
     || (verseApp(c, "mediaguard", nu) && c?.app_backups?.mediaguard?.status === "gedekt"));
   const volledig = (a: CoverageApp) => a.volledige_appbackup && dbVers(a) && a.db_export.status === "geverifieerd"
@@ -63,23 +61,24 @@ export function BackupsScreen() {
             if (!naam) return null;
             const meting = c?.app_backups?.[id];
             const uitleg = Object.hasOwn(BRONNAMEN, id)
-              ? meting?.vereist === false ? "Niet vereist" : !oud && meting?.status === "gedekt" && verseApp(c, id, nu) ? "Bevestigd" : "Onbekend"
+              ? !oud && optioneelAfwezig(c, id, nu) ? "Niet vereist" : !oud && meting?.status === "gedekt" && verseApp(c, id, nu) ? "Bevestigd" : "Onbekend"
+              : id === "eigen_backup" ? !self.stale && laatsteExport ? "Geverifieerde export aanwezig" : "Geen geverifieerde export aangetoond"
               : status === "unknown" ? "Geen afzonderlijke blokkade gemeld" : "Voldoet volgens de gate";
             return <li key={id}>{naam} · {uitleg}</li>;
           })}
         </ul>}
-        {r2.data && <p>R2/R3-acties · <StatusBadge view={gateStatus(backupGate(r2.data, c, r2.stale || (r2.data.toegestaan && (oud || status !== "toegestaan")), nu))} /></p>}
+        {r2.data && <p>R2/R3-acties · <StatusBadge view={gateStatus(backupGate(r2.data, c, r2.stale || (r2.data.toegestaan && status !== "toegestaan"), nu, self.stale ? undefined : self.data))} /></p>}
         <Freshness bron="Hub · back-upgate" observedAt={meettijd(gate.data?.afgeleid_op, nu)} verouderd={gate.stale} />
       </section>
       <Leesstand bron={coverage} naam="Back-updekking" />
       {c && <>
         <section className="card stack" aria-labelledby="bronnen-titel">
           <h2 id="bronnen-titel">Bronnen van de dekking</h2>
-          <p>{counts.fresh && vers(...Object.keys(BRON_LABEL))
-            ? `${c.apps.filter(volledig).length} van ${counts.totaal} apps hebben een volledige app-back-up.`
+          <p>{apps && counts.fresh && vers(...Object.keys(BRON_LABEL))
+            ? `${apps.filter(volledig).length} van ${counts.totaal} apps hebben een volledige app-back-up.`
             : "Niet alle bronnen zijn actueel. De dekking is deels onbekend."}</p>
           <ul className="plain-list">{Object.entries(BRON_LABEL).map(([id, naam]) => <li key={id}>
-            {naam} · {vers(id) ? "Vers" : "Onbekend"} · gemeten {formatDateTime(meettijd(c.bronnen[id]?.observed_at, nu))}
+            {naam} · {vers(id) ? "Vers" : "Onbekend"} · gemeten {formatDateTime(meettijd(c.bronnen?.[id]?.observed_at, nu))}
           </li>)}</ul>
           <p>Synchronisatie is geen herstelgarantie.</p>
           <h3 id="appmeldingen">Back-upmeldingen</h3>
@@ -94,7 +93,7 @@ export function BackupsScreen() {
                   {stand === "degraded" && " Niet gedekt."}
                   {stand === "gedekt" && rij?.leeftijd_uren != null && ` Bij controle ${formatNumber(rij.leeftijd_uren)} uur oud.`}
                   {id === "emby_exportarchief" && stand === "gedekt" && rij?.aanwezig && " Archief aanwezig."}
-                  {rij?.vereist === false && " Niet vereist voor de gate."}
+                  {!oud && optioneelAfwezig(c, id, nu) && " Niet vereist voor de gate."}
                   {rij?.observed_at && ` Gemeten ${formatDateTime(meettijd(rij.observed_at, nu))}.`}
                 </span></span>
                 <StatusBadge view={stand === "degraded" ? { tone: "degraded", label: "Beperkt" } : coverageStatus(stand)} />
@@ -104,7 +103,8 @@ export function BackupsScreen() {
         </section>
         <section className="card stack" aria-labelledby="apps-titel" data-testid="dekking-apps">
           <h2 id="apps-titel">Per app</h2>
-          <ResponsiveList items={c.apps} label="Back-updekking per app" sleutel={a => a.app} tabelVanaf={768} kolommen={[
+          {!apps && <p>App-inventaris onbekend.</p>}
+          <ResponsiveList items={apps ?? []} label="Back-updekking per app" sleutel={a => a.app} tabelVanaf={768} kolommen={[
             { kop: "App", cel: a => <><Link className="losse-link break-all" href={`/backups/herstelpunten?app=${encodeURIComponent(appNaam(a.app))}`}>{appNaam(a.app)}</Link>
               <p>{oud ? "Volledigheid onbekend" : volledig(a) ? "Volledige appback-up" : "Geen volledige appback-up aangetoond"}</p></> },
             { kop: "Back-updekking", cel: a => <>
@@ -119,8 +119,8 @@ export function BackupsScreen() {
         </section>
         <section className="card stack" aria-labelledby="datasets-titel" data-testid="dekking-datasets">
           <h2 id="datasets-titel">Per dataset</h2>
-          {!c.datasets.length && <p>{vers("datasets") ? "Geen datasets voor deze selectie." : "Datasets onbekend."}</p>}
-          <ResponsiveList items={c.datasets} label="Back-updekking per dataset" sleutel={d => d.dataset} tabelVanaf={768} kolommen={[
+          {!datasets?.length && <p>{datasets && vers("datasets") ? "Geen datasets voor deze selectie." : "Datasets onbekend."}</p>}
+          <ResponsiveList items={datasets ?? []} label="Back-updekking per dataset" sleutel={d => d.dataset} tabelVanaf={768} kolommen={[
             { kop: "Dataset", cel: d => <span className="break-all">{datasetNaam(d.dataset) ?? "Onbekend"}</span> },
             { kop: "Apps", className: "break-all", cel: d => d.apps.map(appNaam).join(", ") || "Onbekend" },
             { kop: "Lokaal snapshot", cel: d => <>{badge(d.lokaal_snapshot.status, lokaal)} {formatDateTime(meettijd(d.lokaal_snapshot.laatste_snapshot, nu))}</> },
@@ -133,8 +133,8 @@ export function BackupsScreen() {
       <section className="card stack" aria-labelledby="eigen-titel" data-testid="sectie-eigen-backup">
         <h2 id="eigen-titel">Database van de Hub zelf</h2>
         <Leesstand bron={self} naam="Eigen back-up" />
-        {self.data && <p>{self.stale ? "Laatste export onbekend." : self.data.laatste_geverifieerd
-          ? `Geverifieerde export · checksum en inhoudsopgave gecontroleerd op ${formatDateTime(self.data.laatste_geverifieerd.beeindigd_op)}.`
+        {self.data && <p>{self.stale ? "Laatste export onbekend." : laatsteExport
+          ? `Geverifieerde export · checksum en inhoudsopgave gecontroleerd op ${formatDateTime(laatsteExport.beeindigd_op)}.`
           : "Er is nog geen geverifieerde export van de Hub-database."}</p>}
       </section>
     </div>
