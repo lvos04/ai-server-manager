@@ -435,3 +435,46 @@ vraagt ("mogen wel starten zodra de regisseur dat vastlegt in STATUS.md").
 ### Uitkomst van de gate
 
 volgt — S-P2-910. De faseregel P2 staat op `Bezig` met `Sim-getest; NIET GEVALIDEERD (echte NAS)`.
+
+## P3 — eigen apps koppelen: gebouwd en in de simulator getest (2026-11-24)
+
+Versie 1 volgt variant B. De Hub beheert de bestaande apps en Emby blijft de mediaserver. De tabel noemt de gepushte broncommits waarop het fasebewijs rust. De cijfers tussen haakjes zijn de bijbehorende Forgejo-runs.
+
+| Repo en bronstand | Stappen | Wat is gebouwd en beproefd |
+|---|---|---|
+| ai-server-manager · `a6cc363` (#77) | S-P3-010 t/m S-P3-100, S-P3-170 | Media toont beschikbare MediaGuard-cijfers en de openbare MSO-gezondheid. Zonder aantoonbaar leesrecht blijft de diagnose onbekend. Huis toont gegevens van de bevestigde my_house-koppeling. Ontbrekende back-upmetingen sluiten de poort. De rooktest controleert de Hub- en executor-images. Kosten toont een plaatshouder. |
+| media-guard-ultimate · `1e05ba5` (#55, #56) | S-P3-600 t/m S-P3-680 | Sleutels hebben begrensde rechten. De connector levert leesgegevens, events met cursor en een herstelrapport. De schemacontrole, de healthcheck en het Custom App-manifest zijn gebouwd. Het upgrade- en terugzetbewijs vergelijkt de voortgang in een gevulde 1.2.2-testdatabase. |
+| media-source-optimizer · `dca9ccf` (#31) | S-P3-200 t/m S-P3-290 | De machinesleutel begrenst lezen en wijzigen. De connector koppelt een wijziging aan de goedgekeurde voorvertoning. De testdatabase doorloopt de upgrade. De image heeft een healthcheck als gebruiker 568 en een Custom App-manifest. |
+| my_house · `517cd5b` (#82) | S-P3-700 t/m S-P3-755 | De alles-in-één-image bevat Zigbee2MQTT als optioneel proces. Het bedieningspad toetst de sleutel, het doel en de inbedrijfstelling. De boiler blijft alleen leesbaar. De webapp herstelde een versleutelde export van testinstantie A op B. |
+| home-control-hub · `f2dd141` (#19) | S-P3-300, S-P3-310, S-P3-360 | De energietijdreeks houdt bron, meetkwaliteit, reset, meterwisseling en tijdvak bij. Bij Node-RED is het oude beveiligingsprofiel vervallen. Zonder dienstaanmelding krijgt de meting de stand onbekend. |
+| jelly-leon-platform · `3677179` (#30) | S-P3-400 t/m S-P3-450 | De controlelijsten I03, I04, I05 en I15 t/m I20, en de manifestkopieën van de drie bestaande apps zijn vastgelegd. Het Node-RED-manifest blijft in de afgesproken wachtstand. De editor weigert anonieme toegang. |
+| appstore-en-fork · `936b2da` (#10) | S-P3-490 | De manifestvalidator ondersteunt de voorziening voor beheerder en dienstaccount en weigert geheimen in het installatieformulier. |
+
+### Wat versie 2 nog moet leveren
+
+De noodstop AAN vanuit de Hub (S-P3-110) wacht op een actienaam, risicoklasse en goedkeuringsregel in contract en beleid. De noodstop is in MediaGuard zelf beschikbaar. De Hub-goedkeuring van MSO-wijzigingen (S-P3-120), het bewaakte schrijfpad naar my_house (S-P3-130), de module voor energie en kosten en het bijbehorende scherm (S-P3-150, S-P3-160) zijn uitgesteld. B01-011 heeft daarom de status `Niet gestart`.
+
+De versieplanning stelt ook de bijwerking van de appdocumenten en het register (S-P3-180, S-P3-500), energieplanning, kostenadvies, meldingen en statusweergave (S-P3-320 t/m S-P3-350), de Android-schermronde en de extra poolbron van MediaGuard (S-P3-685, S-P3-690) en de schermronde van my_house (S-P3-765) uit.
+
+### NIET GEVALIDEERD op de echte omgeving
+
+| Wat nog getoetst moet worden | Proef |
+|---|---|
+| MediaGuard, MSO en my_house als standaard Custom App installeren. De Hub koppelen aan de geïnstalleerde apps en de echte bronrechten, foutredenen en versheid meten. Bij MediaGuard de upgrade en de terugval controleren met behoud van kijkgeschiedenis en voortgang. T-01 houdt een nieuwe MediaGuard-release tegen zolang de pakketkoppeling openstaat. | N-P6-05, N-P6-06 |
+| Lampen, airco en meters koppelen en hun teruggelezen toestand vergelijken met de fysieke toestand. De boiler mag uitsluitend meetwaarden leveren. De Zigbee-stick via het formulier doorgeven, vaststellen of gebruiker 568 hem kan openen en de werking na een herstart toetsen. | D01, D12, D13, D14 en N-P6-06 |
+| Op de echte pool een momentopname en database-export maken. De kopie herstellen en met de bron vergelijken. Ook de installatie en rechten van de Hub en de executor en de aanmelding met de benodigde accounts staan open. | N-P6-02, N-P6-03, N-P6-04 |
+| De volledige scenario’s voor MSO, Hub-goedkeuring, Node-RED, opslag, huis en energie doorlopen. Voor EX50 moeten Hub, my_house en aanmelding na herstel op een tweede omgeving met een ander adres samen blijven werken. | S-P6-16, S-P6-18 t/m S-P6-21 en N-P6-14 |
+
+De Testmatrix gebruikt voor deze integrale scenario’s de status `Geblokkeerd` (§8.2). Het bewijsveld vermeldt welke deelproef al in een repo is uitgevoerd.
+
+### Besluiten die bij P3 gelden
+
+- **Z-02, Z-03, Z-08 en Z-10.** Op 16 november koos de gebruiker telkens optie 1. De hostbeperking voor het koppelen via een statuspagina geldt. Elke databasemigratie van een mediaserver vraagt een voor/na-rapport. Het ingestelde Hub-adres in my_house is zonder inloggen leesbaar. MSO draait CI bij een push op de werkbranch.
+- **BG-05.** Voor zoeken en herstellen via de Hub geldt ‘niet’. MediaGuard houdt de bediening. De afzonderlijke Hub-noodstop valt onder het uitstel van S-P3-110.
+- **Z-18.** Op 21 november koos de gebruiker optie 2. S-P3-438 en S-P3-440 gebruiken voor I05-05-02 ‘Formulier standaard Custom App zonder Zigbee/tunnel’ en voor I05-05-03 ‘TrueNAS Install via formulier standaard Custom App’.
+- **Z-17 en Z-21.** Op 11 november koos de gebruiker Zigbee2MQTT in de image van my_house, alleen actief wanneer een USB-apparaat is opgegeven. Voor Z-21 koos de gebruiker optie 2. S-P3-755 laat de apparatenlijst in het manifest leeg en beschrijft de optionele stick in het veld Devices van het formulier. De doorgifte en toegang op de NAS zijn nog te meten (D01, D13).
+- **C-12.** Op 11 november koos de gebruiker voor inrichting van beheerder en dienstaccount via de manifeststandaard, zonder geheim in het formulier (S-P3-490, S-P3-445, S-P3-360). Voor de officiële Node-RED-image geldt de keuze ‘Wachten’. Het manifest bevat nog geen accounts en de editor blijft dicht tot een ondersteunde inrichting beschikbaar is.
+
+### Uitkomst van de gate
+
+volgt — S-P3-910. De faseregel P3 staat op `Bezig` met `Sim-getest; NIET GEVALIDEERD (echte NAS)`.
