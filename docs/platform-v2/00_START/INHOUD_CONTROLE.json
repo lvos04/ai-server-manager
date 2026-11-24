@@ -1,5 +1,5 @@
 {
-  "generated_date": "2026-11-09",
+  "generated_date": "2026-11-24",
   "version": "2.0-complete",
   "files_excluding_manifest": 98,
   "markdown_files": 94,
@@ -15,8 +15,8 @@
     },
     {
       "path": "00_START/INHOUDSOPGAVE.md",
-      "bytes": 5346,
-      "sha256": "853421f4fd8420cdcd1f67f18f0c5eff7ab0560e7de44ac6cc9f041d5572c53a"
+      "bytes": 5746,
+      "sha256": "a6a119dadbb23db1f2666680d88cbd86561eb54b6800b12d8ef220d2def29ea0"
     },
     {
       "path": "00_START/LEES_MIJ_EERST.md",
@@ -35,8 +35,8 @@
     },
     {
       "path": "01_ARCHITECTUUR/03_RISICO_AUTONOMIE.md",
-      "bytes": 3348,
-      "sha256": "b853131c024c4846b80433f15e589d59187cc8d5b5a92379ee8e4fbe6f4af138"
+      "bytes": 3985,
+      "sha256": "e44e9573f83d2c42aa798dead72e0e078dbe86ee6b49bf764b7d28fad756270b"
     },
     {
       "path": "01_ARCHITECTUUR/04_GEGEVENS_EN_STORAGE.md",
@@ -50,8 +50,8 @@
     },
     {
       "path": "01_ARCHITECTUUR/06_FASERING_EN_GATES.md",
-      "bytes": 3457,
-      "sha256": "9cb9fbbde499642c62fc845d0c2236f50ab40fd08b51dc96953fef4424ed3ebf"
+      "bytes": 6193,
+      "sha256": "e4aca368d3d946aacfd2d924dd834303343abeec699179d5d0b99e076fae880c"
     },
     {
       "path": "01_ARCHITECTUUR/07_API_EN_EVENTSCHEMA.md",
@@ -75,8 +75,8 @@
     },
     {
       "path": "02_BOUWPLANNEN/B03_UNIVERSELE_MEDIASERVER.md",
-      "bytes": 16294,
-      "sha256": "38feb201fe713a83a17369359743bbd4e31274ca3ab057bc581e6feda9290b05"
+      "bytes": 1361155,
+      "sha256": "89265ef5c92868a76045b1388c2c6f063c4c91242b41b423452abc165ddbae72"
     },
     {
       "path": "02_BOUWPLANNEN/B04_MEDIAGUARD_DELTA.md",
@@ -120,8 +120,8 @@
     },
     {
       "path": "02_BOUWPLANNEN/B12_BACKUP_HERSTEL.md",
-      "bytes": 10252,
-      "sha256": "36979c12bedf128e2b38981020746c1a5bc4fc222a3b9679bf7c8558bc7797ae"
+      "bytes": 10933,
+      "sha256": "3c40ba4d656dd12acd44decc3ee402badc115cecdd195a94f2c03f92b51df9e0"
     },
     {
       "path": "02_BOUWPLANNEN/B13_AUTHENTIK_SSO.md",
@@ -160,8 +160,8 @@
     },
     {
       "path": "03_INSTALLATIE/I05_MY_HOUSE.md",
-      "bytes": 6429,
-      "sha256": "6b5748d9f82b3322df10de3eac8c887ba8af616d7c06e3cace6bca9901a98c17"
+      "bytes": 6474,
+      "sha256": "028de06ac50c1d29a743b2e383be500000d5fcca88d386f0f46f68523701f77c"
     },
     {
       "path": "03_INSTALLATIE/I06_JELLYFIN.md",
@@ -185,8 +185,8 @@
     },
     {
       "path": "03_INSTALLATIE/I10_NODE_RED.md",
-      "bytes": 4855,
-      "sha256": "97e1c60556af5b6d45df2515f545fb9c196b17ce67a7caba443aad8bc39ba056"
+      "bytes": 6236,
+      "sha256": "bda2115ba352c9ba3fe10a7ac5947e095d66b2d0c46c1e3439ee86e561eb0c7e"
     },
     {
       "path": "03_INSTALLATIE/I11_NETALERTX.md",
@@ -275,13 +275,13 @@
     },
     {
       "path": "04_BESTAANDE_APPS/A02_EMBY.md",
-      "bytes": 1558,
-      "sha256": "d76bdabbe739de0b4228e418fd9538c126965c06bd28902ebd339d7f876cd753"
+      "bytes": 2498,
+      "sha256": "ceed0e999f1bac5e2b16799cce2940edfcb87b597c7c8e9f873e645c8ec774bb"
     },
     {
       "path": "04_BESTAANDE_APPS/A03_JELLYPLEX_WATCHED.md",
-      "bytes": 1518,
-      "sha256": "34ad350ae4829e3413f1eae18283a65f9b098b52d61a1ea637285ad8b0a5e586"
+      "bytes": 1970,
+      "sha256": "61c9fbd0c7ad5bb876d7e12fcbc4a0078b0b2d787f7e5002b8c0d1ba7d6d3ffe"
     },
     {
       "path": "04_BESTAANDE_APPS/A04_READARR.md",
@@ -480,8 +480,8 @@
     },
     {
       "path": "08_EXCEL/TrueNAS_V2_Uitvoering_en_Afvinken.xlsx",
-      "bytes": 72602,
-      "sha256": "972748e8e0ba353b5582b659abef70b6571e115cd4681557504f820c784c6ab5"
+      "bytes": 297934,
+      "sha256": "7e4fe8a34924aad63b2ef6a0d9eca0112adc35b869792524eda2cc8ceeff22fa"
     },
     {
       "path": "08_EXCEL/decisions.json",
@@ -490,13 +490,13 @@
     },
     {
       "path": "08_EXCEL/e2e_cases.json",
-      "bytes": 7021,
-      "sha256": "cf7fb0936c26f79c9c51256a016987bfa97b0e3db9c4eba1b52d40b786c8f8ac"
+      "bytes": 86906,
+      "sha256": "839d0fd99b1bcf6b328488461b32d9efd929df495c668ffffe3a8a73d3aaf404"
     },
     {
       "path": "08_EXCEL/tasks.json",
-      "bytes": 214784,
-      "sha256": "37f2fad59b67adcd1ac2fc1fa60d86ea4a6e43b271474e457de7735ecfc4b460"
+      "bytes": 415783,
+      "sha256": "26a352ad7216fcf270bc20afcc870434edebcaa98d89cbabf9c357e2a00714d8"
     }
   ]
 }
