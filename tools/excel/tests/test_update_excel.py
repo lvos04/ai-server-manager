@@ -265,7 +265,7 @@ def maak_werkboek(pad: Path) -> None:
     )
     app = _blad(
         [
-            _kop(1, ["App", "Soort", "Document", "Taken", "Gereed", "Voortgang"]),
+            _kop(1, ["App", "Soort", "Document", "Taken", "Afgevinkt", "Voortgang"]),
             _row(
                 2,
                 [
@@ -283,7 +283,7 @@ def maak_werkboek(pad: Path) -> None:
         "</x:conditionalFormatting>" + ext,
     )
     rel = _blad([_kop(1, ["Project", "Stand"]), _row(2, [_c("A2", "MediaGuard Ultimate"), _c("B2", "1.2.2")])])
-    instr = _blad([_kop(1, ["Onderwerp", "Instructie"]), _row(2, [_c("A2", "Status"), _c("B2", "nooit Gereed")])])
+    instr = _blad([_kop(1, ["Onderwerp", "Instructie"]), _row(2, [_c("A2", "Status"), _c("B2", "definitieve aftekening door de gebruiker")])])
     styles = (
         '<?xml version="1.0" encoding="utf-8"?><x:styleSheet ' + NSDECL + '><x:fonts count="1"><x:font><x:sz val="11"/>'
         '<x:name val="Calibri"/></x:font></x:fonts><x:fills count="2"><x:fill><x:patternFill patternType="none"/></x:fill>'
@@ -536,6 +536,32 @@ def test_klein_werkboek_rijen_testrijen_en_fase(klein):
     ):
         assert voor[naam] == na[naam], naam
     assert (klein["dir"] / "klein.xlsx.bak").read_bytes() != klein["xlsx"].read_bytes()
+
+
+@pytest.mark.parametrize("veld", ["bewijs", "blokkade", "opmerking"])
+def test_eindstatus_in_vrije_bewijstekst_wordt_bij_de_bron_gemeld(klein, veld, capsys):
+    ev = _bewijs(klein["dir"], [{"id": "EX01", "status": "Bezig", veld: "Status 'Geslaagd' bij acceptatie."}])
+    uit = klein["dir"] / "proef.xlsx"
+    assert ue.main(["--xlsx", str(klein["xlsx"]), "--evidence", str(ev), "--out", str(uit)]) == 2
+    assert f"EX01: definitieve status in vrije tekst ({veld})" in capsys.readouterr().err
+    assert not uit.exists()
+
+
+def test_kolomkop_en_instructies_in_de_proefwerkmap(tmp_path):
+    uit = tmp_path / "proef.xlsx"
+    programma = REPO / "docs/platform-v2/EVIDENCE_PROGRAMMA.json"
+    sjabloon = ue.Werkboek(EXCEL)
+    ue.set_cell(ue.data_rows(sjabloon.blad("Appoverzicht"))[0], 5, "Gereed")
+    oude_kopie = tmp_path / "oude-kolomkop.xlsx"
+    sjabloon.schrijf(oude_kopie)
+    assert ue.main(["--xlsx", str(oude_kopie), "--program", str(programma), "--out", str(uit)]) == 0
+    delen = onderdelen(uit)
+    assert waarde(blad(delen, 6), "E1") == "Afgevinkt"
+    assert formule(blad(delen, 6), "E2") == formule(blad(onderdelen(EXCEL), 6), "E2")
+    instructies = {ue.row_id(r): ue.cell_text(ue.find_cell(r, 2)) for r in ue.data_rows(blad(delen, 8))}
+    for rij in json.loads(programma.read_text())["instructies"]:
+        assert instructies[rij["onderwerp"]] == rij["instructie"]
+    assert not any(re.search(r"\b(?:Gereed|Geslaagd)\b", v) for v in instructies.values())
 
 
 def test_idempotent(klein):
@@ -933,7 +959,12 @@ def test_echte_excel_in_tijdelijke_kopie(tmp_path: Path, met_vinkje: bool):
         "Releases",
         "Instructies",
     ]
-    for naam in wb.sheetnames:
-        assert next(wb[naam].iter_rows(max_row=1, values_only=True)) == next(
-            openpyxl.load_workbook(EXCEL, read_only=True)[naam].iter_rows(max_row=1, values_only=True)
-        )
+    with EXCEL.open("rb") as sjabloon:
+        origineel = openpyxl.load_workbook(sjabloon, read_only=True)
+        for naam in wb.sheetnames:
+            kop = list(next(origineel[naam].values))
+            if naam == "Appoverzicht":
+                kop[4] = "Afgevinkt"
+            assert next(wb[naam].values) == tuple(kop)
+        origineel.close()
+    wb.close()

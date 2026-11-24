@@ -24,6 +24,8 @@ nieuwe rij of faserij met zo'n (start)status wordt geweigerd: exitcode 2 en er w
 voor één ID wint de voorzichtigste status. Dezelfde invoer twee keer verwerken verandert de tweede keer niets
 (idempotent). Bij een wijziging in het origineel komt er een `.xlsx.bak` naast; verwijder die na controle.
 
+De kolom *Afgevinkt* in *Appoverzicht* telt de taken die de gebruiker handmatig heeft geaccepteerd. Een letterlijke eindstatus in een vrij EVIDENCE-veld stopt de verwerking. De foutmelding noemt het ID en de veldnaam van de aan te passen bronregel.
+
 ## Afvinken door de gebruiker
 
 Besluit van de gebruiker van 2026-11-23 (zie `docs/platform-v2/OVERDRACHT/STATUS.md`, kop "Besluiten van de gebruiker

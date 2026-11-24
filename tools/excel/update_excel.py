@@ -1183,6 +1183,10 @@ def run(args: argparse.Namespace) -> dict:
     src = Path(args.xlsx)
     out = Path(args.out) if args.out else src
     wb = Werkboek(src)
+    # De kolom telt handmatig afgevinkte taken. De statuswaarden in de telformules blijven intact.
+    kop = wb.blad("Appoverzicht").find(f"{X}sheetData/{X}row[@r='1']")
+    if kop is not None and cell_text(find_cell(kop, 5)) == "Gereed":
+        set_cell(kop, 5, "Afgevinkt")
 
     # 1. rijen toevoegen of vervangen (alles of niets: fouten worden vóór het schrijven gemeld)
     rijen: list[dict] = []
@@ -1223,6 +1227,9 @@ def run(args: argparse.Namespace) -> dict:
             rid = str(e.get("id", "")).strip()
             if not rid:
                 continue
+            for veld in ("bewijs", "blokkade", "opmerking"):
+                if re.search(r"\b(?:Gereed|Geslaagd)\b", str(e.get(veld, ""))):
+                    raise ExcelFout(f"{rid}: definitieve status in vrije tekst ({veld}); herformuleer in EVIDENCE")
             e.setdefault("repo", Path(p).parts[-4] if len(Path(p).parts) >= 4 else "")
             if is_extern(rid):
                 overzicht.append(overzichtregel(e, warnings))

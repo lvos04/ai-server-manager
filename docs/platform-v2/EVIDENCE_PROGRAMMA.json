@@ -58,8 +58,20 @@
   ],
   "instructies": [
     {
+      "onderwerp": "Afvinken",
+      "instructie": "Vink een werkpakket pas handmatig af nadat het acceptatiecriterium is getest. Vul bij Bewijs / link de commit, schermafdruk of het testlog in."
+    },
+    {
+      "onderwerp": "Testen",
+      "instructie": "De Testmatrix bevat geïntegreerde tests. Vink een test na een positieve uitkomst handmatig af en leg het bewijs vast."
+    },
+    {
+      "onderwerp": "Statuswaarden",
+      "instructie": "Niet gestart / Bezig / Geblokkeerd / N.v.t. De gebruiker kan een taak na acceptatie handmatig afvinken."
+    },
+    {
       "onderwerp": "Kolom Validatie (toegevoegd)",
-      "instructie": "Sim-getest = code + CI + simulator-test geslaagd; NIET GEVALIDEERD (echte NAS|hardware|account|Mac/Xcode) = nog niet op de echte omgeving getest. Status 'Gereed'/'Geslaagd' alleen na echte acceptatie op de NAS; het hulpmiddel tools/excel/update_excel.py zet die nooit."
+      "instructie": "Sim-getest betekent dat code, CI en de simulatorproef zijn gecontroleerd met positief resultaat. NIET GEVALIDEERD (echte NAS|hardware|account|Mac/Xcode) duidt een open praktijkproef aan. Alleen de gebruiker vinkt werkpakketten en tests definitief af na acceptatie op de NAS."
     },
     {
       "onderwerp": "Bron van de statussen",
