@@ -12,11 +12,11 @@ import { APP_ID, appNaam, databaseAanwezig, meettijd, puntDatasets, puntenReden,
 import { formatDateTime, formatDuration, formatRelative } from "@/lib/format";
 import { coverageStatus, testResult } from "@/lib/status";
 import type { Coverage } from "@/lib/types";
-import { useMeting } from "@/lib/use-meting";
+import { useBronlijst, useMeting } from "@/lib/use-meting";
 
 export function Herstelpunten({ initApp }: { initApp?: string }) {
   const [app, kies] = useState(initApp && APP_ID.test(initApp) ? initApp : "");
-  const punten = useMeting<{ items: Herstelpunt[] }>(`/api/v1/backups/herstelpunten${app ? `?app=${encodeURIComponent(app)}` : ""}`);
+  const punten = useBronlijst<{ items: Herstelpunt[] }>(`/api/v1/backups/herstelpunten${app ? `?app=${encodeURIComponent(app)}` : ""}`);
   const dekking = useMeting<Coverage>("/api/v1/backups/coverage");
   const nu = useNow(1000).getTime();
   const opties = new Set([app, ...(dekking.data?.apps.map(a => a.app) ?? []), ...(punten.data?.items.map(p => p.app) ?? [])].filter(a => APP_ID.test(a)));
@@ -52,13 +52,13 @@ const UPLOAD: Record<string, string> = {
 };
 
 export function Extern() {
-  const bron = useMeting<{ status: string; taken: UploadTaak[]; max_leeftijd_s: number }>("/api/v1/backups/extern");
+  const bron = useBronlijst<{ status: string; taken: UploadTaak[]; max_leeftijd_s: number }>("/api/v1/backups/extern", "afgeleid_op");
   const nu = useNow(1000).getTime();
   const data = bron.data;
   const taken = data?.taken ?? [];
   const stand = (t: UploadTaak) => uploadStand(t, data?.max_leeftijd_s ?? 0, nu);
   const status = data?.status === "ok" ? (taken.length ? taken.map(stand).find(s => s !== "ok") ?? "ok" : "unknown") : data?.status;
-  const label = (s: string | undefined) => s && Object.hasOwn(UPLOAD, s) && !(bron.stale && s === "ok") ? UPLOAD[s] : "Externe back-up onbekend";
+  const label = (s: string | undefined) => s && Object.hasOwn(UPLOAD, s) && !(bron.stale && (s === "ok" || s === "ontbreekt")) ? UPLOAD[s] : "Externe back-up onbekend";
   return <section className="card stack">
     <Leesstand bron={bron} naam="Externe back-up" />
     {data && <>
@@ -66,7 +66,7 @@ export function Extern() {
         {status !== "ok" && <p>De externe voorwaarde van de back-upgate blijft dicht. <Link className="losse-link" href="/problemen">Bekijk problemen</Link></p>}
         {status === "ok" && <p>Een bevestigde upload bewijst alleen de synchronisatie.</p>}
       </Melding>
-      <p>Gerapporteerde taken · {data.status === "unknown" && !taken.length ? "Onbekend" : taken.length}. Maximale uploadleeftijd · {formatDuration(data.max_leeftijd_s)}.</p>
+      <p>Gerapporteerde taken · {bron.stale || (data.status === "unknown" && !taken.length) ? "Onbekend" : taken.length}. Maximale uploadleeftijd · {formatDuration(data.max_leeftijd_s)}.</p>
       <ResponsiveList label="Uploadtaken uit D04" items={taken} sleutel={t => String(t.id)} tabelVanaf={768} kolommen={[
         { kop: "D04-uploadtaak", cel: t => Number.isSafeInteger(t.id) ? `Taak ${t.id}` : "Taak-ID onbekend" },
         { kop: "Bron", cel: () => "TrueNAS Cloud Sync · OneDrive" },
@@ -107,7 +107,7 @@ const SCENARIOS: Record<string, { titel: string; stappen: string[] }> = {
 };
 
 export function Rampenscenarios({ scenario }: { scenario?: string }) {
-  const bron = useMeting<{ scenarios: { id: string }[]; laatste_hersteltests: TestRecord[] }>("/api/v1/backups/rampenscenario");
+  const bron = useBronlijst<{ scenarios: { id: string }[]; laatste_hersteltests: TestRecord[] }>("/api/v1/backups/rampenscenario");
   const ids = [...new Set(bron.data?.scenarios.map(s => s.id).filter(id => Object.hasOwn(SCENARIOS, id)))];
   const keuze = scenario ?? ids[0];
   const actief = keuze && ids.includes(keuze) ? SCENARIOS[keuze] : null;

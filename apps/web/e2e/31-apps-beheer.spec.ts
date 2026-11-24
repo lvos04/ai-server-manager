@@ -165,6 +165,7 @@ test("appstore en wizard zonder manifestbron: C-12, ‘Volgende’ uit, Enter ma
 });
 
 const PLAN = (extra: Record<string, unknown> = {}) => ({
+  observed_at: new Date().toISOString(),
   plan_id: "99999999-2222-4333-8444-555555555555",
   app_id: "fotos",
   app_name: "fotos",
@@ -221,4 +222,42 @@ test("wizard met een plan: geblokkeerde controle vooraf houdt tegen; de preview 
   await page.getByTestId("wizard-volgende").click();
   await page.waitForURL(new RegExp(`/goedkeuringen/${requestId}$`));
   expect(posts).toHaveLength(1);
+});
+
+test("E15 · lege versiehistorie en actieselectie volgen de app-inventaris", async ({ page }) => {
+  const id = await appId(page, "my-house");
+  const app = await (await page.request.get(`/api/v1/apps/${id}`)).json();
+  const beleid = await (await page.request.get("/api/v1/policy")).json();
+  const nu = Date.now() - 1000;
+  let tijd = new Date(nu).toISOString();
+  await page.route(`**/api/v1/apps/${id}`, r => r.fulfill({ json: { ...app, image_historie: [], datasets: [], poorten: [], bron: { ...app.bron, observed_at: tijd } } }));
+  await page.route("**/api/v1/policy", r => r.fulfill({ json: {
+    ...beleid, observed_at: new Date(nu).toISOString(), acties: beleid.acties.filter((a: { doel: string }) => a.doel !== "app"),
+  } }));
+  for (const [tab, tekst] of [["versies", "Nog geen versiehistorie."], ["acties", "Geen acties voor deze app."]] as const) {
+    tijd = new Date(nu).toISOString();
+    await page.goto(`/apps/${id}?tab=${tab}`);
+    await expect(page.getByText(tekst, { exact: true })).toBeVisible();
+    const datasets = page.getByTestId("app-gezondheid").getByText("Data-datasets", { exact: true }).locator("..").locator("dd");
+    await expect(datasets).toHaveText("geen gevonden");
+    tijd = new Date(nu - 24 * 3600_000).toISOString();
+    await page.reload();
+    await expect(page.getByRole("tabpanel").getByTestId("bronstand")).toContainText("Verouderd");
+    await expect(page.getByText(tekst, { exact: true })).toHaveCount(0);
+    await expect(datasets).toHaveText("onbekend");
+  }
+});
+
+test("E15 · de installatiewizard toont ontbrekende manifestcontroles alleen na een verse lezing", async ({ page }) => {
+  const nu = Date.now() - 1000;
+  let tijd = new Date(nu).toISOString();
+  const plan = PLAN({ controles_na_installatie: [] });
+  await page.route(`**/api/v1/catalog/plans/${plan.plan_id}`, r => r.fulfill({ json: { ...plan, observed_at: tijd } }));
+  await page.goto(`/apps/installeren?plan=${plan.plan_id}`);
+  const leeg = page.getByText("Dit manifest noemt geen controles na installatie.");
+  await expect(leeg).toBeVisible();
+  tijd = new Date(nu - 24 * 3600_000).toISOString();
+  await page.reload();
+  await expect(page.getByTestId("plan-verouderd")).toContainText("Verouderd");
+  await expect(leeg).toHaveCount(0);
 });

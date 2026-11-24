@@ -2,7 +2,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
 import { puntenReden, uploadStand, type Herstelpunt } from "@/lib/backups";
 import { Hersteltests } from "@/app/backups/Hersteltests";
-import { Extern, Rampenscenarios } from "@/app/backups/BackupDetails";
+import { AppsScreen } from "@/app/apps/AppsScreen";
+import { GoedkeuringenScreen } from "@/app/goedkeuringen/GoedkeuringenScreen";
+import { BeleidScreen } from "@/app/goedkeuringen/beleid/BeleidScreen";
+import { BackupsScreen } from "@/app/backups/BackupsScreen";
+import { Monitorplan } from "@/app/instellingen/monitoring/Monitorplan";
+import { LIJST_MAX_LEEFTIJD_MS, lijstIsVers } from "@/lib/lijstversheid";
+import { formatDateTime } from "@/lib/format";
+import { Extern, Herstelpunten, Rampenscenarios } from "@/app/backups/BackupDetails";
 import { Automatisering } from "@/app/automatisering/Automatisering";
 
 const bron = vi.hoisted(() => ({ rol: "admin", data: {} as Record<string, unknown> }));
@@ -144,4 +151,62 @@ it("het monitorplan geeft alleen een bestaand meettijdstip weer in het datetime-
   }
   bron.data[pad] = { items: [], observed_at: "2024-02-29T11:00:00+01:00" };
   expect(renderToStaticMarkup(<Monitorplan admin />)).toContain('dateTime="2024-02-29T10:00:00.000Z"');
+});
+
+it.each([
+  ["goedkeuringen", "/api/v1/actions?status=wacht_op_goedkeuring&limit=50", () => <GoedkeuringenScreen />, "Geen openstaande goedkeuringen."],
+  ["beleidsbron", "/api/v1/policy", () => <BeleidScreen />, "De beleidsbron bevat geen acties."],
+  ["herstelpunten", "/api/v1/backups/herstelpunten", () => <Herstelpunten />, "Geen herstelpunten gevonden."],
+  ["hersteltests", "/api/v1/backups/restore-tests", () => <Hersteltests />, "Nog geen hersteltests."],
+  ["oefenbewijs", "/api/v1/backups/rampenscenario", () => <Rampenscenarios />, "Nog geen hersteltests vastgelegd."],
+  ["externe back-up", "/api/v1/backups/extern", () => <Extern />, "Geen passende uploadtaak"],
+  ["gebeurtenissen", "/api/v1/events?source_app=home-control-hub&limit=50", () => <Automatisering onderdeel="eventtypen" />, "Geen gebeurtenissen ontvangen voor dit filter."],
+  ["flowhistorie", "/api/v1/actions?limit=50", () => <Automatisering onderdeel="historie" />, "Geen actieverzoeken van flows."],
+  ["flowdetail", "/api/v1/actions?limit=50", () => <Automatisering onderdeel="detail" flow={id} />, "Geen actieverzoeken van flows."],
+  ["flowherstel", "/api/v1/actions?action_id=automation.flows.restore&limit=50", () => <Automatisering onderdeel="versies" />, "Geen herstelverzoeken gevonden."],
+  ["monitorplan", "/api/v1/monitoring/monitorplan", () => <Monitorplan admin />, "Geen apps voor dit monitorplan."],
+  ["eigen export", "/api/v1/backups/self", () => <BackupsScreen />, "Er is nog geen geverifieerde export van de Hub-database."],
+] as const)("%s laat een verouderde lezing nooit een actuele leegmelding geven", (_naam, pad, scherm, leeg) => {
+  const vers = Date.now() - 1000;
+  const inhoud = { items: [], next_cursor: null, acties: [], scenarios: [], laatste_hersteltests: [], status: "ontbreekt", taken: [], laatste_geverifieerd: null };
+  for (const uren of [0, 24]) {
+    const tijd = new Date(vers - uren * 3600_000).toISOString();
+    // usePaginaLijst geeft de oudste pagina als observed_at door aan het scherm.
+    bron.data[pad] = { ...inhoud, observed_at: tijd, afgeleid_op: tijd, bijgewerkt_op: tijd };
+    const html = renderToStaticMarkup(scherm());
+    if (uren === 0) expect(html).toContain(leeg);
+    else {
+      expect(html).not.toContain(leeg);
+      expect(html).toContain("Verouderd");
+    }
+  }
+});
+
+it("de meetgrens geldt ook zonder herladen en onbruikbare tijden bewijzen geen lege lijst", () => {
+  const tijd = new Date(nu).toISOString();
+  expect(lijstIsVers(tijd, nu + LIJST_MAX_LEEFTIJD_MS)).toBe(true);
+  expect(lijstIsVers(tijd, nu + LIJST_MAX_LEEFTIJD_MS + 1)).toBe(false);
+  for (const t of [null, undefined, "", "ongeldig", "2026-02-30T00:00:00Z", new Date(nu + 1000).toISOString()]) {
+    expect(lijstIsVers(t, nu)).toBe(false);
+  }
+});
+
+it("een verse ophaling maakt een oude app- of datasetinventaris niet actueel", () => {
+  const vers = Date.now() - 1000;
+  for (const oud of [false, true]) {
+    const inventaris = { status: "ok", verouderd: false, observed_at: new Date(vers - (oud ? 24 * 3600_000 : 0)).toISOString() };
+    bron.data["/api/v1/apps?limit=200"] = { items: [], totaal: 0, next_cursor: null, per_status: {},
+      observed_at: new Date(vers).toISOString(), inventaris };
+    bron.data["/api/v1/backups/coverage"] = { apps: [], datasets: [], bronnen: { datasets: inventaris } };
+    const apps = renderToStaticMarkup(<AppsScreen />);
+    const backups = renderToStaticMarkup(<BackupsScreen />);
+    expect(apps.includes("Nog geen apps in de catalogus.")).toBe(!oud);
+    expect(backups.includes("Geen datasets voor deze selectie.")).toBe(!oud);
+    if (oud) {
+      expect(apps).toContain("Inventaris verouderd");
+      expect(backups).toContain("Datasets onbekend.");
+      expect(apps).toContain(formatDateTime(inventaris.observed_at));
+      expect(backups).toContain(formatDateTime(inventaris.observed_at));
+    }
+  }
 });

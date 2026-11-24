@@ -12,7 +12,7 @@ test("back-upgate, databasebewijs, upload en oefendatum hebben afzonderlijke bro
   await p2Afdrukken(page, info, "backups");
 
   const punt = randomUUID(), checkpoint = randomUUID();
-  await page.route("**/api/v1/backups/herstelpunten*", r => r.fulfill({ json: { items: [{
+  await page.route("**/api/v1/backups/herstelpunten*", r => r.fulfill({ json: { observed_at: new Date().toISOString(), items: [{
     id: punt, app: "mediaguard", checkpoint_id: checkpoint, gemaakt_op: new Date().toISOString(), status: "geverifieerd",
     snapshot: { actie_id: checkpoint, datasets: ["proef/app"] }, db_export: null, reden: null,
   }] } }));
@@ -20,7 +20,7 @@ test("back-upgate, databasebewijs, upload en oefendatum hebben afzonderlijke bro
   await expect(page.getByText("Telt niet mee. De vereiste database-export ontbreekt.")).toBeVisible();
   await expectNoHorizontalScroll(page, "herstelpunt");
   await p2Afdrukken(page, info, "herstelpunten");
-  await page.route("**/api/v1/backups/extern", r => r.fulfill({ json: { status: "ok", max_leeftijd_s: 60, taken: [
+  await page.route("**/api/v1/backups/extern", r => r.fulfill({ json: { afgeleid_op: new Date().toISOString(), status: "ok", max_leeftijd_s: 60, taken: [
     { id: 1, status: "ok", beeindigd: new Date(Date.now() - 3600_000).toISOString(), fout: "interne proefnotitie" },
   ] } }));
   await page.getByRole("link", { name: "Externe back-up", exact: true }).click();
@@ -76,7 +76,7 @@ test("een echte testkijker leest hersteltests zonder startknop en de robot weige
 test("de zandbakproef begint met één R1-voorstel en doet nog geen uitvoering of robotregistratie", async ({ page }) => {
   const punt = randomUUID(), checkpoint = randomUUID(), verzoek = randomUUID();
   const tijd = new Date(Date.now() - 60_000).toISOString();
-  await page.route("**/api/v1/backups/herstelpunten", r => r.fulfill({ json: { items: [{
+  await page.route("**/api/v1/backups/herstelpunten", r => r.fulfill({ json: { observed_at: new Date().toISOString(), items: [{
     id: punt, app: "proef", gemaakt_op: tijd, checkpoint_id: checkpoint, snapshot: { actie_id: checkpoint, datasets: ["proef/app"] },
     status: "geverifieerd", db_export: null, reden: null,
   }] } }));
@@ -106,7 +106,7 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
   const ds = ["proef/app", "proef/db"];
   const tijd = new Date(Date.now() - 60_000).toISOString();
   const verzoeken: string[][] = [];
-  await page.route("**/api/v1/backups/herstelpunten", r => r.fulfill({ json: { items: [{
+  await page.route("**/api/v1/backups/herstelpunten", r => r.fulfill({ json: { observed_at: new Date().toISOString(), items: [{
     id: punt, app: "proef", gemaakt_op: tijd, checkpoint_id: checkpoint, snapshot: { actie_id: checkpoint, datasets: ds },
   }] } }));
   await page.route(`**/api/v1/actions/${checkpoint}`, r => r.fulfill({ json: {
@@ -115,7 +115,7 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
     resultaat: { readback: { aanwezig: true, leden: { "proef/app": "4", "proef/db": "4" } } },
   } }));
   await page.route("**/api/v1/actions?*action_id=zfs.snapshot.clone_to_sandbox*", r => r.fulfill({ json: {
-    items: ids.map((id, i) => ({ request_id: id, action_id: "zfs.snapshot.clone_to_sandbox", status: "uitgevoerd", risk_class: "R1",
+    bijgewerkt_op: new Date().toISOString(), items: ids.map((id, i) => ({ request_id: id, action_id: "zfs.snapshot.clone_to_sandbox", status: "uitgevoerd", risk_class: "R1",
       uitgevoerd_op: new Date().toISOString(), target: { snapshot: `${ds[i]}@punt` },
       resultaat: { readback: { aanwezig: true, dataset: `proef/asm-sandbox/proef-${punt}-${i + 1}` } },
     })), next_cursor: null,
@@ -138,8 +138,8 @@ test("flowhistorie volgt de cursor en toont één regel per verzoek zonder vrije
   const eerste = { request_id: id, actor: { type: "flow", id: `flow:${flow}` }, action_id: "app.restart", risk_class: "R2",
     goedkeuring_nodig: true, status: "onbekend", reason: "interne proefnotitie" };
   await page.route("**/api/v1/actions?limit=50*", r => r.fulfill({ json: r.request().url().includes("cursor=")
-    ? { items: [eerste, { ...eerste, request_id: volgende, status: "afgewezen", resultaat: { message: "interne proefnotitie" } }], next_cursor: null }
-    : { items: [eerste], next_cursor: "vervolg" } }));
+    ? { bijgewerkt_op: new Date().toISOString(), items: [eerste, { ...eerste, request_id: volgende, status: "afgewezen", resultaat: { message: "interne proefnotitie" } }], next_cursor: null }
+    : { bijgewerkt_op: new Date().toISOString(), items: [eerste], next_cursor: "vervolg" } }));
   await page.goto("/automatisering/historie");
   await ready(page);
   await page.getByRole("button", { name: "Meer verzoeken laden" }).click();
@@ -196,7 +196,7 @@ test("een positieve back-upgate vraagt verse inventaris en de verplichte eigen e
   await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { status: "toegestaan", toegestaan: true, redenen: [],
     vereist: { besluiten: [], metingen: ["eigen_backup", ...namen], gates: [] }, afgeleid_op: tijd(-1000) } }));
   const eigen = { id: randomUUID(), status: "geslaagd", beeindigd_op: tijd(-1000), sha256: "a".repeat(64), inhoudsopgave_items: 10 };
-  await page.route("**/api/v1/backups/self", r => r.fulfill({ json: { items: exportAanwezig ? [eigen] : [], laatste_geverifieerd: exportAanwezig ? eigen : null } }));
+  await page.route("**/api/v1/backups/self", r => r.fulfill({ json: { observed_at: tijd(-1000), items: exportAanwezig ? [eigen] : [], laatste_geverifieerd: exportAanwezig ? eigen : null } }));
   await page.route("**/api/v1/backups/coverage", r => r.fulfill({ json: { apps: [], datasets: [],
     app_backups: Object.fromEntries(namen.map(id => [id, { vereist: id !== mso, status: id === mso ? "unknown" : "gedekt",
       observed_at: tijd(-1000), geldig_tot: tijd(60_000) }])),

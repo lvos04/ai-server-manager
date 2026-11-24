@@ -112,6 +112,7 @@ test("een geweigerd voorstel toont vaste tekst en een geldige trace-ID", async (
   const planId = randomUUID();
   await page.route(`**/api/v1/catalog/plans/${planId}`, (route) => route.fulfill({ json: {
     plan_id: planId, app_id: "proefapp", app_name: "proefapp", status: "klaar_voor_voorstel", step_id: "installeren",
+    observed_at: new Date().toISOString(),
     request_id: null, reden: null, expires_at: new Date(Date.now() + 600_000).toISOString(), release: {}, controles_na_installatie: [],
   } }));
   await page.route("**/steps/installeren/propose", (route) => route.fulfill(fout));

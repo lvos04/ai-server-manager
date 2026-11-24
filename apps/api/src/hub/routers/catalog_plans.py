@@ -19,6 +19,7 @@ from hub.deps import DB, Idem, Operator, SettingsDep, Viewer, get_keyring, get_v
 from hub.errors import trace_id_of
 from hub.keys import KeyRing
 from hub.routers.actions import _afhandelen
+from hub.timeutil import iso, utcnow
 from hub.vault import Vault
 
 router = APIRouter(prefix="/api/v1/catalog/plans", tags=["catalogusinstallatie"])
@@ -85,7 +86,7 @@ def maak(
 
 @router.get("/{plan_id}", summary="Eén eigen plan met status, registratie en open controles")
 def toon(plan_id: uuid.UUID, db: DB, _: Viewer) -> dict[str, Any]:
-    return plannen.plan_dict(plannen.haal_plan(db, plan_id))
+    return {**plannen.plan_dict(plannen.haal_plan(db, plan_id)), "observed_at": iso(utcnow())}
 
 
 @router.post(

@@ -12,7 +12,7 @@ import { formatDateTime } from "@/lib/format";
 import { useRole } from "@/lib/session";
 import { testResult } from "@/lib/status";
 import { useAction } from "@/lib/use-action";
-import { useMeting, usePaginaLijst } from "@/lib/use-meting";
+import { useBronlijst, useMeting, usePaginaLijst } from "@/lib/use-meting";
 
 const sleutel = (v: ActieVerzoek) => v.request_id;
 const SOORT: Record<string, string> = { foto: "Foto", database: "Database", dataset: "Dataset", config: "Configuratie" };
@@ -93,7 +93,7 @@ function Proef({ punt, verouderd, ververs }: { punt: Herstelpunt; verouderd: boo
 }
 
 function NieuweTest({ initPunt, ververs }: { initPunt?: string; ververs: () => Promise<void> }) {
-  const punten = useMeting<{ items: Herstelpunt[] }>("/api/v1/backups/herstelpunten");
+  const punten = useBronlijst<{ items: Herstelpunt[] }>("/api/v1/backups/herstelpunten");
   const opties = punten.data?.items.filter(p => UUID.test(p.id) && UUID.test(p.checkpoint_id)) ?? [];
   const [keuze, kies] = useState(initPunt);
   const punt = keuze ? opties.find(p => p.id === keuze) : opties[0];
@@ -105,12 +105,12 @@ function NieuweTest({ initPunt, ververs }: { initPunt?: string; ververs: () => P
         window.history.replaceState(null, "", `?punt=${encodeURIComponent(e.target.value)}`);
       }}>{!punt && <option value="">Kies een herstelpunt</option>}{opties.map(p => <option key={p.id} value={p.id}>{appNaam(p.app)} · {formatDateTime(p.gemaakt_op)} · {p.id.slice(0, 8)}</option>)}</select></>}
     {punt ? <Proef key={punt.id} punt={punt} verouderd={punten.stale} ververs={ververs} />
-      : <><p id="geen-punt">Een bevestigd herstelpunt voor de zandbakkloon is niet beschikbaar.</p><Button uit aria-describedby="geen-punt">Nieuwe hersteltest</Button></>}
+      : <><p id="geen-punt">{punten.stale || !punten.data ? "De actuele herstelpunten zijn onbekend." : "Een bevestigd herstelpunt voor de zandbakkloon is niet beschikbaar."}</p><Button uit aria-describedby="geen-punt">Nieuwe hersteltest</Button></>}
   </section>;
 }
 
 export function Hersteltests({ initPunt }: { initPunt?: string }) {
-  const bron = useMeting<{ items: TestRecord[] }>("/api/v1/backups/restore-tests");
+  const bron = useBronlijst<{ items: TestRecord[] }>("/api/v1/backups/restore-tests");
   const rol = useRole();
   return <div className="stack">
     {rol === "admin" && <NieuweTest initPunt={initPunt} ververs={bron.reload} />}

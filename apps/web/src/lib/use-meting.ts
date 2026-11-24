@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest, HubApiError, type ApiOptions } from "./api";
 import { useOnline } from "./pwa";
-import { useApi } from "./use-api";
+import { brontijd } from "./format";
+import { LIJST_MAX_LEEFTIJD_MS, lijstIsVers } from "./lijstversheid";
+import { useCatalogClock } from "./use-catalog-clock";
+import { useApi, type ApiState } from "./use-api";
 
 const bewaar = (e: HubApiError) => ![401, 403, 404].includes(e.status);
 
@@ -21,17 +24,37 @@ export function useMeting<T>(pad: string | null, request = apiRequest<T>, interv
   return { ...s, stale: !!s.stale || !online || (sinds > 0 && !(Date.parse(s.lastOk ?? "") >= sinds)) };
 }
 
-interface Pagina<T> { items: T[]; next_cursor: string | null }
+type Tijdveld = "observed_at" | "bijgewerkt_op" | "afgeleid_op";
+type Bronmoment = Partial<Record<Tijdveld, string | null>>;
+
+/** De datum van de lezing bij de bron blijft ook na opnieuw ophalen of een mislukte verversing leidend. */
+export function useBronstand<T>(bron: ApiState<T>, tijd: string | null | undefined) {
+  const moment = brontijd(tijd);
+  const nu = useCatalogClock([moment - 1, moment + LIJST_MAX_LEEFTIJD_MS]);
+  const bronTijd = moment <= nu ? new Date(moment).toISOString() : null;
+  return { ...bron, bronTijd, stale: bron.stale || (bron.data !== undefined && !lijstIsVers(tijd, nu)) };
+}
+
+export function useBronlijst<T>(pad: string | null, veld: Tijdveld = "observed_at", interval = 30_000) {
+  const bron = useMeting<T & Bronmoment>(pad, undefined, interval);
+  return useBronstand(bron, bron.data?.[veld]);
+}
+
+interface Pagina<T> extends Bronmoment { items: T[]; next_cursor: string | null }
 
 /** Herlees ook geladen vervolgpagina's. Een geweigerd recht wist daarmee de hele selectie. */
-export function usePaginaLijst<T>(pad: string | null, sleutel: (rij: T) => string) {
-  const [aantal, setAantal] = useState(1);
+export function usePaginaLijst<T>(pad: string | null, sleutel: (rij: T) => string, veld: Tijdveld = "bijgewerkt_op") {
+  const [selectie, kies] = useState({ pad, aantal: 1 });
+  const aantal = selectie.pad === pad ? selectie.aantal : 1;
   const lees = useCallback(async (url: string, opts: ApiOptions = {}) => {
     const eerste = await apiRequest<Pagina<T>>(url, opts);
     const rijen = new Map<string, T>();
     const gezien = new Set<string>();
     let pagina = eerste.data;
+    let oudste = Infinity;
     for (let i = 1; ; i++) {
+      const tijd = brontijd(pagina[veld]);
+      oudste = Math.min(oudste, tijd <= Date.now() ? tijd : NaN);
       for (const rij of pagina.items) if (!rijen.has(sleutel(rij))) rijen.set(sleutel(rij), rij);
       const cursor = pagina.next_cursor;
       if (!cursor || i >= aantal) break;
@@ -39,7 +62,9 @@ export function usePaginaLijst<T>(pad: string | null, sleutel: (rij: T) => strin
       gezien.add(cursor);
       pagina = (await apiRequest<Pagina<T>>(`${url}&cursor=${encodeURIComponent(cursor)}`, opts)).data;
     }
-    return { ...eerste, data: { items: [...rijen.values()], next_cursor: pagina.next_cursor } };
-  }, [aantal, sleutel]);
-  return { ...useMeting<Pagina<T>>(pad, lees), meer: () => setAantal(n => n + 1) };
+    const observed_at = Number.isFinite(oudste) ? new Date(oudste).toISOString() : null;
+    return { ...eerste, data: { items: [...rijen.values()], next_cursor: pagina.next_cursor, observed_at } };
+  }, [aantal, sleutel, veld]);
+  const bron = useMeting(pad, lees);
+  return { ...useBronstand(bron, bron.data?.observed_at), meer: () => kies({ pad, aantal: aantal + 1 }) };
 }

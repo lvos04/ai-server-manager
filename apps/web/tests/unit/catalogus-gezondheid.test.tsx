@@ -7,7 +7,7 @@ import { HubApiError } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 
 // Alleen de gegevensgrens en de router zijn nagebootst. Beide schermen renderen hun eigen statuscomponenten.
-const proef = vi.hoisted(() => ({ uitval: false, eersteOphaling: false, app: "my_house", verlopenStoring: false, nieuweMeting: false, zonderVervalgrens: false }));
+const proef = vi.hoisted(() => ({ uitval: false, eersteOphaling: false, app: "my_house", verlopenStoring: false, nieuweMeting: false, zonderVervalgrens: false, oudeInventaris: false }));
 const meettijd = "2026-11-18T12:00:00Z";
 const ophaaltijd = "2026-11-18T12:01:00Z";
 vi.mock("next/navigation", () => ({
@@ -41,8 +41,9 @@ vi.mock("@/lib/use-api", () => ({
       runtime_staat: "RUNNING", deep_link_detail: {}, datasets: [], poorten: [], image_historie: [],
       gezondheidsprofiel: { binnenkant: proef.app === "my_house" ? "adapter_p3" : null },
     };
+    const inventaristijd = proef.oudeInventaris ? "2026-11-17T12:00:00Z" : gezondheid.observed_at;
     if (pad.includes("?")) {
-      return { ...antwoord, data: { items: [item], totaal: 1, inventaris: {status: "ok"},
+      return { ...antwoord, data: { items: [item], totaal: 1, observed_at: gezondheid.observed_at, inventaris: { status: "ok", observed_at: inventaristijd },
         per_status: { healthy: 1, degraded: 0, down: 0, unknown: 0 } } };
     }
     const bron = proef.app === "my_house" ? "adapter_p3" : "uptime_kuma:proef";
@@ -50,7 +51,7 @@ vi.mock("@/lib/use-api", () => ({
       ...gezondheid, bron, soort: proef.app === "my_house" ? "binnenkant" : "buitenkant",
       laatste_status: oud ? "down" : null, verouderd: oud,
     };
-    return { ...antwoord, data: { ...item, gezondheid: { ...gezondheid, componenten: [component] } } };
+    return { ...antwoord, data: { ...item, bron: { observed_at: inventaristijd }, gezondheid: { ...gezondheid, componenten: [component] } } };
   },
 }));
 
@@ -64,11 +65,24 @@ beforeEach(() => {
   proef.verlopenStoring = false;
   proef.nieuweMeting = false;
   proef.zonderVervalgrens = false;
+  proef.oudeInventaris = false;
   proef.app = "my_house";
   vi.setSystemTime(new Date(ophaaltijd));
 });
 
 afterEach(() => vi.useRealTimers());
+
+it("een lijstlezing maakt oude inventarisgegevens en lege datasets of poorten niet actueel", () => {
+  expect(weergave("lijst")).toContain('data-status="healthy"');
+  const vers = weergave("detail");
+  expect(vers).toContain("<dt>Data-datasets</dt><dd>geen gevonden</dd>");
+  expect(vers).toContain("<dt>Poorten</dt><dd>geen</dd>");
+  proef.oudeInventaris = true;
+  expect(weergave("lijst")).not.toContain('data-status="healthy"');
+  const oud = weergave("detail");
+  expect(oud).toContain("<dt>Data-datasets</dt><dd>onbekend</dd>");
+  expect(oud).toContain("<dt>Poorten</dt><dd>onbekend</dd>");
+});
 
 for (const app of ["my_house", "emby"]) {
   for (const scherm of ["detail", "lijst"]) {

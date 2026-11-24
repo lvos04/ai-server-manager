@@ -135,7 +135,7 @@ def _afhandelen(request: Request, idem: Idempotency, werk: Callable[[], tuple[in
 # ------------------------------------------------------------------ beleid en noodstop
 @router.get("/policy", summary="Het risicobeleid: acties, klassen, blokkades en policy_hash (alleen-lezen)")
 def get_policy(_: Viewer) -> dict[str, Any]:
-    return beleid.weergave(beleid.get_policy())
+    return {**beleid.weergave(beleid.get_policy()), "observed_at": iso(utcnow())}
 
 
 @router.get("/actions/noodstop", summary="Staat de noodstop aan? (dan voert de Hub geen enkele actie uit)")

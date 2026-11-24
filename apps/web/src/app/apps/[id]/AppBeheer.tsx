@@ -9,6 +9,7 @@ import { useNow } from "@/components/Freshness";
 import { isUuid } from "@/lib/uuid";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { KopieerVeld } from "@/components/KopieerVeld";
+import { Leesstand } from "@/components/Leesstand";
 import { Loading } from "@/components/Loading";
 import { Melding } from "@/components/Melding";
 import { ResponsiveList } from "@/components/ResponsiveList";
@@ -18,13 +19,12 @@ import { vasteFout, werkwoord, type ActieLijst, type Beleid } from "@/lib/acties
 import { APP_DOEL, appActies, EMBY_ZIN, terugzetPunten, updateDoel, wieBeslist, type AppActie } from "@/lib/appbeheer";
 import { gateVoorwaarde, meettijd, puntenReden, type Herstelpunt } from "@/lib/backups";
 import { useBackupGate } from "@/lib/use-backup-gate";
-import { useMeting } from "@/lib/use-meting";
+import { useBronlijst } from "@/lib/use-meting";
 import type { CatalogDetail } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/format";
 import { hasRole, ROLE_LABEL, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
 import type { ApiState } from "@/lib/use-api";
-import { useApi } from "@/lib/use-api";
 
 export const ALLEEN_CONTAINER = "Alleen de container wordt verwijderd. Je gegevens blijven bewaard.";
 export const GEEN_TERUGZETPAD =
@@ -58,11 +58,13 @@ function Uitleg({ rijen }: { rijen: AppActie[] }) {
 }
 
 function BeleidStand({ beleid }: { beleid: ApiState<Beleid> }) {
-  if (beleid.data && !beleid.stale) return null;
+  if (beleid.data && !beleid.stale) {
+    return beleid.data.acties.length ? null : <Melding soort="onbekend" titel="Risicobeleid onbekend" />;
+  }
   if (beleid.data) {
     return (
       <Melding soort="onbekend" titel="Verouderd" data-testid="beleid-verouderd">
-        <p>Het risicobeleid kon niet opnieuw worden gelezen. Er zijn geen knoppen tot een nieuwe, geslaagde lezing.</p>
+        <p>Een actuele lezing van het risicobeleid ontbreekt.</p>
       </Melding>
     );
   }
@@ -71,19 +73,19 @@ function BeleidStand({ beleid }: { beleid: ApiState<Beleid> }) {
 }
 
 // ------------------------------------------------------------------ S-044 Versies
-export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<Beleid> }) {
+export function Versies({ app, beleid, appOud = false }: { app: CatalogDetail; beleid: ApiState<Beleid>; appOud?: boolean }) {
   const role = useRole();
   const operator = hasRole(role, "operator");
   const voorstel = useVoorstel(app);
-  const updates = useApi<ActieLijst>(operator ? "/api/v1/actions?action_id=app.update&status=uitgevoerd&limit=50" : null);
+  const updates = useBronlijst<ActieLijst>(operator ? "/api/v1/actions?action_id=app.update&status=uitgevoerd&limit=50" : null, "bijgewerkt_op");
   const rijen = beleid.data ? appActies(beleid.data, app) : [];
   const bijwerken = rijen.find((r) => r.actie.action_id === "app.update");
   const terugzetten = rijen.find((r) => r.actie.action_id === "app.rollback");
-  const bruikbaar = Boolean(beleid.data && !beleid.stale);
+  const bruikbaar = Boolean(beleid.data?.acties.length && !beleid.stale && !appOud);
   const nu = useNow(1000).getTime();
   const controleer = operator && bruikbaar && (bijwerken?.blokkades.length === 0 || terugzetten?.blokkades.length === 0);
   const { gate, dekking, stand } = useBackupGate(controleer, nu);
-  const herstel = useMeting<{ items: Herstelpunt[] }>(controleer ? `/api/v1/backups/herstelpunten?app=${encodeURIComponent(app.naam)}` : null);
+  const herstel = useBronlijst<{ items: Herstelpunt[] }>(controleer ? `/api/v1/backups/herstelpunten?app=${encodeURIComponent(app.naam)}` : null);
   const rij = Array.isArray(dekking.data?.apps) ? dekking.data.apps.find(a => a.app === app.naam) : undefined;
   const eigenPunten = herstel.data?.items.filter(p => p.app === app.naam);
   const reden = stand === "geblokkeerd" ? (gate.data?.redenen[0] ? gateVoorwaarde(gate.data.redenen[0])[0] : "De back-upgate is dicht.")
@@ -125,7 +127,7 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
             { kop: "Digest", cel: (h) => <code className="break-all">{h.digest ?? "digest onbekend"}</code> },
           ]}
         />
-      ) : (
+      ) : !appOud && (
         <p>Nog geen versiehistorie.</p>
       )}
       <p className="text-sm text-muted-foreground">Een eerder gezien image bewijst op zichzelf geen veilig terugzetpad.</p>
@@ -157,6 +159,8 @@ export function Versies({ app, beleid }: { app: CatalogDetail; beleid: ApiState<
             <ErrorPanel vast={vasteFout} error={updates.error} title="Terugzetpaden ophalen mislukt" alert={false} />
           ) : !updates.data ? (
             <Loading text="Terugzetpaden ophalen…" regels={1} />
+          ) : updates.stale ? (
+            <Leesstand bron={updates} naam="Terugzetpaden" />
           ) : punten.length ? (
             <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="terugzetpunten">
               {punten.map((p) => (
@@ -232,12 +236,12 @@ function ControleerWatBlijft({ app, sluit, voorstel }: { app: CatalogDetail; slu
 }
 
 // ------------------------------------------------------------------ S-045 Acties
-export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<Beleid> }) {
+export function Acties({ app, beleid, appOud = false }: { app: CatalogDetail; beleid: ApiState<Beleid>; appOud?: boolean }) {
   const role = useRole();
   const operator = hasRole(role, "operator");
   const voorstel = useVoorstel(app);
   const [verwijderen, setVerwijderen] = useState(false);
-  const bruikbaar = Boolean(beleid.data && !beleid.stale);
+  const bruikbaar = Boolean(beleid.data?.acties.length && !beleid.stale && !appOud);
   const rijen = beleid.data ? appActies(beleid.data, app) : [];
   const magVerwijderen = rijen.find((r) => r.actie.action_id === "app.uninstall")?.blokkades.length === 0;
 
@@ -287,7 +291,7 @@ export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<B
               { kop: "Handeling", cel: handeling },
             ]}
           />
-        ) : (
+        ) : bruikbaar && (
           <p>Geen acties voor deze app.</p>
         )
       ) : null}

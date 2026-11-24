@@ -11,10 +11,9 @@ import { Melding } from "@/components/Melding";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { doelNaam, statusView, weigerReden, type ActieLijst, type ActieVerzoek, vasteFout } from "@/lib/acties";
-import { apiGet } from "@/lib/api";
+import { doelNaam, statusView, weigerReden, type ActieVerzoek, vasteFout } from "@/lib/acties";
 import { formatDateTime, formatTime } from "@/lib/format";
-import { useApi } from "@/lib/use-api";
+import { usePaginaLijst } from "@/lib/use-meting";
 import { cn } from "@/lib/utils";
 
 type Filter = "wacht_op_goedkeuring" | "open" | "alle";
@@ -23,6 +22,8 @@ const FILTER: Record<Filter, string> = {
   open: "Open (ook goedgekeurd en klaar)",
   alle: "Alle, met historie",
 };
+
+const sleutel = (v: ActieVerzoek) => v.request_id;
 
 function Rij({ v, verouderd }: { v: ActieVerzoek; verouderd: boolean }) {
   const doel = doelNaam(v.target) ?? "onbekend doel";
@@ -58,22 +59,9 @@ function Rij({ v, verouderd }: { v: ActieVerzoek; verouderd: boolean }) {
 export function GoedkeuringenScreen() {
   const [filter, setFilter] = useState<Filter>("wacht_op_goedkeuring");
   const pad = `/api/v1/actions?status=${filter}&limit=50`;
-  const s = useApi<ActieLijst>(pad, 30_000);
-  const [extra, setExtra] = useState<{ pad: string; items: ActieVerzoek[]; cursor: string | null } | null>(null);
-  const [meerFout, setMeerFout] = useState<unknown>(null);
-  const eigenExtra = extra && extra.pad === pad ? extra : null;
-  const items = [...(s.data?.items ?? []), ...(eigenExtra?.items ?? [])];
-  const cursor = eigenExtra ? eigenExtra.cursor : (s.data?.next_cursor ?? null);
-  const meer = async () => {
-    if (!cursor) return;
-    setMeerFout(null);
-    try {
-      const d = await apiGet<ActieLijst>(`${pad}&cursor=${encodeURIComponent(cursor)}`);
-      setExtra({ pad, items: [...(eigenExtra?.items ?? []), ...d.items], cursor: d.next_cursor });
-    } catch (e) {
-      setMeerFout(e);
-    }
-  };
+  const s = usePaginaLijst(pad, sleutel);
+  const items = s.data?.items ?? [];
+  const cursor = s.data?.next_cursor;
   return (
     <>
       <PageHeader
@@ -104,14 +92,14 @@ export function GoedkeuringenScreen() {
             ))}
           </select>
         </div>
-        {s.stale ? (
-          <Melding soort="onbekend" titel={`Verouderd · stand van ${formatTime(s.lastOk)}`} data-testid="verouderd">
-            <p>Goedkeuringen ophalen mislukt. Dit is de laatst bekende lijst; open een verzoek voor de actuele stand.</p>
+        {s.data && s.stale ? (
+          <Melding soort="onbekend" titel={s.bronTijd ? `Verouderd · stand van ${formatTime(s.bronTijd)}` : "Tijdstip van de wachtlijst onbekend"} className="arcering border-dashed border-stale" data-testid="verouderd">
+            <p>De huidige stand van de wachtlijst is onbekend. Open een verzoek voor de actuele stand.</p>
           </Melding>
         ) : null}
         {s.error && !s.data ? <ErrorPanel vast={vasteFout} error={s.error} title="Goedkeuringen ophalen mislukt" onRetry={() => void s.reload()} /> : null}
         {!s.data && !s.error ? <Loading text="Goedkeuringen ophalen…" /> : null}
-        {s.data && !items.length && !s.stale ? (
+        {s.data && !items.length && !cursor && !s.stale ? (
           <p data-testid="leeg">{filter === "wacht_op_goedkeuring" ? "Geen openstaande goedkeuringen." : "Geen voorstellen voor dit filter."}</p>
         ) : null}
         {items.length ? (
@@ -123,13 +111,13 @@ export function GoedkeuringenScreen() {
             ))}
           </ul>
         ) : null}
-        {meerFout ? <ErrorPanel vast={vasteFout} error={meerFout} title="Meer laden mislukt" /> : null}
+        {s.data && s.error ? <ErrorPanel vast={vasteFout} error={s.error} title="Goedkeuringen ophalen mislukt" onRetry={() => void s.reload()} /> : null}
         {cursor ? (
           <div>
-            <Button onClick={() => void meer()}>Meer laden</Button>
+            <Button onClick={s.meer} bezig={s.loading}>Meer laden</Button>
           </div>
         ) : null}
-        {s.data ? <Freshness observedAt={s.data.bijgewerkt_op} bron="Hub-acties" verouderd={s.stale} /> : null}
+        {s.data ? <Freshness observedAt={s.bronTijd} bron="Hub-acties" verouderd={s.stale} /> : null}
       </div>
     </>
   );

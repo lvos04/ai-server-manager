@@ -165,6 +165,7 @@ def list_herstelpunten(db: DB, _: Viewer, app: str | None = None) -> dict[str, A
             }
             for h in db.scalars(q)
         ],
+        "observed_at": iso(utcnow()),
         "regel": "Alleen een geverifieerd herstelpunt jonger dan de RPO uit D16 telt; voor Emby, de mediaserver en "
         "MediaGuard alleen met de database erin.",
     }
@@ -214,6 +215,7 @@ def run_hersteltest(
 def get_rampenscenario(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
     inp = coverage_inputs(db, settings)
     return {
+        "observed_at": iso(utcnow()),
         "scenarios": rampenscenario.SCENARIOS,
         "rpo_rto": inp.rpo_rto,
         "laatste_hersteltests": [
@@ -228,7 +230,11 @@ def get_rampenscenario(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, An
 def list_self(db: DB, _: Viewer) -> dict[str, Any]:
     rows = db.scalars(select(SelfBackup).order_by(SelfBackup.started_at.desc()).limit(50))
     b = latest_verified(db)
-    return {"items": [to_dict(r) for r in rows], "laatste_geverifieerd": to_dict(b) if b else None}
+    return {
+        "items": [to_dict(r) for r in rows],
+        "laatste_geverifieerd": to_dict(b) if b else None,
+        "observed_at": iso(utcnow()),
+    }
 
 
 @router.post("/self", status_code=202, summary="Nu een eigen database-export maken (job)")
@@ -280,7 +286,7 @@ def verify_self(backup_id: uuid.UUID, db: DB, settings: SettingsDep, principal: 
 @router.get("/restore-tests", summary="Vastgelegde hersteltests (bewijsrecords)")
 def list_restore_tests(db: DB, _: Viewer) -> dict[str, Any]:
     rows = db.scalars(select(RestoreTest).order_by(RestoreTest.uitgevoerd_op.desc()))
-    return {"items": [restore_dict(r) for r in rows]}
+    return {"items": [restore_dict(r) for r in rows], "observed_at": iso(utcnow())}
 
 
 @router.post(

@@ -130,6 +130,7 @@ def list_events(
     rows = rows[:limit]
     show = principal.role == Role.admin
     return {
+        "observed_at": iso(utcnow()),
         "items": [inbox_to_dict(r, show_sensitive=show) for r in rows],
         "next_cursor": encode_cursor(rows[-1].seq) if more and rows else None,
     }

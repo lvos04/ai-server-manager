@@ -31,9 +31,30 @@ from fakes.fake_truenas import FakeTrueNAS
 from policyhelpers import DIGEST, install_params
 
 from hub.models import ActionRequest, IdempotencyRecord
+from hub.timeutil import iso, utcnow
 
 pytestmark = pytest.mark.integration
 TOKEN = "gotify-app-token-voor-test"
+
+
+def test_p2_leeslijsten_geven_het_bronmoment_ook_bij_een_lege_selectie(admin: Any) -> None:
+    for pad, tijdveld, lijstveld in (
+        ("actions?status=wacht_op_goedkeuring", "bijgewerkt_op", "items"),
+        ("events?source_app=home-control-hub", "observed_at", "items"),
+        ("backups/herstelpunten", "observed_at", "items"),
+        ("backups/restore-tests", "observed_at", "items"),
+        ("backups/rampenscenario", "observed_at", "laatste_hersteltests"),
+        ("backups/self", "observed_at", "items"),
+        ("monitoring/monitorplan", "observed_at", "items"),
+        ("policy", "observed_at", None),
+    ):
+        begin = iso(utcnow())
+        antwoord = admin.get(f"/api/v1/{pad}")
+        assert antwoord.status_code == 200, pad
+        data = antwoord.json()
+        assert begin <= data[tijdveld] <= iso(utcnow()), pad
+        if lijstveld:
+            assert data[lijstveld] == [], pad
 
 
 @pytest.fixture

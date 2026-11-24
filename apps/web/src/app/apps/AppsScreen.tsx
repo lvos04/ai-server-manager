@@ -16,7 +16,7 @@ import { actueleMeting, appHealth, catalogusTellingen, EIGENAAR, INSTALLATIE, me
 import { formatDate, formatTime } from "@/lib/format";
 import { hasRole, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
-import { useApi } from "@/lib/use-api";
+import { useBronstand, useMeting } from "@/lib/use-meting";
 import { useCatalogClock } from "@/lib/use-catalog-clock";
 
 type Filter = "alle" | "down" | "degraded" | "unknown" | "healthy";
@@ -76,15 +76,19 @@ function Gezondheid({ app }: { app: CatalogApp }) {
 export function AppsScreen() {
   const role = useRole();
   const [verdwenen, setVerdwenen] = useState(false);
-  const list = useApi<CatalogList>(`/api/v1/apps?limit=200${verdwenen ? "&alleen_aanwezig=false" : ""}`, 60_000);
+  const lezing = useMeting<CatalogList>(`/api/v1/apps?limit=200${verdwenen ? "&alleen_aanwezig=false" : ""}`, undefined, 60_000);
+  const list = useBronstand(lezing, lezing.data?.observed_at);
   const discover = useAction<{ toelichting: string; nieuw: number; bijgewerkt: number; verdwenen: number }>();
   const [filter, setFilter] = useState<Filter>("alle");
   const [q, setQ] = useState("");
   const d = list.data;
   const nu = useCatalogClock([...(d?.items ?? []).map((a) => vervalgrens(a.gezondheid)), Date.parse(d?.overige_geldig_tot ?? "")]);
-  const ophaalfout = list.stale || Boolean(list.error);
-  const stand = (d?.items ?? []).map((a) => ({ ...a, gezondheid: actueleMeting(a.gezondheid, ophaalfout, nu) }));
-  const telling = d && catalogusTellingen(d, stand, ophaalfout, nu);
+  const inventaris = useBronstand(list, d?.inventaris.observed_at);
+  const invStale = Boolean(d && (inventaris.stale || d.inventaris.verouderd || d.inventaris.status !== "ok"));
+  const stand = (d?.items ?? []).map((a) => ({
+    ...a, gezondheid: actueleMeting(invStale ? { ...a.gezondheid, verouderd: true } : a.gezondheid, lezing.stale, nu),
+  }));
+  const telling = d && catalogusTellingen(d, stand, invStale, nu);
   const meer = Boolean(d?.next_cursor);
   const needle = q.trim().toLowerCase();
   const items = sortApps(stand, meer).filter(
@@ -92,7 +96,6 @@ export function AppsScreen() {
       (filter === "alle" || a.gezondheid.status === filter) &&
       (!needle || [a.titel, a.naam, a.app_id, a.runtime_id, a.image.repository].some((v) => (v ?? "").toLowerCase().includes(needle))),
   );
-  const invStale = d && (d.inventaris.verouderd || d.inventaris.status !== "ok");
   const now = new Date();
 
   return (
@@ -144,7 +147,7 @@ export function AppsScreen() {
               const n = c.id === "alle" ? (d?.totaal ?? 0) : (telling?.[c.id] ?? 0);
               return (
                 <Button key={c.id} size="klein" variant={filter === c.id ? "primair" : "secundair"} aria-pressed={filter === c.id} onClick={() => setFilter(c.id)}>
-                  {c.label} <span className="font-mono">({n})</span>
+                  {c.label} {d && (!invStale || d.items.length > 0) && <span className="font-mono">({n})</span>}
                 </Button>
               );
             })}
@@ -156,11 +159,11 @@ export function AppsScreen() {
         </div>
 
         <p className="text-sm" aria-live="polite" data-testid="app-teller">
-          {d ? `${items.length} ${items.length === 1 ? "app" : "apps"} · ${meer ? "op naam" : "slechtste status eerst"} · filter: ${CHIPS.find((c) => c.id === filter)?.label.toLowerCase()}` : ""}
+          {d && !invStale ? `${items.length} ${items.length === 1 ? "app" : "apps"} · ${meer ? "op naam" : "slechtste status eerst"} · filter: ${CHIPS.find((c) => c.id === filter)?.label.toLowerCase()}` : ""}
         </p>
         {meer ? <Melding soort="info">Meer dan 200 apps: gesorteerd op naam.</Melding> : null}
         {invStale ? (
-          <Melding soort="onbekend" titel={`Inventaris verouderd (laatst ${formatTime(d?.inventaris.observed_at, now)})`}>
+          <Melding soort="onbekend" titel={`Inventaris verouderd (stand van ${formatTime(list.stale ? list.bronTijd : inventaris.bronTijd, now)})`}>
             <p>
               Elke app staat daarom op Onbekend of Verouderd met de laatst bekende TrueNAS-staat. <Link href="/server">Vernieuw de inventaris.</Link>
             </p>
@@ -168,7 +171,7 @@ export function AppsScreen() {
         ) : null}
         {list.error ? <ErrorPanel error={list.error} onRetry={() => void list.reload()} alert={false} /> : null}
         {!d && list.loading ? <Loading regels={5} /> : null}
-        {d && d.totaal === 0 && !verdwenen ? (
+        {d && !invStale && !meer && d.totaal === 0 && !verdwenen ? (
           <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
             <p>Nog geen apps in de catalogus. De catalogus vult zich na een geslaagde inventaris.</p>
             <p>
@@ -241,7 +244,7 @@ export function AppsScreen() {
               </div>
             )}
           />
-        ) : d && d.totaal > 0 ? (
+        ) : d && !invStale && d.totaal > 0 ? (
           <p>Geen apps met dit filter.</p>
         ) : null}
       </div>

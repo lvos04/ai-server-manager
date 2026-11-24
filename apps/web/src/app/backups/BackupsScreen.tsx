@@ -127,7 +127,7 @@ export function BackupsScreen() {
             { kop: "Extern", cel: d => badge(d.extern.status, extern) },
             { kop: "Hersteltest", cel: d => test(d.laatste_hersteltest) },
           ]} />
-          <Freshness observedAt={meettijd(counts.observedAt, nu)} bron="TrueNAS-inventaris" verouderd={oud || !counts.fresh} label="Oudste bron gemeten" />
+          <Freshness observedAt={meettijd(counts.observedAt, nu)} bron="TrueNAS-inventaris" verouderd={oud || !counts.fresh || !vers(...Object.keys(c.bronnen ?? {}))} label="Oudste bron gemeten" />
         </section>
       </>}
       <section className="card stack" aria-labelledby="eigen-titel" data-testid="sectie-eigen-backup">

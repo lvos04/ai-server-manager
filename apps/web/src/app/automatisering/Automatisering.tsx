@@ -31,7 +31,7 @@ const ACTIES = new Set(["app.start", "app.stop", "app.restart", "app.install", "
   "sso.oidc.hub.register", "zfs.snapshot.create", "zfs.snapshot.clone_to_sandbox", "notification.send", FLOWHERSTEL, "sso.sessions.revoke"]);
 
 function Gebeurtenissen() {
-  const bron = usePaginaLijst<EventRij>("/api/v1/events?source_app=home-control-hub&limit=50", eventSleutel);
+  const bron = usePaginaLijst<EventRij>("/api/v1/events?source_app=home-control-hub&limit=50", eventSleutel, "observed_at");
   const rijen = bron.data?.items.filter(e => e.source_app === "home-control-hub" && UUID.test(e.event_id)) ?? [];
   return <section className="card stack"><h2>Ontvangen gebeurtenissen</h2>
     <p>Catalogus van eventtypen nog niet beschikbaar.</p>

@@ -1,5 +1,6 @@
 import type { Coverage, Gate, GateReason, SelfBackupList } from "./types";
 import { brontijd, formatNumber } from "./format";
+import { lijstIsVers } from "./lijstversheid";
 
 export const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export const KLOON = "zfs.snapshot.clone_to_sandbox";
@@ -31,8 +32,7 @@ export function verseApp(c: Coverage | undefined, id: string, nu: number) {
 
 export function verseBron(c: Coverage | undefined, id: string, nu: number) {
   const bron = c?.bronnen?.[id];
-  const tijd = meettijd(bron?.observed_at, nu);
-  return bron?.status === "ok" && bron.verouderd === false && tijd !== null && nu - Date.parse(tijd) <= 900_000
+  return bron?.status === "ok" && bron.verouderd === false && lijstIsVers(bron.observed_at, nu)
     && (id !== "apps" || Array.isArray(c?.apps));
 }
 

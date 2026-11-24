@@ -106,7 +106,7 @@ export async function leesToegestaneBackupGate(page: Page): Promise<void> {
   await page.route("**/api/v1/gates/backup_gate", r => r.fulfill({ json: { id: "backup_gate", status: "toegestaan", toegestaan: true,
     vereist: { besluiten: [], metingen: ["eigen_backup", "mediaguard", "emby_exportarchief", "my_house", mso], gates: [] }, redenen: [], afgeleid_op: new Date().toISOString() } }));
   const eigen = { id: randomUUID(), beeindigd_op: new Date().toISOString(), status: "geslaagd", sha256: "a".repeat(64), inhoudsopgave_items: 10 };
-  await page.route("**/api/v1/backups/self", r => r.fulfill({ json: { items: [eigen], laatste_geverifieerd: eigen } }));
+  await page.route("**/api/v1/backups/self", r => r.fulfill({ json: { observed_at: new Date().toISOString(), items: [eigen], laatste_geverifieerd: eigen } }));
   await page.route("**/api/v1/backups/coverage", async r => {
     const dekking = await (await r.fetch()).json();
     const tijd = { observed_at: new Date().toISOString(), geldig_tot: new Date(Date.now() + 600_000).toISOString() };

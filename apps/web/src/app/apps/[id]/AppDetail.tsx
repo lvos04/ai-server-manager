@@ -23,6 +23,8 @@ import type { IncidentList } from "@/lib/incidents";
 import { PERIODES, queryPath, RESOLUTIE_LABEL, toRows, type Periode, type QueryResult, type Series } from "@/lib/metrics";
 import { hasRole, useRole } from "@/lib/session";
 import { appState, healthView, type StatusView } from "@/lib/status";
+import { Leesstand } from "@/components/Leesstand";
+import { useBronlijst, useBronstand, useMeting } from "@/lib/use-meting";
 import { useApi } from "@/lib/use-api";
 import type { Beleid } from "@/lib/acties";
 import { Acties, Versies } from "./AppBeheer";
@@ -177,8 +179,9 @@ function Logs({ app }: { app: CatalogDetail }) {
 }
 
 export function AppDetail({ id }: { id: string }) {
-  const app = useApi<CatalogDetail>(`/api/v1/apps/${id}`, 60_000);
-  const beleid = useApi<Beleid>("/api/v1/policy", 60_000);
+  const app = useMeting<CatalogDetail>(`/api/v1/apps/${id}`, undefined, 60_000);
+  const inventaris = useBronstand(app, app.data?.bron?.observed_at);
+  const beleid = useBronlijst<Beleid>("/api/v1/policy", "observed_at", 60_000);
   const gezondheid = app.data?.gezondheid;
   const beschermingTot = Date.parse(app.data?.actiebeleid?.geldig_tot ?? "");
   const nu = useCatalogClock([beschermingTot, ...(gezondheid ? [gezondheid, ...gezondheid.componenten].map(vervalgrens) : [])]);
@@ -260,7 +263,7 @@ export function AppDetail({ id }: { id: string }) {
             </div>
             <div>
               <dt>{a.datasets.length === 1 ? "Data-dataset" : "Data-datasets"}</dt>
-              <dd>{a.datasets.length ? a.datasets.map((d) => <code key={d} className="block">{d}</code>) : "geen gevonden"}</dd>
+              <dd>{a.datasets.length ? a.datasets.map((d) => <code key={d} className="block">{d}</code>) : inventaris.stale ? "onbekend" : "geen gevonden"}</dd>
             </div>
             <div>
               <dt>Resourcegrenzen</dt>
@@ -268,7 +271,7 @@ export function AppDetail({ id }: { id: string }) {
             </div>
             <div>
               <dt>Poorten</dt>
-              <dd>{a.poorten.length ? a.poorten.map((p) => `${p.host_poort}→${p.container_poort}/${p.protocol}`).join(", ") : "geen"}</dd>
+              <dd>{a.poorten.length ? a.poorten.map((p) => `${p.host_poort}→${p.container_poort}/${p.protocol}`).join(", ") : inventaris.stale ? "onbekend" : "geen"}</dd>
             </div>
           </dl>
         </div>
@@ -322,10 +325,12 @@ export function AppDetail({ id }: { id: string }) {
           <Logs app={a} />
         </TabsContent>
         <TabsContent value="versies">
-          <Versies app={a} beleid={beleid} />
+          <Leesstand bron={inventaris} naam="App-inventaris" />
+          <Versies app={a} beleid={beleid} appOud={inventaris.stale} />
         </TabsContent>
         <TabsContent value="acties">
-          <Acties app={a} beleid={beleid} />
+          <Leesstand bron={inventaris} naam="App-inventaris" />
+          <Acties app={a} beleid={beleid} appOud={inventaris.stale} />
         </TabsContent>
       </Tabs>
     </>

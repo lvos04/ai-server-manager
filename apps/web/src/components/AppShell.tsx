@@ -17,6 +17,7 @@ import {
 } from "@/lib/nav";
 import { useOnline, useServiceWorker } from "@/lib/pwa";
 import { hasRole, ROLE_LABEL, SessionProvider, useSession } from "@/lib/session";
+import { useBronlijst } from "@/lib/use-meting";
 import { WACHTLIJST, type ActieLijst } from "@/lib/acties";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
@@ -243,10 +244,10 @@ function Navigation({ pathname, problemen }: { pathname: string; problemen: numb
 function GoedkeuringenLink({ pathname }: { pathname: string }) {
   const { state } = useSession();
   const ok = state.status === "auth" && hasRole(state.me.user.role, "viewer");
-  const s = useApi<ActieLijst>(ok ? WACHTLIJST : null, 30_000);
+  const s = useBronlijst<ActieLijst>(ok ? WACHTLIJST : null, "bijgewerkt_op");
   if (!ok) return null;
-  const n = s.data && !s.stale ? s.data.items.length : null;
   const meer = Boolean(s.data?.next_cursor);
+  const n = s.data && !s.stale && (!meer || s.data.items.length > 0) ? s.data.items.length : null;
   return (
     <Link
       href="/goedkeuringen"

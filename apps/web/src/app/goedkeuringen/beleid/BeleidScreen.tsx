@@ -12,13 +12,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { ResponsiveList } from "@/components/ResponsiveList";
 import type { Beleid, BeleidsActie } from "@/lib/acties";
 import { vasteFout } from "@/lib/acties";
-import type { HubApiError } from "@/lib/api";
 import { formatDuration, formatTime } from "@/lib/format";
-import { useApi } from "@/lib/use-api";
+import { useBronlijst } from "@/lib/use-meting";
 import { cn } from "@/lib/utils";
 
 export const NIET_DOOR_AI = "Het beleid kan niet door de AI worden gewijzigd.";
-const bewaar = (e: HubApiError) => e.status !== 401 && e.status !== 403;
 
 /** Zoekt in action_id en omschrijving (hoofdletterongevoelig). */
 export function filterActies(acties: BeleidsActie[], zoek: string): BeleidsActie[] {
@@ -28,7 +26,7 @@ export function filterActies(acties: BeleidsActie[], zoek: string): BeleidsActie
 
 /** S-066: het risicobeleid, uitsluitend lezen. */
 export function BeleidScreen() {
-  const s = useApi<Beleid>("/api/v1/policy", undefined, bewaar);
+  const s = useBronlijst<Beleid>("/api/v1/policy");
   const [zoek, setZoek] = useState("");
   const b = s.data;
   const leeg = b && !b.acties.length;
@@ -41,14 +39,14 @@ export function BeleidScreen() {
         intro={NIET_DOOR_AI}
       />
       <div className={cn("flex flex-col gap-4", s.stale && "arcering rounded-lg border-2 border-dashed border-stale p-3")} data-testid="beleid">
-        {s.stale ? (
-          <Melding soort="onbekend" titel={`Verouderd · stand van ${formatTime(s.lastOk)}`} data-testid="verouderd">
-            <p>Beleid ophalen mislukt. Dit overzicht is geen basis voor een nieuwe actie.</p>
+        {s.data && s.stale ? (
+          <Melding soort="onbekend" titel={s.bronTijd ? `Verouderd · stand van ${formatTime(s.bronTijd)}` : "Tijdstip van het beleid onbekend"} data-testid="verouderd">
+            <p>De huidige beleidsstand is onbekend.</p>
           </Melding>
         ) : null}
         {s.error && !b ? <ErrorPanel vast={vasteFout} error={s.error} title="Risicobeleid onbekend" onRetry={() => void s.reload()} /> : null}
         {!b && !s.error ? <Loading text="Beleid ophalen…" /> : null}
-        {leeg ? (
+        {leeg && !s.stale ? (
           <Melding soort="onbekend" titel="Risicobeleid onbekend">
             <p>De beleidsbron bevat geen acties.</p>
           </Melding>
@@ -86,7 +84,7 @@ export function BeleidScreen() {
                   { kop: "Wachttijd", cel: (a) => (a.cooldown_seconden ? formatDuration(a.cooldown_seconden) : "geen") },
                 ]}
               />
-            ) : (
+            ) : !s.stale && (
               <p data-testid="geen-regel">Geen regel gevonden voor dit filter.</p>
             )}
             <section className="card" aria-labelledby="verboden-kop">
@@ -116,7 +114,7 @@ export function BeleidScreen() {
             </section>
           </>
         ) : null}
-        {b ? <Freshness observedAt={s.lastOk} bron="Risicobeleid in de Hub" verouderd={s.stale} /> : null}
+        {b ? <Freshness observedAt={s.bronTijd} bron="Risicobeleid in de Hub" verouderd={s.stale} /> : null}
       </div>
     </>
   );

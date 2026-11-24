@@ -13,12 +13,11 @@ import { Melding } from "@/components/Melding";
 import { PageHeader } from "@/components/PageHeader";
 import { RolMelding } from "@/components/RolMelding";
 import { Button, buttonVariants } from "@/components/ui/button";
-import type { HubApiError } from "@/lib/api";
 import { CATALOGUS_NOG_NIET, planBlokkade, planCatalogus, planDigests, type InstallPlan } from "@/lib/appbeheer";
 import { formatTime } from "@/lib/format";
 import { hasRole, useRole } from "@/lib/session";
 import { useAction } from "@/lib/use-action";
-import { useApi } from "@/lib/use-api";
+import { useBronlijst } from "@/lib/use-meting";
 import { cn } from "@/lib/utils";
 
 export const STAPPEN = ["Kies app", "Parameters", "Controle vooraf", "Preview", "Goedkeuring", "Uitvoering", "Controle na uitvoering"] as const;
@@ -26,7 +25,6 @@ type Toestand = "klaar" | "huidig" | "open" | "geblokkeerd";
 
 export const NIET_IN_PLAN = "Niet beschikbaar — het installatieplan levert dit nog niet aan de browser.";
 
-const bewaar = (e: HubApiError) => e.status !== 401 && e.status !== 403 && e.status !== 404;
 
 /** Welke stap nu aan de beurt is: zonder plan ‘Kies app’; een blokkade houdt de wizard bij ‘Controle vooraf’. */
 export function huidigeStap(plan: InstallPlan | null, blok: string | null): number {
@@ -67,7 +65,7 @@ function Stappen({ huidig, geblokkeerd }: { huidig: number; geblokkeerd: boolean
 }
 
 /** Installatiepreview (COMPONENTEN.md §15): alleen getypte velden uit het plan; geen geheime waarde, geen vrije tekst. */
-function InstallatiePreview({ plan }: { plan: InstallPlan }) {
+function InstallatiePreview({ plan, oud }: { plan: InstallPlan; oud: boolean }) {
   const cat = planCatalogus(plan);
   const digests = planDigests(plan);
   const nb = <span className="text-sm">{NIET_IN_PLAN}</span>;
@@ -113,7 +111,7 @@ function InstallatiePreview({ plan }: { plan: InstallPlan }) {
             </li>
           ))}
         </ul>
-      ) : (
+      ) : !oud && (
         <p>Dit manifest noemt geen controles na installatie.</p>
       )}
       <p className="text-sm text-muted-foreground">Zolang een controle open staat, is de app niet ‘gezond’.</p>
@@ -126,7 +124,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
   const role = useRole();
   const router = useRouter();
   const nu = useNow(1000);
-  const p = useApi<InstallPlan>(planId ? `/api/v1/catalog/plans/${planId}` : null, 15_000, bewaar);
+  const p = useBronlijst<InstallPlan>(planId ? `/api/v1/catalog/plans/${planId}` : null, "observed_at", 15_000);
   const propose = useAction<{ request_id?: unknown }>();
   const plan = p.data ?? null;
   const blok = plan ? planBlokkade(plan, nu) : null;
@@ -136,7 +134,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
   let reden: string | null = null;
   if (!planId) reden = "Kies eerst een app.";
   else if (!plan) reden = "Het plan is nog niet gelezen.";
-  else if (p.stale) reden = "Verouderde gegevens: de laatste lezing van het plan is mislukt. Ververs eerst de pagina.";
+  else if (p.stale) reden = "Een actuele lezing van het plan ontbreekt. Ververs de pagina.";
   else if (blok) reden = blok;
   else if (!operator) reden = "Alleen een operator of beheerder kan een voorstel maken.";
   else if (huidig !== 3) reden = "In deze stap is er niets meer voor te stellen.";
@@ -174,8 +172,8 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
     inhoud = (
       <>
         {p.stale ? (
-          <Melding soort="onbekend" titel={`Verouderd · stand van ${formatTime(p.lastOk)}`} data-testid="plan-verouderd">
-            <p>De laatste lezing van het plan en de controle vooraf is mislukt. Er kan niets worden voorgesteld.</p>
+          <Melding soort="onbekend" titel={p.bronTijd ? `Verouderd · stand van ${formatTime(p.bronTijd)}` : "Tijdstip van het plan onbekend"} data-testid="plan-verouderd">
+            <p>Een actuele lezing van het plan en de controle vooraf ontbreekt.</p>
           </Melding>
         ) : null}
         {huidig === 2 ? (
@@ -195,7 +193,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
             <p>De installatie is teruggelezen. De app is pas gezond als de controles hieronder zijn afgerond.</p>
           </Melding>
         ) : null}
-        <InstallatiePreview plan={plan} />
+        <InstallatiePreview plan={plan} oud={p.stale} />
       </>
     );
   }

@@ -204,15 +204,16 @@ describe("tab Versies (S-044)", () => {
   it("terugzetten alleen naar een eigen, uitgevoerde bijwerking van deze app; anders geblokkeerd met reden", () => {
     const v = (status: string, app_id: string) => ({ request_id: `r-${status}-${app_id}`, action_id: "app.update", status, target: { app_id }, uitgevoerd_op: "2026-11-20T10:00:00Z" }) as never;
     expect(terugzetPunten([v("uitgevoerd", "demo"), v("mislukt", "demo"), v("uitgevoerd", "ander")], "demo")).toEqual([{ request_id: "r-uitgevoerd-demo", uitgevoerd_op: "2026-11-20T10:00:00Z" }]);
-    proef.data["/api/v1/actions"] = { items: [], next_cursor: null, bijgewerkt_op: "" };
+    proef.data["/api/v1/actions"] = { items: [], next_cursor: null, bijgewerkt_op: new Date().toISOString() };
     const html = renderToStaticMarkup(<Versies app={app()} beleid={staat(BELEID)} />);
     expect(html).toContain(GEEN_TERUGZETPAD);
     expect(html).toContain('href="/backups"');
   });
 });
 
-function plan(extra: Partial<InstallPlan> = {}): InstallPlan {
+function plan(extra: Partial<InstallPlan> = {}): InstallPlan & { observed_at: string } {
   return {
+    observed_at: new Date().toISOString(),
     plan_id: "99999999-2222-3333-4444-555555555555",
     app_id: "fotos",
     app_name: "fotos",
@@ -300,10 +301,10 @@ it.each([
       status: id === mso ? "unknown" : "gedekt", vereist: id !== mso || situatie === "verplichte onbekende MSO" }])) };
   const eigen = { id: doel.id, beeindigd_op: tijd, status: situatie === "export niet geverifieerd" ? "mislukt" : "geslaagd",
     sha256: "a".repeat(64), inhoudsopgave_items: 10 };
-  proef.data[exportPad] = situatie === "ontbrekende export" ? { laatste_geverifieerd: null, items: [] } : { laatste_geverifieerd: eigen, items: [eigen] };
+  proef.data[exportPad] = situatie === "ontbrekende export" ? { observed_at: tijd, laatste_geverifieerd: null, items: [] } : { observed_at: tijd, laatste_geverifieerd: eigen, items: [eigen] };
   if (situatie === "exportlezing verouderd") proef.oud.add(exportPad);
-  proef.data["/api/v1/actions"] = { items: [{ action_id: "app.update", status: "uitgevoerd", target: { app_id: doel.naam }, request_id: doel.id, uitgevoerd_op: tijd }] };
-  proef.data["/api/v1/backups/herstelpunten"] = { items: [{ id: doel.id, app: doel.naam, checkpoint_id: doel.id, gemaakt_op: tijd,
+  proef.data["/api/v1/actions"] = { bijgewerkt_op: tijd, items: [{ action_id: "app.update", status: "uitgevoerd", target: { app_id: doel.naam }, request_id: doel.id, uitgevoerd_op: tijd }] };
+  proef.data["/api/v1/backups/herstelpunten"] = { observed_at: tijd, items: [{ id: doel.id, app: doel.naam, checkpoint_id: doel.id, gemaakt_op: tijd,
     snapshot: { actie_id: doel.id, datasets: ["proef/app"] }, status: "geverifieerd", reden: null }] };
 
   const overzicht = renderToStaticMarkup(<BackupsScreen />);
@@ -326,4 +327,19 @@ it.each(["proef-foutcode", "forbidden"])("Versies filtert de foutcode %s met bij
   expect(html).not.toMatch(/proef-(foutcode|bericht|detail|trace)|Technische details/);
   expect(/Kopiëren<span[^>]*>: Trace-ID<\/span>/.test(html)).toBe(bekend);
   if (bekend) expect(html).toContain(trace);
+});
+
+it("lege versies, acties en manifestcontroles krijgen alleen bij een verse bron een leegmelding", () => {
+  const doel = app({ image_historie: [] });
+  const beleid = staat({ ...BELEID, acties: [actie("notification.send", { doel: "melding" })] });
+  for (const oud of [false, true]) {
+    const versies = renderToStaticMarkup(<Versies app={doel} beleid={beleid} appOud={oud} />);
+    const acties = renderToStaticMarkup(<Acties app={doel} beleid={beleid} appOud={oud} />);
+    proef.data["/api/v1/catalog/plans/p"] = { ...plan({ controles_na_installatie: [] }),
+      observed_at: new Date(Date.now() - (oud ? 24 * 3600_000 : 1000)).toISOString() };
+    const wizard = renderToStaticMarkup(<Installatiewizard planId="p" />);
+    expect(versies.includes("Nog geen versiehistorie.")).toBe(!oud);
+    expect(acties.includes("Geen acties voor deze app.")).toBe(!oud);
+    expect(wizard.includes("Dit manifest noemt geen controles na installatie.")).toBe(!oud);
+  }
 });
