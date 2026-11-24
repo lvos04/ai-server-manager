@@ -854,8 +854,8 @@
     "status": "Bezig",
     "validatie": "Sim-geslaagd; NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS)",
     "bewijs": "commit b9ba96f (S-P2-100); apps/api/tests/integration/test_hersteltest.py::test_ex13_externe_back_up_exacte_inhoud_en_database_integriteit (nagebootste download van export met .sha256 en .json en een geldige synthetische PNG-foto: foto byte-gelijk en gedecodeerd tot dezelfde pixels; beschadigde en afgebroken foto onleesbaar; export met dezelfde SHA-256 hersteld in een proefdatabase met gelijke aantallen en inhoudshashes per tabel; beschadigde download: mislukt checksum_afwijkend)",
-    "blokkade": "NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS): hersteltest vanaf de echte OneDrive is niet gedaan; hoort in STAPPEN_P6.md.",
-    "opmerking": "De download zelf is in de simulator een gekopieerde map; geen echt account gebruikt. alleen NAS-test nodig",
+    "blokkade": "NIET GEVALIDEERD (account); NIET GEVALIDEERD (echte NAS). D04 blijft open tot de gebruikte OneDrive-back-upmethode en uploadtaak zijn vastgesteld. Voor D05 en T-11 (N-P6-02) moeten een foto en database-export uit dat account naar een apart doel worden hersteld en met het origineel worden vergeleken.",
+    "opmerking": "De simulator leest uit een gekopieerde map. De accountproef en de herstelproef op de NAS staan open.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-24"
   },
@@ -864,7 +864,7 @@
     "status": "Bezig",
     "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS)",
     "bewijs": "commit b9ba96f (S-P2-100); tests/e2e/test_hersteltest.py::test_ex14_snapshot_herstel_in_de_zandbak_oude_waarde_terug_productie_onaangeroerd (nagebootste TrueNAS: appconfig 'oud' in de snapshot, productie daarna 'nieuw'; kloon via R1-voorstel en executor naar testpool/asm-sandbox/proef geeft 'oud', productie blijft 'nieuw'; schrijfaanroepen alleen app.create, pool.snapshot.create, pool.snapshot.clone), ::test_gewijzigde_kloon_of_andere_snapshotgeneratie_is_geen_bewijs (later gewijzigde kloon of een snapshot met andere createtxg: onbekend)",
-    "blokkade": "NIET GEVALIDEERD (echte NAS): snapshot-herstel in de zandbak op een echte TrueNAS is niet gedaan; hoort in STAPPEN_P6.md.",
+    "blokkade": "NIET GEVALIDEERD (echte NAS). Voor T-11 (N-P6-02) moet een snapshot op een aparte proefplek de oude appconfiguratie opleveren terwijl de oorspronkelijke dataset de nieuwe waarde behoudt. D04 (OneDrive-methode) en D05 (bewijs van foto- en databaseherstel) blijven afzonderlijk open bij EX13.",
     "opmerking": "Productie wordt nooit teruggezet: alleen klonen naar <pool>/asm-sandbox/<naam>. De integrale simulatorproef van dit scenario in jelly-leon-platform staat open in S-P6-20.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-24"
