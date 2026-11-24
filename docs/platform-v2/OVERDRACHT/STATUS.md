@@ -389,3 +389,49 @@ vraagt ("mogen wel starten zodra de regisseur dat vastlegt in STATUS.md").
   (tegenstrijdig bewijs). Het gereedschap en geen enkele agent zet zelf ooit "Gereed" of "Geslaagd"; dat blijft alleen
   de gebruiker. Niet gekozen: optie 2 (geen wijziging; de gebruiker vinkt pas af na de allerlaatste run) en optie 3
   (iets anders). Geen BG-besluit; het contract (§1.1, §1.2) wordt niet geraakt.
+
+## P2 — veilig automatiseren: gebouwd en in de simulator getest (2026-11-24)
+
+### Wat er per repo staat
+
+| Repo | Stappen | Resultaat op de werkbranch |
+|---|---|---|
+| ai-server-manager | S-P2-005 t/m S-P2-220 | De Hub toont voorstel, diff en goedkeuring. De executor toetst het verzoek opnieuw en leest de uitvoering terug. De simulator dekt onder meer appbeheer, back-upgates en flowverzoeken. Het monitorplan en de P2-schermen zijn vastgelegd. S-P2-110, S-P2-120, S-P2-130 en het resterende deel van S-P2-200 staan op versie 2. |
+| home-control-hub | S-P2-290 t/m S-P2-340 | De connector verwerkt events en flowverzoeken, bewaakt de isolatie van Node-RED en ondersteunt momentopnamen, herstel en Authentik-acties. De proef tegen de Hub-code gebruikte testdiensten. |
+| jelly-leon-platform | S-P2-395 t/m S-P2-420 | De lifecycle-planner controleert catalogusbeschikbaarheid. Een losse installatie- of updatepreview geeft geen uitvoerbare stap. Het Node-RED-manifest sluit anonieme toegang tot de editor. |
+| appstore-en-fork | S-P2-500 t/m S-P2-520 | De catalogus verwijst naar de kluis. Het ontwerp voor beheerder en dienstaccount en de validatie van manifestvelden houden geheime waarden uit het formulier. |
+| media-guard-ultimate | S-P2-590 t/m S-P2-620 | Simulatorproeven dekken aanmelden per mediaserver en het gelijktijdig volgen van Emby en Jelly Leon. Het upgrade- en terugzetbewijs gebruikt een gevulde 1.2.2-testdatabase. Het mediaserver-tabblad en de Engelse Android-weergave zijn beoordeeld. |
+| my_house | S-P2-700 en S-P2-710 | De grafiek ‘Laatste 24 uur’ heeft een tabel en toetsenbordbediening. De bewijsregels benoemen de resterende apparaat- en meterproeven. |
+| jelly-leon | S-P2-800 en S-P2-810 | De review van contract 1.3 en de controle van het risicobeleid zijn vastgelegd bij de serverfork. |
+| jelly-leon-web | S-P2-850 en S-P2-860 | Een neutrale testwaarde vervangt de oude fixture. Het webproject heeft het risicobeleid en de bewijsaantekeningen overgenomen. |
+| jelly-leon-clients | S-P2-870 | Het risicobeleid en het clientbewijs zijn gecontroleerd. Op dezelfde commit is de forkcontrole groen en de upstream-sync rood. Run 42 is het door de regisseur aanvaarde signaal. |
+| zoeken-en-persoonlijke-ai | S-P2-880 | Het risicobeleid is gelijk aan de bron. Vier zoekscenario’s vermelden het simulatorresultaat, het resterende integratiewerk en de NAS-proef. |
+| media-source-optimizer | S-P2-890 | Het risicobeleid is gelijk aan de bron. Bij B05-004 resteert de groeimeting van dertig UTC-dagen op de installatie. |
+
+### NIET GEVALIDEERD op de echte omgeving
+
+| Onderdeel | Open praktijkproef | Vervolg |
+|---|---|---|
+| Hub en executor | Beide installeren als standaard Custom App. De koppeling, schrijfrechten en methoden per TrueNAS-versie toetsen. Een goedgekeurde R1-herstart op een toegestane app uitvoeren en de toestand teruglezen. | N-P6-03, S-P6-18 |
+| Appbeheer | Installeren op een gepinde releasedigest, bijwerken, terugzetten en verwijderen met behoud van gegevens. Het gedrag van het Custom App-formulier controleren. | N-P6-03, S-P6-02 t/m S-P6-06, S-P6-20 |
+| Opslag en boiler | De blokkade bij een ongezonde pool toetsen met echte pool- en schijfmetingen. Met een aangesloten meter de leesstand en de weigering van een schakelverzoek controleren. | N-P6-01, N-P6-06, S-P6-20 en S-P6-21 |
+| Back-up en herstel | OneDrive-aanmelding en upload bevestigen, een foto en database-export teruglezen en ZFS-momentopnamen op de pool toetsen. De rampenoefening vraagt herstel op andere hardware. | N-P6-02 en N-P6-14 |
+| AI-aanbieder | Na de bouw van versie 2 het werkelijke tegoed, de harde stop en de monitor voor betaalde overschrijding toetsen. | D09, N-P6-08 |
+| Node-RED | De Custom App installeren, beheerder en dienstaccount inrichten, flows en diensttoegang plaatsen en de flows uitvoeren. Herstel naar een verse instantie toetsen. | N-P6-04, S-P6-19 |
+| Monitoring en SSO | De monitors in Uptime Kuma bevestigen. Bij een echte Authentik de catalogusgeheimen via de executor invullen, de OIDC-client registreren, sessies intrekken en de upgradegate toetsen. | T-18, D17, N-P6-04 |
+| MediaGuard en mediaservers | Emby en een geïnstalleerde Jelly Leon tegelijk volgen. De contracttest met de Jelly Leon-image en de upgrade van de productiedatabase staan open. Kijkgeschiedenis en MediaGuard-voortgang moeten beschikbaar blijven, met voor/na-rapport, getest terugvalpad en akkoord van de gebruiker. Emby blijft de terugval. | S-P6-32, S-P6-33, N-P6-05 en N-P6-11 |
+| MediaGuard-release en Android | De gebruiker koppelt de GHCR-pakketten aan de nieuwe repo en bevestigt de zichtbaarheid. De Engelse Android-app moet op een echte telefoon worden bediend met schermlezer en in fel licht. | T-01, N-P6-05 |
+| my_house | De tabel en grafiek toetsen met echte airco en sensor, afwijkende apparaatklok, schermlezer, telefoon in fel licht, Firefox, Safari en 200% zoom. | N-P6-06 |
+| Fase als geheel | De open praktijkproeven uit het NAS-acceptatiedraaiboek uitvoeren en hun resultaat aan de faseregel koppelen. | S-P6-50 |
+
+### Open besluiten en gegevens
+
+- D01, D02, D04, D05, D06 en D16 vragen de werkelijke TrueNAS-versie, pools en datasets, back-upmethode, herstelbewijs, poolgezondheid en hersteldoelen. D17 vraagt domein, HTTPS, herstelaccount en rollen. Deze gegevens worden bij de praktijkproeven ingevuld.
+- Bij D09 ontbreken het bevestigde inbegrepen tegoed en het productieaccount. AI staat standaard uit. De AI-chat, kennisgereedschappen, kostenbewaking en afzonderlijke veiligheidssuite zijn uitgesteld naar versie 2. Ook de resterende catalogusweergave ‘Geïmporteerd’ en E15 voor verouderde storingen of beperkingen staan open.
+- Voor BG-05 geldt de vastgelegde stand ‘niet’ voor zoeken of herstellen via de Hub. De noodstop in MediaGuard zelf blijft beschikbaar. De Hub-actie uit S-P3-110 is uitgesteld naar versie 2 tot er een actienaam in contract en beleid staat.
+- T-01 houdt de nieuwe MediaGuard-release tegen. Onder Z-06 blijft het werk op de werkbranch tot de gebruiker beslist over opname in de standaardbranch. Z-03 is op 16 november beslist. Elke databasemigratie van een mediaserver vraagt een voor/na-rapport. Z-04 en Z-05 zijn op 11 november beslist.
+- De grenzen uit hoofdstuk 8 blijven gelden. De installatie wacht op een vooraf beschikbare dataset (C-2). Bij Node-RED blijven de inrichtingsproeven uit C-5 open. De flow voor een verouderde my_house-sensor wacht op de contractroute (C-6). C-11 en C-12 leggen toegang via een beheerder en inrichting zonder geheim in het formulier vast.
+
+### Uitkomst van de gate
+
+volgt — S-P2-910. De faseregel P2 staat op `Bezig` met `Sim-getest; NIET GEVALIDEERD (echte NAS)`.
