@@ -42,6 +42,9 @@ export const NAAM_EERST = "Typ eerst de exacte naam van het doel";
 export function beslisBlokkade(v: ActieVerzoek, verval: string | null, verouderd: boolean, metBackup = true): string | null {
   if (verval) return verval;
   if (verouderd) return "Verouderde gegevens: de laatste lezing is mislukt. Ververs eerst de pagina.";
+  if (v.action_id === "sso.oidc.hub.register" || v.action_id === "sso.sessions.revoke") {
+    return "Registratie van de Hub en het intrekken van Authentik-sessies zijn uitgesteld tot versie 2.";
+  }
   if (v.action_id === "automation.flows.restore") {
     if (typeof v.preview?.requires_backup !== "boolean") return "De back-upvereiste van de eigenaar is onbekend.";
     if (v.blokkades.length) return "Het beleid blokkeert dit herstelvoorstel.";
@@ -266,12 +269,13 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
   }
 
   // Een zandbakkloon vereist ook bij R1 een beheerder.
-  const klaar = v.status === "klaar" && operator;
+  const klaar = v.status === "klaar" && !v.goedkeuring_nodig;
   const goedgekeurd = v.status === "goedgekeurd";
   const goedkeuringVerlopen = goedgekeurd && v.goedkeuring?.expires_at ? Date.parse(v.goedkeuring.expires_at) <= nu.getTime() : false;
   let uitvoeren = null;
-  if ((goedgekeurd || (v.status === "klaar" && v.action_id === KLOON)) && (!admin || geenRecht)) {
-    uitvoeren = <RolMelding>Alleen een beheerder kan dit uitvoeren.</RolMelding>;
+  const beheerderNodig = v.action_id === KLOON || (k !== "R0" && k !== "R1");
+  if ((klaar || goedgekeurd) && (geenRecht || !operator || (beheerderNodig && !admin))) {
+    uitvoeren = <RolMelding>{beheerderNodig ? "Alleen een beheerder kan dit uitvoeren." : "Uitvoeren kan vanaf de rol operator."}</RolMelding>;
   } else if (klaar || goedgekeurd) {
     const uitBlok = goedkeuringVerlopen ? "Goedkeuring verlopen. Keur het voorstel opnieuw goed." : beslisBlokkade(v, verval, verouderd, false);
     uitvoeren = (

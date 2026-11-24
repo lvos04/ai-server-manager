@@ -258,7 +258,7 @@ def test_onbekend_gereserveerd_en_klassen() -> None:
     huis = classify(POLICY, action_id="my_house.lamp.on", target={}, parameters={}, actor_type="user")
     assert huis.gereserveerd is not None and huis.gereserveerd.code == "capability_unavailable"
     r1 = classify(POLICY, action_id="app.restart", target=APP, parameters={}, actor_type="ai")
-    assert (r1.risk_class, r1.requires_approval, r1.geweigerd) == ("R1", False, False)
+    assert (r1.risk_class, r1.requires_approval, r1.geweigerd) == ("R1", True, False)
     r2 = classify(POLICY, action_id="app.update", target=APP, parameters={}, actor_type="user")
     assert (r2.risk_class, r2.requires_approval, r2.requires_backup, r2.opslagmutatie) == ("R2", True, True, True)
     kritiek = classify(
@@ -439,7 +439,7 @@ def test_stoppen_van_een_custom_app_vraagt_goedkeuring_een_catalogusapp_niet() -
     # Alleen stoppen: starten en herstarten van dezelfde Custom App blijven R1.
     for aid in ("app.start", "app.restart"):
         c = classify(POLICY, action_id=aid, target=APP, parameters={}, actor_type="user", herkend_als=custom)
-        assert not c.geweigerd and c.risk_class == "R1" and not c.requires_approval, aid
+        assert not c.geweigerd and c.risk_class == "R1" and c.requires_approval == (aid == "app.restart"), aid
     # Een compose-app en een Custom App zonder bekende naam net zo.
     for app in (
         _readback("web", "RUNNING", ["ghcr.io/x/web:1"], catalogus="", custom=True),
@@ -872,10 +872,13 @@ def _besluit(req: dict[str, Any], herkend: str | None = None, uitvoerder: str = 
     return w.code if w else None
 
 
-def test_besluit_r1_zonder_goedkeuring_en_risicoklasse_nooit_lager() -> None:
+def test_besluit_r1_herstart_vraagt_goedkeuring_en_risicoklasse_nooit_lager() -> None:
     key = Ed25519PrivateKey.generate()
     prop = proposal("app.restart", APP, expected_version=ETAG)
-    assert _besluit(execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R1", now=NU)) is None
+    assert (
+        _besluit(execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R1", now=NU))
+        == "goedkeuring_ontbreekt"
+    )
     assert (
         _besluit(execution_request(key, prop, policy_hash=POLICY.hash, risk_class="R0", now=NU))
         == "risicoklasse_te_laag"
@@ -932,13 +935,10 @@ def test_ex19_goedkeuring_is_gebonden_aan_elk_veld() -> None:
     assert code({**goed, "risk_class": "R1"}) == "goedkeuring_past_niet"
     # Andere parameters, ander doel of andere actie dan waarvoor is goedgekeurd.
     andere_tag = {"image": {"repository": "ghcr.io/voorbeeld/demo-app", "tag": f"1.2.5@{DIGEST}"}}
-    assert code(goed, proposal("app.update", APP, andere_tag, expected_version=ETAG)) == "goedkeuring_past_niet"
+    assert code(goed, {**prop, "parameters": andere_tag}) == "goedkeuring_past_niet"
     ander_doel = {"host_id": HOST, "app_id": "andere-app"}
-    assert code(goed, proposal("app.update", ander_doel, params, expected_version=ETAG)) == "goedkeuring_past_niet"
-    assert (
-        code(goed, proposal("app.update", APP, params, expected_version="sha256:" + "f" * 64))
-        == "goedkeuring_past_niet"
-    )
+    assert code(goed, {**prop, "target": ander_doel}) == "goedkeuring_past_niet"
+    assert code(goed, {**prop, "expected_version": "sha256:" + "f" * 64}) == "goedkeuring_past_niet"
     # Geldigheid: hooguit 15 minuten.
     assert code(goed, now=NU + timedelta(seconds=601)) == "goedkeuring_verlopen"
     lang = approval_for(prop, policy_hash=POLICY.hash, risk_class="R2", now=NU, ttl=901, backup_checkpoint_id="cp-1")

@@ -37,7 +37,6 @@ from executorhelpers import (
     execute,
     nas_hub,
     set_write_key,
-    signed,
     write_nas,
 )
 from executorhelpers import client as hub_client
@@ -82,7 +81,7 @@ def install_prop(name: str = "demo-app", **values: Any) -> dict[str, Any]:
 
 
 def herstart(hub: Hub, nas: FakeTrueNAS) -> dict[str, Any]:
-    return signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
+    return approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
 
 
 def writes(nas: FakeTrueNAS) -> list[str]:

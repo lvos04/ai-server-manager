@@ -687,3 +687,26 @@ def test_terugweg_0025_bewaart_een_tijdens_het_wachten_bevestigd_herstelpunt(leg
         assert len(voor) == 1 and na == voor
     finally:
         engine.dispose()
+
+
+def test_oude_open_herstart_komt_in_de_wachtlijst(lege_db: str) -> None:
+    migrations.upgrade(lege_db, "0025")
+    engine = sa.create_engine(lege_db)
+    try:
+        _vul(engine)
+        with Session(engine) as db:
+            rijen = db.scalars(sa.select(ActionRequest).order_by(ActionRequest.id)).all()
+            for rij, (actie, status) in zip(
+                rijen, [("app.restart", "klaar"), ("app.restart", "uitgevoerd"), ("app.start", "klaar")], strict=True
+            ):
+                rij.action_id, rij.status = actie, status
+            db.commit()
+        migrations.upgrade(lege_db, "0026")
+        with Session(engine) as db:
+            assert db.scalars(sa.select(ActionRequest.status).order_by(ActionRequest.id)).all() == [
+                "wacht_op_goedkeuring",
+                "uitgevoerd",
+                "klaar",
+            ]
+    finally:
+        engine.dispose()

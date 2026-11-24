@@ -90,6 +90,7 @@ def appbeleid(naam: str, runtime_id: str, inventaris: dict[str, Any]) -> dict[st
             )
             acties[a.action_id] = {
                 "risk_class": oordeel.risk_class,
+                "goedkeuring_nodig": oordeel.requires_approval,
                 "blokkades": [b.as_dict() for b in oordeel.blokkades],
             }
     return {"policy_hash": policy.hash, "geldig_tot": inventaris["geldig_tot"], "acties": acties}
@@ -143,10 +144,10 @@ def weergave(policy: Policy) -> dict[str, Any]:
                 "doel": a.doel,
                 "risk_class": a.klasse,
                 "risk_class_kritiek": a.klasse_kritiek,
-                "goedkeuring_nodig": a.klasse in ("R2", "R3"),
+                "goedkeuring_nodig": a.goedkeuring_nodig(a.klasse),
                 "risk_class_custom_app": custom[a.action_id],
                 "goedkeuring_nodig_custom_app": (
-                    custom[a.action_id] in ("R2", "R3") if custom[a.action_id] is not None else None
+                    a.goedkeuring_nodig(klasse) if (klasse := custom[a.action_id]) is not None else None
                 ),
                 "requires_backup": a.requires_backup,
                 "ai_mag_voorstellen": a.ai_mag_voorstellen,

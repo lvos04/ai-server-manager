@@ -116,8 +116,8 @@ EXECUTION_REQUEST_SCHEMA: dict[str, Any] = {
         "proposal": {"type": "object", "description": "ActionProposal (§8), ongewijzigd zoals beoordeeld door de Hub."},
         "approval": {
             "type": ["object", "null"],
-            "description": "Gebonden goedkeuring (verplicht bij R2/R3): preview_hash, resource_etag, policy_hash, "
-            "risk_class, expires_at (≤ 15 min), one_time_nonce, backup_checkpoint_id, action_scope.",
+            "description": "Gebonden goedkeuring (verplicht bij app.restart en R2/R3): preview_hash, resource_etag, "
+            "policy_hash, risk_class, expires_at (≤ 15 min), one_time_nonce, backup_checkpoint_id, action_scope.",
         },
         "policy_decision": {
             "type": "object",

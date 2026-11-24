@@ -70,40 +70,65 @@ def _rij(app: Any, request_id: str) -> Any:
         return db.get(ActionRequest, uuid.UUID(request_id))
 
 
-# ---------------------------------------------------------------------- R1: zonder goedkeuring
-def test_r1_herstart_zonder_goedkeuring_met_readback(stack: Stack) -> None:
+def test_r1_herstart_zonder_goedkeuring_bereikt_de_executor_niet(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
     admin, nas = stack.admin, stack.nas
-    r = stel_voor(admin, "app.restart", app_target("my-house"), risk_claim="R0")
-    assert r.status_code == 201, r.text
-    v = r.json()
-    # EX18: de claim wordt bewaard en genegeerd; het beleid bepaalt R1.
-    assert v["risk_class"] == "R1" and v["risk_claim"] == "R0" and v["risk_claim_genegeerd"] is True
-    assert v["status"] == "klaar" and v["goedkeuring_nodig"] is False and v["blokkades"] == []
-    assert v["preview"]["wijziging"] == {"soort": "restart", "app": "my-house", "verwacht": {"staat": "RUNNING"}}
-    assert schrijfaanroepen(nas) == []  # een voorstel wijzigt niets
-    # Goedkeuren van een R1-actie bestaat niet.
-    r = keur_goed(admin, v)
-    assert r.status_code == 409 and r.json()["code"] == "status_past_niet", r.text
+    naar_executor = _naar_executor(monkeypatch)
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert v["status"] == "wacht_op_goedkeuring" and v["goedkeuring"] is None and v["goedkeuring_nodig"]
+    aanroepen = list(nas.calls)  # de preview heeft de huidige app gelezen
     r = voer_uit(admin, v)
+    assert (r.status_code, r.json()["code"]) == (409, "goedkeuring_nodig")
+    assert nas.calls == aanroepen and schrijfaanroepen(nas) == [] and naar_executor == []
+
+
+def test_r1_herstart_met_gebonden_goedkeuring_en_readback(stack: Stack, monkeypatch: pytest.MonkeyPatch) -> None:
+    admin, nas = stack.admin, stack.nas
+    make_user(admin, "oscar", "operator")
+    operator = login_as(stack.app, "oscar")
+    enveloppen: list[dict[str, Any]] = []
+    naar_executor = _naar_executor(monkeypatch, enveloppen=enveloppen)
+    r = stel_voor(operator, "app.restart", app_target("my-house"), risk_claim="R0")
+    assert r.status_code == 201, r.text
+    v = haal(admin, r.json())
+    assert v["risk_class"] == "R1" and v["risk_claim"] == "R0" and v["risk_claim_genegeerd"] is True
+    assert v["status"] == "wacht_op_goedkeuring" and v["blokkades"] == [] and v["preview"]["goedkeuring_nodig"]
+    assert v["preview"]["wijziging"] == {"soort": "restart", "app": "my-house", "verwacht": {"staat": "RUNNING"}}
+    assert keur_goed(operator, v).status_code == 403
+    assert keur_goed(admin, v, preview_hash="sha256:" + "0" * 64).json()["code"] == "preview_gewijzigd"
+    assert voer_uit(operator, v).json()["code"] == "goedkeuring_nodig"
+    r = keur_goed(admin, v)
+    assert r.status_code == 200 and r.json()["status"] == "goedgekeurd", r.text
+    g = r.json()["goedkeuring"]
+    assert g["approved_by"] == "beheerder" and {k: g[k] for k in hashes(v)} == hashes(v)
+    assert schrijfaanroepen(nas) == [] and naar_executor == []
+    r = voer_uit(operator, v)
     assert r.status_code == 200, r.text
     uit = r.json()
+    assert naar_executor == [v["request_id"]]
+    (verzoek,) = enveloppen
+    assert verzoek["signature"] and verzoek["approval"]["approval_id"] == g["approval_id"]
+    assert verzoek["approval"]["preview_hash"] == v["preview_hash"] and verzoek["policy_decision"]["risk_class"] == "R1"
     assert uit["status"] == "uitgevoerd" and uit["resultaat"]["status"] == "uitgevoerd"
-    assert uit["resultaat"]["before_hash"] and uit["resultaat"]["after_hash"]
-    assert uit["resultaat"]["methode"] == "app.redeploy" and uit["goedkeuring"] is None
+    assert uit["resultaat"]["before_hash"] == v["resource_etag"] and uit["resultaat"]["after_hash"]
+    assert uit["resultaat"]["methode"] == "app.redeploy" and uit["goedkeuring"]["gebruikt_op"]
     assert schrijfaanroepen(nas) == ["app.redeploy"]
-    assert haal(admin, v)["status"] == "uitgevoerd"
+    methoden = [m for m, _ in nas.calls]
+    assert "app.query" in methoden[methoden.index("app.redeploy") + 1 :]
+    assert haal(admin, v)["resultaat"]["readback"]["staat"] == "RUNNING"
     acties = audit_acties(stack.app)
-    for verwacht in ("action.proposal.created", "action.execution.started", "action.execution.succeeded"):
+    for verwacht in (
+        "action.proposal.created",
+        "action.approval.granted",
+        "action.execution.started",
+        "action.execution.succeeded",
+    ):
         assert verwacht in acties
-    # Tweede keer uitvoeren kan niet: de status past niet meer en TrueNAS krijgt niets.
     r = voer_uit(admin, v)
     assert r.status_code == 409 and r.json()["code"] == "status_past_niet", r.text
-    assert schrijfaanroepen(nas) == ["app.redeploy"]
-    # Anti-flap: binnen de afkoeltijd wordt dezelfde app niet nog eens herstart, door wie ook.
     r = stel_voor(admin, "app.restart", app_target("my-house"))
     assert r.status_code == 201 and "cooldown" in _codes(r.json()), r.text
-    _geblokkeerd(voer_uit(admin, r.json()), "cooldown")
-    assert schrijfaanroepen(nas) == ["app.redeploy"]
+    _geblokkeerd(keur_goed(admin, r.json()), "cooldown")
+    assert schrijfaanroepen(nas) == ["app.redeploy"] and naar_executor == [v["request_id"]]
 
 
 def test_operator_voert_r1_uit_kijker_niet(stack: Stack) -> None:
@@ -623,7 +648,7 @@ def test_tweede_goedkeuring_op_een_goedgekeurd_voorstel_wordt_geweigerd(stack: S
     assert schrijfaanroepen(nas) == ["app.delete"]
 
 
-def _naar_executor(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+def _naar_executor(monkeypatch: pytest.MonkeyPatch, *, enveloppen: list[dict[str, Any]] | None = None) -> list[str]:
     """Telt de uitvoerverzoeken die de Hub echt naar de executor stuurt (``POST /api/v1/execute``)."""
     from hub import servicecalls
 
@@ -632,7 +657,10 @@ def _naar_executor(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
     def call(base_url: str, method: str, path: str, **kw: Any) -> Any:
         if method == "POST" and path == "/api/v1/execute":
-            gezien.append(str((kw.get("body") or {}).get("proposal", {}).get("idempotency_key")))
+            body = kw["body"]
+            gezien.append(str(body["proposal"]["idempotency_key"]))
+            if enveloppen is not None:
+                enveloppen.append(body)
         return echte(base_url, method, path, **kw)
 
     monkeypatch.setattr(servicecalls, "call", call)
@@ -829,7 +857,7 @@ def _gelijktijdig(eerste: Any, tweede: Any, moment: Any, *, tweede_eerst: bool |
 def test_gelijktijdig_uitvoeren_gaat_maar_een_keer_naar_de_executor(
     stack: Stack, monkeypatch: pytest.MonkeyPatch, action_id: str, methode: str
 ) -> None:
-    """V-044 en EX20: twee beheerders voeren tegelijk hetzelfde voorstel uit (R1 zonder, R2 met goedkeuring). Precies
+    """V-044 en EX20: twee beheerders voeren tegelijk hetzelfde goedgekeurde R1- of R2-voorstel uit. Precies
     één uitvoering bereikt de executor; de andere krijgt een 409 van de Hub zelf."""
     from hub.models import ActionRequest
 
@@ -861,7 +889,8 @@ def test_afkoeltijd_geldt_ook_voor_twee_voorstellen_tegelijk(stack: Stack, monke
     tweede = login_as(stack.app, "beheerder")
     a = stel_voor(admin, "app.restart", app_target("my-house")).json()
     b = stel_voor(admin, "app.restart", app_target("my-house")).json()
-    assert a["status"] == b["status"] == "klaar" and a["blokkades"] == b["blokkades"] == []
+    assert a["status"] == b["status"] == "wacht_op_goedkeuring" and a["blokkades"] == b["blokkades"] == []
+    assert keur_goed(admin, a).status_code == keur_goed(admin, b).status_code == 200
     naar_executor = _naar_executor(monkeypatch)
     rid = a["request_id"]
     r1, r2 = _gelijktijdig(
@@ -1022,7 +1051,9 @@ def test_pool_niet_gezond_blokkeert_opslagmutaties_ook_met_goedkeuring(stack: St
     _geblokkeerd(keur_goed(admin, nieuw), "pool_niet_gezond")
     assert schrijfaanroepen(nas) == [] and nas.created == []
     # Geen opslagmutatie en R1: een app herstarten mag nog wel.
-    r = voer_uit(admin, stel_voor(admin, "app.restart", app_target("my-house")).json())
+    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
+    r = voer_uit(admin, v)
     assert r.status_code == 200 and schrijfaanroepen(nas) == ["app.redeploy"], r.text
 
 
@@ -1505,6 +1536,7 @@ def test_noodstop_legt_alle_uitvoering_stil(stack: Stack) -> None:
     make_user(admin, "oscar", "operator")
     oscar = login_as(stack.app, "oscar")
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = oscar.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "x"}, headers=idem())
     assert r.status_code == 403
     r = admin.put("/api/v1/actions/noodstop", json={"actief": True}, headers=idem())
@@ -1538,6 +1570,7 @@ def test_afwijking_stopt_alles_en_wordt_een_incident(stack: Stack, periodic_run:
     assert len(afw) == 1 and afw[0]["ernst"] == "kritiek", incidenten
     # De executor voert daarna niets meer uit tot een beheerder hem vrijgeeft; de Hub meldt dat eerlijk.
     w = stel_voor(admin, "app.restart", app_target("media-source-optimizer")).json()
+    assert keur_goed(admin, w).status_code == 200
     r = voer_uit(admin, w)
     assert r.status_code == 409 and r.json()["code"] == "uitvoering_geweigerd", r.text
     assert r.json()["details"]["executor"]["code"] == "executor_gestopt"
@@ -1550,6 +1583,7 @@ def test_executor_onbereikbaar_uitkomst_onbekend_en_ophelderen(stack: Stack, per
 
     admin, nas = stack.admin, stack.nas
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     stack.servers.pop().stop()  # de executor is weg
     r = voer_uit(admin, v)
     assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
@@ -1635,6 +1669,7 @@ def test_executor_stopt_na_de_schrijfaanroep_reden_en_gestopt_in_antwoord_event_
     else:
         _jobstatus_weg(nas)
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = voer_uit(admin, v)
     assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text
     assert r.json()["details"]["reden"] == reden and r.json()["details"]["gestopt"] is True, r.text
@@ -1690,6 +1725,7 @@ def test_journaalrij_die_achteraf_afwijking_of_mislukt_is_neemt_ophelderen_over(
         else:
             nas.fail["app.redeploy"] = "proef: redeploy mislukt"
         v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+        assert keur_goed(admin, v).status_code == 200
         methode = "app.redeploy"
     stand = _antwoord_valt_weg(monkeypatch)
     r = voer_uit(admin, v)
@@ -1843,6 +1879,7 @@ def test_truenas_weigert_de_schrijfactie_mislukt_zonder_afwijking(stack: Stack) 
     admin, nas = stack.admin, stack.nas
     nas.fail["app.redeploy"] = "proef: redeploy mislukt"
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = voer_uit(admin, v)
     assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
     assert haal(admin, v)["status"] == "mislukt"
@@ -1870,6 +1907,7 @@ def test_executor_zonder_schrijfsleutel_voert_niets_uit(
     )
     try:
         v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+        assert keur_goed(admin, v).status_code == 200
         r = voer_uit(admin, v)
         assert r.status_code in (409, 501), r.text
         assert r.json()["code"] in ("uitvoering_geweigerd", "capability_unavailable"), r.text
@@ -2015,6 +2053,7 @@ def test_uitgevoerd_alleen_met_volledig_bewijs_anders_onbekend(
     admin, nas = stack.admin, stack.nas
     _vervals(monkeypatch, 409, {"code": "afwijking", "message": "m", "details": {"reden": "staat_verschilt"}})
     a = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, a).status_code == 200
     assert voer_uit(admin, a).status_code == 409
     periodic_run("incidenten_bijwerken")
     assert [(i["status"], i["ernst"]) for i in _alle_incidenten(admin, "actie.afwijking")] == [("open", "kritiek")]
@@ -2048,6 +2087,7 @@ def test_ophelderen_neemt_uitgevoerd_alleen_over_met_volledig_bewijs(
     admin, nas = stack.admin, stack.nas
     stand = _antwoord_valt_weg(monkeypatch)
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = voer_uit(admin, v)
     assert r.status_code == 502 and r.json()["code"] == "uitkomst_onbekend", r.text
     assert schrijfaanroepen(nas) == ["app.redeploy"]
@@ -2114,6 +2154,7 @@ def test_executorantwoord_overschrijft_geen_eigen_velden_van_de_hub(
     details = {"reden": "staat_verschilt", "gestopt": True, **EIGEN_VELDEN}
     _vervals(monkeypatch, status, {"code": code, "message": "m", "details": details})
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = voer_uit(admin, v)
     assert r.status_code == status and r.json()["code"] == code, r.text
     fout = r.json()["details"]
@@ -2173,6 +2214,7 @@ def test_reden_van_de_executor_is_altijd_een_code(
     admin = stack.admin
     _vervals(monkeypatch, status, {"code": code, "message": "m", "details": {"reden": reden, "gestopt": "ja"}})
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = voer_uit(admin, v)
     assert r.status_code == status and r.json()["code"] == code, r.text
     assert r.json()["details"]["reden"] == verwacht and "gestopt" not in r.json()["details"], r.text
@@ -2195,6 +2237,7 @@ def test_te_groot_of_onleesbaar_executorantwoord(stack: Stack, monkeypatch: pyte
     groot = {"reden": "geweigerd_door_proef", "vulling": "A" * 900_000, "fouten": fouten}
     _vervals(monkeypatch, 409, {"code": "iets_geweigerd", "message": "m" * 900_000, "details": groot})
     v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    assert keur_goed(admin, v).status_code == 200
     r = voer_uit(admin, v)
     assert r.status_code == 409 and r.json()["code"] == "uitvoering_geweigerd", r.text[:300]
     assert r.json()["details"]["executor"] == {
@@ -2208,6 +2251,7 @@ def test_te_groot_of_onleesbaar_executorantwoord(stack: Stack, monkeypatch: pyte
     afw = {"reden": "staat_verschilt", "gestopt": True, "afwijkingen": [{"code": "x", "gevonden": "A" * 900_000}]}
     _vervals(monkeypatch, 409, {"code": "afwijking", "message": "m", "details": afw})
     w = stel_voor(admin, "app.restart", app_target("media-source-optimizer")).json()
+    assert keur_goed(admin, w).status_code == 200
     r = voer_uit(admin, w)
     assert r.status_code == 409 and r.json()["code"] == "afwijking", r.text[:300]
     assert haal(admin, w)["resultaat"]["afwijkingen"] is None

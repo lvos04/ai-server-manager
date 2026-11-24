@@ -1,10 +1,11 @@
 /**
  * Afsluitende scenario's (desktop): NAS offline → onbekend/verouderd (nooit groen), browser offline met service
  * worker, rolrechten (kijker kan niets wijzigen), client-IP niet te vervalsen via X-Forwarded-For, en nog steeds
- * geen enkele schrijfaanroep op de (fake) NAS.
+ * geen enkele schrijfaanroep tot aan de afzonderlijke proef met één goedgekeurde herstart op de fake NAS.
  */
 import { expect, request as pwRequest, test } from "@playwright/test";
-import { ADMIN, KIND, VIEWER, expectAccessible, nasMutations, ready, setNas, shot, stackState } from "./helpers";
+import { randomUUID } from "node:crypto";
+import { ADMIN, KIND, VIEWER, control, expectAccessible, nasMutations, ready, setNas, shot, stackState } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -326,4 +327,39 @@ test("na alle scenario’s: geen enkele schrijfaanroep op de NAS; uitloggen slui
   const me = await page.evaluate(async () => (await fetch("/api/v1/auth/me")).status);
   expect(me).toBe(401);
   expect(ADMIN.username).toBe("beheerder");
+});
+
+test("goedgekeurde R1-herstart via de gekoppelde executor wordt uitgevoerd en teruggelezen", async ({ page }) => {
+  const st = stackState();
+  test.skip(Boolean(process.env.HUB_E2E_BASE_URL) && !st.executor_url, "de externe imageproef heeft geen lokale executor");
+  expect(st.executor_url).toBeTruthy();
+  const login = await page.request.post("/api/v1/auth/login", { data: ADMIN });
+  expect(login.status()).toBe(200);
+  const app = "ai-server-manager-executor";
+  const bron = await control("/nas/app", { naam: app, image: `ghcr.io/lvos04/${app}:test`, poort: Number(new URL(st.executor_url!).port), container_poort: 30410 });
+  expect(bron.status).toBe(200);
+  await page.goto("/server");
+  await ready(page);
+  await page.getByTestId("inventaris-vernieuwen").click();
+  await expect(page.getByTestId("vernieuwen-status")).toHaveText("Inventaris vernieuwd.", { timeout: 60_000 });
+  const csrf = (await page.context().cookies()).find(c => c.name === "hub_csrf")?.value ?? "";
+  const voorstel = await page.request.post("/api/v1/actions", {
+    headers: { "X-CSRF-Token": csrf, "Idempotency-Key": randomUUID() },
+    data: { action_id: "app.restart", target: { host_id: "nas-primary", app_id: "my-house" }, reason: "Browserproef met goedkeuring" },
+  });
+  expect(voorstel.status(), await voorstel.text()).toBe(201);
+  const v = await voorstel.json();
+  expect([v.status, v.risk_class, v.blokkades]).toEqual(["wacht_op_goedkeuring", "R1", []]);
+  await page.goto(`/goedkeuringen/${v.request_id}`);
+  await ready(page);
+  await expect(page.getByTestId("uitvoeren")).toHaveCount(0);
+  await page.getByTestId("goedkeuren").click();
+  await expect(page.getByTestId("verzoek-status")).toContainText("Goedgekeurd");
+  expect(await nasMutations()).toEqual([]);
+  await page.getByTestId("uitvoeren").click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Uitvoeren" }).click();
+  await expect(page.getByTestId("uitvoering-eind")).toHaveText("Uitgevoerd en gecontroleerd");
+  const detail = await (await page.request.get(`/api/v1/actions/${v.request_id}`)).json();
+  expect(detail.resultaat.readback.staat).toBe("RUNNING");
+  expect(await nasMutations()).toEqual(["app.redeploy"]);
 });

@@ -64,6 +64,7 @@ def test_catalogus_ontdekt_bestaande_apps_zonder_mutatie(admin: Any, fake_nas: F
     assert d["catalogus"]["app"] == "ix-app" and d["catalogus"]["trein"] == "stable"
     acties = {a["id"]: a for a in d["acties"]}
     assert acties["openen"]["beschikbaar"] and not acties["herstarten"]["beschikbaar"]
+    assert "een beheerder de preview goedkeurt" in acties["herstarten"]["reden"]
     assert d["appstore"]["status"] == "unknown" and d["appstore"]["reden"] == "appstore_niet_gekoppeld"
     comps = {c["soort"]: c for c in d["gezondheid"]["componenten"]}
     assert comps["truenas"]["status"] == "healthy" and comps["truenas"]["staat"] == "RUNNING"

@@ -18,8 +18,8 @@ Regels (in deze volgorde, de strengste wint):
    → geweigerd. Is van een bestaande app niet vast te stellen wat erin draait (geen image te zien, zoals bij een
    gestopte app, en geen catalogusapp), dan kan het een beschermde app zijn → elke actie op die app geweigerd.
 8. Een actie met ``ai_mag_voorstellen: false`` van een AI- of flow-actor → geweigerd.
-9. R2/R3 vragen menselijke goedkeuring per gebonden diff; R0/R1 mogen automatisch (allowlist, cooldown, anti-flap
-   controleert de Hub dynamisch).
+9. R2/R3 en acties met ``requires_approval`` vragen menselijke goedkeuring per gebonden diff. De Hub controleert
+   cooldown en anti-flap dynamisch.
 """
 
 from __future__ import annotations
@@ -316,7 +316,7 @@ def classify(
         klasse,
         tuple(rules),
         tuple(blocks),
-        requires_approval=class_at_least(klasse, "R2"),
+        requires_approval=actie.goedkeuring_nodig(klasse),
         requires_backup=requires_backup,
         opslagmutatie=actie.opslagmutatie,
         uitvoerder=actie.uitvoerder,

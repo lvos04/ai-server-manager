@@ -326,6 +326,7 @@ function Sso() {
         <h2 id="sso-titel">Inloggen via SSO</h2>
         {c ? <StatusBadge view={{ tone: "neutral", label: c.ingeschakeld ? "Aan" : "Uit", icon: "aan" }} /> : null}
       </div>
+      <p>Automatische registratie van de Hub en het intrekken van sessies bij Authentik volgen in versie 2.</p>
       {cfg.error ? <ErrorPanel error={cfg.error} alert={false} /> : null}
       {!c && cfg.loading ? <Loading /> : null}
       {c?.reden === "oidc_clientgeheim_ontbreekt" ? (

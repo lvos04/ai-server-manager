@@ -242,8 +242,7 @@ bewijs:
 vraagt op dat moment een levende sessie met de vereiste rol: voorstel operator of hoger; goedkeuring, R2/R3 en de
 bevestiging van een handmatige stap admin. De controles zijn die van `routers/actions.py::propose` en `::approve`
 (rol, CSRF, `actor_past_niet`); `service.stel_voor` en `keur_goed` doen zelf geen rolcontrole en worden daarom
-alleen vanuit zo'n aanvraag aangeroepen. Er is geen lus die vervolgstappen (ook R0/R1, die zonder goedkeuring
-uitvoeren) op naam van de starter uitvoert. Is de sessie ingetrokken, de rol verlaagd of de gebruiker
+alleen vanuit zo'n aanvraag aangeroepen. Er is geen lus die vervolgstappen (ook R0/R1) op naam van de starter uitvoert. Is de sessie ingetrokken, de rol verlaagd of de gebruiker
 uitgeschakeld, dan volgt geen voorstel en geen uitvoering.
 
 Elke actiestap doorloopt dezelfde proposalservice, deterministische policy, actuele gates, preview en menselijke

@@ -63,6 +63,11 @@ class ActieDef:
     timeout_seconden: int
     verwacht: dict[str, Any]
 
+    requires_approval: bool = False
+
+    def goedkeuring_nodig(self, klasse: str) -> bool:
+        return self.requires_approval or klasse in ("R2", "R3")
+
     @property
     def via_executor(self) -> bool:
         return self.uitvoerder == "executor"
@@ -221,7 +226,7 @@ def _actie(action_id: str, raw: Any) -> ActieDef:
             "timeout_seconden",
             "verwacht",
         },
-        {"klasse_kritiek"},
+        {"klasse_kritiek", "requires_approval"},
     )
     uitvoerder = _str(d["uitvoerder"], f"{where}.uitvoerder")
     if not UITVOERDER_RE.match(uitvoerder):
@@ -255,6 +260,7 @@ def _actie(action_id: str, raw: Any) -> ActieDef:
         klasse=klasse,
         klasse_kritiek=kritiek,
         parameters=params,
+        requires_approval=_bool(d.get("requires_approval", False), f"{where}.requires_approval"),
         requires_backup=_bool(d["requires_backup"], f"{where}.requires_backup"),
         ai_mag_voorstellen=_bool(d["ai_mag_voorstellen"], f"{where}.ai_mag_voorstellen"),
         opslagmutatie=_bool(d["opslagmutatie"], f"{where}.opslagmutatie"),

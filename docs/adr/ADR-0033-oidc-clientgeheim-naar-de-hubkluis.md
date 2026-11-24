@@ -10,6 +10,13 @@ zijn afgerond. De bestaande tijdelijke handmatige contractweg krijgt hierdoor ge
 Ook die tussenweg mag pas worden gebruikt nadat haar bestaande afwijkingen hieronder zijn hersteld en getoetst.
 Geen code-, policy-, contract- of EVIDENCE-wijziging; geen validatie op een echte NAS of met echte accounts.
 
+## Besluit over versie 1 (2026-11-24)
+
+De gebruiker stelde registratie van de Hub als OIDC-client en het intrekken van Authentik-sessies uit tot
+versie 2 (G-20, S-P2-910). Een voorstel kan worden beoordeeld door de eigenaar. Het toepassen blijft gesloten,
+ook bij een geldig ondertekend en goedgekeurd verzoek. Voor versie 2 staan de vertrouwde doelbinding en
+de eenmalige overdracht van het clientgeheim (O1/O2) open. Lokale Hub-sessies worden in de Hub beheerd.
+
 ## Verkenning en bronnen
 
 De graphify-query is vóór het gerichte bronlezen uitgevoerd. Op origin is ADR-0032 het hoogste nummer;

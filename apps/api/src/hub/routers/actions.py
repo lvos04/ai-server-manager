@@ -4,8 +4,8 @@ Eén weg voor elke wijziging buiten de Hub:
 
 1. ``POST /api/v1/actions`` — een getypt voorstel (``ActionProposal``). De policy-engine bepaalt de risicoklasse;
    ``risk_claim`` uit het voorstel wordt bewaard en genegeerd. Het antwoord bevat de preview en drie hashes.
-2. ``POST /api/v1/actions/{id}/approve`` — alleen bij R2/R3, alleen door een beheerder, alleen voor precies de preview
-   die hij zag (``preview_hash``, ``resource_etag``, ``policy_hash``). Hooguit 15 minuten geldig, één keer bruikbaar.
+2. ``POST /api/v1/actions/{id}/approve`` — alleen een beheerder keurt een actie goed voor de getoonde preview
+   met (``preview_hash``, ``resource_etag``, ``policy_hash``). Hooguit 15 minuten geldig, één keer bruikbaar.
 3. ``POST /api/v1/actions/{id}/execute`` — de Hub controleert alles opnieuw, ondertekent een ``ExecutionRequest`` en
    stuurt dat naar de executor. De executor controleert zelf nog eens en voert uit met readback.
 
@@ -260,7 +260,7 @@ def get_action(request_id: uuid.UUID, db: DB, _: Viewer) -> dict[str, Any]:
 # ------------------------------------------------------------------ goedkeuren, afwijzen, uitvoeren
 @router.post(
     "/actions/{request_id}/approve",
-    summary="R2/R3 goedkeuren voor precies deze preview (beheerder; 15 minuten, één keer bruikbaar)",
+    summary="Actie goedkeuren voor precies deze preview (beheerder; 15 minuten, één keer bruikbaar)",
 )
 def approve(
     request_id: uuid.UUID,

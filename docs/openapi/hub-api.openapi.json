@@ -4823,7 +4823,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "R2/R3 goedkeuren voor precies deze preview (beheerder; 15 minuten, één keer bruikbaar)",
+        "summary": "Actie goedkeuren voor precies deze preview (beheerder; 15 minuten, één keer bruikbaar)",
         "tags": [
           "acties en goedkeuringen"
         ]

@@ -42,7 +42,6 @@ from executorhelpers import (
     execute,
     nas_hub,
     set_write_key,
-    signed,
     write_nas,
 )
 from executorhelpers import client as hub_client
@@ -116,7 +115,7 @@ def restart_request(hub: Hub, nas: FakeTrueNAS) -> dict[str, Any]:
 
     etag = app_etag(nas.app("my-house"), nas.data["app.image.query"])
     prop = proposal("app.restart", {"host_id": HOST, "app_id": "my-house"}, expected_version=etag)
-    return signed(hub, prop, risk_class="R1")
+    return approved(hub, prop, risk_class="R1")
 
 
 def _b64(data: bytes) -> str:
@@ -233,7 +232,8 @@ class AndereHub:
 
         etag = app_etag(nas.app("my-house"), nas.data["app.image.query"])
         prop = proposal("app.restart", {"host_id": HOST, "app_id": "my-house"}, expected_version=etag)
-        return execution_request(self.policy_key, prop, policy_hash=POLICY.hash, risk_class="R1")
+        goedkeuring = approval_for(prop, policy_hash=POLICY.hash, risk_class="R1")
+        return execution_request(self.policy_key, prop, policy_hash=POLICY.hash, risk_class="R1", approval=goedkeuring)
 
     def r2(self, nas: FakeTrueNAS) -> dict[str, Any]:
         """Een R2-actie met een 'goedkeuring' die deze Hub zelf ondertekent."""

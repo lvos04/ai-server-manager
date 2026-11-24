@@ -88,7 +88,32 @@ def journaal(c: TestClient, hub: Hub, request_id: str) -> dict[str, Any]:
     return dict(r.json())
 
 
-# ------------------------------------------------------------------ R1 zonder goedkeuring: starten, stoppen, herstart
+@pytest.mark.parametrize(
+    ("geval", "status", "code"),
+    [
+        ("ongetekend", 422, "execution_request_ongeldig"),
+        ("ongekeurd", 403, "goedkeuring_ontbreekt"),
+        ("verlopen", 403, "goedkeuring_verlopen"),
+        ("ander_verzoek", 409, "goedkeuring_past_niet"),
+    ],
+)
+def test_r1_herstart_weigert_voor_elk_contact_met_truenas(stack: Stack, geval: str, status: int, code: str) -> None:
+    hub, c, nas = stack
+    prop = app_prop(nas, "app.restart", "my-house")
+    if geval == "ongekeurd":
+        req = signed(hub, prop, risk_class="R1")
+    elif geval == "verlopen":
+        req = approved(hub, prop, risk_class="R1", now=datetime.now(UTC) - timedelta(hours=1))
+    elif geval == "ander_verzoek":
+        req = approved(hub, prop, risk_class="R1", request_id=str(uuid.uuid4()))
+    else:
+        req = approved(hub, prop, risk_class="R1")
+        del req["signature"]
+    r = execute(c, hub, req)
+    assert (r.status_code, r.json()["code"]) == (status, code), r.text
+    assert nas.calls == [] and nas.logins == 0 and writes(nas) == []
+
+
 def test_herstart_uitgevoerd_met_hashes_readback_en_journaal(stack: Stack) -> None:
     hub, c, nas = stack
     st = c.get("/api/v1/status").json()
@@ -98,7 +123,7 @@ def test_herstart_uitgevoerd_met_hashes_readback_en_journaal(stack: Stack) -> No
     assert WRITE_KEY not in str(st)
 
     prop = app_prop(nas, "app.restart", "my-house")
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     assert r.status_code == 200, r.text
     uit = r.json()
     assert uit["status"] == "uitgevoerd" and uit["methode"] == "app.redeploy" and uit["action_id"] == "app.restart"
@@ -169,7 +194,7 @@ def test_stoppen_van_een_custom_app_alleen_met_goedkeuring_van_een_beheerder(sta
 
 def test_exacte_herhaling_met_hetzelfde_token_geeft_hetzelfde_antwoord(stack: Stack) -> None:
     hub, c, nas = stack
-    req = signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
+    req = approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
     headers = auth(hub.jwt(), str(uuid.uuid4()))
     eerste = c.post("/api/v1/execute", json=req, headers=headers)
     tweede = c.post("/api/v1/execute", json=req, headers=headers)
@@ -219,7 +244,7 @@ def test_handtekening_tijden_en_policy_hash(stack: Stack) -> None:
 
 def test_nonce_van_het_verzoek_is_eenmalig(stack: Stack) -> None:
     hub, c, nas = stack
-    req = signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
+    req = approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
     r = execute(c, hub, req)
     assert r.status_code == 200, r.text
     # Hetzelfde ondertekende verzoek met een nieuw token en een nieuwe Idempotency-Key: de executor kent de nonce.
@@ -230,7 +255,7 @@ def test_nonce_van_het_verzoek_is_eenmalig(stack: Stack) -> None:
 
 def test_nonce_overleeft_een_herstart_van_de_executor(stack: Stack) -> None:
     hub, c, nas = stack
-    req = signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
+    req = approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
     r = execute(c, hub, req)
     assert r.status_code == 200, r.text
     r = execute(hub_client(hub), hub, req)  # nieuwe app-instantie, zelfde datamap
@@ -244,7 +269,7 @@ def test_kritieke_app_vraagt_r2_en_een_goedkeuring(stack: Stack) -> None:
         _app("authentik", "RUNNING", "ghcr.io/goauthentik/server:2025.2.4", 30140, 9000, "/mnt/testpool/a", "/data")
     )
     prop = app_prop(nas, "app.restart", "authentik")
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     assert r.status_code == 403 and r.json()["code"] == "risicoklasse_te_laag", r.text
     assert r.json()["details"]["eigen_risk_class"] == "R2"
     r = execute(c, hub, signed(hub, prop, risk_class="R2"))
@@ -261,7 +286,7 @@ def test_kritieke_app_onder_een_andere_naam_wordt_herkend_op_de_image(stack: Sta
         _app("dns", "RUNNING", "adguard/adguardhome:v0.107.52", 30053, 3000, "/mnt/testpool/a", "/data")
     )
     prop = app_prop(nas, "app.restart", "dns")
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     assert r.status_code == 403 and r.json()["code"] == "risicoklasse_te_laag", r.text
     assert r.json()["details"]["eigen_risk_class"] == "R2" and writes(nas) == []
     assert execute(c, hub, approved(hub, prop)).status_code == 200
@@ -388,7 +413,7 @@ def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(stack: Stack) -> N
         _app("media-source-optimizer", "RUNNING", "emby/embyserver:4.8.10.0", 8096, 8096, "/mnt/t/e", "/c")
     )
     for action in ("app.stop", "app.restart"):
-        r = execute(c, hub, signed(hub, app_prop(nas, action, "media-source-optimizer"), risk_class="R1"))
+        r = execute(c, hub, approved(hub, app_prop(nas, action, "media-source-optimizer"), risk_class="R1"))
         assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
         assert "emby_nooit_door_platform" in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
     app = nas.app("media-source-optimizer")
@@ -1075,7 +1100,7 @@ def test_andere_digest_dan_goedgekeurd_is_een_afwijking_en_stopt_de_executor(sta
     # Gestopt: ook een onschuldige herstart wordt niet meer uitgevoerd, ook niet na een herstart van de executor.
     voor = list(nas.mutations)
     for client in (c, hub_client(hub)):
-        r = execute(client, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
+        r = execute(client, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
         assert r.status_code == 409 and r.json()["code"] == "executor_gestopt", r.text
         assert r.json()["details"]["reden"] == "digest_verschilt"
     assert nas.mutations == voor
@@ -1333,7 +1358,7 @@ def test_pool_niet_gezond_of_onbekend_blokkeert_opslagmutaties(stack: Stack, toe
         assert isinstance(r.json()["details"]["pools"], list)
     assert writes(nas) == [] and nas.created == []
     # Geen opslagmutatie: een app herstarten mag nog wel.
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
     assert r.status_code == 200 and writes(nas) == ["app.redeploy"], r.text
 
 
@@ -1446,7 +1471,7 @@ def test_snapshot_buiten_de_sandbox_of_op_een_onbekende_dataset(stack: Stack) ->
 def test_methode_ontbreekt_in_deze_versie_capability_unavailable(stack: Stack) -> None:
     hub, c, nas = stack
     nas.hidden.add("app.redeploy")
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
     assert r.status_code == 501 and r.json()["code"] == "capability_unavailable", r.text
     assert r.json()["details"] == {"methoden": ["app.redeploy"]} and writes(nas) == []
 
@@ -1455,7 +1480,7 @@ def test_mislukte_job_zonder_wijziging_is_geen_afwijking(stack: Stack) -> None:
     hub, c, nas = stack
     nas.fail["app.redeploy"] = "image pull mislukt"
     prop = app_prop(nas, "app.restart", "my-house")
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
     d = r.json()["details"]
     assert d["reden"] == "job_mislukt" and d["before_hash"] == d["after_hash"]
@@ -1466,7 +1491,7 @@ def test_mislukte_job_zonder_wijziging_is_geen_afwijking(stack: Stack) -> None:
     assert "image pull mislukt" not in str(journaal(c, hub, prop["idempotency_key"]))
     # Niet gestopt: de volgende actie loopt gewoon.
     del nas.fail["app.redeploy"]
-    assert execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")).status_code == 200
+    assert execute(c, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")).status_code == 200
 
 
 def test_job_die_slaagt_zonder_iets_te_doen_is_een_afwijking(stack: Stack) -> None:
@@ -1508,7 +1533,7 @@ def test_alleen_lezen_sleutel_kan_niets_uitvoeren(tmp_path: Path, nas: FakeTrueN
     hub = nas_hub(tmp_path / "appdata", nas)
     set_write_key(hub, nas, READ_KEY, ["READONLY_ADMIN"])
     c = hub_client(hub)
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
     assert r.status_code == 502 and r.json()["code"] == "uitvoering_mislukt", r.text
     assert r.json()["details"]["reden"] == "truenas_geen_toegang"
     app = nas.app("my-house")
@@ -1575,7 +1600,7 @@ def test_fout_na_de_schrijfaanroep_belooft_nooit_dat_er_niets_is_uitgevoerd(
     assert r.json()["details"]["reden"] == "uitkomst_onbekend" and r.json()["details"]["gestopt"] is True
     assert journaal(c, hub, req["approval"]["request_id"])["uitvoeringen"][0]["status"] == "afwijking"
     monkeypatch.undo()
-    volgende = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "media-source-optimizer"), risk_class="R1"))
+    volgende = execute(c, hub, approved(hub, app_prop(nas, "app.restart", "media-source-optimizer"), risk_class="R1"))
     assert volgende.status_code == 409 and volgende.json()["code"] == "executor_gestopt", volgende.text
 
 
@@ -1583,7 +1608,7 @@ def test_ander_certificaat_dan_vastgelegd_de_sleutel_wordt_niet_verstuurd(tmp_pa
     hub = nas_hub(tmp_path / "appdata", nas)
     NasLinkStore(hub.settings.secrets_dir).save_key(NAS_HOST, nas.port, "0" * 64, WRITE_KEY, ["FULL_ADMIN"])
     c = hub_client(hub)
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
     assert r.status_code == 503 and r.json()["code"] == "certificaat_gewijzigd", r.text
     assert nas.logins == 0 and nas.calls == []
 
@@ -1591,11 +1616,11 @@ def test_ander_certificaat_dan_vastgelegd_de_sleutel_wordt_niet_verstuurd(tmp_pa
 def test_truenas_onbereikbaar_of_sleutel_ingetrokken(stack: Stack) -> None:
     hub, c, nas = stack
     del nas.keys[WRITE_KEY]
-    r = execute(c, hub, signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
+    r = execute(c, hub, approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"))
     assert r.status_code == 503 and r.json()["code"] == "sleutel_geweigerd", r.text
     prop = app_prop(nas, "app.restart", "my-house")
     nas.offline()
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     assert r.status_code == 503 and r.json()["code"] == "truenas_onbereikbaar", r.text
     assert writes(nas) == []
 
@@ -1637,7 +1662,7 @@ def test_onleesbare_sleutelopslag_voert_niets_uit(stack: Stack) -> None:
     st = c.get("/api/v1/status").json()
     assert st["schrijfsleutel"] == {"ingesteld": False, "onleesbaar": True, "laatste4": None, "ingesteld_op": None}
     assert st["uitvoeren"] == {"mogelijk": False, "reden": "sleutelopslag_onleesbaar"}
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     # ADR-0030 besluit 13 en docs/EXECUTION_REQUEST.md: onleesbare sleutelopslag = 503 schrijfsleutel_onleesbaar, nooit
     # "niet ingesteld" (R-TECH-3, S-P2-020).
     assert r.status_code == 503 and r.json()["code"] == "schrijfsleutel_onleesbaar", r.text
@@ -1659,7 +1684,7 @@ def test_een_uitvoering_tegelijk_en_de_nonce_blijft_bruikbaar(tmp_path: Path, na
         timeout=5,
     )
     keys = [hub.policy_key.public_key()]
-    req = signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
+    req = approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1")
     assert uitvoerder._bezig.acquire(blocking=False)
     try:
         uit = uitvoerder.run(req, keys)
@@ -1681,7 +1706,7 @@ def test_onbruikbaar_journaal_voert_niets_uit(tmp_path: Path, nas: FakeTrueNAS) 
         naslink=NasLinkStore(hub.settings.secrets_dir),
     )
     uit = uitvoerder.run(
-        signed(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"), [hub.policy_key.public_key()]
+        approved(hub, app_prop(nas, "app.restart", "my-house"), risk_class="R1"), [hub.policy_key.public_key()]
     )
     assert uit.status == 503 and uit.body["code"] == "journaal_niet_beschikbaar"
     assert writes(nas) == [] and nas.logins == 0

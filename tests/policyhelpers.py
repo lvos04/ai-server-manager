@@ -125,7 +125,7 @@ def approval_for(
     now = now or datetime.now(UTC)
     out: dict[str, Any] = {
         "approval_id": str(uuid.uuid4()),
-        "request_id": str(uuid.uuid4()),
+        "request_id": prop["idempotency_key"],
         "preview_hash": "sha256:" + "c" * 64,
         "resource_etag": prop["expected_version"],
         "policy_hash": policy_hash,

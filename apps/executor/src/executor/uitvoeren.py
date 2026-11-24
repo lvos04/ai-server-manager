@@ -717,6 +717,9 @@ class Uitvoerder:
         doelnaam = prop["target"].get("app_id") if isinstance(prop.get("target"), Mapping) else None
         op_naam = recognize_all(policy, doelnaam if isinstance(doelnaam, str) else None)
         actie, _eigen, w = check_decision(policy, request, now=now, herkend_als=op_naam, uitvoerder="executor")
+        # Een goedkeuring die de actie zelf vereist, is al vóór de eerste NAS-aanroep te toetsen.
+        if w is not None and actie is not None and actie.requires_approval:
+            return _weiger(w)
         if w is not None and w.code in (
             "actie_geweigerd",
             "capability_unavailable",

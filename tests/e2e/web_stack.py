@@ -281,6 +281,7 @@ def _start_executor(data_dir: Path, nas_port: int) -> Any:
     ex_settings = ExecutorSettings(
         data_dir=data_dir,
         allow_loopback_hub=True,
+        allow_writable_policy=True,  # lokale browsertest met de policy uit de werkkopie
         truenas_host="127.0.0.1",
         truenas_port=nas_port,
         truenas_timeout_seconds=5,

@@ -25,24 +25,25 @@ const ONBEKEND: Blokkade = {
 export interface AppActie {
   actie: BeleidsActie;
   klasse: string;
+  goedkeuringNodig: boolean | null;
   blokkades: Blokkade[];
 }
 
 export function appActies(beleid: Beleid, app: CatalogDetail): AppActie[] {
   const oordeel = app.actiebeleid;
   const zelfdeBeleid = oordeel && oordeel.policy_hash === beleid.policy_hash;
-  return VOLGORDE.flatMap((id) => {
+  return VOLGORDE.flatMap<AppActie>((id) => {
     const actie = beleid.acties.find((a) => a.action_id === id && a.doel === "app");
     if (!actie) return [];
     const regel = zelfdeBeleid ? oordeel.acties?.[id] : undefined;
     const klasse = risicoKlasse(regel?.risk_class);
-    if (!klasse || !Array.isArray(regel?.blokkades)) return [{ actie, klasse: "Onbekend", blokkades: [ONBEKEND] }];
-    return [{ actie, klasse, blokkades: regel.blokkades }];
+    if (!klasse || typeof regel?.goedkeuring_nodig !== "boolean" || !Array.isArray(regel.blokkades)) return [{ actie, klasse: "Onbekend", goedkeuringNodig: null, blokkades: [ONBEKEND] }];
+    return [{ actie, klasse, goedkeuringNodig: regel.goedkeuring_nodig, blokkades: regel.blokkades }];
   });
 }
 
-export function wieBeslist(klasse: string): string {
-  if (klasse === "R2" || klasse === "R3") return "Een beheerder keurt goed";
+export function wieBeslist({ klasse, goedkeuringNodig }: AppActie): string {
+  if (goedkeuringNodig) return "Een beheerder keurt goed";
   if (klasse === "R0" || klasse === "R1") return "Een operator voert uit, zonder goedkeuring";
   return "Onbekend";
 }

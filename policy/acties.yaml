@@ -12,6 +12,7 @@
 #   klasse           minimale risicoklasse R0–R3 (risk_claim van AI/flow telt nooit mee, EX18)
 #   klasse_kritiek   klasse als het doel een kritieke app is (netwerk, DNS, auth, het platform zelf; apps.yaml)
 #   parameters       naam van het parameterschema (asm_policy.params), met harde grenzen
+#   requires_approval true = ook bij R0/R1 een gebonden goedkeuring van een beheerder
 #   requires_backup  vóór goedkeuring een geverifieerd B12-herstelpunt binden (§8 back-upbevestiging)
 #   ai_mag_voorstellen  false = alleen een mens (beheerder) kan dit voorstellen
 #   opslagmutatie    true = geblokkeerd bij pool DEGRADED/onbekend of back-upgate rood (EX11/EX12)
@@ -21,9 +22,10 @@
 schema: asm-policy/1
 acties:
   app.restart:
-    omschrijving: App opnieuw uitrollen (herstarten).
+    omschrijving: App opnieuw uitrollen (herstarten) na goedkeuring door een beheerder.
     uitvoerder: executor
     truenas: [app.redeploy]
+    requires_approval: true
     doel: app
     klasse: R1
     klasse_kritiek: R2
@@ -166,7 +168,7 @@ acties:
   # Acties via de eigenaar-connector (§8, tweede tabel). De eigenaar voert uit via POST /connector/v1/apply met een
   # door de Hub ondertekend ExecutionRequest en controleert zelf opnieuw.
   sso.oidc.hub.register:
-    omschrijving: OIDC-client van de Hub registreren in Authentik (via home-control-hub).
+    omschrijving: De OIDC-client van de Hub registreren in Authentik is uitgesteld tot versie 2.
     uitvoerder: eigenaar:home-control-hub
     truenas: []
     doel: eigenaar
@@ -180,7 +182,7 @@ acties:
     timeout_seconden: 120
     verwacht: {}
   sso.sessions.revoke:
-    omschrijving: SSO-sessies intrekken in Authentik (via home-control-hub).
+    omschrijving: Authentik-sessies intrekken is uitgesteld tot versie 2.
     uitvoerder: eigenaar:home-control-hub
     truenas: []
     doel: eigenaar

@@ -106,8 +106,12 @@ def test_beleid_noemt_de_engine_regels_en_r2_voor_het_stoppen_van_een_custom_app
     stop = acties["app.stop"]
     assert (stop["risk_class"], stop["goedkeuring_nodig"]) == ("R1", False)
     assert (stop["risk_class_custom_app"], stop["goedkeuring_nodig_custom_app"]) == ("R2", True)
-    for aid in ("app.start", "app.restart"):
-        assert (acties[aid]["risk_class_custom_app"], acties[aid]["goedkeuring_nodig_custom_app"]) == ("R1", False)
+    assert (
+        acties["app.start"]["risk_class_custom_app"] == "R1" and not acties["app.start"]["goedkeuring_nodig_custom_app"]
+    )
+    herstart = acties["app.restart"]
+    assert herstart["risk_class_custom_app"] == "R1" and herstart["goedkeuring_nodig_custom_app"] is True
+    assert herstart["goedkeuring_nodig"] is True
     assert acties["notification.send"]["risk_class_custom_app"] is None  # geen app als doel
     regels = {r["id"]: r for r in b["engine_regels"]}
     assert set(regels) == {"STOP-EENRICHTING", "DOEL-ONHERKENBAAR"}
@@ -726,7 +730,7 @@ def test_muterende_actieroutes_vragen_een_idempotency_key(stack: Stack) -> None:
 # ---------------------------------------------------------------------- zonder executor
 def test_zonder_gekoppelde_executor_wordt_er_niets_gewijzigd(stack: Stack) -> None:
     admin = stack.admin
-    v = stel_voor(admin, "app.restart", app_target("my-house")).json()
+    v = stel_voor(admin, "app.start", app_target("my-house")).json()
     assert v["status"] == "klaar"
     r = voer_uit(admin, v)
     assert r.status_code == 409 and r.json()["code"] == "executor_niet_gekoppeld", r.text

@@ -66,7 +66,7 @@ export interface CatalogDetail extends CatalogApp {
   actiebeleid?: {
     policy_hash: string;
     geldig_tot: string;
-    acties: Record<string, { risk_class: string; blokkades: Blokkade[] }>;
+    acties: Record<string, { risk_class: string; goedkeuring_nodig: boolean; blokkades: Blokkade[] }>;
   } | null;
   gezondheid: Gezondheid & { componenten: Component[] };
   deep_link_detail: { url: string | null; reden: string | null; bron: string | null };

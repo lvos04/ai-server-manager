@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from actiehelpers import Stack, app_target, bouw_stack, haal, schrijfaanroepen, voer_uit
+from actiehelpers import Stack, app_target, bouw_stack, haal, keur_goed, schrijfaanroepen, voer_uit
 from executorhelpers import write_nas
 from fakes.fake_truenas import FakeTrueNAS
 from flowhelpers import flow_audit, flow_event, flow_request_id, koppel_hch
@@ -63,7 +63,10 @@ def test_vijf_keer_afgeleverd_geeft_een_voorstel_en_een_uitvoering(
     assert r.json()["status"] == "accepted"
     rid = flow_request_id(ev)
     v = haal(stack.admin, rid)
-    assert (v["status"], v["actor"]["type"]) == ("klaar", "flow")
+    assert (v["status"], v["actor"]["type"]) == ("wacht_op_goedkeuring", "flow")
+    assert voer_uit(stack.admin, rid).json()["code"] == "goedkeuring_nodig"
+    assert schrijfaanroepen(stack.nas) == []
+    assert keur_goed(stack.admin, v).status_code == 200
 
     r = voer_uit(stack.admin, rid)
     assert r.status_code == 200, r.text

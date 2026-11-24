@@ -5,7 +5,7 @@
  */
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, p2Afdrukken, ready } from "./helpers";
+import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, nasMutations, p2Afdrukken, ready } from "./helpers";
 
 const DOEL = (app: string) => ({ host_id: "nas-primary", app_id: app });
 const KIJKER = { username: "kijker-acties", password: "Kijker-Acties-Lang-2026" }; // gitleaks:allow -- synthetische testwaarde
@@ -94,7 +94,7 @@ test("een uitgeschakelde of geblokkeerde goedkeurknop doet echt niets (V-065)", 
   }
 });
 
-test("R1 uitvoeren: bevestiging met focus op Annuleren; twee keer snel klikken geeft één uitvoering", async ({ page }) => {
+test("R1-herstart wacht op goedkeuring van de preview en daarna op bevestiging van uitvoeren", async ({ page }) => {
   const v = await stelVoor(page, "app.restart", "my-house");
   expect(v.risk_class).toBe("R1");
   const posts: string[] = [];
@@ -103,9 +103,18 @@ test("R1 uitvoeren: bevestiging met focus op Annuleren; twee keer snel klikken g
   });
   await page.goto(`/goedkeuringen/${v.request_id}`);
   await ready(page);
-  await expect(page.getByTestId("uitvoering-eind")).toHaveText("Nog niet uitgevoerd");
+  await expect(page.getByTestId("verzoek-status")).toHaveText("Wacht op goedkeuring");
   const knop = page.getByTestId("uitvoeren");
-  test.skip((await knop.getAttribute("aria-disabled")) === "true", "R1 geblokkeerd in deze stack");
+  expect(v.status).toBe("wacht_op_goedkeuring");
+  await expect(page.getByTestId("actie-preview")).toContainText("app.restart");
+  await expect(knop).toHaveCount(0);
+  const geweigerd = await post(page.request, page.context(), `/api/v1/actions/${v.request_id}/execute`, {});
+  expect(geweigerd.status()).toBe(409);
+  expect((await geweigerd.json()).code).toBe("goedkeuring_nodig");
+  expect(await nasMutations()).toEqual([]);
+  await page.getByTestId("goedkeuren").click();
+  await expect(page.getByTestId("verzoek-status")).toContainText("Goedgekeurd");
+  await expect(page.getByTestId("uitvoering-eind")).toHaveText("Nog niet uitgevoerd");
   await knop.click();
   const dialoog = page.getByRole("alertdialog");
   await expect(dialoog).toBeVisible();
@@ -241,9 +250,9 @@ test("R-VEILIG-1 (RV-8): na uitvoeren nooit de vrije executormelding of details-
         ? r.fulfill({ status, json: { code, message: "VRIJE-EXECUTOR-MELDING-1", details: { request_id: id, executor: { code: "x_y", message: "VRIJE-EXECUTOR-MELDING-2" } }, trace_id: "t-rv8" } })
         : r.fulfill({
             json: {
-              request_id: id, status: "klaar", action_id: "app.restart", target: { host_id: "nas-primary", app_id: "proef-app" }, actor: { type: "user", id: "beheerder" },
+              request_id: id, status: "klaar", action_id: "app.start", target: { host_id: "nas-primary", app_id: "proef-app" }, actor: { type: "user", id: "beheerder" },
               risk_class: "R1", risk_claim: null, risk_claim_genegeerd: false, rule_ids: ["PROEF"], goedkeuring_nodig: false, policy_hash: H("a"), uitvoerder: "executor",
-              resource_etag: '"proef-1"', preview_hash: H("b"), preview: { omschrijving: "App herstarten", requires_backup: false, huidig: {}, wijziging: { soort: "herstarten", app: "proef-app" } },
+              resource_etag: '"proef-1"', preview_hash: H("b"), preview: { omschrijving: "App starten", requires_backup: false, huidig: {}, wijziging: { soort: "start", app: "proef-app" } },
               blokkades: [], goedkeuring: null, resultaat: null, aangemaakt_op: new Date(nu).toISOString(), bijgewerkt_op: new Date(nu).toISOString(),
               geldig_tot: new Date(nu + 900_000).toISOString(), gestart_op: null, uitgevoerd_op: null,
             },

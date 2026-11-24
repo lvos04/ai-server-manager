@@ -8,7 +8,7 @@ Twee stappen, omdat de tweede het doel uit een eigen readback nodig heeft:
 
 1. :func:`check_envelope` — vorm, handtekening, tijden, policy-hash. Geen netwerk.
 2. :func:`check_decision` — allowlist, doel- en parameterschema, eigen classificatie (met ``herkend_als`` uit de eigen
-   readback), risicoklasse ≥ eigen herberekening, en bij R2/R3 de gebonden goedkeuring.
+   readback), risicoklasse ≥ eigen herberekening, en bij een herstart of R2/R3 de gebonden goedkeuring.
 
 Wat alleen de uitvoerder kan weten (nonce al gebruikt, ETag van het doel nu, toestand van de pool) hoort hier niet.
 """
@@ -159,6 +159,7 @@ def approval_problem(
     if expires <= approved or (expires - approved).total_seconds() > execreq.MAX_APPROVAL_SECONDS:
         return Weigering(403, "goedkeuring_ongeldig", "Een goedkeuring is hooguit 15 minuten geldig.")
     gebonden = {
+        "request_id": approval.get("request_id") == prop.get("idempotency_key"),
         "policy_hash": approval.get("policy_hash") == policy.hash,
         "resource_etag": approval.get("resource_etag") == prop.get("expected_version"),
         "action_scope": approval.get("action_scope")

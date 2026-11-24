@@ -1,7 +1,7 @@
 """Acties voorstellen, goedkeuren en uitvoeren (contract 1.3 §8, B01-007, B01-003; ADR-0030).
 
 Stroom: voorstel → deterministische classificatie (``risk_claim`` wordt genegeerd) → eigen readback van het doel →
-preview met ``preview_hash`` → bij R2/R3 een goedkeuring die vastzit aan preview, ETag en beleid → vlak vóór verzending
+preview met ``preview_hash`` → bij een herstart of R2/R3 goedkeuring op preview, ETag en beleid → vlak vóór verzending
 alles opnieuw → ondertekend ``ExecutionRequest`` naar de executor → uitkomst eerlijk vastleggen. Een actie van een
 eigenaar-connector (§8, tweede tabel) loopt net zo, met het voorstel van de eigenaar (``/connector/v1/propose``) als
 doel en ``/connector/v1/apply`` van de eigenaar als uitvoerder.
@@ -145,6 +145,14 @@ def veilig_doel(target: Any) -> dict[str, Any]:
     return {k: v for k, v in target.items() if k in DOEL_VELDEN and isinstance(v, str) and _DOEL_WAARDE_RE.fullmatch(v)}
 
 
+def _goedkeuring_nodig(req: ActionRequest) -> bool:
+    return (
+        req.status == "wacht_op_goedkeuring"
+        or bool((req.preview or {}).get("goedkeuring_nodig"))
+        or class_at_least(req.risk_class, "R2")
+    )
+
+
 def weergave(db: Session, req: ActionRequest) -> dict[str, Any]:
     ap = huidige_goedkeuring(db, req)
     return {
@@ -161,7 +169,7 @@ def weergave(db: Session, req: ActionRequest) -> dict[str, Any]:
         "risk_claim": req.risk_claim,
         "risk_claim_genegeerd": req.risk_claim is not None,
         "rule_ids": req.rule_ids,
-        "goedkeuring_nodig": class_at_least(req.risk_class, "R2"),
+        "goedkeuring_nodig": _goedkeuring_nodig(req),
         "policy_hash": req.policy_hash,
         "uitvoerder": req.uitvoerder,
         "resource_etag": req.resource_etag or None,
@@ -784,7 +792,7 @@ def keur_goed(
             409,
             "status_past_niet",
             "Dit voorstel wacht niet op goedkeuring.",
-            {"status": req.status, "goedkeuring_nodig": class_at_least(req.risk_class, "R2")},
+            {"status": req.status, "goedkeuring_nodig": _goedkeuring_nodig(req)},
         )
     actie, cls, _doel, preview, phash = _herbereken(db, settings, vault, policy, req, now, keyring)
     anders = _neem_over(req, policy, cls, _doel, preview, phash, now)
@@ -1539,7 +1547,7 @@ def voer_uit(
         raise HubError(403, "forbidden", "Alleen een beheerder voert een R2- of R3-actie uit.")
     ap = huidige_goedkeuring(db, req) if req.status == "goedgekeurd" else None
     actie, cls, doel, preview, phash = _herbereken(db, settings, vault, policy, req, now, keyring)
-    if cls.requires_approval and principal.role != Role.admin:
+    if class_at_least(cls.risk_class, "R2") and principal.role != Role.admin:
         raise HubError(403, "forbidden", "Alleen een beheerder voert een R2- of R3-actie uit.")
     if ap is not None:
         gebonden = {

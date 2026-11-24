@@ -262,8 +262,8 @@ function Voorstel({ v, Sub }: { v: HerstelVoorstel; Sub: "h3" | "h4" }) {
         <dt>Risico</dt>
         <dd>Bepaalt het beleid (P2). Voorgestelde klasse {v.voorstel.risk_claim} is een claim en telt niet.</dd>
       </dl>
-      <Melding soort="nogniet" titel="Uitvoeren volgt in fase P2">
-        <p>Tot dan voer je dit zelf uit in TrueNAS → Apps. De Hub wijzigt nu niets.</p>
+      <Melding soort="nogniet" titel={v.voorstel.action_id === "app.restart" ? "Goedkeuring nodig voor herstart" : "Hersteladvies"}>
+        <p>{v.advies}</p>
       </Melding>
     </div>
   );

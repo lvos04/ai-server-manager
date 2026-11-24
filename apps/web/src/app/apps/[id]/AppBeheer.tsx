@@ -283,7 +283,7 @@ export function Acties({ app, beleid }: { app: CatalogDetail; beleid: ApiState<B
               { kop: "Actie", cel: (r) => <strong>{werkwoord(r.actie.action_id)}</strong> },
               { kop: "Risico", cel: (r) => <RisicoBadge klasse={r.klasse} /> },
               { kop: "Back-up vooraf", cel: (r) => (r.actie.requires_backup ? "Vereist" : "Niet nodig") },
-              { kop: "Wie beslist", cel: (r) => wieBeslist(r.klasse) },
+              { kop: "Wie beslist", cel: (r) => wieBeslist(r) },
               { kop: "Handeling", cel: handeling },
             ]}
           />

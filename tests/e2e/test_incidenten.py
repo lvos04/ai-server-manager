@@ -529,9 +529,11 @@ def test_onderzoek_en_herstel_voorstellen_zonder_uitvoering(admin: Any, app: Any
     assert f"/api/v1/apps/{cid}" in bronnen and any(inc["id"] in b for b in bronnen)
     r = admin.post(f"/api/v1/incidents/{inc['id']}/herstel-voorstellen", headers=idem())
     out = r.json()
-    assert r.status_code == 200 and out["uitvoerbaar"] is False and out["reden"] == "policy_engine_niet_beschikbaar"
+    assert r.status_code == 200 and out["uitvoerbaar"] is False and out["reden"] == "goedkeuring_nodig"
+    assert "Een beheerder keurt de actuele preview goed" in out["advies"]
     v = out["voorstel"]
-    assert v["action_id"] == "app.restart" and v["target"] == {"host_id": "nas-primary", "app_id": "prowlarr"}
+    assert v["action_id"] == "app.restart" and v["parameters"] == {}
+    assert v["target"] == {"host_id": "nas-primary", "app_id": "prowlarr"}
     assert v["expected_version"] == "sha256:" + "a" * 64 and v["risk_claim"] == "R1"
     with app.state.sessionmaker() as db:
         assert db.scalar(select(func.count()).select_from(Job)) == 0  # niets uitgevoerd of ingepland

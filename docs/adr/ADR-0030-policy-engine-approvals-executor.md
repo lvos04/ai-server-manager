@@ -9,7 +9,7 @@ TrueNAS-API; niets is op een echte NAS gevalideerd.
 ## Context
 
 Tot P2 weigerde de executor alles en bestond er geen beleid. Dit deel bouwt de stroom van contract §8:
-voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per gebonden diff → ondertekend
+voorstel → deterministische policy → (bij R2/R3 en bij een herstart) menselijke goedkeuring per gebonden diff → ondertekend
 `ExecutionRequest` → executor controleert zelf opnieuw → uitvoering → readback → audit.
 
 ## Besluiten
@@ -424,7 +424,7 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     | `GET /policy` | kijker | beleid, klassen, blokkades en `policy_hash` (alleen-lezen) |
     | `POST /actions` | operator | voorstel → classificatie, preview en drie hashes; er wordt niets uitgevoerd |
     | `GET /actions`, `GET /actions/{request_id}` | kijker | voorstellen met preview, blokkades, goedkeuring, uitkomst |
-    | `POST /actions/{request_id}/approve` | beheerder | R2/R3 goedkeuren voor precies de getoonde hashes |
+    | `POST /actions/{request_id}/approve` | beheerder | een herstart of R2/R3 goedkeuren voor precies de getoonde hashes |
     | `POST /actions/{request_id}/reject` | beheerder | afwijzen met reden |
     | `POST /actions/{request_id}/execute` | operator (R2/R3: beheerder) | opnieuw controleren, ondertekenen, uitvoeren |
     | `POST /actions/{request_id}/reconcile` | operator | onbekende uitkomst ophelderen (alleen lezen) |
@@ -434,7 +434,7 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
     contract §8); staat hij ook in de body, dan moet hij gelijk zijn. Voorstellen door diensten, flows of de AI
     krijgen later een eigen ingang met een eigen dienstscope; tot dan bestaat die weg niet (dus ook geen AI-actor die
     iets kan goedkeuren of uitvoeren).
-19. **Statussen.** `klaar` (R0/R1, direct uitvoerbaar), `wacht_op_goedkeuring`, `goedgekeurd`, `afgewezen`,
+19. **Statussen (herzien bij besluit 33).** `klaar` (R0/R1 zonder goedkeuringsplicht), `wacht_op_goedkeuring`, `goedgekeurd`, `afgewezen`,
     `geweigerd` (beleid), `bezig`, `uitgevoerd`, `mislukt` (toestand aantoonbaar onveranderd), `afwijking`, `onbekend`
     en `verlopen`. Een geweigerd voorstel wordt wél vastgelegd (wie, wat, welke regel), maar zonder parameterwaarden:
     alleen hun hash. Een voorstel dat het schema niet haalt (422) of waarvan het doel niet te lezen is, wordt niet
@@ -653,6 +653,16 @@ voorstel → deterministische policy → (bij R2/R3) menselijke goedkeuring per 
       `/geheimwoord`), een sleutel onder een geheim-achtige naam die op een gewone naam lijkt, en een naam die met
       `public` begint maar ook een geheimwoord bevat (`public_password`: alleen `redact_text`). Beleid en
       `policy_hash` ongewijzigd.
+
+33. **Goedkeuring verplicht voor herstart (2026-11-24).** De gebruiker koos bij G-01/G-08 van S-P2-910
+    voor ‘Goedkeuring verplicht’. Dit herziet besluit 19. Ook bij R1 begint `app.restart` in
+    `wacht_op_goedkeuring`. Een beheerder keurt de actuele preview goed volgens besluit 10. Daarna mag een
+    operator de R1-herstart uitvoeren. Voor een kritieke app blijven de R2-regels gelden. Een flow kan dezelfde
+    goedkeuringsketen starten. Het incidentenrunbook geeft advies en verwijst voor het voorstel naar het appbeheer.
+    De executor verifieert de handtekening en de aan dit verzoek gebonden goedkeuring voordat hij voor de
+    herstart contact maakt met TrueNAS. Hij herkent het doel opnieuw en leest na `app.redeploy` de toestand terug.
+    Bestaande open herstarts komen bij de upgrade in de wachtlijst. Bij een gewijzigde preview moet de
+    beheerder de nieuwe hashes beoordelen. Afgeronde verzoeken behouden hun geschiedenis.
 
 ## Open punten
 

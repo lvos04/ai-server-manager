@@ -252,15 +252,26 @@ describe("rechten komen van de server (O-06)", () => {
     expect(knop(html, "uitvoeren")).toBeNull();
   });
 
-  it("een operator mag R1 uitvoeren na bevestiging", () => {
+  it("een operator mag een goedgekeurde R1-herstart uitvoeren na bevestiging", () => {
     proef.rol = "operator";
-    const html = pagina(verzoek({ status: "klaar", risk_class: "R1" }));
+    const v = verzoek({ action_id: "app.restart", risk_class: "R1", goedkeuring_nodig: true,
+      preview: { requires_backup: false, wijziging: { soort: "restart", app: "demo-app", verwacht: { staat: "RUNNING" } } } });
+    expect(knop(pagina(v), "uitvoeren")).toBeNull();
+    const html = pagina({ ...v, status: "goedgekeurd" });
     expect(knop(html, "uitvoeren")).not.toContain('aria-disabled="true"');
+  });
+
+  it.each(["sso.oidc.hub.register", "sso.sessions.revoke"])("toont %s als uitgesteld tot versie 2", action_id => {
+    proef.rol = "admin";
+    const v = verzoek({ action_id });
+    expect(pagina(v)).toContain("uitgesteld tot versie 2");
+    expect(knop(pagina(v), "goedkeuren")).toContain('aria-disabled="true"');
+    expect(knop(pagina({ ...v, status: "goedgekeurd" }), "uitvoeren")).toContain('aria-disabled="true"');
   });
 
   it.each(["viewer", "operator", "admin"])("bestaand R1-kloonvoorstel toont de uitvoerknop alleen aan een beheerder (%s)", (rol) => {
     proef.rol = rol;
-    const v = verzoek({ action_id: "zfs.snapshot.clone_to_sandbox", status: "klaar", risk_class: "R1",
+    const v = verzoek({ action_id: "zfs.snapshot.clone_to_sandbox", status: "klaar", risk_class: "R1", goedkeuring_nodig: false,
       preview: { omschrijving: "Zandbakkloon", requires_backup: false,
         wijziging: { soort: "snapshot_klonen", snapshot: "proef/app@voorbeeld", naar: "proef/asm-sandbox/voorbeeld" } } });
     const uitvoer = knop(pagina(v), "uitvoeren");

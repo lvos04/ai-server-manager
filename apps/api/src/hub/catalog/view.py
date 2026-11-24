@@ -19,7 +19,7 @@ from hub.timeutil import iso
 
 
 def actions(link: dict[str, Any], role: Role | None) -> list[dict[str, Any]]:
-    """Knoppen voor de UI: alleen 'openen' kan nu; logs en herstart lopen in P2 via policy en executor (R1/R2)."""
+    """De catalogus biedt een directe link naar de app. Een herstart loopt via het afzonderlijke appbeheer."""
     can_operate = role is not None and ROLE_RANK[role] >= ROLE_RANK[Role.operator]
     return [
         {
@@ -41,7 +41,7 @@ def actions(link: dict[str, Any], role: Role | None) -> list[dict[str, Any]]:
             "beschikbaar": False,
             "vereiste_rol": "operator",
             "risico": "R1/R2 (policy bepaalt)",
-            "reden": "Volgt in fase P2: app.restart via voorstel, policy en executor."
+            "reden": "Herstarten via appbeheer kan als het beleid dit toestaat en een beheerder de preview goedkeurt."
             if can_operate
             else "Alleen voor operator of beheerder.",
         },

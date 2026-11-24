@@ -76,7 +76,7 @@ Hooguit 15 minuten geldig. Vervalt bij elke wijziging van een gebonden veld (`pr
 }
 ```
 
-- `approval` is `null` bij R0/R1.
+- Voor `app.restart` en voor R2/R3 is een gebonden goedkeuring verplicht. Voor andere R0/R1-acties mag `approval` `null` zijn. De executor vergelijkt `approval.request_id` met de voorstelsleutel.
 - Tijden altijd `YYYY-MM-DDTHH:MM:SSZ` (UTC, hele seconden); een verzoek is hooguit 15 minuten geldig.
 - **Handtekening:** Ed25519 met de policy-sleutel van de Hub over de canonieke JSON van het verzoek zonder
   `signature`; base64url zonder opvulling. Canonieke JSON = gesorteerde sleutels, scheidingstekens `,` en `:`, UTF-8

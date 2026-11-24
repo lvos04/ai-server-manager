@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HubApiError } from "@/lib/api";
 import { BRONNAMEN } from "@/lib/backups";
 import type { Beleid, BeleidsActie, Blokkade } from "@/lib/acties";
-import { appActies, PLAN_VERLOPEN, planBlokkade, planCatalogus, planDigests, terugzetPunten, updateDoel, type InstallPlan } from "@/lib/appbeheer";
+import { wieBeslist, appActies, PLAN_VERLOPEN, planBlokkade, planCatalogus, planDigests, terugzetPunten, updateDoel, type InstallPlan } from "@/lib/appbeheer";
 import type { CatalogDetail } from "@/lib/catalog";
 
 const proef = vi.hoisted(() => ({
@@ -58,7 +58,8 @@ function actiebeleid(blokkades: Blokkade[] = []): NonNullable<CatalogDetail["act
     policy_hash: BELEID.policy_hash,
     geldig_tot: new Date(Date.now() + 60_000).toISOString(),
     acties: Object.fromEntries(BELEID.acties.filter((a) => a.doel === "app").map((a) => [
-      a.action_id, { risk_class: a.risk_class_custom_app ?? a.risk_class, blokkades },
+      a.action_id, { risk_class: a.risk_class_custom_app ?? a.risk_class,
+        goedkeuring_nodig: a.action_id === "app.restart" || (a.risk_class_custom_app ?? a.risk_class) === "R2", blokkades },
     ])),
   };
 }
@@ -160,6 +161,8 @@ describe("tab Acties (S-045)", () => {
   it("klasse per doel: Custom App en kritieke app volgens het beleid", () => {
     const rijen = (a: CatalogDetail) => Object.fromEntries(appActies(BELEID, a).map((r) => [r.actie.action_id, r.klasse]));
     expect(rijen(app())["app.stop"]).toBe("R2");
+    const herstart = appActies(BELEID, app()).find(r => r.actie.action_id === "app.restart")!;
+    expect([herstart.klasse, wieBeslist(herstart)]).toEqual(["R1", "Een beheerder keurt goed"]);
     const oordeel = actiebeleid();
     oordeel.acties["app.stop"]!.risk_class = "R1";
     oordeel.acties["app.restart"]!.risk_class = "R2";

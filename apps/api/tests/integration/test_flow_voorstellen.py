@@ -81,7 +81,7 @@ def test_flowverzoek_wordt_voorstel_met_actor_flow_en_dezelfde_classificatie(sta
     assert r.status_code == 202 and r.json()["status"] == "accepted", r.text
     v = haal(stack.admin, flow_request_id(ev))
     assert v["actor"] == ev["actor"] and v["actor"]["type"] == "flow"
-    assert (v["status"], v["risk_class"], v["goedkeuring_nodig"]) == ("klaar", "R1", False)
+    assert (v["status"], v["risk_class"], v["goedkeuring_nodig"]) == ("wacht_op_goedkeuring", "R1", True)
     assert v["risk_claim"] is None and f"event:{ev['event_id']}" in v["evidence_ids"]
     # Dezelfde classificatie als een voorstel van een beheerder voor dezelfde actie.
     mens = stel_voor(stack.admin, "app.restart", app_target("my-house")).json()

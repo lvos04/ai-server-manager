@@ -5,8 +5,8 @@
 - **Veilige modus:** heropent een incident ``max_herhalingen`` keer binnen ``venster_s`` (de app faalt telkens
   opnieuw, ook na herstarts door TrueNAS of een mens), dan gaat het incident in de veilige modus: één melding met de
   oorzaak-vraag, en 'Herstel voorstellen' geeft **geen** herstart meer (geen eindeloze herstartlus).
-- **Herstel voorstellen** maakt alleen een ``ActionProposal`` (contract §8) zonder uitvoering: de policy-engine en de
-  executor-acties komen in P2, dus ``uitvoerbaar: false`` met een vaste reden. Nooit gesimuleerd succes.
+- **Herstel voorstellen** geeft een alleen-lezen ``ActionProposal`` (contract §8). Voor een herstart verwijst het
+  runbook naar het appbeheer, waar de beheerder de actuele preview goedkeurt (ADR-0030 besluit 33).
 """
 
 from __future__ import annotations
@@ -168,7 +168,7 @@ def herstel_voorstellen(db: Session, settings: Settings, inc: Incident, actor: s
         "idempotency_key": str(uuid.uuid4()),
         "action_id": rb.herstart_voorstel,
         "target": target,
-        "parameters": {"grace_seconds": 30} if rb.herstart_voorstel == "app.restart" else {},
+        "parameters": {},
         "reason": f"Incident {inc.id}: {inc.titel}"[:200],
         "actor": {"type": "user", "id": actor},
         "expected_version": expected,
@@ -176,6 +176,14 @@ def herstel_voorstellen(db: Session, settings: Settings, inc: Incident, actor: s
         "evidence_ids": [f"incident:{inc.id}"],
         "expires_in_seconds": 300,
     }
+    if rb.herstart_voorstel == "app.restart":
+        return {
+            **base,
+            "voorstel": proposal,
+            "reden": "goedkeuring_nodig",
+            "advies": "Open de app in de Hub en stel een herstart voor. Een beheerder keurt de actuele preview goed "
+            "voordat de executor de app kan herstarten.",
+        }
     return {
         **base,
         "voorstel": proposal,

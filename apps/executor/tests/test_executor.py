@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from executorhelpers import POLICY, Hub, auth, execute, signed
+from executorhelpers import POLICY, Hub, approved, auth, execute, signed
 from executorhelpers import client as hub_client
 from fastapi.testclient import TestClient
 from policyhelpers import HOST, proposal
@@ -98,7 +98,7 @@ def test_zonder_schrijfsleutel_capability_unavailable_nooit_gesimuleerd_succes(t
     st = c.get("/api/v1/status").json()
     assert st["uitvoeren"] == {"mogelijk": False, "reden": "schrijfsleutel_ontbreekt"}
     prop = proposal("app.restart", {"host_id": HOST, "app_id": "demo-app"}, expected_version="sha256:" + "0" * 64)
-    r = execute(c, hub, signed(hub, prop, risk_class="R1"))
+    r = execute(c, hub, approved(hub, prop, risk_class="R1"))
     assert r.status_code == 501, r.text
     assert r.json()["code"] == "capability_unavailable" and r.json()["details"]["reden"] == "schrijfsleutel_ontbreekt"
 
