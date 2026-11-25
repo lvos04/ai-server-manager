@@ -261,3 +261,20 @@ test("E15 · de installatiewizard toont ontbrekende manifestcontroles alleen na 
   await expect(page.getByTestId("plan-verouderd")).toContainText("Verouderd");
   await expect(leeg).toHaveCount(0);
 });
+
+test("E15 · de bevestigde installatiestap verliest offline haar vinkjes", async ({ page, context }) => {
+  const plan = PLAN({ status: "geinstalleerd_controles_open" });
+  await page.route(`**/api/v1/catalog/plans/${plan.plan_id}`, r => r.fulfill({ json: plan }));
+  await page.goto(`/apps/installeren?plan=${plan.plan_id}`);
+  await expect(page.getByTestId("controles-open")).toBeVisible();
+  const vinkjes = page.getByTestId("wizard-stappen").locator("svg.lucide-check");
+  await expect(vinkjes.first()).toBeVisible();
+  await context.setOffline(true);
+  try {
+    await expect(page.getByTestId("wizard-stap")).toHaveText("Laatst bekend · Stap 7 van 7: Controle na uitvoering");
+    await expect(vinkjes).toHaveCount(0);
+    await expect(page.getByTestId("controles-open")).toHaveCount(0);
+  } finally {
+    await context.setOffline(false);
+  }
+});

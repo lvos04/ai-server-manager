@@ -404,6 +404,7 @@ staat dan de rij "TrueNAS-schrijfsleutel · Onleesbaar". De melding zei dus iets
   gaat via de Hub", terwijl ontkoppelen bij de executor op de statuspagina zelf gebeurt (§3.9) en bij een onleesbare
   sleutelopslag alleen via een nieuwe datamap (`CUSTOM_APP.md`, kop "Herstel"). Oplossen vraagt een nieuwe Peil-versie
   (uitzondering voor de executor in het sjabloon); dat is een besluit, geen ontwerpreview.
+  VERSIE 2 (BESLOTEN door regisseur 2026-11-25): opgelost met een nieuwe Peil-versie; tot dan is de melding bovenaan de executorpagina leidend.
 - **O-S2-005-5 (klein):** `ERRORS_NL["koppelstatus_onleesbaar"]` in `apps/executor/src/executor/hublink.py` zegt
   alleen "Herstel gaat met de TrueNAS-schrijfsleutel op deze pagina (Ontkoppelen van de Hub)". Die tekst verschijnt bij
   een formulierverzoek dat de executor met deze code weigert, en in `last_error` van de koppelstatus. Zonder bruikbare

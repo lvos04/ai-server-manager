@@ -329,7 +329,7 @@ test("na alle scenario’s: geen enkele schrijfaanroep op de NAS; uitloggen slui
   expect(ADMIN.username).toBe("beheerder");
 });
 
-test("goedgekeurde R1-herstart via de gekoppelde executor wordt uitgevoerd en teruggelezen", async ({ page }) => {
+test("goedgekeurde R1-herstart via de gekoppelde executor wordt teruggelezen en krijgt offline E15 op vier breedtes", async ({ page, context }) => {
   const st = stackState();
   test.skip(Boolean(process.env.HUB_E2E_BASE_URL) && !st.executor_url, "de externe imageproef heeft geen lokale executor");
   expect(st.executor_url).toBeTruthy();
@@ -361,5 +361,33 @@ test("goedgekeurde R1-herstart via de gekoppelde executor wordt uitgevoerd en te
   await expect(page.getByTestId("uitvoering-eind")).toHaveText("Uitgevoerd en gecontroleerd");
   const detail = await (await page.request.get(`/api/v1/actions/${v.request_id}`)).json();
   expect(detail.resultaat.readback.staat).toBe("RUNNING");
+  expect(await nasMutations()).toEqual(["app.redeploy"]);
+  const kop = page.getByTestId("verzoek-status");
+  const einde = page.getByTestId("uitvoering-eind");
+  const brontijd = page.getByTestId("freshness").locator("time");
+  const tijd = new Date(detail.bijgewerkt_op).toISOString();
+  await expect(brontijd).toHaveAttribute("datetime", tijd);
+  const tijdtekst = (await brontijd.innerText()).split(" (")[0];
+  for (const width of [360, 390, 768, 1440]) {
+    await test.step(`Bevestigde herstart → offline → herlezen op ${width} px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(kop).toHaveText("Uitgevoerd en gecontroleerd");
+      await expect(kop.locator("svg.lucide-check")).toBeVisible();
+      await expect(einde).toHaveText("Uitgevoerd en gecontroleerd");
+      await context.setOffline(true);
+      try {
+        await expect(kop).toHaveText(`Verouderd · stand van ${tijdtekst}`);
+        await expect(kop).toHaveAttribute("data-status", "stale");
+        await expect(kop.locator("svg.lucide-clock-alert")).toBeVisible();
+        await expect(kop.locator("svg.lucide-check")).toHaveCount(0);
+        await expect(einde).toHaveText("Laatst bekend: Uitgevoerd en gecontroleerd");
+        await expect(brontijd).toHaveAttribute("datetime", tijd);
+      } finally {
+        await context.setOffline(false);
+      }
+      await expect(kop).toHaveAttribute("data-status", "neutral");
+      await expect(einde).toHaveText("Uitgevoerd en gecontroleerd");
+    });
+  }
   expect(await nasMutations()).toEqual(["app.redeploy"]);
 });

@@ -101,7 +101,7 @@ test("de zandbakproef begint met één R1-voorstel en doet nog geen uitvoering o
   expect(posts).toEqual(["/api/v1/actions"]);
 });
 
-test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum houdt het punt ongezond", async ({ page }) => {
+test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum houdt het punt ongezond", async ({ page, context }) => {
   const punt = randomUUID(), checkpoint = randomUUID(), ids = [randomUUID(), randomUUID()];
   const ds = ["proef/app", "proef/db"];
   const tijd = new Date(Date.now() - 60_000).toISOString();
@@ -131,6 +131,13 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
   expect(verzoeken).toEqual([ids]);
   await expect(page.getByText("Hersteltest mislukt", { exact: true })).toBeVisible();
   await expect(page.getByText("De controlesom wijkt af. Het herstelpunt is ongezond.")).toBeVisible();
+  await context.setOffline(true);
+  try {
+    await expect(page.locator("#robotreden")).toContainText("Laatst bekend · bevestigde zandbakklonen · 2");
+    await expect(page.getByRole("button", { name: "Hersteltest in zandbak starten" })).toHaveAttribute("aria-disabled", "true");
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test("flowhistorie volgt de cursor en toont één regel per verzoek zonder vrije actor- of redenvelden", async ({ page }, info) => {

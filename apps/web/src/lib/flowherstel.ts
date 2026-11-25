@@ -22,7 +22,7 @@ export function herstelbewijs(v: ActieVerzoek) {
   return id;
 }
 
-export function flowStatus(v: ActieVerzoek, oud: boolean) {
+export function flowStatus(v: ActieVerzoek, oud = false) {
   if (v.status === "uitgevoerd" && (oud || (v.action_id === FLOWHERSTEL && !herstelbewijs(v)))) return "onbekend";
   return v.status;
 }

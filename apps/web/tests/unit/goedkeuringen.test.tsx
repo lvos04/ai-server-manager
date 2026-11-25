@@ -5,6 +5,7 @@ import { ErrorPanel } from "@/components/ErrorPanel";
 import { ALLEEN_BEHEERDER, foutVerval, GoedkeuringsPagina, HERSTELPUNT_ONTBREEKT } from "@/components/GoedkeuringsPagina";
 import { eindTekst, UitvoeringsTijdlijn } from "@/components/UitvoeringsTijdlijn";
 import { Button } from "@/components/ui/button";
+import { GoedkeuringScreen } from "@/app/goedkeuringen/[id]/GoedkeuringScreen";
 import { filterActies } from "@/app/goedkeuringen/beleid/BeleidScreen";
 import {
   diffRegels,
@@ -20,9 +21,15 @@ import {
   type BeleidsActie,
 } from "@/lib/acties";
 import { HubApiError } from "@/lib/api";
+import { formatTime } from "@/lib/format";
 import type { Role } from "@/lib/types";
 
-const proef = vi.hoisted(() => ({ rol: "admin" as string }));
+const proef = vi.hoisted(() => ({ rol: "admin", online: true, detail: undefined as ActieVerzoek | undefined }));
+
+vi.mock("@/lib/use-api", () => ({
+  useApi: () => ({ data: proef.detail, stale: false, lastOk: new Date().toISOString(), reload: async () => {} }),
+}));
+vi.mock("@/lib/pwa", () => ({ useOnline: () => proef.online }));
 
 vi.mock("@/lib/session", () => {
   const rank: Record<string, number> = { kind: 0, viewer: 1, operator: 2, admin: 3 };
@@ -77,6 +84,8 @@ const knop = (html: string, testId: string) => html.match(new RegExp(`<button[^>
 
 beforeEach(() => {
   proef.rol = "admin";
+  proef.online = true;
+  proef.detail = undefined;
 });
 
 describe("vaste fouttekst na een handeling (R-VEILIG-1, RV-8)", () => {
@@ -302,7 +311,7 @@ describe("uitvoering (C-23)", () => {
     const html = renderToStaticMarkup(<UitvoeringsTijdlijn v={verzoek({ status: "onbekend", gestart_op: new Date().toISOString() })} />);
     expect(html).toContain("Uitkomst onbekend");
     expect(html).not.toContain("Uitgevoerd en gecontroleerd");
-    expect(statusView("iets_nieuws")).toEqual({ tone: "unknown", label: "Onbekende status" });
+    expect(statusView(verzoek({ status: "iets_nieuws" }), { stale: false, bronTijd: new Date().toISOString() })).toEqual({ tone: "unknown", label: "Onbekende status" });
     expect(eindTekst("bezig")).toBe("Uitvoering bezig");
   });
 
@@ -319,6 +328,54 @@ describe("uitvoering (C-23)", () => {
   it("verouderd houdt het woord ‘Laatst bekend’", () => {
     const html = renderToStaticMarkup(<UitvoeringsTijdlijn v={verzoek({ status: "bezig", gestart_op: new Date().toISOString() })} verouderd />);
     expect(html).toContain("Laatst bekend: Uitvoering bezig");
+  });
+
+  it("kop en tijdlijn volgen dezelfde herstart bij verbindingsverlies en bij een oude bron na opnieuw ophalen", () => {
+    const tijd = new Date(Date.now() - 1000).toISOString();
+    proef.detail = verzoek({ action_id: "app.restart", status: "uitgevoerd", bijgewerkt_op: tijd, uitgevoerd_op: tijd });
+    const scherm = () => renderToStaticMarkup(<GoedkeuringScreen id={proef.detail!.request_id} />);
+    const vers = scherm();
+    expect(vers).toContain('data-status="neutral" data-testid="verzoek-status"');
+    expect(vers).toContain('data-testid="uitvoering-eind">Uitgevoerd en gecontroleerd');
+    proef.online = false;
+    const offline = scherm();
+    expect(offline).toContain('data-status="stale" data-testid="verzoek-status"');
+    expect(offline).toContain(`Verouderd · stand van ${formatTime(tijd)}`);
+    expect(offline).toContain("Laatst bekend: Uitgevoerd en gecontroleerd");
+
+    proef.online = true;
+    const oud = new Date(Date.now() - 16 * 60_000).toISOString();
+    proef.detail = { ...proef.detail, bijgewerkt_op: oud, uitgevoerd_op: oud };
+    const herlezen = scherm();
+    expect(herlezen).toContain('data-status="stale" data-testid="verzoek-status"');
+    expect(herlezen).toContain(`Verouderd · stand van ${formatTime(oud)}`);
+    expect(herlezen).toContain("Laatst bekend: Uitgevoerd en gecontroleerd");
+  });
+
+  it("behoudt een oude afwijking en laat een ontbrekend tijdstip geen vinkje opleveren", () => {
+    const tijd = new Date().toISOString();
+    expect(statusView(verzoek({ status: "afwijking" }), { stale: true, bronTijd: tijd })).toEqual({
+      tone: "degraded", label: `Gestopt: afwijking na uitvoering · stand van ${formatTime(tijd)}`,
+    });
+    expect(statusView(verzoek({ status: "uitgevoerd" }), { stale: true, bronTijd: null })).toEqual({
+      tone: "unknown", label: "Tijdstip onbekend",
+    });
+  });
+
+  it("toont offline alleen een historische hersteltijdlijn bij overeenkomend leesbewijs", () => {
+    const v = verzoek({ action_id: "automation.flows.restore", status: "uitgevoerd", target: { app_id: "home-control-hub", resource: "node_red" } });
+    proef.online = false;
+    proef.detail = v;
+    const scherm = () => renderToStaticMarkup(<GoedkeuringScreen id={v.request_id} />);
+    const onbewezen = scherm();
+    expect(onbewezen).toContain("Herstelstatus onbekend");
+    expect(onbewezen).not.toContain('data-testid="uitvoering-eind"');
+    proef.detail = { ...v, resultaat: { after_hash: H("a"), readback: {
+      gelezen: true, gelijk_aan_momentopname: true, checksum_sha256: "a".repeat(64), snapshot_id: "11111111-2222-4333-8444-555555555555",
+    } } };
+    const historisch = scherm();
+    expect(historisch).toContain('data-status="stale" data-testid="verzoek-status"');
+    expect(historisch).toContain("Laatst bekend: Uitgevoerd en gecontroleerd");
   });
 });
 

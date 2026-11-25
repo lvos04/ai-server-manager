@@ -5,7 +5,8 @@
  * een weigeringsreden, een foutbericht van de executor) komt nooit in beeld. De server beslist over elk recht; de UI
  * leest alleen de sessierol uit `GET /api/v1/auth/me` om bediening te verbergen.
  */
-import { FLOWHERSTEL, flowDiff } from "./flowherstel";
+import { FLOWHERSTEL, flowDiff, flowStatus } from "./flowherstel";
+import { formatTime } from "./format";
 import { HubApiError } from "./api";
 import type { StatusView } from "./status";
 import { isUuid } from "./uuid";
@@ -124,9 +125,16 @@ const STATUS: Record<string, StatusView> = {
   verlopen: { tone: "paused", label: "Verlopen" },
 };
 
-/** Een onbekende status is nooit een succes. */
-export function statusView(status: string): StatusView {
-  return Object.hasOwn(STATUS, status) ? STATUS[status]! : { tone: "unknown", label: "Onbekende status" };
+/** De tijd van het verzoek en de bereikbaarheid gelden voor elke weergave van dezelfde actiestatus. */
+export function statusView(v: ActieVerzoek, stand: { stale: boolean; bronTijd: string | null }): StatusView {
+  const status = flowStatus(v);
+  const view: StatusView = Object.hasOwn(STATUS, status) ? STATUS[status]! : { tone: "unknown", label: "Onbekende status" };
+  if (!stand.stale) return view;
+  const tijd = stand.bronTijd ? `stand van ${formatTime(stand.bronTijd)}` : "tijdstip onbekend";
+  if (view.tone === "down" || view.tone === "degraded" || view.tone === "unknown") {
+    return { tone: view.tone, label: `${view.label} · ${tijd}` };
+  }
+  return stand.bronTijd ? { tone: "stale", label: `Verouderd · ${tijd}` } : { tone: "unknown", label: "Tijdstip onbekend" };
 }
 
 const ACTIE_WERKWOORD: Record<string, string> = {

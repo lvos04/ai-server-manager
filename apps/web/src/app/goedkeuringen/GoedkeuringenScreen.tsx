@@ -13,7 +13,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { doelNaam, statusView, weigerReden, type ActieVerzoek, vasteFout } from "@/lib/acties";
 import { formatDateTime, formatTime } from "@/lib/format";
-import { usePaginaLijst } from "@/lib/use-meting";
+import type { ApiState } from "@/lib/use-api";
+import { useBronstand, usePaginaLijst } from "@/lib/use-meting";
 import { cn } from "@/lib/utils";
 
 type Filter = "wacht_op_goedkeuring" | "open" | "alle";
@@ -25,18 +26,19 @@ const FILTER: Record<Filter, string> = {
 
 const sleutel = (v: ActieVerzoek) => v.request_id;
 
-function Rij({ v, verouderd }: { v: ActieVerzoek; verouderd: boolean }) {
+function Rij({ v, bron }: { v: ActieVerzoek; bron: ApiState<unknown> }) {
+  const stand = useBronstand(bron, v.bijgewerkt_op);
   const doel = doelNaam(v.target) ?? "onbekend doel";
   const wacht = v.status === "wacht_op_goedkeuring";
   return (
     <Link
       href={`/goedkeuringen/${v.request_id}`}
-      className={cn("flex min-h-touch flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-foreground no-underline hover:bg-accent", verouderd && "arcering border-2 border-dashed border-stale")}
+      className={cn("flex min-h-touch flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-foreground no-underline hover:bg-accent", stand.stale && "arcering border-2 border-dashed border-stale")}
       data-testid={`verzoek-${v.request_id}`}
     >
       <span className="flex flex-wrap items-center gap-2">
         <RisicoBadge klasse={v.risk_class} />
-        <StatusBadge view={verouderd ? { tone: "stale", label: `Verouderd · ${statusView(v.status).label}` } : statusView(v.status)} />
+        <StatusBadge view={statusView(v, stand)} />
       </span>
       <strong className="[overflow-wrap:anywhere]">
         <code>{v.action_id}</code> · {doel}
@@ -106,7 +108,7 @@ export function GoedkeuringenScreen() {
           <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Voorstellen" data-testid="goedkeuringen-lijst">
             {items.map((v) => (
               <li key={v.request_id}>
-                <Rij v={v} verouderd={s.stale} />
+                <Rij v={v} bron={s} />
               </li>
             ))}
           </ul>

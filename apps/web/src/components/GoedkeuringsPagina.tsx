@@ -41,7 +41,7 @@ export const NAAM_EERST = "Typ eerst de exacte naam van het doel";
 /** Waarom beslissen (goedkeuren of uitvoeren) nu niet kan, of null. Volgorde: vervallen, verouderd, blokkade, diff, back-up. */
 export function beslisBlokkade(v: ActieVerzoek, verval: string | null, verouderd: boolean, metBackup = true): string | null {
   if (verval) return verval;
-  if (verouderd) return "Verouderde gegevens: de laatste lezing is mislukt. Ververs eerst de pagina.";
+  if (verouderd) return "Verouderde gegevens. Een actuele stand van het verzoek is nodig.";
   if (v.action_id === "sso.oidc.hub.register" || v.action_id === "sso.sessions.revoke") {
     return "Registratie van de Hub en het intrekken van Authentik-sessies zijn uitgesteld tot versie 2.";
   }

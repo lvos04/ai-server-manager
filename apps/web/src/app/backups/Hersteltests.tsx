@@ -78,7 +78,8 @@ function Proef({ punt, verouderd, ververs }: { punt: Herstelpunt; verouderd: boo
         {volgende ? " Bekijk de R1-preview en voer de kloon afzonderlijk uit. Keer daarna terug naar dit herstelpunt." : " Het bronbewijs voor de preview is niet beschikbaar."}</p>
       <Button uit={oud || !volgende} bezig={voorstel.busy} aria-describedby="kloonreden" onClick={() => void openPreview()}>Nieuwe hersteltest</Button>
     </>}
-    {gereed && <><p id="robotreden">Bevestigde zandbakklonen · {ids.length}. De robot toetst deze klonen en de proefdatabase bij dit herstelpunt.</p>
+    {gereed && <><p id="robotreden">{oud ? "Laatst bekend · bevestigde zandbakklonen" : "Bevestigde zandbakklonen"} · {ids.length}.
+      {oud ? " De actuele stand van de klonen is onbekend." : " De robot toetst deze klonen en de proefdatabase bij dit herstelpunt."}</p>
       <Button uit={oud || herlezen} bezig={robot.busy} aria-describedby="robotreden" onClick={() => void toets()}>Hersteltest in zandbak starten</Button></>}
     {voorstel.error && <ErrorPanel vast={vasteFout} error={toonbareFout(voorstel.error)} title="Kloonvoorstel onbekend" />}
     {robot.error && <><ErrorPanel vast={vasteFout} error={toonbareFout(robot.error)} title="Resultaat onbekend" /><p>De stand is opnieuw opgevraagd. Controleer de bewijsrecords voordat je opnieuw start.</p></>}

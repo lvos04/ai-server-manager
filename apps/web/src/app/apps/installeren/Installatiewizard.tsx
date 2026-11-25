@@ -172,7 +172,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
     inhoud = (
       <>
         {p.stale ? (
-          <Melding soort="onbekend" titel={p.bronTijd ? `Verouderd · stand van ${formatTime(p.bronTijd)}` : "Tijdstip van het plan onbekend"} data-testid="plan-verouderd">
+          <Melding soort="onbekend" titel={p.bronTijd ? `Verouderd · stand van ${formatTime(p.bronTijd)}` : "Tijdstip van het plan onbekend"} className="arcering border-dashed border-stale" data-testid="plan-verouderd">
             <p>Een actuele lezing van het plan en de controle vooraf ontbreekt.</p>
           </Melding>
         ) : null}
@@ -188,7 +188,7 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
             </Link>
           </p>
         ) : null}
-        {huidig === 6 ? (
+        {huidig === 6 && !p.stale ? (
           <Melding soort="info" titel="Geïnstalleerd · controles na installatie staan open" data-testid="controles-open">
             <p>De installatie is teruggelezen. De app is pas gezond als de controles hieronder zijn afgerond.</p>
           </Melding>
@@ -206,9 +206,9 @@ export function Installatiewizard({ planId }: { planId: string | null }) {
         intro="Installeren gaat altijd via een voorstel met preview en goedkeuring, als standaard TrueNAS Custom App of officiële catalogusapp."
       />
       <div className="flex flex-col gap-4">
-        <Stappen huidig={huidig} geblokkeerd={huidig === 2 || (huidig === 0 && !planId)} />
+        {!(plan && p.stale) && <Stappen huidig={huidig} geblokkeerd={huidig === 2 || (huidig === 0 && !planId)} />}
         <h2 className="text-xl" data-testid="wizard-stap">
-          Stap {huidig + 1} van {STAPPEN.length}: {STAPPEN[huidig]}
+          {plan && p.stale ? "Laatst bekend · " : ""}Stap {huidig + 1} van {STAPPEN.length}: {STAPPEN[huidig]}
         </h2>
         {!operator ? <RolMelding>Installeren kan pas vanaf de rol operator.</RolMelding> : null}
         {inhoud}

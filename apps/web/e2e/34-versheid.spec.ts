@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { ready } from "./helpers";
 
 const dag = 24 * 60 * 60_000;
@@ -71,6 +72,28 @@ test("E15 · een oude vervolgpagina verklaart ook een lege flowselectie verouder
   await page.getByRole("button", { name: "Meer verzoeken laden" }).click();
   await expect(page.locator("main").getByTestId("bronstand")).toContainText("Verouderd");
   await expect(page.getByText("Geen actieverzoeken van flows.")).toHaveCount(0);
+});
+
+test("E15 · een verse lijst houdt de eigen meettijd van elke uitvoering in goedkeuringen en flowhistorie", async ({ page }) => {
+  const nu = Date.now() - 1000;
+  const tijden = [new Date(nu - dag).toISOString(), new Date(nu).toISOString()];
+  const items = tijden.map(tijd => ({
+    request_id: randomUUID(), action_id: "app.restart", status: "uitgevoerd", risk_class: "R1",
+    target: { app_id: "proef-app" }, actor: { type: "flow", id: `flow:${flow}` }, goedkeuring_nodig: true,
+    aangemaakt_op: tijd, uitgevoerd_op: tijd, bijgewerkt_op: tijd,
+  }));
+  const lijst = { items, next_cursor: null, bijgewerkt_op: tijden[1] };
+  await page.route("**/api/v1/actions?status=alle&limit=50", r => r.fulfill({ json: lijst }));
+  await page.route("**/api/v1/actions?limit=50", r => r.fulfill({ json: lijst }));
+  for (const pad of ["/goedkeuringen", "/automatisering/historie"]) {
+    await page.goto(pad);
+    await ready(page);
+    if (pad === "/goedkeuringen") await page.getByTestId("filter").selectOption("alle");
+    const oud = page.locator('main [data-status="stale"]');
+    await expect(oud).toHaveText(`Verouderd · stand van ${await brondatum(page, tijden[0]!)}`);
+    await expect(oud.locator("svg.lucide-check")).toHaveCount(0);
+    await expect(page.getByText("Uitgevoerd en gecontroleerd", { exact: true })).toHaveCount(1);
+  }
 });
 
 test("E15 · de appcatalogus en de datasetselectie volgen de onderliggende inventaris", async ({ page }) => {

@@ -12,10 +12,11 @@ import { Button } from "@/components/ui/button";
 import { RisicoBadge } from "@/components/ActiePreview";
 import { risicoKlasse, statusView, weigerReden, type ActieVerzoek } from "@/lib/acties";
 import { UUID } from "@/lib/backups";
-import { FLOWHERSTEL, flowStatus, herstelbewijs, menselijkHerstel } from "@/lib/flowherstel";
+import { FLOWHERSTEL, herstelbewijs, menselijkHerstel } from "@/lib/flowherstel";
 import { formatDateTime, parseIso } from "@/lib/format";
 import { useRole } from "@/lib/session";
-import { useMeting, usePaginaLijst } from "@/lib/use-meting";
+import type { ApiState } from "@/lib/use-api";
+import { useBronstand, useMeting, usePaginaLijst } from "@/lib/use-meting";
 
 const TABS = [
   ["flows", "Flows"], ["detail", "Flowdetail"], ["testmodus", "Testmodus"],
@@ -51,6 +52,11 @@ function flowId(v: ActieVerzoek) {
   return v.actor?.type === "flow" && id && UUID.test(id) ? id : null;
 }
 
+function VerzoekStand({ v, bron }: { v: ActieVerzoek; bron: ApiState<unknown> }) {
+  const stand = useBronstand(bron, v.bijgewerkt_op);
+  return <StatusBadge view={statusView(v, stand)} />;
+}
+
 function Historie({ herstel = false, flow }: { herstel?: boolean; flow?: string }) {
   const pad = herstel ? `/api/v1/actions?action_id=${FLOWHERSTEL}&limit=50` : "/api/v1/actions?limit=50";
   const bron = usePaginaLijst<ActieVerzoek>(pad, verzoekSleutel);
@@ -66,7 +72,7 @@ function Historie({ herstel = false, flow }: { herstel?: boolean; flow?: string 
         {flowId(v) && <p><Link className="losse-link break-all" href={`/automatisering/detail?flow=${flowId(v)}`}>Flow {flowId(v)}</Link></p>}</> },
       { kop: "Gevraagd", cel: v => formatDateTime(v.aangemaakt_op) },
       { kop: "Goedkeuring", cel: v => <><RisicoBadge klasse={v.risk_class} /><p>{typeof v.goedkeuring_nodig !== "boolean" || !risicoKlasse(v.risk_class) ? "Vereiste onbekend" : v.goedkeuring_nodig ? "Menselijke goedkeuring vereist" : "Geen aparte goedkeuring vereist"}</p></> },
-      { kop: "Stand", cel: v => <><StatusBadge view={statusView(flowStatus(v, bron.stale))} />{v.status === "afgewezen" && <p>{weigerReden(v.resultaat)}</p>}
+      { kop: "Stand", cel: v => <><VerzoekStand v={v} bron={bron} />{v.status === "afgewezen" && <p>{weigerReden(v.resultaat)}</p>}
         {herstel && <p className="break-all">Momentopname · {herstelbewijs(v) ?? "Niet beschikbaar"}</p>}</> },
       { kop: "Verloop", cel: v => (herstel && !menselijkHerstel(v)) || (!herstel && !flowId(v))
         ? "Voorstel niet beschikbaar" : <Link className="losse-link" href={`/goedkeuringen/${v.request_id}`}>Bekijk actie-preview<span className="sr-only"> {v.request_id}</span></Link> },
