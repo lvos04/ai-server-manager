@@ -105,6 +105,7 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
   const punt = randomUUID(), checkpoint = randomUUID(), ids = [randomUUID(), randomUUID()];
   const ds = ["proef/app", "proef/db"];
   const tijd = new Date(Date.now() - 60_000).toISOString();
+  const kloontijd = new Date(Date.now() - 1000).toISOString();
   const verzoeken: string[][] = [];
   await page.route("**/api/v1/backups/herstelpunten", r => r.fulfill({ json: { observed_at: new Date().toISOString(), items: [{
     id: punt, app: "proef", gemaakt_op: tijd, checkpoint_id: checkpoint, snapshot: { actie_id: checkpoint, datasets: ds },
@@ -116,7 +117,7 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
   } }));
   await page.route("**/api/v1/actions?*action_id=zfs.snapshot.clone_to_sandbox*", r => r.fulfill({ json: {
     bijgewerkt_op: new Date().toISOString(), items: ids.map((id, i) => ({ request_id: id, action_id: "zfs.snapshot.clone_to_sandbox", status: "uitgevoerd", risk_class: "R1",
-      uitgevoerd_op: new Date().toISOString(), target: { snapshot: `${ds[i]}@punt` },
+      bijgewerkt_op: kloontijd, uitgevoerd_op: kloontijd, target: { snapshot: `${ds[i]}@punt` },
       resultaat: { readback: { aanwezig: true, dataset: `proef/asm-sandbox/proef-${punt}-${i + 1}` } },
     })), next_cursor: null,
   } }));
@@ -133,7 +134,9 @@ test("pas na elke teruggelezen kloon gaat de robot aan; een afwijkende checksum 
   await expect(page.getByText("De controlesom wijkt af. Het herstelpunt is ongezond.")).toBeVisible();
   await context.setOffline(true);
   try {
-    await expect(page.locator("#robotreden")).toContainText("Laatst bekend · bevestigde zandbakklonen · 2");
+    await expect(page.locator("#robotreden")).toContainText("Laatst bekend · stand van");
+    await expect(page.locator("#robotreden")).toContainText("Zandbakklonen · 2");
+    await expect(page.locator("#robotreden time")).toHaveAttribute("datetime", kloontijd);
     await expect(page.getByRole("button", { name: "Hersteltest in zandbak starten" })).toHaveAttribute("aria-disabled", "true");
   } finally {
     await context.setOffline(false);

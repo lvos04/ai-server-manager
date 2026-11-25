@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -89,7 +90,9 @@ def _status(stack: Stack) -> tuple[str, str | None]:
     return hp["status"], hp["reden"]
 
 
-def test_ex14_snapshot_herstel_in_de_zandbak_oude_waarde_terug_productie_onaangeroerd(stack: Stack) -> None:
+def test_ex14_snapshot_herstel_in_de_zandbak_oude_waarde_terug_productie_onaangeroerd(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
     hp, _ = _herstelpunt(stack)
     nas = stack.nas
     nas.inhoud[DS] = {"config": "nieuw"}  # productie verandert na de snapshot
@@ -98,6 +101,21 @@ def test_ex14_snapshot_herstel_in_de_zandbak_oude_waarde_terug_productie_onaange
         "dataset": "testpool/asm-sandbox/proef",
         "aanwezig": True,
     }, r.text
+    kloon = r.json()
+    morgen = datetime.now(UTC) + timedelta(days=1)
+    with monkeypatch.context() as m:
+        m.setattr("hub.routers.actions.utcnow", lambda: morgen)
+        lijst = stack.admin.get(
+            "/api/v1/actions", params={"action_id": "zfs.snapshot.clone_to_sandbox", "status": "uitgevoerd"}
+        )
+    assert lijst.status_code == 200
+    [item] = lijst.json()["items"]
+    assert lijst.json()["bijgewerkt_op"] != item["bijgewerkt_op"]
+    assert item["request_id"] == kloon["request_id"]
+    assert item["bijgewerkt_op"] == kloon["bijgewerkt_op"]
+    assert item["uitgevoerd_op"] == kloon["uitgevoerd_op"]
+    assert item["resultaat"]["uitgevoerd_op"] == kloon["resultaat"]["uitgevoerd_op"]
+    assert item["resultaat"]["uitgevoerd_op"]
     assert nas.inhoud["testpool/asm-sandbox/proef"] == {"config": "oud"}  # de oude waarde is terug
     assert nas.inhoud[DS] == {"config": "nieuw"}  # productie is niet veranderd
     # Alleen een snapshot en een kloon: nooit een rollback, update of verwijdering op productie.

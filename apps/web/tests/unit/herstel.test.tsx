@@ -86,6 +86,42 @@ it("een kloonvoorstel gebruikt de uitgevoerde snapshot en exact het eigen zandba
   expect(kloonDoelen(punt, { ...v, resultaat: {} } as never)).toEqual([]);
 });
 
+it("een verse actielijst verjongt noch het kloonverzoek noch de readback van de executor", () => {
+  const nu = Date.now();
+  const vers = new Date(nu - 2000).toISOString();
+  const oud = new Date(nu - 24 * 3600_000).toISOString();
+  const toekomst = new Date(nu + 3600_000).toISOString();
+  bron.data["/api/v1/backups/herstelpunten"] = { observed_at: vers, items: [{
+    ...punt, gemaakt_op: new Date(nu - 3 * 24 * 3600_000).toISOString(),
+  }] };
+  bron.data[`/api/v1/actions/${id}`] = { request_id: id, action_id: "zfs.snapshot.create", status: "uitgevoerd",
+    target: { dataset: "proef/app" }, bijgewerkt_op: vers, preview: { wijziging: { soort: "snapshot_maken", snapshot: "proef/app@punt" } },
+    resultaat: { readback: { aanwezig: true, leden: { "proef/app": "42" } } } };
+  const pad = "/api/v1/actions?action_id=zfs.snapshot.clone_to_sandbox&status=uitgevoerd&limit=50";
+  function scherm(bijgewerkt: string | null, afgesloten: string, gelezen: string | null) {
+    bron.data[pad] = { observed_at: vers, items: [{ request_id: id, action_id: "zfs.snapshot.clone_to_sandbox", status: "uitgevoerd",
+      risk_class: "R1", target: { snapshot: "proef/app@punt" }, bijgewerkt_op: bijgewerkt, uitgevoerd_op: afgesloten,
+      resultaat: { uitgevoerd_op: gelezen, readback: { aanwezig: true, dataset: `proef/asm-sandbox/proef-${id}-1` } },
+    }] };
+    return renderToStaticMarkup(<Hersteltests />);
+  }
+  const start = /<button[^>]*aria-disabled="true"[^>]*>Hersteltest in zandbak starten/;
+  const actueel = scherm(vers, vers, vers);
+  expect(actueel).toContain("Bevestigde zandbakklonen");
+  expect(actueel).not.toMatch(start);
+  for (const tijden of [[oud, vers, vers], [vers, oud, vers], [vers, vers, oud]] as const) {
+    const html = scherm(...tijden);
+    expect(html).toContain(`dateTime="${oud}">${formatDateTime(oud)}</time>`);
+    expect(html).not.toContain("Bevestigde zandbakklonen");
+    expect(html).toMatch(start);
+  }
+  for (const html of [scherm(null, vers, vers), ...[null, "ongeldig", toekomst].map(t => scherm(vers, vers, t))]) {
+    expect(html).toContain("Tijdstip van de kloonbevestiging onbekend");
+    expect(html).not.toContain("Bevestigde zandbakklonen");
+    expect(html).toMatch(start);
+  }
+});
+
 it("flowherstel vereist menselijk R2 en overeenkomende readback, vrije nodevelden blokkeren de preview", async () => {
   const { FLOWHERSTEL, flowStatus, menselijkHerstel, flowDiff } = await import("@/lib/flowherstel");
   const sha = "a".repeat(64);

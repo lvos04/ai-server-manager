@@ -27,12 +27,14 @@ export function useMeting<T>(pad: string | null, request = apiRequest<T>, interv
 type Tijdveld = "observed_at" | "bijgewerkt_op" | "afgeleid_op";
 type Bronmoment = Partial<Record<Tijdveld, string | null>>;
 
-/** De datum van de lezing bij de bron blijft ook na opnieuw ophalen of een mislukte verversing leidend. */
-export function useBronstand<T>(bron: ApiState<T>, tijd: string | null | undefined) {
-  const moment = brontijd(tijd);
-  const nu = useCatalogClock([moment - 1, moment + LIJST_MAX_LEEFTIJD_MS]);
-  const bronTijd = moment <= nu ? new Date(moment).toISOString() : null;
-  return { ...bron, bronTijd, stale: bron.stale || (bron.data !== undefined && !lijstIsVers(tijd, nu)) };
+/** Een gezamenlijke bevestiging is zo oud als de oudste vereiste lezing. Elke brontijd moet bekend zijn. */
+export function useBronstand<T>(bron: ApiState<T>, ...tijden: (string | null | undefined)[]) {
+  const momenten = tijden.map(brontijd);
+  const nu = useCatalogClock(momenten.flatMap(t => [t - 1, t + LIJST_MAX_LEEFTIJD_MS]));
+  const oudste = Math.min(...momenten);
+  const bekend = Number.isFinite(oudste) && momenten.every(t => t <= nu);
+  const bronTijd = bekend ? new Date(oudste).toISOString() : null;
+  return { ...bron, bronTijd, stale: bron.stale || (bron.data !== undefined && !lijstIsVers(bronTijd, nu)) };
 }
 
 export function useBronlijst<T>(pad: string | null, veld: Tijdveld = "observed_at", interval = 30_000) {

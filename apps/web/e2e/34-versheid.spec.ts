@@ -96,6 +96,61 @@ test("E15 · een verse lijst houdt de eigen meettijd van elke uitvoering in goed
   }
 });
 
+test("E15 · alleen actuele bevestiging van elke vereiste kloon opent de hersteltest", async ({ page }) => {
+  const nu = Date.now();
+  await page.clock.install({ time: nu });
+  const tijd = (leeftijd: number) => new Date(nu - leeftijd).toISOString();
+  const punt = randomUUID(), checkpoint = randomUUID();
+  const datasets = ["proef/app", "proef/db"];
+  const ids = datasets.map(() => randomUUID());
+  let tweedeKloon = tijd(2000);
+  await page.route("**/api/v1/backups/herstelpunten", r => r.fulfill({ json: { observed_at: tijd(1000), items: [{
+    id: punt, app: "proef", gemaakt_op: tijd(3 * dag), checkpoint_id: checkpoint, snapshot: { actie_id: checkpoint, datasets },
+  }] } }));
+  await page.route(`**/api/v1/actions/${checkpoint}`, r => r.fulfill({ json: {
+    request_id: checkpoint, action_id: "zfs.snapshot.create", status: "uitgevoerd", target: { dataset: "proef" },
+    bijgewerkt_op: tijd(1000), preview: { wijziging: { soort: "snapshot_maken", snapshot: "proef@punt" } },
+    resultaat: { readback: { aanwezig: true, leden: { "proef/app": "4", "proef/db": "4" } } },
+  } }));
+  await page.route("**/api/v1/actions?*action_id=zfs.snapshot.clone_to_sandbox*", r => r.fulfill({ json: {
+    bijgewerkt_op: tijd(1000), next_cursor: null, items: datasets.map((dataset, i) => ({
+      request_id: ids[i], action_id: "zfs.snapshot.clone_to_sandbox", status: "uitgevoerd", risk_class: "R1",
+      target: { snapshot: `${dataset}@punt` }, bijgewerkt_op: tijd(2000), uitgevoerd_op: tijd(2000),
+      resultaat: { uitgevoerd_op: i === 1 ? tweedeKloon : tijd(2000), readback: { aanwezig: true, dataset: `proef/asm-sandbox/proef-${punt}-${i + 1}` } },
+    })),
+  } }));
+  let robotaanroepen = 0;
+  await page.route(`**/api/v1/backups/herstelpunten/${punt}/hersteltest`, r => {
+    robotaanroepen++;
+    return r.fulfill({ json: {} });
+  });
+  await page.goto("/backups/hersteltests");
+  const reden = page.locator("#robotreden");
+  const start = page.getByRole("button", { name: "Hersteltest in zandbak starten" });
+  await expect(reden).toContainText("Bevestigde zandbakklonen · 2");
+  await expect(start).toBeEnabled();
+
+  tweedeKloon = tijd(dag);
+  await page.reload();
+  await expect(reden).toContainText(`Laatst bekend · stand van ${await brondatum(page, tweedeKloon)}`);
+  await expect(reden.locator("time")).toHaveAttribute("datetime", tweedeKloon);
+  await expect(reden).not.toContainText("Bevestigde zandbakklonen");
+  await expect(start).toBeDisabled();
+  await start.click({ force: true });
+  await start.press("Enter");
+  await start.press("Space");
+  expect(robotaanroepen).toBe(0);
+
+  tweedeKloon = tijd(14 * 60_000);
+  await page.reload();
+  await expect(reden).toContainText("Bevestigde zandbakklonen · 2");
+  await expect(start).toBeEnabled();
+  await page.clock.fastForward(61_000);
+  await expect(start).toBeDisabled();
+  await expect(reden.locator("time")).toHaveAttribute("datetime", tweedeKloon);
+  expect(robotaanroepen).toBe(0);
+});
+
 test("E15 · de appcatalogus en de datasetselectie volgen de onderliggende inventaris", async ({ page }) => {
   const nu = Date.now() - 1000;
   let tijd = new Date(nu).toISOString();

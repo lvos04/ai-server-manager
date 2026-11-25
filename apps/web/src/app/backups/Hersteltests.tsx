@@ -8,11 +8,12 @@ import { ResponsiveList } from "@/components/ResponsiveList";
 import { Button } from "@/components/ui/button";
 import { type ActieVerzoek, toonbareFout, vasteFout } from "@/lib/acties";
 import { appNaam, datasetNaam, KLOON, puntDatasets, UUID, type Herstelpunt, type TestRecord } from "@/lib/backups";
-import { formatDateTime } from "@/lib/format";
+import { brontijd, formatDateTime } from "@/lib/format";
+import { lijstIsVers } from "@/lib/lijstversheid";
 import { useRole } from "@/lib/session";
 import { testResult } from "@/lib/status";
 import { useAction } from "@/lib/use-action";
-import { useBronlijst, useMeting, usePaginaLijst } from "@/lib/use-meting";
+import { useBronlijst, useBronstand, useMeting, usePaginaLijst } from "@/lib/use-meting";
 
 const sleutel = (v: ActieVerzoek) => v.request_id;
 const SOORT: Record<string, string> = { foto: "Foto", database: "Database", dataset: "Dataset", config: "Configuratie" };
@@ -45,15 +46,24 @@ function Proef({ punt, verouderd, ververs }: { punt: Herstelpunt; verouderd: boo
   const robot = useAction<RobotRapport>();
   const [herlezen, setHerlezen] = useState(false);
   const doelen = kloonDoelen(punt, snapshot.data);
-  const ids = doelen.map(d => klonen.data?.items.find(v => {
+  const passendeKlonen = doelen.map(d => klonen.data?.items.find(v => {
     const rb = object(v.resultaat?.readback);
     return v.action_id === KLOON && v.status === "uitgevoerd" && v.risk_class === "R1" && UUID.test(v.request_id)
       && v.target.snapshot === d.snapshot && rb.aanwezig === true && rb.dataset === d.doel
-      && Date.parse(v.uitgevoerd_op ?? "") > Date.parse(punt.gemaakt_op);
-  })?.request_id);
-  const volgende = doelen.find((_, i) => !ids[i]);
-  const gereed = doelen.length > 0 && ids.every((id): id is string => !!id);
-  const oud = verouderd || snapshot.stale || klonen.stale || !klonen.data;
+      && brontijd(v.uitgevoerd_op) > brontijd(punt.gemaakt_op);
+  }));
+  const volgende = doelen.find((_, i) => !passendeKlonen[i]);
+  const bevestigd = passendeKlonen.filter((v): v is ActieVerzoek => v !== undefined);
+  const compleet = doelen.length > 0 && bevestigd.length === doelen.length;
+  const tijden = bevestigd.flatMap(v => {
+    // Bij later opgehaald executorbewijs kan de Hub het verzoek pas na de eigenlijke readback hebben afgesloten.
+    const meettijden = [v.bijgewerkt_op, v.uitgevoerd_op];
+    const readbackTijd = v.resultaat?.uitgevoerd_op;
+    if (readbackTijd !== undefined) meettijden.push(typeof readbackTijd === "string" ? readbackTijd : null);
+    return meettijden;
+  });
+  const stand = useBronstand(klonen, klonen.bronTijd, ...tijden);
+  const oud = verouderd || snapshot.stale || klonen.stale || !klonen.data || (compleet && stand.stale);
   const openPreview = async () => {
     if (!volgende || oud || voorstel.busy) return;
     const res = await voorstel.run("/api/v1/actions", { body: {
@@ -63,9 +73,9 @@ function Proef({ punt, verouderd, ververs }: { punt: Herstelpunt; verouderd: boo
     if (res && UUID.test(res.request_id)) router.push(`/goedkeuringen/${res.request_id}`);
   };
   const toets = async () => {
-    if (!gereed || oud || herlezen || robot.busy) return;
+    if (!compleet || oud || herlezen || robot.busy || !lijstIsVers(stand.bronTijd, Date.now())) return;
     setHerlezen(true);
-    await robot.run(`/api/v1/backups/herstelpunten/${punt.id}/hersteltest`, { body: { klonen: ids } });
+    await robot.run(`/api/v1/backups/herstelpunten/${punt.id}/hersteltest`, { body: { klonen: bevestigd.map(v => v.request_id) } });
     await ververs();
   };
   const r = robot.result?.herstelpunt === punt.id ? robot.result : null;
@@ -73,13 +83,15 @@ function Proef({ punt, verouderd, ververs }: { punt: Herstelpunt; verouderd: boo
     <Leesstand naam="Snapshotbewijs" bron={snapshot} />
     <Leesstand naam="Zandbakklonen" bron={klonen} />
     {klonen.data?.next_cursor && <Button onClick={klonen.meer}>Oudere klonen laden</Button>}
-    {!gereed && <>
+    {!compleet && <>
       <p id="kloonreden">Start geblokkeerd — er ontbreekt een bevestigde zandbakkloon.
         {volgende ? " Bekijk de R1-preview en voer de kloon afzonderlijk uit. Keer daarna terug naar dit herstelpunt." : " Het bronbewijs voor de preview is niet beschikbaar."}</p>
       <Button uit={oud || !volgende} bezig={voorstel.busy} aria-describedby="kloonreden" onClick={() => void openPreview()}>Nieuwe hersteltest</Button>
     </>}
-    {gereed && <><p id="robotreden">{oud ? "Laatst bekend · bevestigde zandbakklonen" : "Bevestigde zandbakklonen"} · {ids.length}.
-      {oud ? " De actuele stand van de klonen is onbekend." : " De robot toetst deze klonen en de proefdatabase bij dit herstelpunt."}</p>
+    {compleet && <><p id="robotreden" className={oud ? "arcering rounded-lg border border-dashed border-stale p-3" : undefined}>
+      {oud ? <>{stand.bronTijd ? <>Laatst bekend · stand van <time dateTime={stand.bronTijd}>{formatDateTime(stand.bronTijd)}</time></> : "Tijdstip van de kloonbevestiging onbekend"}.
+        {" "}Zandbakklonen · {bevestigd.length}. Starten wacht op een actuele bevestiging.</>
+        : <>Bevestigde zandbakklonen · {bevestigd.length}. De robot toetst deze klonen en de proefdatabase bij dit herstelpunt.</>}</p>
       <Button uit={oud || herlezen} bezig={robot.busy} aria-describedby="robotreden" onClick={() => void toets()}>Hersteltest in zandbak starten</Button></>}
     {voorstel.error && <ErrorPanel vast={vasteFout} error={toonbareFout(voorstel.error)} title="Kloonvoorstel onbekend" />}
     {robot.error && <><ErrorPanel vast={vasteFout} error={toonbareFout(robot.error)} title="Resultaat onbekend" /><p>De stand is opnieuw opgevraagd. Controleer de bewijsrecords voordat je opnieuw start.</p></>}
