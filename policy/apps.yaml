@@ -26,6 +26,9 @@ herkenning:
   uptime-kuma: {namen: [uptime-kuma, uptimekuma]}
   gotify: {namen: [gotify]}
   immich: {namen: [immich, immich-server]}
+  prowlarr: {namen: [prowlarr]}
+  sabnzbd: {namen: [sabnzbd]}
+  qbittorrent: {namen: [qbittorrent]}
 kritiek:
   - ai-server-manager
   - ai-server-manager-executor
@@ -35,6 +38,21 @@ kritiek:
   - tailscale
   - cloudflared
 beschermd:
+  - id: APP-PROWLARR
+    app: prowlarr
+    acties: '*'
+    code: appbeheer_bij_eigenaar
+    reden_nl: Prowlarr beheert de indexercatalogus en synchronisatie. De Hub heeft alleen leesrecht.
+  - id: APP-SABNZBD
+    app: sabnzbd
+    acties: '*'
+    code: appbeheer_bij_eigenaar
+    reden_nl: SABnzbd beheert de Usenet-wachtrij. Wijzigingen aan serverprioriteiten lopen via MSO. De Hub heeft alleen leesrecht.
+  - id: APP-QBITTORRENT
+    app: qbittorrent
+    acties: '*'
+    code: appbeheer_bij_eigenaar
+    reden_nl: qBittorrent beheert de torrentwachtrij. Wijzigingen aan snelheidslimieten lopen via MSO. De Hub heeft alleen leesrecht.
   - id: APP-EMBY
     app: emby
     acties: '*'

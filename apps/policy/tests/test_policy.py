@@ -364,6 +364,25 @@ def _readback(naam: str, staat: str, images: list[str], catalogus: str = "ix-app
 APP_ACTIES = ("app.uninstall", "app.update", "app.rollback", "app.start", "app.restart", "app.stop")
 
 
+@pytest.mark.parametrize("app", ["prowlarr", "sabnzbd", "qbittorrent"])
+def test_downloadapp_blijft_ook_onder_een_eigen_naam_bij_de_eigenaar(app: str) -> None:
+    image = f"voorbeeld/{app}:1"
+    bestaand = herken_app(POLICY, "voorbeeld", _readback("voorbeeld", "RUNNING", [image]))
+    nieuw = herken_app(POLICY, "voorbeeld", None, [image])
+    for actie in POLICY.acties.values():
+        if actie.doel in {"app", "app_nieuw"}:
+            oordeel = classify(
+                POLICY,
+                action_id=actie.action_id,
+                target={"host_id": HOST, "app_id": "voorbeeld"},
+                parameters={},
+                actor_type="user",
+                herkend_als=nieuw if actie.doel == "app_nieuw" else bestaand,
+            )
+            assert oordeel.geweigerd, actie.action_id
+            assert "appbeheer_bij_eigenaar" in [b.code for b in oordeel.blokkades], actie.action_id
+
+
 def test_gestopte_app_herkenning_op_de_catalogusapp_en_anders_dicht() -> None:
     """TrueNAS toont bij een gestopte app geen image. Een catalogusapp blijft herkenbaar aan ``metadata.name``; een
     Custom App (``ix-app``) of compose-app zonder zichtbare image is niet herkenbaar en dan weigert het beleid elke

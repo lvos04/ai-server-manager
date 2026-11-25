@@ -427,6 +427,9 @@ def test_bekende_naam_met_emby_image_krijgt_ook_de_emby_regel(stack: Stack) -> N
         pytest.param("mediaserver", "emby/embyserver:4.8.10.0", "ix-app", "doel_niet_herkenbaar", id="custom-emby"),
         pytest.param("media-guard", "ghcr.io/lvos04/mediaguard-core:1.2.2", "ix-app", "doel_niet_herkenbaar", id="mg"),
         pytest.param("jellyleon", "ghcr.io/lvos04/jelly-leon:10.11.0", "ix-app", "doel_niet_herkenbaar", id="jl"),
+        ("indexers", "voorbeeld/prowlarr:1", "prowlarr", "appbeheer_bij_eigenaar"),
+        ("nieuws", "voorbeeld/sabnzbd:1", "sabnzbd", "appbeheer_bij_eigenaar"),
+        ("torrents", "voorbeeld/qbittorrent:1", "qbittorrent", "appbeheer_bij_eigenaar"),
     ],
 )
 def test_gestopte_app_zonder_zichtbare_image_weigert_de_executor_zelf(

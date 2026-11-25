@@ -1,10 +1,13 @@
 # Prowlarr — behoud, migratie en acceptatie
 
 ## Besluit
-Behouden, eigenaar indexercatalogus.
+Prowlarr is de enige eigenaar van de indexercatalogus. De beheerder wijzigt indexers, tags en de native
+synchronisatie in Prowlarr. De gekoppelde MediaGuard-forks ontvangen de synchronisatie. MSO mag een
+zoekendpoint aanbieden. In versie 1 blijven de Hub en zijn executor alleen-lezen voor Prowlarr, ook na
+goedkeuring door een beheerder. Dit geldt ook voor algemene appacties. [Gedeeld appbeleid](../../../policy/apps.yaml)
 
 ## Waarom
-MediaGuard forks beheren Prowlarr synchronisatie; MSO kan eigen endpoint aanbieden.
+Eén synchronisatie houdt indexers en tags in de gekoppelde apps consistent.
 
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).
@@ -23,4 +26,4 @@ MediaGuard forks beheren Prowlarr synchronisatie; MSO kan eigen endpoint aanbied
 ## Testcase en beslissing
 **Acceptatie:** Geen cyclische zoeklus of tag drift.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+**Praktijkproef:** NIET GEVALIDEERD (echte NAS). Controleer daar de installatiestatus, de synchronisatie en of gebruikers bij stoppen in één handeling kunnen terugkeren naar de bestaande app.

@@ -634,6 +634,9 @@ def test_losse_surrogaat_in_de_parameters_geeft_422(stack: Stack) -> None:
         ("ai-server-manager-executor", "app.stop", "executor_niet_zelf"),
         ("mediaguard", "app.uninstall", "mediaguard_upgradebewijs_ontbreekt"),
         ("jellyfin", "app.uninstall", "mediaserver_migratie_vraagt_rapport"),
+        ("prowlarr", "app.restart", "appbeheer_bij_eigenaar"),
+        ("sabnzbd", "app.restart", "appbeheer_bij_eigenaar"),
+        ("qbittorrent", "app.restart", "appbeheer_bij_eigenaar"),
     ],
 )
 def test_beschermde_apps(stack: Stack, naam: str, action_id: str, code: str) -> None:
@@ -642,6 +645,7 @@ def test_beschermde_apps(stack: Stack, naam: str, action_id: str, code: str) -> 
     _key, r = _voorstel(stack.admin, action_id, app_target(naam))
     assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
     assert code in [b["code"] for b in r.json()["details"]["blokkades"]], r.text
+    assert schrijfaanroepen(stack.nas) == []
 
 
 def test_schema_en_doel_worden_gecontroleerd(stack: Stack) -> None:

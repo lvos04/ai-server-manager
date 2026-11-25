@@ -1,7 +1,11 @@
 # qBittorrent — behoud, migratie en acceptatie
 
 ## Besluit
-Behouden, torrentclient.
+qBittorrent is eigenaar van zijn torrentwachtrij en configuratie. De beheerder gebruikt qBittorrent voor handmatig
+wachtrijbeheer. Voor de snelheidslimieten die MSO beheert, lopen wijzigingen uitsluitend via de bestaande
+torrentregels van MSO. MediaGuard gebruikt de client voor zijn eigen downloads en import.
+In versie 1 blijven de Hub en zijn executor alleen-lezen voor qBittorrent, ook bij algemene appacties en na
+goedkeuring door een beheerder. [Gedeeld appbeleid](../../../policy/apps.yaml)
 
 ## Waarom
 MSO tuning, hardlink en private trackers veilig.
@@ -23,4 +27,4 @@ MSO tuning, hardlink en private trackers veilig.
 ## Testcase en beslissing
 **Acceptatie:** Geen automatische bestanden verwijderen.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+**Praktijkproef:** NIET GEVALIDEERD (echte NAS). Controleer daar de installatiestatus, het behoud van bestanden en of gebruikers bij stoppen in één handeling kunnen terugkeren naar de bestaande app.
