@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from asm_policy.canonical import canonical_sha256
 from conftest import idem, login_as, make_user
+from fakes.adressen import ONGESPECIFICEERD
 from fakes.fake_appstore import FakeAppstore
 from sqlalchemy import select
 
@@ -49,7 +50,7 @@ def _app(app: Any, naam: str, appstore: dict[str, Any], host_poort: int = 30080)
             adaptertype="alleen_truenas",
             soort="derde",
             installatiewijze="custom_app",
-            poorten=[{"container_poort": 80, "host_poort": host_poort, "host_ip": "0.0.0.0", "protocol": "tcp"}],
+            poorten=[{"container_poort": 80, "host_poort": host_poort, "host_ip": ONGESPECIFICEERD, "protocol": "tcp"}],
             appstore=appstore,
         )
         db.add(row)
@@ -63,7 +64,9 @@ def _poort(app: Any, app_id: str, host_poort: int) -> None:
     with app.state.sessionmaker() as db:
         row = db.get(CatalogApp, uuid.UUID(app_id))
         assert row is not None
-        row.poorten = [{"container_poort": 80, "host_poort": host_poort, "host_ip": "0.0.0.0", "protocol": "tcp"}]
+        row.poorten = [
+            {"container_poort": 80, "host_poort": host_poort, "host_ip": ONGESPECIFICEERD, "protocol": "tcp"}
+        ]
         db.commit()
 
 

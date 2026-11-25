@@ -8,6 +8,7 @@ import jwt
 import pytest
 from argon2.low_level import Type, hash_secret
 from conftest import STRONG_PASSWORD, idem, login_as, make_user
+from fakes.adressen import documentatieadres
 
 pytestmark = pytest.mark.integration
 
@@ -130,7 +131,7 @@ def test_rollen_viewer_en_kind(admin: Any, app: Any) -> None:
     viewer = login_as(app, "kijker")
     assert viewer.get("/api/v1/inventory").status_code == 200
     assert viewer.get("/api/v1/gates").status_code == 200
-    r = viewer.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}}, headers=idem())
+    r = viewer.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": documentatieadres(1)}}, headers=idem())
     assert r.status_code == 403 and r.json()["code"] == "forbidden"
     assert viewer.post("/api/v1/inventory/refresh", headers=idem()).status_code == 403
     assert viewer.put("/api/v1/truenas/api-key", json={"api_key": "x" * 20}, headers=idem()).status_code == 403
@@ -143,7 +144,9 @@ def test_rollen_viewer_en_kind(admin: Any, app: Any) -> None:
     op = login_as(app, "operator1")
     assert op.post("/api/v1/inventory/refresh", headers=idem()).status_code == 202
     assert (
-        op.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}}, headers=idem()).status_code
+        op.put(
+            "/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": documentatieadres(1)}}, headers=idem()
+        ).status_code
         == 403
     )
 
@@ -283,7 +286,7 @@ def test_gezondheid_en_statuspagina(client: Any) -> None:
 def test_uniform_foutformaat(admin: Any) -> None:
     r = admin.get("/api/v1/bestaat-niet")
     assert r.status_code == 404 and set(r.json()) == {"code", "message", "details", "trace_id"}
-    r = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.1"}})
+    r = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": documentatieadres(1)}})
     assert r.status_code == 400 and r.json()["code"] == "idempotency_key_required"
 
 

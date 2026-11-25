@@ -3,6 +3,7 @@
  * Tegen de echte Hub-API met de fake TrueNAS (Sim-getest). Alleen het R3-geval gebruikt een gesimuleerd verzoek: het
  * echte beleid kent geen R3-actie die op goedkeuring wacht (een R3-patroon wordt altijd geweigerd).
  */
+import { documentatieAdres } from "../tests/adressen";
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { expectAccessible, expectNoHorizontalScroll, expectTouchTargets, nasMutations, p2Afdrukken, ready } from "./helpers";
@@ -136,7 +137,7 @@ test("EX18: een kijker ziet geen goedkeurknop en de route weigert met 403", asyn
   const v = await stelVoor(page, "app.uninstall", "my-house");
   const maak = await post(page.request, page.context(), "/api/v1/users", { ...KIJKER, role: "viewer" });
   expect([201, 409, 422]).toContain(maak.status());
-  const ctx = await browser.newContext({ storageState: undefined, extraHTTPHeaders: { "X-Forwarded-For": "203.0.113.17" } });
+  const ctx = await browser.newContext({ storageState: undefined, extraHTTPHeaders: { "X-Forwarded-For": documentatieAdres(17) } });
   try {
     const k = await ctx.newPage();
     const login = await k.request.post("/api/v1/auth/login", { data: KIJKER });

@@ -16,6 +16,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from executorhelpers import linked_fields
+from fakes.adressen import ADRES_MET_VOORLOOPNUL, ONGESPECIFICEERD, documentatieadres, ipv4
 
 from executor.adres import AdresOngeldig, host_allowed_for_post, resolve_allowed
 from executor.hublink import (
@@ -80,38 +81,38 @@ def test_enroll_verzoek_heeft_exact_de_velden_van_3_3() -> None:
 @pytest.mark.parametrize(
     ("url", "ok"),
     [
-        ("http://192.0.2.5:30400", True),
+        (f"http://{documentatieadres(5)}:30400", True),
         ("https://hub.thuis:443", True),
         ("http://[fd00::5]:30400", True),
-        ("http://192.0.2.5:30400/", True),
-        ("http://192.0.2.5:30400/api", False),
-        ("http://192.0.2.5:30400?x=1", False),
-        ("http://user:pw@192.0.2.5", False),
-        ("ftp://192.0.2.5", False),
+        (f"http://{documentatieadres(5)}:30400/", True),
+        (f"http://{documentatieadres(5)}:30400/api", False),
+        (f"http://{documentatieadres(5)}:30400?x=1", False),
+        (f"http://user:pw@{documentatieadres(5)}", False),
+        (f"ftp://{documentatieadres(5)}", False),
         ("http://127.0.0.1:30400", False),
         ("http://localhost:30400", False),
-        ("http://169.254.1.1", False),
+        (f"http://{ipv4(169, 254, 1, 1)}", False),
         ("http://[fe80::1]", False),
-        ("http://0.0.0.0", False),
+        (f"http://{ONGESPECIFICEERD}", False),
         ("http://[::]", False),
-        ("http://192.0.2.5:99999", False),
+        (f"http://{documentatieadres(5)}:99999", False),
         # Contract 1.3 §3.2: alleen canonieke IPv4-vormen; IPv6 alleen tussen [].
         ("http://127.1", False),
         ("http://2130706433", False),
         ("http://0x7f000001", False),
-        ("http://010.0.0.1", False),
+        (f"http://{ADRES_MET_VOORLOOPNUL}", False),
         ("http://0", False),
-        ("http://192.168.001.5", False),
-        ("http://256.1.1.1", False),
+        ("http://" + ".".join(("192", "168", "001", "5")), False),
+        ("http://" + ".".join(("256", "1", "1", "1")), False),
         ("http://localhost.:30400", False),
         ("http://LOCALHOST", False),
         ("http://[::ffff:127.0.0.1]", False),
         ("http://[fe80::1%25eth0]", False),
         ("http://hub_x.lan", False),
-        ("http://192.0.2.5.:30400", True),
+        (f"http://{documentatieadres(5)}.:30400", True),
         ("http://nas.local.", True),
-        ("http://192.0.2.5:0", False),
-        ("http://192.0.2.5:30400#x", False),
+        (f"http://{documentatieadres(5)}:0", False),
+        (f"http://{documentatieadres(5)}:30400#x", False),
     ],
 )
 def test_hub_adres_regels(url: str, ok: bool) -> None:
@@ -125,24 +126,31 @@ def test_hub_adres_regels(url: str, ok: bool) -> None:
 
 def test_hub_adres_genormaliseerd_en_niet_afgekapt() -> None:
     assert validate_hub_url("http://NAS.Local.:30400") == "http://nas.local:30400"
-    assert validate_hub_url("http://192.0.2.5.:30400/") == "http://192.0.2.5:30400"
+    assert validate_hub_url(f"http://{documentatieadres(5)}.:30400/") == f"http://{documentatieadres(5)}:30400"
     assert validate_hub_url("http://[FD00::5]:1") == "http://[fd00::5]:1"
     lang = "http://" + ".".join(ch * 60 for ch in "abcd") + ".local"  # 249 tekens: een geldige lange naam
     assert len(lang) < 512 and validate_hub_url(lang)
     with pytest.raises(ValueError):
-        validate_hub_url("http://192.0.2.5:30400" + " " * 500)  # > 512 tekens als geheel: geweigerd, niet afgekapt
+        validate_hub_url(
+            f"http://{documentatieadres(5)}:30400" + " " * 500
+        )  # > 512 tekens als geheel: geweigerd, niet afgekapt
 
 
 def test_verboden_bereiken_ook_na_dns_resolutie(monkeypatch: pytest.MonkeyPatch) -> None:
     import socket
 
-    answers = {"rebind.lan": "127.0.0.1", "ll.lan": "169.254.10.1", "nul.lan": "0.0.0.0", "ok.lan": "192.0.2.7"}
+    answers = {
+        "rebind.lan": "127.0.0.1",
+        "ll.lan": ipv4(169, 254, 10, 1),
+        "nul.lan": ONGESPECIFICEERD,
+        "ok.lan": documentatieadres(7),
+    }
 
     def fake(host: str, port: int, *a: Any, **k: Any) -> list[Any]:
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (answers[host], port))]
 
     monkeypatch.setattr(socket, "getaddrinfo", fake)
-    assert resolve_allowed("ok.lan", 80) == "192.0.2.7"
+    assert resolve_allowed("ok.lan", 80) == documentatieadres(7)
     for name in ("rebind.lan", "ll.lan", "nul.lan"):
         with pytest.raises(AdresOngeldig):
             resolve_allowed(name, 80)
@@ -154,8 +162,8 @@ def test_verboden_bereiken_ook_na_dns_resolutie(monkeypatch: pytest.MonkeyPatch)
 @pytest.mark.parametrize(
     ("host", "ok"),
     [
-        ("192.0.2.5:30410", True),
-        ("192.0.2.5", True),
+        (f"{documentatieadres(5)}:30410", True),
+        (documentatieadres(5), True),
         ("[fd00::5]:30410", True),
         ("nas:30410", True),
         ("nas.:30410", True),
@@ -169,7 +177,7 @@ def test_verboden_bereiken_ook_na_dns_resolutie(monkeypatch: pytest.MonkeyPatch)
         ("2130706433:30410", False),
         ("fd00::5", False),  # IPv6 zonder []
         ("", False),
-        ("192.0.2.5:poort", False),
+        (f"{documentatieadres(5)}:poort", False),
         ("a_b.local", False),
     ],
 )

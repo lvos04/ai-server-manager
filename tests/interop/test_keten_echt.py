@@ -42,6 +42,7 @@ from conftest import ADMIN_URL, idem, login_as, make_user
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from executorhelpers import write_nas
+from fakes.adressen import documentatieadres
 from fakes.fake_truenas import FakeTrueNAS
 from policyhelpers import DIGEST, DIGEST_B, policy_met_regels
 
@@ -219,7 +220,7 @@ def _forge(repo_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
     def dns(host: str, *a: Any, **kw: Any) -> Any:
         if host == "forge.test":
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.10", 443))]
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (documentatieadres(10), 443))]
         return echt_dns(host, *a, **kw)
 
     monkeypatch.setattr(sources.socket, "getaddrinfo", dns)

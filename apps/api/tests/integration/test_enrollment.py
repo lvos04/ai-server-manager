@@ -14,6 +14,7 @@ from typing import Any
 import psycopg
 import pytest
 from conftest import enroll_body, idem, service_jwk
+from fakes.adressen import LINKLOCAL_METADATA, documentatieadres
 
 pytestmark = pytest.mark.integration
 
@@ -26,7 +27,7 @@ def _token(admin: Any, app_id: str = "jelly-leon-platform") -> str:
     return str(r.json()["enrollment_token"])
 
 
-def _anon(app: Any, ip: str = "192.0.2.50") -> Any:
+def _anon(app: Any, ip: str = documentatieadres(50)) -> Any:
     from fastapi.testclient import TestClient
 
     return TestClient(app, base_url="https://testserver", client=(ip, 50000))
@@ -269,7 +270,7 @@ def test_verkeerde_app_en_verlopen_token(admin: Any, app: Any, clean_db: str) ->
 
 
 def test_rate_limit_per_bron_ip_met_retry_after(admin: Any, app: Any) -> None:
-    attacker, other = _anon(app, "192.0.2.66"), _anon(app, "192.0.2.67")
+    attacker, other = _anon(app, documentatieadres(66)), _anon(app, documentatieadres(67))
     for _ in range(10):
         r = attacker.post("/api/v1/services/enroll", json=enroll_body("jelly-leon", token="enr_" + "C" * 43))
         assert r.status_code == 401
@@ -379,7 +380,7 @@ def test_intrekken_en_herinschrijving(admin: Any, app: Any) -> None:
 @pytest.mark.parametrize(
     ("base_url", "bewaard", "genegeerd"),
     [
-        ("http://192.0.2.5:30401", "http://192.0.2.5:30401", False),
+        (f"http://{documentatieadres(5)}:30401", f"http://{documentatieadres(5)}:30401", False),
         ("https://hch.lan/pad/", "https://hch.lan/pad", False),
         (None, None, False),
         ("ftp://x", None, True),
@@ -387,11 +388,11 @@ def test_intrekken_en_herinschrijving(admin: Any, app: Any) -> None:
         ("http://127.1:30401", None, True),
         ("http://2130706433", None, True),
         ("http://127.0.0.1:30401", None, True),
-        ("http://169.254.169.254", None, True),
+        (f"http://{LINKLOCAL_METADATA}", None, True),
         ("http://user:pw@nas:1", None, True),
         ("http://nas:1/" + "p" * 600, None, True),
         ("geen url", None, True),
-        (" http://192.0.2.5:1", None, True),
+        (f" http://{documentatieadres(5)}:1", None, True),
     ],
 )
 def test_base_url_nooit_reden_voor_weigering(

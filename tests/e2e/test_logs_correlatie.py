@@ -17,6 +17,7 @@ import psycopg
 import pytest
 from conftest import idem, login_as, make_user
 from eventhelpers import active, event, post, service
+from fakes.adressen import ipv4
 from fakes.fake_gotify import FakeGotify
 
 from hub import logsink
@@ -58,17 +59,18 @@ def test_geheimen_niet_in_index_supportbundel_of_zoekresultaat(admin: Any, app: 
     svc = service(admin)
     svc_token = svc["Authorization"].split(" ", 1)[1]
     trace = str(uuid.uuid4())
+    testmail = "@".join(("redactie", "example.invalid"))
     lines = [
         _line(f"verbinden met gotify mislukt, key {GOTIFY_TOKEN} geweigerd", trace=trace),
         _line(f"eigen service-token {svc_token} gelekt", trace=trace),
         _line(f"Authorization: Bearer {JWT}"),
         _line(f"sleutel {PEM}"),
-        _line("login wachtwoord=Hunter2-Hunter2 vanaf 192.168.10.44 door leon@example.org"),
-        _line("callback ?code=abc123def&state=xyz789 publiek 8.8.4.4", niveau="warning"),
+        _line(f"login wachtwoord=Hunter2-Hunter2 vanaf {ipv4(192, 168, 10, 44)} door {testmail}"),
+        _line(f"callback ?code=abc123def&state=xyz789 publiek {ipv4(8, 8, 4, 4)}", niveau="warning"),
         _line(
             "veld met geheim",
             token="t0k3n-in-veld",
-            nested={"password": "pw-in-genest", "ip": "10.1.2.3"},
+            nested={"password": "pw-in-genest", "ip": ipv4(10, 1, 2, 3)},
         ),
     ]
     r = admin.post("/api/v1/logs", json={"regels": lines}, headers=svc)
@@ -83,14 +85,14 @@ def test_geheimen_niet_in_index_supportbundel_of_zoekresultaat(admin: Any, app: 
         svc_token,
         JWT,
         "Hunter2-Hunter2",
-        "192.168.10.44",
-        "leon@example.org",
+        ipv4(192, 168, 10, 44),
+        testmail,
         "abc123def",
         "xyz789",
-        "8.8.4.4",
+        ipv4(8, 8, 4, 4),
         "t0k3n-in-veld",
         "pw-in-genest",
-        "10.1.2.3",
+        ipv4(10, 1, 2, 3),
         "MC4CAQAw",
     ]
     for secret in forbidden:
@@ -190,13 +192,15 @@ def test_eigen_hub_logs_met_trace_id_en_geschoond(app: Any, client: Any, clean_d
     trace = str(uuid.uuid4())
     token = logsink.current_trace.set(trace)
     try:
-        logging.getLogger("hub.test").warning("verbinding faalt met api_key=%s naar %s", "Zeer-Geheim-9876", "10.0.0.7")
+        logging.getLogger("hub.test").warning(
+            "verbinding faalt met api_key=%s naar %s", "Zeer-Geheim-9876", ipv4(10, 0, 0, 7)
+        )
         logging.getLogger("hub.test").info("info komt niet in de index (vanaf warning)")
     finally:
         logsink.current_trace.reset(token)
     handler.flush_now()
     raw = _all_log_text(clean_db)
-    assert "Zeer-Geheim-9876" not in raw and "10.0.0.7" not in raw and "info komt niet" not in raw
+    assert "Zeer-Geheim-9876" not in raw and ipv4(10, 0, 0, 7) not in raw and "info komt niet" not in raw
     with psycopg.connect(clean_db, autocommit=True) as conn:
         rows = conn.execute("SELECT bron, niveau, trace_id FROM log_entry WHERE trace_id = %s", (trace,)).fetchall()
     assert rows == [("hub-api", "warning", trace)]

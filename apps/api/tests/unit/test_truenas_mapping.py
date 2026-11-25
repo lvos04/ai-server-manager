@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from fakes.adressen import ONGESPECIFICEERD, documentatieadres
 
 from hub.truenas import normalize as norm
 from hub.truenas.capabilities import build_capability_map, parse_version
@@ -88,13 +89,13 @@ def test_abonneren_alleen_op_toegestane_events() -> None:
 
     from hub.truenas.client import TrueNASClient
 
-    client = TrueNASClient("wss://192.0.2.5/api/current", "x")
+    client = TrueNASClient(f"wss://{documentatieadres(5)}/api/current", "x")
     with pytest.raises(PermissionError):
         asyncio.run(client.first_event("app.query", 1))
 
 
 def test_url_en_adresvalidatie() -> None:
-    assert build_ws_url("192.0.2.5", None) == "wss://192.0.2.5/api/current"
+    assert build_ws_url(documentatieadres(5), None) == f"wss://{documentatieadres(5)}/api/current"
     assert build_ws_url("nas.lan", 8443) == "wss://nas.lan:8443/api/current"
     assert build_ws_url("fd00::1", 443) == "wss://[fd00::1]/api/current"
     for bad in ("http://nas", "nas:443", "", "-bad", "a/b"):
@@ -122,7 +123,7 @@ def test_apps_normaliseren_en_herkennen() -> None:
                     {
                         "container_port": 38081,
                         "protocol": "TCP",
-                        "host_ports": [{"host_port": 38081, "host_ip": "0.0.0.0"}],
+                        "host_ports": [{"host_port": 38081, "host_ip": ONGESPECIFICEERD}],
                     }
                 ],
                 "volumes": [{"source": "/mnt/p/apps/mso", "destination": "/appdata", "type": "bind"}],
@@ -132,7 +133,9 @@ def test_apps_normaliseren_en_herkennen() -> None:
     a = norm.apps(raw)[0]
     assert a["herkend_als"] == "media-source-optimizer"
     assert a["images"][0]["tag"] == "1.6.0" and a["images"][0]["digest"] == "sha256:" + "a" * 64
-    assert a["poorten"] == [{"container_poort": 38081, "host_poort": 38081, "host_ip": "0.0.0.0", "protocol": "tcp"}]
+    assert a["poorten"] == [
+        {"container_poort": 38081, "host_poort": 38081, "host_ip": ONGESPECIFICEERD, "protocol": "tcp"}
+    ]
     assert "config" not in a and "geheim" not in str(a)
     assert norm.recognize_app("my-house", []) == "my_house"
     assert norm.recognize_app("onbekend", ["docker.io/x/y:1"]) is None

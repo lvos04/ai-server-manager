@@ -16,6 +16,7 @@ from typing import Any
 import jwt
 import pytest
 from conftest import enroll_body, idem
+from fakes.adressen import documentatieadres
 
 pytestmark = pytest.mark.integration
 
@@ -210,11 +211,11 @@ def test_registeradres_uit_d03_en_gemeten_hostpoort(app: Any, settings: Any, mon
     svc = Service(app_id="home-control-hub", enrolled_via="token")
     with Session(app.state.engine) as db:
         assert registry.service_base_url(db, settings, svc) == (None, "nas_adres_onbekend")
-        monkeypatch.setattr(registry, "nas_address", lambda db: "192.0.2.20")
+        monkeypatch.setattr(registry, "nas_address", lambda db: documentatieadres(20))
         monkeypatch.setattr(registry, "measured_apps", lambda db, s: {"status": "unknown", "data": apps})
         assert registry.service_base_url(db, settings, svc) == (None, "inventaris_niet_actueel")
         monkeypatch.setattr(registry, "measured_apps", lambda db, s: {"status": "ok", "data": apps})
-        assert registry.service_base_url(db, settings, svc) == ("http://192.0.2.20:30421", None)
+        assert registry.service_base_url(db, settings, svc) == (f"http://{documentatieadres(20)}:30421", None)
         svc.truenas_app_name = "andere-naam"
         assert registry.service_base_url(db, settings, svc) == (None, "app_niet_gevonden")
         svc.truenas_app_name = None

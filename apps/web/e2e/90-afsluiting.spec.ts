@@ -3,6 +3,7 @@
  * worker, rolrechten (kijker kan niets wijzigen), client-IP niet te vervalsen via X-Forwarded-For, en nog steeds
  * geen enkele schrijfaanroep tot aan de afzonderlijke proef met één goedgekeurde herstart op de fake NAS.
  */
+import { documentatieAdres } from "../tests/adressen";
 import { expect, request as pwRequest, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { ADMIN, KIND, VIEWER, control, expectAccessible, nasMutations, ready, setNas, shot, stackState } from "./helpers";
@@ -80,7 +81,8 @@ test("rolrechten: beheerder maakt een kijker; de kijker kan niets invullen, mete
   await users.getByRole("button", { name: "Gebruiker aanmaken" }).click();
   await expect(users).toContainText(`Gebruiker ${VIEWER.username} aangemaakt.`);
 
-  const ctx = await browser.newContext({ storageState: undefined, extraHTTPHeaders: { "X-Forwarded-For": "203.0.113.9" } });
+  const opgegevenAdres = documentatieAdres(9);
+  const ctx = await browser.newContext({ storageState: undefined, extraHTTPHeaders: { "X-Forwarded-For": opgegevenAdres } });
   const v = await ctx.newPage();
   await v.goto("/inloggen");
   await v.getByLabel("Gebruikersnaam").fill(VIEWER.username);
@@ -137,7 +139,7 @@ test("rolrechten: beheerder maakt een kijker; de kijker kan niets invullen, mete
   await expect(v).toHaveURL(/\/instellingen\/account$/);
   await ready(v);
   await expect(v.getByTestId("sessies")).toContainText("127.0.0.1");
-  await expect(v.getByTestId("sessies")).not.toContainText("203.0.113.9");
+  await expect(v.getByTestId("sessies")).not.toContainText(opgegevenAdres);
   await ctx.close();
 });
 

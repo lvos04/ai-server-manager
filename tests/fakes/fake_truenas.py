@@ -51,6 +51,8 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 
+from fakes.adressen import ONGESPECIFICEERD
+
 READ_METHODS = {
     "auth.login_with_api_key",
     "auth.me",
@@ -506,7 +508,7 @@ def _app(
         "latest_version": None,
         "image_updates_available": False,
         "metadata": {"app_version": image.rsplit(":", 1)[-1], "name": catalog_app, "train": "stable"},
-        "portals": {"Web UI": f"http://0.0.0.0:{host_port}/"},
+        "portals": {"Web UI": f"http://{ONGESPECIFICEERD}:{host_port}/"},
         "config": {"env": {"SECRET_TOKEN": "mag-nooit-opgehaald-worden"}},
     }
     werklast = {
@@ -515,7 +517,7 @@ def _app(
             {
                 "container_port": container_port,
                 "protocol": "tcp",
-                "host_ports": [{"host_port": host_port, "host_ip": "0.0.0.0"}],
+                "host_ports": [{"host_port": host_port, "host_ip": ONGESPECIFICEERD}],
             }
         ],
         "container_details": [{"service_name": name, "image": image, "state": state.lower()}],

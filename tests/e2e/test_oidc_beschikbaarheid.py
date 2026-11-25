@@ -7,6 +7,7 @@ from conftest import STRONG_PASSWORD, idem
 from e2e import test_oidc_sso
 from e2e.test_oidc_grenzen import noodlogin
 from e2e.test_oidc_sso import NOOD_PW, REDIRECT, _breakglass, enable, fout
+from fakes.adressen import LAN_CLIENT
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
@@ -111,7 +112,7 @@ def test_ontbrekende_nood_totp_laat_lokale_aanmelding_toe(
 
     assert auditregels() == []
     nieuwe_app = create_app(settings)
-    with TestClient(nieuwe_app, base_url="https://testserver", client=("192.168.1.20", 40000)) as lokaal:
+    with TestClient(nieuwe_app, base_url="https://testserver", client=(LAN_CLIENT, 40000)) as lokaal:
         beschikbaar = lokaal.get("/api/v1/auth/oidc/beschikbaar").json()
         assert beschikbaar["ingeschakeld"] and beschikbaar["login_url"] and not beschikbaar["verplicht"]
         assert beschikbaar["reden"] == reden

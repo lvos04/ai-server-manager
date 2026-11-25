@@ -15,6 +15,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+from fakes.adressen import documentatieadres
 
 from executor.app import FORM_MESSAGES
 from executor.hublink import ERRORS_NL, public_status
@@ -115,7 +116,7 @@ BELEID = {"geladen": True, "hash": "sha256:" + "ab" * 32, "read_only": True, "to
 NAS = {
     "ingesteld": True,
     "onleesbaar": False,
-    "nas_adres": "192.0.2.10",
+    "nas_adres": documentatieadres(10),
     "nas_poort": 443,
     "tls_vingerafdruk": "0f" * 32,
     "laatste4": "wxyz",
@@ -160,7 +161,7 @@ def test_met_schrijfsleutel_gezond_en_beheerformulier_zonder_de_sleutel() -> Non
     assert "<code>wxyz</code>" in html
     # Het vastgelegde NAS-adres en certificaat als feit.
     assert 'pil-feit"><svg aria-hidden="true"><use href="#i-feit"/></svg>Vastgelegd' in html
-    assert "192.0.2.10, poort 443; TLS-vingerafdruk (SHA-256) 0F:0F:" in html
+    assert f"{documentatieadres(10)}, poort 443; TLS-vingerafdruk (SHA-256) 0F:0F:" in html
     assert "Een ander adres of certificaat wordt geweigerd." in html
 
 

@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 import uvicorn
 from conftest import idem
+from fakes.adressen import documentatieadres
 
 pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
@@ -229,7 +230,7 @@ def test_formulier_beveiliging_en_throttle(admin: Any, hub: Served, executor: tu
     # De pagina zelf zet same-origin, zodat een browser bij het eigen formulier de echte Origin meestuurt (N-01).
     assert c.get("/").headers["referrer-policy"] == "same-origin"
     # Ongeldige invoer → 422 zonder Hub-aanroep; loopback zonder ontwikkelvlag is in productie verboden
-    assert _submit(c, "http://192.0.2.5:30400/pad", "ABCD-EFGH-JKMN", fp).status_code == 422
+    assert _submit(c, f"http://{documentatieadres(5)}:30400/pad", "ABCD-EFGH-JKMN", fp).status_code == 422
     assert _submit(c, hub.url, "ABCD-EFGH", fp).status_code == 422
     assert _submit(c, hub.url, "ABCD-EFGH-JKMN", "MEGG").status_code == 422
     # Throttle: 5 pogingen per bron-IP per 15 min (de vorige 3 telden mee) → daarna 429

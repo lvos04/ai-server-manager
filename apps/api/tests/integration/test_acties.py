@@ -26,6 +26,7 @@ from actiehelpers import (
 )
 from conftest import idem, login_as, make_user
 from executorhelpers import write_nas
+from fakes.adressen import ONGESPECIFICEERD, ipv4
 from fakes.fake_gotify import FakeGotify
 from fakes.fake_truenas import FakeTrueNAS
 from policyhelpers import DIGEST, install_params
@@ -1454,11 +1455,13 @@ def test_de_toonfunctie_verbergt_niets_wat_de_beheerder_moet_zien(stack: Stack) 
     catalogusapp; een losse naam onder ``env`` ook."""
     p = install_params(
         "demo-g5",
-        portals=[{"name": "Web UI", "scheme": "http", "host": "0.0.0.0", "port": 30555, "path": "/zichtbaar-portal"}],
+        portals=[
+            {"name": "Web UI", "scheme": "http", "host": ONGESPECIFICEERD, "port": 30555, "path": "/zichtbaar-portal"}
+        ],
         labels=[{"key": "x.info", "value": "zichtbaar-label", "containers": []}],
         run_as_custom_user=True,
         run_as={"user": 568, "group": 568},
-        dns_config={"nameservers": ["1.1.1.1"], "searches": [], "options": [{"key": "ndots", "value": "2"}]},
+        dns_config={"nameservers": [ipv4(1, 1, 1, 1)], "searches": [], "options": [{"key": "ndots", "value": "2"}]},
     )
     r = stel_voor(stack.admin, "app.install", app_target("demo-g5"), p)
     assert r.status_code == 201, r.text

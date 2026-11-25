@@ -10,6 +10,7 @@ from typing import Any
 import psycopg
 import pytest
 from conftest import STRONG_PASSWORD
+from fakes.adressen import LAN_CLIENT, documentatieadres, ipv4
 
 from hub import breakglass
 from hub.timeutil import utcnow
@@ -70,7 +71,7 @@ def test_instellen_bevestigen_en_inloggen(admin: Any, app: Any, clean_db: str) -
         )
     assert secret not in dump
     # Voor bevestiging kan de noodlogin niet
-    assert _login(app, "192.168.1.20", _code(secret)).status_code == 401
+    assert _login(app, LAN_CLIENT, _code(secret)).status_code == 401
     # Contract 1.3 §5: een foute code binnen een geldige sessie is 422 invalid_totp, nooit 401 (dat is aanmelden).
     wrong = admin.post("/api/v1/auth/break-glass/confirm", json={"totp": "000000"})
     assert wrong.status_code == 422 and wrong.json()["code"] == "invalid_totp"
@@ -79,11 +80,11 @@ def test_instellen_bevestigen_en_inloggen(admin: Any, app: Any, clean_db: str) -
     assert r.status_code == 200, r.text
     assert r.json()["werkend"] is True and r.json()["oidc_verplicht_mogelijk"] is True
     # Gewone login met het noodaccount kan nooit (TOTP is verplicht)
-    plain = _client(app, "192.168.1.20").post("/api/v1/auth/login", json={"username": "nood", "password": NOOD_PW})
+    plain = _client(app, LAN_CLIENT).post("/api/v1/auth/login", json={"username": "nood", "password": NOOD_PW})
     assert plain.status_code == 401
     # Een al gebruikte code (tijdstap van de bevestiging) wordt geweigerd; de volgende code werkt.
-    assert _login(app, "192.168.1.20", _code(secret)).status_code == 401
-    ok = _login(app, "192.168.1.20", _code(secret, 1))
+    assert _login(app, LAN_CLIENT, _code(secret)).status_code == 401
+    ok = _login(app, LAN_CLIENT, _code(secret, 1))
     assert ok.status_code == 200, ok.text
     body = ok.json()
     assert body["noodlogin"] is True and body["user"]["break_glass"] is True
@@ -99,7 +100,7 @@ def test_instellen_bevestigen_en_inloggen(admin: Any, app: Any, clean_db: str) -
     st = admin.get("/api/v1/auth/break-glass").json()["noodaccount"]
     assert st["rotatie_vereist"] is True and st["laatst_gebruikt"]
     # Noodaccount wijzigt zijn wachtwoord alleen via roteren
-    nood = _client(app, "192.168.1.20")
+    nood = _client(app, LAN_CLIENT)
     nood.cookies.update(ok.cookies)
     nood.headers["X-CSRF-Token"] = body["csrf_token"]
     pw = nood.post("/api/v1/auth/password", json={"huidig_wachtwoord": NOOD_PW, "nieuw_wachtwoord": NOOD_PW + "x"})
@@ -126,17 +127,18 @@ def test_alleen_prive_bronadres_en_rate_limit_per_account_en_ip(admin: Any, app:
     secret = _setup(admin)["totp"]["geheim"]
     assert admin.post("/api/v1/auth/break-glass/confirm", json={"totp": _code(secret)}).status_code == 200
     # Publiek adres: geweigerd, ook met juiste gegevens
-    r = _login(app, "203.0.113.7", _code(secret, 1))
+    r = _login(app, ipv4(203, 0, 113, 7), _code(secret, 1))
     assert r.status_code == 403 and r.json()["code"] == "source_not_private"
     assert _login(app, "127.0.0.1", _code(secret, 1)).status_code == 403
     # Vijf foute pogingen vanaf één LAN-adres blokkeren alleen dat adres, niet het account
+    begrensd_adres = ipv4(192, 168, 1, 66)
     for _ in range(5):
-        assert _login(app, "192.168.1.66", "000000", password="fout-wachtwoord-x").status_code == 401
-    blocked = _login(app, "192.168.1.66", _code(secret, 1))
+        assert _login(app, begrensd_adres, "000000", password="fout-wachtwoord-x").status_code == 401
+    blocked = _login(app, begrensd_adres, _code(secret, 1))
     assert blocked.status_code == 429 and int(blocked.headers["Retry-After"]) >= 1
-    assert _login(app, "10.0.0.8", _code(secret, 1)).status_code == 200
+    assert _login(app, ipv4(10, 0, 0, 8), _code(secret, 1)).status_code == 200
     # Fout wachtwoord met juiste code, of juist wachtwoord met foute code: altijd dezelfde 401
-    assert _login(app, "10.0.0.9", _code(secret, 1), password="x" * 25).json()["code"] == "invalid_credentials"
+    assert _login(app, ipv4(10, 0, 0, 9), _code(secret, 1), password="x" * 25).json()["code"] == "invalid_credentials"
 
 
 def test_zelftest_zonder_mutatie_toont_bron_ip(admin: Any, app: Any, clean_db: str) -> None:
@@ -144,8 +146,8 @@ def test_zelftest_zonder_mutatie_toont_bron_ip(admin: Any, app: Any, clean_db: s
     assert r.status_code == 200, r.text
     checks = {c["naam"]: c for c in r.json()["controles"]}
     assert r.json()["resultaat"] == "niet_ok" and checks["noodaccount"]["status"] == "fout"
-    assert checks["bereik_binnen"]["status"] == "ok" and checks["bereik_buiten"]["adres"] == "192.0.2.10"
-    # De zelftest toont of 100.64.0.0/10 meetelt (standaard niet, contract 1.3 §4.1).
+    assert checks["bereik_binnen"]["status"] == "ok" and checks["bereik_buiten"]["adres"] == documentatieadres(10)
+    # De zelftest toont of het CGNAT-bereik van RFC 6598 meetelt (standaard niet, contract 1.3 §4.1).
     assert checks["bereik_cgnat"]["prive"] is False and checks["bereik_cgnat"]["toegestaan_door_beheerder"] is False
     assert checks["bereik_cgnat"]["status"] == "ok"
     assert checks["bron_ip"]["adres"] == "testclient" and checks["bron_ip"]["prive"] is False
@@ -161,7 +163,7 @@ def test_zelftest_zonder_mutatie_toont_bron_ip(admin: Any, app: Any, clean_db: s
     from sqlalchemy.orm import Session
 
     with Session(app.state.engine) as db:
-        res = gw(db, "172.17.0.1", app.state.vault())
+        res = gw(db, ipv4(172, 17, 0, 1), app.state.vault())
     bron = next(c for c in res["controles"] if c["naam"] == "bron_ip")
     assert bron["lijkt_docker_gateway"] is True and bron["status"] == "waarschuwing" and res["resultaat"] == "ok"
 
@@ -194,13 +196,16 @@ def test_negatieve_gevallen_instellen(admin: Any, app: Any) -> None:
 
 
 def test_cgnat_standaard_niet_prive_en_alleen_beheerder_kan_het_toestaan(admin: Any, app: Any, clean_db: str) -> None:
-    """C1.3-ASM-05: 100.64.0.0/10 (CGNAT, ook Tailscale) telt standaard niet als privé; een beheerder kan het in de
-    Hub-UI toestaan (audit + waarschuwing); de zelftest toont het. Geen action_id: alleen deze beheerroute."""
+    """C1.3-ASM-05 controleert het CGNAT-bereik uit RFC 6598 (ook Tailscale).
+
+    De Hub weigert het standaard. Alleen de beheerroute kan het toestaan. Audit, waarschuwing en zelftest volgen.
+    """
     from conftest import idem
 
     secret = _setup(admin)["totp"]["geheim"]
     assert admin.post("/api/v1/auth/break-glass/confirm", json={"totp": _code(secret)}).status_code == 200
-    r = _login(app, "100.64.12.34", _code(secret, 1))
+    cgnat_adres = ipv4(100, 64, 12, 34)
+    r = _login(app, cgnat_adres, _code(secret, 1))
     assert r.status_code == 403 and r.json()["code"] == "source_not_private"
     st = admin.get("/api/v1/auth/break-glass").json()["cgnat"]
     assert st["toegestaan"] is False and "Tailscale niet met anderen deelt" in st["waarschuwing"]
@@ -211,18 +216,18 @@ def test_cgnat_standaard_niet_prive_en_alleen_beheerder_kan_het_toestaan(admin: 
     assert r.json()["cgnat"]["toegestaan"] is True and r.json()["cgnat"]["gewijzigd_door"] == "beheerder"
     checks = {c["naam"]: c for c in admin.post("/api/v1/auth/break-glass/selftest").json()["controles"]}
     assert checks["bereik_cgnat"]["prive"] is True and checks["bereik_cgnat"]["toegestaan_door_beheerder"] is True
-    ok = _login(app, "100.64.12.34", _code(secret, 1))
+    ok = _login(app, cgnat_adres, _code(secret, 1))
     assert ok.status_code == 200, ok.text
     # Weer uit: direct weer geweigerd.
     admin.put("/api/v1/auth/break-glass/cgnat", json={"toestaan": False}, headers=idem())
-    assert _login(app, "100.64.12.35", _code(secret, 2)).status_code == 403
+    assert _login(app, ipv4(100, 64, 12, 35), _code(secret, 2)).status_code == 403
     with psycopg.connect(clean_db) as conn:
         acties = [r[0] for r in conn.execute("SELECT action FROM audit_event ORDER BY id").fetchall()]
     assert "auth.break_glass.cgnat_toegestaan" in acties and acties.index("auth.break_glass.cgnat_uit") > acties.index(
         "auth.break_glass.cgnat_toegestaan"
     )
     # Alleen een beheerder: een kijker of anoniem kan het niet.
-    assert _client(app, "192.168.1.20").put("/api/v1/auth/break-glass/cgnat", json={"toestaan": True}).status_code in (
+    assert _client(app, LAN_CLIENT).put("/api/v1/auth/break-glass/cgnat", json={"toestaan": True}).status_code in (
         401,
         403,
     )

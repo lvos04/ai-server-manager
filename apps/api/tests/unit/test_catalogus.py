@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from fakes.adressen import ADRES_MET_VOORLOOPNUL, LINKLOCAL_METADATA, ONGESPECIFICEERD, documentatieadres
 
 from hub.actions.beleid import appbeleid
 from hub.adapters.health import stored_health
@@ -71,7 +72,7 @@ def test_herkenning_exact_voor_voorvoegsel(name: str, image: str, expected: str 
 
 
 def test_portals_nemen_host_nooit_over() -> None:
-    out = norm.portals({"Web UI": "http://0.0.0.0:30080/ui", "kapot": "ftp://x", "zonder": 5})
+    out = norm.portals({"Web UI": f"http://{ONGESPECIFICEERD}:30080/ui", "kapot": "ftp://x", "zonder": 5})
     assert out == [{"naam": "Web UI", "schema": "http", "poort": 30080, "pad": "/ui"}]
 
 
@@ -140,7 +141,7 @@ def _row(**kw: Any) -> Any:
 def test_deep_link_alleen_met_d03_en_uit_portal_of_hostpoort() -> None:
     row = _row(portals=[{"naam": "Web UI", "schema": "http", "poort": 30101, "pad": "/"}])
     assert deep_link(row, None) == {"url": None, "reden": "nas_adres_onbekend"}
-    assert deep_link(row, "192.0.2.10")["url"] == "http://192.0.2.10:30101/"
+    assert deep_link(row, documentatieadres(10))["url"] == f"http://{documentatieadres(10)}:30101/"
     ports = [
         {"container_poort": 38989, "host_poort": 38989, "protocol": "tcp"},
         {"container_poort": 30080, "host_poort": 31080, "protocol": "tcp"},
@@ -368,14 +369,14 @@ def test_statuswaarde_voor_tijdreeks() -> None:
         ("http://nas:3001/?x=1", "adres_ongeldig"),
         ("http://127.0.0.1:3001", "adres_niet_toegestaan"),
         ("http://localhost:3001", "adres_niet_toegestaan"),
-        ("http://169.254.169.254", "adres_niet_toegestaan"),
+        (f"http://{LINKLOCAL_METADATA}", "adres_niet_toegestaan"),
         ("http://[fe80::1]:80", "adres_niet_toegestaan"),
-        ("http://0.0.0.0:80", "adres_niet_toegestaan"),
+        (f"http://{ONGESPECIFICEERD}:80", "adres_niet_toegestaan"),
         # Contract 1.3 §3.2: alleen canonieke IP-vormen; IPv6 alleen tussen [].
         ("http://127.1:3001", "adres_ongeldig"),
         ("http://2130706433", "adres_ongeldig"),
         ("http://0x7f000001", "adres_ongeldig"),
-        ("http://010.0.0.1", "adres_ongeldig"),
+        (f"http://{ADRES_MET_VOORLOOPNUL}", "adres_ongeldig"),
         ("http://0", "adres_ongeldig"),
         ("http://localhost.:3001", "adres_niet_toegestaan"),
         ("http://[::ffff:127.0.0.1]:80", "adres_niet_toegestaan"),
@@ -389,6 +390,6 @@ def test_uitgaande_adressen_streng(url: str, reason: str) -> None:
 
 
 def test_uitgaand_adres_toegestaan_en_loopback_alleen_met_vlag() -> None:
-    assert validate_base_url("http://192.0.2.10:3001/") == "http://192.0.2.10:3001"
+    assert validate_base_url(f"http://{documentatieadres(10)}:3001/") == f"http://{documentatieadres(10)}:3001"
     assert validate_base_url("https://kuma.lan/status") == "https://kuma.lan/status"
     assert validate_base_url("http://127.0.0.1:3001", allow_loopback=True) == "http://127.0.0.1:3001"

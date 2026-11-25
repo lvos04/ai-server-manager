@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from conftest import enroll_body, idem, login_as, make_user
+from fakes.adressen import documentatieadres
 
 pytestmark = pytest.mark.integration
 
@@ -132,13 +133,13 @@ def test_besluit_statusovergangen(admin: Any) -> None:
     assert bad.status_code == 422 and bad.json()["details"]["fouten"]
     ok = admin.put(
         "/api/v1/decisions/D03/waarde",
-        json={"waarde": {"nas_adres": "192.0.2.20"}},
+        json={"waarde": {"nas_adres": documentatieadres(20)}},
         headers={**idem(), "If-Match": etag},
     )
     assert ok.status_code == 200 and ok.json()["status"] == "Ingevuld" and ok.json()["waarde_bron"] == "gebruiker"
     stale = admin.put(
         "/api/v1/decisions/D03/waarde",
-        json={"waarde": {"nas_adres": "192.0.2.21"}},
+        json={"waarde": {"nas_adres": documentatieadres(21)}},
         headers={**idem(), "If-Match": etag},
     )
     assert stale.status_code == 412
@@ -150,7 +151,7 @@ def test_besluit_statusovergangen(admin: Any) -> None:
     }
     r = admin.post("/api/v1/decisions/D03/bewijs", json=ev, headers=idem())
     assert r.json()["status"] == "Getest" and r.json()["bewijs"][0]["bron"] == "gebruiker"
-    r = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.22"}}, headers=idem())
+    r = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": documentatieadres(22)}}, headers=idem())
     assert r.json()["status"] == "Ingevuld" and r.json()["getest_op"] is None
     r = admin.post(
         "/api/v1/decisions/D01/status", json={"status": "N.v.t.", "reden": "niet van toepassing"}, headers=idem()
@@ -169,12 +170,12 @@ def test_besluit_statusovergangen(admin: Any) -> None:
 
 def test_idempotency_replay_voert_niet_twee_keer_uit(admin: Any) -> None:
     key = idem()
-    body = {"waarde": {"nas_adres": "192.0.2.30"}}
+    body = {"waarde": {"nas_adres": documentatieadres(30)}}
     r1 = admin.put("/api/v1/decisions/D03/waarde", json=body, headers=key)
     r2 = admin.put("/api/v1/decisions/D03/waarde", json=body, headers=key)
     assert r1.json() == r2.json() and r2.headers["Idempotent-Replay"] == "true"
     assert admin.get("/api/v1/decisions/D03").json()["version"] == r1.json()["version"]
-    r3 = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.31"}}, headers=key)
+    r3 = admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": documentatieadres(31)}}, headers=key)
     assert r3.status_code == 422 and r3.json()["code"] == "idempotency_key_reused"
     assert (
         admin.put("/api/v1/decisions/D03/waarde", json=body, headers={"Idempotency-Key": "geen-uuid"}).status_code
@@ -219,7 +220,7 @@ def test_d05_getest_vereist_hersteltests(admin: Any) -> None:
 
 
 def test_audit_spoor(admin: Any) -> None:
-    admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": "192.0.2.40"}}, headers=idem())
+    admin.put("/api/v1/decisions/D03/waarde", json={"waarde": {"nas_adres": documentatieadres(40)}}, headers=idem())
     items = admin.get("/api/v1/audit").json()["items"]
     actions = [i["actie"] for i in items]
     assert "decision.value_set" in actions and "setup.admin_created" in actions

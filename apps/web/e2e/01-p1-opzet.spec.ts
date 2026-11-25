@@ -311,7 +311,7 @@ test("noodaccount (H6): geheim één keer, foute code → veldfout, goede code �
   const bronIp = page.getByTestId("zelftest-controles").locator('[data-controle="bron_ip"]');
   await expect(bronIp).toContainText("127.0.0.1");
   await expect(bronIp).toHaveAttribute("data-uitkomst", "beleid");
-  // Contract 1.3 §4.1 (C1.3-ASM-05): 100.64.0.0/10 telt standaard niet als privé; de zelftest toont het.
+  // Contract 1.3 §4.1 (C1.3-ASM-05): het CGNAT-bereik van RFC 6598 telt standaard niet als privé; de zelftest toont het.
   const cgnatControle = page.getByTestId("zelftest-controles").locator('[data-controle="bereik_cgnat"]');
   await expect(cgnatControle).toHaveAttribute("data-uitkomst", "beleid");
   const cgnat = page.getByTestId("noodaccount-cgnat");

@@ -19,6 +19,7 @@ from typing import Any
 
 import jwt
 
+from fakes.adressen import documentatieadres
 from fakes.fake_http import FakeHTTP, Reply, Seen
 
 GIB = 1024**3
@@ -169,7 +170,13 @@ class FakeBeszel(FakeHTTP):
         self.tokens: set[str] = set()
         self.systems: list[dict[str, Any]] = [
             {"id": "nas000000000001", "name": "truenas", "host": "127.0.0.1", "port": "45876", "status": "up"},
-            {"id": "mini00000000001", "name": "mini-pc", "host": "192.0.2.50", "port": "45876", "status": "up"},
+            {
+                "id": "mini00000000001",
+                "name": "mini-pc",
+                "host": documentatieadres(50),
+                "port": "45876",
+                "status": "up",
+            },
         ]
         now = datetime.now(UTC)
         self.stats: dict[str, dict[str, Any]] = {

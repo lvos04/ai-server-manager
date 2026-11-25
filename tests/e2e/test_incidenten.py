@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from conftest import STRONG_PASSWORD, idem, login_as, make_user
 from eventhelpers import active, event, post, service
+from fakes.adressen import LAN_CLIENT
 from fakes.fake_gotify import FakeGotify
 from fakes.fake_monitoring import FakeUptimeKuma
 from sqlalchemy import func, select
@@ -306,7 +307,7 @@ def test_noodlogin_wordt_kritiek_incident_en_sluit_na_rotatie(admin: Any, app: A
     secret = r.json()["totp"]["geheim"]
     code = breakglass.totp_at(secret, breakglass.time_step(utcnow()))
     admin.post("/api/v1/auth/break-glass/confirm", json={"totp": code}).raise_for_status()
-    nood = TestClient(app, base_url="https://testserver", client=("192.168.1.20", 40000))
+    nood = TestClient(app, base_url="https://testserver", client=(LAN_CLIENT, 40000))
     code2 = breakglass.totp_at(secret, breakglass.time_step(utcnow()) + 1)
     r = nood.post(
         "/api/v1/auth/break-glass/login",

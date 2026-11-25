@@ -14,6 +14,7 @@ from typing import Any
 import psycopg
 import pytest
 from conftest import enroll_body, idem, login_as, make_user
+from fakes.adressen import documentatieadres
 from fakes.fake_monitoring import FakeBeszel, FakeDienst, FakeUptimeKuma, nas_stats
 from fakes.fake_truenas import FakeTrueNAS, _app
 from monitorhulp import bevestig_monitor
@@ -170,7 +171,7 @@ def test_uptime_kuma_koppelt_monitors_en_wordt_onbekend_bij_veroudering_of_inget
 
 def test_kuma_zonder_monitor_id_en_validatie(admin: Any, kuma: FakeUptimeKuma) -> None:
     kuma.with_ids = False  # oudere Uptime Kuma: sleutel op naam
-    kuma.add(1, 'Rare "naam" \\ met tekens', url="http://192.0.2.9:80/")
+    kuma.add(1, 'Rare "naam" \\ met tekens', url=f"http://{documentatieadres(9)}:80/")
     src = _source(admin, {"soort": "uptime_kuma", "naam": "Oud", "basis_url": kuma.url, "api_key": KEY})
     admin.post(f"/api/v1/monitoring/sources/{src['id']}/test", headers=idem()).raise_for_status()
     mons = admin.get(f"/api/v1/monitoring/sources/{src['id']}").json()["monitors"]

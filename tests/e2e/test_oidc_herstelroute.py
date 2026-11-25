@@ -8,6 +8,7 @@ from conftest import idem
 from e2e import test_oidc_sso
 from e2e.test_oidc_grenzen import body, noodlogin
 from e2e.test_oidc_sso import NOOD_PW, _breakglass, enable, fout, sso_login
+from fakes.adressen import LAN_CLIENT
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -121,7 +122,7 @@ def _roteer_noodaccount(nood: TestClient) -> str:
 
 
 def _bevestig_rotatie_via_noodlogin(app: Any, sso: TestClient, nieuw_totp: str) -> None:
-    nieuw = TestClient(app, base_url="https://testserver", client=("192.168.1.20", 40001))
+    nieuw = TestClient(app, base_url="https://testserver", client=(LAN_CLIENT, 40001))
     gegevens = {
         "username": "nood",
         "password": NOOD_PW + "-rotatie",

@@ -17,6 +17,7 @@ from e2e.test_oidc_sso import (
     enable,
     sso_login,
 )
+from fakes.adressen import LAN_CLIENT, documentatieadres
 from fakes.fake_oidc import FakeOidc
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
@@ -60,7 +61,7 @@ def unchanged(app: Any) -> tuple[Any, ...]:
 
 
 def noodlogin(app: Any, secret: str, offset: int = 1) -> TestClient:
-    c = TestClient(app, base_url="https://testserver", client=("192.168.1.20", 40000))
+    c = TestClient(app, base_url="https://testserver", client=(LAN_CLIENT, 40000))
     code = breakglass.totp_at(secret, breakglass.time_step(utcnow()) + offset)
     r = c.post(
         "/api/v1/auth/break-glass/login",
@@ -215,8 +216,8 @@ def test_bestaand_totp_na_clientinvoer(admin: Any, app: Any, idp: FakeOidc) -> N
 
 @pytest.mark.parametrize("trusted", [False, True])
 def test_geheim_volgt_alleen_vertrouwde_proxy(admin: Any, app: Any, idp: FakeOidc, trusted: bool) -> None:
-    proxy = ProxyHeadersMiddleware(app, trusted_hosts=["192.0.2.10"] if trusted else ["127.0.0.1"])
-    c = TestClient(proxy, base_url="http://testserver", client=("192.0.2.10", 40000))
+    proxy = ProxyHeadersMiddleware(app, trusted_hosts=[documentatieadres(10)] if trusted else ["127.0.0.1"])
+    c = TestClient(proxy, base_url="http://testserver", client=(documentatieadres(10), 40000))
     c.cookies.set("hub_session", admin.cookies.get("hub_session"))
     r = c.put(
         "/api/v1/auth/oidc",

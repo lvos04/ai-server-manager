@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 from conftest import idem, login_as, make_user
+from fakes.adressen import LINKLOCAL_METADATA
 from fakes.fake_gotify import FakeGotify
 from fakes.fake_truenas import FakeTrueNAS
 from nashelpers import connect, refresh
@@ -63,7 +64,7 @@ def test_kanaal_beheren_testmelding_echt_en_token_nooit_terug(admin: Any, app: A
     # Adresregels: geen inloggegevens in de URL, geen link-local.
     bad = admin.post(
         "/api/v1/notifications/channels",
-        json={"naam": "x", "basis_url": "http://169.254.169.254", "token": TOKEN},
+        json={"naam": "x", "basis_url": f"http://{LINKLOCAL_METADATA}", "token": TOKEN},
         headers=idem(),
     )
     assert bad.status_code == 422 and bad.json()["details"]["reden"] == "adres_niet_toegestaan"

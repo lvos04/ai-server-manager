@@ -16,6 +16,7 @@ import psycopg
 import pytest
 from conftest import STRONG_PASSWORD, enroll_body, idem, login_as, make_user
 from eventhelpers import event, post, service
+from fakes.adressen import LAN_CLIENT
 from fakes.fake_oidc import FakeHchSso, FakeOidc
 from fastapi.testclient import TestClient
 
@@ -323,7 +324,7 @@ def test_noodlogin_blijft_werken_en_oidc_verplicht(admin: Any, app: Any, idp: Fa
     idp.stop()
     _, resp = sso_login(app, idp)
     assert fout(resp) == "token_onbereikbaar"
-    nood = TestClient(app, base_url="https://testserver", client=("192.168.1.20", 40000))
+    nood = TestClient(app, base_url="https://testserver", client=(LAN_CLIENT, 40000))
     code = breakglass.totp_at(secret, breakglass.time_step(utcnow()) + 1)
     r = nood.post("/api/v1/auth/break-glass/login", json={"username": "nood", "password": NOOD_PW, "totp": code})
     assert r.status_code == 200 and r.json()["noodlogin"] is True

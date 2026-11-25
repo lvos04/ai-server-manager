@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from fakes.adressen import ONGESPECIFICEERD
 from policyhelpers import DIGEST, DIGEST_B, HOST, POLICY_DIR, approval_for, execution_request, install_params, proposal
 
 from asm_policy import PolicyError, execreq, load_policy, policy_hash
@@ -1671,7 +1672,7 @@ def test_vrije_tekst_in_catalogusapp_waarden_blijft_toegestaan() -> None:
     ix = install_params(
         hostname="runtime",
         notes="--privileged staat uit; zie /etc:/x",
-        portals=[{"name": "web", "scheme": "http", "host": "0.0.0.0", "port": 30555, "path": "/"}],
+        portals=[{"name": "web", "scheme": "http", "host": ONGESPECIFICEERD, "port": 30555, "path": "/"}],
         labels=[{"key": "toelichting", "value": "/usr/bin:/bin", "containers": ["demo-app"]}],
     )
     assert validate_parameters(POLICY, POLICY.acties["app.install"], APP, ix) == []
@@ -1722,7 +1723,7 @@ OPDRACHTEN_IX_APP = [
     pytest.param("command", ["gunicorn", "--pid", "/tmp/g.pid", "app:app"], id="gunicorn_pid"),
     pytest.param("command", ["mytool", "--privileged"], id="eigen_vlag_privileged"),
     pytest.param("command", ["lsblk", "--devices"], id="lsblk_devices"),
-    pytest.param("entrypoint", ["/bin/sh", "-c", "exec /app/run --listen 0.0.0.0:8080"], id="sh_c"),
+    pytest.param("entrypoint", ["/bin/sh", "-c", f"exec /app/run --listen {ONGESPECIFICEERD}:8080"], id="sh_c"),
 ]
 
 

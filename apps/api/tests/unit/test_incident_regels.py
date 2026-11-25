@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from fakes.adressen import LAN_CLIENT, ipv4
 
 from hub import APP_ID
 from hub.incidents.rules import EventIn, classify
@@ -30,7 +31,7 @@ def ev(
 @pytest.mark.parametrize(
     ("text", "absent", "present"),
     [
-        ("van 192.168.1.20 en 8.8.8.8", ["192.168.1.20", "8.8.8.8"], ["[ip-privé]", "[ip-publiek]"]),
+        (f"van {LAN_CLIENT} en {ipv4(8, 8, 8, 8)}", [LAN_CLIENT, ipv4(8, 8, 8, 8)], ["[ip-privé]", "[ip-publiek]"]),
         ("lokaal 127.0.0.1 en fe80::1", ["127.0.0.1", "fe80::1"], ["[ip-lokaal]"]),
         ("tijd 12:30:45 blijft", [], ["12:30:45"]),
         ("Authorization: Bearer abcdefghijklmnop", ["abcdefghijklmnop"], []),
@@ -77,7 +78,7 @@ def test_vaste_set_tokens_met_veel_scheidingstekens() -> None:
 
 
 def test_velden_en_grenzen() -> None:
-    out = redact_log_value({"token": "x" * 10, "wachtwoord": "geheim", "nested": {"ip": "10.0.0.1"}, "ok": True})
+    out = redact_log_value({"token": "x" * 10, "wachtwoord": "geheim", "nested": {"ip": ipv4(10, 0, 0, 1)}, "ok": True})
     assert out == {"token": "***", "wachtwoord": "***", "nested": {"ip": "[ip-privé]"}, "ok": True}
     assert len(redact_log_text("z " * 2500)) == 2000
     assert len(redact_log_value(list(range(100)))) == 50

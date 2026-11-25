@@ -1,3 +1,4 @@
+import { documentatieAdres } from "../adressen";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- JavaScript-module van de webserver (zonder typedeclaraties)
 import { MAX_BODY_BYTES, bodyCounter, declaredTooLarge, downstreamHeaders, isApiPath, normalizeIp, parseTrusted, payloadTooLargeBody, unavailableBody, upstreamHeaders } from "../../server/proxy.mjs";
@@ -9,11 +10,13 @@ describe("API-doorgang van de webserver", () => {
   });
 
   it("vervalste X-Forwarded-* van de client worden genegeerd; het echte adres wordt gezet", () => {
+    const opgegeven = documentatieAdres(9);
+    const client = documentatieAdres(10);
     const h = upstreamHeaders(
-      { host: "nas:30400", "x-forwarded-for": "203.0.113.9", "x-forwarded-proto": "https", forwarded: "for=1.2.3.4", cookie: "a=b", connection: "keep-alive" },
-      { remoteAddress: "::ffff:192.0.2.10", encrypted: false, trusted: new Set() },
+      { host: "nas:30400", "x-forwarded-for": opgegeven, "x-forwarded-proto": "https", forwarded: `for=${documentatieAdres(4)}`, cookie: "a=b", connection: "keep-alive" },
+      { remoteAddress: `::ffff:${client}`, encrypted: false, trusted: new Set() },
     );
-    expect(h["x-forwarded-for"]).toBe("192.0.2.10");
+    expect(h["x-forwarded-for"]).toBe(client);
     expect(h["x-forwarded-proto"]).toBe("http");
     expect(h["x-forwarded-host"]).toBe("nas:30400");
     expect(h.forwarded).toBeUndefined();
@@ -22,11 +25,13 @@ describe("API-doorgang van de webserver", () => {
   });
 
   it("een expliciet vertrouwde reverse proxy mag de keten en https doorgeven", () => {
+    const client = documentatieAdres(7);
+    const proxy = documentatieAdres(1);
     const h = upstreamHeaders(
-      { "x-forwarded-for": "198.51.100.7", "x-forwarded-proto": "https" },
-      { remoteAddress: "192.0.2.1", encrypted: false, trusted: parseTrusted(" 192.0.2.1 ,") },
+      { "x-forwarded-for": client, "x-forwarded-proto": "https" },
+      { remoteAddress: proxy, encrypted: false, trusted: parseTrusted(` ${proxy} ,`) },
     );
-    expect(h["x-forwarded-for"]).toBe("198.51.100.7, 192.0.2.1");
+    expect(h["x-forwarded-for"]).toBe(`${client}, ${proxy}`);
     expect(h["x-forwarded-proto"]).toBe("https");
   });
 

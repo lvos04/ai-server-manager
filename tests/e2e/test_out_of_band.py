@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from conftest import idem, login_as, make_user
+from fakes.adressen import ipv4
 from fakes.fake_gotify import FakeGotify
 from fakes.fake_monitoring import FakeUptimeKuma
 from fakes.fake_truenas import FakeTrueNAS, _app
@@ -95,7 +96,7 @@ def test_ex22_kuma_meldt_zonder_hub_en_hub_zit_niet_in_het_pad(
 def test_ex23_geen_claim_zonder_externe_host_en_bevestiging_alleen_handmatig(admin: Any, app: Any) -> None:
     admin.put(
         "/api/v1/decisions/D03/waarde",
-        json={"waarde": {"nas_adres": "10.20.30.40", "https_poort": 443}},
+        json={"waarde": {"nas_adres": ipv4(10, 20, 30, 40), "https_poort": 443}},
         headers=idem(),
     ).raise_for_status()
     st = admin.get("/api/v1/monitoring/out-of-band").json()
@@ -104,7 +105,12 @@ def test_ex23_geen_claim_zonder_externe_host_en_bevestiging_alleen_handmatig(adm
     # Kuma op het NAS-adres → bij NAS-uitval meldt niemand iets.
     on_nas = admin.post(
         "/api/v1/monitoring/sources",
-        json={"soort": "uptime_kuma", "naam": "Kuma", "basis_url": "http://10.20.30.40:3001", "api_key": KEY},
+        json={
+            "soort": "uptime_kuma",
+            "naam": "Kuma",
+            "basis_url": f"http://{ipv4(10, 20, 30, 40)}:3001",
+            "api_key": KEY,
+        },
         headers=idem(),
     ).json()
     st = admin.get("/api/v1/monitoring/out-of-band").json()
@@ -114,7 +120,9 @@ def test_ex23_geen_claim_zonder_externe_host_en_bevestiging_alleen_handmatig(adm
     assert st["hub_uitval"]["status"] == "hiaat"  # Kuma bewaakt de Hub (nog) niet
     # Kuma op een ander adres: hooguit 'extern_onbevestigd', nooit 'gedekt'.
     admin.patch(
-        f"/api/v1/monitoring/sources/{on_nas['id']}", json={"basis_url": "http://10.99.0.5:3001"}, headers=idem()
+        f"/api/v1/monitoring/sources/{on_nas['id']}",
+        json={"basis_url": f"http://{ipv4(10, 99, 0, 5)}:3001"},
+        headers=idem(),
     ).raise_for_status()
     st = admin.get("/api/v1/monitoring/out-of-band").json()
     assert (

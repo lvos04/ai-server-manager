@@ -45,6 +45,7 @@ from executorhelpers import (
     write_nas,
 )
 from executorhelpers import client as hub_client
+from fakes.adressen import documentatieadres
 from fakes.fake_truenas import FakeTrueNAS, KeyProfile
 from fastapi.testclient import TestClient
 from policyhelpers import HOST, approval_for, execution_request, proposal
@@ -513,14 +514,16 @@ def test_nas_adres_uit_het_adres_van_de_pagina(tmp_path: Path, monkeypatch: pyte
         assert r.status_code == 409 and code_van(r) == "nas_adres_onbekend", base
     assert gezien == []
 
-    c = TestClient(create_app(hub.settings), base_url="http://192.0.2.10:30410")  # documentatie-adres (RFC 5737)
+    c = TestClient(
+        create_app(hub.settings), base_url=f"http://{documentatieadres(10)}:30410"
+    )  # documentatie-adres (RFC 5737)
     r = post(c, SLEUTEL, {"truenas_sleutel": WRITE_KEY})
     assert r.status_code == 200 and display_fingerprint("ab" * 32) in r.text, r.text
-    assert gezien == [("vingerafdruk", "192.0.2.10", 443)]
+    assert gezien == [("vingerafdruk", documentatieadres(10), 443)]
     r = post(c, SLEUTEL, {"truenas_sleutel": WRITE_KEY})
     assert r.status_code == 200 and "getest en opgeslagen" in r.text, r.text
-    assert gezien[-1] == ("test", "192.0.2.10", 443, "ab" * 32)
-    assert status(c)["truenas"] == {"adres": "192.0.2.10", "poort": 443, "tls_vingerafdruk": "ab" * 32}
+    assert gezien[-1] == ("test", documentatieadres(10), 443, "ab" * 32)
+    assert status(c)["truenas"] == {"adres": documentatieadres(10), "poort": 443, "tls_vingerafdruk": "ab" * 32}
 
 
 def test_ander_adres_tijdens_de_bevestiging_begint_opnieuw(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -530,7 +533,7 @@ def test_ander_adres_tijdens_de_bevestiging_begint_opnieuw(tmp_path: Path, monke
 
     def fake_fingerprint(host: str, port: int, *, timeout: float = 5.0) -> str:
         gezien.append(("vingerafdruk", host))
-        return ("ab" if host == "192.0.2.10" else "cd") * 32
+        return ("ab" if host == documentatieadres(10) else "cd") * 32
 
     def fake_verify(host: str, port: int, fingerprint: str, api_key: str, *, timeout: float = 15.0) -> Any:
         gezien.append(("test", host))
@@ -538,12 +541,12 @@ def test_ander_adres_tijdens_de_bevestiging_begint_opnieuw(tmp_path: Path, monke
 
     monkeypatch.setattr(executor_app, "fetch_fingerprint", fake_fingerprint)
     monkeypatch.setattr(executor_app, "verify_key", fake_verify)
-    een = TestClient(create_app(hub.settings), base_url="http://192.0.2.10:30410")
-    twee = TestClient(create_app(hub.settings), base_url="http://192.0.2.20:30410")
+    een = TestClient(create_app(hub.settings), base_url=f"http://{documentatieadres(10)}:30410")
+    twee = TestClient(create_app(hub.settings), base_url=f"http://{documentatieadres(20)}:30410")
     assert post(een, SLEUTEL, {"truenas_sleutel": WRITE_KEY}).status_code == 200
     r = post(twee, SLEUTEL, {"truenas_sleutel": WRITE_KEY})
     assert r.status_code == 200 and display_fingerprint("cd" * 32) in r.text
-    assert gezien == [("vingerafdruk", "192.0.2.10"), ("vingerafdruk", "192.0.2.20")]
+    assert gezien == [("vingerafdruk", documentatieadres(10)), ("vingerafdruk", documentatieadres(20))]
     assert status(twee)["schrijfsleutel"]["ingesteld"] is False
 
 
@@ -953,7 +956,7 @@ def test_na_wissen_van_de_sleutel_blijven_adres_en_vingerafdruk_vast(hub: Hub, n
     assert store.vastgelegd() == (NAS_HOST, nas.port, vinger) and not store.configured()
     for host, port, vingerafdruk in (
         (NAS_HOST, nas.port + 1, vinger),
-        ("192.0.2.9", nas.port, vinger),
+        (documentatieadres(9), nas.port, vinger),
         (NAS_HOST, nas.port, "0" * 64),
     ):
         with pytest.raises(NasLinkOnleesbaar):

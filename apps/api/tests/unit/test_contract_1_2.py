@@ -13,6 +13,7 @@ from typing import Any
 
 import jwt
 import pytest
+from fakes.adressen import LAN_CLIENT, documentatieadres, ipv4
 
 from hub import breakglass
 from hub.firststart import ensure_secrets
@@ -109,19 +110,19 @@ def test_totp_verificatie_venster_en_eenmalig() -> None:
 @pytest.mark.parametrize(
     ("ip", "private"),
     [
-        ("10.1.2.3", True),
-        ("172.16.0.5", True),
-        ("172.31.255.1", True),
-        ("192.168.1.20", True),
-        ("100.64.0.1", False),  # contract 1.3 §4.1: CGNAT (ook Tailscale) standaard niet privé
-        ("100.127.255.254", False),
+        (ipv4(10, 1, 2, 3), True),
+        (ipv4(172, 16, 0, 5), True),
+        (ipv4(172, 31, 255, 1), True),
+        (LAN_CLIENT, True),
+        (ipv4(100, 64, 0, 1), False),  # contract 1.3 §4.1: CGNAT (ook Tailscale) standaard niet privé
+        (ipv4(100, 127, 255, 254), False),
         ("fd12:3456::1", True),
-        ("::ffff:192.168.1.20", True),
-        ("172.32.0.1", False),
-        ("8.8.8.8", False),
-        ("192.0.2.10", False),
+        (f"::ffff:{LAN_CLIENT}", True),
+        (ipv4(172, 32, 0, 1), False),
+        (ipv4(8, 8, 8, 8), False),
+        (documentatieadres(10), False),
         ("127.0.0.1", False),
-        ("169.254.1.1", False),
+        (ipv4(169, 254, 1, 1), False),
         ("fe80::1", False),
         ("2001:db8::1", False),
         ("testclient", False),
@@ -133,19 +134,19 @@ def test_prive_bereiken(ip: str, private: bool) -> None:
 
 
 def test_cgnat_alleen_als_een_beheerder_het_toestaat() -> None:
-    """C1.3-ASM-05: 100.64.0.0/10 telt alleen mee met de beheerinstelling; andere bereiken veranderen niet."""
-    assert breakglass.is_private_source("100.64.0.1", allow_cgnat=True)
-    assert breakglass.is_private_source("::ffff:100.100.1.1", allow_cgnat=True)
-    assert not breakglass.is_private_source("100.128.0.1", allow_cgnat=True)  # buiten /10
-    assert not breakglass.is_private_source("203.0.113.7", allow_cgnat=True)
+    """C1.3-ASM-05: de beheerinstelling geldt uitsluitend voor het CGNAT-bereik van RFC 6598."""
+    assert breakglass.is_private_source(ipv4(100, 64, 0, 1), allow_cgnat=True)
+    assert breakglass.is_private_source(f"::ffff:{ipv4(100, 100, 1, 1)}", allow_cgnat=True)
+    assert not breakglass.is_private_source(ipv4(100, 128, 0, 1), allow_cgnat=True)  # buiten /10
+    assert not breakglass.is_private_source(ipv4(203, 0, 113, 7), allow_cgnat=True)
     assert not breakglass.is_private_source("127.0.0.1", allow_cgnat=True)
 
 
 def test_docker_gateway_heuristiek() -> None:
-    assert breakglass.looks_like_docker_gateway("172.17.0.1")
-    assert breakglass.looks_like_docker_gateway("172.18.0.1")
-    assert not breakglass.looks_like_docker_gateway("172.17.0.5")
-    assert not breakglass.looks_like_docker_gateway("192.168.1.1")
+    assert breakglass.looks_like_docker_gateway(ipv4(172, 17, 0, 1))
+    assert breakglass.looks_like_docker_gateway(ipv4(172, 18, 0, 1))
+    assert not breakglass.looks_like_docker_gateway(ipv4(172, 17, 0, 5))
+    assert not breakglass.looks_like_docker_gateway(ipv4(192, 168, 1, 1))
 
 
 # ------------------------------------------------------------------ register (H14)
@@ -171,7 +172,7 @@ class _Handler(BaseHTTPRequestHandler):
         _Handler.calls.append({"path": self.path, "headers": dict(self.headers), "body": self.rfile.read(length)})
         if self.path == "/redirect":
             self.send_response(302)
-            self.send_header("Location", "http://192.0.2.1/elders")
+            self.send_header("Location", f"http://{documentatieadres(1)}/elders")
             self.end_headers()
             return
         payload = json.dumps({"code": "unauthorized", "details": {"reason": "not_linked"}}).encode()
@@ -197,7 +198,7 @@ def server() -> Iterator[str]:
 
 
 def test_dienstaanroep_volgt_geen_redirect_en_leest_reden(server: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HTTP_PROXY", "http://192.0.2.99:9")  # proxy-omgeving wordt genegeerd
+    monkeypatch.setenv("HTTP_PROXY", f"http://{documentatieadres(99)}:9")  # proxy-omgeving wordt genegeerd
     res = call(server, "POST", "/unlink", bearer="jwt-x", idempotency_key="k-1", body={})
     assert res.status == 401 and res.code == "unauthorized" and res.reason == "not_linked"
     sent = _Handler.calls[-1]["headers"]

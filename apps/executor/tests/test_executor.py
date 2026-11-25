@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from executorhelpers import POLICY, Hub, approved, auth, execute, signed
 from executorhelpers import client as hub_client
+from fakes.adressen import documentatieadres
 from fastapi.testclient import TestClient
 from policyhelpers import HOST, proposal
 
@@ -240,7 +241,7 @@ def test_te_groot_formulier_geeft_vaste_melding_nooit_een_kale_500(tmp_path: Pat
     csrf = re.search(r'name="csrf" value="([^"]+)"', c.get("/").text)
     assert csrf is not None
     body = (
-        f"csrf={csrf.group(1)}&hub_adres=http%3A%2F%2F192.0.2.5%3A30400&koppelcode=ABCD-EFGH-JKMN"
+        f"csrf={csrf.group(1)}&hub_adres=http%3A%2F%2F{documentatieadres(5)}%3A30400&koppelcode=ABCD-EFGH-JKMN"
         f"&hub_vingerafdruk=MEGG-8GFG-2E4Y-K2RQ&{extra}"
     )
     r = c.post(
