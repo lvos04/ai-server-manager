@@ -1,5 +1,5 @@
 {
-  "generated_date": "2026-11-24",
+  "generated_date": "2026-11-25",
   "version": "2.0-complete",
   "files_excluding_manifest": 98,
   "markdown_files": 94,
@@ -320,8 +320,8 @@
     },
     {
       "path": "04_BESTAANDE_APPS/A11_PROWLARR.md",
-      "bytes": 1498,
-      "sha256": "1dd2f977fab4fb491b4758cb47b49a9c9e252f9c841c32aa19cc934dd5b1c8f6"
+      "bytes": 1911,
+      "sha256": "647bd21a6a6a5ec91355118f83a948732ee7f37e241d09c7452e08f97d2bff73"
     },
     {
       "path": "04_BESTAANDE_APPS/A12_SEERR.md",
@@ -330,13 +330,13 @@
     },
     {
       "path": "04_BESTAANDE_APPS/A13_SABNZBD.md",
-      "bytes": 1451,
-      "sha256": "0968fcacfbdd0292765d4ecfed4d8e50f0572125c3c1b2654999febb339b0a58"
+      "bytes": 2079,
+      "sha256": "3a78e04631e197c3a8b87942627bdbecec8f3247e66ec005587a43b331fd6384"
     },
     {
       "path": "04_BESTAANDE_APPS/A14_QBITTORRENT.md",
-      "bytes": 1458,
-      "sha256": "d725c26b27887c5568121c104b930713a7cf6a0f9042ce67ef338f1201b2dcec"
+      "bytes": 1970,
+      "sha256": "9b04dee3428e12430e091388a1ef0510289b504dbf5acd0fc7ab33117ef4d4ad"
     },
     {
       "path": "04_BESTAANDE_APPS/A15_TAILSCALE.md",
@@ -480,8 +480,8 @@
     },
     {
       "path": "08_EXCEL/TrueNAS_V2_Uitvoering_en_Afvinken.xlsx",
-      "bytes": 399456,
-      "sha256": "c09505a2f425182f885a2d6c555e1c73035250466ca30b04d3bfbd5eacf45bd0"
+      "bytes": 399568,
+      "sha256": "e56bfadf975ad0e3fff40dfb43dacb3cf2695c9ef35c266da74d52a8b65414dc"
     },
     {
       "path": "08_EXCEL/decisions.json",
