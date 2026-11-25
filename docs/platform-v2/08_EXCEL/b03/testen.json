@@ -44,8 +44,8 @@
   [
     "JLT-08",
     "Externe deelnemer via VPN (gesimuleerd)",
-    "Deelnemer in een aparte Docker-bridge met bronadres uit 100.64.0.0/10 en netem 80±20 ms; ExternalMode uit, vpn_huishouden en een poging tot vpn_gasten met en zonder geslaagde zelftest anonieme streamroutes; huishoud- en gastaccount; daarna de VPN-share ingetrokken (EX34-variant); extra gevallen: Docker-gatewayadres als bron en 100.64.0.0/10 in LocalNetworkSubnets; gast met en zonder RemoteClientBitrateLimit",
-    "uit: een sessie met klasse vpn, extern of onbekend ziet en joint niets; vpn_huishouden: huishoudaccount doet mee met p95-drift ≤ 250 ms, gastaccount niet; vpn_gasten niet te kiezen (422) zolang anonieme streamroutes open zijn; na intrekken geen toegang en LAN blijft werken; gatewayadres → onbekend met NL-melding; 100.64.0.0/10 in LocalNetworkSubnets → waarschuwing; ACL-voorwaarde getoond als 'niet te verifiëren'; geen nieuwe open poort; validatie Sim-geslaagd/Sim-mislukt (gesimuleerd); echte Tailscale en TrueNAS-NAT in JLT-06"
+    "Deelnemer in een aparte Docker-bridge met bronadres uit het CGNAT-bereik van RFC 6598 en netem 80±20 ms; ExternalMode uit, vpn_huishouden en een poging tot vpn_gasten met en zonder geslaagde zelftest anonieme streamroutes; huishoud- en gastaccount; daarna de VPN-share ingetrokken (EX34-variant); extra gevallen: Docker-gatewayadres als bron en het CGNAT-bereik van RFC 6598 in LocalNetworkSubnets; gast met en zonder RemoteClientBitrateLimit",
+    "uit: een sessie met klasse vpn, extern of onbekend ziet en joint niets; vpn_huishouden: huishoudaccount doet mee met p95-drift ≤ 250 ms, gastaccount niet; vpn_gasten niet te kiezen (422) zolang anonieme streamroutes open zijn; na intrekken geen toegang en LAN blijft werken; gatewayadres → onbekend met NL-melding; het CGNAT-bereik van RFC 6598 in LocalNetworkSubnets → waarschuwing; ACL-voorwaarde getoond als 'niet te verifiëren'; geen nieuwe open poort; validatie Sim-geslaagd/Sim-mislukt (gesimuleerd); echte Tailscale en TrueNAS-NAT in JLT-06"
   ],
   [
     "JLT-09",
