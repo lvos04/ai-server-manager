@@ -80,6 +80,12 @@ def test_contractpunten_en_reviews_hebben_de_vaste_vorm(item: dict[str, Any]) ->
         assert REVIEW.fullmatch(rid), rid
 
 
+@pytest.mark.parametrize("rid", ["EX45", "EX46"])
+def test_flowproef_vermeldt_het_vereiste_dienstaccount(rid: str) -> None:
+    per_id = {regel["id"]: regel for regel in _items()}
+    assert "NIET GEVALIDEERD (account)" in per_id[rid]["validatie"].split("; ")
+
+
 def test_ids_uniek() -> None:
     ids = [e["id"] for e in _items()]
     assert len(ids) == len(set(ids))

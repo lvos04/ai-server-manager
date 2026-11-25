@@ -892,7 +892,7 @@
   {
     "id": "EX45",
     "status": "Geblokkeerd",
-    "validatie": "NIET GEVALIDEERD (echte NAS)",
+    "validatie": "NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
     "bewijs": "Hub-deel (Sim-geslaagd). commit 433dbfd (S-P2-140): apps/api/tests/integration/test_flow_voorstellen.py::test_dataset_verwijderen_via_flow_geweigerd_en_in_audit (pool.dataset.delete: geweigerd, actor flow, action.proposal.refused in de audit, ook een beheerder kan het niet uitvoeren), ::test_actie_boven_de_rechten_van_een_flow_geweigerd (ai_mag_voorstellen false: ACTOR:alleen_mens), ::test_geen_shell_en_geen_boiler_via_een_flow; tests/e2e/test_flow_acties.py::test_dataset_verwijderen_via_flow_bereikt_de_executor_nooit (geen schrijfaanroep op de fake TrueNAS); herstel 52348fe: apps/api/tests/integration/test_flow_voorstellen.py::test_r_veilig_2_audit_noemt_de_geverifieerde_bron_bij_een_ongeldige_flow_id (vóór de actorcontrole staat de geverifieerde bron service:home-control-hub met de event-ID in de audit, nooit de vrije actor-ID), ::test_r_veilig_1_weigering_bewaart_en_toont_alleen_veilige_velden (geweigerd voorstel: alleen veilige doelvelden, reden en bewijs geschoond, ook voor bestaande regels)",
     "blokkade": "S-P6-19 moet een verboden verzoek uit een Node-RED-flow over de hele keten toetsen. VERSIE 2: het Hub-schrijfpad naar my_house (S-P3-130) is uitgesteld. Het Node-RED-manifest staat in wachtstand. De praktijkproef met een dienstaccount hoort bij N-P6-04.",
     "opmerking": "Hub-deel; flow-deel in home-control-hub. Action-policy weigert; flow blijft auditbaar. De integrale simulatorproef in jelly-leon-platform staat open in S-P6-19.",
@@ -902,7 +902,7 @@
   {
     "id": "EX46",
     "status": "Geblokkeerd",
-    "validatie": "NIET GEVALIDEERD (echte NAS)",
+    "validatie": "NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
     "bewijs": "Hub-deel (Sim-geslaagd). commit 433dbfd (S-P2-140): apps/api/tests/integration/test_flow_voorstellen.py::test_vijf_keer_hetzelfde_event_geeft_een_voorstel; tests/e2e/test_flow_acties.py::test_vijf_keer_afgeleverd_geeft_een_voorstel_en_een_uitvoering (vijf keer hetzelfde event plus een nieuwe aflevering met een ander event_id: één voorstel, één app.redeploy op de fake TrueNAS, een tweede uitvoering geweigerd); herstel 52348fe: apps/api/tests/integration/test_flow_voorstellen.py::test_r_veilig_4_herlevering_na_onderbreking_geeft_een_voorstel (ontvangst en verwerking in één transactie: herlevering na een onderbreking geeft precies één voorstel met audit), ::test_r_veilig_5_hergebruikt_bronvolgnummer_is_een_zichtbaar_conflict (andere inhoud onder dezelfde bron- of aanvraagsleutel: 409 bron_id_conflict of idempotentie_conflict in de audit, nooit stil duplicate), ::test_r_veilig_5_gelijktijdige_levering_geeft_een_voorstel",
     "blokkade": "S-P6-19 moet vijf herhalingen van hetzelfde event over de hele keten toetsen. S-P3-620 levert event-ID’s aan de bron. De praktijkproef met Node-RED en het dienstaccount hoort bij N-P6-04.",
     "opmerking": "Hub-deel; flow-deel in home-control-hub. Koppeling op ID: request_id = uuid5 van bron en action_request_id. Een hergebruikte bron-ID met andere inhoud wordt geweigerd (409), niet samengevoegd; de bron-ID moet aan de kant van home-control-hub uniek blijven na herstel. De integrale simulatorproef in jelly-leon-platform staat open in S-P6-19.",
