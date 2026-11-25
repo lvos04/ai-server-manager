@@ -930,6 +930,16 @@
     "bijgewerkt": "2026-11-24"
   },
   {
+    "id": "REVIEW-ai-server-manager-executorstatuspagina-o-s2-005-4",
+    "status": "Niet gestart",
+    "validatie": "Niet getest",
+    "bewijs": "docs/ontwerp/PEIL_REVIEW.md, O-S2-005-4, en VERVOLGPUNTEN.md (besluit regisseur 2026-11-25). Het Peil-sjabloon verwijst bij koppelstatus_onleesbaar naar een koppeltoken en in het blok ‘gekoppeld’ naar ontkoppelen via de Hub. De aanpassing van de hersteltekst aan contract §3.9 en de ontwerpreview van de onleesbare koppelstatus wachten op een nieuwe Peil-versie.",
+    "blokkade": "",
+    "opmerking": "VERSIE 2",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-25"
+  },
+  {
     "id": "B02-001",
     "status": "Niet gestart",
     "validatie": "Niet getest",
