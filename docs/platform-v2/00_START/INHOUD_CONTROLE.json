@@ -480,8 +480,8 @@
     },
     {
       "path": "08_EXCEL/TrueNAS_V2_Uitvoering_en_Afvinken.xlsx",
-      "bytes": 400578,
-      "sha256": "16038ce703ee043bd94c8900b8e038c2f049949ef81ebe1ae67206e94547a793"
+      "bytes": 400572,
+      "sha256": "bc8061ec0fbcee05fe70c5a85a0774d1acbb759d8b693981464d1b69e6e86878"
     },
     {
       "path": "08_EXCEL/decisions.json",
