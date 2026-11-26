@@ -1052,6 +1052,7 @@ def test_sleutelopslag_met_verkeerde_rechten_eigenaar_of_inhoud_is_onleesbaar(
     """R-TECH-3, V-045: naslink.json met rechten voor groep of anderen, als symlink (ook naar een geldig bestand), van
     een andere eigenaar, met een andere hoofdversie, of met een sleutel zonder adres of vingerafdruk is onleesbaar.
     Geen formulier, uitvoeren 503, en het bestand (en een doel van de symlink) blijft byte-gelijk."""
+    import executor.geheimbestand as geheimbestand
     import executor.naslink as naslink_mod
 
     set_write_key(hub, nas)
@@ -1065,7 +1066,14 @@ def test_sleutelopslag_met_verkeerde_rechten_eigenaar_of_inhoud_is_onleesbaar(
         pad.unlink()
         pad.symlink_to(doel)
     elif soort == "andere_eigenaar":
-        monkeypatch.setattr(naslink_mod, "os", _AndereEigenaar())
+        echte = geheimbestand.eigen_geheim
+
+        def van_een_ander(fd: int) -> bool:  # alleen voor naslink.json; hub-link.json blijft van de eigen gebruiker
+            with monkeypatch.context() as m:
+                m.setattr(geheimbestand, "os", _AndereEigenaar())
+                return echte(fd)
+
+        monkeypatch.setattr(naslink_mod, "eigen_geheim", van_een_ander)
     else:
         data = json.loads(pad.read_text())
         if soort == "schema_2":
@@ -1160,8 +1168,9 @@ def test_melding_koppelstatus_onleesbaar_noemt_de_herstelweg_die_er_is(
     hub: Hub, nas: FakeTrueNAS, sleutel: str
 ) -> None:
     """R-ONTWERP-4 (S-P2-005): het formulierantwoord en ``last_error`` in /api/v1/status bij koppelstatus_onleesbaar
-    noemen 'Ontkoppelen van de Hub' op deze pagina alleen als dat blok er staat (een bruikbare schrijfsleutel); anders
-    verwijzen ze naar de kop 'Herstel' in het installatiedocument."""
+    noemen 'Ontkoppelen van de Hub' op deze pagina alleen als dat blok er staat (een bruikbare schrijfsleutel). Zonder
+    opgeslagen sleutel noemt het formulierantwoord het blok 'Koppelbestand resetten'; bij een onleesbare sleutelopslag
+    verwijst het naar de kop 'Herstel' in het installatiedocument."""
     if sleutel != "niet_ingesteld":
         set_write_key(hub, nas)
     c = hub_client(hub)
@@ -1179,7 +1188,9 @@ def test_melding_koppelstatus_onleesbaar_noemt_de_herstelweg_die_er_is(
         tekst = unescape(r.text)
         assert ('action="/beheer"' in r.text) is bruikbaar
         assert (HERSTEL_HIER in tekst) is bruikbaar, f"{pad}: herstel op deze pagina terwijl het blok er niet is"
-        assert (HERSTEL_DOC in tekst) is not bruikbaar, f"{pad}: verwijzing naar de kop 'Herstel' klopt niet"
+        assert (HERSTEL_DOC in tekst) is (sleutel == "opslag_onleesbaar"), f"{pad}: verwijzing naar 'Herstel'"
+        reset = sleutel == "niet_ingesteld"
+        assert ('action="/koppelbestand-resetten"' in r.text) is reset and ("Koppelbestand resetten" in tekst) is reset
     melding = status(c)["koppeling"]["last_error"]["melding"]
     assert (HERSTEL_HIER in melding) is bruikbaar and (HERSTEL_DOC in melding) is not bruikbaar, melding
 
@@ -1374,3 +1385,176 @@ def test_geen_melding_uit_een_zelfgekozen_queryparameter(
     assert "zelfgekozen" not in r.text and "zelfgekozen" not in unescape(r.text)
     assert _zonder_formuliercode(r.text) == _zonder_formuliercode(schoon.text)
     assert nas.calls == []
+
+
+# ------------------------------------------------------------------ koppelen op een ACL-dataset (TrueNAS-preset Apps)
+def _lege_executor(tmp_path: Path) -> tuple[TestClient, Settings]:
+    """Verse installatie: lege /appdata, eigen sleutels aangemaakt zoals ``executor init``, nooit gekoppeld."""
+    settings = Settings(data_dir=tmp_path / "appdata", allow_loopback_hub=True)
+    ensure_secrets(settings.secrets_dir)
+    return TestClient(create_app(settings), base_url=BASE), settings
+
+
+def _acl_dataset(monkeypatch: pytest.MonkeyPatch, *, chmod: str, herkend: bool) -> None:
+    """Bootst een ZFS-dataset met NFSv4-ACL na (TrueNAS-preset Apps; ZFS met NFSv4-ACL is lokaal niet beschikbaar):
+    elk nieuw bestand krijgt 0770 uit de overgeërfde ACE's (``aclinherit=passthrough`` negeert de 0600 van open()).
+    ``chmod``: ``werkt`` (aclmode=passthrough), ``geweigerd`` (aclmode=restricted) of ``genegeerd``. ``herkend``: of
+    de NFSv4-ACL zichtbaar is als xattr (``system.nfs4_acl_xdr``)."""
+    import errno
+
+    import executor.geheimbestand as geheimbestand
+
+    echte_open, echte_fchmod = os.open, os.fchmod
+
+    def open_acl(path: Any, flags: int, mode: int = 0o777, *args: Any, **kwargs: Any) -> int:
+        fd = echte_open(path, flags, mode, *args, **kwargs)
+        if flags & os.O_CREAT and stat.S_ISREG(os.fstat(fd).st_mode):
+            echte_fchmod(fd, 0o770)
+        return fd
+
+    def fchmod_acl(fd: int, mode: int) -> None:
+        if chmod == "geweigerd":
+            raise PermissionError(errno.EPERM, "Operation not permitted")
+        if chmod == "werkt":
+            echte_fchmod(fd, mode)
+
+    monkeypatch.setattr(os, "open", open_acl)
+    monkeypatch.setattr(os, "fchmod", fchmod_acl)
+    monkeypatch.setattr(geheimbestand, "nfs4_acl", lambda fd: herkend)
+
+
+def test_koppelen_op_een_lege_appdata(tmp_path: Path, andere_hub: AndereHub) -> None:
+    """De volledige koppelflow op een verse installatie: formulier → Hub → gekoppeld en bevestigd, bestand 0600."""
+    c, settings = _lege_executor(tmp_path)
+    assert 'action="/koppelen"' in c.get("/").text
+    r = andere_hub.koppelen(c)
+    assert r.status_code == 200 and "Gekoppeld met de Hub." in r.text, r.text
+    st = status(c)
+    assert st["koppeling"]["state"] == "gekoppeld" and st["koppeling"]["last_error"] is None
+    pad = settings.secrets_dir / "hub-link.json"
+    assert stat.S_IMODE(pad.stat().st_mode) == 0o600
+    assert json.loads(pad.read_text())["confirmed_at"]
+
+
+@pytest.mark.parametrize(("chmod", "herkend"), [("werkt", False), ("geweigerd", True), ("genegeerd", True)])
+def test_koppelen_op_een_acl_dataset(
+    tmp_path: Path, andere_hub: AndereHub, monkeypatch: pytest.MonkeyPatch, chmod: str, herkend: bool
+) -> None:
+    """Gebruikersmelding 0.1.0: op een dataset met preset Apps gaf POST /koppelen een 500 (KoppelstatusOnleesbaar bij
+    het teruglezen) en bleef de executor onleesbaar. Nu: fchmod 0600 na aanmaken; waar de ACL dat weigert of negeert,
+    accepteert de leescontrole de rechten van de dataset."""
+    _acl_dataset(monkeypatch, chmod=chmod, herkend=herkend)
+    c, settings = _lege_executor(tmp_path)
+    r = andere_hub.koppelen(c)
+    assert r.status_code == 200 and "Gekoppeld met de Hub." in r.text, r.text
+    assert status(c)["koppeling"]["state"] == "gekoppeld"
+    modus = stat.S_IMODE((settings.secrets_dir / "hub-link.json").stat().st_mode)
+    assert modus == (0o600 if chmod == "werkt" else 0o770)
+
+
+def test_koppelen_laat_nooit_een_onleesbaar_bestand_achter(
+    tmp_path: Path, andere_hub: AndereHub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Kan de executor het net geschreven bestand niet teruglezen (hier: ACL weigert chmod en is niet herkenbaar),
+    dan een vaste melding in plaats van een kale 500, en terug naar 'nooit gekoppeld': geen bestand, formulier terug."""
+    _acl_dataset(monkeypatch, chmod="geweigerd", herkend=False)
+    c, settings = _lege_executor(tmp_path)
+    r = andere_hub.koppelen(c)
+    assert r.status_code == 503 and code_van(r) == "koppelbestand_niet_opgeslagen", r.text
+    assert 'role="alert"' in r.text and "Internal Server Error" not in r.text
+    assert not (settings.secrets_dir / "hub-link.json").exists()
+    st = status(c)["koppeling"]
+    assert st["state"] == "nooit_gekoppeld" and st["last_error"] is None
+    assert 'action="/koppelen"' in c.get("/").text
+
+
+def test_geheimbestand_regels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ook op een ACL-dataset blijven wereld-schrijfbaar en een andere eigenaar onleesbaar; zonder ACL alleen 0600."""
+    import executor.geheimbestand as geheimbestand
+
+    pad = tmp_path / "geheim"
+    pad.write_text("x")
+    echte_acl = geheimbestand.nfs4_acl
+
+    def oordeel(modus: int, *, acl: bool) -> bool:
+        pad.chmod(modus)
+        monkeypatch.setattr(geheimbestand, "nfs4_acl", lambda fd: acl)
+        fd = os.open(pad, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            return geheimbestand.eigen_geheim(fd)
+        finally:
+            os.close(fd)
+
+    assert oordeel(0o600, acl=False) and not oordeel(0o640, acl=False) and not oordeel(0o660, acl=False)
+    assert oordeel(0o770, acl=True) and stat.S_IMODE(pad.stat().st_mode) == 0o600  # aangescherpt waar het kan
+    assert not oordeel(0o666, acl=True) and not oordeel(0o602, acl=True)
+    assert not echte_acl(os.open(tmp_path, os.O_RDONLY))  # gewoon bestandssysteem: geen NFSv4-ACL
+
+
+# ------------------------------------------------------------------ koppelbestand resetten (zonder shell)
+def _reset(c: TestClient, bevestiging: str = "RESETTEN", **kwargs: Any) -> Any:
+    return post(c, "/koppelbestand-resetten", {"bevestiging": bevestiging}, **kwargs)
+
+
+def test_koppelbestand_resetten_zonder_schrijfsleutel(tmp_path: Path, andere_hub: AndereHub) -> None:
+    c, settings = _lege_executor(tmp_path)
+    pad = settings.secrets_dir / "hub-link.json"
+    pad.write_bytes(b"{kapot")
+    pad.chmod(0o600)
+    page = c.get("/").text
+    assert 'action="/koppelbestand-resetten"' in page and "Koppelbestand resetten" in unescape(page)
+    assert 'action="/koppelen"' not in page
+    # Zonder getypte bevestiging, of van een andere herkomst: niets gewijzigd.
+    r = _reset(c, "ja")
+    assert r.status_code == 422 and code_van(r) == "bevestiging_ontbreekt"
+    assert _reset(c, origin="http://elders.invalid").status_code == 403
+    assert pad.read_bytes() == b"{kapot"
+    r = _reset(c, "resetten")
+    assert r.status_code == 200 and "Het koppelbestand is gereset." in r.text, r.text
+    assert not pad.exists()
+    (bewaard,) = settings.secrets_dir.glob("hub-link.json.onleesbaar-*")
+    assert bewaard.read_bytes() == b"{kapot" and stat.S_IMODE(bewaard.stat().st_mode) == 0o600
+    st = status(c)["koppeling"]
+    assert st["state"] == "nooit_gekoppeld" and st["keyset_fingerprint"] is None and st["last_error"] is None
+    assert 'action="/koppelen"' in r.text
+    # Daarna gewoon opnieuw koppelen; een tweede reset is niet nodig.
+    assert andere_hub.koppelen(c).status_code == 200
+    assert _reset(c).status_code == 409 and code_van(_reset(c)) == "koppelbestand_leesbaar"
+
+
+@pytest.mark.parametrize("sleutel", ["ingesteld", "opslag_onleesbaar"])
+def test_koppelbestand_resetten_weigert_met_schrijfsleutel(lan_hub: Hub, nas: FakeTrueNAS, sleutel: str) -> None:
+    """Ligt er een schrijfsleutel (of kan er een liggen), dan zou resetten zonder bewijs die sleutel aan een nieuwe Hub
+    op het LAN geven: alleen 'Ontkoppelen van de Hub' met de live geverifieerde sleutel."""
+    set_write_key(lan_hub, nas)
+    c = hub_client(lan_hub)
+    formuliercode = csrf(c)  # van een tabblad van vóór het onleesbaar worden
+    pad = lan_hub.settings.secrets_dir / "hub-link.json"
+    pad.write_bytes(b"{kapot")
+    if sleutel == "opslag_onleesbaar":
+        naslink_file(lan_hub).write_text("{kapot", encoding="utf-8")
+    page = c.get("/").text
+    assert 'action="/koppelbestand-resetten"' not in page
+    formuliercode = m.group(1) if (m := re.search(r'name="csrf" value="([^"]+)"', page)) else formuliercode
+    r = c.post(
+        "/koppelbestand-resetten",
+        data={"csrf": formuliercode, "bevestiging": "RESETTEN"},
+        headers={"Origin": str(c.base_url).rstrip("/")},
+    )
+    assert r.status_code == 409 and code_van(r) == "reset_met_sleutel", r.text
+    assert pad.read_bytes() == b"{kapot" and not list(pad.parent.glob("hub-link.json.onleesbaar-*"))
+
+
+def test_onverwachte_fout_geeft_een_nette_pagina(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def kapot(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("onverwacht")
+
+    monkeypatch.setattr(executor_app, "enroll_with_pairing_code", kapot)
+    settings = Settings(data_dir=tmp_path / "appdata", allow_loopback_hub=True)
+    ensure_secrets(settings.secrets_dir)
+    c = TestClient(create_app(settings), base_url=BASE, raise_server_exceptions=False)
+    r = post(c, "/koppelen", {"hub_adres": "http://127.0.0.1:9", "koppelcode": "ABCD-EFGH-JKMN",
+                              "hub_vingerafdruk": "MEGG-8GFG-2E4Y-K2RQ"})  # fmt: skip
+    assert r.status_code == 500 and "Er ging iets mis" in r.text and "Trace-ID" in r.text
+    assert "Traceback" not in r.text and "onverwacht" not in r.text
+    assert c.get("/api/v1/status").status_code == 200

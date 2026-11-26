@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
 import secrets
 import stat
@@ -11,6 +12,8 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from executor.geheimbestand import alleen_eigenaar
 
 IDENTITY = "executor-identity.ed25519"
 VAULT_KEY = "vault.key"
@@ -23,6 +26,7 @@ class FirstStartError(RuntimeError):
 def _write_exclusive(path: Path, data: bytes) -> None:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
+        alleen_eigenaar(fd)  # een ACL-dataset negeert de 0600 van open()
         os.write(fd, data)
         os.fsync(fd)
     finally:
@@ -62,7 +66,8 @@ def _vault_key() -> bytes:
 def ensure_secrets(secrets_dir: Path) -> list[str]:
     secrets_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     if stat.S_IMODE(secrets_dir.stat().st_mode) & 0o077:
-        os.chmod(secrets_dir, 0o700)
+        with contextlib.suppress(PermissionError):  # NFSv4-ACL met aclmode=restricted weigert chmod
+            os.chmod(secrets_dir, 0o700)
     created: list[str] = []
     gens: dict[str, Callable[[], bytes]] = {IDENTITY: _identity_pem, VAULT_KEY: _vault_key}
     for name, gen in gens.items():
@@ -70,7 +75,8 @@ def ensure_secrets(secrets_dir: Path) -> list[str]:
         if path.exists():
             _validate(path)
             if stat.S_IMODE(path.stat().st_mode) & 0o077:
-                os.chmod(path, 0o600)
+                with contextlib.suppress(PermissionError):  # idem; de ACL van de dataset bepaalt het dan
+                    os.chmod(path, 0o600)
         else:
             _write_exclusive(path, gen())
             created.append(name)

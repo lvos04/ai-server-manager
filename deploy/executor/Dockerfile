@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=ca_bundle,required=false \
     && pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore --prefix=/install --no-deps /wheels/executor-*.whl
 
 FROM ${PYTHON_IMAGE}
-ARG VERSION=0.1.0
+ARG VERSION=0.1.1
 ARG REVISION=onbekend
 LABEL org.opencontainers.image.title="ai-server-manager-executor" \
       org.opencontainers.image.description="AI Server Manager — executor (voert alleen door de Hub ondertekende acties van de allowlist uit)" \

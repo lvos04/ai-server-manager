@@ -2,7 +2,7 @@
   "info": {
     "description": "Executor van TrueNAS Home Platform V2. Koppelen met de Hub via de statuspagina (koppelcode + vingerafdruk, contract 1.3 §3.9). Voert alleen acties van de allowlist uit het ingebakken beleid uit, en alleen met een door de Hub ondertekend ExecutionRequest dat de executor zelf opnieuw controleert (§8). Geen shell, sudo of Docker.",
     "title": "AI Server Manager — executor",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "openapi": "3.1.0",
   "paths": {

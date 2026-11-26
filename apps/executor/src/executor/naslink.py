@@ -18,7 +18,6 @@ import hmac
 import json
 import os
 import secrets
-import stat
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -29,6 +28,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from executor.firststart import VAULT_KEY
+from executor.geheimbestand import alleen_eigenaar, eigen_geheim
 
 FILE_NAME = "naslink.json"
 LOCK_NAME = ".naslink.lock"
@@ -110,8 +110,7 @@ class NasLinkStore:
         except OSError:
             return None
         try:
-            st = os.fstat(fd)
-            if not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or st.st_mode & 0o077:
+            if not eigen_geheim(fd):
                 return None
             raw = os.read(fd, 64 * 1024 + 1)
         finally:
@@ -151,6 +150,7 @@ class NasLinkStore:
             tmp = self.dir / f".{FILE_NAME}.{uuid.uuid4().hex}"
             out = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
+                alleen_eigenaar(out)  # een ACL-dataset negeert de 0600 van open()
                 os.write(out, (json.dumps(data, indent=1, sort_keys=True) + "\n").encode())
                 os.fsync(out)
             finally:

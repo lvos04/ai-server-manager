@@ -2,6 +2,20 @@
 
 Alle noemenswaardige wijzigingen. Versies volgen `VERSION`; images krijgen exact deze tag (nooit `latest`).
 
+## [0.1.1] — 2026-11-26 (executor)
+
+- **Koppelen op een TrueNAS-dataset met preset Apps.** Op een dataset met NFSv4-ACL negeert ZFS de rechten `0600`
+  van een nieuw bestand; de executor las zijn net geschreven `hub-link.json` daarna als onleesbaar terug en gaf bij
+  koppelen een 500. Nu zet hij `0600` na het aanmaken (`fchmod`) en accepteert hij de rechten van de dataset alleen
+  als het bestand een NFSv4-ACL draagt; een symlink, een andere eigenaar en schrijfrechten voor iedereen blijven
+  onleesbaar. Hetzelfde geldt voor `naslink.json` en de eigen sleutels.
+- Een koppelpoging laat nooit meer een onleesbaar of half koppelbestand achter: lukt opslaan niet, dan staat de
+  executor weer zoals vóór de poging, met een vaste melding (`koppelbestand_niet_opgeslagen`).
+- Nieuw herstel zonder shell: bij `koppelstatus_onleesbaar` zonder opgeslagen schrijfsleutel toont de statuspagina
+  **Koppelbestand resetten** (getypte bevestiging). Het origineel blijft bewaard als
+  `hub-link.json.onleesbaar-<tijd>`; de executor wordt weer *nog niet gekoppeld*.
+- Een onverwachte fout geeft een vaste foutpagina met trace-ID in plaats van een kale 500.
+
 ## [0.1.0] — 2026-11-09 (fase P0, backend en web-UI; niet uitgebracht)
 
 ### Rooktest en schermafdrukken van P2 (S-P2-220)

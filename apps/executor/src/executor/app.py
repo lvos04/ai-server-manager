@@ -73,7 +73,14 @@ from executor.journal import Journal, JournalUnavailable
 from executor.kluis import Kluis
 from executor.naslink import MAX_KEY_LEN, NasLinkConflict, NasLinkOnleesbaar, NasLinkStore
 from executor.replay import ReplayCache, ReplayUnavailable
-from executor.statuspagina import HERSTEL, executor_page, onleesbaar_melding, vingerafdruk_melding
+from executor.statuspagina import (
+    HERSTEL,
+    RESET_BEVESTIGING,
+    RESET_HERSTEL,
+    executor_page,
+    onleesbaar_melding,
+    vingerafdruk_melding,
+)
 from executor.truenas import NasFout, display_fingerprint, fetch_fingerprint, verify_key
 from executor.uitvoeren import Uitvoerder
 
@@ -166,6 +173,21 @@ FORM_MESSAGES: dict[str, tuple[int, str, str]] = {
     "koppelen_bezig": (409, "Koppelen bezig", "Er loopt al een koppelpoging. Laad de pagina over een minuut opnieuw."),
     "validation_error": (422, "Koppelen is mislukt", "Een of meer velden zijn niet goed ingevuld; zie de velden."),
     "sleutel_ontbreekt": (503, "Koppelen is mislukt", "De eigen sleutel ontbreekt; herstart de executor."),
+    "koppelbestand_niet_opgeslagen": (503, "Koppelen is mislukt", ERRORS_NL["koppelbestand_niet_opgeslagen"]),
+    # ---- Koppelbestand resetten (alleen bij koppelstatus_onleesbaar zonder schrijfsleutel).
+    "bevestiging_ontbreekt": (
+        422,
+        "Bevestig het resetten",
+        f"Typ {RESET_BEVESTIGING} in het veld om het resetten te bevestigen. Er is niets gewijzigd.",
+    ),
+    "koppelbestand_leesbaar": (409, "Resetten is niet nodig", "Het koppelbestand is leesbaar; er is niets gewijzigd."),
+    "reset_met_sleutel": (
+        409,
+        "Resetten kan niet",
+        "Er is een TrueNAS-schrijfsleutel opgeslagen (of de sleutelopslag is onleesbaar). Zonder bewijs resetten zou "
+        "die sleutel aan een nieuwe Hub geven. Herstel met 'Ontkoppelen van de Hub' en de huidige sleutel als bewijs. "
+        f"Er is niets gewijzigd. {HERSTEL}",
+    ),
     # ---- TrueNAS-schrijfsleutel en beheer (§3.9); dezelfde regels als het koppelformulier.
     "niet_gekoppeld": (409, "Sleutel instellen kan niet", "Koppel de executor eerst met de Hub."),
     "sleutel_al_ingesteld": (
@@ -385,6 +407,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "not_found" if exc.status_code == 404 else "http_error",
             "Niet gevonden." if exc.status_code == 404 else "Er ging iets mis.",
             exc.status_code,
+        )
+
+    @app.exception_handler(Exception)
+    async def _onverwacht(request: Request, exc: Exception) -> Response:
+        """Nooit een kale 500: een vaste melding met trace-ID; de details staan alleen in het log."""
+        trace = str(uuid.uuid4())
+        logging.getLogger("executor").error(
+            "onverwachte fout: %s trace_id=%s", type(exc).__name__, trace, exc_info=(type(exc), exc, exc.__traceback__)
+        )
+        if request.url.path.startswith(("/api/", "/connector/")):
+            body = _err_body("internal_error", "Er ging iets mis in de executor; er is niets uitgevoerd.")
+            return JSONResponse({**body, "trace_id": trace}, status_code=500)
+        return HTMLResponse(
+            '<!doctype html><html lang="nl"><meta charset="utf-8"><title>Executor: fout</title>'
+            "<h1>Er ging iets mis</h1><p>De executor kon dit verzoek niet afhandelen en heeft niets gewijzigd. Laad "
+            '<a href="/">de statuspagina</a> opnieuw; die toont de huidige toestand.</p>'
+            f"<p>Trace-ID <code>{trace}</code></p></html>",
+            status_code=500,
         )
 
     @app.exception_handler(RequestValidationError)
@@ -806,6 +846,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         nas = naslink.read()
         return not nas.get("_onleesbaar") and nas.get("key") is None
 
+    def _reset_mogelijk(raw: dict[str, Any], nas: dict[str, Any]) -> bool:
+        """'Koppelbestand resetten' alleen bij een onleesbaar koppelbestand zonder opgeslagen schrijfsleutel. Ligt er
+        een sleutel (of is de sleutelopslag onleesbaar, dan kan er een liggen), dan zou resetten zonder bewijs die
+        sleutel aan een nieuwe Hub geven: dan alleen 'Ontkoppelen van de Hub' met de live geverifieerde sleutel."""
+        return bool(raw.get("_onleesbaar")) and not nas.get("ingesteld") and not nas.get("onleesbaar")
+
     def _page(
         melding: dict[str, str] | None = None,
         *,
@@ -818,15 +864,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         nas = naslink.public()
         linked = not raw.get("_onleesbaar") and raw.get("state") == "gekoppeld"
         wacht = naslink.pending() if linked and not nas.get("ingesteld") and not nas.get("onleesbaar") else None
+        reset = _reset_mogelijk(raw, nas)
         show_form = (
             (_koppelformulier_open(raw) and raw.get("pending") is None)
             or (linked and not nas.get("ingesteld") and not nas.get("onleesbaar"))
             or bool(nas.get("ingesteld"))
+            or reset
         )
         csrf = secrets.token_urlsafe(32) if show_form else ""
         if melding is None:
             if raw.get("_onleesbaar"):
-                melding = onleesbaar_melding(sleutel_ingesteld=bool(nas.get("ingesteld")))
+                melding = onleesbaar_melding(sleutel_ingesteld=bool(nas.get("ingesteld")), reset_mogelijk=reset)
             elif wacht is not None:
                 # Bestaande toestand (geen live-rol): de vingerafdruk wacht nog op bevestiging.
                 melding = vingerafdruk_melding(display_fingerprint(str(wacht.get("fingerprint") or "")), rol="")
@@ -855,6 +903,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             gestopt=gestopt(),
             allowlist=policy.executor_allowlist() if policy is not None else None,
             policy={**policy_status(), "toegestaan": settings.allow_writable_policy},
+            reset=reset,
         )
         resp = HTMLResponse(html, status_code=status_code)
         if csrf:
@@ -874,7 +923,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         status_code, titel, tekst = FORM_MESSAGES[code]
         if code == "koppelstatus_onleesbaar":
             # Herstel op deze pagina alleen als het beheerblok er staat (een bruikbare schrijfsleutel); R-ONTWERP-4.
-            tekst = melding_nl(code, sleutel_ingesteld=bool(naslink.public().get("ingesteld"))) or tekst
+            # Zonder sleutel staat er het blok 'Koppelbestand resetten'.
+            nas = naslink.public()
+            tekst = (
+                f"De koppelstatus van de executor is onleesbaar. {RESET_HERSTEL}"
+                if _reset_mogelijk(store.read(), nas)
+                else melding_nl(code, sleutel_ingesteld=bool(nas.get("ingesteld"))) or tekst
+            )
         melding = {"toon": "fout", "rol": "alert", "titel": titel, "tekst": tekst, "code": code, "trace_id": trace}
         return _page(melding, status_code=status_code, veld=veld)
 
@@ -994,6 +1049,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
             status_code=400,
             veld={field: text} if field else None,
+        )
+
+    @app.post("/koppelbestand-resetten", response_class=HTMLResponse, include_in_schema=False)
+    async def reset_koppelbestand(request: Request) -> HTMLResponse:
+        """Herstel bij ``koppelstatus_onleesbaar`` zonder shell. Dezelfde regels als elk formulier (herkomst, Host,
+        formuliercode, pogingenlimiet) plus een getypte bevestiging. Alleen zonder opgeslagen schrijfsleutel: zonder
+        sleutel voert de executor niets uit, dus resetten geeft niemand op het LAN meer dan een verse installatie
+        (koppelformulier open). Het origineel blijft bewaard; er wordt geen sleutel of vertrouwen overgenomen."""
+        trace, soort = str(uuid.uuid4()), "resetpoging"
+        form = await _formulier(request, trace, soort)
+        if isinstance(form, HTMLResponse):
+            return form
+        if form.get("bevestiging", "").strip().upper() != RESET_BEVESTIGING:
+            return _afgehandeld("bevestiging_ontbreekt", trace, soort=soort)
+        if not store.read().get("_onleesbaar"):
+            return _afgehandeld("koppelbestand_leesbaar", trace, soort=soort)
+        if not _reset_mogelijk({"_onleesbaar": True}, naslink.public()):
+            return _afgehandeld("reset_met_sleutel", trace, soort=soort)
+        try:
+            gereset = store.reset_onleesbaar()
+        except OSError:
+            return _afgehandeld("sleutelopslag_niet_schrijfbaar", trace, soort=soort)
+        if not gereset:
+            return _afgehandeld("koppelbestand_leesbaar", trace, soort=soort)
+        log.warning("koppelbestand gereset (origineel bewaard): trace_id=%s", trace)
+        return _gelukt(
+            "koppelbestand_gereset",
+            trace,
+            "Het koppelbestand is gereset.",
+            "Het onleesbare bestand is bewaard als hub-link.json.onleesbaar-<tijd>. De executor is nog niet gekoppeld "
+            "en voert niets uit. Koppel hieronder met een nieuwe koppelcode en de vingerafdruk uit jouw Hub.",
+            soort=soort,
         )
 
     # ------------------------------------------------------------------ TrueNAS-schrijfsleutel en beheer (§3.9)

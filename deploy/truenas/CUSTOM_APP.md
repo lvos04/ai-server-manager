@@ -247,7 +247,9 @@ executor niets uit en zet hij het bestand nooit zelf terug (fail-closed).
 | `sleutelopslag_onleesbaar` | `/appdata/secrets/naslink.json` | de opgeslagen TrueNAS-koppeling: NAS-adres, certificaat en schrijfsleutel |
 
 Onleesbaar is: kapotte of onvolledige inhoud, een andere hoofdversie, een symlink, een andere eigenaar dan de executor
-zelf (gebruiker 568), of rechten voor groep of anderen (alleen `0600` is goed). Bij `sleutelopslag_onleesbaar` ook: een
+zelf (gebruiker 568), schrijfrechten voor iedereen, of rechten voor groep of anderen (alleen `0600` is goed). Op een
+dataset met NFSv4-ACL (TrueNAS-preset *Apps*) bepaalt de ACL de rechten van nieuwe bestanden; daar zet de executor
+`0600` waar de ACL dat toestaat en accepteert hij anders de rechten van de dataset (vanaf executor 0.1.1). Bij `sleutelopslag_onleesbaar` ook: een
 `/appdata/secrets/vault.key` die de opgeslagen sleutel niet opent (bijvoorbeeld omdat `vault.key` weg was en de executor
 bij de start een nieuwe maakte).
 
@@ -273,8 +275,13 @@ het blok **Ontkoppelen of sleutel vervangen**.
 Meldt de executor bij punt 1 `certificaat_gewijzigd` (het certificaat van TrueNAS is veranderd sinds het vastleggen),
 dan kan het niet op de statuspagina: volg **Nieuwe datamap** hieronder.
 
-**Koppelbestand onleesbaar, zonder schrijfsleutel.** Het blok **Ontkoppelen of sleutel vervangen** ontbreekt en de
-executor koppelt niet met een koppeltoken, dus op de statuspagina kan het niet. Volg **Nieuwe datamap**.
+**Koppelbestand onleesbaar, zonder schrijfsleutel** (vanaf executor 0.1.1). De statuspagina toont het blok
+**Koppelbestand resetten**. Typ `RESETTEN` en kies **Koppelbestand resetten**. Het onleesbare bestand blijft bewaard
+als `/appdata/secrets/hub-link.json.onleesbaar-<UTC-tijd>` en de executor is weer *nog niet gekoppeld*: er wordt geen
+sleutel en geen vertrouwen van de oude koppeling overgenomen. Koppel daarna opnieuw zoals in stap 3 en controleer het
+adres en de vingerafdruk van de Hub. Het blok staat er alleen zolang er geen schrijfsleutel is opgeslagen: met een
+sleutel zou resetten zonder bewijs die sleutel aan een andere Hub op het netwerk geven. Bij een onleesbare
+sleutelopslag ontbreekt het blok ook; volg dan **Nieuwe datamap**.
 
 **Sleutelopslag onleesbaar (`sleutelopslag_onleesbaar`), met of zonder eerder ingestelde schrijfsleutel.** De
 statuspagina toont dan geen sleutelformulier en geen blok **Ontkoppelen of sleutel vervangen**, en de executor

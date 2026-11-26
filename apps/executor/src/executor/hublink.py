@@ -6,10 +6,11 @@
   ook de schrijfsleutel; in ``ontkoppeld`` komt het koppelformulier terug, en de executor voert niets uit tot de sleutel
   opnieuw is ingesteld (BN-1 a, S-P2-020; ADR-0030 besluit 13).
 - Opslag in ``/appdata/secrets/hub-link.json`` (0600, atomair, onder ``hub-link.lock``), nooit in een database. Een
-  onleesbaar bestand (geen geldige JSON, andere major, ontbrekende velden, verkeerde eigenaar of rechten) is
-  **fail-closed** (§3.5): geen vertrouwen, geen formulier, ``koppelstatus_onleesbaar``; een gewone schrijfactie zet
-  het nooit stil terug. De executor heeft geen env-token (§3.9): herstel gaat alleen met de live geverifieerde
-  schrijfsleutel (:meth:`HubLinkStore.ontkoppel`, aangeroepen door ``/beheer``).
+  onleesbaar bestand (geen geldige JSON, andere major, ontbrekende velden, verkeerde eigenaar of rechten; zie
+  :mod:`executor.geheimbestand` voor ACL-datasets) is **fail-closed** (§3.5): geen vertrouwen, geen formulier,
+  ``koppelstatus_onleesbaar``; een gewone schrijfactie zet het nooit stil terug. De executor heeft geen env-token
+  (§3.9): herstel gaat met de live geverifieerde schrijfsleutel (:meth:`HubLinkStore.ontkoppel`, ``/beheer``), of,
+  als er geen schrijfsleutel ligt, met :meth:`HubLinkStore.reset_onleesbaar` (bevestigd op de statuspagina).
 - Hub-sleutels worden gepind uit het enroll-antwoord; een via HTTP opgehaalde JWKS voegt nooit vertrouwen toe.
 - Aanroepen naar de Hub: ``http.client`` (geen redirects, geen proxy-omgeving), 5 s connect / 15 s read; de host
   wordt bij elke verbinding opgelost en gecontroleerd (§3.2) en de verbinding gaat naar precies dat adres.
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import copy
 import fcntl
 import hashlib
 import http.client
@@ -43,6 +45,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from executor.adres import AdresOngeldig, resolve_allowed
 from executor.adres import validate_hub_url as _validate_hub_url
+from executor.geheimbestand import alleen_eigenaar, eigen_geheim
 from executor.statuspagina import HERSTEL
 
 SCHEMA_VERSION = "1.3"
@@ -78,6 +81,9 @@ ERRORS_NL = {
     "enroll_endpoint_ontbreekt": "Deze Hub-versie kent aanmelden niet.",
     "rate_limited": "Te veel pogingen; wacht even en probeer het dan opnieuw.",
     "koppelen_onderbroken": "Het koppelen is onderbroken door een herstart. Voer de koppelcode opnieuw in.",
+    "koppelbestand_niet_opgeslagen": "De executor kon de koppeling niet opslaan in /appdata/secrets. Hij staat weer "
+    "zoals vóór deze poging en vertrouwt de Hub niet. Controleer de opslag van /appdata en maak in de Hub een nieuwe "
+    "koppelcode.",
     # Bij de executor niet "via de Hub": ontkoppelen en opnieuw koppelen gaan op deze pagina (§3.9, KLEIN-60).
     "ingetrokken_door_hub": "De Hub heeft deze koppeling ingetrokken; de executor voert niets uit. Opnieuw koppelen "
     "kan alleen na 'Ontkoppelen van de Hub' op deze pagina, met de huidige TrueNAS-schrijfsleutel als bewijs. Dat blok "
@@ -225,9 +231,8 @@ class HubLinkStore:
         except OSError:
             return None  # o.a. een symlink of geen leesrecht
         try:
-            st = os.fstat(fd)
-            if not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or st.st_mode & 0o077:
-                return None  # verkeerde eigenaar of rechten (moet 0600 van de eigen gebruiker zijn)
+            if not eigen_geheim(fd):
+                return None  # verkeerde eigenaar of rechten (0600 van de eigen gebruiker, of de ACL van de dataset)
             raw = os.read(fd, 1024 * 1024 + 1)
         finally:
             os.close(fd)
@@ -256,22 +261,60 @@ class HubLinkStore:
         return bool(self.read().get("_onleesbaar"))
 
     @contextlib.contextmanager
-    def update(self) -> Iterator[dict[str, Any]]:
-        """Lezen-wijzigen-schrijven onder een exclusieve vergrendeling; atomair vervangen (O_EXCL → fsync → rename).
-        Een onleesbaar bestand → :class:`KoppelstatusOnleesbaar` (nooit stil terugzetten, §3.5)."""
+    def _vergrendeld(self) -> Iterator[None]:
         self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
+    @contextlib.contextmanager
+    def update(self) -> Iterator[dict[str, Any]]:
+        """Lezen-wijzigen-schrijven onder een exclusieve vergrendeling; atomair vervangen (O_EXCL → fsync → rename).
+        Een onleesbaar bestand → :class:`KoppelstatusOnleesbaar` (nooit stil terugzetten, §3.5)."""
+        with self._vergrendeld():
             data = self._load()
             if data is None:
                 raise KoppelstatusOnleesbaar
             yield data
             data["schema_version"] = SCHEMA_VERSION  # een dienst schrijft de versie van het contract dat hij volgt
             self._write(data)
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+
+    def _bewaar_onleesbaar(self, at: str) -> None:
+        """Het onleesbare origineel blijft bewaard als ``hub-link.json.onleesbaar-<UTC-tijd>`` (0600, §3.5)."""
+        bewaard = self.dir / f"{FILE_NAME}.onleesbaar-{at.replace('-', '').replace(':', '')}"
+        # Hernoemen volgt nooit een symlink (die wordt zelf hernoemd); een gewoon bestand krijgt 0600.
+        os.rename(self.path, bewaard)
+        with contextlib.suppress(OSError):
+            kopie = os.open(bewaard, os.O_RDONLY | os.O_NOFOLLOW)
+            try:
+                if stat.S_ISREG(os.fstat(kopie).st_mode):
+                    os.fchmod(kopie, 0o600)
+            finally:
+                os.close(kopie)
+
+    def reset_onleesbaar(self) -> bool:
+        """Herstel zonder schrijfsleutel (bevestigd op de statuspagina; de aanroeper controleert dat er geen
+        schrijfsleutel ligt): het onleesbare origineel wordt bewaard en er komt **geen** nieuw bestand, dus de
+        executor is weer ``nooit_gekoppeld``: geen pins, geen service-token, niets van het oude vertrouwen. ``False``
+        als het bestand intussen leesbaar is (dan verandert er niets)."""
+        with self._vergrendeld():
+            if self._load() is not None:
+                return False
+            self._bewaar_onleesbaar(now_iso())
+            return True
+
+    def herstel(self, vorige: dict[str, Any] | None) -> None:
+        """Na een koppelpoging die niet kon afsluiten: terug naar de toestand van vóór de poging. ``None`` = er was
+        geen bestand (``nooit_gekoppeld``); dan gaat het halve bestand weg in plaats van onleesbaar te blijven."""
+        with self._vergrendeld():
+            if vorige is None:
+                self.path.unlink(missing_ok=True)
+            else:
+                self._write(vorige)
 
     def ontkoppel(self) -> None:
         """Ontkoppelen op de executorpagina, na een live geverifieerde TrueNAS-schrijfsleutel (contract 1.3 §3.9; de
@@ -283,23 +326,11 @@ class HubLinkStore:
         §3.5) en komt er een nieuw bestand met ``unreadable_replaced_at``. De echte ``first_linked_at`` is dan niet te
         lezen; omdat er een schrijfsleutel lag, is de executor eerder gekoppeld geweest, en ``first_linked_at`` wordt
         het moment van vervangen (nooit leeg: een leeg veld zou "nooit gekoppeld" betekenen)."""
-        self.dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
+        with self._vergrendeld():
             at = now_iso()
             data = self._load()
             if data is None:
-                bewaard = self.dir / f"{FILE_NAME}.onleesbaar-{at.replace('-', '').replace(':', '')}"
-                # Hernoemen volgt nooit een symlink (die wordt zelf hernoemd); een gewoon bestand krijgt 0600.
-                os.rename(self.path, bewaard)
-                with contextlib.suppress(OSError):
-                    kopie = os.open(bewaard, os.O_RDONLY | os.O_NOFOLLOW)
-                    try:
-                        if stat.S_ISREG(os.fstat(kopie).st_mode):
-                            os.fchmod(kopie, 0o600)
-                    finally:
-                        os.close(kopie)
+                self._bewaar_onleesbaar(at)
                 data = {**empty_link(), "unreadable_replaced_at": at}
             if data.get("pins"):
                 data["previous_pins"] = data["pins"]
@@ -315,14 +346,12 @@ class HubLinkStore:
                 last_error=None,
             )
             self._write(data)
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
 
     def _write(self, data: dict[str, Any]) -> None:
         tmp = self.dir / f".{FILE_NAME}.{uuid.uuid4().hex}"
         out = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         try:
+            alleen_eigenaar(out)  # een ACL-dataset negeert de 0600 van open() (zie executor.geheimbestand)
             os.write(out, (json.dumps(data, indent=1, sort_keys=True) + "\n").encode())
             os.fsync(out)
         finally:
@@ -577,10 +606,14 @@ def enroll_with_pairing_code(
     """Koppelen via de statuspagina (eenmalig, vóór de eerste koppeling). Geeft de publieke status terug.
 
     ``EnrollFailed`` met ``koppelstatus_onleesbaar``, ``al_gekoppeld`` of ``koppelen_bezig`` als er niets naar de Hub
-    gaat (§3.7); anders staat de uitkomst in ``last_error`` van de teruggegeven status."""
+    gaat (§3.7); anders staat de uitkomst in ``last_error`` van de teruggegeven status. Met
+    ``koppelbestand_niet_opgeslagen`` als het koppelbestand niet te schrijven of na schrijven niet terug te lezen is:
+    dan staat het weer zoals vóór de poging en blijft er nooit een onleesbaar bestand achter."""
     secret_hash = hashlib.sha256(normalize_code(pairing_code).encode()).hexdigest()
+    vorige: Any = _ONBEKEND
     try:
         with store.update() as link:
+            vorige = copy.deepcopy(link) if os.path.lexists(store.path) else None
             if not koppelen_toegestaan(link):
                 raise EnrollFailed("al_gekoppeld")
             if link.get("pending") is not None and not pending_expired(link):
@@ -594,6 +627,9 @@ def enroll_with_pairing_code(
             }
     except KoppelstatusOnleesbaar:
         raise EnrollFailed("koppelstatus_onleesbaar") from None
+    except OSError:
+        _herstel(store, vorige)
+        raise EnrollFailed("koppelbestand_niet_opgeslagen") from None
     code: str | None = "hub_antwoord_ongeldig"
     pins: dict[str, Any] | None = None
     body: Any = None
@@ -615,32 +651,53 @@ def enroll_with_pairing_code(
         code = exc.code
     finally:
         # Altijd afsluiten, ook bij een onverwachte fout: een achtergebleven ``pending`` zou elk volgend verzoek
-        # ``koppelen_bezig`` geven.
-        with store.update() as link:
-            link["pending"] = None  # het adres van een mislukte poging wordt nergens bewaard
-            if pins is None or body is None:
-                link["last_error"] = {"code": code or "hub_antwoord_ongeldig", "at": now_iso()}
-            else:
-                at = now_iso()
-                if link.get("pins"):
-                    link["previous_pins"] = link["pins"]
-                link.update(
-                    state="gekoppeld",
-                    app_id=app_id,
-                    hub_url=hub_url,
-                    service_id=body["service_id"],
-                    via="koppelcode",
-                    first_linked_at=link.get("first_linked_at") or at,
-                    linked_at=at,
-                    confirmed_at=None,
-                    service_token=body["service_token"],
-                    service_token_last4=body["service_token"][-4:],
-                    pins=pins,
-                    last_error=None,
-                )
+        # ``koppelen_bezig`` geven. Lukt afsluiten niet (schrijven, of het net geschreven bestand teruglezen), dan
+        # terug naar de toestand van vóór de poging: nooit een onleesbaar of half bestand achterlaten.
+        try:
+            _afsluiten(store, code, pins, body, app_id, hub_url)
+        except (KoppelstatusOnleesbaar, OSError):
+            _herstel(store, vorige)
+            raise EnrollFailed("koppelbestand_niet_opgeslagen") from None
     if pins is not None:
         confirm(store)
     return public_status(store.read())
+
+
+_ONBEKEND = object()  # de toestand van vóór de poging is (nog) niet gelezen: dan niets terugzetten
+
+
+def _herstel(store: HubLinkStore, vorige: Any) -> None:
+    if vorige is _ONBEKEND:
+        return
+    with contextlib.suppress(OSError):  # opslag onbruikbaar: de pagina toont wat er staat; nooit een kale 500
+        store.herstel(vorige)
+
+
+def _afsluiten(
+    store: HubLinkStore, code: str | None, pins: dict[str, Any] | None, body: Any, app_id: str, hub_url: str
+) -> None:
+    with store.update() as link:
+        link["pending"] = None  # het adres van een mislukte poging wordt nergens bewaard
+        if pins is None or body is None:
+            link["last_error"] = {"code": code or "hub_antwoord_ongeldig", "at": now_iso()}
+        else:
+            at = now_iso()
+            if link.get("pins"):
+                link["previous_pins"] = link["pins"]
+            link.update(
+                state="gekoppeld",
+                app_id=app_id,
+                hub_url=hub_url,
+                service_id=body["service_id"],
+                via="koppelcode",
+                first_linked_at=link.get("first_linked_at") or at,
+                linked_at=at,
+                confirmed_at=None,
+                service_token=body["service_token"],
+                service_token_last4=body["service_token"][-4:],
+                pins=pins,
+                last_error=None,
+            )
 
 
 class KeyRotationPoller:

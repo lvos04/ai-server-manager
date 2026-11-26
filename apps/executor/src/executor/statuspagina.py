@@ -39,6 +39,30 @@ KOPPELBESTAND = "/appdata/secrets/hub-link.json"
 SLEUTELBESTAND = "/appdata/secrets/naslink.json"
 # Herstel zonder bruikbare schrijfsleutel staat in het installatiedocument; een test controleert dat de kop bestaat.
 HERSTEL = "Zie deploy/truenas/CUSTOM_APP.md, kop 'Herstel'."
+RESET_BEVESTIGING = "RESETTEN"
+RESET_HERSTEL = (
+    "Er is geen TrueNAS-schrijfsleutel ingesteld. Herstel: kies hieronder 'Koppelbestand resetten'. Het bestand blijft "
+    "bewaard als hub-link.json.onleesbaar-<tijd> en de executor wordt 'nog niet gekoppeld'; er wordt geen sleutel en "
+    "geen vertrouwen overgenomen. Koppel daarna opnieuw met een nieuwe koppelcode."
+)
+# Herstelblok bij koppelstatus_onleesbaar zonder schrijfsleutel. Het Peil-sjabloon is gepind (E08) en kent dit blok
+# niet; het komt daarom vóór het vaste blok "Wat deze versie uitvoert" in de gerenderde pagina, met dezelfde klassen.
+RESET_ANKER = '<section class="blok" aria-labelledby="h-dienst">'
+RESET_BLOK = f"""<section class="blok" aria-labelledby="h-reset">
+  <h2 id="h-reset">Koppelbestand resetten</h2>
+  <p>Het koppelbestand is onleesbaar en er is geen TrueNAS-schrijfsleutel ingesteld. Resetten bewaart het bestand
+  als <code>hub-link.json.onleesbaar-&lt;tijd&gt;</code> en zet de executor terug op 'nog niet gekoppeld': geen
+  Hub-sleutels, geen token, niets van de oude koppeling. Daarna koppel je opnieuw met een nieuwe koppelcode. Controleer
+  na het koppelen dat het adres en de vingerafdruk van de Hub die van jouw Hub zijn.</p>
+  <form method="post" action="/koppelbestand-resetten" autocomplete="off" novalidate>
+    <input type="hidden" name="csrf" value="{{{{csrf_token}}}}">
+    <div class="veld"><label for="reset">Typ {RESET_BEVESTIGING} om te bevestigen
+      <span class="verplicht">(verplicht)</span></label>
+      <input id="reset" name="bevestiging" required autocomplete="off" spellcheck="false"></div>
+    <button class="knop knop-secundair" type="submit">Koppelbestand resetten</button>
+  </form>
+</section>
+"""
 
 
 def template() -> str:
@@ -151,6 +175,7 @@ def executor_page(
     gestopt: Mapping[str, Any] | None = None,
     allowlist: list[str] | None = None,
     policy: Mapping[str, Any] | None = None,
+    reset: bool = False,
 ) -> str:
     """Pagina-data voor de executor.
 
@@ -422,7 +447,11 @@ def executor_page(
         )
     for c in [*data["checks"], *data["dienst_blok"]]:
         c["toon"] = _toon(c["toon"])
-    return render(template(), data)
+    html = render(template(), data)
+    if reset and onleesbaar:
+        blok = render(RESET_BLOK, {"csrf_token": csrf})
+        html = html.replace(RESET_ANKER, blok + RESET_ANKER, 1)
+    return html
 
 
 def _dienst_blok(
@@ -490,7 +519,7 @@ def _dienst_blok(
     return rijen
 
 
-def onleesbaar_melding(*, sleutel_ingesteld: bool = False) -> dict[str, str]:
+def onleesbaar_melding(*, sleutel_ingesteld: bool = False, reset_mogelijk: bool = False) -> dict[str, str]:
     """Bestaande toestand bij het laden (geen live-rol, geen trace-ID; code + pad, Peil 1.1.1 §29.1). De executor
     koppelt niet met een koppeltoken (§3.9): herstel gaat met de TrueNAS-schrijfsleutel op deze pagina."""
     return {
@@ -503,6 +532,9 @@ def onleesbaar_melding(*, sleutel_ingesteld: bool = False) -> dict[str, str]:
             "in, laat 'Nieuwe sleutel' leeg en kies 'Ontkoppelen van de Hub' (dat wist ook de sleutel). Koppel daarna "
             "opnieuw met een koppelcode en vul de sleutel opnieuw in. Het bestand:"
             if sleutel_ingesteld
+            else f"De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. {RESET_HERSTEL} "
+            "Het bestand:"
+            if reset_mogelijk
             else "De executor kon zijn koppelbestand niet lezen en voert daarom niets uit. De executor koppelt niet "
             "met een koppeltoken, en er is geen bruikbare TrueNAS-schrijfsleutel (niet ingesteld of onleesbaar) "
             f"waarmee je dit hier kunt herstellen. {HERSTEL} Het bestand:"

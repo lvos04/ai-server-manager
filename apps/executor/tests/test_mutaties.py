@@ -245,6 +245,8 @@ EXEMPT = {
     # TrueNAS-schrijfsleutel tegen het vastgelegde NAS-adres en certificaat vóór er iets verandert.
     "write_key": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.9)",
     "manage": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.9)",
+    # Herstel bij een onleesbaar koppelbestand zonder schrijfsleutel: dezelfde regels plus een getypte bevestiging.
+    "reset_koppelbestand": "formulier-POST van de statuspagina (contract 1.3 §5, §3.7, §3.5)",
 }
 
 
