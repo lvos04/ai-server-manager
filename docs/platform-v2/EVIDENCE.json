@@ -1118,5 +1118,15 @@
     "opmerking": "S-P3-735 bewijst gegevensbehoud voor de eigen app. Een gezamenlijk herstel met de Hub en de aanmelddienst staat open.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-24"
+  },
+  {
+    "id": "REVIEW-ai-server-manager-nas-acceptatie",
+    "status": "Bezig",
+    "validatie": "Unit-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "docs/platform-v2/OVERDRACHT/NAS_ACCEPTATIE.md (N-P6-01 t/m N-P6-14) en apps/api/tests/unit/test_evidence_contract.py. De Forgejo-run hoort bij de commit die het draaiboek toevoegt.",
+    "blokkade": "",
+    "opmerking": "document; geen uitvoering. Het draaiboek is op geen enkele NAS doorlopen. De TrueNAS-menunamen komen uit jelly-leon-platform/install/truenas/INSTALLATIE.md en zijn niet op de NAS van de gebruiker gecontroleerd.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-26"
   }
 ]
