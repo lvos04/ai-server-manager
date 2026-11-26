@@ -62,7 +62,7 @@
   {
     "id": "B12-001",
     "status": "Geblokkeerd",
-    "validatie": "NIET GEVALIDEERD (echte NAS)",
+    "validatie": "NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
     "bewijs": "commit 2dd7592; apps/api/tests/unit/test_coverage.py; tests/e2e/test_wizard_inventory.py::test_volledige_wizard_en_inventaris_zonder_mutatie (dekking)",
     "blokkade": "Acceptatie vraagt een echte foto + app-DB uit OneDrive teruggezet in een geïsoleerde omgeving: echte NAS en OneDrive-account nodig (D04/D05).",
     "opmerking": "Gebouwd en Sim-getest: dekkingsmatrix per app/dataset met detectie van OneDrive-cloud-sync-taken (provider ONEDRIVE, laatste job), 'synchronisatie ≠ herstelgarantie' en registratie van hersteltests als bewijsrecord.",
