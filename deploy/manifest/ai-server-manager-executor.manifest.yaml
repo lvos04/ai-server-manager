@@ -17,7 +17,7 @@ install:
 image:
   repository: ghcr.io/lvos04/ai-server-manager-executor
   tag: "0.1.0"
-  digest: null
+  digest: "sha256:f1809cb1316c18b77478a93c930ee800e0154b34d9647dc46e661c4aa58523aa"
 custom_app:
   storage:
     - name: appdata
@@ -116,8 +116,4 @@ provenance:
   source_commit: null
   upstream_repo: null
   license: GPL-3.0
-accepted_findings:
-  - code: digest_pending_release
-    reden_nl: >-
-      Eigen image vóór de eerste release: de release-CI vult de digest in (release/digests.json). Tot dan blokkeert
-      de vertaling de installatie via de API met digest_not_pinned; de eerste installatie gaat met het formulier.
+accepted_findings: []

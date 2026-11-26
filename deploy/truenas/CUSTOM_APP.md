@@ -13,24 +13,24 @@ geen compose-bestand, geen terminal en geen `install.sh`.
 > kunnen per versie iets afwijken. Waarden tussen `<…>` vul je zelf in; er staan hier bewust geen voorbeeld-IP's of
 > poolnamen.
 
-> **Nog niet uitgebracht:** de tag `0.1.0` bestaat op GHCR pas nadat release `v0.1.0` is gemaakt (`release.yml`; zie
-> `CHANGELOG.md`). Tot dan kan TrueNAS de image niet ophalen; vul dus geen andere tag (en zeker niet `latest`) in.
-
 ## 0. Image en tag (publiek, met digest)
 
-De images staan op GHCR en worden **publiek** zodra de scan van besluit 3 klaar is (contract 1.3 §2.1); dan heb je
-**geen** registry-login nodig. De exacte tag én digest van een release staan in de release-bijlage
-`release/digests.json` (gemaakt door `release.yml`). Vul de tag in het formulier in als
-**`<versie>@sha256:<64 hex>`**, bijvoorbeeld `0.1.0@sha256:<digest uit digests.json>`. Dat is geldige Docker-syntax:
-TrueNAS maakt er `ghcr.io/lvos04/ai-server-manager:<versie>@sha256:…` van en haalt dan precies die image op.
+Neem voor release `v0.1.0` de **Repository** en de volledige **Tag** over uit de rij van de app die je installeert.
+De digest legt de inhoud van de image vast. Beide imagemanifesten waren op 26 november 2026 zonder aanmelding
+opvraagbaar bij GHCR. [Releasebijlage digests.json](https://github.com/lvos04/ai-server-manager/releases/download/v0.1.0/digests.json)
+
+| Custom App | Repository | Tag |
+|---|---|---|
+| Hub | `ghcr.io/lvos04/ai-server-manager` | `0.1.0@sha256:4accffc49b8d4180a302c974f4acf6e2c0d36b2a4fe458e80741b8ffc94546fa` |
+| Executor | `ghcr.io/lvos04/ai-server-manager-executor` | `0.1.0@sha256:f1809cb1316c18b77478a93c930ee800e0154b34d9647dc46e661c4aa58523aa` |
 
 > **NIET GEVALIDEERD (echte NAS):** of het TrueNAS-formulier een tag met `@` accepteert en of TrueNAS met zo'n tag nog
 > updates detecteert, is niet op een echte NAS getest (contract 1.3 §2.2). Weigert het formulier de tag, vul dan
-> alleen de exacte versie in (bv. `0.1.0`, nooit `latest`). De Hub leest na elke installatie of update via de
+> alleen de exacte versie in (`0.1.0` voor deze release). De Hub leest na elke installatie of update via de
 > executor de digest terug en stopt bij een afwijking.
 
-**Terugval: registry-login (alleen als de image nog privé is).** Zolang het pakket nog niet publiek is, kan TrueNAS het
-alleen ophalen met een registry-login: TrueNAS → **Apps → Configuration → Docker Registries → Add** (menunamen verschillen per versie), registry
+**Terugval bij een privépakket.** Voor een privépakket stel je in TrueNAS een registry-login in via
+**Apps → Configuration → Docker Registries → Add** (menunamen verschillen per versie), registry
 `ghcr.io`, je GitHub-gebruikersnaam en een token dat **alleen pakketten mag lezen** (`read:packages`). Dat token is een
 geheim van jou in TrueNAS: nooit in een formulierveld van de app, in een manifest, in Git of in een log. Gedrag van
 TrueNAS met GHCR-tokens: **NIET GEVALIDEERD (account/echte NAS)**. Beheerder van de repo: pakket publiek maken gaat via
@@ -57,7 +57,7 @@ submappen en verder van niets.
 |---|---|---|
 | Application Name | | `ai-server-manager` |
 | Image Configuration | Repository | `ghcr.io/lvos04/ai-server-manager` |
-| | Tag | `<versie>@sha256:<digest>` uit `release/digests.json` (stap 0); terugval: alleen de exacte versie, nooit `latest` |
+| | Tag | De volledige tag uit de rij **Hub** in stap 0 |
 | | Pull Policy | *Pull the image if it is not already present on host* |
 | Container Configuration | Entrypoint / Command | **leeg laten** |
 | | Timezone | je eigen tijdzone |
@@ -111,7 +111,7 @@ die alleen binnen de container (127.0.0.1) luistert. Je hoeft dus geen tweede po
 |---|---|---|
 | Application Name | | `ai-server-manager-executor` |
 | Image Configuration | Repository | `ghcr.io/lvos04/ai-server-manager-executor` |
-| | Tag | `<versie>@sha256:<digest>` van de executor uit `release/digests.json` (stap 0); terugval: alleen de exacte versie |
+| | Tag | De volledige tag uit de rij **Executor** in stap 0 |
 | | Pull Policy | *Pull the image if it is not already present on host* |
 | Container Configuration | Entrypoint / Command / Environment Variables | **leeg laten** |
 | | Timezone | je eigen tijdzone |
@@ -320,11 +320,11 @@ trek de oude in (Credentials → API Keys): de oude sleutel staat versleuteld in
 | Web-UI meldt "Offline-schil: niet actief" | Verwacht via `http://`: offline gebruik en installeren als app vereisen HTTPS (volgt met D17). |
 | `oude postmaster.pid ... verwijderd` | Geen fout: de vorige stop was onverwacht (stroom/kill). |
 | Poort bezet bij opslaan | Kies een andere vrije **Host Port**; de Container Port blijft `30400` / `30410`. |
-| Image kan niet worden opgehaald | Stap 0: het GHCR-pakket staat nog op privé (registry-login als terugval), of de digest hoort niet bij deze versie. |
+| Image kan niet worden opgehaald | Controleer de repository, tag en digest van de gekozen app in stap 0. Controleer bij een privépakket ook de registry-login. |
 | Formulier weigert de tag met `@sha256:` | Vul alleen de exacte versie in (stap 0); de digest-readback blijft de controle. |
 
 ## Niet doen
 
 - Geen *Install via YAML*, geen `custom_compose_config`, geen compose-bestand (compose in `deploy/dev/` is alleen voor
   ontwikkeling en CI).
-- Geen `latest`-tag, geen privileged-modus, geen Docker-socket, geen wachtwoorden in Environment Variables.
+- Geen zwevende tags, geen privileged-modus, geen Docker-socket, geen wachtwoorden in Environment Variables.

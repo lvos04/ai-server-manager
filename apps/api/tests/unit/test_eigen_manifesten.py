@@ -68,13 +68,21 @@ def test_beide_eigen_manifesten_gevonden() -> None:
 
 @pytest.mark.parametrize("pad", MANIFESTEN, ids=lambda p: p.name)
 def test_eigen_manifest_volgt_contract_1_3(pad: Path) -> None:
-    assert bevindingen(pad.read_text(encoding="utf-8")) == []
+    tekst = pad.read_text(encoding="utf-8")
+    assert bevindingen(tekst) == []
+    assert re.search(r"""^  digest: (["']?)sha256:[0-9a-f]{64}\1$""", tekst, re.MULTILINE)
 
 
 def test_monitorpad_bestaat_achter_de_webpoort() -> None:
     """Het monitorplan van de Hub wijst naar /readyz op de webpoort: de Node-doorgang stuurt dat door naar de API."""
     proxy = (ROOT / "apps" / "web" / "server" / "proxy.mjs").read_text(encoding="utf-8")
     assert '"/readyz"' in proxy
+
+
+def met_bevinding(tekst: str, code: str) -> str:
+    return tekst.replace(
+        "accepted_findings: []", f"accepted_findings:\n  - code: {code}\n    reden_nl: Negatieve test."
+    )
 
 
 @pytest.mark.parametrize(
@@ -85,11 +93,15 @@ def test_monitorpad_bestaat_achter_de_webpoort() -> None:
         (lambda t: re.sub(r"^  monitor: .*\n", "", t, flags=re.MULTILINE), "healthcheck_monitor_missing"),
         (lambda t: t.replace("pad: /readyz", "pad: /healthz"), "monitor_ongeldig"),
         (
-            lambda t: t.replace("- code: digest_pending_release", "- code: install_reason_ontbreekt"),
+            lambda t: met_bevinding(t, "install_reason_ontbreekt"),
             "accepted_finding_niet_toegestaan",
         ),
         (
-            lambda t: t.replace("  digest: null", '  digest: "sha256:' + "a" * 64 + '"'),
+            lambda t: met_bevinding(t, "digest_pending_release"),
+            "digest_pending_release_klopt_niet",
+        ),
+        (
+            lambda t: re.sub(r"^  digest: .+$", "  digest: null", t, flags=re.MULTILINE),
             "digest_pending_release_klopt_niet",
         ),
         (lambda t: t.replace('  tag: "0.1.0"', '  tag: "latest"'), "latest_tag"),
