@@ -208,6 +208,11 @@ def _executor_rondgang(keten: Keten, app: Any, ids: dict[str, str]) -> list[str]
         sleutel = {"truenas_sleutel": WRITE_KEY}
         formulier("/beheer", {**sleutel, "nieuwe_sleutel": WRITE_KEY, "actie": "vervangen"}, "is vervangen")
         formulier("/beheer", {**sleutel, "actie": "ontkoppelen"}, "Ontkoppeld van de Hub")
+        # Resetten kan alleen bij een onleesbaar koppelbestand: bevoegd verzoek, vaste melding (volledige pagina).
+        csrf = re.search(r'name="csrf" value="([^"]+)"', uit[-1])
+        assert csrf, uit[-1][:300]
+        reset = {"csrf": csrf.group(1), "bevestiging": "RESETTEN"}
+        assert "koppelbestand_leesbaar" in roep("POST", "/koppelbestand-resetten", 409, data=reset).text
         r = keten.stack.admin.post("/api/v1/services/pairing-codes", json={"app_id": "ai-server-manager-executor"})
         assert r.status_code == 201, r.text
         grant = r.json()
