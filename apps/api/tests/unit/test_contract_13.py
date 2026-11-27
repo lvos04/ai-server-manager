@@ -1,6 +1,6 @@
 """Contract 1.3 (``docs/platform-v2/PLATFORM_CONTRACTEN.md``) en de conformiteitslijst: volledig en kopieerbaar.
 
-- De kop zegt ``contracts 1.3``; het wijzigingslog 1.2 → 1.3 noemt elke contractgroep (a) uit de inventaris.
+- De huidige kop zegt ``contracts 1.4``; het wijzigingslog 1.2 → 1.3 noemt elke contractgroep (a) uit de inventaris.
 - Elke contractgroep staat ook in ``CONTRACT_1.3_CONFORMITEIT.md``; die lijst heeft een hoofdstuk per repo (alle 11),
   unieke ID's ``C1.3-<REPO>-<nn>`` en per regel een geldig moment (NU of een fase).
 - Geen relatieve links: in een byte-gelijke kopie in een andere repo zouden ze kapot zijn (contract, kop; A35).
@@ -59,9 +59,9 @@ def _wijzigingslog() -> str:
     return tekst[begin:eind]
 
 
-def test_kop_zegt_contracts_13() -> None:
+def test_kop_zegt_contracts_14() -> None:
     eerste = _tekst(CONTRACT).splitlines()[:5]
-    assert any(r.startswith("Versie: `contracts 1.3`") for r in eerste), eerste
+    assert any(r.startswith("Versie: `contracts 1.4`") for r in eerste), eerste
 
 
 def test_wijzigingslog_noemt_elke_contractgroep() -> None:
@@ -229,11 +229,10 @@ def _paragraaf(kop: str) -> str:
 
 
 def test_versieregel_blijft_letterlijk_staan() -> None:
-    """De aanvulling blijft 1.3: de versieregel (met de peildatum) is gelijk, want de versieparsers en de driftregel
-    van de kopieën lezen haar letterlijk (ADR-0031)."""
+    """De versieparsers en de driftregel van de kopieën lezen de versieregel letterlijk."""
     eerste = _tekst(CONTRACT).splitlines()[2]
     assert eerste == (
-        "Versie: `contracts 1.3` · Peildatum 2026-11-10 · Eigenaar: `lvos04/ai-server-manager` (bron van waarheid)."
+        "Versie: `contracts 1.4` · Peildatum 2026-11-27 · Eigenaar: `lvos04/ai-server-manager` (bron van waarheid)."
     )
 
 

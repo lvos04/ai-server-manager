@@ -7,24 +7,42 @@ Er wordt hier nooit iets geïnstalleerd of gewijzigd op de NAS.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyCookie, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hub import audit
+from hub.adapters.binding import confirmed_binding
 from hub.config import Settings
-from hub.deps import DB, Cursor, Idem, Limit, Operator, SettingsDep, Viewer, decode_cursor, encode_cursor
-from hub.errors import HubError
+from hub.deps import (
+    DB,
+    SESSION_COOKIE,
+    Cursor,
+    Idem,
+    Limit,
+    Operator,
+    Principal,
+    SettingsDep,
+    Viewer,
+    decode_cursor,
+    encode_cursor,
+    require_viewer_or_scope,
+)
+from hub.errors import HubError, trace_id_of
+from hub.inventory.poolstatus import Poolmeting, projecteer
 from hub.inventory.store import kind_state, latest_run
 from hub.jobs import job_dict
-from hub.models import Decision, Job, Service
-from hub.timeutil import iso
+from hub.models import AdapterLink, Decision, Job, Service
+from hub.scopes import POOLSTATUS_LEZEN
+from hub.timeutil import iso, utcnow
 from hub.truenas.connection import current_target
 
 router = APIRouter(prefix="/api/v1", tags=["inventaris"])
+PoolReader = Annotated[Principal, Depends(require_viewer_or_scope(POOLSTATUS_LEZEN))]
 
 PUBLIC_KINDS = {
     "apps": "apps",
@@ -92,6 +110,65 @@ def inventory_summary(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any
     }
 
 
+@router.get(
+    "/inventory/pools",
+    summary="Poolinventaris voor een kijker of de gekoppelde MediaGuard-dienstidentiteit",
+    response_model=None,
+    dependencies=[
+        Depends(
+            HTTPBearer(scheme_name="MediaGuardPooltoken", description="Token voor poolstatus.lezen", auto_error=False)
+        ),
+        Depends(APIKeyCookie(name=SESSION_COOKIE, scheme_name="HubSessie", auto_error=False)),
+    ],
+    responses={
+        200: {
+            "model": Poolmeting | dict[str, Any],
+            "description": "MediaGuard ontvangt Poolmeting. Een kijker ontvangt de bestaande gepagineerde inventaris.",
+        },
+        400: {"description": "MediaGuard vraagt de meting zonder queryparameters op"},
+        401: {"description": "Geen geldige sessie of ongeldig, vervangen of ingetrokken poolleestoken"},
+        403: {"description": "Onvoldoende gebruikersrol, ontbrekende scope of onbevestigde adapterbinding"},
+    },
+)
+def inventory_pools(
+    request: Request,
+    response: Response,
+    db: DB,
+    settings: SettingsDep,
+    principal: PoolReader,
+    limit: Limit = 200,
+    cursor: Cursor = None,
+) -> Poolmeting | dict[str, Any]:
+    """MediaGuard stuurt `Authorization: Bearer <pool_token>` met scope `poolstatus.lezen`.
+    De dienst krijgt alle toestanden uit één meting, zonder queryparameters of paginering."""
+    response.headers["Cache-Control"] = "no-store"
+    if principal.kind == "user":
+        return _inventory_page(_state(db, settings, "pools"), limit, cursor)
+    link = db.get_one(AdapterLink, uuid.UUID(principal.id))
+    nas = current_target(db)
+    if nas is None or not confirmed_binding(db, settings, link, nas):
+        raise HubError(
+            403, "forbidden", "De MediaGuard-koppeling kan niet worden bevestigd.", {"reason": "doelbinding"}
+        )
+    if request.query_params:
+        raise HubError(400, "bad_request", "De volledige poolmeting wordt zonder queryparameters opgevraagd.")
+    nu = utcnow()
+    staat = kind_state(db, "pools", target=nas.url, ttl_seconds=settings.inventory_max_age_seconds, now=nu)
+    meting = projecteer(staat, nu)
+    audit.record(
+        db,
+        actor_type="service",
+        actor_id=link.app_id,
+        action="inventory.pools.read",
+        target_type="adapter_link",
+        target_id=principal.id,
+        details={"scope": POOLSTATUS_LEZEN},
+        trace_id=trace_id_of(request),
+    )
+    db.commit()
+    return meting
+
+
 @router.get("/inventory/{soort}", summary="Eén soort uit de inventaris (alleen-lezen)")
 def inventory_kind(
     soort: str, db: DB, settings: SettingsDep, _: Viewer, limit: Limit = 200, cursor: Cursor = None
@@ -99,12 +176,15 @@ def inventory_kind(
     kind = PUBLIC_KINDS.get(soort)
     if kind is None:
         raise HubError(404, "not_found", f"Onbekende soort; kies uit: {', '.join(PUBLIC_KINDS)}.")
-    st = _state(db, settings, kind)
+    return _inventory_page(_state(db, settings, kind), limit, cursor)
+
+
+def _inventory_page(st: dict[str, Any], limit: int, cursor: str | None) -> dict[str, Any]:
     data = st.get("data")
     if isinstance(data, list):
         offset = decode_cursor(cursor) or 0
         page = data[offset : offset + limit]
-        if kind == "apps":
+        if st["kind"] == "apps":
             stale = st["status"] != "ok"
             page = [
                 {

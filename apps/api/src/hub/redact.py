@@ -69,7 +69,7 @@ _PEM_RE = re.compile(r"-----BEGIN [A-Z0-9 ]+-----.*?(-----END [A-Z0-9 ]+-----|$)
 _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{0,}")
 _KV_RE = re.compile(rf"(?i)(\b(?:{_GEHEIME_VELDNAMEN})\b[\"']?\s*[:=]\s*[\"']?)([^\s\"',;&}}]+)")
 _PREFIX_RE = re.compile(
-    r"\b(?:svc|enr|ses|csrf|ghp|gho|ghs|ghu|github_pat|xox[abprs]|sk|rk|pk|uk\d+)_[A-Za-z0-9_-]{8,}"
+    r"\b(?:svc|mgp|enr|ses|csrf|ghp|gho|ghs|ghu|github_pat|xox[abprs]|sk|rk|pk|uk\d+)_[A-Za-z0-9_-]{8,}"
     r"|\bAKIA[0-9A-Z]{16}\b"
 )
 _HEX_RE = re.compile(r"(?<![A-Za-z0-9:])(?<!sha256:)[A-Fa-f0-9]{32,}(?![A-Za-z0-9])")

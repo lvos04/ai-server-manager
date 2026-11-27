@@ -18,12 +18,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import ColumnElement
 
+from hub.adapters import mediaguard
 from hub.config import Settings
 from hub.errors import HubError
 from hub.keys import KeyRing
-from hub.models import IdempotencyRecord, OidcConfig, Service, ServiceToken, User, WebSession
+from hub.models import AdapterLink, IdempotencyRecord, OidcConfig, Service, ServiceToken, User, WebSession
 from hub.oidc import IDEMPOTENCY_ROUTES
-from hub.scopes import has_scope
+from hub.scopes import POOLSTATUS_LEZEN, has_scope
 from hub.security import ROLE_RANK, Role, constant_eq, sha256_hex
 from hub.timeutil import utcnow
 from hub.vault import Vault, VaultError
@@ -70,7 +71,7 @@ ReadableVault = Annotated[Vault | None, Depends(get_readable_vault)]
 
 @dataclass
 class Principal:
-    kind: str  # user | service
+    kind: str  # user | service (enrollment) | adapter (expliciet poolleesrecht)
     id: str
     name: str
     role: Role | None = None
@@ -221,6 +222,16 @@ def visible_oidc_session(now: datetime, settings: Settings) -> ColumnElement[boo
 def optional_principal(request: Request, db: DB, settings: SettingsDep) -> Principal | None:
     token = _bearer(request)
     if token:
+        if token.startswith(mediaguard.POOL_TOKEN_PREFIX + "_"):
+            # Het gedeelde rijslot ordent een lezing en een gelijktijdige intrekking of doelwijziging.
+            link = db.scalar(
+                select(AdapterLink)
+                .where(AdapterLink.app_id == mediaguard.APP_ID, AdapterLink.pool_token_hash == sha256_hex(token))
+                .with_for_update(read=True)
+            )
+            if link is None:
+                raise HubError(401, "unauthorized", "Ongeldig poolleestoken.", {"reason": "invalid_token"})
+            return Principal("adapter", str(link.id), link.app_id)
         return _service_principal(request, db, settings, token)
     return _session_principal(request, db, settings)
 
@@ -239,6 +250,8 @@ def require_user(min_role: Role) -> Callable[..., Principal]:
 
 
 def require_service(principal: Annotated[Principal | None, Depends(optional_principal)]) -> Principal:
+    if principal is not None and principal.kind == "adapter":
+        raise HubError(403, "forbidden", "Het poolleesrecht geeft geen toegang tot deze dienstroute.")
     if principal is None or principal.kind != "service":
         raise HubError(
             401, "unauthorized", "Service-token vereist (Authorization: Bearer).", {"reason": "invalid_token"}
@@ -249,7 +262,7 @@ def require_service(principal: Annotated[Principal | None, Depends(optional_prin
 def require_viewer_or_service(principal: Annotated[Principal | None, Depends(optional_principal)]) -> Principal:
     if principal is None:
         raise HubError(401, "unauthorized", "Niet aangemeld.")
-    if principal.kind == "user" and (principal.role is None or ROLE_RANK[principal.role] < ROLE_RANK[Role.viewer]):
+    if principal.kind != "service" and (principal.role is None or ROLE_RANK[principal.role] < ROLE_RANK[Role.viewer]):
         raise HubError(403, "forbidden", "Hiervoor is minimaal de rol 'viewer' nodig.")
     return principal
 
@@ -261,8 +274,13 @@ def require_viewer_or_scope(scope: str | None) -> Callable[..., Principal]:
     def dep(principal: Annotated[Principal | None, Depends(optional_principal)]) -> Principal:
         if principal is None:
             raise HubError(401, "unauthorized", "Niet aangemeld.")
-        if principal.kind == "service":
-            if scope is None or not has_scope(principal.service_app_id, scope):
+        if principal.kind in ("service", "adapter"):
+            toegestaan = (
+                principal.kind == "adapter" and principal.name == mediaguard.APP_ID
+                if scope == POOLSTATUS_LEZEN
+                else principal.kind == "service" and scope is not None and has_scope(principal.service_app_id, scope)
+            )
+            if not toegestaan:
                 raise HubError(
                     403,
                     "scope_ontbreekt",

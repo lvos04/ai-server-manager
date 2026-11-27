@@ -483,6 +483,7 @@ class AdapterLink(Base):
     my_house_status: Mapped[str | None] = mapped_column(String(16))  # Voor terugrol naar 0019.
     my_house_checks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     health_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    pool_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
 
 
 class AdapterHouseSnapshot(Base):

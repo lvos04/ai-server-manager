@@ -59,6 +59,11 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/sessions/{session_id}/revoke"): "kind",
     ("GET", "/api/v1/audit"): "admin",
     ("GET", "/api/v1/audit/verify"): "admin",
+    ("GET", "/api/v1/ai/providers"): "viewer",
+    ("GET", "/api/v1/ai/audit"): "admin",
+    ("GET", "/api/v1/ai/kennis/{incident_id}"): "viewer",
+    ("POST", "/api/v1/ai/diagnose"): "operator",
+    ("POST", "/api/v1/ai/plan"): "operator",
     ("GET", "/api/v1/incidents"): "viewer",
     ("GET", "/api/v1/incidents/samenvatting"): "viewer",
     ("GET", "/api/v1/incidents/downloadketen/{wanted_id}"): "viewer",
@@ -105,6 +110,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("PATCH", "/api/v1/adapterkoppelingen/{link_id}"): "admin",
     ("DELETE", "/api/v1/adapterkoppelingen/{link_id}"): "admin",
     ("POST", "/api/v1/adapterkoppelingen/{link_id}/test"): "admin",
+    ("PUT", "/api/v1/adapterkoppelingen/{link_id}/poolleesrecht"): "admin",
     ("GET", "/api/v1/monitoring/sources"): "operator",
     ("POST", "/api/v1/monitoring/sources"): "admin",
     ("GET", "/api/v1/monitoring/sources/{source_id}"): "operator",
@@ -161,6 +167,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/inventory"): "viewer",
     ("POST", "/api/v1/inventory/refresh"): "operator",
     ("GET", "/api/v1/inventory/{soort}"): "viewer",
+    ("GET", "/api/v1/inventory/pools"): VIEWER_OR_SERVICE,
     ("GET", "/api/v1/jobs"): "viewer",
     ("GET", "/api/v1/jobs/{job_id}"): "viewer",
     ("GET", "/api/v1/registry/services"): "viewer",
@@ -193,7 +200,7 @@ MATRIX: dict[tuple[str, str], str] = {
 PATH_VALUES = {
     "wanted_id": "42",
     "decision_id": "D03",
-    "soort": "pools",
+    "soort": "datasets",  # De letterlijke poolroute heeft haar eigen rechtenrij.
     "gate_id": "deploy",
     "evidence_id": "onbekend",
 }

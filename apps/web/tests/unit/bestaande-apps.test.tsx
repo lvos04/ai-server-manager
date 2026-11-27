@@ -92,6 +92,17 @@ describe("Bestaande apps onder Diensten", () => {
     expect(html).toContain(">Gekoppeld<");
     expect(html).not.toMatch(/<(input|form)\b|>Ontkoppelen<|>Testen</);
   });
+  it("biedt poolleesrecht alleen op de bestaande MediaGuard-koppeling aan de beheerder", () => {
+    const link = { ...huis, app_id: "mediaguard", catalog_app_id: "installatie-mediaguard",
+      verbinding: { status: "unknown", observed_at: null }, poolleesrecht: false };
+    proef.lijst = { data: { items: [link], next_cursor: null } };
+    expect(kaart().match(/Poolleesrecht toekennen/g)).toHaveLength(1);
+    link.poolleesrecht = true;
+    expect(kaart()).toContain("Poolleesrecht intrekken");
+    expect(kaart()).toContain("Pooltoken vervangen");
+    proef.rol = "viewer";
+    expect(kaart()).not.toContain("Poolleesrecht intrekken");
+  });
   it("toont na weigering geen oude koppeling en biedt opnieuw ophalen aan", () => {
     meting("healthy", new Date().toISOString());
     proef.lijst.error = new HubApiError(403, "forbidden", "Geen toegang.");

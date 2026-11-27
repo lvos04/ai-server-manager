@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { Field } from "@/components/Field";
 import { Freshness, useNow } from "@/components/Freshness";
+import { KopieerVeld } from "@/components/KopieerVeld";
 import { Loading } from "@/components/Loading";
 import { Melding } from "@/components/Melding";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -18,7 +19,7 @@ import {
   type Koppeling, type Pagina, type Probleem, type Veld, veiligAdres,
 } from "./adapterweergave";
 
-type Actie = "Opslaan" | "Testen" | "Ontkoppelen";
+type Actie = "Opslaan" | "Testen" | "Ontkoppelen" | "Pooltoken uitgeven" | "Poolleesrecht intrekken";
 const CONTACTWOORDEN: Record<string, string> = { healthy: "Bereikbaar", degraded: "Beperkt", down: "Niet bereikbaar" };
 
 function verbindingsuitval(error: HubApiError) {
@@ -42,6 +43,7 @@ function AppKaart({ app, doel, koppeling, beheer, inventarisActueel, laatstBeken
   const [bezig, zetBezig] = useState<Actie | null>(null);
   const [fout, zetFout] = useState<Probleem | null>(null);
   const [melding, zetMelding] = useState("");
+  const [pooltoken, zetPooltoken] = useState<{ waarde: string; versie: number } | null>(null);
   const [mislukteProef, zetMislukteProef] = useState<string | null>(null);
   const invoer = useRef<HTMLInputElement>(null);
   const bezigRef = useRef(false);
@@ -73,10 +75,13 @@ function AppKaart({ app, doel, koppeling, beheer, inventarisActueel, laatstBeken
     zetBezig(actie);
     zetMelding("");
     zetFout(null);
+    zetPooltoken(null);
     const bedoeling = [actie, pad, koppeling?.version].join("/");
     if (poging.current?.bedoeling !== bedoeling) poging.current = { bedoeling, sleutel: uuidv4() };
     try {
-      const { data } = await apiRequest<{ id?: string; version?: number; verwijderd?: boolean }>(actie === "Testen" ? pad + "/test" : pad, {
+      const poolrecht = actie === "Pooltoken uitgeven" || actie === "Poolleesrecht intrekken";
+      const route = poolrecht ? pad + "/poolleesrecht" : actie === "Testen" ? pad + "/test" : pad;
+      const { data } = await apiRequest<{ id?: string; version?: number; verwijderd?: boolean; pool_token?: string }>(route, {
         ...opties, idempotencyKey: poging.current.sleutel,
       });
       if (actie === "Ontkoppelen" ? data?.verwijderd !== true : !data?.id || !Number.isInteger(data.version)) {
@@ -84,6 +89,15 @@ function AppKaart({ app, doel, koppeling, beheer, inventarisActueel, laatstBeken
       }
       poging.current = null;
       zetMislukteProef(null);
+      if (poolrecht) {
+        if (actie === "Pooltoken uitgeven" && data.pool_token && data.version !== undefined) {
+          zetPooltoken({ waarde: data.pool_token, versie: data.version });
+        }
+        await vernieuw();
+        zetMelding(actie === "Poolleesrecht intrekken" ? "Poolleesrecht ingetrokken." : data.pool_token
+          ? "Neem het token nu over in MediaGuard." : "Het token is al uitgegeven. Vervang het als je het niet hebt ontvangen.");
+        return;
+      }
       if (actie !== "Testen") formulier.current?.reset();
       await vernieuw();
       zetMelding(actie === "Opslaan" ? "Koppeling opgeslagen." : actie === "Ontkoppelen" ? "Koppeling verwijderd uit de Hub." : "Contactproef uitgevoerd.");
@@ -178,6 +192,25 @@ function AppKaart({ app, doel, koppeling, beheer, inventarisActueel, laatstBeken
             <Melding soort="fout" role="alert" titel="Handeling mislukt" id={id + "-fout"}>
               {fout.veld && kanOpslaan ? <a className="losse-link" href={"#" + id + "-" + fout.veld}>{fout.tekst}</a> : <p>{fout.tekst}</p>}
             </Melding>
+          ) : null}
+          {app === "mediaguard" && koppeling ? (
+            <div className="flex flex-col gap-2">
+              <p>Poolstatus lezen · {koppeling.poolleesrecht ? "Toegekend" : "Uit"}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button uit={!kanOpslaan || Boolean(bezig)} onClick={() => void verstuur("Pooltoken uitgeven", {
+                  method: "PUT", body: { ingeschakeld: true }, ifMatch: `"${koppeling.version}"`,
+                })}>{koppeling.poolleesrecht ? "Pooltoken vervangen" : "Poolleesrecht toekennen"}</Button>
+                {koppeling.poolleesrecht ? <Button uit={Boolean(bezig)} onClick={() => void verstuur("Poolleesrecht intrekken", {
+                  method: "PUT", body: { ingeschakeld: false }, ifMatch: `"${koppeling.version}"`,
+                })}>Poolleesrecht intrekken</Button> : null}
+              </div>
+              {pooltoken && pooltoken.versie === koppeling.version && koppeling.poolleesrecht ? (
+                <>
+                  <KopieerVeld label="Eenmalig getoond pooltoken voor MediaGuard" waarde={pooltoken.waarde} />
+                  <div><Button onClick={() => zetPooltoken(null)}>Token verbergen</Button></div>
+                </>
+              ) : null}
+            </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button uit={!koppeling || Boolean(bezig)} bezig={bezig === "Testen"} aria-describedby={!koppeling ? id + "-reden" : undefined}

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from hub.adapters import basis
 
 APP_ID = "mediaguard"
+POOL_TOKEN_PREFIX = "mgp"  # noqa: S105 — openbaar voorvoegsel voor de tokenuitgifte
 REASON_CODE: Final = "geen_alleen_lezen_bron"
 
 

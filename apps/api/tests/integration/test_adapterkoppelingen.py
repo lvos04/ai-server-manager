@@ -109,6 +109,142 @@ def invoer(waarde: str) -> dict[str, str]:
     return {**idem(), "X-Adapter-Credential": waarde}
 
 
+def test_poolleesrecht_uitgifte_lezen_en_intrekken(admin: Any, app: Any, doel: dict[str, Any]) -> None:
+    sleutel = secrets.token_urlsafe()
+    created = admin.post(ROUTE, json=doel, headers=invoer(sleutel))
+    assert created.status_code == 201
+    link_id = created.json()["id"]
+    koppeling = f"{ROUTE}/{link_id}"
+    beheer = koppeling + "/poolleesrecht"
+    pools = "/api/v1/inventory/pools"
+    assert admin.get(koppeling).json()["poolleesrecht"] is False
+    assert admin.get(pools, headers={"Authorization": f"Bearer {sleutel}"}).status_code == 401
+    for dienst in ("mediaguard", "jelly-leon-platform"):
+        grant = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": dienst}).json()
+        diensttoken = admin.post("/api/v1/services/enroll", json=enroll_body(dienst, token=grant["enrollment_token"]))
+        assert diensttoken.status_code == 200
+        geweigerd = admin.get(pools, headers={"Authorization": f"Bearer {diensttoken.json()['service_token']}"})
+        assert geweigerd.status_code == 403 and geweigerd.json()["details"] == {"vereiste_scope": "poolstatus.lezen"}
+
+    aanvraag = {**idem(), "If-Match": created.headers["ETag"]}
+    uitgifte = admin.put(beheer, headers=aanvraag, json={"ingeschakeld": True})
+    assert uitgifte.status_code == 200 and uitgifte.headers["Cache-Control"] == "no-store"
+    token = uitgifte.json()["pool_token"]
+    replay = admin.put(beheer, headers=aanvraag, json={"ingeschakeld": True})
+    assert replay.status_code == 200 and replay.headers["ETag"] == uitgifte.headers["ETag"]
+    assert replay.json() == {"id": link_id, "version": uitgifte.json()["version"]}
+    assert admin.get(koppeling).json()["poolleesrecht"] is True
+
+    gemeten = utcnow() - timedelta(seconds=30)
+    with app.state.sessionmaker.begin() as db:
+        nas = current_target(db)
+        assert nas is not None
+        rijen = normalize.pools(
+            [{"name": f"testpool-{i}", "status": "ONLINE", "healthy": True} for i in range(201)]
+            + [{"name": "testpool-laatste", "status": "DEGRADED", "healthy": False}]
+        )
+        save_run(
+            db,
+            CollectResult(
+                "ok", None, nas.url, kinds=[KindResult("pools", "ok", None, "", "pool.query", rijen, gemeten)]
+            ),
+            trigger="test",
+        )
+    with TestClient(app, base_url="https://testserver") as dienst:
+        assert dienst.get(pools).status_code == 401
+        dienst.headers["Authorization"] = f"Bearer {token}"
+        meting = dienst.get(pools)
+        assert meting.status_code == 200 and meting.headers["Cache-Control"] == "no-store"
+        assert meting.json() == {
+            "kind": "pools",
+            "status": "ok",
+            "reason_code": None,
+            "observed_at": iso(gemeten),
+            "geldig_tot": iso(gemeten + timedelta(seconds=900)),
+            "items": [{"status": "ONLINE", "gezond": True}] * 201 + [{"status": "DEGRADED", "gezond": False}],
+        }
+        opnieuw = dienst.get(pools)
+        assert opnieuw.json() == meting.json()
+        aanvragen = {meting.headers["X-Trace-Id"], opnieuw.headers["X-Trace-Id"]}
+        kijker = admin.get(pools, params={"limit": 1}).json()
+        assert kijker["totaal"] == 202 and len(kijker["items"]) == 1 and kijker["next_cursor"]
+        assert dienst.get(pools, params={"limit": 1}).status_code == 400
+        for pad in (
+            "/api/v1/inventory",
+            "/api/v1/inventory/datasets",
+            "/api/v1/observability/nas",
+            "/api/v1/ai/providers",
+            "/api/v1/apps",
+            "/api/v1/services/self",
+            "/connector/v1/discover",
+            "/connector/v1/items?type=decision",
+            koppeling,
+        ):
+            assert dienst.get(pad).status_code == 403, pad
+        for pad in (
+            "/api/v1/inventory/refresh",
+            "/api/v1/events/inbox",
+            "/api/v1/services/self/rotate",
+            "/api/v1/ai/plan",
+        ):
+            assert dienst.post(pad, headers=idem(), json={}).status_code == 403, pad
+        for methode in ("POST", "PUT", "PATCH", "DELETE"):
+            assert dienst.request(methode, pools).status_code == 405
+        assert dienst.put(beheer, json={"ingeschakeld": True}, headers=idem()).status_code == 403
+        assert admin.put(beheer, json={"ingeschakeld": False}, headers=idem()).status_code == 200
+        assert dienst.get(pools).status_code == 401
+        assert admin.put(beheer, headers=aanvraag, json={"ingeschakeld": True}).json() == replay.json()
+        assert dienst.get(pools).status_code == 401
+
+    with app.state.sessionmaker() as db:
+        gebruik = db.scalars(select(AuditEvent).where(AuditEvent.action == "inventory.pools.read")).all()
+        assert len(gebruik) == 2
+        assert {e.trace_id for e in gebruik} == aanvragen
+        assert all(
+            (e.actor_type, e.actor_id, e.target_id, e.details)
+            == ("service", "mediaguard", link_id, {"scope": "poolstatus.lezen"})
+            for e in gebruik
+        )
+        assert token not in str(db.scalars(select(IdempotencyRecord.response_body)).all())
+    assert token not in admin.get(koppeling).text and token not in admin.get("/api/v1/audit").text
+
+
+def test_poolleesrecht_vervanging_doelbinding_en_ontkoppeling(admin: Any, app: Any, doel: dict[str, Any]) -> None:
+    created = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
+    koppeling = f"{ROUTE}/{created.json()['id']}"
+    beheer = koppeling + "/poolleesrecht"
+    pools = "/api/v1/inventory/pools"
+
+    def uitgeven() -> dict[str, str]:
+        antwoord = admin.put(beheer, json={"ingeschakeld": True}, headers=idem())
+        assert antwoord.status_code == 200
+        return {"Authorization": f"Bearer {antwoord.json()['pool_token']}"}
+
+    oud, nieuw = uitgeven(), uitgeven()
+    assert admin.get(pools, headers=oud).status_code == 401
+    bereikbaar = admin.get(pools, headers=nieuw)
+    assert bereikbaar.status_code == 200 and bereikbaar.json()["status"] == "unknown"
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {ANDERE_APP_ID: (443,)})
+    assert admin.get(pools, headers=nieuw).status_code == 403
+    assert admin.put(beheer, json={"ingeschakeld": True}, headers=idem()).status_code == 409
+    with app.state.sessionmaker.begin() as db:
+        _bewaar_apps(db, {APP_ID: (443, 8443)})
+    gewijzigd = admin.patch(koppeling, json={"doel_bevestigd": True}, headers=invoer(secrets.token_urlsafe()))
+    assert gewijzigd.status_code == 200 and admin.get(pools, headers=nieuw).status_code == 401
+    laatst = uitgeven()
+    assert admin.delete(koppeling, headers=idem()).status_code == 200
+    assert admin.get(pools, headers=laatst).status_code == 401
+
+
+@pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+def test_poolleesrecht_niet_op_een_andere_adapter(admin: Any, doel: dict[str, Any]) -> None:
+    created = admin.post(ROUTE, json=doel, headers=idem())
+    assert created.status_code == 201
+    beheer = f"{ROUTE}/{created.json()['id']}/poolleesrecht"
+    assert admin.put(beheer, json={"ingeschakeld": True}, headers=idem()).status_code == 403
+
+
 def test_beheer_kluis_replay_redactie_en_ontkoppelen(
     admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch, caplog: Any
 ) -> None:

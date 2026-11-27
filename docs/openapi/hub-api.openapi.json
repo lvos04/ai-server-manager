@@ -2203,6 +2203,10 @@
           "mediaguard": {
             "$ref": "#/components/schemas/Readings"
           },
+          "poolleesrecht": {
+            "title": "Poolleesrecht",
+            "type": "boolean"
+          },
           "verbinding": {
             "$ref": "#/components/schemas/Measurement"
           },
@@ -2221,7 +2225,8 @@
           "verbinding",
           "gezondheid",
           "version",
-          "mediaguard"
+          "mediaguard",
+          "poolleesrecht"
         ],
         "title": "MediaGuardLinkView",
         "type": "object"
@@ -2846,6 +2851,139 @@
           "goedkeuring_nodig"
         ],
         "title": "PlanUit",
+        "type": "object"
+      },
+      "Pool": {
+        "properties": {
+          "gezond": {
+            "title": "Gezond",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "gezond"
+        ],
+        "title": "Pool",
+        "type": "object"
+      },
+      "Poolmeting": {
+        "properties": {
+          "geldig_tot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Einde van de geldigheid in UTC, uiterlijk 900 s na de meting.",
+            "title": "Geldig Tot"
+          },
+          "items": {
+            "description": "Alle pools uit dezelfde meting. Leeg bij een onbekende meting.",
+            "items": {
+              "$ref": "#/components/schemas/Pool"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "const": "pools",
+            "default": "pools",
+            "title": "Kind",
+            "type": "string"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UTC-bronmeettijd van de gezamenlijke meting.",
+            "title": "Observed At"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason_code",
+          "observed_at",
+          "geldig_tot",
+          "items"
+        ],
+        "title": "Poolmeting",
+        "type": "object"
+      },
+      "PoolrechtIn": {
+        "additionalProperties": false,
+        "properties": {
+          "ingeschakeld": {
+            "title": "Ingeschakeld",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ingeschakeld"
+        ],
+        "title": "PoolrechtIn",
+        "type": "object"
+      },
+      "PoolrechtReceipt": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "pool_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alleen bij de eerste afgifte van een nieuw poolleestoken.",
+            "title": "Pool Token"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "title": "PoolrechtReceipt",
         "type": "object"
       },
       "ProposalIn": {
@@ -5034,6 +5172,18 @@
         "title": "SnoozeIn",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "HubSessie": {
+        "in": "cookie",
+        "name": "hub_session",
+        "type": "apiKey"
+      },
+      "MediaGuardPooltoken": {
+        "description": "Token voor poolstatus.lezen",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -6032,6 +6182,85 @@
           }
         },
         "summary": "MediaGuard-overzicht lezen (alleen lezen)",
+        "tags": [
+          "adapterkoppelingen"
+        ]
+      }
+    },
+    "/api/v1/adapterkoppelingen/{link_id}/poolleesrecht": {
+      "put": {
+        "description": "Bij inschakelen verschijnt `pool_token` eenmaal. Dezelfde Idempotency-Key geeft daarna alleen de bevestiging.",
+        "operationId": "poolleesrecht_api_v1_adapterkoppelingen__link_id__poolleesrecht_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolrechtIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolrechtReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Poolleesrecht voor MediaGuard uitgeven, vervangen of intrekken (beheerder)",
         "tags": [
           "adapterkoppelingen"
         ]
@@ -10302,6 +10531,98 @@
           }
         },
         "summary": "Overzicht per soort: status, observed_at, veroudering",
+        "tags": [
+          "inventaris"
+        ]
+      }
+    },
+    "/api/v1/inventory/pools": {
+      "get": {
+        "description": "MediaGuard stuurt `Authorization: Bearer <pool_token>` met scope `poolstatus.lezen`.\nDe dienst krijgt alle toestanden uit één meting, zonder queryparameters of paginering.",
+        "operationId": "inventory_pools_api_v1_inventory_pools_get",
+        "parameters": [
+          {
+            "description": "Maximaal 200 per pagina.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "description": "Maximaal 200 per pagina.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Cursor uit `next_cursor` van de vorige pagina.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor uit `next_cursor` van de vorige pagina.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Poolmeting"
+                    },
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  ],
+                  "title": "Response 200 Inventory Pools Api V1 Inventory Pools Get"
+                }
+              }
+            },
+            "description": "MediaGuard ontvangt Poolmeting. Een kijker ontvangt de bestaande gepagineerde inventaris."
+          },
+          "400": {
+            "description": "MediaGuard vraagt de meting zonder queryparameters op"
+          },
+          "401": {
+            "description": "Geen geldige sessie of ongeldig, vervangen of ingetrokken poolleestoken"
+          },
+          "403": {
+            "description": "Onvoldoende gebruikersrol, ontbrekende scope of onbevestigde adapterbinding"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "MediaGuardPooltoken": []
+          },
+          {
+            "HubSessie": []
+          }
+        ],
+        "summary": "Poolinventaris voor een kijker of de gekoppelde MediaGuard-dienstidentiteit",
         "tags": [
           "inventaris"
         ]

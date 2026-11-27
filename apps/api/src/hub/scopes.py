@@ -6,6 +6,8 @@ intrekking (§3.8). Nooit geheimen via deze routes.
 
 - ``inventaris.lezen``: ``GET /api/v1/apps`` en ``GET /api/v1/apps/{id}`` (gepagineerd over een momentopname, §5).
 - ``catalogus.lezen``: ``GET /api/v1/catalog/availability`` voor één vastgezette versie (§4.4, M3).
+- ``poolstatus.lezen`` (1.4): uitsluitend per bevestigde MediaGuard-adapter; de algemene diensttokens krijgen dit
+  recht niet via de vaste tabel hieronder.
 - ``besluiten.lezen``: ``GET /connector/v1/items?type=decision`` — standaard aan **geen** dienst (K6: gemeten leest geen
   dienst besluiten van de Hub). Toekennen vraagt een ADR met de lijst per besluittype.
 
@@ -18,11 +20,13 @@ from __future__ import annotations
 INVENTARIS_LEZEN = "inventaris.lezen"
 CATALOGUS_LEZEN = "catalogus.lezen"
 BESLUITEN_LEZEN = "besluiten.lezen"
+POOLSTATUS_LEZEN = "poolstatus.lezen"
 
 ALLE_SCOPES: dict[str, str] = {
     INVENTARIS_LEZEN: "Inventaris lezen: GET /api/v1/apps en /api/v1/apps/{id}",
     CATALOGUS_LEZEN: "Catalogusbeschikbaarheid lezen: GET /api/v1/catalog/availability",
     BESLUITEN_LEZEN: "Besluiten lezen: GET /connector/v1/items?type=decision (standaard aan geen enkele dienst)",
+    POOLSTATUS_LEZEN: "Poolstatus lezen: GET /api/v1/inventory/pools (per MediaGuard-koppeling toegekend)",
 }
 
 # Contract 1.3 §4.4, tabel "Diensten (v1)". Vast in de Hub; niet door de dienst te kiezen.

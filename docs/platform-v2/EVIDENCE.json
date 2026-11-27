@@ -510,6 +510,26 @@
     "bijgewerkt": "2026-11-10"
   },
   {
+    "id": "C1.4-ALG-01",
+    "status": "Bezig",
+    "validatie": "Unit-getest",
+    "bewijs": "apps/api/tests/unit/test_contract_pin.py controleert beide 1.4-documenten op hun vaste SHA-256 en de verwijzingen naar poolstatus.lezen.",
+    "blokkade": "",
+    "opmerking": "De bron is vastgelegd. Het overnemen van de kopieën en pins per afnemende repo volgt in de orkestratie.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-27"
+  },
+  {
+    "id": "C1.4-ASM-01",
+    "status": "Bezig",
+    "validatie": "Unit-getest; NIET GEVALIDEERD (echte NAS)",
+    "bewijs": "apps/api/tests/unit/test_poolstatus.py beproeft de volledige poolprojectie, de kortere brontermijn bij herhaald lezen en het weigeren van onvolledige of verlopen metingen. apps/api/tests/unit/test_contract_pin.py controleert het bijbehorende contract.",
+    "blokkade": "De toepassing als tweede poolbron in MediaGuard en de integrale proef van EX11 volgen in S-P3-690 en S-P6-20. NIET GEVALIDEERD (echte NAS).",
+    "opmerking": "Hub-deel van poolstatus.lezen. De beheerder verleent het recht aan een specifieke adapterkoppeling. Iedere toegelaten dienstlezing krijgt een eigen auditregel.",
+    "repo": "ai-server-manager",
+    "bijgewerkt": "2026-11-27"
+  },
+  {
     "id": "C1.3-ALG-01",
     "status": "Bezig",
     "validatie": "Unit-getest",

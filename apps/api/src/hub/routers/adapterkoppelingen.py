@@ -17,7 +17,14 @@ from sqlalchemy import select, update
 
 from hub import audit
 from hub.adapters import basis, mediaguard, mediaguard_lezen, mso, my_house
-from hub.adapters.binding import binding_is_current, published_ports, registered_peers, registered_port, target_matches
+from hub.adapters.binding import (
+    binding_is_current,
+    confirmed_binding,
+    published_ports,
+    registered_peers,
+    registered_port,
+    target_matches,
+)
 from hub.adapters.health import stored_health
 from hub.backup.appdekking import Meting, huisrapport
 from hub.config import Settings
@@ -36,6 +43,7 @@ from hub.models import (
     VaultSecret,
 )
 from hub.outbound import OutboundError
+from hub.security import new_token, sha256_hex
 from hub.timeutil import UtcDateTime, utcnow
 from hub.truenas.connection import NasTarget, current_target
 from hub.vault import Vault, VaultError, make_ref
@@ -92,6 +100,7 @@ class LinkView(BaseModel):
 
 class MediaGuardLinkView(LinkView):
     mediaguard: mediaguard.Readings
+    poolleesrecht: bool
 
 
 class LinkList(BaseModel):
@@ -107,6 +116,18 @@ class HouseLinks(BaseModel):
 class LinkReceipt(BaseModel):
     id: uuid.UUID
     version: int
+
+
+class PoolrechtIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ingeschakeld: bool = Field(strict=True)
+
+
+class PoolrechtReceipt(LinkReceipt):
+    pool_token: str | None = Field(
+        default=None, description="Alleen bij de eerste afgifte van een nieuw poolleestoken."
+    )
 
 
 class MsoTestReceipt(LinkReceipt):
@@ -158,7 +179,9 @@ def _view(row: AdapterLink, *, bound: bool) -> MediaGuardLinkView | LinkView:
         version=row.version,
     )
     if is_mediaguard:
-        return MediaGuardLinkView(**view.model_dump(), mediaguard=mediaguard.Readings())
+        return MediaGuardLinkView(
+            **view.model_dump(), mediaguard=mediaguard.Readings(), poolleesrecht=row.pool_token_hash is not None
+        )
     return view
 
 
@@ -589,6 +612,45 @@ def create_link(
     return _save_link(idem, 201, row)
 
 
+@router.put(
+    "/{link_id}/poolleesrecht",
+    response_model=PoolrechtReceipt,
+    summary="Poolleesrecht voor MediaGuard uitgeven, vervangen of intrekken (beheerder)",
+)
+def poolleesrecht(
+    link_id: uuid.UUID,
+    body: PoolrechtIn,
+    db: DB,
+    admin: Admin,
+    idem: Idem,
+    settings: SettingsDep,
+    if_match: IfMatch = None,
+) -> JSONResponse:
+    """Bij inschakelen verschijnt `pool_token` eenmaal. Dezelfde Idempotency-Key geeft daarna alleen de bevestiging."""
+    if (replay := _replay_link(idem)) is not None:
+        return replay
+    row = _link(db, link_id, lock=True)
+    if (replay := _replay_link(idem)) is not None:
+        return replay
+    _precondition(row, if_match)
+    if row.app_id != mediaguard.APP_ID:
+        raise HubError(403, "forbidden", "Alleen MediaGuard kan het poolleesrecht krijgen.")
+    if body.ingeschakeld and not confirmed_binding(db, settings, row, current_target(db)):
+        raise _binding_conflict()
+    token = new_token(mediaguard.POOL_TOKEN_PREFIX) if body.ingeschakeld else None
+    row.pool_token_hash = sha256_hex(token) if token else None
+    row.version += 1
+    _record(db, admin, row, "poolleesrecht_uitgegeven" if token else "poolleesrecht_ingetrokken")
+    receipt = PoolrechtReceipt(id=row.id, version=row.version, pool_token=token)
+    response = _save_link(idem, 200, row)
+    if token is None:
+        return response
+    # Alleen de bevestiging is herhaalbaar. Het token komt nooit in het idempotentieregister.
+    return JSONResponse(
+        receipt.model_dump(mode="json"), headers={"ETag": response.headers["ETag"], "Cache-Control": "no-store"}
+    )
+
+
 @router.patch("/{link_id}", response_model=LinkReceipt, summary="Adapterkoppeling wijzigen (beheerder)")
 def update_link(
     link_id: uuid.UUID,
@@ -655,6 +717,9 @@ def update_link(
         row.laatste4, row.ingevoerd_op = meta.last4, meta.updated_at
     row.laatste_status, row.observed_at, row.max_age_s = None, None, None
     row.my_house_checks = None
+    if row.pool_token_hash is not None:
+        row.pool_token_hash = None
+        _record(db, admin, row, "poolleesrecht_ingetrokken")
     # Een nieuwe koppeling begint met een schone reeks; een open incident vereist nog steeds herstel.
     if row.health_failures < 3:
         row.health_failures = 0

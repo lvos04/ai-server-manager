@@ -6,7 +6,11 @@ from ipaddress import ip_address
 from typing import Any
 from urllib.parse import urlsplit
 
+from sqlalchemy.orm import Session
+
 from hub.adapters import basis
+from hub.config import Settings
+from hub.inventory.store import kind_state
 from hub.models import AdapterLink, CatalogApp
 from hub.outbound import OutboundError
 from hub.truenas.connection import NasTarget
@@ -93,3 +97,8 @@ def binding_is_current(
         return False
     port = registered_port(base, target, nas, owners)
     return port is not None and registered_peers(target, port, row.peer_addresses)
+
+
+def confirmed_binding(db: Session, settings: Settings, row: AdapterLink, nas: NasTarget | None) -> bool:
+    inventory = kind_state(db, "apps", target=nas.url if nas else None, ttl_seconds=settings.inventory_max_age_seconds)
+    return binding_is_current(row, db.get(CatalogApp, row.catalog_app_id), nas, published_ports(inventory))

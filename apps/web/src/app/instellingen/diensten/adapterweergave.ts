@@ -27,6 +27,7 @@ export interface Koppeling {
   laatste4: string;
   ingevoerd_op: string | null;
   version: number;
+  poolleesrecht?: boolean;
   verbinding: { status: string; observed_at: string | null; reason_code: string | null; laatste_status?: string | null };
 }
 export function veiligAdres(waarde: string) {

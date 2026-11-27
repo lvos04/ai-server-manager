@@ -176,6 +176,8 @@ test("een MediaGuard-sleutel wordt vervangen zonder hem terug te tonen", async (
   const id = randomUUID();
   const waarde = randomUUID();
   const kenmerk = waarde.slice(-4);
+  const pooltoken = randomUUID();
+  let poolleesrecht = false;
   let versie = 4;
   await page.route("**/api/v1/apps?soort=bestaand&*", (r) => r.fulfill({
     json: { items: [doel], next_cursor: null, inventaris: { status: "ok" } },
@@ -184,9 +186,18 @@ test("een MediaGuard-sleutel wordt vervangen zonder hem terug te tonen", async (
     const req = r.request();
     if (req.method() === "GET") return r.fulfill({ json: { items: [{
       id, app_id: doel.app_id, catalog_app_id: doel.id, basis_url: doel.deep_link,
-      laatste4: versie === 4 ? "VOR1" : kenmerk, ingevoerd_op: new Date().toISOString(), version: versie,
+      laatste4: versie === 4 ? "VOR1" : kenmerk, ingevoerd_op: new Date().toISOString(), version: versie, poolleesrecht,
       verbinding: { status: "unknown", observed_at: null, reason_code: "geen_alleen_lezen_bron" },
     }], next_cursor: null } });
+    if (req.method() === "PUT") {
+      expect(new URL(req.url()).pathname).toBe(route + "/" + id + "/poolleesrecht");
+      expect(req.headers()["if-match"]).toBe(`"${versie}"`);
+      expect(Boolean(req.headers()["x-csrf-token"] && req.headers()["idempotency-key"])).toBe(true);
+      expect(req.postDataJSON()).toEqual({ ingeschakeld: !poolleesrecht });
+      poolleesrecht = !poolleesrecht;
+      versie++;
+      return r.fulfill({ json: { id, version: versie, ...(poolleesrecht && { pool_token: pooltoken }) } });
+    }
     expect(new URL(req.url()).pathname).toBe(route + "/" + id);
     expect(req.method()).toBe("PATCH");
     expect(req.headers()["if-match"]).toBe('"4"');
@@ -210,4 +221,11 @@ test("een MediaGuard-sleutel wordt vervangen zonder hem terug te tonen", async (
   expect((await page.content()).includes(waarde)).toBe(false);
   await expect(kaart).toContainText("geen veilige leescontrole");
   await expect(kaart.getByText("Gekoppeld", { exact: true })).toHaveCount(0);
+  await kaart.getByRole("button", { name: "Poolleesrecht toekennen" }).click();
+  await expect(kaart.locator("code", { hasText: pooltoken })).toBeVisible();
+  await kaart.getByRole("button", { name: "Token verbergen" }).click();
+  await expect(kaart.locator("code", { hasText: pooltoken })).toHaveCount(0);
+  await kaart.getByRole("button", { name: "Poolleesrecht intrekken" }).click();
+  await expect(kaart.getByRole("button", { name: "Poolleesrecht toekennen" })).toBeVisible();
+  expect(poolleesrecht).toBe(false);
 });
