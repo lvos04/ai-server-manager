@@ -941,43 +941,43 @@
   },
   {
     "id": "B02-001",
-    "status": "Niet gestart",
-    "validatie": "Niet getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
-    "bewijs": "VOORTGANG.md, S-P2-110 ([2]). De standaard uitgeschakelde runner in apps/api/src/hub/airunner.py en de isolatieproef in tests/rooktest_airunner.py (1a62b76) dekken de eerste versie.",
-    "blokkade": "",
-    "opmerking": "VERSIE 2: De AI-client met tegoedbewaking en een harde kostenlimiet is uitgesteld.",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
+    "bewijs": "apps/api/tests/integration/test_ai_tegoed.py en test_ai.py: een geteste D09 met maand en taakmaximum is vereist. Van twee gelijktijdige aanvragen reserveert er één. Herhaling en een verstreken maand geven geen nieuw krediet. De oorspronkelijke auditrijen en hun hashes blijven intact. De CI-run op de eindcommit staat in het bouwrapport S-P2-110.",
+    "blokkade": "NIET GEVALIDEERD (account): geen echte aanbieder aangesloten; D09 is open. NIET GEVALIDEERD (echte NAS): praktijkproef staat open.",
+    "opmerking": "De Hub reserveert het taakmaximum vóór verzending. De runner controleert de lokale procesidentiteit. Een 402 sluit de kredietmaand.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-24"
+    "bijgewerkt": "2026-11-27"
   },
   {
     "id": "B02-002",
-    "status": "Niet gestart",
-    "validatie": "Niet getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
-    "bewijs": "VOORTGANG.md, S-P2-110 ([2]). De bestaande leesroutes staan in docs/openapi/hub-api.openapi.json. De runner in apps/api/src/hub/airunner.py heeft nog geen aansluiting voor deze instrumenten.",
-    "blokkade": "",
-    "opmerking": "VERSIE 2: De rolgebonden leesinstrumenten waarmee AI inventaris, incidenten, logs en runbooks kan raadplegen zijn uitgesteld.",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
+    "bewijs": "apps/api/tests/integration/test_ai.py::test_leesinstrumenten_volgen_rol_bron_en_classificatie: inventaris, incident, tracegebonden logs en runbook via de lokale API. De kijker krijgt geen logtekst en de schrijfpoging op het leesinstrument geeft 405. De CI-run op de eindcommit staat in het bouwrapport S-P2-110.",
+    "blokkade": "NIET GEVALIDEERD (account): geen echte aanbieder aangesloten; D09 is open. NIET GEVALIDEERD (echte NAS): praktijkproef staat open.",
+    "opmerking": "De bronnen hebben een verwijzing en een meettijd of catalogushash. Een diagnose stuurt uitsluitend vaste categorieën en aantallen naar de kredietdienst.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-24"
+    "bijgewerkt": "2026-11-27"
   },
   {
     "id": "B02-003",
-    "status": "Niet gestart",
-    "validatie": "Niet getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
-    "bewijs": "VOORTGANG.md, S-P2-110 ([2]). Commit af489e7 en tests/e2e/test_incidenten.py::test_100_identieke_crashes_geven_een_doorlopend_incident dekken al de samenvoeging van gelijke crashes in de incidenteninbox.",
-    "blokkade": "",
-    "opmerking": "VERSIE 2: De triage vóór een AI-aanroep en de bijbehorende proef met een bewuste AV1-pauze zijn uitgesteld.",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
+    "bewijs": "tests/e2e/test_incidenten.py::test_100_identieke_crashes_geven_een_doorlopend_incident en apps/api/tests/unit/test_airunner.py::test_av1_pauze_en_crash_blijven_onderscheidbaar. De incidentenmotor en diagnose verwerkten 100 crashes tot één incident en één melding. Een bewuste AV1-pauze gaf geen crashalarm. De CI-run op de eindcommit staat in het bouwrapport S-P2-110.",
+    "blokkade": "NIET GEVALIDEERD (account): geen echte aanbieder aangesloten; D09 is open. NIET GEVALIDEERD (echte NAS): praktijkproef staat open.",
+    "opmerking": "De Hub beoordeelt het gecorreleerde incident vóór een kredietreservering. De vaste regels blijven beschikbaar bij uitgeput tegoed.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-24"
+    "bijgewerkt": "2026-11-27"
   },
   {
     "id": "B02-004",
-    "status": "Niet gestart",
-    "validatie": "Niet getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
-    "bewijs": "VOORTGANG.md, S-P2-110 ([2]). Het installatieplan uit b6c3028 hoort bij de catalogus. docs/openapi/hub-api.openapi.json bevat de catalogusroute en nog geen AI-planroute.",
-    "blokkade": "",
-    "opmerking": "VERSIE 2: Het omzetten van een AI-analyse met bronverwijzingen en terugrolstappen naar een getoetst actievoorstel is uitgesteld.",
+    "status": "Bezig",
+    "validatie": "Unit-getest; Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
+    "bewijs": "apps/api/tests/integration/test_ai.py::test_plan_bindt_bereik_en_logtekst_kan_het_voorstel_niet_verhogen. Een geldige herstart levert één opvraagbare preview met actor ai. Onbekende actie, afwijkend doel en vreemde catalogus-ID geven 422. De NAS-simulator ontving nul schrijfaanroepen. De CI-run op de eindcommit staat in het bouwrapport S-P2-110.",
+    "blokkade": "NIET GEVALIDEERD (account): geen echte aanbieder aangesloten; D09 is open. NIET GEVALIDEERD (echte NAS): praktijkproef staat open.",
+    "opmerking": "De planroute bindt het runbook aan het incident en gebruikt de voorstelcontrole van S-P2-040. De risicoklasse komt uit het beleid.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-24"
+    "bijgewerkt": "2026-11-27"
   },
   {
     "id": "B02-007",
@@ -1031,13 +1031,13 @@
   },
   {
     "id": "EX21",
-    "status": "Niet gestart",
-    "validatie": "Niet getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
-    "bewijs": "VOORTGANG.md, S-P2-110 ([2]). VERVOLGPUNTEN.md, S-P6-12 credits. In de eerste versie blijft de runner in apps/api/src/hub/airunner.py uit. De kostenstop bij uitgeput tegoed heeft nog geen simulatiebewijs.",
-    "blokkade": "",
-    "opmerking": "VERSIE 2: De proef met uitgeput tegoed en doorlopende vaste regels wacht op een AI-client en de credits-simulator.",
+    "status": "Bezig",
+    "validatie": "Sim-geslaagd; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (account)",
+    "bewijs": "apps/api/tests/integration/test_ai.py::test_ex21_uitgeput_tegoed_laat_de_regels_werken telt HTTP-verzoeken via tests/fakes/fake_kredietdienst.py en fake_http.py. Eén aanvraag verbruikt het laatste tegoed. Herhaling, een nieuwe diagnose en de daaropvolgende crashmelding geven nul extra aanroepen. Een afzonderlijke HTTP 402 sluit de maand eveneens. De CI-run op de eindcommit staat in het bouwrapport S-P2-110.",
+    "blokkade": "NIET GEVALIDEERD (account): geen echte aanbieder aangesloten; D09 is open. NIET GEVALIDEERD (echte NAS): praktijkproef staat open.",
+    "opmerking": "Gemeten tegen de lokale kredietdienst, met een positieve controle op dezelfde verbinding en doorlopende incidentmeldingen.",
     "repo": "ai-server-manager",
-    "bijgewerkt": "2026-11-24"
+    "bijgewerkt": "2026-11-27"
   },
   {
     "id": "B01-011",
