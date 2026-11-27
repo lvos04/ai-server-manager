@@ -1,17 +1,20 @@
 # my_house — behoud, migratie en acceptatie
 
 ## Besluit
-Bouwen/testen en integreren (release v0.1.0).
+Integreren met de Hub voor het huisoverzicht en voor herstelbare temperatuurwijzigingen na goedkeuring.
 
 ## Waarom
 Geen nieuw Home Assistant, apparatuur-gates; lees B06.
 
 ## Stand na P3 (simulator)
 
-Maak in my_house een eenmalige koppelcode met rol Kijker (`viewer`) en doel `hub`. Voer de code en de
-bijbehorende server-ID in de Hub in. Het scherm Huis toont per woning de zonetemperaturen, de stand van de
-lichtgroepen en de open meldingen. De koppeling geeft alleen leesrecht. Voor bediening opent de beheerder
-my_house. De boiler is uitsluitend een meetpunt. NIET GEVALIDEERD (echte NAS).
+Voer in de Hub de eenmalige kijkerscode (rol `viewer`, doel `hub`) en de server-ID uit my_house in. Het scherm
+Huis toont zonetemperaturen, lichtgroepen en open meldingen. Bevestig voor ondertekende voorstellen ook de publieke
+Hub-sleutelset in my_house. Na vrijgave van de fysieke klimaatbediening en goedkeuring kan de Hub een herstelbare
+wijziging van de insteltemperatuur laten uitvoeren. Het journaal bevestigt de uitvoering zodra de voor- en nameting
+overeenkomen met de goedgekeurde wijziging.
+Een nieuw zoneschema blijft een concept. Zonder herstelpad bedient de beheerder lichtgroepen en scènes in my_house
+en hervat daar het zoneschema. De boiler is uitsluitend een meetpunt. NIET GEVALIDEERD (echte NAS).
 
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).

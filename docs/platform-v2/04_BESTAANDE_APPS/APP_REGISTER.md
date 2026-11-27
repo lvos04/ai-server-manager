@@ -23,6 +23,6 @@ Niet iedere huidige app moet worden herbouwd. De Hub importeert alle apps als ca
 | Jellyfin | Een bestaande Jellyfin-installatie behouden als mediaserver. Jellyfin is de basis voor Jelly Leon | No library/watch state regression. |
 | MediaGuard | Behouden, bibliotheek- en AV1-eigenaar | Geteste noodstop, HDR/VMAF failclosed. |
 | Media Source Optimizer | Behouden, bronoptimalisatie | Echte service mocks/live parity en geen owner writes. |
-| my_house | Bouwen/testen en integreren (release v0.1.0) | Boiler nooit schakelen; Gree readback. |
+| my_house | Integreren met de Hub voor het huisoverzicht en voor herstelbare temperatuurwijzigingen na goedkeuring | Boiler nooit schakelen; Gree readback. |
 
 **Bouwvoorwaarde:** eigenaar en werkelijke versie/route/media mount uit TrueNAS inventaris, niet uit screenshot alleen. In `03_INSTALLATIE/I26_BESTAANDE_APPS.md` is een geteste decommission-procedure beschreven.
