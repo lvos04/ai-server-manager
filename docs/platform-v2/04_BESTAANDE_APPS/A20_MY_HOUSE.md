@@ -14,7 +14,14 @@ Hub-sleutelset in my_house. Na vrijgave van de fysieke klimaatbediening en goedk
 wijziging van de insteltemperatuur laten uitvoeren. Het journaal bevestigt de uitvoering zodra de voor- en nameting
 overeenkomen met de goedgekeurde wijziging.
 Een nieuw zoneschema blijft een concept. Zonder herstelpad bedient de beheerder lichtgroepen en scènes in my_house
-en hervat daar het zoneschema. De boiler is uitsluitend een meetpunt. NIET GEVALIDEERD (echte NAS).
+en hervat daar het zoneschema. De boiler is uitsluitend een meetpunt.
+
+Op **Backups** leest de Hub de back-upcontrole uit de systeemstatus van my_house. Alleen een actuele `ok` met
+een geldige back-upleeftijd binnen de grens en zonder automatische back-upfouten telt als gedekt. Ontbreekt de
+meting of is ze verlopen, dan toont de Hub **Onbekend**. Meldt de meting een te oude back-up of een automatische
+back-upfout, dan toont de Hub **Niet gedekt**.
+
+NIET GEVALIDEERD (echte NAS).
 
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).

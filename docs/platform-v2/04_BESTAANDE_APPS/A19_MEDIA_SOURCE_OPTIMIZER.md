@@ -11,7 +11,12 @@ Head 1.6.0, release/VERSION 1.5.0 bij inspectie; lees B05.
 De Hub leest zonder sleutel de bereikbaarheid, versie en inrichtingsstatus van MSO. MSO biedt voor beschermde
 gegevens een machinesleutel met het recht `read`. De Hub kan dit recht nog niet bevestigen en toont open
 wijzigingen en kosten daarom als onbekend. De beheerder bekijkt het wijzigingsvoorstel en keurt het in MSO goed.
-MSO voert de wijziging uit en controleert het resultaat. NIET GEVALIDEERD (echte NAS).
+MSO voert de wijziging uit en controleert het resultaat.
+
+Op **Backups** blijft de dekking van MSO **Onbekend**. De Hub heeft geen toegestane leesroute voor een
+back-upmeting. De openbare bereikbaarheidscontrole laat alleen zien of MSO reageert.
+
+NIET GEVALIDEERD (echte NAS).
 
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).

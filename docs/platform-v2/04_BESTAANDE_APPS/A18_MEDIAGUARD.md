@@ -12,6 +12,12 @@ Maak in MediaGuard onder **Instellingen → API-sleutels** de sleutel `hub` aan 
 Het scherm Media toont de aantallen openstaande zoekitems, mislukte taken, lopende AV1-encodes en open incidenten,
 plus de stand van de noodstop. Voor een aflevering leest de Hub de opgeslagen diagnose. De downloadwachtrij en de
 mediaserverstatus blijven onbekend. De noodstop bedienen, herstellen en opnieuw zoeken doet de beheerder in MediaGuard.
+
+Op **Backups** beoordeelt de Hub het herstelrapport voor de MediaGuard-voortgang. Het omvat de kern- en
+encoderdatabases, de versleutelde bundel met bijbehorende sleutel, de externe kopie en alle forkback-ups.
+Ontbreekt een vereiste forkback-up, dan toont de Hub **Niet gedekt**. Ontbreekt het rapport of klopt de
+controlesom niet, dan toont de Hub **Onbekend**.
+
 NIET GEVALIDEERD (echte NAS).
 
 ## Verplichte inventaris voor bouwer
