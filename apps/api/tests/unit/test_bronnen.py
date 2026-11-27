@@ -189,6 +189,32 @@ def test_ongeldige_connectorcontrole_na_de_weergavegrens_telt_mee() -> None:
     assert judge_connector_health({**body, "checks": {}}, NOW)[:2] == ("unknown", "antwoord_ongeldig")
 
 
+def test_oude_connectorstoring_zonder_bewaarde_deeltermijn() -> None:
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    from hub.models import CatalogApp, HealthObservation
+    from hub.monitoring.appstatus import observation_components
+
+    app = CatalogApp(id=uuid4())
+    obs = HealthObservation(
+        bron_type="connector",
+        status="down",
+        observed_at=NOW,
+        ttl_seconds=180,
+        details={"checks": [], "aantal_controles": 21, "geldig_tot": None},
+    )
+    db = Mock()
+    db.scalars.return_value = [obs]
+    [oud] = observation_components(db, app, NOW)
+    assert oud.status == "unknown" and oud.extra["laatste_status"] == "down"
+    # Na een nieuwe bronmeting zonder eigen limieten geldt voor een storing weer de gewone Hub-termijn.
+    body = {"status": "down", "observed_at": iso(NOW), "checks": []}
+    _, _, _, obs.details = judge_connector_health(body, NOW)
+    [nieuw] = observation_components(db, app, NOW)
+    assert nieuw.status == "down" and nieuw.geldig_tot == NOW + timedelta(seconds=180)
+
+
 def test_max_age_van_de_bron_nooit_soepeler() -> None:
     """§6.2: de Hub neemt een strengere max_age uit discover over; een ruimere waarde maakt het niet soepeler."""
     from hub.monitoring.sources import max_age_for

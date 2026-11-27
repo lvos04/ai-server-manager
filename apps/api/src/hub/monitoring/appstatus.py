@@ -121,14 +121,10 @@ def observation_components(db: Session, row: CatalogApp, now: datetime) -> list[
         c = freshen(c, obs.ttl_seconds, now)
         if obs.bron_type == "connector" and c.status != "unknown" and (c.status == "healthy" or "checks" in details):
             source_deadline = _source_time(details.get("geldig_tot"))
-            # Bij oude metingen is onbekend hoeveel controles vóór de beoordeling zijn afgekapt.
-            if (
-                type(details.get("aantal_controles")) is not int
-                or (source_deadline is None and c.status == "healthy")
-                or (source_deadline is not None and source_deadline < now)
-            ):
+            # Bij oude metingen kunnen controles of hun kortste deeltermijn ontbreken.
+            if type(details.get("aantal_controles")) is not int or source_deadline is None or source_deadline < now:
                 c = c.last_known("meting_verouderd")
-            elif source_deadline is not None and c.geldig_tot is not None:
+            elif c.geldig_tot is not None:
                 c.geldig_tot = min(c.geldig_tot, source_deadline)
         if details.get("bron_fout") and c.status != "unknown":
             c = c.last_known("bron_onbereikbaar")

@@ -321,10 +321,11 @@ def judge_connector_health(
     checks = body.get("checks", [])
     if not isinstance(checks, list):
         return "unknown", "antwoord_ongeldig", observed, {}
-    # De catalogus krijgt uitsluitend een door de bron begrensde geldigheid.
+    # Voor een gezonde status moet de bron zelf het geheel begrenzen.
     table = limits.get("max_age_s") if isinstance(limits, dict) else None
     source_age = table.get("health") if isinstance(table, dict) else None
-    deadline = observed + timedelta(seconds=top_age) if type(source_age) is int and source_age > 0 else None
+    top_deadline = observed + timedelta(seconds=top_age)
+    deadline = top_deadline if type(source_age) is int and source_age > 0 else None
     part_deadline = None
     clean: list[dict[str, Any]] = []
     statuses: set[str] = set()
@@ -363,7 +364,7 @@ def judge_connector_health(
             )
     total = worst([stated, *statuses])
     if deadline is None and total in ("down", "degraded"):
-        deadline = part_deadline
+        deadline = min(top_deadline, part_deadline) if part_deadline is not None else top_deadline
     if total != stated or (total != "healthy" and reason is None):
         if job_failed and total in ("down", "degraded"):
             reason = "jobs_staan_stil"
