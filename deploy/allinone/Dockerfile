@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# AI Server Manager — Hub, ALLES-IN-ÉÉN image (PostgreSQL 16 + API + worker + AI-runner-stub + web-UI).
+# AI Server Manager — Hub, ALLES-IN-ÉÉN image (PostgreSQL 16 + API + worker + AI-runner + web-UI).
 #
 #   docker build -f deploy/allinone/Dockerfile [--secret id=ca_bundle,src=<ca.pem>] -t ai-server-manager:dev .
 #

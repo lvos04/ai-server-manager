@@ -1,7 +1,7 @@
 """AI Server Manager (Hub) — procesbewaker van de alles-in-één image (PID 1 van de container).
 
 Eén container met alles: PostgreSQL 16 (alleen unix-socket, geen netwerkpoort, geen wachtwoord), first-start-init,
-migraties, API, worker, AI-runner (stub) en de web-UI (Next.js op poort 30400, met doorgang naar de API die dan alleen
+migraties, API, worker, AI-runner en de web-UI (Next.js op poort 30400, met doorgang naar de API die dan alleen
 op 127.0.0.1:8400 luistert). Daardoor installeert
 de Hub als gewone TrueNAS **Custom App** met één image, één poort (30400) en één map (/appdata). Geen YAML.
 
