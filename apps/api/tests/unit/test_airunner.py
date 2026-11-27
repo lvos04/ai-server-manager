@@ -89,3 +89,41 @@ def test_cli_toetst_de_socket_uit_de_database_url_voor_postgres_luistert(tmp_pat
     assert subprocess.run(opdracht, env=env, check=False).returncode == 0
     socketmap.mkdir()
     assert subprocess.run(opdracht, env=env, check=False).returncode == 78
+
+
+def test_actief_kanaal_weigert_buiten_de_runner_uid(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(os, "getuid", lambda: 568)
+    assert airunner.main(tmp_path, ai_enabled=True, once=True) == 78
+
+
+def test_runner_beperkt_antwoord_en_weigert_betaalde_uitwijk() -> None:
+    from uuid import uuid4
+
+    from fakes.fake_kredietdienst import FakeKredietdienst
+
+    from hub.ai.runner import Aanvraag, Triage, raadpleeg
+    from hub.timeutil import utcnow
+
+    fake = FakeKredietdienst(2)
+    fake.start()
+    try:
+        instellingen = config.Settings(ai_provider_url=f"http://localhost:{fake.port}", outbound_allow_loopback=True)
+        taak = Aanvraag(
+            taak_id=uuid4(),
+            aanbieder=uuid4().hex,
+            modelkeuze=uuid4().hex,
+            maand=utcnow().strftime("%Y-%m"),
+            max_eenheden=1,
+            triage=Triage(ernst="waarschuwing", gebeurtenissen=1, inventaris="unknown", logregels=0),
+        )
+        assert raadpleeg(taak, instellingen).status == "dienst_onbeschikbaar"
+        assert fake.requests == []
+        instellingen.ai_enabled = True
+        assert raadpleeg(taak, instellingen).status == "advies"
+        fake.advies["action_id"] = "app.restart"
+        assert raadpleeg(taak.model_copy(update={"taak_id": uuid4()}), instellingen).status == "dienst_onbeschikbaar"
+        assert raadpleeg(taak.model_copy(update={"taak_id": uuid4()}), instellingen).status == "tegoed_op"
+        assert fake.paths() == ["/diagnose"] * 3
+        assert fake.eenheden == 0
+    finally:
+        fake.stop()

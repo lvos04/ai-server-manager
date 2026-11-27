@@ -24,6 +24,7 @@ from hub.onboarding.service import seed
 from hub.routers import (
     actions,
     adapterkoppelingen,
+    ai,
     alerts,
     auth,
     backups,
@@ -319,6 +320,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         incidents.router,
         runbooks.router,
         actions.router,
+        ai.router,
         logs.router,
         events.router,
     ):

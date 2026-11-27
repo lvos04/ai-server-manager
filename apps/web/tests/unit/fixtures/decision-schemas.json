@@ -518,6 +518,20 @@
   "D09": {
     "additionalProperties": false,
     "properties": {
+      "aanbieder": {
+        "anyOf": [
+          {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Aanbieder"
+      },
       "account_gekoppeld": {
         "title": "Account Gekoppeld",
         "type": "boolean"
@@ -527,6 +541,21 @@
         "description": "Verplicht: harde stop bij 0 resterend tegoed.",
         "title": "Harde Stop",
         "type": "boolean"
+      },
+      "inbegrepen_eenheden": {
+        "anyOf": [
+          {
+            "maximum": 1000000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Het inbegrepen krediet dat deze maand aan de Hub is toegewezen.",
+        "title": "Inbegrepen Eenheden"
       },
       "inbegrepen_maandbudget": {
         "anyOf": [
@@ -543,11 +572,54 @@
         "description": "Zoals de officiële console het toont.",
         "title": "Inbegrepen Maandbudget"
       },
+      "max_eenheden_per_taak": {
+        "anyOf": [
+          {
+            "maximum": 1000000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Bovengrens per diagnose, in dezelfde kredieteenheden.",
+        "title": "Max Eenheden Per Taak"
+      },
+      "modelkeuze": {
+        "anyOf": [
+          {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Modelkeuze"
+      },
       "overage_toegestaan": {
         "const": false,
         "description": "Verplicht onwaar: nooit betaalde overage.",
         "title": "Overage Toegestaan",
         "type": "boolean"
+      },
+      "tegoedmaand": {
+        "anyOf": [
+          {
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Maand in UTC (JJJJ-MM).",
+        "title": "Tegoedmaand"
       }
     },
     "required": [

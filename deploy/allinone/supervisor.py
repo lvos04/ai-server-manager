@@ -189,7 +189,8 @@ class Child:
         log(f"start {self.name}")
         if self.ai:
             env = {"HOME": "/tmp", "PATH": os.environ.get("PATH", ""), "HUB_DATA_DIR": str(DATA), "PYTHONUNBUFFERED": "1",  # noqa: S108
-                   "HUB_AI_ENABLED": os.environ.get("HUB_AI_ENABLED", "false")}
+                   "HUB_AI_ENABLED": os.environ.get("HUB_AI_ENABLED", "false"),
+                   "HUB_AI_PROVIDER_URL": os.environ.get("HUB_AI_PROVIDER_URL", "")}
             self.proc = subprocess.Popen(self.cmd, env=env, preexec_fn=demote_ai, cwd="/tmp", start_new_session=True)  # noqa: S108
         else:
             self.proc = subprocess.Popen(self.cmd, env=env_for(self.extra_env), preexec_fn=demote, start_new_session=True)

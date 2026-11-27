@@ -230,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--port", type=int)
     w = sub.add_parser("worker", help="achtergrondtaken")
     w.add_argument("--once", action="store_true")
-    r = sub.add_parser("ai-runner", help="AI-runner (stub; aparte gebruiker zonder geheimen)")
+    r = sub.add_parser("ai-runner", help="Geïsoleerde runner voor begrensde diagnoseaanvragen")
     r.add_argument("--once", action="store_true")
     m = sub.add_parser("migrate", help="databasemigraties")
     m.add_argument("--revision", default="head")

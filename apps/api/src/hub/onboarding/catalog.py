@@ -156,6 +156,20 @@ class D08Waarde(Strict):
 class D09Waarde(Strict):
     account_gekoppeld: bool
     inbegrepen_maandbudget: Tekst | None = Field(default=None, description="Zoals de officiële console het toont.")
+    aanbieder: KorteTekst | None = None
+    modelkeuze: KorteTekst | None = None
+    tegoedmaand: str | None = Field(
+        default=None, pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$", description="Maand in UTC (JJJJ-MM)."
+    )
+    inbegrepen_eenheden: int | None = Field(
+        default=None,
+        ge=0,
+        le=1_000_000_000,
+        description="Het inbegrepen krediet dat deze maand aan de Hub is toegewezen.",
+    )
+    max_eenheden_per_taak: int | None = Field(
+        default=None, ge=0, le=1_000_000_000, description="Bovengrens per diagnose, in dezelfde kredieteenheden."
+    )
     harde_stop: Literal[True] = Field(description="Verplicht: harde stop bij 0 resterend tegoed.")
     overage_toegestaan: Literal[False] = Field(description="Verplicht onwaar: nooit betaalde overage.")
 
@@ -309,7 +323,7 @@ DECISIONS: tuple[DecisionDef, ...] = (
     ),
     DecisionDef(
         "D09",
-        "Claude API-credit claim",
+        "Inbegrepen AI-tegoed",
         "Console org link, officieel inbegrepen maandbudget, hard stop en no-pay overage",
         "Verplicht vóór AI agent cloud tool",
         D09Waarde,

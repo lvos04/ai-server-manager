@@ -1,8 +1,8 @@
-"""AI-runner (stub, fase P0).
+"""AI-runner voor begrensde diagnoseaanvragen.
 
 Draait als **aparte gebruiker** zonder toegang tot ``/appdata/secrets`` (signing keys, vault) en zonder toegang tot de
-database-socket (contract §8, ADR-0005). In P0 doet hij niets: AI staat standaard uit, er zijn geen modellen en er
-worden geen externe of betaalde aanroepen gedaan. De runner start alleen als zijn toegangscontrole isolatie bevestigt.
+database-socket (contract §8, ADR-0005). AI staat standaard uit. Het lokale diagnosekanaal opent
+alleen na de isolatiecontrole, als uid 569 en bij expliciete inschakeling.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from psycopg import ProgrammingError
 from psycopg.conninfo import conninfo_to_dict
 
 from hub import config
+from hub.ai import runner
 
 log = logging.getLogger("hub.ai-runner")
 
@@ -89,16 +90,17 @@ def main(data_dir: Path, ai_enabled: bool, *, once: bool = False) -> int:
     if not isolated:
         log.error("De AI-runner weigert te starten omdat de isolatie van sleutels en database niet vaststaat.")
         return 78
-    if ai_enabled:
-        log.warning("AI is ingeschakeld, maar in deze versie is er nog geen model of provider gekoppeld (fase P2+).")
-    log.info(
-        "AI-runner actief als uid %s: AI staat uit (standaard); geen modellen, geen externe aanroepen.", os.getuid()
-    )
+    if ai_enabled and (os.getuid(), os.geteuid()) != (runner.RUNNER_UID, runner.RUNNER_UID):
+        log.error("Het ingeschakelde diagnosekanaal vereist uid 569.")
+        return 78
     if once:
         return 0
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
-    while not stop.wait(3600):
-        log.info("AI-runner: nog steeds uit (standaard).")
+    if ai_enabled:
+        runner.bedien(config.get_settings(), stop)
+    else:
+        log.info("AI staat uit. De runner wacht zonder aanbieder te benaderen.")
+        stop.wait()
     return 0

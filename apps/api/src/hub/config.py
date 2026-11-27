@@ -140,6 +140,7 @@ class Settings(BaseSettings):
 
     # AI is standaard uit (lokale modellen optioneel en standaard uit; geen betaalde overage)
     ai_enabled: bool = False
+    ai_provider_url: str | None = Field(default=None, max_length=512)
 
     def outbound_policy(self) -> OutboundPolicy:
         return OutboundPolicy(
