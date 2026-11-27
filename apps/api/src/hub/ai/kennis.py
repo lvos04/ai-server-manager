@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -19,6 +18,7 @@ from hub.registry import measured_apps
 from hub.runbooks import engine
 from hub.runbooks.catalogus import runbook_hash
 from hub.security import Role
+from hub.timeutil import UtcDateTime
 
 
 class InventarisBron(BaseModel):
@@ -32,7 +32,7 @@ class InventarisBron(BaseModel):
 class IncidentBron(BaseModel):
     ref: str
     classificatie: str
-    observed_at: datetime
+    observed_at: UtcDateTime
     soort: str
     ernst: Literal["info", "waarschuwing", "kritiek"]
     status: str
@@ -44,7 +44,7 @@ class IncidentBron(BaseModel):
 
 class LogBron(BaseModel):
     ref: str
-    observed_at: datetime
+    observed_at: UtcDateTime
     niveau: str
     bericht: str = Field(max_length=500)
 
@@ -64,8 +64,8 @@ class Kennis(BaseModel):
     runbook: RunbookBron | None
 
 
-def incident(db: Session, incident_id: uuid.UUID, principal: Principal) -> Incident:
-    inc = db.get(Incident, incident_id)
+def incident(db: Session, incident_id: uuid.UUID, principal: Principal, *, vergrendel: bool = False) -> Incident:
+    inc = db.get(Incident, incident_id, with_for_update=vergrendel)
     if inc is None:
         raise HubError(404, "not_found", "Incident niet gevonden.")
     if inc.classificatie == "sensitive" and principal.role != Role.admin:

@@ -1,6 +1,29 @@
 {
   "components": {
     "schemas": {
+      "AanbiederUit": {
+        "properties": {
+          "bron": {
+            "const": "D09",
+            "default": "D09",
+            "title": "Bron",
+            "type": "string"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "tegoed": {
+            "$ref": "#/components/schemas/Tegoed"
+          }
+        },
+        "required": [
+          "tegoed",
+          "observed_at"
+        ],
+        "title": "AanbiederUit",
+        "type": "object"
+      },
       "Actor": {
         "additionalProperties": false,
         "properties": {
@@ -826,6 +849,74 @@
         "title": "DiagnoseIn",
         "type": "object"
       },
+      "DiagnoseUit": {
+        "properties": {
+          "advies": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Advies"
+          },
+          "bron": {
+            "title": "Bron",
+            "type": "string"
+          },
+          "gebeurtenissen": {
+            "title": "Gebeurtenissen",
+            "type": "integer"
+          },
+          "incident_id": {
+            "format": "uuid",
+            "title": "Incident Id",
+            "type": "string"
+          },
+          "melding": {
+            "title": "Melding",
+            "type": "string"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "regel": {
+            "title": "Regel",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "zekerheid_regel": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zekerheid Regel"
+          }
+        },
+        "required": [
+          "incident_id",
+          "regel",
+          "melding",
+          "gebeurtenissen",
+          "status",
+          "advies",
+          "zekerheid_regel",
+          "bron",
+          "observed_at"
+        ],
+        "title": "DiagnoseUit",
+        "type": "object"
+      },
       "DoelIn": {
         "additionalProperties": false,
         "properties": {
@@ -1442,7 +1533,6 @@
             "type": "string"
           },
           "observed_at": {
-            "format": "date-time",
             "title": "Observed At",
             "type": "string"
           },
@@ -1992,7 +2082,6 @@
             "type": "string"
           },
           "observed_at": {
-            "format": "date-time",
             "title": "Observed At",
             "type": "string"
           },
@@ -2670,6 +2759,93 @@
           "incident_id"
         ],
         "title": "PlanIn",
+        "type": "object"
+      },
+      "PlanUit": {
+        "additionalProperties": true,
+        "description": "De gedeelde actieroute levert ook de overige preview- en goedkeuringsvelden.",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "actor": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Actor",
+            "type": "object"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "goedkeuring_nodig": {
+            "title": "Goedkeuring Nodig",
+            "type": "boolean"
+          },
+          "policy_hash": {
+            "title": "Policy Hash",
+            "type": "string"
+          },
+          "preview": {
+            "additionalProperties": true,
+            "title": "Preview",
+            "type": "object"
+          },
+          "preview_hash": {
+            "title": "Preview Hash",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "resource_etag": {
+            "title": "Resource Etag",
+            "type": "string"
+          },
+          "risk_class": {
+            "enum": [
+              "R0",
+              "R1",
+              "R2",
+              "R3"
+            ],
+            "title": "Risk Class",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Target",
+            "type": "object"
+          }
+        },
+        "required": [
+          "request_id",
+          "status",
+          "action_id",
+          "target",
+          "actor",
+          "risk_class",
+          "evidence_ids",
+          "preview",
+          "preview_hash",
+          "policy_hash",
+          "resource_etag",
+          "goedkeuring_nodig"
+        ],
+        "title": "PlanUit",
         "type": "object"
       },
       "ProposalIn": {
@@ -4294,6 +4470,84 @@
           "checks"
         ],
         "title": "System",
+        "type": "object"
+      },
+      "Tegoed": {
+        "properties": {
+          "aanbieder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aanbieder"
+          },
+          "beschikbaar": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beschikbaar"
+          },
+          "gereserveerd": {
+            "default": 0,
+            "title": "Gereserveerd",
+            "type": "integer"
+          },
+          "inbegrepen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbegrepen"
+          },
+          "maand": {
+            "title": "Maand",
+            "type": "string"
+          },
+          "max_per_taak": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Per Taak"
+          },
+          "modelkeuze": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelkeuze"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "maand"
+        ],
+        "title": "Tegoed",
         "type": "object"
       },
       "TrueNasAppIn": {
@@ -5947,7 +6201,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnoseUit"
+                }
               }
             },
             "description": "Successful Response"
@@ -6047,7 +6303,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PlanUit"
+                }
               }
             },
             "description": "Successful Response"
@@ -6077,9 +6335,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Providers Api V1 Ai Providers Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AanbiederUit"
                 }
               }
             },

@@ -129,6 +129,19 @@ def test_ex21_uitgeput_tegoed_laat_de_regels_werken(
         }
         assert admin.post("/api/v1/decisions/D09/bewijs", json=bewijs, headers=idem()).status_code == 200
 
+        proef = runner.Aanvraag(
+            taak_id=uuid.uuid4(),
+            aanbieder=keuze["aanbieder"],
+            modelkeuze=keuze["modelkeuze"],
+            maand=keuze["tegoedmaand"],
+            max_eenheden=1,
+            triage=runner.Triage(ernst="info", gebeurtenissen=1, inventaris="unknown", logregels=0),
+        )
+        for partij in ("RUNNER_UID", "HUB_UID"):
+            with monkeypatch.context() as grens:
+                grens.setattr(runner, partij, os.getuid() + 1)
+                assert runner.vraag_runner(proef).status == "dienst_onbeschikbaar"
+        assert fake.requests == []
         sleutel = idem()
         advies = admin.post(pad, json=lichaam, headers=sleutel)
         assert advies.status_code == 200 and advies.json()["advies"] == fake.advies["analyse"]

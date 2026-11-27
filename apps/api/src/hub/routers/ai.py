@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -17,15 +17,21 @@ from hub.deps import DB, Admin, Cursor, Idem, Limit, Operator, SettingsDep, View
 from hub.errors import HubError, trace_id_of
 from hub.models import AuditEvent, IdempotencyRecord
 from hub.routers.actions import VaultDep, _afhandelen
-from hub.timeutil import iso, utcnow
+from hub.timeutil import UtcDateTime, utcnow
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI-diagnose"])
 
 
+class AanbiederUit(BaseModel):
+    tegoed: tegoed.Tegoed
+    bron: Literal["D09"] = "D09"
+    observed_at: UtcDateTime
+
+
 @router.get("/providers", summary="Gekozen aanbieder en het resterende inbegrepen maandtegoed")
-def providers(db: DB, settings: SettingsDep, _: Viewer) -> dict[str, Any]:
+def providers(db: DB, settings: SettingsDep, _: Viewer) -> AanbiederUit:
     now = utcnow()
-    return {"tegoed": tegoed.stand(db, settings, now).model_dump(), "bron": "D09", "observed_at": iso(now)}
+    return AanbiederUit(tegoed=tegoed.stand(db, settings, now), observed_at=now)
 
 
 @router.get("/audit", summary="Kredietreserveringen, diagnose-uitkomsten en AI-voorstellen")
@@ -52,6 +58,18 @@ class DiagnoseIn(BaseModel):
     incident_id: uuid.UUID
 
 
+class DiagnoseUit(BaseModel):
+    incident_id: uuid.UUID
+    regel: str
+    melding: str
+    gebeurtenissen: int
+    status: str
+    advies: str | None
+    zekerheid_regel: float | None
+    bron: str
+    observed_at: UtcDateTime
+
+
 def _frequentie(db: DB, idem: Idem) -> None:
     aantal = db.scalar(
         select(func.count())
@@ -64,7 +82,11 @@ def _frequentie(db: DB, idem: Idem) -> None:
         )
 
 
-@router.post("/diagnose", summary="Verklaar een incident met vaste regels en zo nodig een begrensde analyse")
+@router.post(
+    "/diagnose",
+    response_model=DiagnoseUit,
+    summary="Verklaar een incident met vaste regels en zo nodig een begrensde analyse",
+)
 def diagnose(
     body: DiagnoseIn, request: Request, db: DB, settings: SettingsDep, principal: Operator, idem: Idem
 ) -> JSONResponse:
@@ -100,20 +122,18 @@ def diagnose(
         trace_id=trace_id_of(request),
         details={"status": status, "regel": regel},
     )
-    return idem.save(
-        200,
-        {
-            "incident_id": str(inc.id),
-            "regel": regel,
-            "melding": melding,
-            "gebeurtenissen": inc.aantal,
-            "status": status,
-            "advies": advies,
-            "zekerheid_regel": bronnen.incident.zekerheid,
-            "bron": f"/api/v1/ai/kennis/{inc.id}",
-            "observed_at": iso(inc.laatste_op),
-        },
+    uitkomst = DiagnoseUit(
+        incident_id=inc.id,
+        regel=regel,
+        melding=melding,
+        gebeurtenissen=inc.aantal,
+        status=status,
+        advies=advies,
+        zekerheid_regel=bronnen.incident.zekerheid,
+        bron=f"/api/v1/ai/kennis/{inc.id}",
+        observed_at=inc.laatste_op,
     )
+    return idem.save(200, uitkomst.model_dump(mode="json"))
 
 
 class PlanIn(DiagnoseIn):
@@ -123,11 +143,31 @@ class PlanIn(DiagnoseIn):
     expected_version: str | None = Field(default=None, max_length=300)
 
 
-@router.post("/plan", status_code=201, summary="Maak een gebonden ActionProposal bij een incident")
+class PlanUit(BaseModel):
+    """De gedeelde actieroute levert ook de overige preview- en goedkeuringsvelden."""
+
+    model_config = ConfigDict(extra="allow")
+    request_id: uuid.UUID
+    status: str
+    action_id: str
+    target: dict[str, str]
+    actor: dict[str, str]
+    risk_class: Literal["R0", "R1", "R2", "R3"]
+    evidence_ids: list[str]
+    preview: dict[str, Any]
+    preview_hash: str
+    policy_hash: str
+    resource_etag: str
+    goedkeuring_nodig: bool
+
+
+@router.post(
+    "/plan", status_code=201, response_model=PlanUit, summary="Maak een gebonden ActionProposal bij een incident"
+)
 def maak_plan(
     body: PlanIn, request: Request, db: DB, settings: SettingsDep, principal: Operator, idem: Idem, vault: VaultDep
 ) -> JSONResponse:
-    inc = kennis.incident(db, body.incident_id, principal)
+    inc = kennis.incident(db, body.incident_id, principal, vergrendel=True)
 
     def werk() -> tuple[int, dict[str, Any]]:
         _frequentie(db, idem)

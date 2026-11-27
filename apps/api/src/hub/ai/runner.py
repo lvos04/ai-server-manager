@@ -28,7 +28,7 @@ Naam = Annotated[str, Field(min_length=1, max_length=128)]
 
 
 class Bericht(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
 class Triage(Bericht):
@@ -102,7 +102,9 @@ def vraag_runner(taak: Aanvraag) -> Antwoord:
             kanaal.connect(ADRES)
             if _uid(kanaal) == RUNNER_UID:
                 kanaal.sendall(taak.model_dump_json().encode())
-                return Antwoord.model_validate_json(kanaal.recv(MAX_BERICHT + 1))
+                data = kanaal.recv(MAX_BERICHT + 1)
+                if len(data) <= MAX_BERICHT:
+                    return Antwoord.model_validate_json(data)
     except (OSError, ValidationError):
         pass
     return Antwoord(status="dienst_onbeschikbaar")
