@@ -1563,6 +1563,7 @@ def test_r3_goedkeuring_eist_exacte_doelnaam(stack: Stack, tmp_path: Path, monke
 
     import yaml
     from asm_policy import load_policy
+    from conftest import enroll_body
 
     from hub.actions import service
 
@@ -1578,9 +1579,19 @@ def test_r3_goedkeuring_eist_exacte_doelnaam(stack: Stack, tmp_path: Path, monke
     v = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
     assert v["risk_class"] == "R3"
     pad = f"/api/v1/actions/{v['request_id']}/approve"
+    # De R3-poort vereist een gekoppelde executor voordat de doelnaam aan de beurt komt.
+    geblokkeerd = admin.post(pad, json=hashes(v), headers=idem())
+    assert (geblokkeerd.status_code, geblokkeerd.json()["code"]) == (409, "actie_geblokkeerd")
+    assert haal(admin, v)["goedkeuring"] is None
+    dienst = "ai-server-manager-executor"
+    koppeling = admin.post("/api/v1/services/pairing-codes", json={"app_id": dienst})
+    assert koppeling.status_code == 201
+    registratie = admin.post("/api/v1/services/enroll", json=enroll_body(dienst, code=koppeling.json()["koppelcode"]))
+    assert registratie.status_code == 200
     for extra in ({}, {"bevestig_naam": "MY-HOUSE"}, {"bevestig_naam": "my-house "}):
         antwoord = admin.post(pad, json={**hashes(v), **extra}, headers=idem())
         assert antwoord.status_code == 422
         assert antwoord.json()["code"] == "doelnaam_ongeldig"
         assert haal(admin, v)["goedkeuring"] is None
     assert admin.post(pad, json={**hashes(v), "bevestig_naam": "my-house"}, headers=idem()).status_code == 200
+    assert schrijfaanroepen(stack.nas) == []
