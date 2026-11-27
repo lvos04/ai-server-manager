@@ -25,7 +25,7 @@ from hub.catalog.discovery import is_inventory_fresh
 from hub.config import Settings
 from hub.inventory.store import kind_state
 from hub.keys import KeyRing
-from hub.models import CatalogApp, PeriodicTask
+from hub.models import CatalogApp, OutboxEvent, PeriodicTask
 from hub.monitoring import alerts, timeseries
 from hub.monitoring.appstatus import app_health
 from hub.monitoring.health import status_value
@@ -207,12 +207,24 @@ def _backup_versheid(db: Session, ctx: Context) -> bool:
 
     inp = gate_inputs(db, ctx.settings)
     b = inp.eigen_backup
-    # shortcut: nog nooit een geverifieerde back-up is "ontbreekt", geen "verouderd"; de gate is dan wel dicht en een
-    # mislukte export geeft al een incident (backup.eigen_mislukt). Versie 2: ook een incident als er na de eerste
-    # start te lang geen enkele back-up is.
-    verouderd = b is not None and not binnen_venster(b["finished_at"], ctx.now, inp.eigen_backup_max_age_seconds)
-    # De stand van vorige keer is het open incident zelf (ook na een mislukte ronde of een handmatige afsluiting).
-    voor = engine.active_for(db, rules.BACKUP_VEROUDERD_FP) is not None
+    # De incidentverwerker kan achterlopen. De laatste wachtende overgang telt al mee.
+    pending = db.scalar(
+        select(OutboxEvent.event_type)
+        .where(
+            OutboxEvent.entity_type == "self_backup",
+            OutboxEvent.entity_id == "hub",
+            OutboxEvent.event_type.in_(("backup.freshness.stale", "backup.freshness.recovered")),
+            OutboxEvent.incident_verwerkt_op.is_(None),
+        )
+        .order_by(OutboxEvent.seq.desc())
+        .limit(1)
+    )
+    voor = (
+        pending == "backup.freshness.stale" if pending else engine.active_for(db, rules.BACKUP_VEROUDERD_FP) is not None
+    )
+    if b is None:
+        return voor  # Zonder geverifieerd bewijs verandert de vorige incidentstand niet.
+    verouderd = not binnen_venster(b["finished_at"], ctx.now, inp.eigen_backup_max_age_seconds)
     if verouderd != voor:
         emit(
             db,
@@ -220,7 +232,7 @@ def _backup_versheid(db: Session, ctx: Context) -> bool:
             "self_backup",
             "hub",
             {
-                "laatste_geverifieerd": iso(b["finished_at"]) if b else None,
+                "laatste_geverifieerd": iso(b["finished_at"]),
                 "max_leeftijd_s": inp.eigen_backup_max_age_seconds,
             },
         )

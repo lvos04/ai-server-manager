@@ -111,7 +111,7 @@ gescheiden en telt alleen de gekozen bron mee. Gebruik de volgende veldselectie 
 | --- | --- |
 | wanted | Vergelijk equivalent open wanted-bereik, het totaal, `wanted_id`, soort en reden bij gelijke filters en dezelfde meetpopulatie. Vergelijk toestand alleen bij aantoonbaar dezelfde betekenis. Schakel dan de hele wanted-meting over naar `items` van type `wanted`. Gebruik vóór die overgang de toegelaten legacy-uitlezing. |
 | status | Vergelijk noodstop actief en sinds, aantallen wachtende, actieve en onopgeloste mislukte jobs en ongelezen waarschuwingen en fouten bij dezelfde definities en peildatum. In `97410b9` is alleen het connectoritem `status` kandidaat voor deze waarden. Gebruik een onafhankelijke neveneffectvrije testreferentie voor vergelijking zolang het legacy-pad is uitgesloten. |
-| downloads | De historische uitkomsten over 7 en 30 dagen per brontype (`grabs`, `imported`, `failed`, `success_rate`) komen uitsluitend uit een toegelaten uitlezing van verzamelde statistiek en blijven tot die tijd `unknown`. Type `downloads` levert de actuele voortgang, toestand en wachten-op-import per item. Vergelijk actuele waarden alleen met een veilige referentie voor dezelfde wachtrij en peildatum. |
+| downloads | De historische uitkomsten over 7 en 30 dagen per brontype (`grabs`, `imported`, `failed`, `success_rate`) vereisen een toegelaten uitlezing van verzamelde statistiek. Ook de actuele voortgang blijft `unknown`. Toelating vraagt een proef met lege cache en een downloadclient die aanmelding vereist. De bron moet de meting kunnen leveren zonder aanmeldverzoek of opslagwijziging. |
 | AV1 | Legacy `/api/v1/encoding/jobs` blijft bron voor jobtotalen per toestand, met vermelding van een begrensde lijst. Type `av1_lanes` levert CPU- en GPU-banen met bezetting, slotlimieten, gewenste plaatsen en pauzestatus. Vergelijk baanmetingen alleen met een veilige referentie met dezelfde baan, eenheid en meettijd. |
 | incidenten | Vergelijk bij volledige waarnemingen de incidenten over hetzelfde bronbereik per begrensde bron-ID, eigenaar, bekende oorzaakcode, ernst en aantal. Kies één volledige bron, met `incidents` als connectorbron. Legacy-incidenten zijn uitgesloten zolang de routebijwerking of het ontbreken van volledigheidsbewijs speelt. |
 
@@ -182,7 +182,7 @@ cachevulgedrag bij een lege cache ligt bij de broneigenaar. Het mediascherm volg
 ### Overzicht voor het scherm Media (S-P3-082, versie 1)
 
 Op wens van de gebruiker van 21 november 2026 leest de Hub voor het scherm Media de connectorroutes uit de
-leeslijst hierboven: `/connector/v1/discover` en `/connector/v1/items` voor `wanted`, `status`, `downloads`,
+leeslijst hierboven: `/connector/v1/discover` en `/connector/v1/items` voor `wanted`, `status`,
 `av1_lanes` en `incidents`. S-P3-610 en S-P3-615 zijn afgerond. Daar leest `items` onder `observation_read`
 zonder opslag. Vooraf gaat dezelfde sleutelcontrole als bij de downloadketen, met dezelfde aanvaarde
 sleutelboekhouding (`api_keys.last_used_at`). De Hub neemt alleen totalen, `jobs_failed`, de som van `running`

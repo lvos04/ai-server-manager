@@ -816,3 +816,66 @@ def test_niet_bestaand_kluispad_bij_uitvoeren_weigert_vóór_ondertekening(
     with app.state.sessionmaker() as db:
         assert db.execute(sa.text("SELECT count(*) FROM kluis_afgifte")).scalar_one() == 0
         assert db.execute(sa.text("SELECT count(*) FROM approval WHERE used_at IS NOT NULL")).scalar_one() == 0
+
+
+def test_markering_pas_bij_mogelijke_afgifte(kluisketen: Keten, app: Any) -> None:
+    from datetime import timedelta
+
+    from hub.catalog.kluis import gemarkeerd
+    from hub.models import CatalogPlan, KluisAfgifte
+    from hub.timeutil import utcnow
+
+    admin = kluisketen.stack.admin
+    plan = _plan(admin).json()
+    voorstel = _stel_voor(admin, plan)
+    assert voorstel.status_code == 201
+    rid = uuid.UUID(voorstel.json()["request_id"])
+    with app.state.sessionmaker.begin() as db:
+        assert not gemarkeerd(db, "demo-app")
+        eind = utcnow() + timedelta(seconds=60)
+        afgifte = KluisAfgifte(request_id=rid, request_sha256=DIGEST, expires_at=eind)
+        db.add(afgifte)
+        db.flush()
+        assert gemarkeerd(db, "demo-app")
+        afgifte.expires_at = utcnow() - timedelta(seconds=1)
+        db.flush()
+        assert not gemarkeerd(db, "demo-app")
+        afgifte.claimed_at = afgifte.expires_at - timedelta(seconds=2)
+        db.flush()
+        assert gemarkeerd(db, "demo-app")
+        # Ook een geregistreerde installatie uit een oudere versie kan al ingevulde plekken hebben.
+        db.delete(afgifte)
+        bestaand = db.get(CatalogPlan, uuid.UUID(plan["plan_id"]))
+        bestaand.registratie = {"app_name": "demo-app", "digests": [DIGEST]}
+        db.flush()
+        assert gemarkeerd(db, "demo-app")
+
+
+@pytest.mark.parametrize("tijd", ["geen tijd", "2026-02-30T10:00:00Z", "2026-11-22T10:00:00"])
+def test_claim_eist_echt_utc_tijdstip(tijd):
+    from pydantic import ValidationError
+
+    from hub.routers.kluis import SecretClaimIn
+
+    vorm = _geldige_vorm()
+    assert SecretClaimIn(**vorm).issued_at == vorm["issued_at"]
+    vorm["issued_at"] = tijd
+    with pytest.raises(ValidationError):
+        SecretClaimIn(**vorm)
+
+
+def test_claim_zonder_database_levert_niets(app, monkeypatch):
+    from fastapi.testclient import TestClient
+    from sqlalchemy.exc import OperationalError
+
+    from hub.deps import get_db
+
+    def onbeschikbaar():
+        raise OperationalError(None, None, OSError())
+
+    monkeypatch.setitem(app.dependency_overrides, get_db, onbeschikbaar)
+    with TestClient(app, base_url="https://testserver", raise_server_exceptions=False) as client:
+        antwoord = client.post("/api/v1/executor/secret-claims", json=_geldige_vorm())
+    assert antwoord.status_code == 503
+    assert int(antwoord.headers["Retry-After"]) > 0
+    assert "afgifte" not in antwoord.json()

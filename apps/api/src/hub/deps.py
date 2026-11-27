@@ -26,7 +26,7 @@ from hub.oidc import IDEMPOTENCY_ROUTES
 from hub.scopes import has_scope
 from hub.security import ROLE_RANK, Role, constant_eq, sha256_hex
 from hub.timeutil import utcnow
-from hub.vault import Vault
+from hub.vault import Vault, VaultError
 
 SESSION_COOKIE = "hub_session"
 CSRF_COOKIE = "hub_csrf"
@@ -51,7 +51,12 @@ def get_keyring(request: Request) -> KeyRing:
 
 
 def get_vault(request: Request) -> Vault:
-    return request.app.state.vault()  # type: ignore[no-any-return]
+    try:
+        return request.app.state.vault()  # type: ignore[no-any-return]
+    except (OSError, ValueError, VaultError):
+        raise HubError(
+            503, "dependency_unavailable", "De kluis is tijdelijk niet beschikbaar.", headers={"Retry-After": "5"}
+        ) from None
 
 
 def get_readable_vault(request: Request) -> Vault | None:
@@ -343,7 +348,7 @@ async def _idempotency(
     request: Request,
     db: DB,
     principal: Annotated[Principal | None, Depends(optional_principal)],
-    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> Idempotency:
     if not idempotency_key:
         raise HubError(400, "idempotency_key_required", "Header Idempotency-Key (UUID) is verplicht voor wijzigingen.")

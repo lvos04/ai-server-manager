@@ -544,8 +544,9 @@ def test_poorteigenaar_per_probe(admin: Any, app: Any, doel: dict[str, Any], mon
 
 
 @pytest.mark.parametrize("doel", [ANDERE_APP_ID], indirect=True)
+@pytest.mark.parametrize("herbevestig", [False, True])
 def test_herstelsignaal_vereist_eerdere_storing(
-    admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    herbevestig: bool, admin: Any, app: Any, doel: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     created = admin.post(ROUTE, json=doel, headers=idem())
     assert created.status_code == 201
@@ -560,6 +561,12 @@ def test_herstelsignaal_vereist_eerdere_storing(
     for status in ("healthy", "healthy", "unknown", "healthy", "healthy"):
         assert admin.post(f"{path}/test", headers=idem()).status_code == 200
         assert admin.get(path).json()["verbinding"]["status"] == status
+        if herbevestig and status == "unknown":
+            etag = admin.get(path).headers["ETag"]
+            assert (
+                admin.patch(path, json={"doel_bevestigd": True}, headers={**idem(), "If-Match": etag}).status_code
+                == 200
+            )
 
     with app.state.sessionmaker() as db:
         events = db.scalars(
@@ -1295,9 +1302,9 @@ def test_my_house_workeruitval_heeft_eigen_vervalgrens(
 
 @pytest.mark.parametrize("doel", ["my_house"], indirect=True)
 @pytest.mark.parametrize(
-    ("bronleeftijd", "tweede_uitval"),
-    [(421, False), (120, True)],
-    ids=["doorlopend", "tweede_uitval"],
+    ("bronleeftijd", "tweede_uitval", "verstreken_ms"),
+    [(421, False, 300500), (120, True, 300500), (120, True, 121000)],
+    ids=["doorlopend", "tweede_uitval", "secondegrens"],
 )
 def test_my_house_herkent_volgende_uitval_aan_de_hartslag(
     admin: Any,
@@ -1306,6 +1313,7 @@ def test_my_house_herkent_volgende_uitval_aan_de_hartslag(
     monkeypatch: pytest.MonkeyPatch,
     bronleeftijd: int,
     tweede_uitval: bool,
+    verstreken_ms: int,
 ) -> None:
     code, toestand, oproepen = huis_simulatie
     koppeling = admin.post(ROUTE, json=doel, headers=invoer(code))
@@ -1335,7 +1343,7 @@ def test_my_house_herkent_volgende_uitval_aan_de_hartslag(
 
     # De Hub pollt tussendoor niet. Bij de tweede uitval meldt de bron de
     # leeftijd van een hartslag die 180 s na de eerste uitval is gemeten.
-    klok += timedelta(milliseconds=300500)
+    klok += timedelta(milliseconds=verstreken_ms)
     worker["age_s"] = bronleeftijd
     laatste_sleutel = idem()
     laatste = admin.post(f"{path}/test", headers=laatste_sleutel)
@@ -1819,7 +1827,8 @@ def bewaar_inventaris(db: Session, data: list[dict[str, Any]], *, gestart: datet
 @pytest.mark.parametrize("doel", ["home-control-hub"], indirect=True)
 @pytest.mark.parametrize("positie", [1, 21])
 @pytest.mark.parametrize("status", ["healthy", "down"])
-def test_connector_vervalt_op_lijst_en_detail(admin, app, settings, doel, monkeypatch, positie, status):
+@pytest.mark.parametrize("algemeen", [False, True])
+def test_connector_vervalt_op_lijst_en_detail(admin, app, settings, doel, monkeypatch, positie, status, algemeen):
     naam = doel["app_id"]
     uitgifte = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": naam})
     assert uitgifte.status_code == 201
@@ -1838,14 +1847,18 @@ def test_connector_vervalt_op_lijst_en_detail(admin, app, settings, doel, monkey
     def lees_bron(_basis, methode, pad, **_opties):
         assert methode == "GET"
         if pad == "/connector/v1/discover":
-            return CallResult(200, {"app_id": naam, "limits": {"max_age_s": {"health": 120, "worker": 5}}})
+            termijnen = {"health": 120} if algemeen else dict.fromkeys(namen, 120)
+            return CallResult(200, {"app_id": naam, "limits": {"max_age_s": {**termijnen, "worker": 5}}})
         assert pad == "/connector/v1/health"
         return CallResult(200, {"status": "healthy", "observed_at": iso(op), "reason_code": None, "checks": controles})
 
     monkeypatch.setattr(sources, "call", lees_bron)
     poll = admin.post("/api/v1/monitoring/poll", headers=idem())
     assert poll.status_code == 200 and poll.json()["diensten"]["diensten"] == 1
-    assert toestanden(admin, doel) == ("healthy", "healthy")
+    beginstatus = "healthy" if algemeen else "unknown"
+    assert toestanden(admin, doel) == (beginstatus, beginstatus)
+    if not algemeen and status == "healthy":
+        return
     if status == "down":
         controles[positie - 1]["status"] = "down"
         assert admin.post("/api/v1/monitoring/poll", headers=idem()).status_code == 200
@@ -2926,3 +2939,119 @@ def test_backupdekking_vervangend_archief(admin, app, settings, periodic_run, gr
     assert all(
         waarde not in uitvoer for waarde in ("tweede-proefbron", "andere-kijker", "tweede-testpersoon", "testpersoon")
     )
+
+
+@pytest.mark.parametrize(
+    ("historie", "leeftijd"),
+    [
+        (None, None),
+        ("healthy", 10),
+        ("down", 10),
+        ("degraded", 10),
+        ("unknown", 10),
+        ("healthy", 901),
+        ("down", 901),
+        ("healthy", None),
+        ("down", None),
+        ("healthy", -600),
+    ],
+)
+def test_mediaguard_contacthistorie(admin, app, doel, monkeypatch, historie, leeftijd):
+    transport = Mock(side_effect=AssertionError("Ongeplande bronaanroep"))
+    monkeypatch.setattr(outbound, "request", transport)
+    gemaakt = admin.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
+    assert gemaakt.status_code == 201
+    pad = f"{ROUTE}/{gemaakt.json()['id']}"
+    tijd = utcnow() - timedelta(seconds=leeftijd) if leeftijd is not None else None
+    with app.state.sessionmaker.begin() as db:
+        rij = db.scalars(select(AdapterLink)).one()
+        rij.laatste_status, rij.observed_at = historie, tijd
+    headers = idem()
+    for ronde in range(3):
+        if ronde:
+            reactie = admin.post(f"{pad}/test", headers=headers)
+            assert reactie.status_code == 200
+            assert (reactie.headers.get("Idempotent-Replay") == "true") == (ronde == 2)
+        detail = admin.get(pad).json()
+        assert admin.get(ROUTE).json()["items"] == [detail]
+        assert detail["gezondheid"]["status"] == detail["verbinding"]["status"] == "unknown"
+        geldig = leeftijd is not None and leeftijd >= 0
+        assert detail["verbinding"]["laatste_status"] == (historie if geldig else None)
+        assert detail["verbinding"]["observed_at"] == (iso(tijd) if geldig else None)
+    transport.assert_not_called()
+
+
+@pytest.mark.parametrize("bron", ["database", "kluis"])
+def test_adapteropslag_onbeschikbaar(admin, app, doel, monkeypatch, bron):
+    from sqlalchemy.exc import OperationalError
+
+    if bron == "database":
+        # FastAPI leest de signatuur van een dependency.
+        def uitval():
+            raise OperationalError(None, None, OSError())
+
+        monkeypatch.setitem(app.dependency_overrides, get_db, uitval)
+    else:
+        monkeypatch.setattr(app.state, "vault", Mock(side_effect=FileNotFoundError()))
+    with TestClient(
+        app,
+        base_url="https://testserver",
+        raise_server_exceptions=False,
+        cookies=admin.cookies,
+        headers=dict(admin.headers),
+    ) as client:
+        antwoord = client.post(ROUTE, json=doel, headers=invoer(secrets.token_urlsafe()))
+    assert antwoord.status_code == 503
+    assert antwoord.json()["code"] == "dependency_unavailable"
+    assert int(antwoord.headers["Retry-After"]) > 0
+    with app.state.sessionmaker() as db:
+        assert db.scalar(select(AdapterLink.id)) is None
+        assert db.scalar(select(VaultSecret.ref).where(VaultSecret.ref.startswith("vault://adapters/"))) is None
+
+
+def test_adapter_openapi_en_werkelijke_weigering(admin, app, doel):
+    import jsonschema
+
+    spec = app.openapi()
+    for pad, methode in [
+        (ROUTE, "post"),
+        (ROUTE + "/{link_id}", "patch"),
+        (ROUTE + "/{link_id}", "delete"),
+        (ROUTE + "/{link_id}/test", "post"),
+    ]:
+        op = spec["paths"][pad][methode]
+        (sleutel,) = [p for p in op["parameters"] if p["name"] == "Idempotency-Key"]
+        assert sleutel["required"]
+        verwijzing = op["responses"]["422"]["content"]["application/json"]["schema"]["$ref"].split("/")[-1]
+        schema = spec["components"]["schemas"][verwijzing]
+        assert set(schema["required"]) == {"code", "message", "details", "trace_id"}
+    assert admin.post(ROUTE, json=doel).status_code == 400
+    antwoord = admin.post(ROUTE, headers=idem(), json={})
+    assert antwoord.status_code == 422
+    jsonschema.validate(antwoord.json(), schema)
+
+
+@pytest.mark.parametrize(
+    ("codes", "retry", "wacht"),
+    [
+        ([503, 200], "1", 1),
+        ([429, 429, 429], "1", 2),
+        ([503], "9999", 0),
+    ],
+)
+def test_tijdelijke_openbare_probe_hercontroleert_binding(monkeypatch, codes, retry, wacht):
+    import time
+
+    from hub.adapters import mso
+
+    antwoord = b'{"status":"ok","version":"1.6.0"}'
+    verzoek = Mock(side_effect=[outbound.Response(c, antwoord, {"retry-after": retry}) for c in codes])
+    controle = Mock()
+    slaap = Mock()
+    monkeypatch.setattr(basis, "read_request", verzoek)
+    monkeypatch.setattr(time, "sleep", slaap)
+    resultaat = mso._read(AdapterLink(), mso.HEALTH_PATH, mso.Liveness, outbound.OutboundPolicy(), controle)
+    assert isinstance(resultaat, mso.Liveness) == (codes[-1] == 200)
+    assert controle.call_count == verzoek.call_count == len(codes)
+    assert slaap.call_count == wacht
+    assert all(1 <= aanroep.args[0] <= 5 for aanroep in slaap.call_args_list)

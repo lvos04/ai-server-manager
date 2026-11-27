@@ -160,10 +160,20 @@ def leg_afgifte_vast(db: Session, req: ActionRequest, ap: Approval | None, verzo
 
 def gemarkeerd(db: Session, app_name: str) -> bool:
     """Register van de Hub (§8.3): een instantie waarin de executor plekken heeft (of kan hebben) ingevuld."""
-    plannen = db.scalars(
-        select(CatalogPlan).where(CatalogPlan.app_name == app_name, CatalogPlan.request_id.is_not(None))
+    plannen = db.execute(
+        select(CatalogPlan, KluisAfgifte)
+        .outerjoin(KluisAfgifte, KluisAfgifte.request_id == CatalogPlan.request_id)
+        .where(CatalogPlan.app_name == app_name, CatalogPlan.request_id.is_not(None))
     )
-    return any(heeft_kluis(p.binding) for p in plannen)
+    now = utcnow()
+    return any(
+        heeft_kluis(plan.binding)
+        and (
+            bool(plan.registratie)
+            or (afgifte is not None and (afgifte.claimed_at is not None or afgifte.expires_at > now))
+        )
+        for plan, afgifte in plannen
+    )
 
 
 # ------------------------------------------------------------------ de claim

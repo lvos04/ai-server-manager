@@ -190,7 +190,7 @@ test("R3 (gesimuleerd verzoek): twee stappen, naam typen; zonder naam doet de ge
   await page.route(`**/api/v1/actions/${id}**`, async (r) => {
     if (r.request().method() === "POST") {
       goedgekeurd++;
-      expect(r.request().postDataJSON()).toEqual({ preview_hash: H("b"), resource_etag: '"proef-1"', policy_hash: H("a") });
+      expect(r.request().postDataJSON()).toEqual({ preview_hash: H("b"), resource_etag: '"proef-1"', policy_hash: H("a"), bevestig_naam: "proef-app" });
       await new Promise((ok) => setTimeout(ok, 300));
       return r.fulfill({ json: { ...verzoek, status: "goedgekeurd" } });
     }

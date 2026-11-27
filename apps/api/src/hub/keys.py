@@ -99,8 +99,11 @@ def keyset_fingerprint(
 
 def normalize_fingerprint(value: str) -> str:
     """Invoer van een mens vergelijkbaar maken: hoofdletters, zonder streepjes/spaties, ``O→0`` en ``I/L→1``."""
-    cleaned = "".join(ch for ch in value.upper() if ch.isalnum())
-    return cleaned.replace("O", "0").replace("I", "1").replace("L", "1")
+    cleaned = value.replace("-", "").replace(" ", "")
+    normalized = cleaned.upper().replace("O", "0").replace("I", "1").replace("L", "1")
+    if not cleaned.isascii() or not normalized or any(ch not in CROCKFORD_ALPHABET for ch in normalized):
+        raise ValueError("Ongeldig teken in de vingerafdruk.")
+    return normalized
 
 
 def public_pem(key: Ed25519PublicKey) -> str:

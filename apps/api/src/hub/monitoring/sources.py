@@ -325,6 +325,7 @@ def judge_connector_health(
     table = limits.get("max_age_s") if isinstance(limits, dict) else None
     source_age = table.get("health") if isinstance(table, dict) else None
     deadline = observed + timedelta(seconds=top_age) if type(source_age) is int and source_age > 0 else None
+    part_deadline = None
     clean: list[dict[str, Any]] = []
     statuses: set[str] = set()
     job_names = (*JOB_CHECKS, *JOB_CHECKS_OVERGANG)
@@ -338,6 +339,10 @@ def judge_connector_health(
         c_obs = _ts(c.get("observed_at"))
         age = max_age_for(limits, name)
         fresh = c_obs is not None and (now - c_obs).total_seconds() <= age and (c_obs - now).total_seconds() <= 300
+        part_age = table.get(name) if isinstance(table, dict) else None
+        if c_obs is not None and (c_obs - now).total_seconds() <= 300 and type(part_age) is int and part_age > 0:
+            end = c_obs + timedelta(seconds=age)
+            part_deadline = min(part_deadline, end) if part_deadline is not None else end
         if deadline is not None and c_obs is not None and c_obs < deadline:
             deadline = min(deadline, c_obs + timedelta(seconds=age))
         status = st if fresh else "unknown"
@@ -357,6 +362,8 @@ def judge_connector_health(
                 }
             )
     total = worst([stated, *statuses])
+    if deadline is None and total in ("down", "degraded"):
+        deadline = part_deadline
     if total != stated or (total != "healthy" and reason is None):
         if job_failed and total in ("down", "degraded"):
             reason = "jobs_staan_stil"

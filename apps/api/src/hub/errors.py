@@ -9,12 +9,21 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import DBAPIError
+from pydantic import BaseModel
+from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from hub.logfilter import db_error_text
 
 log = logging.getLogger("hub.errors")
+
+
+class ErrorResponse(BaseModel):
+    code: str
+    message: str
+    details: dict[str, Any]
+    trace_id: str
 
 
 class HubError(Exception):
@@ -55,6 +64,16 @@ _STATUS_CODES = {
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    async def _database_unavailable(request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(
+            error_body(request, "dependency_unavailable", "De database is tijdelijk niet beschikbaar."),
+            status_code=503,
+            headers={"Retry-After": "5"},
+        )
+
+    for error in (OperationalError, InterfaceError, PoolTimeout):
+        app.add_exception_handler(error, _database_unavailable)
+
     @app.exception_handler(HubError)
     async def _hub_error(request: Request, exc: HubError) -> JSONResponse:
         return JSONResponse(
@@ -63,6 +82,11 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:
+        if any(e["type"] == "missing" and e["loc"] == ("header", "Idempotency-Key") for e in exc.errors()):
+            return JSONResponse(
+                error_body(request, "idempotency_key_required", "Header Idempotency-Key (UUID) is verplicht."),
+                status_code=400,
+            )
         fouten = [
             {"veld": ".".join(str(p) for p in err.get("loc", ())), "fout": err.get("msg", ""), "type": err.get("type")}
             for err in exc.errors()

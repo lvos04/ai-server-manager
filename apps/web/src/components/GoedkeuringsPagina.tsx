@@ -124,7 +124,10 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
   const keurGoed = () =>
     eenmalig(async () => {
       const res = await approve.run(`/api/v1/actions/${v.request_id}/approve`, {
-        body: { preview_hash: binding.preview_hash, resource_etag: binding.resource_etag, policy_hash: binding.policy_hash },
+        body: {
+          preview_hash: binding.preview_hash, resource_etag: binding.resource_etag, policy_hash: binding.policy_hash,
+          ...(k === "R3" ? { bevestig_naam: naam } : {}),
+        },
       });
       if (res) opnieuw();
     });

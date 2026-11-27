@@ -203,8 +203,16 @@ def hashes(voorstel: dict[str, Any]) -> dict[str, str]:
 
 
 def keur_goed(c: Any, voorstel: dict[str, Any], **wijzig: str) -> Any:
+    body = hashes(voorstel)
+    if voorstel.get("risk_class") == "R3":
+        target = voorstel["target"]
+        body["bevestig_naam"] = next(
+            target[k] for k in ("app_id", "dataset", "snapshot", "resource", "host_id") if k in target
+        )
     return c.post(
-        f"/api/v1/actions/{voorstel['request_id']}/approve", json={**hashes(voorstel), **wijzig}, headers=idem()
+        f"/api/v1/actions/{voorstel['request_id']}/approve",
+        json={**body, **wijzig},
+        headers=idem(),
     )
 
 

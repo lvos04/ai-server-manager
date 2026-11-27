@@ -7,10 +7,11 @@ zonder waarde.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from hub.catalog import kluis
 from hub.deps import DB, Principal, SettingsDep, get_keyring, get_vault, require_service
@@ -41,8 +42,14 @@ class SecretClaimIn(Strict):
     refs: list[RefIn] = Field(max_length=20)
     token: StrictBool
     ontvanger: str = Field(min_length=43, max_length=43, pattern=B64URL, description="Publieke X25519-sleutel.")
-    issued_at: str = Field(max_length=32)
+    issued_at: str = Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?Z$")
     handtekening: str = Field(min_length=86, max_length=86, pattern=B64URL, description="Ed25519, executor-identiteit.")
+
+    @field_validator("issued_at")
+    @classmethod
+    def utc_tijdstip(cls, waarde: str) -> str:
+        datetime.fromisoformat(waarde)
+        return waarde  # De handtekening bindt de oorspronkelijke schrijfwijze.
 
 
 @router.post(

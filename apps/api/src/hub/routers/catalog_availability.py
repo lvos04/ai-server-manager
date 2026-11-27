@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from hub.catalog import availability
 from hub.deps import DB, ServiceP, SettingsDep
-from hub.errors import HubError
+from hub.errors import ErrorResponse, HubError
 from hub.scopes import CATALOGUS_LEZEN, has_scope
 from hub.timeutil import UtcDateTime
 
@@ -29,13 +29,6 @@ class CatalogPin(BaseModel):
         description="Bronmeettijd in UTC met Z. Bij onbekend is de waarde null.",
         json_schema_extra={"format": "date-time"},
     )
-
-
-class ErrorResponse(BaseModel):
-    code: str
-    message: str
-    details: dict[str, Any]
-    trace_id: str
 
 
 def _storage_unavailable() -> HubError:

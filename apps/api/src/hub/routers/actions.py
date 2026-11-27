@@ -102,6 +102,7 @@ class ApproveIn(Strict):
     preview_hash: str = Field(pattern=SHA)
     resource_etag: str = Field(min_length=1, max_length=300)
     policy_hash: str = Field(pattern=SHA)
+    bevestig_naam: str | None = Field(default=None, max_length=200, description="Exacte doelnaam bij R3.")
 
 
 class RejectIn(Strict):
@@ -285,6 +286,7 @@ def approve(
             preview_hash=body.preview_hash,
             resource_etag=body.resource_etag,
             policy_hash=body.policy_hash,
+            bevestig_naam=body.bevestig_naam,
             trace_id=trace_id_of(request),
             keyring=keyring,
         )

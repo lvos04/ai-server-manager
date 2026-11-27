@@ -12,12 +12,13 @@ nog geblokkeerd). ``apply_route = False`` bootst een eigenaar zonder de route ``
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from typing import Any
 
 import jwt
 from asm_policy import Policy
-from asm_policy.canonical import canonical_sha256
+from asm_policy.canonical import canonical_json, canonical_sha256
 from asm_policy.verify import check_decision, check_envelope
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -33,30 +34,60 @@ def _fout(status: int, code: str, message: str = "Geweigerd.", details: dict[str
 
 
 class FakeEigenaar(FakeHTTP):
-    def __init__(self, jwt_key: Ed25519PublicKey, policy_key: Ed25519PublicKey, policy: Policy) -> None:
+    def __init__(
+        self,
+        jwt_key: Ed25519PublicKey,
+        policy_key: Ed25519PublicKey,
+        policy: Policy,
+        service_id: str,
+    ) -> None:
         super().__init__()
         self.jwt_key, self.policy_key, self.policy = jwt_key, policy_key, policy
+        self.service_id = service_id
+        self.gebruikte_jtis: set[str] = set()
+        self.gebruikte_nonces: set[str] = set()
+        self.gebruikte_goedkeuringen: set[str] = set()
+        self._slot = threading.Lock()
         self.etag = "e" * 64
         self.voorstellen: dict[str, dict[str, Any]] = {}  # preview_hash → voorstel
         self.geweigerd: list[str] = []
         self.geaccepteerd: list[dict[str, Any]] = []
         self.apply_route = True
-        self.apply_reply = _fout(501, "capability_unavailable", "Uitvoeren is voor deze actie niet beschikbaar.")
+        self.apply_reply = _fout(
+            501,
+            "capability_unavailable",
+            "Uitvoeren is voor deze actie niet beschikbaar.",
+        )
         self.propose_reply: Reply | None = None  # een vast antwoord op propose (storingsproef)
 
     def _jwt(self, seen: Seen) -> bool:
+        bearer = seen.headers.get("authorization", "")
+        if not bearer.startswith("Bearer "):
+            return False
         try:
             claims = jwt.decode(
-                seen.headers.get("authorization", "")[7:],
+                bearer[7:],
                 self.jwt_key,
                 algorithms=["EdDSA"],
                 audience=APP_ID,
                 issuer="hub",
+                options={"require": ["exp", "iat", "nbf", "jti"], "strict_aud": True},
             )
         except jwt.PyJWTError as exc:
             self.geweigerd.append(type(exc).__name__)
             return False
-        return claims.get("token_use") == "hub_service" and claims.get("sub") == "hub"
+        if (
+            claims.get("token_use"),
+            claims.get("sub"),
+            claims.get("roles"),
+            claims.get("service_id"),
+        ) != ("hub_service", "hub", ["service"], self.service_id):
+            return False
+        with self._slot:
+            if claims["jti"] in self.gebruikte_jtis:
+                return False
+            self.gebruikte_jtis.add(claims["jti"])
+        return True
 
     def handle(self, seen: Seen) -> Reply:
         if seen.method == "POST" and seen.path == "/connector/v1/apply" and not self.apply_route:
@@ -75,9 +106,28 @@ class FakeEigenaar(FakeHTTP):
         if aid not in BACKUP:
             return _fout(422, "onbekende_actie")
         if aid == "automation.flows.restore":
-            diff = [{"object": "node_red", "operation": "terugzetten", "parameters": body["parameters"]}]
+            diff = [
+                {
+                    "object": "node_red",
+                    "operation": "terugzetten",
+                    "key": body["parameters"].get("snapshot_id"),
+                    "changes": [
+                        {
+                            "field": "checksum_sha256",
+                            "before": self.etag,
+                            "after": "2" * 64,
+                        }
+                    ],
+                }
+            ]
         else:
-            diff = [{"object": "sessies", "operation": "intrekken", "parameters": body["parameters"]}]
+            diff = [
+                {
+                    "object": "sessies",
+                    "operation": "intrekken",
+                    "parameters": body["parameters"],
+                }
+            ]
         voorstel = {
             "proposal_id": str(uuid.uuid4()),
             "action_id": aid,
@@ -105,8 +155,20 @@ class FakeEigenaar(FakeHTTP):
             return _fout(fout.status, fout.code, fout.melding, fout.details)
         approval = body.get("approval") or {}
         eigen = self.voorstellen.get(str(approval.get("preview_hash", "")).removeprefix("sha256:"))
-        if eigen is None or body["proposal"]["expected_version"] != f"sha256:{eigen['resource_etag']}":
+        voorstel = body["proposal"]
+        if (
+            eigen is None
+            or voorstel["expected_version"] != f"sha256:{eigen['resource_etag']}"
+            or eigen["action_id"] != voorstel["action_id"]
+            or canonical_json(eigen["target"]) != canonical_json(voorstel["target"])
+            or canonical_json(eigen["parameters"]) != canonical_json(voorstel["parameters"])
+        ):
             self.geweigerd.append("goedkeuring_past_niet")
             return _fout(409, "goedkeuring_past_niet")
-        self.geaccepteerd.append(body)
+        with self._slot:
+            if body["nonce"] in self.gebruikte_nonces or approval["approval_id"] in self.gebruikte_goedkeuringen:
+                return _fout(409, "al_gebruikt")
+            self.gebruikte_nonces.add(body["nonce"])
+            self.gebruikte_goedkeuringen.add(approval["approval_id"])
+            self.geaccepteerd.append(body)
         return self.apply_reply

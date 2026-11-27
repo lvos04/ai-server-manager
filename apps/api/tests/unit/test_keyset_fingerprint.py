@@ -113,3 +113,15 @@ def test_dienst_jwt_nooit_na_het_absolute_einde() -> None:
     assert exp == int(eind.timestamp()) and exp <= (nu + timedelta(seconds=5)).timestamp()
     with pytest.raises(JwtVensterVerstreken):
         ring.issue_hub_service_jwt(audience="x", service_id=sid, uiterlijk=nu - timedelta(seconds=1))
+
+
+def test_alleen_contractscheiding_bij_vingerafdruk() -> None:
+    import pytest
+    from executor.hublink import valid_fingerprint
+
+    geldig = "MEGG-8GFG-2E4Y-K2RQ"
+    assert valid_fingerprint(geldig.lower().replace("-", " "))
+    for teken in ("!", "\t", "_", "é"):
+        assert not valid_fingerprint(geldig + teken)
+        with pytest.raises(ValueError):
+            normalize_fingerprint(geldig + teken)

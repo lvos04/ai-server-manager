@@ -1556,3 +1556,31 @@ def test_herhaald_oud_uit_verzoek_heft_een_later_gezette_noodstop_niet_op(stack:
     assert audit_acties(stack.app).count("action.emergency_stop.disabled") == uit_voor
     r = admin.put("/api/v1/actions/noodstop", json={"actief": True, "reden": "x"}, headers=k1)
     assert r.status_code == 422 and r.json()["code"] == "idempotency_key_reused", r.text
+
+
+def test_r3_goedkeuring_eist_exacte_doelnaam(stack: Stack, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil
+
+    import yaml
+    from asm_policy import load_policy
+
+    from hub.actions import service
+
+    # Het huidige productiebeleid heeft geen uitvoerbare R3-actie. Verhoog alleen in deze kopie de klasse.
+    kopie = shutil.copytree(service.get_policy().bron, tmp_path / "r3-beleid")
+    pad_acties = kopie / "acties.yaml"
+    regels = yaml.safe_load(pad_acties.read_text())
+    regels["acties"]["app.uninstall"]["klasse"] = "R3"
+    pad_acties.write_text(yaml.safe_dump(regels))
+    beleid = load_policy(kopie)
+    monkeypatch.setattr(service, "get_policy", lambda: beleid)
+    admin = stack.admin
+    v = stel_voor(admin, "app.uninstall", app_target("my-house")).json()
+    assert v["risk_class"] == "R3"
+    pad = f"/api/v1/actions/{v['request_id']}/approve"
+    for extra in ({}, {"bevestig_naam": "MY-HOUSE"}, {"bevestig_naam": "my-house "}):
+        antwoord = admin.post(pad, json={**hashes(v), **extra}, headers=idem())
+        assert antwoord.status_code == 422
+        assert antwoord.json()["code"] == "doelnaam_ongeldig"
+        assert haal(admin, v)["goedkeuring"] is None
+    assert admin.post(pad, json={**hashes(v), "bevestig_naam": "my-house"}, headers=idem()).status_code == 200

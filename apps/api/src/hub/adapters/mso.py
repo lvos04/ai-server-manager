@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import secrets
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
@@ -72,11 +74,19 @@ def items(item_type: str, *, cursor: str | None, limit: int) -> dict[str, object
 def _read[T: BaseModel](
     link: AdapterLink, path: str, model: type[T], policy: outbound.OutboundPolicy, check_binding: Callable[[], None]
 ) -> T | ProbeFailure:
-    check_binding()
-    try:
-        response = basis.read_request(link, path, policy=policy)
-    except outbound.OutboundError as exc:
-        return ProbeFailure(exc.reason)
+    for poging in range(3):
+        check_binding()
+        try:
+            response = basis.read_request(link, path, policy=policy)
+        except outbound.OutboundError as exc:
+            return ProbeFailure(exc.reason)
+        if response.status not in (429, 503) or poging == 2:
+            break
+        advies = response.headers.get("retry-after", "0").strip()
+        # Een lange of onbekende wachttijd laten we aan de volgende contactproef.
+        if not advies.isascii() or not advies.isdecimal() or len(advies) > 3 or int(advies) > 5:
+            break
+        time.sleep(max(int(advies), 0.25 * 2**poging + secrets.randbelow(100) / 1000))
 
     try:
         body: Any = response.json()

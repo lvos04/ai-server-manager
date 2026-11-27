@@ -258,7 +258,7 @@ def _system_readings(
                 # bevestiging bewijst dat deze uitval nieuw is.
                 worker_error_observed = previous_worker_error_at
                 if worker_observed is not None and (
-                    previous_worker_error_at is None or worker_observed > previous_worker_error_at
+                    previous_worker_error_at is None or worker_observed >= previous_worker_error_at
                 ):
                     worker_error_observed = requested_at
         elif check.key == "backup" and check.state == "ok" and "age_h" in by_key[check.key]:

@@ -157,7 +157,10 @@ def valid_pairing_code(value: str) -> bool:
 
 def valid_fingerprint(value: str) -> bool:
     """Invoer ≤ 64 tekens als geheel (§3.7: nooit eerst afkappen); na normalisatie precies 16 tekens."""
-    n = normalize_code(value)
+    cleaned = value.replace("-", "").replace(" ", "")
+    if not cleaned.isascii() or not cleaned.isalnum():
+        return False
+    n = normalize_code(cleaned)
     return len(value) <= 64 and len(n) == 16 and all(ch in CROCKFORD for ch in n)
 
 
@@ -550,7 +553,7 @@ def check_enroll_response(body: Any, app_id: str, expected_fingerprint: str) -> 
     computed = keyset_fingerprint(keys, [body["policy_public_key"]])
     if computed != body["keyset_fingerprint"]:
         raise EnrollFailed("hub_antwoord_ongeldig")
-    if normalize_code(computed) != normalize_code(expected_fingerprint):
+    if not valid_fingerprint(expected_fingerprint) or normalize_code(computed) != normalize_code(expected_fingerprint):
         raise EnrollFailed("hub_vingerafdruk_onjuist")
     return {"jwt": jwt_pins, "policy": [policy_pin], "keyset_fingerprint": computed, "rotation_sequence": sequence}
 

@@ -72,6 +72,14 @@ def test_verouderde_backup_geeft_kritiek_incident_en_houdt_r2_r3_dicht(
     periodic_run("incidenten_bijwerken")
     assert len(_incidenten(admin)) == 1 and _stale_events(app) == 1
 
+    with app.state.sessionmaker.begin() as db:
+        from hub.timeutil import utcnow
+
+        db.scalars(select(SelfBackup)).one().deleted_at = utcnow()
+    periodic_run("incidenten_bijwerken")
+    assert _incidenten(admin)[0]["status"] == "open"
+    assert _eigen_backup_te_oud(admin)
+
     # Een nieuwe, geverifieerde export: de gate is weer vrij van deze reden en het incident sluit.
     assert admin.post("/api/v1/backups/self", headers=idem()).status_code == 202
     assert worker_once()[-1]["status"] == "geslaagd"
@@ -79,3 +87,22 @@ def test_verouderde_backup_geeft_kritiek_incident_en_houdt_r2_r3_dicht(
     [inc] = _incidenten(admin)
     assert inc["status"] == "opgelost", inc
     assert not _eigen_backup_te_oud(admin)
+
+
+def test_volle_wachtrij_houdt_een_verouderingsevent(admin, app, settings, worker_once, periodic_run):
+    from hub.events.envelope import emit
+    from hub.models import SelfBackup
+
+    assert admin.post("/api/v1/backups/self", headers=idem()).status_code == 202
+    assert worker_once()[-1]["status"] == "geslaagd"
+    settings.incident_batch = 10
+    with app.state.sessionmaker.begin() as db:
+        export = db.scalars(select(SelfBackup)).one()
+        leeftijd = timedelta(seconds=settings.self_backup_interval_seconds + 3 * 3600)
+        export.started_at -= leeftijd
+        export.finished_at -= leeftijd
+        for i in range(2 * settings.incident_batch):
+            emit(db, "monitoring.sample.observed", "sensor", str(i), {})
+    for _ in range(2):
+        assert periodic_run("incidenten_bijwerken")["incidenten_bijwerken"]["backup_verouderd"]
+    assert _stale_events(app) == 1

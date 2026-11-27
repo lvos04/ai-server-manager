@@ -52,25 +52,44 @@ class Keten:
 
 
 @pytest.fixture
-def keten(admin: Any, app: Any, worker_once: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Keten]:
+def keten(
+    admin: Any,
+    app: Any,
+    worker_once: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[Keten]:
     from fastapi.testclient import TestClient
 
     from hub.actions.beleid import get_policy
 
     nas: FakeTrueNAS = write_nas().start()
     stack = bouw_stack(
-        admin=admin, app=app, nas=nas, worker_once=worker_once, tmp_path=tmp_path, monkeypatch=monkeypatch
+        admin=admin,
+        app=app,
+        nas=nas,
+        worker_once=worker_once,
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
     )
     keys = app.state.keyring()
-    eigenaar = FakeEigenaar(keys.jwt_signing.public_key(), keys.policy_signing.public_key(), get_policy()).start()
     tok = admin.post("/api/v1/services/enrollment-tokens", json={"app_id": APP_ID}).json()["enrollment_token"]
     r = TestClient(app, base_url="https://testserver").post(
         "/api/v1/services/enroll", json=enroll_body(APP_ID, token=tok)
     )
     assert r.status_code == 200, r.text
+    eigenaar = FakeEigenaar(
+        keys.jwt_signing.public_key(),
+        keys.policy_signing.public_key(),
+        get_policy(),
+        r.json()["service_id"],
+    ).start()
     # In productie komen de adressen uit de inventaris (app.query + D03); hier zijn het de testservers.
     urls = {APP_ID: eigenaar.url, "ai-server-manager-executor": stack.ex_url}
-    monkeypatch.setattr("hub.actions.service.service_base_url", lambda db, s, svc: (urls[svc.app_id], None))
+    monkeypatch.setattr(
+        "hub.actions.service.service_base_url",
+        lambda db, s, svc: (urls[svc.app_id], None),
+    )
     try:
         yield Keten(stack, eigenaar, r.json()["service_id"])
     finally:
@@ -265,7 +284,7 @@ def _ontvangst(v: dict[str, Any]) -> dict[str, Any]:
         "policy_hash": v["policy_hash"],
         "uitgevoerd_op": "2026-11-22T10:00:00Z",
         "resource_etag": v["resource_etag"],
-        "readback": {"ingetrokken_sessies": 0},
+        "readback": {"ingetrokken_sessies": 0, "gelezen": True},
         "waarschuwingen": [],
     }
 
@@ -365,11 +384,19 @@ def test_geheimen_van_de_eigenaar_worden_gemaskeerd_voor_opslag(keten: Keten, so
     markering = uuid.uuid4().hex
     if soort == "readback":
         antwoord = _ontvangst(v)
-        antwoord["readback"] = {"ingetrokken_sessies": 0, "client": {"client_secret": markering}}
+        antwoord["readback"] = {
+            "ingetrokken_sessies": 0,
+            "gelezen": True,
+            "client": {"client_secret": markering},
+        }
         keten.eigenaar.apply_reply = Reply(200, antwoord)
     else:
         keten.eigenaar.apply_reply = Reply(
-            409, {"code": "geweigerd", "details": {"fouten": [{"client_secret": markering}]}}
+            409,
+            {
+                "code": "geweigerd",
+                "details": {"fouten": [{"client_secret": markering}]},
+            },
         )
     kop = idem()
     r = keten.stack.admin.post(f"/api/v1/actions/{v['request_id']}/execute", headers=kop)
@@ -488,8 +515,14 @@ def test_flowherstel_vergt_bewijs_van_de_gevraagde_momentopname(keten: Keten, ve
 
 @pytest.mark.parametrize(
     "readback",
-    [{}, {"ingetrokken_sessies": False}, {"ingetrokken_sessies": -1}, {"ingetrokken_sessies": 0, "gelezen": False}],
-    ids=["leeg", "boolean", "negatief", "ongelezen"],
+    [
+        {},
+        {"ingetrokken_sessies": 0},
+        {"ingetrokken_sessies": False},
+        {"ingetrokken_sessies": -1},
+        {"ingetrokken_sessies": 0, "gelezen": False},
+    ],
+    ids=["leeg", "leesbewijs_ontbreekt", "boolean", "negatief", "ongelezen"],
 )
 def test_sessies_intrekken_vergt_een_teruggelezen_aantal(keten: Keten, readback: dict[str, Any]) -> None:
     v = _goedgekeurd(keten)
@@ -552,7 +585,9 @@ def test_de_ai_kan_flowherstel_niet_voorstellen(keten: Keten) -> None:
     assert keten.eigenaar.paths() == []
 
 
-def test_flowherstel_ondertekend_met_andere_parameters_of_actor_weigert_de_eigenaar(keten: Keten) -> None:
+def test_flowherstel_ondertekend_met_andere_parameters_of_actor_weigert_de_eigenaar(
+    keten: Keten,
+) -> None:
     """Ook een geldig ondertekend verzoek met andere parameters, een flow of de AI als actor wordt bij apply
     geweigerd (de eigenaar rekent zelf met hetzelfde beleid)."""
     v = stel_voor(keten.stack.admin, "automation.flows.restore", FLOWBRON, MOMENTOPNAME).json()
@@ -568,6 +603,9 @@ def test_flowherstel_ondertekend_met_andere_parameters_of_actor_weigert_de_eigen
         body["nonce"] = str(uuid.uuid4())
         return keten.direct_apply(execreq.sign(body, keys.policy_signing))
 
+    ander = {"snapshot_id": str(uuid.uuid4())}
+    assert opnieuw(lambda b: b["proposal"].update(parameters=ander)).status_code == 409
+    assert keten.direct_apply(goed).status_code == 409
     r = opnieuw(lambda b: b["proposal"].update(parameters={**MOMENTOPNAME, "credentials": "x"}))
     assert r.status_code >= 400 and len(keten.eigenaar.geaccepteerd) == 1, r.text
     r = opnieuw(lambda b: b["proposal"].update(target={**FLOWBRON, "app_id": "my-house"}))
@@ -576,3 +614,41 @@ def test_flowherstel_ondertekend_met_andere_parameters_of_actor_weigert_de_eigen
         r = opnieuw(lambda b, a=actor: b["proposal"].update(actor=a))
         assert r.status_code == 403 and r.json()["code"] == "actie_geweigerd", r.text
     assert len(keten.eigenaar.geaccepteerd) == 1
+
+
+def test_flowherstel_bevestigt_de_vooraf_getoonde_checksum(keten: Keten) -> None:
+    admin = keten.stack.admin
+    v = stel_voor(admin, "automation.flows.restore", FLOWBRON, MOMENTOPNAME).json()
+    assert keur_goed(admin, v).status_code == 200
+    antwoord = _herstelbewijs(v)
+    antwoord["after_hash"] = "sha256:" + "3" * 64
+    antwoord["readback"]["checksum_sha256"] = "3" * 64
+    keten.eigenaar.apply_reply = Reply(200, antwoord)
+    _controleer_onbekende_uitkomst(keten, v)
+
+
+def test_simulator_weigert_tweede_gebruik_en_vreemde_dienst(keten: Keten) -> None:
+    from fakes.fake_http import Seen
+
+    ring = keten.stack.app.state.keyring()
+    for sid, toegestaan in [(str(uuid.uuid4()), False), (keten.service_id, True)]:
+        bearer, _ = ring.issue_hub_service_jwt(audience=APP_ID, service_id=sid)
+        verzoek = Seen(
+            "POST",
+            "/connector/v1/propose",
+            {},
+            {"authorization": f"Bearer {bearer}"},
+            b"{}",
+        )
+        assert keten.eigenaar._jwt(verzoek) is toegestaan
+        assert not keten.eigenaar._jwt(verzoek)
+
+
+def test_oidc_voorstel_met_andere_parameters_wordt_geweigerd(keten: Keten) -> None:
+    actie = "sso.oidc.hub.register"
+    eigen = keten.eigenaar._propose({"action_id": actie, "target": DOEL, "parameters": {}}).body
+    eigen["parameters"] = {"andere_instantie": True}
+    keten.eigenaar.propose_reply = Reply(201, eigen)
+    antwoord = stel_voor(keten.stack.admin, actie, DOEL, {})
+    assert (antwoord.status_code, antwoord.json()["code"]) == (409, "doel_onbekend")
+    assert not keten.apply_paden()

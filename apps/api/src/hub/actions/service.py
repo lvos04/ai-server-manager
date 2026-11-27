@@ -133,7 +133,7 @@ def _goedkeuring_dict(ap: Approval) -> dict[str, Any]:
 
 
 #: velden die een doel kan hebben (``asm_policy.params.validate_target``); waarden alleen met vaste vorm
-DOEL_VELDEN = ("host_id", "app_id", "dataset", "snapshot", "resource")
+DOEL_VELDEN = ("app_id", "dataset", "snapshot", "resource", "host_id")
 _DOEL_WAARDE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@/:-]{0,199}$")
 
 
@@ -781,6 +781,7 @@ def keur_goed(
     policy_hash: str,
     trace_id: str,
     keyring: KeyRing | None = None,
+    bevestig_naam: str | None = None,
 ) -> dict[str, Any]:
     policy = get_policy()
     now = _nu()
@@ -821,6 +822,11 @@ def keur_goed(
             "Deze actie is nu geblokkeerd; een goedkeuring heft een blokkade niet op.",
             {"blokkades": blok, "request_id": str(req.id)},
         )
+    if cls.risk_class == "R3":
+        doel = veilig_doel(req.target)
+        naam = next((doel[k] for k in DOEL_VELDEN if k in doel), None)
+        if naam is None or bevestig_naam != naam:
+            raise HubError(422, "doelnaam_ongeldig", "Typ de exacte naam van het doel om deze actie goed te keuren.")
     for oud in db.scalars(
         select(Approval).where(
             Approval.request_id == req.id, Approval.used_at.is_(None), Approval.vervallen_op.is_(None)
@@ -1036,20 +1042,43 @@ def _stopgegevens(reden: Any, gestopt: Any) -> dict[str, Any]:
     return uit
 
 
+def _herstelchecksum(diff: Any, snapshot_id: Any, resource: Any) -> str | None:
+    """Zoek het ene doelbewijs van deze momentopname in de getoonde eigenaarsdiff."""
+    if not isinstance(diff, list) or not isinstance(snapshot_id, str) or not isinstance(resource, str):
+        return None
+    checksums = [
+        veld.get("after")
+        for rij in diff
+        if isinstance(rij, dict)
+        and rij.get("key") == snapshot_id
+        and rij.get("object") == resource
+        and isinstance(rij.get("changes"), list)
+        for veld in rij["changes"]
+        if isinstance(veld, dict) and veld.get("field") == "checksum_sha256"
+    ]
+    if len(checksums) != 1 or not isinstance(checksums[0], str) or not re.fullmatch(r"[0-9a-f]{64}", checksums[0]):
+        return None
+    return str(checksums[0])
+
+
 def _readback_bevestigt(req: ActionRequest, readback: dict[str, Any], after_hash: str) -> bool:
     """Toets de teruggelezen toestand aan de actie waarvoor de goedkeuring is verbruikt."""
     if req.action_id == "automation.flows.restore":
         snapshot_id = _vorm(readback.get("snapshot_id"), UUID_RE)
+        wijziging = (req.preview or {}).get("wijziging") or {}
+        verwacht = _herstelchecksum(wijziging.get("diff"), snapshot_id, req.target.get("resource"))
         return (
             readback.get("gelezen") is True
             and readback.get("gelijk_aan_momentopname") is True
             and snapshot_id is not None
             and snapshot_id == req.parameters.get("snapshot_id")
             and readback.get("checksum_sha256") == after_hash.removeprefix("sha256:")
+            and verwacht is not None
+            and verwacht == readback.get("checksum_sha256")
         )
     if req.action_id == "sso.sessions.revoke":
         aantal = readback.get("ingetrokken_sessies")
-        return readback.get("gelezen", True) is True and type(aantal) is int and aantal >= 0
+        return readback.get("gelezen") is True and type(aantal) is int and aantal >= 0
     return True
 
 
@@ -1279,10 +1308,13 @@ def _eigenaar_voorstel(
         or body.get("action_id") != actie.action_id
     ):
         raise _eigenaar_onbekend("eigenaar_antwoord_ongeldig")
-    if actie.action_id in ("automation.flows.restore", "sso.sessions.revoke") and not _zelfde_eigenaarsaanvraag(
-        body, target, parameters
-    ):
+    if not _zelfde_eigenaarsaanvraag(body, target, parameters):
         raise _eigenaar_onbekend("eigenaar_aanvraag_wijkt_af")
+    if (
+        actie.action_id == "automation.flows.restore"
+        and _herstelchecksum(diff, parameters.get("snapshot_id"), target.get("resource")) is None
+    ):
+        raise _eigenaar_onbekend("eigenaar_antwoord_ongeldig")
     return Doel(
         "eigenaar",
         eigenaar,

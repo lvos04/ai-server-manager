@@ -22,7 +22,7 @@ from hub.adapters.health import stored_health
 from hub.backup.appdekking import Meting, huisrapport
 from hub.config import Settings
 from hub.deps import DB, Admin, AnyUser, Cursor, Idem, Limit, Principal, SettingsDep, Viewer, get_vault
-from hub.errors import HubError
+from hub.errors import ErrorResponse, HubError
 from hub.events.envelope import emit
 from hub.incidents.rules import ADAPTER_HEALTH_FAILED, ADAPTER_HEALTH_RECOVERED, adapter_health_transition
 from hub.inventory.store import kind_state
@@ -41,7 +41,9 @@ from hub.truenas.connection import NasTarget, current_target
 from hub.vault import Vault, VaultError, make_ref
 
 log = logging.getLogger("hub.adapters")
-router = APIRouter(prefix="/api/v1/adapterkoppelingen", tags=["adapterkoppelingen"])
+router = APIRouter(
+    prefix="/api/v1/adapterkoppelingen", tags=["adapterkoppelingen"], responses={422: {"model": ErrorResponse}}
+)
 VaultDep = Annotated[Vault, Depends(get_vault)]
 Credential = Annotated[
     SecretStr | None,
@@ -125,13 +127,14 @@ def _view(row: AdapterLink, *, bound: bool) -> MediaGuardLinkView | LinkView:
     reason = mediaguard.REASON_CODE if is_mediaguard else row.laatste_fout
     if row.app_id == my_house.APP_ID and row.my_house_expires_at is not None and row.my_house_expires_at <= now:
         reason = "bron_token_verlopen"
-    measurement = basis.Measurement(status=row.laatste_status or "unknown", observed_at=row.observed_at)
+    contacttijd = row.observed_at if row.observed_at is not None and row.observed_at <= now else None
+    measurement = basis.Measurement(status=row.laatste_status or "unknown", observed_at=contacttijd)
     if reason:
         measurement = basis.Measurement(
             status="unknown",
             reason_code=reason,
-            observed_at=row.observed_at,
-            laatste_status=measurement.status if row.observed_at else None,
+            observed_at=contacttijd,
+            laatste_status=row.laatste_status if contacttijd else None,
         )
     if not is_mediaguard and (row.app_id != my_house.APP_ID or (bound and reason is None)):
         measurement = basis.fresh_measurement(measurement, now=now, max_age_s=row.max_age_s or basis.MAX_AGE_S)
@@ -139,8 +142,8 @@ def _view(row: AdapterLink, *, bound: bool) -> MediaGuardLinkView | LinkView:
         measurement = basis.Measurement(
             status="unknown",
             reason_code="doelbinding",
-            observed_at=row.observed_at,
-            laatste_status=row.laatste_status if row.observed_at else None,
+            observed_at=contacttijd,
+            laatste_status=row.laatste_status if contacttijd else None,
         )
     is_mso = row.app_id == mso.APP_ID
     view = LinkView(
@@ -628,6 +631,12 @@ def update_link(
     if body.doel_bevestigd:
         base, peers = _destination(target, base, secret, nas, owners)
         _unique_target(db, catalog_app_id, except_id=row.id)
+        if row.app_id == mso.APP_ID and (catalog_app_id, base, peers) != (
+            row.catalog_app_id,
+            row.basis_url,
+            row.peer_addresses,
+        ):
+            row.laatste_fout = None
         row.catalog_app_id, row.basis_url, row.peer_addresses = catalog_app_id, base, peers
     elif secret is not None and secret.casefold() in row.basis_url.casefold():
         raise HubError(422, "validation_error", "De waarde van het adaptercredential is ongeldig.")
@@ -649,7 +658,7 @@ def update_link(
     # Een nieuwe koppeling begint met een schone reeks; een open incident vereist nog steeds herstel.
     if row.health_failures < 3:
         row.health_failures = 0
-    if row.app_id != my_house.APP_ID:
+    if row.app_id not in (my_house.APP_ID, mso.APP_ID):
         row.laatste_fout = None
     row.version += 1
     _record(db, admin, row, "updated")

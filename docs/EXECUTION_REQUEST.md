@@ -218,7 +218,7 @@ vrije fouttekst van TrueNAS: die kan waarden uit de aanroep bevatten. Een onbeke
   ondertekende verzoek staat in `approval.preview_hash` de hash van de eigenaar; `expected_version` is
   `sha256:<resource_etag>`. De eigenaar controleert bij `apply` dat de goedkeuring bij zijn eigen voorstel hoort. `requires_backup` geldt als het beleid of de eigenaar het vraagt. De `diff` gaat in de
   preview door dezelfde maskeerregel als elke andere wijziging.
-- Bij `sso.sessions.revoke` en `automation.flows.restore` vergelijkt de Hub ook het doel en de parameters uit
+- Bij alle eigenaarsacties vergelijkt de Hub het doel en de parameters uit
   het eigenaarsvoorstel met de eigen aanvraag. Een weggelaten `host_id` staat voor de standaardhost. Een andere
   host, extra of ontbrekende velden en verschillen in JSON-type geven `409 doel_onbekend` vóór de preview.
 - **Uitvoeren.** Het ondertekende verzoek gaat naar `POST /connector/v1/apply` van de eigenaar. De Hub controleert
@@ -241,8 +241,7 @@ Readback, afwijkingen en foutdetails van de eigenaar en de executor neemt de Hub
 hierboven; geneste waarden onder een geheim-achtige naam (`client_secret`, `token`, …) worden `***` vóór opslag
 (`hub.redact.redact`). Dezelfde maskering geldt bij teruglezen en bij een herhaling met dezelfde `Idempotency-Key`.
 
-Voor `sso.sessions.revoke` bevat de teruglezing het gehele, niet-negatieve aantal `ingetrokken_sessies`. Als de
-eigenaar ook `gelezen` meestuurt, moet dat `true` zijn. Een onbevestigde teruglezing of een 502 met
+Voor `sso.sessions.revoke` bevat de teruglezing het gehele, niet-negatieve aantal `ingetrokken_sessies`. De eigenaar bevestigt de uitgevoerde controle met `gelezen: true`. Nul is geldig als de eigenaar heeft vastgesteld dat er geen sessie meer hoefde te worden ingetrokken. Een onbevestigde teruglezing of een 502 met
 `uitvoering_mislukt` van de eigenaar laat de uitkomst onbekend. De goedkeuring blijft verbruikt.
 
 De Hub meet nog geen B12-back-up van de Authentik-database. Daarom blijft `sso.oidc.hub.register` geblokkeerd. De
@@ -307,3 +306,9 @@ home-control-hub (Sim-getest): `apps/api/tests/integration/test_flow_voorstellen
 `tests/e2e/test_flow_acties.py`. Het terugmelden van de uitkomst aan home-control-hub
 (`/integrations/v1/automation/action-requests/{id}/result`) en het scherm Automatisering met een link naar de
 Node-RED-editor volgen later; de echte proef met home-control-hub volgt in S-P2-340.
+
+### Bevestiging van doel en herstelbewijs
+
+Bij R3 stuurt de beheerder de exact getypte doelnaam mee in `bevestig_naam`. De Hub vergelijkt deze met het doel van de getoonde preview voordat hij een goedkeuring opslaat. Voor flowherstel bindt de preview de doelchecksum aan de momentopname. De Hub vergelijkt de teruggelezen checksum met dit vooraf vastgelegde bewijs.
+
+Bij een ontbrekend of opnieuw aangemaakt executorjournaal kunnen de bestaande kluismarkeringen wijzen op eerder ingevulde appwaarden. Herstel in dat geval `executor.sqlite3` en de bijbehorende geheimenmap uit dezelfde consistente executorback-up. Bewaar de huidige bestanden voor vergelijking. Zonder bijpassend herstelpunt blijft de waardewijziging geblokkeerd.
