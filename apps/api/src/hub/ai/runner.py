@@ -111,6 +111,7 @@ def vraag_runner(taak: Aanvraag) -> Antwoord:
 
 
 def bedien(settings: Settings, stop: threading.Event) -> None:
+    uitgeputte_maand: str | None = None
     with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as server:
         server.bind(ADRES)
         server.listen(4)
@@ -128,6 +129,13 @@ def bedien(settings: Settings, stop: threading.Event) -> None:
                     data = kanaal.recv(MAX_BERICHT + 1)
                     if len(data) <= MAX_BERICHT:
                         taak = Aanvraag.model_validate_json(data)
-                        kanaal.sendall(raadpleeg(taak, settings).model_dump_json().encode())
+                        # Ook eerder gereserveerde taken in de wachtrij stoppen direct na een 402.
+                        if taak.maand == uitgeputte_maand:
+                            antwoord = Antwoord(status="tegoed_op")
+                        else:
+                            antwoord = raadpleeg(taak, settings)
+                            if antwoord.status == "tegoed_op":
+                                uitgeputte_maand = taak.maand
+                        kanaal.sendall(antwoord.model_dump_json().encode())
                 except (OSError, ValidationError):
                     continue

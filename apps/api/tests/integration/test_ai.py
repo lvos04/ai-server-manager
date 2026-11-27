@@ -168,6 +168,8 @@ def test_ex21_uitgeput_tegoed_laat_de_regels_werken(
         assert admin.post(pad, json=lichaam, headers=idem()).json()["status"] == "tegoed_op"
         assert admin.get("/api/v1/ai/providers").json()["tegoed"]["beschikbaar"] == 0
         assert admin.post(pad, json=lichaam, headers=idem()).json()["status"] == "tegoed_op"
+        # Een al gereserveerde taak die de runner later bereikt, blijft eveneens lokaal.
+        assert runner.vraag_runner(proef.model_copy(update={"taak_id": uuid.uuid4()})).status == "tegoed_op"
         assert len(fake.requests) == 2
     finally:
         stop.set()
