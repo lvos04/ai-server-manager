@@ -62,7 +62,8 @@ RUN set -eu; npx next build; \
     test -f .next/standalone/.next/required-server-files.json; \
     mkdir -p /out; cp -a .next/standalone/. /out/; rm -f /out/server.js; \
     cp -a .next/static /out/.next/static; cp -a public /out/public; \
-    mkdir -p /out/server; cp server/hub-server.mjs server/proxy.mjs /out/server/; \
+    mkdir -p /out/server; cp server/hub-server.mjs server/proxy.mjs server/webmanifesten.mjs /out/server/; \
+    node scripts/verpak-web.mjs /out; \
     test ! -e /out/node_modules/sharp
 
 # ---------------------------------------------------------------- runtime
@@ -95,6 +96,7 @@ RUN set -eu; \
     groupadd -g 568 apps; useradd -u 568 -g 568 -M -d /tmp -s /usr/sbin/nologin apps; \
     groupadd -g 569 asm-ai; useradd -u 569 -g 569 -M -d /tmp -s /usr/sbin/nologin asm-ai; \
     mkdir -p /appdata; chown 568:568 /appdata; chmod 0750 /appdata; \
+    install -d -m 0700 -o 568 -g 568 /run/hub-web; \
     chown 0:0 /usr/local/share/asm /usr/local/share/asm/policy; chmod 0555 /usr/local/share/asm /usr/local/share/asm/policy; \
     python -c "from asm_policy import load_policy; p = load_policy(); print('policy_hash:', p.hash)"; \
     python -m pip check; \

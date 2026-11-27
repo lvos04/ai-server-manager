@@ -21,7 +21,7 @@ import hmac
 import json
 import os
 import secrets
-import stat
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -30,8 +30,11 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from hub.bestandsrechten import prive_map, prive_rechten
+
 ED25519_KEYS = ("hub-identity.ed25519", "jwt-signing.ed25519", "policy-signing.ed25519")
 VAULT_KEY = "vault.key"
+WEB_KEY = "hub-web.key"
 SETUP_HASH = "setup-code.json"
 SETUP_DONE = "setup-completed"
 # Crockford-base32 zonder verwarrende tekens (geen I, L, O, U)
@@ -52,24 +55,21 @@ class FirstStartResult:
     setup_completed: bool = False
 
 
-def _write_exclusive(path: Path, data: bytes) -> None:
-    """Schrijf alleen als het bestand nog niet bestaat (O_EXCL), met 0600."""
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+def _write_secret(path: Path, data: bytes, *, replace: bool = False) -> None:
+    """Publiceer pas nadat rechten, inhoud en fsync in orde zijn. Alleen de setupcode mag wisselen."""
+    fd, tmp = tempfile.mkstemp(dir=path.parent)
     try:
-        os.write(fd, data)
-        os.fsync(fd)
+        with os.fdopen(fd, "wb") as stream:
+            prive_rechten(fd, 0o600, os.geteuid(), nieuw=True)
+            stream.write(data)
+            stream.flush()
+            os.fsync(fd)
+        if replace:
+            os.replace(tmp, path)
+        else:
+            os.link(tmp, path)
     finally:
-        os.close(fd)
-    os.chmod(path, 0o600)
-
-
-def _write_replace(path: Path, data: bytes) -> None:
-    """Atomair vervangen (alleen voor de setupcode-hash, die per start mag wisselen)."""
-    tmp = path.with_name(path.name + ".tmp")
-    with contextlib.suppress(FileNotFoundError):
-        tmp.unlink()
-    _write_exclusive(tmp, data)
-    os.replace(tmp, path)
+        Path(tmp).unlink(missing_ok=True)
 
 
 def _ed25519_pem() -> bytes:
@@ -81,18 +81,17 @@ def _ed25519_pem() -> bytes:
     )
 
 
-def _vault_key() -> bytes:
+def _random_key() -> bytes:
     return base64.b64encode(secrets.token_bytes(32)) + b"\n"
 
 
-def _validate_existing(path: Path) -> None:
-    raw = path.read_bytes()
+def _validate_existing(path: Path, raw: bytes) -> None:
     if not raw.strip():
         raise FirstStartError(
             f"geheim {path.name} bestaat maar is leeg. Het wordt bewust niet overschreven; "
             f"zet het uit een back-up terug of verwijder het bewust (dan maakt de app een nieuw)."
         )
-    if path.name == VAULT_KEY:
+    if path.name in (VAULT_KEY, WEB_KEY):
         try:
             key = base64.b64decode(raw.strip(), validate=True)
         except ValueError as exc:
@@ -108,18 +107,11 @@ def _validate_existing(path: Path) -> None:
             raise FirstStartError(f"{path.name} is geen Ed25519-sleutel; niet overschreven.")
 
 
-def _ensure_dir(path: Path) -> None:
-    path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    mode = stat.S_IMODE(path.stat().st_mode)
-    if mode & 0o077:
-        os.chmod(path, 0o700)
-
-
-def _tighten(path: Path, result: FirstStartResult) -> None:
-    mode = stat.S_IMODE(path.stat().st_mode)
-    if mode & 0o077:
-        os.chmod(path, 0o600)
-        result.tightened.append(path.name)
+def _read_secret(path: Path) -> tuple[bytes, bool]:
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        tightened = prive_rechten(fd, 0o600, os.geteuid())
+        return stream.read(), tightened
 
 
 def generate_setup_code() -> str:
@@ -141,7 +133,7 @@ def _valid_setup_hash_exists(secrets_dir: Path, now: datetime) -> bool:
     if not path.exists():
         return False
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_read_secret(path)[0])
         expires = datetime.strptime(data["expires_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except (ValueError, KeyError, OSError):
         return False
@@ -157,19 +149,26 @@ def ensure_secrets(
 ) -> FirstStartResult:
     """Maak ontbrekende geheimen; nooit overschrijven. Geeft de (nieuwe) setupcode terug zolang setup open is."""
     result = FirstStartResult()
-    _ensure_dir(secrets_dir)
+    secrets_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    prive_map(secrets_dir, os.geteuid())
 
     generators: dict[str, Callable[[], bytes]] = dict.fromkeys(ED25519_KEYS, _ed25519_pem)
-    generators[VAULT_KEY] = _vault_key
+    generators.update(dict.fromkeys((VAULT_KEY, WEB_KEY), _random_key))
     for name, gen in generators.items():
         path = secrets_dir / name
-        if path.exists():
-            _validate_existing(path)
-            _tighten(path, result)
-            result.kept.append(name)
-        else:
-            _write_exclusive(path, gen())
-            result.created.append(name)
+        if not path.exists():
+            try:
+                _write_secret(path, gen())
+            except FileExistsError:
+                pass  # Een gelijktijdige start heeft het bestand gepubliceerd. Controleer het hieronder.
+            else:
+                result.created.append(name)
+                continue
+        raw, tightened = _read_secret(path)
+        _validate_existing(path, raw)
+        if tightened:
+            result.tightened.append(path.name)
+        result.kept.append(name)
 
     done = secrets_dir / SETUP_DONE
     if done.exists():
@@ -189,7 +188,7 @@ def ensure_secrets(
         "hash": hash_setup_code(code, salt),
         "expires_at": expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    _write_replace(secrets_dir / SETUP_HASH, json.dumps(payload).encode())
+    _write_secret(secrets_dir / SETUP_HASH, json.dumps(payload).encode(), replace=True)
     result.setup_code = code
     result.setup_code_expires_at = expires
     return result
@@ -200,7 +199,7 @@ def verify_setup_code(secrets_dir: Path, code: str, *, now: datetime | None = No
     if (secrets_dir / SETUP_DONE).exists() or not path.exists():
         return False
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_read_secret(path)[0])
         salt = bytes.fromhex(data["salt"])
         expires = datetime.strptime(data["expires_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except (ValueError, KeyError, OSError):
@@ -213,7 +212,8 @@ def verify_setup_code(secrets_dir: Path, code: str, *, now: datetime | None = No
 def mark_setup_completed(secrets_dir: Path) -> None:
     done = secrets_dir / SETUP_DONE
     if not done.exists():
-        _write_exclusive(done, datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ").encode())
+        with contextlib.suppress(FileExistsError):
+            _write_secret(done, datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ").encode())
     with contextlib.suppress(FileNotFoundError):
         (secrets_dir / SETUP_HASH).unlink()
 

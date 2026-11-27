@@ -26,12 +26,15 @@ import os
 import pwd
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
+
+from hub.bestandsrechten import prive_map
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rechten import drop_bounding_set  # noqa: E402
@@ -46,6 +49,7 @@ SOCKET_DIR = Path("/tmp/asm-pg")  # noqa: S108 — 0700 van uid 568: de AI-runne
 PORT = os.environ.get("HUB_PORT", "30400")
 API_PORT = os.environ.get("HUB_INTERNAL_API_PORT", "8400")
 WEB_SERVER = Path(os.environ.get("HUB_WEB_SERVER", "/opt/hub-web/server/hub-server.mjs"))  # aanwezig → web op PORT, API intern
+WEB_RUNTIME_DIR = Path("/run/hub-web")
 DB_URL = f"postgresql+psycopg://hub@/hub?host={SOCKET_DIR}"
 MANAGED = ("postgres", "secrets", "backups", "logs")
 STOP = threading.Event()
@@ -118,11 +122,13 @@ def prepare_dirs() -> None:
     root = os.getuid() == 0
     if root:
         for path in [DATA, *[DATA / n for n in MANAGED if (DATA / n).exists()]]:
-            st = path.stat()
+            st = path.lstat()
+            if not stat.S_ISDIR(st.st_mode):
+                fail(f"{path} moet een gewone gegevensmap zijn.")
             if (st.st_uid, st.st_gid) != (UID, GID):
                 log(f"eigenaar van {path} wordt {UID}:{GID} (alleen eigen mappen van de Hub)")
                 if path == DATA:
-                    os.chown(path, UID, GID)
+                    os.chown(path, UID, GID, follow_symlinks=False)
                     continue
                 for dirpath, dirnames, filenames in os.walk(path):
                     for name in [dirpath, *[os.path.join(dirpath, n) for n in dirnames + filenames]]:
@@ -132,22 +138,27 @@ def prepare_dirs() -> None:
                             pass
     for sub in (PGDATA, DATA / "secrets", DATA / "backups", DATA / "logs"):
         try:
-            sub.mkdir(parents=True, exist_ok=True)
+            sub.mkdir(mode=0o700, parents=True, exist_ok=True)
             if root:
-                os.chown(sub, UID, GID)
+                os.chown(sub, UID, GID, follow_symlinks=False)
         except PermissionError:
             fail(f"geen schrijfrechten op {sub}. Laat 'Custom User' uit (de Hub regelt de rechten) of geef gebruiker "
                  f"{UID} (apps) schrijfrechten op de dataset.")
     try:
-        os.chmod(PGDATA, 0o700)
-        os.chmod(DATA / "secrets", 0o700)
-        os.chmod(DATA / "backups", 0o700)  # V-085: de exports bevatten de hele database
-    except PermissionError:
-        fail(f"{PGDATA}, secrets of backups is niet van gebruiker {UID}; start de app als root of maak {UID} eigenaar.")
+        prive_map(PGDATA, UID, postgres=True)
+        prive_map(DATA / "secrets", UID)
+        prive_map(DATA / "backups", UID)  # V-085: de exports bevatten de hele database
+    except PermissionError as exc:
+        fail(f"Rechtencontrole voor postgres, secrets of backups mislukt: {exc}")
     SOCKET_DIR.mkdir(parents=True, exist_ok=True)
     os.chmod(SOCKET_DIR, 0o700)
     if root:
         os.chown(SOCKET_DIR, UID, GID)
+    if WEB_SERVER.is_file():
+        WEB_RUNTIME_DIR.mkdir(mode=0o700, exist_ok=True)
+        if root:
+            os.chown(WEB_RUNTIME_DIR, UID, GID, follow_symlinks=False)
+        prive_map(WEB_RUNTIME_DIR, UID)
     probe = subprocess.run(
         [sys.executable, "-c", f"open('{DATA}/.hub-write-test','w').close();import os;os.remove('{DATA}/.hub-write-test')"],
         preexec_fn=demote, capture_output=True, check=False,

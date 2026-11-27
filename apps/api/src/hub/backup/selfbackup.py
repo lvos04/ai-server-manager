@@ -32,6 +32,7 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from hub.bestandsrechten import prive_map
 from hub.config import Settings
 from hub.models import SelfBackup
 from hub.timeutil import iso, utcnow
@@ -165,7 +166,7 @@ def run_self_backup(db: Session, settings: Settings, *, trigger: str) -> SelfBac
     """Maak en verifieer een back-up. Commit zelf (ook bij mislukken) zodat het resultaat altijd zichtbaar is."""
     backups = settings.backups_dir
     backups.mkdir(mode=0o700, parents=True, exist_ok=True)
-    backups.chmod(0o700)  # V-085: ook een bestaande map; de dumps bevatten de hele database
+    prive_map(backups, os.geteuid())  # V-085: ook een bestaande map; de dumps bevatten de hele database
     started = utcnow()
     stamp = started.strftime("%Y%m%dT%H%M%SZ")
     row = SelfBackup(trigger=trigger, status="bezig", started_at=started, verification={})

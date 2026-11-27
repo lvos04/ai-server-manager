@@ -45,6 +45,17 @@ testadressen
 wait_healthy "$hub"
 wait_healthy "$executor"
 
+# De pakketlaag bevat alleen verwijzingen. Een ongeopende installatie heeft nog geen websleutels.
+docker run --rm --network none --read-only --entrypoint python "$HUB_IMAGE" -c '
+import json
+from pathlib import Path
+p = Path("/opt/hub-web/.next")
+for naam in ("prerender-manifest.json", "server/preview-props.json",
+             "server/server-reference-manifest.json", "server/server-reference-manifest.js"):
+    assert (p/naam).is_symlink() and not (p/naam).exists()
+assert "preview" not in json.loads((p/"hub-prerender.json").read_bytes())
+'
+
 # shellcheck source=deploy/smoke-controles.sh
 . "$(dirname "${BASH_SOURCE[0]}")/smoke-controles.sh"
 expect() {  # expect <omschrijving> <tekst> <patroon>  (geen grep -q in pipes: pipefail + SIGPIPE)

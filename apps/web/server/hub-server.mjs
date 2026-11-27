@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { runtimeMap, schrijfWebmanifesten, sjabloon } from "./webmanifesten.mjs";
 import {
   bodyCounter,
   declaredTooLarge,
@@ -48,6 +49,12 @@ if (!dev) {
     process.exit(78);
   }
   conf = JSON.parse(readFileSync(rsf, "utf8")).config;
+  const nextMap = path.join(dir, ".next");
+  if (existsSync(path.join(nextMap, sjabloon))) {
+    const keyFile = path.join(process.env.HUB_DATA_DIR || "/appdata", "secrets", "hub-web.key");
+    const installatie = Buffer.from(readFileSync(keyFile, "utf8").trim(), "base64");
+    process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY = schrijfWebmanifesten(nextMap, runtimeMap, installatie);
+  }
   process.env.__NEXT_PRIVATE_STANDALONE_CONFIG = JSON.stringify(conf);
 }
 const next = require("next");
