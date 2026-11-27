@@ -1750,6 +1750,171 @@
         "title": "Koppeling",
         "type": "object"
       },
+      "Kostencijfer": {
+        "properties": {
+          "aanname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aanname"
+          },
+          "bron": {
+            "enum": [
+              "home-control-hub",
+              "media-source-optimizer",
+              "hub.D09"
+            ],
+            "title": "Bron",
+            "type": "string"
+          },
+          "eenheid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eenheid"
+          },
+          "measurement_quality": {
+            "default": "unknown",
+            "enum": [
+              "measured",
+              "estimated",
+              "unknown"
+            ],
+            "title": "Measurement Quality",
+            "type": "string"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "reden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reden"
+          },
+          "tijdvak": {
+            "$ref": "#/components/schemas/Tijdvak"
+          },
+          "waarde": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waarde"
+          }
+        },
+        "required": [
+          "bron",
+          "tijdvak"
+        ],
+        "title": "Kostencijfer",
+        "type": "object"
+      },
+      "Kostenoverzicht": {
+        "properties": {
+          "budgetstatus": {
+            "enum": [
+              "uit",
+              "onbekend",
+              "binnen_grens",
+              "overschreden"
+            ],
+            "title": "Budgetstatus",
+            "type": "string"
+          },
+          "cloudbudget": {
+            "$ref": "#/components/schemas/Kostencijfer"
+          },
+          "externe_diensten": {
+            "$ref": "#/components/schemas/Kostencijfer"
+          },
+          "gevraagd": {
+            "$ref": "#/components/schemas/Tijdvak"
+          },
+          "meteromschrijving": {
+            "title": "Meteromschrijving",
+            "type": "string"
+          },
+          "meterrol": {
+            "enum": [
+              "p1_net",
+              "boiler_socket",
+              "airco_outdoor",
+              "nas_host"
+            ],
+            "title": "Meterrol",
+            "type": "string"
+          },
+          "periode": {
+            "enum": [
+              "dag",
+              "week",
+              "maand"
+            ],
+            "title": "Periode",
+            "type": "string"
+          },
+          "reeks": {
+            "items": {
+              "$ref": "#/components/schemas/Stroom"
+            },
+            "title": "Reeks",
+            "type": "array"
+          },
+          "richting": {
+            "enum": [
+              "import",
+              "export"
+            ],
+            "title": "Richting",
+            "type": "string"
+          },
+          "totaal": {
+            "$ref": "#/components/schemas/Stroom"
+          }
+        },
+        "required": [
+          "gevraagd",
+          "totaal",
+          "reeks",
+          "periode",
+          "meterrol",
+          "meteromschrijving",
+          "richting",
+          "externe_diensten",
+          "cloudbudget",
+          "budgetstatus"
+        ],
+        "title": "Kostenoverzicht",
+        "type": "object"
+      },
       "Light": {
         "properties": {
           "brightness": {
@@ -2250,6 +2415,67 @@
           }
         },
         "title": "Mediaservers",
+        "type": "object"
+      },
+      "Meetdekking": {
+        "description": "De telling van bronintervallen is ook bij deels geschat verbruik rechtstreeks controleerbaar.",
+        "properties": {
+          "bron": {
+            "const": "home-control-hub",
+            "default": "home-control-hub",
+            "title": "Bron",
+            "type": "string"
+          },
+          "gemeten_intervallen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gemeten Intervallen"
+          },
+          "geschatte_intervallen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geschatte Intervallen"
+          },
+          "measurement_quality": {
+            "default": "unknown",
+            "enum": [
+              "measured",
+              "unknown"
+            ],
+            "title": "Measurement Quality",
+            "type": "string"
+          },
+          "tijdvak": {
+            "$ref": "#/components/schemas/Tijdvak"
+          },
+          "verwachte_intervallen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verwachte Intervallen"
+          }
+        },
+        "required": [
+          "tijdvak"
+        ],
+        "title": "Meetdekking",
         "type": "object"
       },
       "MonitorBevestigingIn": {
@@ -4585,6 +4811,106 @@
         "title": "StatusIn",
         "type": "object"
       },
+      "Stroom": {
+        "properties": {
+          "meetdekking": {
+            "$ref": "#/components/schemas/Meetdekking"
+          },
+          "stroomkosten": {
+            "$ref": "#/components/schemas/Kostencijfer"
+          },
+          "verbruik": {
+            "$ref": "#/components/schemas/Kostencijfer"
+          }
+        },
+        "required": [
+          "verbruik",
+          "stroomkosten",
+          "meetdekking"
+        ],
+        "title": "Stroom",
+        "type": "object"
+      },
+      "Stroombudget-Input": {
+        "additionalProperties": false,
+        "description": "Een lege grens schakelt de waarschuwing uit.",
+        "properties": {
+          "grens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grens"
+          },
+          "periode": {
+            "enum": [
+              "dag",
+              "week",
+              "maand"
+            ],
+            "title": "Periode",
+            "type": "string"
+          },
+          "valuta": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Valuta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grens",
+          "valuta",
+          "periode"
+        ],
+        "title": "Stroombudget",
+        "type": "object"
+      },
+      "Stroombudget-Output": {
+        "additionalProperties": false,
+        "description": "Een lege grens schakelt de waarschuwing uit.",
+        "properties": {
+          "grens": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grens"
+          },
+          "periode": {
+            "enum": [
+              "dag",
+              "week",
+              "maand"
+            ],
+            "title": "Periode",
+            "type": "string"
+          },
+          "valuta": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Valuta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grens",
+          "valuta",
+          "periode"
+        ],
+        "title": "Stroombudget",
+        "type": "object"
+      },
       "System": {
         "properties": {
           "checks": {
@@ -4686,6 +5012,60 @@
           "maand"
         ],
         "title": "Tegoed",
+        "type": "object"
+      },
+      "Tijdvak": {
+        "description": "Lokale kalendergrenzen zijn exclusief aan de rechterkant, ook als de brontijdzone nog ontbreekt.",
+        "properties": {
+          "eerste_dag": {
+            "format": "date",
+            "title": "Eerste Dag",
+            "type": "string"
+          },
+          "na_laatste_dag": {
+            "format": "date",
+            "title": "Na Laatste Dag",
+            "type": "string"
+          },
+          "tijdzone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tijdzone"
+          },
+          "tot_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tot Utc"
+          },
+          "van_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Van Utc"
+          }
+        },
+        "required": [
+          "eerste_dag",
+          "na_laatste_dag"
+        ],
+        "title": "Tijdvak",
         "type": "object"
       },
       "TrueNasAppIn": {
@@ -10835,6 +11215,191 @@
         "summary": "Status van een job",
         "tags": [
           "inventaris"
+        ]
+      }
+    },
+    "/api/v1/kosten": {
+      "get": {
+        "operationId": "lees_api_v1_kosten_get",
+        "parameters": [
+          {
+            "description": "Een kalenderdag in de woning.",
+            "in": "query",
+            "name": "datum",
+            "required": true,
+            "schema": {
+              "description": "Een kalenderdag in de woning.",
+              "format": "date",
+              "title": "Datum",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "periode",
+            "required": false,
+            "schema": {
+              "default": "dag",
+              "enum": [
+                "dag",
+                "week",
+                "maand"
+              ],
+              "title": "Periode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "meterrol",
+            "required": false,
+            "schema": {
+              "default": "p1_net",
+              "enum": [
+                "p1_net",
+                "boiler_socket",
+                "airco_outdoor",
+                "nas_host"
+              ],
+              "title": "Meterrol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "richting",
+            "required": false,
+            "schema": {
+              "default": "import",
+              "enum": [
+                "import",
+                "export"
+              ],
+              "title": "Richting",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Kostenoverzicht"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Energie en variabele stroomkosten per woningdag, week of maand met bron en meetdekking",
+        "tags": [
+          "energie en kosten"
+        ]
+      }
+    },
+    "/api/v1/kosten/budget": {
+      "get": {
+        "operationId": "lees_budget_api_v1_kosten_budget_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Stroombudget-Output"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Lees Budget Api V1 Kosten Budget Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ingestelde grens voor de variabele kosten van netafname",
+        "tags": [
+          "energie en kosten"
+        ]
+      },
+      "put": {
+        "operationId": "stel_budget_in_api_v1_kosten_budget_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Stroombudget-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stroombudget-Output"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stroombudget instellen of uitschakelen",
+        "tags": [
+          "energie en kosten"
         ]
       }
     },

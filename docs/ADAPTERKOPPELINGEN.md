@@ -331,3 +331,30 @@ Na terugkeer van een adapter moet de meettijd van het bronrapport voorbij de inv
 `identiteit_sinds` liggen. De strengste meettermijn is die van de bron of vijftien minuten. Na een storing kan alleen
 een nieuwere bronmeting de dekking herstellen. De controle van het eigen herstelpunt vóór een update
 en de afzonderlijke hersteltest blijven vereist waar het actiebeleid dat voorschrijft.
+
+## Energie en kosten
+
+Een kijker opent bijvoorbeeld `GET /api/v1/kosten?datum=2026-03-29&periode=dag`.
+De kalender van de woning bepaalt de dag, week of maand. B14 levert de afgesloten
+UTC-uren van één meterrol en richting. Bij een dag bevat `reeks` de uren, bij een
+week of maand de dagen. Het gevraagde tijdvak staat in `gevraagd`. Elk cijfer bevat
+ook zijn eigen tijdvak, bron, eenheid, meetkwaliteit en bij een schatting de aanname.
+Een bekende waarde is een decimale tekenreeks. Een onbekende waarde is `null`.
+`meetdekking` telt de gemeten, geschatte en verwachte intervallen over de verstreken uren. Een gat maakt het totaal onbekend. `observed_at` is het einde
+van het laatste bruikbare broninterval. Ligt dat meer dan één uur terug in een lopend
+tijdvak, dan houdt het onbekende cijfer die meettijd en de reden `meting_verouderd`.
+
+De netmeter ondersteunt afname en teruglevering. De boilermeter en de gedeelde
+buitenunit hebben elk een eigen afnamereeks. Voor exacte cijfers moet D14 de meterrol bevestigen.
+Een door de bron geschatte uurwaarde houdt haar kwaliteitslabel en aanname.
+De NAS-post blijft onbekend zolang B14 geen afzonderlijke reeks voor die rol aanbiedt.
+MSO-kosten blijven onbekend zolang de kostenroute buiten het machineleesrecht valt.
+D09 kan een bevestigd inbegrepen maandbudget met valuta leveren. Dit plafond staat
+afzonderlijk van de uitgaven.
+
+Een beheerder stelt via `PUT /api/v1/kosten/budget` een periode, valuta en grens in.
+`grens: null` schakelt de waarschuwing uit. Het overzicht vergelijkt bij uitlezing de
+lopende netafname met deze grens, ook wanneer het scherm een andere meetreeks toont.
+Bij overschrijding ontvangt de bestaande meldingenwachtrij één bericht per tijdvak,
+grens en meldingskanaal. De worker verzorgt de verzending. B14 verleent toegang tot de
+uurreeks aan een aangemelde kijker. Zonder uitlezing ontstaat er geen nieuwe budgetwaarneming.
