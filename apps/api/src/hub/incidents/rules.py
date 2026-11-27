@@ -746,6 +746,18 @@ def _generic(ev: EventIn) -> Signaal | None:
             naam,
             samenvatting="Status unknown (geen herstel).",
         )
+    # Een verwachte AV1-pauze bij de eigenaar is geen vastloper. Een echte crash blijft een probleem.
+    if (
+        bron == "mediaguard"
+        and ev.event_type == "media.av1.stalled"
+        and p.get("pause_reason")
+        in (
+            "manual",
+            "playback_active",
+            "outside_window",
+        )
+    ):
+        return None
     soort = f"{domain}.{obj}"
     fp = f"{bron}:{soort}:{onderwerp}"
     if verb in PROBLEEM_WOORDEN:

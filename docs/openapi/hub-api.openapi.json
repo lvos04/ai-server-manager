@@ -811,6 +811,21 @@
         "title": "Device",
         "type": "object"
       },
+      "DiagnoseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "incident_id": {
+            "format": "uuid",
+            "title": "Incident Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incident_id"
+        ],
+        "title": "DiagnoseIn",
+        "type": "object"
+      },
       "DoelIn": {
         "additionalProperties": false,
         "properties": {
@@ -5833,6 +5848,63 @@
           }
         },
         "summary": "Kredietreserveringen, diagnose-uitkomsten en AI-voorstellen",
+        "tags": [
+          "AI-diagnose"
+        ]
+      }
+    },
+    "/api/v1/ai/diagnose": {
+      "post": {
+        "operationId": "diagnose_api_v1_ai_diagnose_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagnoseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verklaar een incident met vaste regels en zo nodig een begrensde analyse",
         "tags": [
           "AI-diagnose"
         ]

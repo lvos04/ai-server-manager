@@ -109,6 +109,9 @@ def test_100_identieke_crashes_geven_een_doorlopend_incident(
     assert len(incident_notifications(app, inc["id"])) == 1 and len(gotify.messages) == 1
     assert periodic_run("incidenten_bijwerken")["incidenten_bijwerken"]["events"] == 0
     assert len(active(admin)) == 1
+    diagnose = admin.post("/api/v1/ai/diagnose", json={"incident_id": inc["id"]}, headers=idem())
+    assert diagnose.status_code == 200
+    assert diagnose.json()["gebeurtenissen"] == 100 and diagnose.json()["regel"] == "proces_gecrasht"
 
 
 def test_herstel_sluit_alleen_het_eigen_incident(admin: Any, app: Any, periodic_run: Any) -> None:

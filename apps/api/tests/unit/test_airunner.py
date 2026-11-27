@@ -127,3 +127,32 @@ def test_runner_beperkt_antwoord_en_weigert_betaalde_uitwijk() -> None:
         assert fake.eenheden == 0
     finally:
         fake.stop()
+
+
+@pytest.mark.parametrize(
+    ("werkwoord", "reden", "probleem"),
+    [
+        ("paused", "manual", False),
+        ("stalled", "manual", False),
+        ("stalled", "playback_active", False),
+        ("stalled", None, True),
+        ("crashed", "manual", True),
+    ],
+)
+def test_av1_pauze_en_crash_blijven_onderscheidbaar(werkwoord: str, reden: str | None, probleem: bool) -> None:
+    from hub.incidents.rules import EventIn, classify
+    from hub.timeutil import utcnow
+
+    ev = EventIn(
+        "inbox",
+        "proef",
+        "mediaguard",
+        f"media.av1.{werkwoord}",
+        "taak",
+        "proef",
+        {"pause_reason": reden},
+        "internal",
+        utcnow(),
+    )
+    signaal = classify(ev)
+    assert (signaal is not None and signaal.rol == "probleem") == probleem
