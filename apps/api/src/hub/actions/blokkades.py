@@ -321,8 +321,12 @@ def _blok(t: tuple[str, str, str]) -> dict[str, Any]:
     return {"id": t[0], "code": t[1], "reden": t[2], "details": []}
 
 
+def klimaatgates(action_id: str) -> list[str]:
+    return ["gree_aansturing"] if action_id in ("zone.command", "zone.resume") else []
+
+
 def nodige_gates(actie: ActieDef, cls: Classification) -> list[str]:
-    out: list[str] = []
+    out = klimaatgates(actie.action_id)
     if class_at_least(cls.risk_class, "R2"):
         out.append("r2_r3_acties")
     if cls.opslagmutatie:

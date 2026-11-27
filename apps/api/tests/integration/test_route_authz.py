@@ -30,6 +30,7 @@ MATRIX: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/login"): PUBLIC,
     ("GET", "/api/v1/auth/jwks"): PUBLIC,
     ("GET", "/api/v1/auth/key-rotations"): PUBLIC,
+    ("POST", "/api/v1/auth/key-rotations"): "admin",
     ("POST", "/api/v1/auth/break-glass/login"): PUBLIC,
     ("GET", "/api/v1/auth/oidc/beschikbaar"): PUBLIC,
     ("GET", "/api/v1/auth/oidc/login"): PUBLIC,

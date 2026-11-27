@@ -5092,6 +5092,7 @@
                 "klaar",
                 "goedgekeurd",
                 "afgewezen",
+                "concept",
                 "geweigerd",
                 "bezig",
                 "uitgevoerd",
@@ -7398,6 +7399,44 @@
           }
         },
         "summary": "Ondertekende sleutelrotaties (zonder authenticatie; contract 1.2 §4.5). Nog niet gebouwd: lege lijst",
+        "tags": [
+          "aanmelden en gebruikers"
+        ]
+      },
+      "post": {
+        "operationId": "vraag_policyrotatie_api_v1_auth_key_rotations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotatie van de policy-sleutel aanvragen",
         "tags": [
           "aanmelden en gebruikers"
         ]

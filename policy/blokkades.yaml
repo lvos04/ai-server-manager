@@ -13,7 +13,8 @@ schema: asm-policy/1
 verboden_patronen:
   - id: BLK-SHELL
     code: actie_verboden_shell
-    patroon: '^(.*[._])?(shell|sudo|su|exec|ssh|docker|container|containers|compose|cron|cronjob|initshutdownscript|init_shutdown_script|run_command|command|script)([._].*)?$'
+    # Alleen de exact benoemde klimaatactie valt buiten dit patroon.
+    patroon: '^(?!zone\.command$)(.*[._])?(shell|sudo|su|exec|ssh|docker|container|containers|compose|cron|cronjob|initshutdownscript|init_shutdown_script|run_command|command|script)([._].*)?$'
     reden_nl: Er bestaat geen shell-, sudo-, exec- of Docker-actie (contract §1 en §8).
   - id: BLK-DESTRUCTIEF
     code: actie_verboden_destructief

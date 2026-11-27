@@ -105,6 +105,13 @@ describe("vaste fouttekst na een handeling (R-VEILIG-1, RV-8)", () => {
     expect(html).toContain(vasteFout(e));
   });
 
+  it("verwijst bij een ontbrekende Hub-pin naar de publieke sleutelset", () => {
+    const fout = new HubApiError(501, "capability_unavailable", "", { reason: "hub_keyset_missing" });
+    const html = renderToStaticMarkup(<ErrorPanel error={fout} vast={vasteFout} />);
+    expect(html).toContain("Plak eerst de Hub-sleutelset in my_house.");
+    expect(html).toContain('href="/instellingen/diensten#vingerafdruk-titel"');
+  });
+
   it("een onbekende code krijgt een vaste tekst, een bekende code haar eigen tekst", () => {
     expect(vasteFout(new HubApiError(409, "uitvoering_geweigerd", "x"))).toBe("De executor heeft de actie geweigerd; er is niets uitgevoerd.");
     expect(vasteFout(new HubApiError(500, "toString", "x"))).toBe(vasteFout(new HubApiError(500, "raar", "x")));

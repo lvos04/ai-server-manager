@@ -150,6 +150,13 @@ HOST_IDS = ("nas-primary",)
 IX_APP = "ix-app"
 RESTART_POLICIES = ("no", "unless-stopped", "on-failure", "always")
 MAX_VALUES_BYTES = 64 * 1024
+HUIS_DOELVELDEN = {
+    "light.group.set": "group_id",
+    "light.scene.recall": "scene_id",
+    "zone.command": "zone_id",
+    "zone.resume": "zone_id",
+    "zone.schedule.propose": "zone_id",
+}
 MAX_EIGENAAR_BYTES = 16 * 1024
 # Bekende velden van het formulier van de standaard Custom App (ix-app 1.4.8, questions.yaml; via appstore-en-fork).
 IX_VALUES_KEYS = frozenset(
@@ -297,6 +304,14 @@ def validate_target(actie: ActieDef, target: Any) -> list[Fout]:
             out.append(_f("target.snapshot", "patroon", "verwacht <dataset>@<naam>"))
     elif doel == "geen":
         out += _only(target, "target", {"host_id"})
+    elif actie.eigenaar == "my_house":
+        veld = HUIS_DOELVELDEN.get(actie.action_id)
+        if veld is None:
+            return [_f("target", "buiten_scope", "onbekende my_house-actie")]
+        out += _only(target, "target", {veld, "link_id"}, {veld})
+        for naam in (veld, "link_id"):
+            if naam in target:
+                out += _text(target[naam], f"target.{naam}", max_len=36, pattern=UUID_RE)
     else:  # eigenaar
         out += _only(target, "target", {"host_id", "app_id", "resource"}, {"app_id"})
         if target.get("app_id") != actie.eigenaar:

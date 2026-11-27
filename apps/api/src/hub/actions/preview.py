@@ -565,6 +565,11 @@ def bouw(
         "dataretentie": DATA_BLIJFT,
         "terugdraaien": _terugdraaien(actie.action_id, doel),
     }
+    if doel.eigenaar and "my_house" in doel.eigenaar:
+        preview["my_house"] = doel.eigenaar["my_house"]
+        if actie.action_id == "zone.schedule.propose":
+            preview["goedkeuring_nodig"] = False
+            preview["terugdraaien"] = "Dit concept verandert het actieve klimaatschema niet."
     # Ook bij een eigenaaractie bindt de goedkeuring de hele getoonde preview: de diff én de preview_hash van de
     # eigenaar (die in ``wijziging`` staat). Het ondertekende verzoek draagt die van de eigenaar (service._envelope).
     return preview, canonical_sha256(preview)

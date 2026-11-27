@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session
 
 from hub import audit, servicecalls
 from hub.actions import blokkades as blok_mod
+from hub.actions import huis
 from hub.actions.beleid import get_policy
 from hub.actions.doel import Doel, DoelOnbekend, lees_doel
 from hub.actions.preview import SCHEMA, bouw, eigen_opdracht, toon_bewaarde_preview
@@ -70,6 +71,7 @@ STATUSSEN = (
     "klaar",
     "goedgekeurd",
     "afgewezen",
+    "concept",
     "geweigerd",
     "bezig",
     "uitgevoerd",
@@ -133,7 +135,7 @@ def _goedkeuring_dict(ap: Approval) -> dict[str, Any]:
 
 
 #: velden die een doel kan hebben (``asm_policy.params.validate_target``); waarden alleen met vaste vorm
-DOEL_VELDEN = ("app_id", "dataset", "snapshot", "resource", "host_id")
+DOEL_VELDEN = ("app_id", "dataset", "snapshot", "resource", "zone_id", "scene_id", "group_id", "link_id", "host_id")
 _DOEL_WAARDE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@/:-]{0,199}$")
 
 
@@ -146,6 +148,8 @@ def veilig_doel(target: Any) -> dict[str, Any]:
 
 
 def _goedkeuring_nodig(req: ActionRequest) -> bool:
+    if req.status == "concept":
+        return False
     return (
         req.status == "wacht_op_goedkeuring"
         or bool((req.preview or {}).get("goedkeuring_nodig"))
@@ -419,9 +423,19 @@ def _lees(
     target: Mapping[str, Any],
     parameters: Mapping[str, Any],
     *,
+    cls: Classification,
+    request_id: uuid.UUID,
+    actor: tuple[str, str],
+    bestaand: ActionRequest | None = None,
     keyring: KeyRing | None = None,
     reden: str = "",
 ) -> Doel:
+    if actie.eigenaar == "my_house":
+        if keyring is None:
+            raise _eigenaar_onbekend("geen_sleutels")
+        return huis.voorstel(
+            db, settings, vault, keyring, policy, cls, target, parameters, actor, request_id, bestaand=bestaand
+        )
     if actie.eigenaar is not None:
         return _eigenaar_voorstel(db, settings, keyring, actie, target, parameters, reden)
     try:
@@ -522,7 +536,9 @@ def stel_voor(
             actor,
             cls=cls,
             status=403,
-            code="actie_geweigerd",
+            code="policy_denied"
+            if aid in huis.HUIS_DOELVELDEN and policy.boiler_id in cls.rule_ids
+            else "actie_geweigerd",
             message="Het beleid weigert deze actie; er is niets voorgesteld.",
             **gemeen,
         )
@@ -570,7 +586,20 @@ def stel_voor(
             501, "capability_unavailable", EIGEN_OPDRACHT_NL, {"reden": "eigen_opdracht", "velden": opdracht}
         )
     # Stap 2: het doel zelf uitlezen en opnieuw classificeren met wat er werkelijk staat (kritiek, beschermd).
-    doel = _lees(db, vault, settings, policy, actie, target, parameters, keyring=keyring, reden=reason)
+    doel = _lees(
+        db,
+        vault,
+        settings,
+        policy,
+        actie,
+        target,
+        parameters,
+        cls=cls,
+        request_id=request_id,
+        actor=actor,
+        keyring=keyring,
+        reden=reason,
+    )
     cls = _met_eigenaar(
         classify(
             policy,
@@ -628,6 +657,10 @@ def stel_voor(
         status="wacht_op_goedkeuring" if cls.requires_approval else "klaar",
         trace_id=trace_id[:64],
     )
+    if doel.eigenaar and "my_house" in doel.eigenaar:
+        req.geldig_tot = min(req.geldig_tot, datetime.fromisoformat(doel.eigenaar["my_house"]["valid_until"]))
+        if aid == huis.CONCEPT:
+            req.status = "concept"
     db.add(req)
     db.flush()
     req.blokkades, _ = blok_mod.dynamisch(db, settings, policy, actie, cls, req, now=now)
@@ -702,7 +735,14 @@ def _herbereken(
         policy, action_id=req.action_id, target=req.target, parameters=req.parameters, actor_type=req.actor_type
     )
     if actie is None or not kaal.known or kaal.geweigerd or kaal.gereserveerd is not None:
-        stop("Het beleid staat deze actie niet (meer) toe.", kaal, {"rule_ids": list(kaal.rule_ids)})
+        stop(
+            "Het beleid staat deze actie niet (meer) toe.",
+            kaal,
+            {"rule_ids": list(kaal.rule_ids)},
+            code="policy_denied"
+            if req.action_id in huis.HUIS_DOELVELDEN and policy.boiler_id in kaal.rule_ids
+            else "actie_geweigerd",
+        )
     fouten = validate_target(actie, req.target)
     fouten += [] if fouten else validate_parameters(policy, actie, req.target, req.parameters)
     if fouten:
@@ -712,7 +752,21 @@ def _herbereken(
         # Een open voorstel van vóór S-P2-040: de preview toonde die opdracht niet (R-VEILIG-1, optie C).
         details = {"reden": "eigen_opdracht", "velden": opdracht}
         stop(EIGEN_OPDRACHT_NL, None, details, status=501, code="capability_unavailable")
-    doel = _lees(db, vault, settings, policy, actie, req.target, req.parameters, keyring=keyring, reden=req.reden)
+    doel = _lees(
+        db,
+        vault,
+        settings,
+        policy,
+        actie,
+        req.target,
+        req.parameters,
+        cls=kaal,
+        request_id=req.id,
+        actor=(req.actor_type, req.actor_id),
+        bestaand=req,
+        keyring=keyring,
+        reden=req.reden,
+    )
     cls = _met_eigenaar(
         classify(
             policy,
@@ -1338,7 +1392,7 @@ def _envelope(
     nonce: uuid.UUID,
     now: datetime,
 ) -> dict[str, Any]:
-    proposal = {
+    proposal: dict[str, Any] = {
         "idempotency_key": str(req.id),
         "action_id": req.action_id,
         "target": req.target,
@@ -1350,6 +1404,9 @@ def _envelope(
         "evidence_ids": list(req.evidence_ids),
         "expires_in_seconds": max(1, int((req.geldig_tot - req.aangemaakt_op).total_seconds())),
     }
+    huisdoel = doel.eigenaar is not None and "my_house" in doel.eigenaar
+    if huisdoel:
+        proposal["target"] = huis.doelvelden(req.action_id, req.target)
     approval = None
     if ap is not None:
         approval = {
@@ -1365,14 +1422,20 @@ def _envelope(
             "expires_at": execreq.iso(ap.expires_at),
             "one_time_nonce": str(ap.one_time_nonce),
             "backup_checkpoint_id": ap.backup_checkpoint_id,
-            "action_scope": ap.action_scope,
+            "action_scope": execreq.action_scope(req.action_id, proposal["target"], req.parameters)
+            if huisdoel
+            else ap.action_scope,
         }
     return {
         "proposal": proposal,
         "approval": approval,
         "policy_decision": {"risk_class": cls.risk_class, "rule_ids": list(cls.rule_ids), "policy_hash": policy.hash},
         "issued_at": execreq.iso(now),
-        "expires_at": execreq.iso(now + timedelta(seconds=REQUEST_TTL)),
+        "expires_at": execreq.iso(
+            min(req.geldig_tot, now + timedelta(seconds=REQUEST_TTL))
+            if huisdoel
+            else now + timedelta(seconds=REQUEST_TTL)
+        ),
         "nonce": str(nonce),
     }
 
@@ -1658,10 +1721,13 @@ def voer_uit(
         )
     if actie.uitvoerder == "hub:gotify":
         return _meld(db, req, principal, now)
-    if actie.eigenaar is not None:
-        svc, base = _eigenaar(db, settings, actie.eigenaar)
+    bestemming = None
+    if actie.eigenaar == "my_house":
+        huis.gebonden_verbinding(db, settings, vault, req)
+    elif actie.eigenaar is not None:
+        bestemming = _eigenaar(db, settings, actie.eigenaar)
     elif actie.via_executor:
-        svc, base = _executor(db, settings)
+        bestemming = _executor(db, settings)
     else:
         raise HubError(501, "capability_unavailable", "Voor deze actie bestaat in deze versie nog geen uitvoerder.")
     kluis.controleer_revisies(db, req)  # een niet-bestaand kluispad: weigering vóór ondertekening (S-P2-070)
@@ -1727,6 +1793,25 @@ def voer_uit(
             {"request_id": str(req.id), "code": eigen.code, "details": eigen.details},
         )
     kluis.leg_afgifte_vast(db, req, ap, verzoek)  # §8.3: de hash van precies dit verzoek, vóór verzending
+    if bestemming is None:
+        try:
+            conn = huis.gebonden_verbinding(db, settings, vault, req)
+            bon = conn.vraag("apply", body=verzoek, verwacht=202)
+        except HubError as exc:
+            if exc.status < 500 or exc.status == 501:
+                _sluit(db, req, "geweigerd", {"code": exc.code, **exc.details}, actor=principal.name)
+                raise Bewaard(exc.status, exc.code, exc.message, exc.details) from None
+            _onbekend(db, req, "my_house_onbereikbaar", principal.name, eigenaar=True)
+        if (
+            bon.get("evidence_id") != req.preview["my_house"]["proposal_id"]
+            or bon.get("status") != "queued"
+            or not isinstance(bon.get("command_id"), str)
+            or not execreq.UUID_RE.fullmatch(bon["command_id"])
+        ):
+            _onbekend(db, req, "my_house_ontvangstbewijs_ongeldig", principal.name, eigenaar=True)
+        req.resultaat = {"command_id": bon["command_id"], "evidence_id": bon["evidence_id"]}
+        return _huisuitkomst(db, req, conn, principal.name)
+    svc, base = bestemming
     bearer, _ = keyring.issue_hub_service_jwt(audience=svc.app_id, service_id=str(svc.id))
     try:
         res = servicecalls.call(
@@ -1838,8 +1923,27 @@ def _verwerk(
     _onbekend(db, req, f"{'eigenaar' if eigenaar else 'executor'}_http_{res.status}", actor, eigenaar=eigenaar)
 
 
+def _huisuitkomst(db: Session, req: ActionRequest, conn: huis.Verbinding, actor: str) -> tuple[int, dict[str, Any]]:
+    try:
+        status, gegevens = huis.lees_bewijs(conn, req, (req.resultaat or {}).get("command_id"))
+    except HubError:
+        if req.status == "onbekend":
+            raise HubError(409, "uitkomst_onbekend", "Er is nog geen passend bewijs van my_house.") from None
+        # Bewaar de bon, ook als de eerste lezing van het bewijs mislukt.
+        _sluit(db, req, "onbekend", {**(req.resultaat or {}), "code": "uitkomst_onbekend"}, actor=actor)
+        raise Bewaard(502, "uitkomst_onbekend", "Lees het bewijs van my_house later opnieuw.") from None
+    if status == "bezig":
+        req.resultaat = gegevens
+        if req.status != status:
+            req.status, req.bijgewerkt_op = status, utcnow()
+        db.flush()
+        return 202, weergave(db, req)
+    _sluit(db, req, status, gegevens, actor=actor)
+    return 200, weergave(db, req)
+
+
 def haal_uitkomst_op(
-    db: Session, settings: Settings, keyring: KeyRing, principal: Principal, req: ActionRequest
+    db: Session, settings: Settings, keyring: KeyRing, principal: Principal, req: ActionRequest, vault: Vault
 ) -> tuple[int, dict[str, Any]]:
     """Een ``onbekend`` of blijven hangen ``bezig`` ophelderen met het journaal van de executor (alleen lezen)."""
     now = utcnow()
@@ -1847,10 +1951,15 @@ def haal_uitkomst_op(
     actie = policy.actie(req.action_id)
     limiet = (actie.timeout_seconden if actie is not None else 1800) + ANTWOORD_MARGE + 60
     start = req.gestart_op or req.bijgewerkt_op
-    if req.status == "bezig" and start + timedelta(seconds=limiet) > now:
-        raise HubError(409, "nog_bezig", "Deze actie loopt nog; wacht op het antwoord van de executor.")
+    woning = req.uitvoerder == "eigenaar:my_house"
+    heeft_bon = woning and (req.resultaat or {}).get("command_id")
+    if req.status == "bezig" and not heeft_bon and start + timedelta(seconds=limiet) > now:
+        raise HubError(409, "nog_bezig", "Deze actie loopt nog. Wacht op het antwoord.")
     if req.status not in ("onbekend", "bezig"):
         raise HubError(409, "status_past_niet", "De uitkomst van dit verzoek is al bekend.", {"status": req.status})
+    if woning:
+        conn = huis.gebonden_verbinding(db, settings, vault, req)
+        return _huisuitkomst(db, req, conn, principal.name)
     if actie is not None and actie.eigenaar is not None:
         # shortcut: de eigenaar biedt de Hub (nog) geen journaal; de uitkomst blijft onbekend tot er een is (VERSIE 2).
         raise HubError(

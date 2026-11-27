@@ -152,6 +152,12 @@ def ensure_secrets(
     secrets_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     prive_map(secrets_dir, os.geteuid())
 
+    if (secrets_dir / SETUP_DONE).exists() and not (secrets_dir / "policy-signing.ed25519").is_file():
+        raise FirstStartError(
+            "De policy-sleutel van deze Hub ontbreekt. Herstel de bestaande sleutel uit de back-up. "
+            "Gekoppelde diensten kunnen de oude set nog vertrouwen."
+        )
+
     generators: dict[str, Callable[[], bytes]] = dict.fromkeys(ED25519_KEYS, _ed25519_pem)
     generators.update(dict.fromkeys((VAULT_KEY, WEB_KEY), _random_key))
     for name, gen in generators.items():

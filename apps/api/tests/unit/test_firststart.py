@@ -236,3 +236,13 @@ def test_supervisor_bereidt_dataset_met_beperkte_acl_voor(tmp_path, monkeypatch)
     assert _mode(data / "secrets") == 0o770
     assert _mode(supervisor.SOCKET_DIR) == 0o700
     assert _mode(supervisor.WEB_RUNTIME_DIR) == 0o700
+
+
+def test_ingerichte_hub_vervangt_ontbrekende_gepinde_policysleutel_niet(tmp_path: Path) -> None:
+    ensure_secrets(tmp_path)
+    mark_setup_completed(tmp_path)
+    sleutel = tmp_path / "policy-signing.ed25519"
+    sleutel.unlink()
+    with pytest.raises(FirstStartError, match="Herstel de bestaande sleutel"):
+        ensure_secrets(tmp_path)
+    assert not sleutel.exists()

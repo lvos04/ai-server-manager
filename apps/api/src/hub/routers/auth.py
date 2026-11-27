@@ -28,10 +28,10 @@ from hub.deps import (
     require_local_admin,
     visible_oidc_session,
 )
-from hub.errors import HubError
+from hub.errors import HubError, error_body
 from hub.firststart import mark_setup_completed, setup_pending, verify_setup_code
 from hub.keys import KeyRing
-from hub.models import OidcConfig, Service, User, WebSession
+from hub.models import AdapterLink, OidcConfig, Service, User, WebSession
 from hub.security import (
     Role,
     clear_failures,
@@ -418,6 +418,31 @@ def change_password(body: PasswordIn, db: DB, settings: SettingsDep, principal: 
 @router.get("/auth/jwks", summary="Publieke sleutels (JWKS) voor dienst-JWT's")
 def jwks(keyring: Annotated[KeyRing, Depends(get_keyring)]) -> JSONResponse:
     return JSONResponse(keyring.jwks(), headers={"Cache-Control": "public, max-age=300"})
+
+
+@router.post("/auth/key-rotations", summary="Rotatie van de policy-sleutel aanvragen")
+def vraag_policyrotatie(request: Request, db: DB, principal: Admin, idem: Idem) -> JSONResponse:
+    if (replay := idem.replay()) is not None:
+        return replay
+    # ADR-0035: ook een offline of verlopen koppeling kan de huidige set nog gepind hebben.
+    if db.scalar(select(AdapterLink.id).where(AdapterLink.app_id == "my_house").limit(1)) is not None:
+        status, code, melding = (
+            409,
+            "sleutelrotatie_wacht_op_bevestiging",
+            "Sleutelrotatie wacht op bevestiging in my_house.",
+        )
+    else:
+        status, code, melding = 501, "capability_unavailable", "Ondertekende sleutelrotatie is nog niet beschikbaar."
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=principal.name,
+        action="auth.key_rotation_refused",
+        target_type="keyset",
+        target_id="policy",
+        details={"code": code},
+    )
+    return idem.save(status, error_body(request, code, melding))
 
 
 @router.get(

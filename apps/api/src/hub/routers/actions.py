@@ -62,6 +62,7 @@ StatusFilter = Literal[
     "klaar",
     "goedgekeurd",
     "afgewezen",
+    "concept",
     "geweigerd",
     "bezig",
     "uitgevoerd",
@@ -348,10 +349,13 @@ def reconcile(
     db: DB,
     settings: SettingsDep,
     keyring: KeyRingDep,
+    vault: VaultDep,
     principal: Operator,
     idem: Idem,
 ) -> JSONResponse:
     def werk() -> tuple[int, dict[str, Any]]:
-        return service.haal_uitkomst_op(db, settings, keyring, principal, service.haal(db, request_id, vergrendel=True))
+        return service.haal_uitkomst_op(
+            db, settings, keyring, principal, service.haal(db, request_id, vergrendel=True), vault
+        )
 
     return _afhandelen(request, idem, werk)

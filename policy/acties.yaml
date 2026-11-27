@@ -209,3 +209,73 @@ acties:
     max_per_uur: 10
     timeout_seconden: 120
     verwacht: {}
+  light.group.set:
+    omschrijving: Een geteste lichtgroep instellen via my_house.
+    uitvoerder: eigenaar:my_house
+    truenas: []
+    doel: eigenaar
+    klasse: R1
+    parameters: eigenaar
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}
+  light.scene.recall:
+    omschrijving: Een geteste lichtscène oproepen via my_house.
+    uitvoerder: eigenaar:my_house
+    truenas: []
+    doel: eigenaar
+    klasse: R1
+    parameters: eigenaar
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}
+  zone.command:
+    omschrijving: Een geteste klimaatzone bedienen via my_house.
+    uitvoerder: eigenaar:my_house
+    truenas: []
+    doel: eigenaar
+    klasse: R2
+    parameters: eigenaar
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}
+  zone.resume:
+    omschrijving: Het schema van een geteste klimaatzone hervatten via my_house.
+    uitvoerder: eigenaar:my_house
+    truenas: []
+    doel: eigenaar
+    klasse: R2
+    parameters: eigenaar
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}
+  zone.schedule.propose:
+    omschrijving: Een klimaatschema als concept in my_house vastleggen.
+    uitvoerder: eigenaar:my_house
+    truenas: []
+    doel: eigenaar
+    klasse: R2
+    parameters: eigenaar
+    requires_backup: false
+    ai_mag_voorstellen: true
+    opslagmutatie: false
+    cooldown_seconden: 0
+    max_per_uur: 10
+    timeout_seconden: 120
+    verwacht: {}

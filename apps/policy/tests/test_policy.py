@@ -2811,3 +2811,54 @@ def test_flowherstel_geldig_doel_en_parameters() -> None:
     zonder_host = {"app_id": "home-control-hub", "resource": "node_red"}
     assert validate_target(POLICY.acties["automation.flows.restore"], zonder_host) == []
     assert _codes({"snapshot_id": MOMENTOPNAME}, "automation.flows.restore", FLOWBRON) == []
+
+
+@pytest.mark.parametrize(
+    "woord",
+    [
+        "shell",
+        "sudo",
+        "su",
+        "exec",
+        "ssh",
+        "docker",
+        "container",
+        "containers",
+        "compose",
+        "cron",
+        "cronjob",
+        "initshutdownscript",
+        "init_shutdown_script",
+        "run_command",
+        "command",
+        "script",
+    ],
+)
+def test_shellblokkade_behoudt_alle_woordgrenzen(woord: str) -> None:
+    for naam in (woord, f"test.{woord}", f"test_{woord}", f"{woord}.test", f"zone.{woord}.test", f"zone_{woord}_test"):
+        assert "BLK-SHELL" in classify(POLICY, action_id=naam, target={}, parameters={}, actor_type="ai").rule_ids
+    assert (
+        "BLK-SHELL"
+        in classify(POLICY, action_id="zone.command.extra", target={}, parameters={}, actor_type="ai").rule_ids
+    )
+    assert (
+        "BLK-SHELL"
+        in classify(POLICY, action_id="extra.zone.command", target={}, parameters={}, actor_type="ai").rule_ids
+    )
+
+
+@pytest.mark.parametrize(
+    ("naam", "klasse"),
+    [
+        ("light.group.set", "R1"),
+        ("light.scene.recall", "R1"),
+        ("zone.command", "R2"),
+        ("zone.resume", "R2"),
+        ("zone.schedule.propose", "R2"),
+    ],
+)
+def test_huisacties_gaan_alleen_naar_de_eigenaar(naam: str, klasse: str) -> None:
+    uitkomst = classify(POLICY, action_id=naam, target={}, parameters={}, actor_type="ai")
+    assert not uitkomst.geweigerd and uitkomst.risk_class == klasse
+    assert uitkomst.uitvoerder == "eigenaar:my_house"
+    assert naam not in POLICY.executor_allowlist()

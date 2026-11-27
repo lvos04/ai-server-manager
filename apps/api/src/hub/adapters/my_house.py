@@ -513,15 +513,7 @@ class Adapter:
         self.check_binding = check_binding
         self.deadline = monotonic() + 30
 
-    def _request(
-        self,
-        route: Route,
-        *,
-        token: str | None = None,
-        code: str | None = None,
-        home_id: UUID | None = None,
-        challenge: dict[str, str] | None = None,
-    ) -> Any:
+    def _destination(self) -> tuple[str, outbound.OutboundPolicy]:
         self.check_binding()
         if self.link.app_id != APP_ID or not self.link.peer_addresses:
             raise outbound.OutboundError("doelbinding")
@@ -536,6 +528,23 @@ class Adapter:
             connect_timeout=min(remaining, self.policy.connect_timeout),
             read_timeout=min(remaining, self.policy.read_timeout),
         )
+        return base, policy
+
+    def verified_destination(self, token: str) -> tuple[str, outbound.OutboundPolicy]:
+        """Bevestig server, cliënt en netwerkbinding vóór een connectorverzoek."""
+        self._identity(token)
+        return self._destination()
+
+    def _request(
+        self,
+        route: Route,
+        *,
+        token: str | None = None,
+        code: str | None = None,
+        home_id: UUID | None = None,
+        challenge: dict[str, str] | None = None,
+    ) -> Any:
+        base, policy = self._destination()
         method = "POST" if route in (Route.REDEEM, Route.REFRESH) else "GET"
         try:
             response = outbound.request(

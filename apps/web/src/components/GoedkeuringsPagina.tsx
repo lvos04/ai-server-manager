@@ -18,7 +18,7 @@ import {
   type ActieVerzoek,
   type Hashes,
 } from "@/lib/acties";
-import type { HubApiError } from "@/lib/api";
+import { HubApiError } from "@/lib/api";
 import { hasRole, useRole } from "@/lib/session";
 import { KLOON } from "@/lib/backups";
 import { useAction } from "@/lib/use-action";
@@ -113,7 +113,10 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
   const execute = useAction<unknown>();
   const reconcile = useAction<unknown>();
 
-  const fout = approve.error ?? reject.error ?? execute.error ?? reconcile.error;
+  const pinOntbreekt = v.status === "geweigerd" && v.uitvoerder === "eigenaar:my_house"
+    && v.resultaat?.code === "capability_unavailable" && v.resultaat.reason === "hub_keyset_missing";
+  const fout = approve.error ?? reject.error ?? execute.error ?? reconcile.error
+    ?? (pinOntbreekt ? new HubApiError(501, "hub_keyset_missing", "") : null);
   // Weigert de server omdat de binding niet meer klopt of het voorstel verlopen is, dan vervallen beide beslisknoppen.
   const verval = foutVerval(fout) ?? vervallen(v, gezien, nu);
   const geenRecht = fout?.status === 403;
@@ -332,8 +335,8 @@ export function GoedkeuringsPagina({ v, gezien, verouderd, opnieuw }: { v: Actie
       {fout && fout.code !== "preview_gewijzigd" && fout.code !== "voorstel_verlopen" && fout.status !== 403 ? <ErrorPanel vast={vasteFout} error={toonbareFout(fout)} title="De handeling is niet gelukt" /> : null}
       {beslissing}
       {uitvoeren}
-      {v.status !== "wacht_op_goedkeuring" ? <UitvoeringsTijdlijn v={v} verouderd={verouderd} /> : null}
-      {v.status === "onbekend" && operator ? (
+      {v.status !== "wacht_op_goedkeuring" && v.status !== "concept" ? <UitvoeringsTijdlijn v={v} verouderd={verouderd} /> : null}
+      {(v.status === "onbekend" || (v.status === "bezig" && v.uitvoerder === "eigenaar:my_house")) && operator ? (
         <section className="card" aria-labelledby="ophelderen-kop">
           <h2 id="ophelderen-kop" className="text-xl font-bold">
             Uitkomst ophelderen

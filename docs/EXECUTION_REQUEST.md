@@ -244,6 +244,25 @@ hierboven; geneste waarden onder een geheim-achtige naam (`client_secret`, `toke
 Voor `sso.sessions.revoke` bevat de teruglezing het gehele, niet-negatieve aantal `ingetrokken_sessies`. De eigenaar bevestigt de uitgevoerde controle met `gelezen: true`. Nul is geldig als de eigenaar heeft vastgesteld dat er geen sessie meer hoefde te worden ingetrokken. Een onbevestigde teruglezing of een 502 met
 `uitvoering_mislukt` van de eigenaar laat de uitkomst onbekend. De goedkeuring blijft verbruikt.
 
+## Woningacties via my_house (S-P3-130)
+
+De Hub gebruikt de bevestigde my_house-koppeling. Kies bij meerdere installaties de `link_id` en geef
+het eigen doel van my_house op met `group_id`, `scene_id` of `zone_id`. De Hub leest het parameterschema
+en de doelcontrole met `GET /connector/v1/discover?action_id=…&target_id=…`. Beide apps begrenzen de
+parameters op 16.384 canonieke UTF-8-bytes. Licht heeft klasse R1 en klimaat R2. Voor `zone.command`
+en `zone.resume` moet de fysieke klimaatbediening onder D12 bevestigd zijn.
+
+De Hub ondertekent zowel `propose` als `apply` met de policy-sleutel. De goedkeuring bindt doel,
+parameters, toestand en het voorstel van dezelfde installatie. Een ontbrekende pin geeft 501.
+Kopieer dan de publieke sleutelset bij **Instellingen → Diensten** en bevestig haar in my_house.
+
+`zone.schedule.propose` blijft een concept. Bij een herstelbare wijziging van de insteltemperatuur
+betekent 202 dat my_house de opdracht heeft ingepland. **Journaal lezen** haalt het bewijs op via
+`GET /connector/v1/evidence/{id}`. De Hub toont de uitvoering als bevestigd zodra de voor- en
+nameting met de goedgekeurde wijziging overeenkomen. Een lichtgroep, scène of schemahervatting
+zonder herstelpad geeft 501. De Hub houdt sleutelrotatie tegen zolang een gekoppelde installatie
+de oude sleutelset kan vertrouwen, ook wanneer die installatie offline is.
+
 De Hub meet nog geen B12-back-up van de Authentik-database. Daarom blijft `sso.oidc.hub.register` geblokkeerd. De
 AI kan geen van beide acties voorstellen: de route laat alleen de aangemelde gebruiker als actor toe en het beleid
 weigert een AI-actor (`ai_mag_voorstellen: false`). `mediaguard.*` blijft gereserveerd tot BG-05 en P3-02

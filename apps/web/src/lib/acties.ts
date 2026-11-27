@@ -112,6 +112,7 @@ export const RISICO_WOORD: Record<RisicoKlasse, string> = {
 };
 
 const STATUS: Record<string, StatusView> = {
+  concept: { tone: "neutral", label: "Schemaconcept" },
   wacht_op_goedkeuring: { tone: "gate", label: "Wacht op goedkeuring" },
   klaar: { tone: "neutral", label: "Klaar om uit te voeren", icon: "open" },
   goedgekeurd: { tone: "info", label: "Goedgekeurd, nog niet uitgevoerd" },
@@ -151,7 +152,7 @@ export function werkwoord(actionId: string): string {
   return ACTIE_WERKWOORD[actionId] ?? "Goedkeuren";
 }
 
-const DOEL_VELDEN = ["app_id", "dataset", "snapshot", "resource", "host_id"] as const;
+const DOEL_VELDEN = ["app_id", "zone_id", "group_id", "scene_id", "dataset", "snapshot", "resource", "host_id", "link_id"] as const;
 const DOEL_RE = /^[A-Za-z0-9][A-Za-z0-9_.@/:-]{0,199}$/;
 
 /** Alleen bekende doelvelden met een vaste vorm (zoals ``veilig_doel`` in de API). */
@@ -352,6 +353,7 @@ const ACTIE_FOUT: Record<string, string> = {
   executor_niet_gekoppeld: "De executor is niet gekoppeld; er is niets uitgevoerd. Koppel hem op zijn eigen statuspagina.",
   executor_adres_onbekend: "Het adres van de executor is onbekend; er is niets uitgevoerd.",
   uitvoering_geweigerd: "De executor heeft de actie geweigerd; er is niets uitgevoerd.",
+  hub_keyset_missing: "Plak eerst de Hub-sleutelset in my_house.",
   capability_unavailable: "Deze handeling is nog niet beschikbaar bij de uitvoerder; er is niets uitgevoerd.",
   uitvoering_mislukt: "De uitvoering is mislukt. Bekijk de uitvoering op deze pagina.",
   uitkomst_onbekend: "De uitkomst is onbekend. Laat de Hub de stand ophelderen.",
@@ -361,6 +363,7 @@ const ACTIE_FOUT: Record<string, string> = {
 export const ONBEKENDE_FOUT = "De Hub meldde een onbekende fout. Lees de stand opnieuw voordat je iets herhaalt.";
 
 export function vasteFoutcode(e: unknown): string | undefined {
+  if (e instanceof HubApiError && e.status === 501 && e.code === "capability_unavailable" && e.details.reason === "hub_keyset_missing") return "hub_keyset_missing";
   return e instanceof HubApiError && Object.hasOwn(ACTIE_FOUT, e.code) ? e.code : undefined;
 }
 

@@ -98,13 +98,11 @@ def _doel(naam: str = _g(1), **staat: Any) -> Doel:
 EIGENAAR_VAST = {"soort", "eigenaar", "preview_hash_eigenaar", "requires_backup"}
 
 
-def _eigenaar(n: int) -> Doel:
+def _eigenaar(n: int, naam: str = "home-control-hub") -> Doel:
     """Een doel uit het voorstel van een eigenaar-connector, met een geheim in zijn diff (S-P2-080)."""
     voorstel = {"voorstel_id": "0" * 8, "preview_hash": "sha256:" + "a" * 64, "requires_backup": False}
     staat = {"naam": _g(n + 100)}  # leeg in de Hub; hier gevuld omdat elke staat door _toon moet
-    return Doel(
-        "eigenaar", "home-control-hub", "sha256:" + "b" * 64, True, staat, eigenaar={**voorstel, "diff": [_g(n)]}
-    )
+    return Doel("eigenaar", naam, "sha256:" + "b" * 64, True, staat, eigenaar={**voorstel, "diff": [_g(n)]})
 
 
 def _values() -> dict[str, Any]:
@@ -209,6 +207,16 @@ GEVALLEN = [
     ),
     Geval("sso_registreren", "sso.oidc.hub.register", {"x": _g(73)}, _eigenaar(75), EIGENAAR_VAST, {"host_id": HOST}),
     Geval("sso_intrekken", "sso.sessions.revoke", {"x": _g(74)}, _eigenaar(76), EIGENAAR_VAST, {"host_id": HOST}),
+    *(
+        Geval(aid, aid, {}, _eigenaar(79, "my_house"), EIGENAAR_VAST, {veld: "00000000-0000-4000-8000-000000000001"})
+        for aid, veld in (
+            ("light.group.set", "group_id"),
+            ("light.scene.recall", "scene_id"),
+            ("zone.command", "zone_id"),
+            ("zone.resume", "zone_id"),
+            ("zone.schedule.propose", "zone_id"),
+        )
+    ),
     Geval(
         "flows_terugzetten",
         "automation.flows.restore",

@@ -1,7 +1,8 @@
 "use client";
 
 import { OctagonX, RotateCw, WifiOff } from "lucide-react";
-import { toonbareFout } from "@/lib/acties";
+import Link from "next/link";
+import { toonbareFout, vasteFoutcode } from "@/lib/acties";
 import { HubApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { KopieerVeld } from "./KopieerVeld";
@@ -70,6 +71,11 @@ export function ErrorPanel({
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <p className="font-bold">{offline ? "Geen verbinding met de Hub" : title}</p>
         <p>{message}</p>
+        {vasteFoutcode(error) === "hub_keyset_missing" ? (
+          <Link className="inline-flex min-h-touch items-center font-semibold underline" href="/instellingen/diensten#vingerafdruk-titel">
+            Kopieer de publieke sleutelset bij Diensten
+          </Link>
+        ) : null}
         {e ? (
           <>
             <dl className="meta !text-current">
