@@ -18,7 +18,7 @@ from hub.keys import TOKEN_USE_USER
 from hub.kosten import bronnen
 from hub.kosten.overzicht import Kostencijfer, Tijdvak
 from hub.models import AuditEvent, Decision, HubSetting, Notification, OutboxEvent, Service
-from hub.routers import kosten
+from hub.routers import ai, kosten
 
 pytestmark = pytest.mark.integration
 NU = datetime(2026, 10, 25, 14, 30, tzinfo=UTC)
@@ -145,6 +145,36 @@ def test_leesrecht_meterrol_en_eigenaar(
         schatting = kijker.get(LEES, params=PARAMS).json()["totaal"]["stroomkosten"]
         assert schatting["measurement_quality"] == "estimated" and schatting["aanname"]
         assert Decimal(schatting["waarde"]) == 4
+
+
+def test_cloudbudget_volgt_het_bronplafond_ook_bij_uitgeput_krediet(
+    admin: Any, app: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings.ai_enabled = True
+    monkeypatch.setattr(ai, "utcnow", lambda: NU)
+    monkeypatch.setattr(kosten, "utcnow", lambda: NU)
+    with app.state.sessionmaker() as db:
+        d09 = db.get(Decision, "D09")
+        d09.status, d09.getest_op = "Getest", NU
+        d09.waarde = {
+            "account_gekoppeld": True,
+            "harde_stop": True,
+            "overage_toegestaan": False,
+            "tegoedmaand": "2026-10",
+            "inbegrepen_eenheden": 4,
+            "max_eenheden_per_taak": 5,
+            "inbegrepen_maandbudget": "EUR 60",
+        }
+        db.commit()
+    saldo = admin.get("/api/v1/ai/providers").json()["tegoed"]
+    assert saldo["status"] == "tegoed_op" and saldo["inbegrepen"] == 4
+    overzicht = admin.get(LEES, params=PARAMS).json()
+    cijfer = overzicht["cloudbudget"]
+    assert Decimal(cijfer["waarde"]) == saldo["inbegrepen"] and cijfer["eenheid"] == "kredieteenheden"
+    assert cijfer["bron"] == "hub.D09" and cijfer["tijdvak"]["tijdzone"] == "UTC"
+    assert overzicht["totaal"]["stroomkosten"]["waarde"] is None
+    settings.ai_enabled = False
+    assert admin.get(LEES, params=PARAMS).json()["cloudbudget"]["waarde"] is None
 
 
 def test_budget_vanaf_waarneming_tot_verzending_en_bestaande_data(

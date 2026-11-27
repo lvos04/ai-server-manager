@@ -349,8 +349,10 @@ buitenunit hebben elk een eigen afnamereeks. Voor exacte cijfers moet D14 de met
 Een door de bron geschatte uurwaarde houdt haar kwaliteitslabel en aanname.
 De NAS-post blijft onbekend zolang B14 geen afzonderlijke reeks voor die rol aanbiedt.
 MSO-kosten blijven onbekend zolang de kostenroute buiten het machineleesrecht valt.
-D09 kan een bevestigd inbegrepen maandbudget met valuta leveren. Dit plafond staat
-afzonderlijk van de uitgaven.
+Bij ingeschakelde kredietbewaking levert een getest D09-besluit het toegewezen
+plafond voor de huidige UTC-maand in kredieteenheden. Oudere besluiten kunnen
+een deze maand bevestigd valutabedrag leveren. Een verlopen of onvolledige
+krediettoewijzing geeft `unknown`. Het maandplafond staat afzonderlijk van de uitgaven.
 
 Een beheerder stelt via `PUT /api/v1/kosten/budget` een periode, valuta en grens in.
 `grens: null` schakelt de waarschuwing uit. Het overzicht vergelijkt bij uitlezing de

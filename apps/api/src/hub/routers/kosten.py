@@ -57,7 +57,9 @@ def lees(
         {
             "home-control-hub": {"stroomkosten": rapport.totaal.stroomkosten},
             "media-source-optimizer": bronnen.mso_posten(vak),
-            "hub.D09": {"cloudbudget": bronnen.cloudbudget(db.get(Decision, "D09"), datum, vak, nu)},
+            "hub.D09": {
+                "cloudbudget": bronnen.cloudbudget(db.get(Decision, "D09"), datum, nu, actief=settings.ai_enabled)
+            },
         },
     )
 

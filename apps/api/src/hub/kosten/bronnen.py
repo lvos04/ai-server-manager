@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,7 @@ from hub.kosten.overzicht import (
     projecteer,
 )
 from hub.models import Decision, Service
+from hub.onboarding.catalog import D09Waarde
 from hub.registry import service_base_url
 
 B14 = "home-control-hub"
@@ -94,33 +96,37 @@ def energie(
     return projecteer(resultaat.body, periode, dag, rol, richting, nu, exact_bevestigd=bevestigd and meter is True)
 
 
-def cloudbudget(besluit: Decision | None, dag: date, vak: Tijdvak, nu: datetime) -> Kostencijfer:
-    """Een vastgelegd maandplafond is geen betaalde uitgave. Vrije consoletekst verlaat de Hub niet."""
-    zone = ZoneInfo(vak.tijdzone) if vak.tijdzone else None
-    maand = kalender("maand", dag, zone)
+def cloudbudget(besluit: Decision | None, dag: date, nu: datetime, *, actief: bool) -> Kostencijfer:
+    """Lees alleen het toegewezen maandplafond uit D09. Reserveringen en vrije consoletekst blijven bij de bron."""
+    maand = kalender("maand", dag, ZoneInfo("UTC"))
     basis = Kostencijfer(bron="hub.D09", tijdvak=maand, reden="maandbudget_onbekend")
-    if besluit is None or besluit.status != "Getest" or besluit.getest_op is None:
-        return basis
-    waarde = besluit.waarde or {}
-    if (
-        waarde.get("account_gekoppeld") is not True
-        or waarde.get("harde_stop") is not True
-        or waarde.get("overage_toegestaan") is not False
-    ):
-        return basis
-    # D09 bewaart alleen de huidige configuratie. Zonder woningtijdzone is de actuele maand op de grens onzeker.
     utc = nu.astimezone(UTC)
-    dagen = (
-        [nu.astimezone(zone).date()]
-        if zone
-        else [(utc - timedelta(hours=12)).date(), (utc + timedelta(hours=14)).date()]
-    )
-    if not all(maand.eerste_dag <= d < maand.na_laatste_dag for d in dagen):
+    if not actief or not maand.eerste_dag <= utc.date() < maand.na_laatste_dag:
         return basis
-    tekst = waarde.get("inbegrepen_maandbudget")
-    if not isinstance(tekst, str):
+    if besluit is None or besluit.status != "Getest" or besluit.getest_op is None or besluit.getest_op > utc:
         return basis
-    tekst = tekst.strip()
+    try:
+        config = D09Waarde.model_validate(besluit.waarde, strict=True)
+    except ValidationError:
+        return basis
+    if not config.account_gekoppeld:
+        return basis
+    if config.tegoedmaand is not None or config.inbegrepen_eenheden is not None:
+        if config.tegoedmaand != utc.strftime("%Y-%m") or config.inbegrepen_eenheden is None:
+            return basis
+        return Kostencijfer(
+            bron="hub.D09",
+            tijdvak=maand,
+            eenheid="kredieteenheden",
+            waarde=Decimal(config.inbegrepen_eenheden),
+            measurement_quality="estimated",
+            observed_at=besluit.getest_op,
+            aanname="De in D09 bevestigde toewijzing geldt voor deze UTC-maand. Het cijfer is het maandplafond.",
+        )
+    # Oudere besluiten missen een kredietmaand. Gebruik alleen een deze maand bevestigd valutabedrag.
+    if besluit.getest_op.astimezone(UTC).date() < maand.eerste_dag:
+        return basis
+    tekst = (config.inbegrepen_maandbudget or "").strip()
     if voor := re.fullmatch(rf"({VALUTA})\s*({BEDRAG})", tekst):
         valuta, bedrag = voor.groups()
     elif na := re.fullmatch(rf"({BEDRAG})\s*({VALUTA})", tekst):

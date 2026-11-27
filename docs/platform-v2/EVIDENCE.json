@@ -1063,9 +1063,9 @@
     "id": "B01-011",
     "status": "Bezig",
     "validatie": "Sim-getest; NIET GEVALIDEERD (echte NAS); NIET GEVALIDEERD (hardware); NIET GEVALIDEERD (account)",
-    "bewijs": "S-P3-150. apps/api/tests/unit/test_kosten.py toetst 23/25 uur, week, maand, versheid, meterbewijs en bronkeuze. apps/api/tests/integration/test_kosten.py toetst de Hub-leesroute met B14-simulator, de budgetgrens en één verzending naar nep-Gotify. De voor-na-proef vergelijkt een bestaande Hub-instelling en eventrij. Het B14-antwoordschema UsageReport op da00f41 is afzonderlijk getoetst voor beide klokwissels.",
-    "blokkade": "S-P3-160 levert het scherm. MSO laat costs/summary op da94e0a buiten het machineleesrecht. Voor nieuwe budgetwaarnemingen zonder aangemelde kijker ontbreekt een B14-dienstleesrecht voor de uurreeks. De integrale huisproef S-P6-21, een fysieke meter met D14 en de installatieproef N-P6-06 staan open. Het werkelijke cloudtegoed vraagt een accountcontrole.",
-    "opmerking": "B14 is de enige stroombron. Alleen een volledig gedekt verstreken tijdvak krijgt een bedrag. De melding gebruikt de kosten van de netafname. D09 levert uitsluitend een apart maandplafond.",
+    "bewijs": "S-P3-150. apps/api/tests/unit/test_kosten.py toetst 23/25 uur, week, maand, versheid, meterbewijs en bronkeuze. apps/api/tests/integration/test_kosten.py toetst de Hub-leesroute met B14-simulator, het maandplafond tegenover de D09-kredietbron, de budgetgrens en één verzending naar nep-Gotify. De voor-na-proef vergelijkt een bestaande Hub-instelling en eventrij. Het B14-antwoordschema UsageReport op da00f41 is afzonderlijk getoetst voor beide klokwissels.",
+    "blokkade": "S-P3-160 levert het scherm. MSO laat costs/summary op ff89f0f buiten het machineleesrecht. Voor nieuwe budgetwaarnemingen zonder aangemelde kijker ontbreekt een B14-dienstleesrecht voor de uurreeks. De integrale huisproef S-P6-21, een fysieke meter met D14 en de installatieproef N-P6-06 staan open. Het werkelijke cloudtegoed vraagt een accountcontrole.",
+    "opmerking": "B14 is de enige stroombron. Alleen een volledig gedekt verstreken tijdvak krijgt een bedrag. De melding gebruikt de kosten van de netafname. D09 levert het aparte plafond voor de UTC-maand in kredieteenheden of, bij oudere besluiten, een deze maand bevestigd valutabedrag.",
     "repo": "ai-server-manager",
     "bijgewerkt": "2026-11-27"
   },

@@ -139,12 +139,42 @@ def test_d09_projecteert_alleen_herkenbaar_huidig_maandbudget(tekst: str, verwac
             "overage_toegestaan": False,
         },
     )
-    vak = kalender("dag", LATER.date())
-    cijfer = cloudbudget(besluit, LATER.date(), vak, LATER)
+    cijfer = cloudbudget(besluit, LATER.date(), LATER, actief=True)
     assert cijfer.waarde == verwacht
     if verwacht is not None:
         assert cijfer.aanname and cijfer.measurement_quality == "estimated"
         assert cijfer.tijdvak.eerste_dag == date(2026, 11, 1)
-    assert cloudbudget(besluit, DAG, vak, LATER).waarde is None
+    assert cloudbudget(besluit, DAG, LATER, actief=True).waarde is None
+    assert cloudbudget(besluit, LATER.date(), LATER, actief=False).waarde is None
     besluit.status = "Open"
-    assert cloudbudget(besluit, LATER.date(), vak, LATER).waarde is None
+    assert cloudbudget(besluit, LATER.date(), LATER, actief=True).waarde is None
+    besluit.status, besluit.getest_op = "Getest", datetime(2026, 10, 31, 23, 59, tzinfo=UTC)
+    assert cloudbudget(besluit, LATER.date(), LATER, actief=True).waarde is None
+
+
+@pytest.mark.parametrize(
+    ("bronmaand", "eenheden", "verwacht"),
+    [("2026-11", 25, 25), ("2026-11", 0, 0), ("2026-10", 25, None), (None, 25, None), ("2026-11", None, None)],
+)
+def test_d09_voorrang_en_utc_maandgrens(bronmaand: str | None, eenheden: int | None, verwacht: int | None) -> None:
+    nu = datetime(2026, 11, 30, 23, 30, tzinfo=UTC)
+    besluit = Decision(
+        id="D09",
+        status="Getest",
+        getest_op=LATER,
+        waarde={
+            "account_gekoppeld": True,
+            "harde_stop": True,
+            "overage_toegestaan": False,
+            "tegoedmaand": bronmaand,
+            "inbegrepen_eenheden": eenheden,
+            "inbegrepen_maandbudget": "EUR 250",
+        },
+    )
+    cijfer = cloudbudget(besluit, nu.date(), nu, actief=True)
+    assert cijfer.waarde == verwacht and cijfer.tijdvak.tijdzone == "UTC"
+    if verwacht is not None:
+        assert cijfer.eenheid == "kredieteenheden" and cijfer.measurement_quality == "estimated" and cijfer.aanname
+    else:
+        assert cijfer.measurement_quality == "unknown"
+    assert cloudbudget(besluit, date(2026, 12, 1), nu, actief=True).waarde is None
