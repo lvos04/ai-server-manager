@@ -8,14 +8,15 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
 
 from hub import audit
-from hub.ai import kennis, runner, tegoed, triage
+from hub.ai import kennis, plan, runner, tegoed, triage
 from hub.deps import DB, Admin, Cursor, Idem, Limit, Operator, SettingsDep, Viewer, decode_cursor, encode_cursor
 from hub.errors import HubError, trace_id_of
 from hub.models import AuditEvent, IdempotencyRecord
+from hub.routers.actions import VaultDep, _afhandelen
 from hub.timeutil import iso, utcnow
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI-diagnose"])
@@ -113,3 +114,45 @@ def diagnose(
             "observed_at": iso(inc.laatste_op),
         },
     )
+
+
+class PlanIn(DiagnoseIn):
+    action_id: str | None = Field(default=None, min_length=1, max_length=96)
+    target: dict[str, str] | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    expected_version: str | None = Field(default=None, max_length=300)
+
+
+@router.post("/plan", status_code=201, summary="Maak een gebonden ActionProposal bij een incident")
+def maak_plan(
+    body: PlanIn, request: Request, db: DB, settings: SettingsDep, principal: Operator, idem: Idem, vault: VaultDep
+) -> JSONResponse:
+    inc = kennis.incident(db, body.incident_id, principal)
+
+    def werk() -> tuple[int, dict[str, Any]]:
+        _frequentie(db, idem)
+        voorstel = plan.voorstel(
+            db,
+            settings,
+            vault,
+            inc,
+            request_id=idem.key,
+            action_id=body.action_id,
+            target=body.target,
+            parameters=body.parameters,
+            expected_version=body.expected_version,
+            trace_id=trace_id_of(request),
+        )
+        audit.record(
+            db,
+            actor_type="user",
+            actor_id=principal.name,
+            action="ai.plan",
+            target_type="action_request",
+            target_id=str(idem.key),
+            trace_id=trace_id_of(request),
+            details={"incident_id": str(inc.id)},
+        )
+        return 201, voorstel
+
+    return _afhandelen(request, idem, werk)

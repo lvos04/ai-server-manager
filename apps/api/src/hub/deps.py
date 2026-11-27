@@ -371,7 +371,7 @@ async def _idempotency(
         from hub.oidc.service import idempotency_response
 
         response_filter = idempotency_response
-    elif path == "/api/v1/actions" or path.startswith("/api/v1/actions/{request_id}/"):
+    elif path in ("/api/v1/actions", "/api/v1/ai/plan") or path.startswith("/api/v1/actions/{request_id}/"):
         from hub.actions.preview import idempotency_response as actieantwoord
 
         response_filter = actieantwoord

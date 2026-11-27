@@ -13,13 +13,12 @@ from sqlalchemy.orm import Session
 from hub.config import Settings
 from hub.deps import Principal
 from hub.errors import HubError
-from hub.inventory.store import kind_state
 from hub.models import Incident, LogEntry
 from hub.redact import redact_log_text
+from hub.registry import measured_apps
 from hub.runbooks import engine
 from hub.runbooks.catalogus import runbook_hash
 from hub.security import Role
-from hub.truenas.connection import current_target
 
 
 class InventarisBron(BaseModel):
@@ -75,8 +74,7 @@ def incident(db: Session, incident_id: uuid.UUID, principal: Principal) -> Incid
 
 
 def lees(db: Session, settings: Settings, inc: Incident, principal: Principal) -> Kennis:
-    doel = current_target(db)
-    inv = kind_state(db, "apps", target=doel.url if doel else None, ttl_seconds=settings.inventory_max_age_seconds)
+    inv = measured_apps(db, settings)
     rb = engine.runbook_for(inc)
     mag_logs = principal.role in (Role.admin, Role.operator)
     logs: list[LogBron] = []

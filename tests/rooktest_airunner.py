@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from hub.airunner import FORBIDDEN
+
 
 def controleer_start(data: Path, verwacht: int) -> None:
     start = subprocess.run(
@@ -39,11 +41,12 @@ def main() -> None:
         raise SystemExit("FOUT: geen draaiende AI-runner gevonden")
 
     data = Path("/appdata")
-    try:
-        with (data / "secrets" / "vault.key").open("rb"):
-            raise SystemExit("FOUT: UID 569 kan de vault-sleutel openen")
-    except PermissionError:
-        pass
+    for naam in FORBIDDEN:
+        try:
+            with (data / "secrets" / naam).open("rb"):
+                raise SystemExit("FOUT: UID 569 kan een afgeschermde sleutel openen")
+        except PermissionError:
+            pass
     controleer_start(data, 0)
     with TemporaryDirectory() as mapnaam:
         proef = Path(mapnaam)
@@ -56,7 +59,10 @@ def main() -> None:
         database.mkdir()
         (database / "PG_VERSION").write_text("16\n", encoding="ascii")
         controleer_start(proef, 78)
-    print("ok: AI-runner draait als 569, kluis ontoegankelijk, leesbare proefsleutel en databasemap elk geweigerd (78)")
+    print(
+        "ok: AI-runner draait als 569, kluis en ondertekensleutel ontoegankelijk, "
+        "leesbare proefsleutel en databasemap elk geweigerd (78)"
+    )
 
 
 if __name__ == "__main__":

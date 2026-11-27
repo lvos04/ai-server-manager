@@ -107,3 +107,5 @@ def uitgeput(db: Session, taak: Aanvraag) -> None:
         target_id=str(taak.taak_id),
         details={"maand": taak.maand},
     )
+    # Ook als de antwoordopslag faalt blijft de door de dienst bevestigde maandstop gelden.
+    db.commit()

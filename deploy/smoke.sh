@@ -144,6 +144,7 @@ uids_toegestaan "Hub: elk proces reëel en effectief 568 of 569" "$v" 568 569 ||
 uid_aanwezig "Hub: AI-runner als aparte gebruiker 569" "$v" 569 || exit 1
 # Onderscheid een geweigerde opening als 569 van een ontbrekend bestand. De proef leest geen sleutelinhoud.
 docker exec -u 568:568 "$hub" test -s /appdata/secrets/vault.key
+docker exec -u 568:568 "$hub" test -s /appdata/secrets/policy-signing.ed25519
 docker exec -i -u 569:569 "$hub" python - < "$REPO_DIR/tests/rooktest_airunner.py"
 v="$(uid_paren "$executor")"; echo "uid's (reëel effectief) in de executor-container: ${v//$'\n'/ | }"
 uids_toegestaan "executor: elk proces reëel en effectief 568" "$v" 568 || exit 1

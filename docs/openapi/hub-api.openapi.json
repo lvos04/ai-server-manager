@@ -2613,6 +2613,65 @@
         "title": "PasswordIn",
         "type": "object"
       },
+      "PlanIn": {
+        "additionalProperties": false,
+        "properties": {
+          "action_id": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version"
+          },
+          "incident_id": {
+            "format": "uuid",
+            "title": "Incident Id",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "incident_id"
+        ],
+        "title": "PlanIn",
+        "type": "object"
+      },
       "ProposalIn": {
         "additionalProperties": false,
         "description": "``ActionProposal`` (contract §8). ``idempotency_key`` staat in de header; in de body mag hij ook, mits gelijk.",
@@ -5948,6 +6007,63 @@
           }
         },
         "summary": "Lokale bronnen bij een incident (logtekst alleen voor operators en beheerders)",
+        "tags": [
+          "AI-diagnose"
+        ]
+      }
+    },
+    "/api/v1/ai/plan": {
+      "post": {
+        "operationId": "maak_plan_api_v1_ai_plan_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Maak een gebonden ActionProposal bij een incident",
         "tags": [
           "AI-diagnose"
         ]

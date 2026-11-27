@@ -76,7 +76,7 @@ def to_dict(row: Decision, *, with_schema: bool = False) -> dict[str, Any]:
     d = BY_ID[row.id]
     out: dict[str, Any] = {
         "id": row.id,
-        "titel": row.titel,
+        "titel": d.titel if row.id == "D09" else row.titel,
         "wat_vastleggen": row.wat_vastleggen,
         "gate": row.gate,
         "status": row.status,
