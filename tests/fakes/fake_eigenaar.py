@@ -83,10 +83,13 @@ class FakeEigenaar(FakeHTTP):
             claims.get("service_id"),
         ) != ("hub_service", "hub", ["service"], self.service_id):
             return False
+        jti = claims.get("jti")
+        if not isinstance(jti, str) or not 1 <= len(jti) <= 128:
+            return False
         with self._slot:
-            if claims["jti"] in self.gebruikte_jtis:
+            if jti in self.gebruikte_jtis:
                 return False
-            self.gebruikte_jtis.add(claims["jti"])
+            self.gebruikte_jtis.add(jti)
         return True
 
     def handle(self, seen: Seen) -> Reply:

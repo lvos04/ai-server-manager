@@ -628,20 +628,23 @@ def test_flowherstel_bevestigt_de_vooraf_getoonde_checksum(keten: Keten) -> None
 
 
 def test_simulator_weigert_tweede_gebruik_en_vreemde_dienst(keten: Keten) -> None:
+    import jwt
     from fakes.fake_http import Seen
 
     ring = keten.stack.app.state.keyring()
-    for sid, toegestaan in [(str(uuid.uuid4()), False), (keten.service_id, True)]:
-        bearer, _ = ring.issue_hub_service_jwt(audience=APP_ID, service_id=sid)
-        verzoek = Seen(
-            "POST",
-            "/connector/v1/propose",
-            {},
-            {"authorization": f"Bearer {bearer}"},
-            b"{}",
-        )
-        assert keten.eigenaar._jwt(verzoek) is toegestaan
-        assert not keten.eigenaar._jwt(verzoek)
+
+    def toegelaten(bearer: str) -> bool:
+        verzoek = Seen("POST", "/connector/v1/propose", {}, {"authorization": f"Bearer {bearer}"}, b"{}")
+        return keten.eigenaar._jwt(verzoek)
+
+    vreemd, _ = ring.issue_hub_service_jwt(audience=APP_ID, service_id=str(uuid.uuid4()))
+    assert not toegelaten(vreemd)
+    eigen, _ = ring.issue_hub_service_jwt(audience=APP_ID, service_id=keten.service_id)
+    assert toegelaten(eigen)
+    assert not toegelaten(eigen)
+    claims = jwt.decode(eigen, ring.jwt_signing.public_key(), algorithms=["EdDSA"], audience=APP_ID)
+    for ongeldig in ("", "a" * 129):
+        assert not toegelaten(ring._sign({**claims, "jti": ongeldig}))
 
 
 def test_oidc_voorstel_met_andere_parameters_wordt_geweigerd(keten: Keten) -> None:
