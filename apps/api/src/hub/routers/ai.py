@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from fastapi import APIRouter
 from sqlalchemy import or_, select
 
 from hub import audit
-from hub.ai import tegoed
+from hub.ai import kennis, tegoed
 from hub.deps import DB, Admin, Cursor, Limit, SettingsDep, Viewer, decode_cursor, encode_cursor
 from hub.models import AuditEvent
 from hub.timeutil import iso, utcnow
@@ -32,3 +33,10 @@ def ai_audit(db: DB, _: Admin, limit: Limit = 50, cursor: Cursor = None) -> dict
         "items": [audit.to_dict(r) for r in rows[:limit]],
         "next_cursor": encode_cursor(rows[limit - 1].id) if len(rows) > limit else None,
     }
+
+
+@router.get(
+    "/kennis/{incident_id}", summary="Lokale bronnen bij een incident (logtekst alleen voor operators en beheerders)"
+)
+def ai_kennis(incident_id: uuid.UUID, db: DB, settings: SettingsDep, principal: Viewer) -> kennis.Kennis:
+    return kennis.lees(db, settings, kennis.incident(db, incident_id, principal), principal)

@@ -1403,6 +1403,77 @@
         "title": "HouseSettings",
         "type": "object"
       },
+      "IncidentBron": {
+        "properties": {
+          "classificatie": {
+            "title": "Classificatie",
+            "type": "string"
+          },
+          "ernst": {
+            "enum": [
+              "info",
+              "waarschuwing",
+              "kritiek"
+            ],
+            "title": "Ernst",
+            "type": "string"
+          },
+          "gebeurtenissen": {
+            "title": "Gebeurtenissen",
+            "type": "integer"
+          },
+          "hypothese": {
+            "title": "Hypothese",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "regel": {
+            "title": "Regel",
+            "type": "string"
+          },
+          "soort": {
+            "title": "Soort",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "zekerheid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zekerheid"
+          }
+        },
+        "required": [
+          "ref",
+          "classificatie",
+          "observed_at",
+          "soort",
+          "ernst",
+          "status",
+          "gebeurtenissen",
+          "regel",
+          "hypothese",
+          "zekerheid"
+        ],
+        "title": "IncidentBron",
+        "type": "object"
+      },
       "InschakelenIn": {
         "additionalProperties": false,
         "properties": {
@@ -1460,6 +1531,98 @@
           "doel"
         ],
         "title": "InstallPlanIn",
+        "type": "object"
+      },
+      "InventarisBron": {
+        "properties": {
+          "aantal_apps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aantal Apps"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "ref": {
+            "default": "/api/v1/inventory/apps",
+            "title": "Ref",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verouderd": {
+            "title": "Verouderd",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "observed_at",
+          "verouderd",
+          "aantal_apps"
+        ],
+        "title": "InventarisBron",
+        "type": "object"
+      },
+      "Kennis": {
+        "properties": {
+          "incident": {
+            "$ref": "#/components/schemas/IncidentBron"
+          },
+          "inventaris": {
+            "$ref": "#/components/schemas/InventarisBron"
+          },
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/LogBron"
+            },
+            "maxItems": 10,
+            "title": "Logs",
+            "type": "array"
+          },
+          "logs_toegestaan": {
+            "title": "Logs Toegestaan",
+            "type": "boolean"
+          },
+          "runbook": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunbookBron"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "inventaris",
+          "incident",
+          "logs_toegestaan",
+          "logs",
+          "runbook"
+        ],
+        "title": "Kennis",
         "type": "object"
       },
       "Koppeling": {
@@ -1800,6 +1963,36 @@
           "version"
         ],
         "title": "Liveness",
+        "type": "object"
+      },
+      "LogBron": {
+        "properties": {
+          "bericht": {
+            "maxLength": 500,
+            "title": "Bericht",
+            "type": "string"
+          },
+          "niveau": {
+            "title": "Niveau",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "observed_at",
+          "niveau",
+          "bericht"
+        ],
+        "title": "LogBron",
         "type": "object"
       },
       "LogsIn": {
@@ -3194,6 +3387,40 @@
           }
         },
         "title": "RulePatch",
+        "type": "object"
+      },
+      "RunbookBron": {
+        "properties": {
+          "observeren": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Observeren",
+            "type": "array"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "runbook_hash": {
+            "title": "Runbook Hash",
+            "type": "string"
+          },
+          "terugdraaien": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Terugdraaien",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ref",
+          "runbook_hash",
+          "observeren",
+          "terugdraaien"
+        ],
+        "title": "RunbookBron",
         "type": "object"
       },
       "Scene": {
@@ -5606,6 +5833,49 @@
           }
         },
         "summary": "Kredietreserveringen, diagnose-uitkomsten en AI-voorstellen",
+        "tags": [
+          "AI-diagnose"
+        ]
+      }
+    },
+    "/api/v1/ai/kennis/{incident_id}": {
+      "get": {
+        "operationId": "ai_kennis_api_v1_ai_kennis__incident_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Incident Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Kennis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lokale bronnen bij een incident (logtekst alleen voor operators en beheerders)",
         "tags": [
           "AI-diagnose"
         ]
