@@ -6,6 +6,13 @@ Behouden, bronoptimalisatie.
 ## Waarom
 Head 1.6.0, release/VERSION 1.5.0 bij inspectie; lees B05.
 
+## Stand na P3 (simulator)
+
+De Hub leest zonder sleutel de bereikbaarheid, versie en inrichtingsstatus van MSO. MSO biedt voor beschermde
+gegevens een machinesleutel met het recht `read`. De Hub kan dit recht nog niet bevestigen en toont open
+wijzigingen en kosten daarom als onbekend. De beheerder bekijkt het wijzigingsvoorstel en keurt het in MSO goed.
+MSO voert de wijziging uit en controleert het resultaat. NIET GEVALIDEERD (echte NAS).
+
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).
 2. Netwerkpoorten, domein, eventuele VPN/tunnel en gekoppelde app credentials (geschoond).
@@ -23,4 +30,4 @@ Head 1.6.0, release/VERSION 1.5.0 bij inspectie; lees B05.
 ## Testcase en beslissing
 **Acceptatie:** Echte service mocks/live parity en geen owner writes.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+Leg bij de praktijkproef de installatiestatus vast en vergelijk de resultaten van de brondiensten met die uit de simulator. Controleer bij een eventuele proefstop de terugkeer naar MSO in één handeling.

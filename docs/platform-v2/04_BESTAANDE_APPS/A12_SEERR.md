@@ -23,4 +23,4 @@ MediaGuard verzorgt aanvragen en anime routering.
 ## Testcase en beslissing
 **Acceptatie:** Vier arr apps en aanvraagstatus correct.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+NIET GEVALIDEERD (echte NAS). Leg de installatiestatus vast en controleer of een aanvraag vanuit Seerr bij de juiste van de vier gekoppelde apps terechtkomt. Controleer de aanvraagstatus en bij een proefstop de terugkeer naar Seerr in één handeling.

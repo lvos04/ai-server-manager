@@ -14,13 +14,13 @@ Niet iedere huidige app moet worden herbouwd. De Hub importeert alle apps als ca
 | Uren | Behouden eigen dienst | Inloggen, exports, appbackups en gebruikersrechten getest. |
 | Bazarr | Behouden tot subtitle parity bewezen | SRT/ASS anime/film test en fallback aanwezig. |
 | Immich | Behouden, primaire fotoapp | Test thumbnails/albums plus originele foto en DB herstel. |
-| Prowlarr | Behouden, eigenaar indexercatalogus | Geen cyclische zoeklus of tag drift. |
+| Prowlarr | Behouden als enige eigenaar van de indexercatalogus | Geen cyclische zoeklus of tag drift. |
 | Seerr | Behouden, verzoekfrontend | Vier arr apps en aanvraagstatus correct. |
-| SABnzbd | Behouden, Usenet client | Geen wildcard category misrouting. |
-| qBittorrent | Behouden, torrentclient | Geen automatische bestanden verwijderen. |
+| SABnzbd | Behouden als eigenaar van de Usenet-wachtrij en de algemene configuratie | Geen wildcard category misrouting. |
+| qBittorrent | Behouden als eigenaar van de torrentwachtrij en de configuratie | Geen automatische bestanden verwijderen. |
 | Tailscale | Behouden, privé toegang | Niet publiek toegankelijk zonder VPN. |
 | Cloudflared | Behouden voor geselecteerde app toegang | Tunnel health + token leakage test. |
-| Jellyfin | Behouden als media server en toekomstig fork fundament | No library/watch state regression. |
+| Jellyfin | Een bestaande Jellyfin-installatie behouden als mediaserver. Jellyfin is de basis voor Jelly Leon | No library/watch state regression. |
 | MediaGuard | Behouden, bibliotheek- en AV1-eigenaar | Geteste noodstop, HDR/VMAF failclosed. |
 | Media Source Optimizer | Behouden, bronoptimalisatie | Echte service mocks/live parity en geen owner writes. |
 | my_house | Bouwen/testen en integreren (release v0.1.0) | Boiler nooit schakelen; Gree readback. |

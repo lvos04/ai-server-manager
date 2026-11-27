@@ -4,7 +4,7 @@
 Behouden, primaire fotoapp.
 
 ## Waarom
-OneDrive-backup al aanwezig voor foto’s maar restore-proef onbekend.
+De dekking van de OneDrive-back-up voor foto’s moet nog blijken uit een herstelproef.
 
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).
@@ -23,4 +23,4 @@ OneDrive-backup al aanwezig voor foto’s maar restore-proef onbekend.
 ## Testcase en beslissing
 **Acceptatie:** Test thumbnails/albums plus originele foto en DB herstel.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+NIET GEVALIDEERD (echte NAS). Leg de installatiestatus vast en controleer na herstel van een origineel en de database of de foto in het juiste album verschijnt. Controleer bij een proefstop de terugkeer naar Immich in één handeling.

@@ -23,4 +23,4 @@ NL subtitles en synchronisatie moeten bewezen door MediaGuard/Jellyfin afgedekt 
 ## Testcase en beslissing
 **Acceptatie:** SRT/ASS anime/film test en fallback aanwezig.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+NIET GEVALIDEERD (echte NAS). Leg de installatiestatus vast en controleer de Nederlandse ondertitels en hun synchronisatie voor anime en film. Beproef vóór een eventuele stop de terugkeer naar Bazarr in één handeling.

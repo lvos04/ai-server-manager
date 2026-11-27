@@ -1,9 +1,9 @@
 # Prowlarr — behoud, migratie en acceptatie
 
 ## Besluit
-Prowlarr is de enige eigenaar van de indexercatalogus. De beheerder wijzigt indexers, tags en de native
+Behouden als enige eigenaar van de indexercatalogus. De beheerder wijzigt indexers, tags en de native
 synchronisatie in Prowlarr. De gekoppelde MediaGuard-forks ontvangen de synchronisatie. MSO mag een
-zoekendpoint aanbieden. In versie 1 blijven de Hub en zijn executor alleen-lezen voor Prowlarr, ook na
+zoekendpoint aanbieden. De Hub en zijn executor hebben alleen leesrecht voor Prowlarr, ook na
 goedkeuring door een beheerder. Dit geldt ook voor algemene appacties. [Gedeeld appbeleid](../../../policy/apps.yaml)
 
 ## Waarom

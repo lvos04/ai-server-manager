@@ -1,7 +1,7 @@
 # Jellyfin — behoud, migratie en acceptatie
 
 ## Besluit
-Behouden als media server en toekomstig fork fundament.
+Een bestaande Jellyfin-installatie behouden als mediaserver. Jellyfin is de basis voor Jelly Leon.
 
 ## Waarom
 Client compat met huidige media testen.
@@ -23,4 +23,4 @@ Client compat met huidige media testen.
 ## Testcase en beslissing
 **Acceptatie:** No library/watch state regression.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+NIET GEVALIDEERD (echte NAS). Leg vast of Jellyfin aanwezig is. Controleer bij een overstap de bibliotheek en vergelijk per gebruiker de kijkgeschiedenis en hervatpunten vóór en na de overstap. Elk verschil vraagt uitdrukkelijk akkoord van de gebruiker. Controleer of gebruikers in één handeling naar de bestaande installatie kunnen terugkeren.

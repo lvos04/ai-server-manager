@@ -1,11 +1,11 @@
 # SABnzbd — behoud, migratie en acceptatie
 
 ## Besluit
-SABnzbd is eigenaar van zijn Usenet-wachtrij en configuratie. De beheerder gebruikt SABnzbd voor handmatig
-wachtrijbeheer. Voor de nieuwsserverinstellingen die MSO beheert, lopen wijzigingen uitsluitend via MSO,
-bijvoorbeeld een wijziging van de serverprioriteit. MSO volgt zijn eigen goedkeuringsregels en leest het resultaat terug.
+Behouden als eigenaar van de Usenet-wachtrij en de algemene configuratie. De beheerder wijzigt de wachtrij in
+SABnzbd. Voor de nieuwsserverinstellingen die MSO beheert, zoals de serverprioriteit, is MSO de enige schrijver.
+MSO volgt zijn eigen goedkeuringsregels en leest het resultaat terug.
 MediaGuard levert downloadopdrachten voor zijn eigen categorieën en importeert de resultaten.
-In versie 1 blijven de Hub en zijn executor alleen-lezen voor SABnzbd, ook bij algemene appacties en na
+De Hub en zijn executor hebben alleen leesrecht voor SABnzbd, ook bij algemene appacties en na
 goedkeuring door een beheerder. [Gedeeld appbeleid](../../../policy/apps.yaml)
 
 ## Waarom

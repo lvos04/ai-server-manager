@@ -1,10 +1,10 @@
 # qBittorrent — behoud, migratie en acceptatie
 
 ## Besluit
-qBittorrent is eigenaar van zijn torrentwachtrij en configuratie. De beheerder gebruikt qBittorrent voor handmatig
+Behouden als eigenaar van de torrentwachtrij en de configuratie. De beheerder gebruikt qBittorrent voor handmatig
 wachtrijbeheer. Voor de snelheidslimieten die MSO beheert, lopen wijzigingen uitsluitend via de bestaande
 torrentregels van MSO. MediaGuard gebruikt de client voor zijn eigen downloads en import.
-In versie 1 blijven de Hub en zijn executor alleen-lezen voor qBittorrent, ook bij algemene appacties en na
+De Hub en zijn executor hebben alleen leesrecht voor qBittorrent, ook bij algemene appacties en na
 goedkeuring door een beheerder. [Gedeeld appbeleid](../../../policy/apps.yaml)
 
 ## Waarom

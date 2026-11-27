@@ -6,6 +6,13 @@ Bouwen/testen en integreren (release v0.1.0).
 ## Waarom
 Geen nieuw Home Assistant, apparatuur-gates; lees B06.
 
+## Stand na P3 (simulator)
+
+Maak in my_house een eenmalige koppelcode met rol Kijker (`viewer`) en doel `hub`. Voer de code en de
+bijbehorende server-ID in de Hub in. Het scherm Huis toont per woning de zonetemperaturen, de stand van de
+lichtgroepen en de open meldingen. De koppeling geeft alleen leesrecht. Voor bediening opent de beheerder
+my_house. De boiler is uitsluitend een meetpunt. NIET GEVALIDEERD (echte NAS).
+
 ## Verplichte inventaris voor bouwer
 1. Draaiende TrueNAS image-tag/digest, container ID, owner en status (niet alleen repositoryversie).
 2. Netwerkpoorten, domein, eventuele VPN/tunnel en gekoppelde app credentials (geschoond).
@@ -23,4 +30,4 @@ Geen nieuw Home Assistant, apparatuur-gates; lees B06.
 ## Testcase en beslissing
 **Acceptatie:** Boiler nooit schakelen; Gree readback.
 
-**Gereed wanneer:** installatiestatus en functionele proef op echte TrueNAS gelogd zijn; bij stoppen kunnen gebruikers in één handeling naar de oude app terug.
+Leg bij de praktijkproef de installatiestatus vast en controleer de teruggelezen apparaatstatus in my_house. Controleer bij een eventuele proefstop de terugkeer naar de app in één handeling. NIET GEVALIDEERD (hardware).
