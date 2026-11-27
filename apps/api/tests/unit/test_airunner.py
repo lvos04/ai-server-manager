@@ -156,3 +156,56 @@ def test_av1_pauze_en_crash_blijven_onderscheidbaar(werkwoord: str, reden: str |
     )
     signaal = classify(ev)
     assert (signaal is not None and signaal.rol == "probleem") == probleem
+
+
+def test_gevoelige_kennis_vraagt_ook_met_een_bekend_incident_id_beheer() -> None:
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    from sqlalchemy.orm import Session
+
+    from hub.ai import kennis
+    from hub.deps import Principal
+    from hub.errors import HubError
+    from hub.models import Incident
+    from hub.security import Role
+
+    db = Mock(spec=Session)
+    bron = Incident(id=uuid4(), classificatie="sensitive")
+    db.get.return_value = bron
+    for rol in (Role.viewer, Role.operator):
+        with pytest.raises(HubError) as fout:
+            kennis.incident(db, bron.id, Principal("user", "proef", "lezer", role=rol))
+        assert fout.value.status == 403
+    assert kennis.incident(db, bron.id, Principal("user", "proef", "beheerder", role=Role.admin)) is bron
+
+
+@pytest.mark.parametrize(("status", "veilige_modus"), [("gesnoozed", False), ("opgelost", False), ("open", True)])
+def test_plan_weigert_vóór_readback_bij_pauze_herstel_of_veilige_modus(status: str, veilige_modus: bool) -> None:
+    from unittest.mock import Mock
+    from uuid import uuid4
+
+    from sqlalchemy.orm import Session
+
+    from hub.ai import plan
+    from hub.errors import HubError
+    from hub.models import Incident
+    from hub.vault import Vault
+
+    db, vault = Mock(spec=Session), Mock(spec=Vault)
+    inc = Incident(soort="app.gezondheid", bron="hub:alerts", status=status, veilige_modus=veilige_modus)
+    with pytest.raises(HubError) as fout:
+        plan.voorstel(
+            db,
+            config.Settings(),
+            vault,
+            inc,
+            request_id=uuid4(),
+            action_id=None,
+            target=None,
+            parameters={},
+            expected_version=None,
+            trace_id="",
+        )
+    assert (fout.value.status, fout.value.code) == (422, "geen_runbookvoorstel")
+    assert db.mock_calls == vault.mock_calls == []
