@@ -11,13 +11,13 @@ description_nl: >-
   via de TrueNAS-API, en controleert elk verzoek zelf opnieuw. Koppelen met de Hub gaat met een koppelcode en de
   Hub-vingerafdruk op de statuspagina; zolang hij niet gekoppeld is of geen TrueNAS-sleutel met schrijfrechten heeft,
   voert hij niets uit.
-version: "0.1.0"
+version: "0.1.1"
 install:
   method: custom_app
 image:
   repository: ghcr.io/lvos04/ai-server-manager-executor
-  tag: "0.1.0"
-  digest: "sha256:f1809cb1316c18b77478a93c930ee800e0154b34d9647dc46e661c4aa58523aa"
+  tag: "0.1.1"
+  digest: "sha256:eb98c8fab8121f819582325dbd9582256e3dd9c77912b2c8a67c7d5619aee27e"
 custom_app:
   storage:
     - name: appdata

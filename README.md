@@ -42,11 +42,12 @@ Echte NAS-, hardware- en accounttests zijn in deze bouwomgeving niet mogelijk. Z
 ## Installeren (gebruiker)
 
 Uitsluitend als **standaard TrueNAS Custom App** (formulier: image + tag, poort, opslag) — nooit via YAML of compose.
-De tag is `<versie>@sha256:<digest>` uit `release/digests.json` (of alleen de exacte versie als het formulier `@` niet
-accepteert; NIET GEVALIDEERD op een echte NAS). De images zijn publiek na de scan van besluit 3; registry-login is
-alleen een terugval. Twee formulieren: [`deploy/truenas/CUSTOM_APP.md`](deploy/truenas/CUSTOM_APP.md). Daarna open je de Hub in de browser;
-de pagina **Eerste start** vraagt de setupcode uit de app-log (TrueNAS → Apps → ai-server-manager → Logs) en maakt het
-eerste beheerdersaccount, waarna de onboarding-wizard volgt.
+Installeer de Hub op `0.1.0` en de executor op `0.1.1`. Neem voor elke app de volledige tag met digest over uit
+stap 0. De handleiding beschrijft ook de terugval als het formulier `@` weigert. **NIET GEVALIDEERD op een echte NAS**.
+[Formulieren voor Hub en executor](deploy/truenas/CUSTOM_APP.md#0-image-en-tag-publiek-met-digest)
+
+Open daarna de Hub in de browser. De pagina **Eerste start** vraagt de setupcode uit de app-log
+(TrueNAS → Apps → ai-server-manager → Logs) en maakt het eerste beheerdersaccount, waarna de onboarding-wizard volgt.
 
 ## Ontwikkelen
 

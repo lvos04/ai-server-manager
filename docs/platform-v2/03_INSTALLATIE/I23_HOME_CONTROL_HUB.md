@@ -3,7 +3,7 @@
 **Rol:** Nieuw eigen managementplatform.  
 **Aanpak:** Bouwen volgens B01, daarna installeren.  
 **Bron:** 02_BOUWPLANNEN/B01_HOME_CONTROL_HUB.md.  
-**Versiebeleid:** Nog geen werkende image: te bouwen, tags pinned via eigen CI.
+De Hub gebruikt versie `0.1.0`. Vul voor de executor bij **Tag** `0.1.1@sha256:eb98c8fab8121f819582325dbd9582256e3dd9c77912b2c8a67c7d5619aee27e` in. [Formulierwaarden voor beide apps](../../../deploy/truenas/CUSTOM_APP.md#0-image-en-tag-publiek-met-digest)
 
 ## 1. Vooraf controleren
 Backups, JSON-RPC adapter, monitoring, risk engine en auth minimaal klaar.
@@ -74,7 +74,7 @@ Echte TrueNAS-app start, authenticatie, persistente data na herstart, firewall/p
 1. Schakel nieuwe automation/ingest uit. 2. Bewaar audit en logs. 3. Stop nieuwe container/route, herstel oude version-pinned image én passend databestand/snapshot waar schema is veranderd. 4. Controleer credentials, clients en content integrity. 5. Maak incidentrapport met wat wel/niet is teruggezet. 6. Bij decommission: data alleen na eigen, afzonderlijke bevestiging verwijderen.
 
 ## 5. Let op
-NIET direct te installeren vóór bouw; hier staat uitsluitend install-/releaseacceptatie voor de bouwer.
+Dit plan beschrijft de releaseacceptatie voor de bouwer. Installatie via het TrueNAS-formulier en teruglezen van de digest zijn **NIET GEVALIDEERD (echte NAS)**.
 
 ## 6. Upstream documentatie en broncontrole
 02_BOUWPLANNEN/B01_HOME_CONTROL_HUB.md

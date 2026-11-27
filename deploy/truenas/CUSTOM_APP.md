@@ -15,19 +15,19 @@ geen compose-bestand, geen terminal en geen `install.sh`.
 
 ## 0. Image en tag (publiek, met digest)
 
-Neem voor release `v0.1.0` de **Repository** en de volledige **Tag** over uit de rij van de app die je installeert.
-De digest legt de inhoud van de image vast. Beide imagemanifesten waren op 26 november 2026 zonder aanmelding
-opvraagbaar bij GHCR. [Releasebijlage digests.json](https://github.com/lvos04/ai-server-manager/releases/download/v0.1.0/digests.json)
+Neem de **Repository** en de volledige **Tag** over uit de rij van de app die je installeert. De digest na `@`
+legt de inhoud van de image vast. Beide imagemanifesten zijn zonder aanmelding opvraagbaar bij GHCR.
+[Releasebijlage Hub 0.1.0](https://github.com/lvos04/ai-server-manager/releases/download/v0.1.0/digests.json) · [Releasebijlage executor 0.1.1](https://github.com/lvos04/ai-server-manager/releases/download/v0.1.1/digests.json)
 
 | Custom App | Repository | Tag |
 |---|---|---|
 | Hub | `ghcr.io/lvos04/ai-server-manager` | `0.1.0@sha256:4accffc49b8d4180a302c974f4acf6e2c0d36b2a4fe458e80741b8ffc94546fa` |
-| Executor | `ghcr.io/lvos04/ai-server-manager-executor` | `0.1.0@sha256:f1809cb1316c18b77478a93c930ee800e0154b34d9647dc46e661c4aa58523aa` |
+| Executor | `ghcr.io/lvos04/ai-server-manager-executor` | `0.1.1@sha256:eb98c8fab8121f819582325dbd9582256e3dd9c77912b2c8a67c7d5619aee27e` |
 
 > **NIET GEVALIDEERD (echte NAS):** of het TrueNAS-formulier een tag met `@` accepteert en of TrueNAS met zo'n tag nog
 > updates detecteert, is niet op een echte NAS getest (contract 1.3 §2.2). Weigert het formulier de tag, vul dan
-> alleen de exacte versie in (`0.1.0` voor deze release). De Hub leest na elke installatie of update via de
-> executor de digest terug en stopt bij een afwijking.
+> alleen de exacte versie in (`0.1.0` voor de Hub, `0.1.1` voor de executor). De Hub leest na elke installatie of
+> update via de executor de digest terug en stopt bij een afwijking.
 
 **Terugval bij een privépakket.** Voor een privépakket stel je in TrueNAS een registry-login in via
 **Apps → Configuration → Docker Registries → Add** (menunamen verschillen per versie), registry
