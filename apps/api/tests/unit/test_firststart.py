@@ -50,21 +50,27 @@ def test_overschrijft_nooit_en_scherpt_rechten_aan(tmp_path: Path) -> None:
     assert {n: (d / n).read_bytes() for n in before} == before
 
 
-@pytest.mark.parametrize("content", [b"", b"geen-base64!!", b"AAAA\n"])
-def test_ongeldige_vault_key_is_harde_fout(tmp_path: Path, content: bytes) -> None:
+@pytest.mark.parametrize(
+    ("content", "reden"), [(b"", "leeg"), (b"geen-base64!!", "base64"), (b"AAAA\n", "in plaats van 32")]
+)
+def test_ongeldige_vault_key_is_harde_fout(tmp_path: Path, content: bytes, reden: str) -> None:
     d = tmp_path / "secrets"
     d.mkdir(mode=0o700)
-    (d / VAULT_KEY).write_bytes(content)
-    with pytest.raises(FirstStartError):
+    bestand = d / VAULT_KEY
+    bestand.touch(mode=0o600)
+    bestand.write_bytes(content)
+    with pytest.raises(FirstStartError, match=reden):
         ensure_secrets(d)
-    assert (d / VAULT_KEY).read_bytes() == content  # niet overschreven
+    assert bestand.read_bytes() == content
 
 
 def test_ongeldige_ed25519_wordt_niet_overschreven(tmp_path: Path) -> None:
     d = tmp_path / "secrets"
     d.mkdir(mode=0o700)
-    (d / "jwt-signing.ed25519").write_bytes(b"-----BEGIN PRIVATE KEY-----\nrommel\n-----END PRIVATE KEY-----\n")
-    with pytest.raises(FirstStartError):
+    bestand = d / "jwt-signing.ed25519"
+    bestand.touch(mode=0o600)
+    bestand.write_bytes(b"-----BEGIN PRIVATE KEY-----\nrommel\n-----END PRIVATE KEY-----\n")
+    with pytest.raises(FirstStartError, match="PEM"):
         ensure_secrets(d)
 
 
@@ -163,14 +169,17 @@ def test_acl_versoepelt_type_en_wereldschrijfrechten_niet(tmp_path, monkeypatch,
     d = tmp_path / "secrets"
     ensure_secrets(d)
     bestand = d / VAULT_KEY
+    inhoud = bestand.read_bytes()
     if onveilig == "symlink":
         bestand.rename(tmp_path / "origineel")
         bestand.symlink_to(tmp_path / "origineel")
     else:
         bestand.chmod(0o666)
     monkeypatch.setattr(os, "getxattr", lambda *_: b"acl")
-    with pytest.raises(OSError):
+    with pytest.raises(FirstStartError, match="kan niet veilig worden gelezen") as fout:
         ensure_secrets(d)
+    assert isinstance(fout.value.__cause__, OSError)
+    assert bestand.read_bytes() == inhoud
 
 
 def test_acl_vervangt_eigenaar_of_postgresrechten_niet(tmp_path, monkeypatch):

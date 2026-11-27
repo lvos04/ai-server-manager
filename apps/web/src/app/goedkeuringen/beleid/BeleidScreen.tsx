@@ -75,8 +75,8 @@ export function BeleidScreen() {
                 testId="beleid-acties"
                 tabelVanaf={1280}
                 kolommen={[
-                  { kop: "Actie", cel: (a) => <><code>{a.action_id}</code><br />{a.omschrijving}</> },
-                  { kop: "Uitvoerder", cel: (a) => a.uitvoerder },
+                  { kop: "Actie", cel: (a) => <><code className="mono">{a.action_id}</code><br />{a.omschrijving}</> },
+                  { kop: "Uitvoerder", className: "[overflow-wrap:anywhere]", cel: (a) => a.uitvoerder },
                   { kop: "Basisklasse", cel: (a) => <RisicoBadge klasse={a.risk_class} /> },
                   { kop: "Kritieke app", cel: (a) => (a.risk_class_kritiek ? <RisicoBadge klasse={a.risk_class_kritiek} /> : "n.v.t.") },
                   { kop: "Custom App", cel: (a) => (a.risk_class_custom_app ? <RisicoBadge klasse={a.risk_class_custom_app} /> : "n.v.t.") },

@@ -170,7 +170,13 @@ def ensure_secrets(
             else:
                 result.created.append(name)
                 continue
-        raw, tightened = _read_secret(path)
+        try:
+            raw, tightened = _read_secret(path)
+        except OSError as exc:
+            raise FirstStartError(
+                f"Bestaand geheim {name} kan niet veilig worden gelezen. "
+                "Controleer het bestandstype, de eigenaar en de rechten."
+            ) from exc
         _validate_existing(path, raw)
         if tightened:
             result.tightened.append(path.name)
