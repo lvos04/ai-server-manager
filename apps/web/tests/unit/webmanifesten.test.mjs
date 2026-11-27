@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { verpakWeb } from "../../scripts/verpak-web.mjs";
 import { schrijfWebmanifesten } from "../../server/webmanifesten.mjs";
@@ -27,6 +28,11 @@ beforeEach(() => {
   schrijf("server/server-reference-manifest.js", "self.__RSC_SERVER_MANIFEST=" + JSON.stringify(acties));
 });
 afterEach(() => rmSync(werk, { recursive: true, force: true }));
+
+test("de actuele webbron gebruikt geen previewmodus of Server Actions", () => {
+  const web = fileURLToPath(new URL("../../", import.meta.url));
+  verpakWeb(pakket, web, runtime);
+});
 
 test("de image bevat geen buildsleutels en iedere installatie krijgt eigen stabiele manifesten", () => {
   const oud = JSON.parse(lees("server/preview-props.json"));

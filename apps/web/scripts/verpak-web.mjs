@@ -15,7 +15,8 @@ function* bestanden(map, overslaan = []) {
 }
 
 function controleerWebbron(map) {
-  for (const bestand of bestanden(map, ["node_modules", ".next", "e2e", "review", "tests", "test-results"])) {
+  const overslaan = ["node_modules", ".next", "e2e", "review", "tests", "test-results", "playwright-report", "blob-report"];
+  for (const bestand of bestanden(map, overslaan)) {
     if (!/\.[cm]?[jt]sx?$/.test(bestand) || path.resolve(bestand) === fileURLToPath(import.meta.url)) continue;
     const bron = ts.createSourceFile(bestand, readFileSync(bestand, "utf8"), ts.ScriptTarget.Latest);
     function bezoek(knoop) {
